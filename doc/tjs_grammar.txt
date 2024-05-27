@@ -1,0 +1,53 @@
+add_sub_expr -> mul_div_expr
+            | add_sub_expr "+" mul_div_expr
+            | add_sub_expr "-" mul_div_expr
+
+
+mul_div_expr
+	: unary_expr
+	| mul_div_expr "%" unary_expr
+	| mul_div_expr "/" unary_expr
+	| mul_div_expr "\\" unary_expr
+	| mul_div_expr_and_asterisk unary_expr
+;
+
+mul_div_expr_and_asterisk
+	: mul_div_expr "*"
+;
+
+unary_expr
+	: incontextof_expr
+	| "!" unary_expr
+	| "~" unary_expr
+	| "--" unary_expr
+	| "++" unary_expr
+	| "new" func_call_expr
+	| "invalidate" unary_expr
+	| "isvalid" unary_expr
+	| incontextof_expr "isvalid"
+	| "delete" unary_expr
+	| "typeof" unary_expr
+	| "#" unary_expr
+	| "$" unary_expr
+	| "+" unary_expr
+	| "-" unary_expr
+	| "&" unary_expr
+	| "*" unary_expr
+	| incontextof_expr "instanceof" unary_expr
+	| incontextof_expr "in" unary_expr
+	| "(" "int" ")" unary_expr
+	| "int" unary_expr
+	| "(" "real" ")" unary_expr
+	| "real" unary_expr
+	| "(" "string" ")" unary_expr
+	| "string" unary_expr
+;
+
+incontextof_expr
+	: priority_expr
+	
+priority_expr
+	: factor_expr
+
+factor_expr
+	: T_CONSTVAL

@@ -1,0 +1,3 @@
+真(true) 和 假(false):
+ value != 0 : true
+ value == 0 : false
