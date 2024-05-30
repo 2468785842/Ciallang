@@ -17,29 +17,27 @@
 #include "Ast.hpp"
 
 namespace Ciallang::Syntax {
-
     struct GraphvizFormatter {
-
-        static std::string escapeChars(const std::string &value) noexcept {
+        static std::string escapeChars(const std::string& value) noexcept {
             std::string buffer;
-            for (const auto &c: value) {
-                if (c == '\"') {
+            for(const auto& c : value) {
+                if(c == '\"') {
                     buffer += "\\\"";
-                } else if (c == '{') {
+                } else if(c == '{') {
                     buffer += "\\{";
-                } else if (c == '}') {
+                } else if(c == '}') {
                     buffer += "\\}";
-                } else if (c == '.') {
+                } else if(c == '.') {
                     buffer += "\\.";
-                } else if (c == '|') {
+                } else if(c == '|') {
                     buffer += "\\|";
-                } else if (c == '<') {
+                } else if(c == '<') {
                     buffer += "\\<";
-                } else if (c == '>') {
+                } else if(c == '>') {
                     buffer += "\\>";
-                } else if (c == '=') {
+                } else if(c == '=') {
                     buffer += "\\=";
-                } else if (c == '\\') {
+                } else if(c == '\\') {
                     buffer += "\\\\";
                 } else {
                     buffer += c;
@@ -50,32 +48,31 @@ namespace Ciallang::Syntax {
     };
 
     class AstFormatter : AstNode::Visitor {
-        FILE *_file = nullptr;
-        AstNode *_root = nullptr;
+        FILE* _file = nullptr;
+        AstNode* _root = nullptr;
 
     public:
-        AstFormatter(AstNode *root, FILE *file);
+        AstFormatter(AstNode* root, FILE* file);
 
-        void format(const std::string &title);
+        void format(const std::string& title);
 
-        void visit(const ValueExprNode *) const override;
+        void visit(const ValueExprNode*) const override;
 
-        void visit(const SymbolExprNode *) const override;
+        void visit(const SymbolExprNode*) const override;
 
-        void visit(const BinaryExprNode *) const override;
+        void visit(const BinaryExprNode*) const override;
 
-        void visit(const UnaryExprNode *) const override;
+        void visit(const UnaryExprNode*) const override;
 
-        void visit(const AssignExprNode *) const override;
+        void visit(const AssignExprNode*) const override;
 
-        void visit(const BlockStmtNode *) const override;
+        void visit(const BlockStmtNode*) const override;
 
-        void visit(const ExprStmtNode *) const override;
+        void visit(const ExprStmtNode*) const override;
 
-        void visit(const IfStmtNode *) const override;
+        void visit(const IfStmtNode*) const override;
 
     private:
-
-        static std::string getVertexName(const AstNode *node);
+        static std::string getVertexName(const AstNode* node);
     };
 }

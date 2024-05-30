@@ -15,11 +15,11 @@
 namespace Ciallang {
 
 #if defined (LLONG_MAX)
-    typedef long long TjsInteger;
-    typedef double TjsReal;
+    using TjsInteger = long long;
+    using TjsReal = double;
 #else
-    typedef int TjsInteger;
-    typedef float TjsReal;
+    using TjsInteger = int;
+    using TjsReal = float;
 #endif
 
     enum class TjsValueType {

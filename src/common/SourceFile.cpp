@@ -61,7 +61,7 @@ namespace Ciallang::Common {
                                location.end().column,
                                fmt::color::yellow,
                                fmt::color::blue)
-                       << "\n"
+                       << '\n'
                        << std::string(6 + location.start().column, ' ')
                        << messageIndicator;
             } else {
@@ -117,12 +117,9 @@ namespace Ciallang::Common {
 
         while (true) {
             auto rune = next(r);
-            if (rune == runeInvalid) {
-                break;
-            }
-            if (rune == runeBom) {
-                rune = next(r);
-            }
+
+            if (rune == runeInvalid) break;
+            if (rune == runeBom) rune = next(r);
 
             const auto endOfBuffer = rune == runeEof;
             const auto unixNewLine = rune == '\n';
@@ -173,9 +170,7 @@ namespace Ciallang::Common {
         _index = index;
     }
 
-    bool SourceFile::load(
-            Result &r,
-            const std::string &buffer) {
+    bool SourceFile::load(Result &r, const std::string &buffer) {
         _buffer.clear();
         _linesByNumber.clear();
         _linesByIndexRange.clear();
@@ -250,16 +245,20 @@ namespace Ciallang::Common {
             const auto cp = utf8Decode(
                     reinterpret_cast<char *>(_buffer.data() + _index),
                     _buffer.size() - _index);
+
             width = cp.width;
             rune = cp.value;
+
             if (rune == runeInvalid && width == 1) {
                 r.error("illegal utf-8 encoding");
                 return runeInvalid;
             }
+
             if (rune == runeBom && _index > 0) {
                 r.error("illegal byte order mark");
                 return runeInvalid;
             }
+
         } else if (ch == '\r' && _buffer.size() != _index + 1) {
             // Windows line feed
             if (_buffer[_index + 1] == '\n') {
@@ -295,16 +294,16 @@ namespace Ciallang::Common {
 
     const SourceFileLineType *SourceFile::lineByNumber(const size_t line) const {
         const auto it = _linesByNumber.find(line);
-        if (it == _linesByNumber.end())
-            return nullptr;
+        if (it == _linesByNumber.end()) return nullptr;
         return it->second;
     }
 
     const SourceFileLineType *SourceFile::lineByIndex(size_t index) const {
-        if (index == -1) index = 0;
-        const auto it = _linesByIndexRange.find(std::make_pair(index, index));
-        if (it == _linesByIndexRange.end())
-            return nullptr;
+        const auto it = _linesByIndexRange.find(
+                std::make_pair(index, index)
+        );
+        // yes, we need, if not found return last iterator
+        if (it == _linesByIndexRange.end()) return nullptr;
         return &it->second;
     }
 }

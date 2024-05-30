@@ -17,24 +17,23 @@
 #include <cassert>
 #include <fmt/format.h>
 
-#include "AstFormatter.hpp"
-#include "Defer.hpp"
+#include "../ast/AstFormatter.hpp"
 
-#include "ExprNode.hpp"
-#include "StmtNode.hpp"
+#include "../ast/ExprNode.hpp"
+#include "../ast/StmtNode.hpp"
 
 namespace Ciallang::Syntax {
     using namespace Common;
 
-    static ExprNode *createExpressionNode(Result &r, Parser *parser) {
+    static ExprNode* createExpressionNode(Result& r, Parser* parser) {
         // expect "("
-        if (!parser->expect(r, &S_LParenthesis))
+        if(!parser->expect(r, &S_LParenthesis))
             return nullptr;
 
         const auto node = parser->parseExpression(r);
 
         // expect ")"
-        if (!parser->expect(r, &S_RParenthesis))
+        if(!parser->expect(r, &S_RParenthesis))
             return nullptr;
         return node;
     }
@@ -84,11 +83,11 @@ namespace Ciallang::Syntax {
      }*/
 
     void Parser::writeAstGraph(
-            const filesystem::path &path, AstNode *programNode
+        const filesystem::path& path, AstNode* programNode
     ) {
         auto closeRequired = false;
-        FILE *astOutputFile = stdout;
-        if (!path.empty()) {
+        FILE* astOutputFile = stdout;
+        if(!path.empty()) {
             fopen_s(&astOutputFile,
                     path.string().c_str(),
                     "wt");
@@ -98,18 +97,18 @@ namespace Ciallang::Syntax {
         AstFormatter formatter(programNode, astOutputFile);
         formatter.format(fmt::format("AST Graph: {}", path.string()));
 
-        if (closeRequired) fclose(astOutputFile);
+        if(closeRequired) fclose(astOutputFile);
     }
 
     bool Parser::lookAhead(const size_t count) {
-        while (count >= tokens().size() && _lexer.hasNext()) {
-            Token *token{nullptr};
-            if (_lexer.next(token)) {
+        while(count >= tokens().size() && _lexer.hasNext()) {
+            Token* token{ nullptr };
+            if(_lexer.next(token)) {
                 assert(token != nullptr);
 
-                while (token->type() == TokenType::BlockComment
-                       || token->type() == TokenType::LineComment) {
-                    if (!_lexer.next(token))
+                while(token->type() == TokenType::BlockComment
+                      || token->type() == TokenType::LineComment) {
+                    if(!_lexer.next(token))
                         return !tokens().empty();
                 }
             }
@@ -118,26 +117,26 @@ namespace Ciallang::Syntax {
     }
 
     bool Parser::peek(const TokenType type) {
-        if (!lookAhead(0)) return false;
-        const auto &token = tokens().front();
+        if(!lookAhead(0)) return false;
+        const auto& token = tokens().front();
         return token->type() == type;
     }
 
     bool Parser::consume() {
-        std::unique_ptr<Token> token;
+        Token token{};
         return consume(token);
     }
 
-    bool Parser::consume(std::unique_ptr<Token> &token) {
-        if (!lookAhead(0))
+    bool Parser::consume(Token& token) {
+        if(!lookAhead(0))
             return false;
 
         return _lexer.tackOverToken(token);
     }
 
-    bool Parser::current(Token *&token) {
+    bool Parser::current(Token*& token) {
         // just check tokens is empty? current tokens is empty we lex,
-        if (!lookAhead(0))
+        if(!lookAhead(0))
             return false;
 
         token = tokens().front();
@@ -145,22 +144,30 @@ namespace Ciallang::Syntax {
         return token->type() != TokenType::EndOfFile;
     }
 
-    bool Parser::expect(Result &r, const Token *token) {
-        if (!lookAhead(0)) return false;
+    bool Parser::expect(Result& r, const Token* token) {
+        if(!lookAhead(0)) return false;
 
         std::string expectedName = token->name();
         const auto expectedType = token->type();
-        std::unique_ptr<Token> tToken;
+        Token tToken{};
 
-        if (!_lexer.tackOverToken(tToken)) return false;
-
-        if (tToken->type() != expectedType) {
+        if(!_lexer.tackOverToken(tToken)) {
             error(r,
                   fmt::format(
-                          "expected token '{}' but found '{}'.",
-                          expectedName,
-                          tToken->name()), tToken->location
-            );
+                              "expected token '{}' but end of file.",
+                              expectedName,
+                              tToken.name()), tToken.location
+                 );
+            return false;
+        }
+
+        if(tToken.type() != expectedType) {
+            error(r,
+                  fmt::format(
+                              "expected token '{}' but found '{}'.",
+                              expectedName,
+                              tToken.name()), tToken.location
+                 );
             return false;
         }
 
@@ -172,24 +179,23 @@ namespace Ciallang::Syntax {
      * @return Token优先级
      */
     Precedence Parser::currentInfixPrecedence() {
-        if (!lookAhead(0))
+        if(!lookAhead(0))
             return Precedence::lowest;
 
-        const auto &token = tokens().front();
+        const auto* token = tokens().front();
         const auto infixParser = infixParserFor(token->type());
-        if (infixParser != nullptr)
+        if(infixParser != nullptr)
             return infixParser->precedence();
 
         return Precedence::lowest;
     }
 
     void Parser::synchronize() {
+        while(!peek(TokenType::EndOfFile)) {
+            Token* token{ nullptr };
+            if(!current(token)) return;
 
-        while (!peek(TokenType::EndOfFile)) {
-            Token *token{nullptr};
-            if (!current(token)) return;
-
-            switch (token->type()) {
+            switch(token->type()) {
                 case TokenType::Function:
                 case TokenType::Class:
                 case TokenType::Var:
@@ -200,96 +206,74 @@ namespace Ciallang::Syntax {
                 case TokenType::Return:
                     return;
                 default:
-                    if (!consume()) return;
+                    if(!consume()) return;
             }
-
         }
     }
 
-    AstNode *Parser::parse(Result &r) {
-        Token *emptyToken{nullptr};
-        return parseScope(r, emptyToken);
-    }
-
-    StmtNode *Parser::parseScope(
-            Result &r, const Token *token
-    ) {
-        const auto scope = _astBuilder.beginScope();
-        if (token)
-            scope->location.start(token->location.start());
-
-        auto isEndOfFile = [&]() -> bool {
-            if (peek(TokenType::EndOfFile)) {
-                return true;
-            }
-
-            if (tokens().empty()) return true;
-
-            if (peek(TokenType::RightCurlyBrace)) {
-                Token *lineTerminatorToken;
-                current(lineTerminatorToken);
-                consume();
-                scope->location.end(lineTerminatorToken->location.end());
-                return true;
-            }
-
-            return false;
-        };
-
-        while (!isEndOfFile()) {
-            auto statement = parseStatement(r);
-            if (r.isFailed()) {
-                // error sync
-                if (statement == nullptr)
-                    synchronize();
-                continue;
-            }
-            scope->children.push_back(statement);
-        }
-
+    StmtNode* Parser::parse(Result& r) {
+        auto* global = _astBuilder.beginScope();
+        parseScope(r, global);
         return _astBuilder.endScope();
     }
 
-    ExprNode *Parser::parseExpression(
-            Result &r, const Precedence precedence
+    void Parser::parseScope(
+        Result& r, BlockStmtNode* blockStmtNode, const TokenType terminatorToken
     ) {
-        std::unique_ptr<Token> token;
-        if (!consume(token)) return nullptr;
+        while(!peek(TokenType::EndOfFile)) {
+            if(peek(terminatorToken)) return;
+            auto* statement = parseStatement(r);
+
+            // error sync
+            if(!statement) {
+                synchronize();
+                continue;
+            }
+
+            blockStmtNode->children.push_back(statement);
+        }
+    }
+
+    ExprNode* Parser::parseExpression(
+        Result& r, const Precedence precedence
+    ) {
+        Token token{};
+        if(!consume(token)) return nullptr;
 
         // 前缀
-        const auto prefixParser = prefixParserFor(token->type());
+        const auto* prefixParser = prefixParserFor(token.type());
 
-        if (prefixParser == nullptr) {
+        if(prefixParser == nullptr) {
             error(r,
-                  fmt::format("prefix parser for token '{}' not found.", token->name()),
-                  token->location);
+                  fmt::format("unable prefix parse for token '{}' not found parser.", token.name()),
+                  token.location);
             return nullptr;
         }
 
-        ExprNode *lhs = prefixParser->parse(r, this, token);
-        if (lhs == nullptr) {
+        ExprNode* lhs = prefixParser->parse(r, this, &token);
+        if(lhs == nullptr) {
             error(r,
                   "unexpected empty ast node.",
-                  token->location);
+                  token.location);
             return nullptr;
         }
 
         // 中缀
-        while (precedence < currentInfixPrecedence()) {
-            if (!consume(token)) {
+        while(precedence < currentInfixPrecedence()) {
+            if(!consume(token)) {
                 break;
             }
 
-            const auto infixParser = infixParserFor(token->type());
-            if (infixParser == nullptr) {
+            const auto infixParser = infixParserFor(token.type());
+            if(infixParser == nullptr) {
                 error(
-                        r,
-                        fmt::format("infix parser for token '{}' not found.", token->name()),
-                        token->location);
+                      r,
+                      fmt::format("unable infix parse for token '{}' not found parser.", token.name()),
+                      token.location);
                 break;
             }
-            lhs = infixParser->parse(r, this, lhs, token);
-            if (lhs == nullptr || r.isFailed())
+            lhs = infixParser->parse(r, this, lhs, &token);
+            if(lhs == nullptr || r.isFailed())
                 break;
         }
         return lhs;
@@ -303,43 +287,38 @@ namespace Ciallang::Syntax {
      *      var b = a; <- parseStatement
      * }
      */
-    StmtNode *Parser::parseStatement(Result &r) {
-        Token *token = nullptr;
-        // just peek;
-        if (!current(token)) return nullptr;
+    StmtNode* Parser::parseStatement(Result& r) {
+        Token* token = nullptr;
+        // just peek
+        if(!current(token)) return nullptr;
 
         const auto stmtParser = stmtParserFor(token->type());
-        StmtNode *statementNode = nullptr;
+        StmtNode* statementNode = nullptr;
 
-        if (stmtParser != nullptr) {
-            std::unique_ptr<Token> consumeToken;
+        if(stmtParser != nullptr) {
+            Token consumeToken{};
             consume(consumeToken);
-            statementNode = stmtParser->parse(r, this, consumeToken);
+            statementNode = stmtParser->parse(r, this, &consumeToken);
         } else {
             // maybe ExpressionStatement
-            auto *expr = parseExpression(r);
-            if (expr != nullptr) {
+            auto* expr = parseExpression(r);
+            if(expr != nullptr) {
                 statementNode = _astBuilder.makeExprStmtNode(expr);
                 statementNode->location = expr->location;
 
                 // ;
-                if (!expect(r, &S_SemiColon)) {
+                if(!expect(r, &S_SemiColon)) {
                     return nullptr;
                 }
             }
         }
 
-        if (statementNode == nullptr) {
-            error(r, "except statement", token->location);
-            return nullptr;
-        }
-
         return statementNode;
     }
 
-    StmtParser *Parser::stmtParserFor(const TokenType type) {
+    const StmtParser* Parser::stmtParserFor(const TokenType type) {
         const auto it = S_StmtParsers.find(type);
-        if (it != S_StmtParsers.end())
+        if(it != S_StmtParsers.end())
             return it->second;
         return nullptr;
     }
@@ -351,9 +330,9 @@ namespace Ciallang::Syntax {
      *             else -> TokenParser
      * @return Token解析器
      */
-    PrefixParser *Parser::prefixParserFor(const TokenType type) {
+    const PrefixParser* Parser::prefixParserFor(const TokenType type) {
         const auto it = S_PrefixParsers.find(type);
-        if (it != S_PrefixParsers.end())
+        if(it != S_PrefixParsers.end())
             return it->second;
         return nullptr;
     }
@@ -365,60 +344,73 @@ namespace Ciallang::Syntax {
      *             else -> TokenParser
      * @return Token解析器
      */
-    InfixParser *Parser::infixParserFor(const TokenType type) {
+    const InfixParser* Parser::infixParserFor(const TokenType type) {
         const auto it = S_InfixParsers.find(type);
-        if (it != S_InfixParsers.end())
+        if(it != S_InfixParsers.end())
             return it->second;
         return nullptr;
     }
+
     /////////////////////////////////////////////////////////////////
 
-    StmtNode *BlockStmtParser::parse(
-            Result &r, Parser *parser, std::unique_ptr<Token> &token
-    ) {
-        return parser->parseScope(r, token.get());
+    StmtNode* BlockStmtParser::parse(
+        Result& r, Parser* parser, Token* token
+    ) const {
+        auto* scope = parser->astBuilder()->beginScope();
+
+        scope->location.start(token->location.start());
+
+        parser->parseScope(r,
+                           scope,
+                           TokenType::RightCurlyBrace);
+
+        if(!parser->peek(TokenType::RightCurlyBrace)) {
+            parser->error(r,
+                          "scope expected token '}'",
+                          token->location);
+
+            parser->astBuilder()->endScope();
+            return nullptr;
+        }
+
+        Token* terminatorToken = nullptr;
+        parser->current(terminatorToken);
+        parser->consume();
+
+        scope->location.end(terminatorToken->location.end());
+        return parser->astBuilder()->endScope();
     }
 
-    StmtNode *IfStmtParser::parse(
-            Result &r, Parser *parser, std::unique_ptr<Token> &token
-    ) {
+    StmtNode* IfStmtParser::parse(
+        Result& r, Parser* parser, Token* token
+    ) const {
+        const auto* test = createExpressionNode(r, parser);
 
-        auto *test = createExpressionNode(r, parser);
+        if(test == nullptr) return nullptr;
 
-        if (test == nullptr) return nullptr;
+        const auto* body = parser->parseStatement(r);
 
-        auto *body = parser->parseStatement(r);
+        if(body == nullptr) return nullptr;
 
-        if (body == nullptr) return nullptr;
-
-        auto *ifNode = parser->astBuilder()
-                ->makeIfStmtNode(test, body);
+        auto* ifNode = parser->astBuilder()
+                             ->makeIfStmtNode(test, body);
 
         ifNode->location.start(token->location.start());
         ifNode->location.end(ifNode->body->location.end());
 
-        if (parser->peek(TokenType::Else)) {
-            Token *elseToken;
+        if(parser->peek(TokenType::Else)) {
+            Token* elseToken;
             parser->current(elseToken);
             parser->consume();
 
             ifNode->elseBody = parser->parseStatement(r);
 
-            if (!ifNode->elseBody) return nullptr;
+            if(!ifNode->elseBody) return nullptr;
 
             ifNode->location.end(ifNode->elseBody->location.end());
         }
 
         return ifNode;
-    }
-
-    BinaryOperatorInfixParser::BinaryOperatorInfixParser(
-            const Precedence precedence,
-            const bool isRightAssociative,
-            const bool withAssignment) noexcept
-            : _precedence(precedence),
-              _withAssignment(withAssignment),
-              _isRightAssociative(isRightAssociative) {
     }
 
     /**
@@ -430,110 +422,70 @@ namespace Ciallang::Syntax {
      * @param token 符号
      * @return 一个二目运算AstNode
      */
-    ExprNode *BinaryOperatorInfixParser::parse(
-            Result &r, Parser *parser, ExprNode *lhs, std::unique_ptr<Token> &token
-    ) {
+    ExprNode* BinaryOperatorInfixParser::parse(
+        Result& r, Parser* parser, ExprNode* lhs, Token* token
+    ) const {
         const auto associativePrecedence = static_cast<Precedence>(
-                static_cast<uint8_t>(_precedence) - (_isRightAssociative ? 1 : 0));
+            static_cast<uint8_t>(_precedence) - (_isRightAssociative ? 1 : 0)
+        );
+
         const auto rhs = parser->parseExpression(r, associativePrecedence);
-        if (rhs == nullptr) {
+        if(rhs == nullptr) {
             parser->error(
-                    r,
-                    "binary operator expects right-hand-side expression",
-                    token->location);
+                          r,
+                          "binary operator expects right-hand-side expression",
+                          token->location);
             return nullptr;
         }
 
         const auto binOpNode = parser
-                ->astBuilder()
-                ->makeBinaryExprNode(stripAssign(*token), lhs, rhs);
+                               ->astBuilder()
+                               ->makeBinaryExprNode(stripAssign(std::move(*token)), lhs, rhs);
 
-        if (!_withAssignment)
-            return binOpNode;
-        return parser->astBuilder()->makeAssignExprNode(lhs, binOpNode);
+        if(!_withAssignment) return binOpNode;
+
+        const SymbolExprNode* symbolExprNode = dynamic_cast<SymbolExprNode*>(lhs);
+
+        if(!symbolExprNode) {
+            parser->error(r,
+                          "assignment operator left-hand-side expects identifier",
+                          lhs->location);
+            return nullptr;
+        }
+
+        if(contains(S_AssignToNonAssign, token->type())) {
+            return parser->astBuilder()->makeAssignExprNode(symbolExprNode, binOpNode);
+        }
+
+        return parser->astBuilder()->makeAssignExprNode(symbolExprNode, rhs);
     }
 
-    Precedence BinaryOperatorInfixParser::precedence() const {
-        return _precedence;
-    }
-
-    ExprNode *ConstValPrefixParser::parse(Result &, Parser *parser, std::unique_ptr<Token> &token) {
+    ExprNode* ConstValPrefixParser::parse(Result&, Parser* parser, Token* token) const {
         return parser->astBuilder()->makeValueExprNode(std::move(*token));
     }
 
-    UnaryOperatorPrefixParser::UnaryOperatorPrefixParser(
-            const Precedence precedence) noexcept: _precedence(precedence) {
-    }
-
-    ExprNode *UnaryOperatorPrefixParser::parse(
-            Result &r, Parser *parser, std::unique_ptr<Token> &token
-    ) {
-
+    ExprNode* UnaryOperatorPrefixParser::parse(
+        Result& r, Parser* parser, Token* token
+    ) const {
         const auto rhs = parser->parseExpression(r, _precedence);
-        if (rhs == nullptr) {
+        if(rhs == nullptr) {
             parser->error(
-                    r,
-                    "unary operator expects right-hand-side expression",
-                    token->location);
+                          r,
+                          "unary operator expects right-hand-side expression",
+                          token->location);
             return nullptr;
         }
 
         const auto node = parser
-                ->astBuilder()
-                ->makeUnaryExprNode(std::move(*token), rhs);
+                          ->astBuilder()
+                          ->makeUnaryExprNode(std::move(*token), rhs);
 
         return node;
     }
 
-    ExprNode *SymbolPrefixParser::parse(
-            Result &r, Parser *parser, std::unique_ptr<Token> &token
-    ) {
+    ExprNode* SymbolPrefixParser::parse(
+        Result& r, Parser* parser, Token* token
+    ) const {
         return parser->astBuilder()->makeSymbolExprNode(std::move(*token));
     }
-
-    /////////////////////////////////////////////////////////
-//    ExprNode *FunctionPrefixParser::parse(
-//            Result &r, Parser *parser, std::unique_ptr<Token> &token
-//    ) {
-//        const auto functionNode = parser->astBuilder()->functionNode();
-//
-//        if (!parser->peek(TokenType::Identifier)) {
-//            parser->error(
-//                    r,
-//                    fmt::format("function expect identifier", token->name()),
-//                    token->location
-//            );
-//            return nullptr;
-//        }
-//
-//        Token *identifierToken;
-//        parser->current(identifierToken);
-//        parser->consume();
-//
-//        functionNode->lhs = parser->astBuilder()->symbolNode(identifierToken);
-//        if (!parser->expect(r, &S_LParenthesis)) {
-//            parser->error(
-//                    r,
-//                    "function expects (",
-//                    token->location);
-//            return nullptr;
-//        }
-//
-//        if (!parser->peek(TokenType::RParenthesis))
-//            pairsToList(functionNode->rhs, parser->parseExpression(r));
-//
-//        if (!parser->expect(r, &S_RParenthesis)) {
-//            parser->error(
-//                    r,
-//                    "function expects )",
-//                    token->location);
-//            return nullptr;
-//        }
-//
-//        functionNode->children.push_back(parser->parseExpression(r));
-//        functionNode->location.start(functionNode->lhs->location.start());
-//        functionNode->location.end(functionNode->rhs->location.end());
-//
-//        return functionNode;
-//    }
 }

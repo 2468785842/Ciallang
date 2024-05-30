@@ -13,11 +13,10 @@
 #pragma once
 
 #include "AstNode.hpp"
-#include "ExprNode.hpp"
 
 namespace Ciallang::Syntax {
-
-    class StmtNode : public AstNode {};
+    class StmtNode : public AstNode {
+    };
 
     class BlockStmtNode : public StmtNode {
     public:
@@ -25,18 +24,19 @@ namespace Ciallang::Syntax {
 
         BlockStmtNode() = delete;
 
-        explicit BlockStmtNode(const char *name) : _name(name) {}
+        explicit BlockStmtNode(const char* name) : _name(name) {
+        }
 
-        void accept(const Visitor *visitor) const override {
+        void accept(const Visitor* visitor) const override {
             visitor->visit(this);
         }
 
-        [[nodiscard]] const char *name() const noexcept override {
+        [[nodiscard]] const char* name() const noexcept override {
             return _name;
         }
 
     private:
-        const char *_name;
+        const char* _name;
     };
 
     class ExprStmtNode : public StmtNode {
@@ -45,39 +45,39 @@ namespace Ciallang::Syntax {
 
         ExprStmtNode() = delete;
 
-        explicit ExprStmtNode(ExprNode *expr) {
+        explicit ExprStmtNode(ExprNode* expr) {
             expressions.push_back(expr);
         }
 
-        void accept(const Visitor *visitor) const override {
+        void accept(const Visitor* visitor) const override {
             visitor->visit(this);
         }
 
-        [[nodiscard]] const char *name() const noexcept override {
+        [[nodiscard]] const char* name() const noexcept override {
             return "expression_statement";
         }
     };
 
     class IfStmtNode : public StmtNode {
     public:
-        const ExprNode *test;
-        const StmtNode *body;
-        StmtNode *elseBody{nullptr};
+        const ExprNode* test;
+        const StmtNode* body;
+        StmtNode* elseBody{ nullptr };
 
         IfStmtNode() = delete;
 
         explicit IfStmtNode(
-                const ExprNode *test,
-                const StmtNode *body
-        ) : test(test), body(body) {}
+            const ExprNode* test,
+            const StmtNode* body
+        ) : test(test), body(body) {
+        }
 
-        void accept(const Visitor *visitor) const override {
+        void accept(const Visitor* visitor) const override {
             visitor->visit(this);
         }
 
-        [[nodiscard]] const char *name() const noexcept override {
+        [[nodiscard]] const char* name() const noexcept override {
             return "if_statement";
         }
     };
-
 }

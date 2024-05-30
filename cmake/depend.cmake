@@ -17,4 +17,15 @@ FetchContent_Declare(
         BINARY_DIR ${CMAKE_BINARY_DIR}/_deps/utf8proc/build
         SUBBUILD_DIR ${CMAKE_BINARY_DIR}/_deps/utf8proc/subbuild
 )
-FetchContent_MakeAvailable(fmt utf8proc)
+
+
+FetchContent_Declare(
+        frozen
+        GIT_REPOSITORY https://github.com/serge-sans-paille/frozen.git
+        GIT_TAG "1.1.1"
+        SOURCE_DIR ${CMAKE_SOURCE_DIR}/ext/frozen
+        BINARY_DIR ${CMAKE_BINARY_DIR}/_deps/frozen/build
+        SUBBUILD_DIR ${CMAKE_BINARY_DIR}/_deps/frozen/subbuild
+)
+
+FetchContent_MakeAvailable(fmt utf8proc frozen)

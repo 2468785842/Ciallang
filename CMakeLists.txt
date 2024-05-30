@@ -5,63 +5,52 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+set(SOURCE_FILES
+        ${CMAKE_SOURCE_DIR}/src/lexer/Lexer.cpp
+        ${CMAKE_SOURCE_DIR}/src/lexer/Token.hpp
+        ${CMAKE_SOURCE_DIR}/src/lexer/IEEETypes.hpp
 
-add_executable(${PROJECT_NAME}
-    src/main.cpp
+        ${CMAKE_SOURCE_DIR}/src/common/Bytes.hpp
+        ${CMAKE_SOURCE_DIR}/src/common/SourceLocation.cpp
+        ${CMAKE_SOURCE_DIR}/src/common/Result.hpp
+        ${CMAKE_SOURCE_DIR}/src/common/ResultMessage.hpp
+        ${CMAKE_SOURCE_DIR}/src/common/Defer.hpp
+        ${CMAKE_SOURCE_DIR}/src/common/SourceFile.cpp
+        ${CMAKE_SOURCE_DIR}/src/common/Colorizer.cpp
+        ${CMAKE_SOURCE_DIR}/src/common/UTF8.cpp
 
-    src/lexer/Lexer.cpp
-    src/lexer/Token.hpp
-    src/lexer/IEEETypes.hpp
+        ${CMAKE_SOURCE_DIR}/src/parser/Parser.cpp
 
-    src/common/Bytes.hpp
-    src/common/SourceLocation.cpp
-    src/common/Result.hpp
-    src/common/ResultMessage.hpp
-    src/common/Defer.hpp
-    src/common/SourceFile.cpp
-    src/common/Colorizer.cpp
-    src/common/UTF8.cpp
+        ${CMAKE_SOURCE_DIR}/src/ast/Ast.cpp
+        ${CMAKE_SOURCE_DIR}/src/ast/AstFormatter.cpp
 
-    src/parser/Parser.cpp
+        ${CMAKE_SOURCE_DIR}/src/ast/AstNode.hpp
+        ${CMAKE_SOURCE_DIR}/src/ast/ExprNode.hpp
+        ${CMAKE_SOURCE_DIR}/src/ast/StmtNode.hpp
 
-    src/ast/Ast.cpp
-    src/ast/AstFormatter.cpp
+        ${CMAKE_SOURCE_DIR}/src/compiler/Compiler.cpp
 
-    src/ast/AstNode.hpp
-    src/ast/ExprNode.hpp
-    src/ast/StmtNode.hpp
+        # ############################################
+        ${CMAKE_SOURCE_DIR}/src/vm/CiallangVM.cpp
+        ${CMAKE_SOURCE_DIR}/src/vm/VMChunk.cpp
+        ${CMAKE_SOURCE_DIR}/src/vm/Rlc.cpp
+        ${CMAKE_SOURCE_DIR}/src/vm/Memory.hpp
+        ${CMAKE_SOURCE_DIR}/src/vm/Instruction.hpp
+        ${CMAKE_SOURCE_DIR}/src/vm/DataPool.hpp
 
-    src/compiler/Compiler.cpp
-
-    # ############################################
-    src/vm/CiallangVM.cpp
-    src/vm/VMTypes.cpp
-
-    src/types/TjsOctet.cpp
-    src/types/TjsString.cpp
-    src/types/TjsObject.cpp
-    src/types/TjsValue.cpp
-    src/types/TjsTypes.hpp
+        ${CMAKE_SOURCE_DIR}/src/types/TjsOctet.cpp
+        ${CMAKE_SOURCE_DIR}/src/types/TjsString.cpp
+        ${CMAKE_SOURCE_DIR}/src/types/TjsObject.cpp
+        ${CMAKE_SOURCE_DIR}/src/types/TjsValue.cpp
+        ${CMAKE_SOURCE_DIR}/src/types/TjsTypes.hpp
 
 )
-
-target_include_directories(${PROJECT_NAME}
-    PRIVATE
-    src/common
-    src/lexer
-    src/compiler
-    src/parser
-    src/ast
-    src/vm
-    src/types
+add_executable(${PROJECT_NAME}
+        src/main.cpp
+        ${SOURCE_FILES}
 )
 
 include(depend)
-target_link_libraries(${PROJECT_NAME} PRIVATE fmt utf8proc)
+target_link_libraries(${PROJECT_NAME} PRIVATE fmt utf8proc frozen)
 
-# vscode clangd
-# execute_process(
-# COMMAND ${CMAKE_COMMAND} -E copy_if_different
-# "${CMAKE_BINARY_DIR}/compile_commands.json"
-# "${CMAKE_SOURCE_DIR}/build/compile_commands.json"
-# )
+add_subdirectory(tests)

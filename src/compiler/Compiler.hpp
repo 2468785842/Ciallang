@@ -14,9 +14,9 @@
 
 #pragma once
 
-#include "SourceFile.hpp"
-#include "Ast.hpp"
-#include "Result.hpp"
+#include "../common/SourceFile.hpp"
+#include "../ast/Ast.hpp"
+#include "../common/Result.hpp"
 
 namespace Ciallang::Inter {
     struct CompilerOptions {
@@ -65,7 +65,7 @@ namespace Ciallang::Inter {
 
         void disassemble(FILE *file);
 
-        Syntax::AstBuilder &astBuilder() const;
+        [[nodiscard]] Syntax::AstBuilder &astBuilder() const;
 
         Common::SourceFile *sourceFile(int32_t id);
 

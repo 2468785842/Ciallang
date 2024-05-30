@@ -16,10 +16,9 @@
 #include <iostream>
 #include <string>
 
-#include "Lexer.hpp"
-#include "UTF8.hpp"
-#include "SourceFile.hpp"
-#include "Compiler.hpp"
+#include "lexer/Lexer.hpp"
+#include "common/SourceFile.hpp"
+#include "compiler/Compiler.hpp"
 
 void testLexer() {
     Ciallang::Common::SourceFile source_file{R"(.\startup.tjs)"};

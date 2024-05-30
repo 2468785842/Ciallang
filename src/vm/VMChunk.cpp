@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024/5/8 上午8:08
+ * Copyright (c) 2024/5/7 下午8:44
  *
  * /\  _` \   __          /\_ \  /\_ \
  * \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -11,21 +11,17 @@
  *                                                            \_/__/
  *
  */
-#pragma once
-#include <cstdint>
-
 #include "VMChunk.hpp"
 
+#include <fmt/format.h>
+
 namespace Ciallang::VM {
-    class CiallangVM {
-    public:
-        bool initializer();
-    private:
-        //10M
-        /*uint64_t registers[1024 * 1024 * 10]{};
-        uint64_t constants[1024 * 1024 * 10]{};
-        Instruction instructions[1024 * 1024 * 10]{};
-        uint32_t PC{};
-        bool flags{};//跳转标记*/
-    };
+    void VMChunk::disassemble() const {
+        fmt::println("-------------- {} --------------", _rlc.name());
+
+        for(size_t offset = 0; offset < count;) {
+            const auto* inst = Instruction::instance(_bytecodes[offset]);
+            fmt::println("{}", inst->disassemble(_bytecodes, _valuArray.constants, &_rlc, offset));
+        }
+    }
 }

@@ -12,13 +12,11 @@
 
 #pragma once
 
-#include <stdexcept>
 #include <vector>
 
-#include "SourceLocation.hpp"
+#include "../common/SourceLocation.hpp"
 
 namespace Ciallang::Syntax {
-
     class AstNode;
 
     class ExprNode;
@@ -41,8 +39,8 @@ namespace Ciallang::Syntax {
 
     class IfStmtNode;
 
-    using ExprNodeList = std::vector<ExprNode *>;
-    using StmtNodeList = std::vector<StmtNode *>;
+    using ExprNodeList = std::vector<ExprNode*>;
+    using StmtNodeList = std::vector<StmtNode*>;
 
     class AstNode {
     public:
@@ -51,13 +49,13 @@ namespace Ciallang::Syntax {
         // just for Gen Graphviz used
         const uint64_t id = serialId++;
 
-        Common::SourceLocation location{};
+        SourceLocation location{};
 
         explicit AstNode() = default;
 
-        virtual void accept(const Visitor *visitor) const = 0;
+        virtual void accept(const Visitor* visitor) const = 0;
 
-        [[nodiscard]] virtual constexpr const char *name() const noexcept = 0;
+        [[nodiscard]] virtual constexpr const char* name() const noexcept = 0;
 
         virtual ~AstNode() = default;
 
@@ -66,23 +64,22 @@ namespace Ciallang::Syntax {
     };
 
     struct AstNode::Visitor {
+        virtual ~Visitor() = default;
 
-        virtual void visit(const ValueExprNode *) const = 0;
+        virtual void visit(const ValueExprNode*) const = 0;
 
-        virtual void visit(const SymbolExprNode *) const = 0;
+        virtual void visit(const SymbolExprNode*) const = 0;
 
-        virtual void visit(const BinaryExprNode *) const = 0;
+        virtual void visit(const BinaryExprNode*) const = 0;
 
-        virtual void visit(const UnaryExprNode *) const = 0;
+        virtual void visit(const UnaryExprNode*) const = 0;
 
-        virtual void visit(const AssignExprNode *) const = 0;
+        virtual void visit(const AssignExprNode*) const = 0;
 
-        virtual void visit(const BlockStmtNode *) const = 0;
+        virtual void visit(const BlockStmtNode*) const = 0;
 
-        virtual void visit(const ExprStmtNode *) const = 0;
+        virtual void visit(const ExprStmtNode*) const = 0;
 
-        virtual void visit(const IfStmtNode *) const = 0;
-
+        virtual void visit(const IfStmtNode*) const = 0;
     };
-
 }

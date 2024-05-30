@@ -16,23 +16,18 @@
 
 #include <forward_list>
 #include <stack>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
 
-#include "Token.hpp"
+#include "../lexer/Token.hpp"
 
-#include "AstNode.hpp"
+
 #include "StmtNode.hpp"
 #include "ExprNode.hpp"
+#include "AstNode.hpp" // IWYU pragma: export
 
 namespace Ciallang::Syntax {
-    using namespace std;
-
-
     class AstBuilder {
-        std::stack<BlockStmtNode *> _scopeStack{};
-        std::forward_list<AstNode *> _nodes{};
+        std::stack<BlockStmtNode*> _scopeStack{};
+        std::forward_list<AstNode*> _nodes{};
 
     public:
         AstBuilder() = default;
@@ -41,48 +36,47 @@ namespace Ciallang::Syntax {
 
         void reset();
 
-
         // scope/block stack
-        BlockStmtNode *endScope();
+        BlockStmtNode* endScope();
 
-        BlockStmtNode *popScope();
+        BlockStmtNode* popScope();
 
-        BlockStmtNode *beginScope();
+        BlockStmtNode* beginScope();
 
-        void pushScope(BlockStmtNode *node);
+        void pushScope(BlockStmtNode* node);
 
-        BlockStmtNode *globalNode();
+        BlockStmtNode* globalNode();
 
-        BlockStmtNode *basicBlockNode();
+        BlockStmtNode* basicBlockNode();
 
-        ExprStmtNode *makeExprStmtNode(ExprNode *rhs);
+        ExprStmtNode* makeExprStmtNode(ExprNode* rhs);
 
-        IfStmtNode *makeIfStmtNode(const ExprNode *test, const StmtNode* body);
+        IfStmtNode* makeIfStmtNode(const ExprNode* test, const StmtNode* body);
 
-        ValueExprNode *makeValueExprNode(Token &&op);
+        ValueExprNode* makeValueExprNode(Token&& op);
 
-        BinaryExprNode *makeBinaryExprNode(Token &&op, const ExprNode *lhs, const ExprNode *rhs);
+        BinaryExprNode* makeBinaryExprNode(Token&& op, const ExprNode* lhs, const ExprNode* rhs);
 
-        UnaryExprNode *makeUnaryExprNode(Token &&op, const ExprNode *rhs);
+        UnaryExprNode* makeUnaryExprNode(Token&& op, const ExprNode* rhs);
 
-        AssignExprNode *makeAssignExprNode(const ExprNode *lhs, const ExprNode *rhs);
+        AssignExprNode* makeAssignExprNode(const SymbolExprNode* lhs, const ExprNode* rhs);
 
-        AstNode *assignmentTargetNode();
+        AstNode* assignmentTargetNode();
 
-        AstNode *assignmentSourceNode();
+        AstNode* assignmentSourceNode();
 
-        SymbolExprNode *makeSymbolExprNode(Token &&token);
+        SymbolExprNode* makeSymbolExprNode(Token&& token);
 
-        AstNode *pairNode();
+        AstNode* pairNode();
 
-        AstNode *procCallNode();
+        AstNode* procCallNode();
 
         // 实参list
-        AstNode *argumentListNode();
+        AstNode* argumentListNode();
 
-        AstNode *functionNode();
+        AstNode* functionNode();
 
-        template<typename R, typename... Args>
-        R *makeNode(Args&&...args);
+        template <typename R, typename... Args>
+        R* makeNode(Args&&... args);
     };
 }

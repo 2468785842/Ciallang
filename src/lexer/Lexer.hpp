@@ -19,27 +19,27 @@
 #include <functional>
 #include <map>
 
-#include "SourceFile.hpp"
-#include "Result.hpp"
+#include "../common/SourceFile.hpp"
+#include "../common/Result.hpp"
 #include "Token.hpp"
 
 namespace Ciallang::Syntax {
     using namespace std;
 
     static int8_t getHexNum(const char c) noexcept {
-        if (c >= 'a' && c <= 'f') return static_cast<int8_t>(c - 'a' + 10);
-        if (c >= 'A' && c <= 'F') return static_cast<int8_t>(c - 'A' + 10);
-        if (c >= '0' && c <= '9') return static_cast<int8_t>(c - '0');
+        if(c >= 'a' && c <= 'f') return static_cast<int8_t>(c - 'a' + 10);
+        if(c >= 'A' && c <= 'F') return static_cast<int8_t>(c - 'A' + 10);
+        if(c >= '0' && c <= '9') return static_cast<int8_t>(c - '0');
         return -1;
     }
 
     static int8_t getOctNum(const char c) noexcept {
-        if (c >= '0' && c <= '7') return static_cast<int8_t>(c - '0');
+        if(c >= '0' && c <= '7') return static_cast<int8_t>(c - '0');
         return -1;
     }
 
     static int8_t getBinNum(const char c) noexcept {
-        if (c == '0' || c == '1') return static_cast<int8_t>(c - '0');
+        if(c == '0' || c == '1') return static_cast<int8_t>(c - '0');
         return -1;
     }
 
@@ -47,7 +47,7 @@ namespace Ciallang::Syntax {
     static char unescapeBackSlash(const char c) noexcept {
         // convert "\?"
         // c must indicate "?"
-        switch (c) {
+        switch(c) {
             case 'a':
                 return 0x7;
             case 'b':
@@ -69,138 +69,143 @@ namespace Ciallang::Syntax {
 
     class Lexer {
     public:
-        using LexerCaseCallable = function<bool(Lexer *, Token *&)>;
+        using LexerCaseCallable = function<bool(Lexer*, Token*&)>;
 
-        explicit Lexer(SourceFile &);
+        explicit Lexer(SourceFile&);
 
-        bool next(Token *&);
+        bool next(Token*&);
 
         void skipComment();
 
-        bool tackOverToken(std::unique_ptr<Token> &token) {
+        bool tackOverToken(Token& token) {
             assert(!_tokens.empty());
 
-            token = std::unique_ptr<Token>{_tokens.front()};
-            _tokens.erase(_tokens.begin());
+            token = *_tokens.front();
 
-            return token->type() != TokenType::EndOfFile;
+            if(token.type() == TokenType::EndOfFile) return false;
+
+            delete _tokens.front();
+            _tokens.erase(_tokens.begin());
+            return true;
         }
 
         [[nodiscard]] bool hasNext() const;
 
-        [[nodiscard]] constexpr const std::vector<Token *> &tokens() const {
+        [[nodiscard]] constexpr const std::vector<Token*>& tokens() const {
             return _tokens;
         }
 
-        [[nodiscard]] const Result &result() const;
+        [[nodiscard]] const Result& result() const;
 
         ~Lexer() noexcept {
-            for (const auto &item: _tokens)
+            for(const auto& item : _tokens)
                 delete item;
         }
 
     private:
-
         static std::multimap<int32_t, LexerCaseCallable> S_Cases;
-        [[maybe_unused]] static void *S_LoadCases;
-        static std::unordered_map<std::string, const Token &> S_Keywords;
 
-        std::vector<Token *> _tokens{};
+        [[maybe_unused]] static void* S_LoadCases;
+
+        static std::unordered_map<std::string, const Token&> S_Keywords;
+
+        std::vector<Token*> _tokens{};
         bool _hasNext = true;
         Result _result{};
-        SourceFile &_sourceFile;
+        SourceFile& _sourceFile;
 
-        Token *makeToken(Token t) {
-            auto *token = new Token{std::move(t)};
+        Token* makeToken(Token t) {
+            auto* token = new Token{ std::move(t) };
             _tokens.push_back(token);
             return token;
         }
 
-        Token *makeToken(TokenType type, TjsValue &&value) {
-            auto *token = new Token{type, std::move(value)};
+        Token* makeToken(const TokenType type, TjsValue&& value) {
+            auto* token = new Token{ type, std::move(value) };
             _tokens.push_back(token);
             return token;
         }
 
-        bool boringMatch(Token *&, const std::vector<pair<string, const Token &>> &signArr);
+        using OperatorTokenSet = std::vector<std::pair<const char*, const Token&>>;
+
+        bool boringMatch(Token*&, const OperatorTokenSet& signMap);
 
         void rewindOneChar() const;
 
         string readIdentifier();
 
-        bool lineTerminator(Token *&);
+        bool lineTerminator(Token*&);
 
-        void setTokenLocation(Token *&);
+        void setTokenLocation(Token*&) const;
 
         [[nodiscard]] pair<uint32_t, uint32_t> getCurrentRowCol() const;
 
-        bool match(const string &literal);
+        bool match(const string& literal);
 
         // <
-        bool gtSign(Token *&);
+        bool gtSign(Token*&);
 
-        bool octetLiteral(Token *&);
+        bool octetLiteral(Token*&);
 
         // >
-        bool ltSign(Token *&);
+        bool ltSign(Token*&);
 
-        bool exclamationSign(Token *&);
+        bool exclamationSign(Token*&);
 
-        bool ampersandSign(Token *&);
+        bool ampersandSign(Token*&);
 
-        bool vertLineSign(Token *&);
+        bool vertLineSign(Token*&);
 
-        bool dotSign(Token *&);
+        bool dotSign(Token*&);
 
-        bool slash(Token *&);
+        bool slash(Token*&);
 
-        bool backslash(Token *&);
+        bool backslash(Token*&);
 
-        bool percent(Token *&);
+        bool percent(Token*&);
 
-        bool chevron(Token *&);
+        bool chevron(Token*&);
 
-        bool singletonSign(Token *&);
+        bool singletonSign(Token*&);
 
         // =
-        bool equalSign(Token *&);
+        bool equalSign(Token*&);
 
-        bool lineComment(Token *&);
+        bool lineComment(Token*&);
 
-        bool blockComment(Token *&);
+        bool blockComment(Token*&);
 
-        bool numberConstVal(Token *&);
+        bool numberConstVal(Token*&);
 
-        bool stringConstVal(Token *&);
+        bool stringConstVal(Token*&);
 
-        bool templateStringConstVal(Token *&);
+        bool templateStringConstVal(Token*&);
 
-        bool parseNonDecimalNumber(Token *&, stringstream &,
+        bool parseNonDecimalNumber(Token*&, stringstream&,
                                    int8_t (*)(char), int8_t);
 
-        bool parseNonDecimalInteger(Token *&, const string &,
+        bool parseNonDecimalInteger(Token*&, const string&,
                                     int8_t (*)(char), int8_t);
 
-        void parseNonDecimalReal(Token *&, const string &,
+        void parseNonDecimalReal(Token*&, const string&,
                                  int8_t (*)(char), int8_t);
 
-        void extractNumber(int8_t (*)(char), const string &expMark, stringstream &, bool &);
+        void extractNumber(int8_t (*)(char), const string& expMark, stringstream&, bool&);
 
-        bool identifier(Token *&);
+        bool identifier(Token*&);
 
-        bool plus(Token *&);
+        bool plus(Token*&);
 
-        bool minus(Token *&);
+        bool minus(Token*&);
 
-        bool mul(Token *&);
+        bool mul(Token*&);
 
         int32_t read(bool skipWhitespace = true);
 
         StringParseState internalStringParser(
-                Token *&token, char delimiter,
-                bool *templateOver = nullptr,
-                bool templateMode = false
+            Token*& token, char delimiter,
+            bool* templateOver = nullptr,
+            bool templateMode = false
         );
-
     };
 }

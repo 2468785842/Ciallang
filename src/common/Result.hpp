@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include <algorithm>
 #include <string>
 
 #include "SourceLocation.hpp"

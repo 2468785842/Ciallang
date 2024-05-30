@@ -14,11 +14,10 @@
 
 #pragma once
 
+#include <utility>
+
 #define SCOPE_GUARD_CONCATENATE_IMPL(s1, s2) s1##s2
 #define SCOPE_GUARD_CONCATENATE(s1, s2) SCOPE_GUARD_CONCATENATE_IMPL(s1, s2)
-
-#include <type_traits>
-
 // ScopeGuard for C++11
 namespace clover {
     template<typename Fun>

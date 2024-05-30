@@ -14,18 +14,17 @@
 
 #include <utility>
 
-#include "Token.hpp"
+#include "../lexer/Token.hpp"
 #include "AstNode.hpp"
 
 namespace Ciallang::Syntax {
-
     class ExprNode : public AstNode {
     public:
-        const Token *token{nullptr};
+        const Token* token{ nullptr };
 
         explicit ExprNode() = default;
 
-        explicit ExprNode(Token &token) : token(new Token{std::move(token)}) {
+        explicit ExprNode(Token& token) : token(new Token{ std::move(token) }) {
             location = this->token->location;
         }
 
@@ -36,13 +35,14 @@ namespace Ciallang::Syntax {
     public:
         ValueExprNode() = delete;
 
-        explicit ValueExprNode(Token &token) : ExprNode(token) {}
+        explicit ValueExprNode(Token& token) : ExprNode(token) {
+        }
 
-        void accept(const Visitor *visitor) const override {
+        void accept(const Visitor* visitor) const override {
             visitor->visit(this);
         }
 
-        [[nodiscard]] const char *name() const noexcept override {
+        [[nodiscard]] const char* name() const noexcept override {
             return "value";
         }
     };
@@ -51,86 +51,85 @@ namespace Ciallang::Syntax {
     public:
         SymbolExprNode() = delete;
 
-        explicit SymbolExprNode(Token &token) : ExprNode(token) {}
+        explicit SymbolExprNode(Token& token) : ExprNode(token) {
+        }
 
-        void accept(const Visitor *visitor) const override {
+        void accept(const Visitor* visitor) const override {
             visitor->visit(this);
         }
 
-        [[nodiscard]] const char *name() const noexcept override {
+        [[nodiscard]] const char* name() const noexcept override {
             return "symbol";
         }
     };
 
-    class BinaryExprNode : public ExprNode{
+    class BinaryExprNode : public ExprNode {
     public:
-
-        const ExprNode *lhs;
-        const ExprNode *rhs;
+        const ExprNode* lhs;
+        const ExprNode* rhs;
 
         BinaryExprNode() = delete;
 
         explicit BinaryExprNode(
-                Token &token,
-                const ExprNode *lhs,
-                const ExprNode *rhs
+            Token& token,
+            const ExprNode* lhs,
+            const ExprNode* rhs
         ) : ExprNode(token), lhs(lhs), rhs(rhs) {
             location.start(lhs->location.start());
             location.end(rhs->location.end());
         }
 
-        void accept(const Visitor *visitor) const override {
+        void accept(const Visitor* visitor) const override {
             visitor->visit(this);
         }
 
-        [[nodiscard]] const char *name() const noexcept override {
+        [[nodiscard]] const char* name() const noexcept override {
             return "binary_operator";
         }
     };
 
     class UnaryExprNode : public ExprNode {
     public:
-        const ExprNode *rhs;
+        const ExprNode* rhs;
 
         UnaryExprNode() = delete;
 
         explicit UnaryExprNode(
-                Token &token,
-                const ExprNode *rhs
+            Token& token,
+            const ExprNode* rhs
         ) : ExprNode(token), rhs(rhs) {
             location.end(rhs->location.end());
         }
 
-        void accept(const Visitor *visitor) const override {
+        void accept(const Visitor* visitor) const override {
             visitor->visit(this);
         }
 
-        [[nodiscard]] const char *name() const noexcept override {
+        [[nodiscard]] const char* name() const noexcept override {
             return "unary_operator";
         }
     };
 
     class AssignExprNode : public ExprNode {
     public:
-
-        const ExprNode *lhs;
-        const ExprNode *rhs;
+        const SymbolExprNode* lhs;
+        const ExprNode* rhs;
 
         AssignExprNode() = delete;
 
         explicit AssignExprNode(
-                const ExprNode *lhs,
-                const ExprNode *rhs
+            const SymbolExprNode* lhs,
+            const ExprNode* rhs
         ) : lhs(lhs), rhs(rhs) {
             location.start(lhs->location.start());
             location.end(rhs->location.end());
         }
 
-        void accept(const Visitor *visitor) const override {
+        void accept(const Visitor* visitor) const override {
             visitor->visit(this);
         }
 
-        [[nodiscard]] const char *name() const noexcept override {
+        [[nodiscard]] const char* name() const noexcept override {
             return "assignment_expression";
         }
     };
