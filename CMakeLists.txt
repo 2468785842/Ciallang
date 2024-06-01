@@ -3,63 +3,68 @@ cmake_minimum_required(VERSION 3.25)
 project(Ciallang CXX)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+
 set(SOURCE_FILES
-        ${CMAKE_SOURCE_DIR}/src/lexer/Lexer.cpp
-        ${CMAKE_SOURCE_DIR}/src/lexer/Token.hpp
-        ${CMAKE_SOURCE_DIR}/src/lexer/IEEETypes.hpp
+        src/lexer/Lexer.cpp
+        src/lexer/Token.hpp
+        src/lexer/IEEETypes.hpp
 
-        ${CMAKE_SOURCE_DIR}/src/common/Bytes.hpp
-        ${CMAKE_SOURCE_DIR}/src/common/SourceLocation.cpp
-        ${CMAKE_SOURCE_DIR}/src/common/Result.hpp
-        ${CMAKE_SOURCE_DIR}/src/common/ResultMessage.hpp
-        ${CMAKE_SOURCE_DIR}/src/common/Defer.hpp
-        ${CMAKE_SOURCE_DIR}/src/common/SourceFile.cpp
-        ${CMAKE_SOURCE_DIR}/src/common/Colorizer.cpp
-        ${CMAKE_SOURCE_DIR}/src/common/UTF8.cpp
+        src/common/Bytes.hpp
+        src/common/SourceLocation.cpp
+        src/common/Result.hpp
+        src/common/ResultMessage.hpp
+        src/common/Defer.hpp
+        src/common/SourceFile.cpp
+        src/common/Colorizer.cpp
+        src/common/UTF8.cpp
 
-        ${CMAKE_SOURCE_DIR}/src/parser/Parser.cpp
+        src/parser/Parser.cpp
 
-        ${CMAKE_SOURCE_DIR}/src/ast/Ast.cpp
-        ${CMAKE_SOURCE_DIR}/src/ast/AstFormatter.cpp
+        src/ast/Ast.cpp
+        src/ast/AstFormatter.cpp
 
-        ${CMAKE_SOURCE_DIR}/src/ast/AstNode.hpp
-        ${CMAKE_SOURCE_DIR}/src/ast/ExprNode.hpp
-        ${CMAKE_SOURCE_DIR}/src/ast/StmtNode.hpp
+        src/ast/AstNode.hpp
+        src/ast/ExprNode.hpp
+        src/ast/StmtNode.hpp
 
-        ${CMAKE_SOURCE_DIR}/src/compiler/Compiler.cpp
+        src/compiler/Compiler.cpp
 
         # ############################################
-        ${CMAKE_SOURCE_DIR}/src/vm/Interpreter.cpp
-        ${CMAKE_SOURCE_DIR}/src/vm/VMChunk.cpp
-        ${CMAKE_SOURCE_DIR}/src/vm/Rlc.cpp
-        ${CMAKE_SOURCE_DIR}/src/vm/Memory.hpp
-        ${CMAKE_SOURCE_DIR}/src/vm/Instruction.hpp
-        ${CMAKE_SOURCE_DIR}/src/vm/DataPool.hpp
+        src/vm/Interpreter.cpp
+        src/vm/VMChunk.cpp
+        src/vm/Rlc.cpp
+        src/vm/Memory.hpp
+        src/vm/Instruction.hpp
+        src/vm/DataPool.hpp
 
-        ${CMAKE_SOURCE_DIR}/src/types/TjsOctet.cpp
-        ${CMAKE_SOURCE_DIR}/src/types/TjsString.cpp
-        ${CMAKE_SOURCE_DIR}/src/types/TjsObject.cpp
-        ${CMAKE_SOURCE_DIR}/src/types/TjsValue.cpp
-        ${CMAKE_SOURCE_DIR}/src/types/TjsTypes.hpp
+        src/types/TjsOctet.cpp
+        src/types/TjsString.cpp
+        src/types/TjsObject.cpp
+        src/types/TjsValue.cpp
+        src/types/TjsTypes.hpp
 
-        ${CMAKE_SOURCE_DIR}/src/init/GlogInit.hpp
+        src/init/GlogInit.hpp
 )
 add_executable(${PROJECT_NAME}
         src/main.cpp
         ${SOURCE_FILES}
 )
 
-include(depend)
+include(cmake/depend.cmake)
 
+find_package(fmt REQUIRED)
+find_package(utf8proc REQUIRED)
+find_package(frozen REQUIRED)
 find_package(gflags REQUIRED)
+find_package(glog REQUIRED)
 
 target_link_libraries(
         ${PROJECT_NAME}
         PRIVATE
         fmt utf8proc frozen gflags glog
 )
-
-enable_testing()
-add_subdirectory(tests)
+set(BUILD_TESTING ON)
+if (${BUILD_TESTING})
+    add_subdirectory(tests)
+endif ()

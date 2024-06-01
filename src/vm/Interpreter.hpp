@@ -27,6 +27,7 @@ namespace Ciallang::VM {
     };
 
     class Interpreter {
+        friend struct Instruction;
 
     public:
         explicit Interpreter(VMChunk*);
@@ -39,7 +40,7 @@ namespace Ciallang::VM {
         struct {
             VMChunk* chunk;
             uint8_t* ip;
-            bool flags; //跳转标记*/
+            bool flags; /* 跳转标记 */
         } _vm;
     };
 }

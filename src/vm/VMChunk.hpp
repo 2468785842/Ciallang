@@ -16,9 +16,10 @@
 #include <cstdint>
 
 #include "DataPool.hpp"
-#include "Instruction.hpp"
+#include "Rlc.hpp"
 
 namespace Ciallang::VM {
+    enum class Opcodes;
     // pd (direct / property direct) 直接,属性直接
     // pi (indirect / property indirect) 间接,属性间接
 
@@ -133,8 +134,9 @@ namespace Ciallang::VM {
         // index from 0 start
         size_t load(TjsValue&& val) {
             _valueArray.writeData(std::move(val));
-            return count - 1;
+            return _valueArray.count - 1;
         }
+        [[nodiscard]] const Rlc* rlc() const { return &_rlc; }
 
         [[nodiscard]] uint8_t* bytecodes() const { return _bytecodes; }
 

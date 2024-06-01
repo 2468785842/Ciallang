@@ -15,15 +15,21 @@
 
 #include <fmt/format.h>
 
+#include "Instruction.hpp"
+
 namespace Ciallang::VM {
     void VMChunk::disassemble() const {
-        fmt::println("-------------- {} --------------", _rlc.name());
+        #define RLC_NAME_LEN (_rlc.name().length() < 35 ? 35 - _rlc.name().length() : 35)
+        #define RLC_NAME (RLC_NAME_LEN == 35 ? "-" : _rlc.name())
+
+        fmt::println("{:-^{}}", RLC_NAME, RLC_NAME_LEN);
 
         for(size_t offset = 0; offset < count;) {
             const auto* inst = Instruction::instance(
                 static_cast<Opcodes>(_bytecodes[offset])
             );
             fmt::println("{}", inst->disassemble(_bytecodes, constants(), &_rlc, offset));
+            offset += inst->offset;
         }
     }
 }

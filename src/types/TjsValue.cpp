@@ -17,6 +17,7 @@
 #include "TjsString.hpp"
 #include "TjsOctet.hpp"
 #include "TjsObject.hpp"
+#include "glog/logging.h"
 
 namespace Ciallang {
     TjsValue::TjsValue(const TjsString& value) :
@@ -125,31 +126,32 @@ namespace Ciallang {
 
 
     TjsInteger TjsValue::asInteger() const {
-        assert(this->_type == TjsValueType::Integer);
+        CHECK(this->_type == TjsValueType::Integer) << "is not integer";
         return _value._integer;
     }
 
     TjsReal TjsValue::asReal() const {
-        assert(this->_type == TjsValueType::Real);
+        CHECK(this->_type == TjsValueType::Real) << "is not real";
         return _value._real;
     }
 
     TjsString* TjsValue::asString() const {
-        assert(this->_type == TjsValueType::String);
+        CHECK(this->_type == TjsValueType::String) << "is not string";
         return _value._string;
     }
 
     TjsOctet* TjsValue::asOctet() const {
-        assert(this->_type == TjsValueType::Octet);
+        CHECK(this->_type == TjsValueType::Octet) << "is not octet";
         return _value._octet;
     }
 
     TjsObject* TjsValue::asObject() const {
-        assert(_type == TjsValueType::Object);
+        CHECK(_type == TjsValueType::Object) << "is not object";
         return _value._object;
     }
 
     const char* TjsValue::name() const {
         return S_TypeToName.at(_type);
     }
+
 }

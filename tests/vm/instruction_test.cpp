@@ -12,13 +12,15 @@
  *
  */
 #include <gtest/gtest.h>
+#include <glog/logging.h>
 
 #include <types/TjsValue.hpp>
 
 #include <vm/VMChunk.hpp>
+#include <vm/Instruction.hpp>
 
-#include <glog/logging.h>
 #include <init/GlogInit.hpp>
+
 using namespace Ciallang::VM;
 
 int main(int argc, char** argv) {

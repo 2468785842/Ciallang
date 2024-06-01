@@ -1,18 +1,44 @@
 cmake_minimum_required(VERSION 3.25)
 
+enable_testing()
+
 project(Ciallang CXX)
+
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 
-include_directories("${CMAKE_SOURCE_DIR}/src")
+macro(get_source_file directory)
+    file(GLOB ${directory}_SOURCE_FILES "${CMAKE_SOURCE_DIR}/src/${directory}/*.[ch]pp")
+endmacro()
+
+get_source_file(common)
+get_source_file(types)
+get_source_file(vm)
 
 add_executable(
         vm_instruction_test
         vm/instruction_test.cpp
-        ${SOURCE_FILES}
+
+        ${CMAKE_SOURCE_DIR}/src/init/GlogInit.hpp
+
+        ${common_SOURCE_FILES}
+        ${types_SOURCE_FILES}
+        ${vm_SOURCE_FILES}
 )
+
+target_include_directories(vm_instruction_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+)
+
+include(cmake/depend.cmake)
+find_package(gtest REQUIRED)
+
+include(../cmake/depend.cmake)
+find_package(fmt REQUIRED)
+find_package(utf8proc REQUIRED)
+find_package(frozen REQUIRED)
+find_package(gflags REQUIRED)
+find_package(glog REQUIRED)
 
 target_link_libraries(
         vm_instruction_test

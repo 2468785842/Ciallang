@@ -13,6 +13,8 @@
  */
 #include "Interpreter.hpp"
 
+#include <glog/logging.h>
+
 #include "VMChunk.hpp"
 #include "Instruction.hpp"
 
@@ -20,17 +22,18 @@ namespace Ciallang::VM {
     #define READ_BYTE() (*_vm.ip++)
     #define READ_CONSTANT() (_vm.chunk->constants()[READ_BYTE()])
 
-    using enum InterpretResult;
-
     Interpreter::Interpreter(VMChunk* chunk)
         : _vm{ chunk, chunk->bytecodes(), false } {
     }
 
+    using enum InterpretResult;
     InterpretResult Interpreter::run() {
         for(;;) {
             auto opcode = static_cast<Opcodes>(READ_BYTE());
             if(opcode == Opcodes::Ret) return OK;
+
             const auto* inst = Instruction::instance(opcode);
+            LOG(INFO) << inst->disassemble(this, opcode);
             inst->execute(this);
         }
     }

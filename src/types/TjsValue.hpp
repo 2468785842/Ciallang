@@ -12,8 +12,10 @@
 
 #pragma once
 
+#include <stdexcept>
 #include <unordered_map>
-#include <string>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 
 #include "TjsTypes.hpp"
 #include "TjsString.hpp"
@@ -41,7 +43,7 @@ namespace Ciallang {
 
         TjsValue(TjsValue&&) noexcept;
 
-        TjsValue& operator=(TjsValue &&value) noexcept;
+        TjsValue& operator=(TjsValue&& value) noexcept;
 
         ~TjsValue() noexcept;
 
@@ -71,6 +73,23 @@ namespace Ciallang {
         } _value{};
 
         TjsValueType _type{ TjsValueType::Void };
+
+        friend std::ostream& operator<<(std::ostream& os, const TjsValue& d) {
+            switch(d.type()) {
+                case TjsValueType::Integer:
+                    return os << d.asInteger();
+                case TjsValueType::Real:
+                    return os << d.asReal();
+                case TjsValueType::String:
+                    return os << d.asString();
+                case TjsValueType::Octet:
+                case TjsValueType::Object:
+                    throw std::logic_error("not support");
+                case TjsValueType::Void:
+                    return os << "void";
+            }
+            return os << "unknown";
+        }
     };
 
     static const std::unordered_map<TjsValueType, const char*> S_TypeToName{
@@ -90,3 +109,8 @@ namespace Ciallang {
         return TjsValue{ value };
     }
 } // namespace Ciallang
+
+// support fmt::format
+template <>
+struct fmt::formatter<Ciallang::TjsValue> : ostream_formatter {
+};
