@@ -122,24 +122,36 @@ namespace Ciallang::VM {
         explicit VMChunk(const std::filesystem::path& path): _rlc{ path } {
         };
 
-        void emit(uint8_t byte, const size_t line) {
-            _rlc.addBytecodeLine(count, line);
-            writeData(std::forward<uint8_t>(byte));
-        }
-
-        void emit(const Opcodes opcode, const size_t line) {
+        void emit(const size_t line, const Opcodes opcode,
+                  const std::initializer_list<uint8_t> args = {}) {
             emit(static_cast<uint8_t>(opcode), line);
+            for(uint8_t arg : args) {
+                emit(arg, line);
+            }
         }
 
-        ValueArray* valueArray() {
-            return &_valuArray;
+        // index from 0 start
+        size_t load(TjsValue&& val) {
+            _valueArray.writeData(std::move(val));
+            return count - 1;
         }
+
+        [[nodiscard]] uint8_t* bytecodes() const { return _bytecodes; }
+
+        [[nodiscard]] TjsValue* constants() const { return _valueArray.dataPool; }
 
         void disassemble() const;
 
     private:
         uint8_t*& _bytecodes = dataPool;
-        ValueArray _valuArray{};
+
+        DataPool<TjsValue> _valueArray{};
+
         Rlc _rlc;
+
+        void emit(uint8_t byte, const size_t line) {
+            _rlc.addBytecodeLine(count, line);
+            writeData(std::forward<uint8_t>(byte));
+        }
     };
 }

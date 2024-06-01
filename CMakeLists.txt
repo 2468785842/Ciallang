@@ -31,7 +31,7 @@ set(SOURCE_FILES
         ${CMAKE_SOURCE_DIR}/src/compiler/Compiler.cpp
 
         # ############################################
-        ${CMAKE_SOURCE_DIR}/src/vm/CiallangVM.cpp
+        ${CMAKE_SOURCE_DIR}/src/vm/Interpreter.cpp
         ${CMAKE_SOURCE_DIR}/src/vm/VMChunk.cpp
         ${CMAKE_SOURCE_DIR}/src/vm/Rlc.cpp
         ${CMAKE_SOURCE_DIR}/src/vm/Memory.hpp
@@ -44,6 +44,7 @@ set(SOURCE_FILES
         ${CMAKE_SOURCE_DIR}/src/types/TjsValue.cpp
         ${CMAKE_SOURCE_DIR}/src/types/TjsTypes.hpp
 
+        ${CMAKE_SOURCE_DIR}/src/init/GlogInit.hpp
 )
 add_executable(${PROJECT_NAME}
         src/main.cpp
@@ -51,6 +52,14 @@ add_executable(${PROJECT_NAME}
 )
 
 include(depend)
-target_link_libraries(${PROJECT_NAME} PRIVATE fmt utf8proc frozen)
 
+find_package(gflags REQUIRED)
+
+target_link_libraries(
+        ${PROJECT_NAME}
+        PRIVATE
+        fmt utf8proc frozen gflags glog
+)
+
+enable_testing()
 add_subdirectory(tests)

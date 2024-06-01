@@ -162,10 +162,11 @@ namespace Ciallang::Syntax {
 
     static constexpr inline IfStmtParser S_IfStmtParser{};
 
-    static constexpr inline frozen::unordered_map<TokenType, const StmtParser*, 2> S_StmtParsers = {
-            { TokenType::LeftCurlyBrace, &S_BlockStmtParser },
-            { TokenType::If, &S_IfStmtParser },
-    };
+    static constexpr inline auto S_StmtParsers =
+            frozen::make_unordered_map<TokenType, const StmtParser*>({
+                    { TokenType::LeftCurlyBrace, &S_BlockStmtParser },
+                    { TokenType::If, &S_IfStmtParser },
+            });
 
     /**
      * +----------------------------------------------------------------------------+
@@ -208,34 +209,35 @@ namespace Ciallang::Syntax {
     static constexpr inline UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
     //    static inline FunctionPrefixParser S_FunctionPrefixParser{};
 
-    static constexpr inline frozen::unordered_map<TokenType, const PrefixParser*, 19> S_PrefixParsers{
-            { TokenType::Const, &S_PrefixParser },
-            { TokenType::Var, &S_PrefixParser },
-            { TokenType::ConstVal, &S_ConstValPrefixParser },
-            { TokenType::Minus, &S_NegatePrefixParser }, // "-"
-            { TokenType::Identifier, &S_SymbolPrefixParser },
-            { TokenType::Exclamation, &S_PrefixParser }, // "!"
-            { TokenType::Tilde, &S_PrefixParser },       // "~"
-            { TokenType::Decrement, &S_PrefixParser },   // "--"
-            { TokenType::Increment, &S_PrefixParser },   // "++"
-            { TokenType::New, &S_PrefixParser },         // "new" 函数调用, 或创建新对象
-            { TokenType::Invalidate, &S_PrefixParser },  // "invalidate"
-            { TokenType::Isvalid, &S_PrefixParser },     // "isvalid" todo: 注意还有中缀表示
-            // incontextof_expr "isvalid"
-            { TokenType::Delete, &S_PrefixParser },    //"delete"
-            { TokenType::Typeof, &S_PrefixParser },    //"typeof
-            { TokenType::Sharp, &S_PrefixParser },     //"#" 获取字符串第一个字符,转为int
-            { TokenType::Dollar, &S_PrefixParser },    //"$" 将int, 转为char
-            { TokenType::Plus, &S_PrefixParser },      //"+"
-            { TokenType::Ampersand, &S_PrefixParser }, // "&" substance accessing (ignores property operation)
-            { TokenType::Asterisk, &S_PrefixParser },  // "*" force property access
-            // incontextof_expr "instanceof" unary_expr
-            // incontextof_expr "in" unary_expr
-            // {TokenType::Int,            &S_TypeCastPrefixParser}, // "int" unary_expr
-            // {TokenType::Real,           &S_TypeCastPrefixParser}, // "real" unary_expr
-            // {TokenType::String,         &S_TypeCastPrefixParser}, // "string" unary_expr
-            // {TokenType::Function,       &S_FunctionPrefixParser}
-    };
+    static constexpr inline auto S_PrefixParsers =
+            frozen::make_unordered_map<TokenType, const PrefixParser*>({
+                    { TokenType::Const, &S_PrefixParser },
+                    { TokenType::Var, &S_PrefixParser },
+                    { TokenType::ConstVal, &S_ConstValPrefixParser },
+                    { TokenType::Minus, &S_NegatePrefixParser }, // "-"
+                    { TokenType::Identifier, &S_SymbolPrefixParser },
+                    { TokenType::Exclamation, &S_PrefixParser }, // "!"
+                    { TokenType::Tilde, &S_PrefixParser },       // "~"
+                    { TokenType::Decrement, &S_PrefixParser },   // "--"
+                    { TokenType::Increment, &S_PrefixParser },   // "++"
+                    { TokenType::New, &S_PrefixParser },         // "new" 函数调用, 或创建新对象
+                    { TokenType::Invalidate, &S_PrefixParser },  // "invalidate"
+                    { TokenType::Isvalid, &S_PrefixParser },     // "isvalid" todo: 注意还有中缀表示
+                    // incontextof_expr "isvalid"
+                    { TokenType::Delete, &S_PrefixParser },    //"delete"
+                    { TokenType::Typeof, &S_PrefixParser },    //"typeof
+                    { TokenType::Sharp, &S_PrefixParser },     //"#" 获取字符串第一个字符,转为int
+                    { TokenType::Dollar, &S_PrefixParser },    //"$" 将int, 转为char
+                    { TokenType::Plus, &S_PrefixParser },      //"+"
+                    { TokenType::Ampersand, &S_PrefixParser }, // "&" substance accessing (ignores property operation)
+                    { TokenType::Asterisk, &S_PrefixParser },  // "*" force property access
+                    // incontextof_expr "instanceof" unary_expr
+                    // incontextof_expr "in" unary_expr
+                    // {TokenType::Int,            &S_TypeCastPrefixParser}, // "int" unary_expr
+                    // {TokenType::Real,           &S_TypeCastPrefixParser}, // "real" unary_expr
+                    // {TokenType::String,         &S_TypeCastPrefixParser}, // "string" unary_expr
+                    // {TokenType::Function,       &S_FunctionPrefixParser}
+            });
 
     /**
      * +----------------------------------------------------------------------------+
@@ -282,47 +284,48 @@ namespace Ciallang::Syntax {
             S_LogicalAndBinOpParser{ Precedence::logical_and, false },
             S_MemberAccessBinOpParser{ Precedence::postfix, false };
 
-    static constexpr inline frozen::unordered_map<TokenType, const InfixParser*, 40> S_InfixParsers{
-            { TokenType::Swap, &S_AssignBinOpParser },                    // <->
-            { TokenType::Assignment, &S_AssignBinOpParser },              // =
-            { TokenType::Plus, &S_SumSubBinOpInfixParser },               // "+"
-            { TokenType::PlusEqual, &S_AssignBinOpParser },               // "+="
-            { TokenType::Minus, &S_SumSubBinOpInfixParser },              // "-"
-            { TokenType::MinusEqual, &S_AssignBinOpParser },              // "-="
-            { TokenType::Slash, &S_ProductBinOpParser },                  // "/" 除法结果为浮点数
-            { TokenType::SlashEqual, &S_AssignBinOpParser },              // "/="
-            { TokenType::Backslash, &S_ProductBinOpParser },              // "\" 除法结果直接截断为整数
-            { TokenType::BackslashEqual, &S_AssignBinOpParser },          // "\="
-            { TokenType::Percent, &S_ProductBinOpParser },                // "%"
-            { TokenType::PercentEqual, &S_AssignBinOpParser },            // "%="
-            { TokenType::Asterisk, &S_ProductBinOpParser },               // "*"
-            { TokenType::AsteriskEqual, &S_AssignBinOpParser },           // "*="
-            { TokenType::Exclamation, &S_ProductBinOpParser },            // !
-            { TokenType::LogicalAndEqual, &S_AssignBinOpParser },         // "&&="
-            { TokenType::LogicalOrEqual, &S_AssignBinOpParser },          // "||="
-            { TokenType::LArithShift, &S_BitwiseShiftOrRollBinOpParser }, // "<<"
-            { TokenType::LArithShiftEqual, &S_AssignBinOpParser },        // "<<="
-            { TokenType::RArithShift, &S_BitwiseShiftOrRollBinOpParser }, // ">>"
-            { TokenType::RArithShiftEqual, &S_AssignBinOpParser },        // ">>="
-            { TokenType::RBitShift, &S_BitwiseShiftOrRollBinOpParser },   // ">>>"
-            { TokenType::RBitShiftEqual, &S_AssignBinOpParser },          // ">>>="
-            { TokenType::Equal, &S_EqualityBinOpParser },                 // ==
-            { TokenType::NotEqual, &S_EqualityBinOpParser },              // !=
-            { TokenType::DiscEqual, &S_EqualityBinOpParser },             // ===
-            { TokenType::DiscNotEqual, &S_EqualityBinOpParser },          // !==
-            { TokenType::Ampersand, &S_BitwiseAndWithAssignBinOpParser }, // &
-            { TokenType::VertLine, &S_BitwiseOrWithAssignBinOpParser },   // |
-            { TokenType::Chevron, &S_BitwiseXorWithAssignBinOpParser },   // ^
-            { TokenType::AmpersandEqual, &S_AssignBinOpParser },          // "&="
-            { TokenType::VertLineEqual, &S_AssignBinOpParser },           // "|="
-            { TokenType::ChevronEqual, &S_AssignBinOpParser },            // "^="
-            { TokenType::Lt, &S_RelationalBinOpParser },                  // <
-            { TokenType::LtOrEqual, &S_RelationalBinOpParser },           // <=
-            { TokenType::Gt, &S_RelationalBinOpParser },                  // >=
-            { TokenType::GtOrEqual, &S_RelationalBinOpParser },           // >
-            { TokenType::LogicalAnd, &S_LogicalAndBinOpParser },          // &&
-            { TokenType::LogicalOr, &S_LogicalOrBinOpParser },            // ||
-            //            {TokenType::Question,         &S_ConditionalTernaryBinOpParser}, // cond ? expr : expr
-            { TokenType::Dot, &S_MemberAccessBinOpParser },
-    };
+    static constexpr inline auto S_InfixParsers =
+            frozen::make_unordered_map<TokenType, const InfixParser*>({
+                    { TokenType::Swap, &S_AssignBinOpParser },                    // <->
+                    { TokenType::Assignment, &S_AssignBinOpParser },              // =
+                    { TokenType::Plus, &S_SumSubBinOpInfixParser },               // "+"
+                    { TokenType::PlusEqual, &S_AssignBinOpParser },               // "+="
+                    { TokenType::Minus, &S_SumSubBinOpInfixParser },              // "-"
+                    { TokenType::MinusEqual, &S_AssignBinOpParser },              // "-="
+                    { TokenType::Slash, &S_ProductBinOpParser },                  // "/" 除法结果为浮点数
+                    { TokenType::SlashEqual, &S_AssignBinOpParser },              // "/="
+                    { TokenType::Backslash, &S_ProductBinOpParser },              // "\" 除法结果直接截断为整数
+                    { TokenType::BackslashEqual, &S_AssignBinOpParser },          // "\="
+                    { TokenType::Percent, &S_ProductBinOpParser },                // "%"
+                    { TokenType::PercentEqual, &S_AssignBinOpParser },            // "%="
+                    { TokenType::Asterisk, &S_ProductBinOpParser },               // "*"
+                    { TokenType::AsteriskEqual, &S_AssignBinOpParser },           // "*="
+                    { TokenType::Exclamation, &S_ProductBinOpParser },            // !
+                    { TokenType::LogicalAndEqual, &S_AssignBinOpParser },         // "&&="
+                    { TokenType::LogicalOrEqual, &S_AssignBinOpParser },          // "||="
+                    { TokenType::LArithShift, &S_BitwiseShiftOrRollBinOpParser }, // "<<"
+                    { TokenType::LArithShiftEqual, &S_AssignBinOpParser },        // "<<="
+                    { TokenType::RArithShift, &S_BitwiseShiftOrRollBinOpParser }, // ">>"
+                    { TokenType::RArithShiftEqual, &S_AssignBinOpParser },        // ">>="
+                    { TokenType::RBitShift, &S_BitwiseShiftOrRollBinOpParser },   // ">>>"
+                    { TokenType::RBitShiftEqual, &S_AssignBinOpParser },          // ">>>="
+                    { TokenType::Equal, &S_EqualityBinOpParser },                 // ==
+                    { TokenType::NotEqual, &S_EqualityBinOpParser },              // !=
+                    { TokenType::DiscEqual, &S_EqualityBinOpParser },             // ===
+                    { TokenType::DiscNotEqual, &S_EqualityBinOpParser },          // !==
+                    { TokenType::Ampersand, &S_BitwiseAndWithAssignBinOpParser }, // &
+                    { TokenType::VertLine, &S_BitwiseOrWithAssignBinOpParser },   // |
+                    { TokenType::Chevron, &S_BitwiseXorWithAssignBinOpParser },   // ^
+                    { TokenType::AmpersandEqual, &S_AssignBinOpParser },          // "&="
+                    { TokenType::VertLineEqual, &S_AssignBinOpParser },           // "|="
+                    { TokenType::ChevronEqual, &S_AssignBinOpParser },            // "^="
+                    { TokenType::Lt, &S_RelationalBinOpParser },                  // <
+                    { TokenType::LtOrEqual, &S_RelationalBinOpParser },           // <=
+                    { TokenType::Gt, &S_RelationalBinOpParser },                  // >=
+                    { TokenType::GtOrEqual, &S_RelationalBinOpParser },           // >
+                    { TokenType::LogicalAnd, &S_LogicalAndBinOpParser },          // &&
+                    { TokenType::LogicalOr, &S_LogicalOrBinOpParser },            // ||
+                    //            {TokenType::Question,         &S_ConditionalTernaryBinOpParser}, // cond ? expr : expr
+                    { TokenType::Dot, &S_MemberAccessBinOpParser },
+            });
 }

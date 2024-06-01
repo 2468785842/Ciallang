@@ -12,20 +12,34 @@
  *
  */
 #pragma once
+
 #include <cstdint>
 
-#include "VMChunk.hpp"
+#include "../types/TjsValue.hpp"
 
 namespace Ciallang::VM {
-    class CiallangVM {
+    class VMChunk;
+
+    enum class InterpretResult {
+        OK,
+        COMPILE_ERROR,
+        RUNTIME_ERROR
+    };
+
+    class Interpreter {
+
     public:
-        bool initializer();
+        explicit Interpreter(VMChunk*);
+
+        InterpretResult run();
+
+        TjsValue readConstant();
+
     private:
-        //10M
-        /*uint64_t registers[1024 * 1024 * 10]{};
-        uint64_t constants[1024 * 1024 * 10]{};
-        Instruction instructions[1024 * 1024 * 10]{};
-        uint32_t PC{};
-        bool flags{};//跳转标记*/
+        struct {
+            VMChunk* chunk;
+            uint8_t* ip;
+            bool flags; //跳转标记*/
+        } _vm;
     };
 }

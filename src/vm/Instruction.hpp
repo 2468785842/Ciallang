@@ -20,6 +20,7 @@
 #include <frozen/unordered_map.h>
 #include <fmt/format.h>
 
+#include "Interpreter.hpp"
 #include "Rlc.hpp"
 
 namespace Ciallang::VM {
@@ -29,13 +30,16 @@ namespace Ciallang::VM {
     };
 
     struct Instruction {
-        static const Instruction* instance(uint8_t bytecodes);
+        static const Instruction* instance(Opcodes opcode);
 
         const char* name{ nullptr };
         const size_t offset;
 
         constexpr Instruction(const char* name, const size_t offset)
             : name(name), offset(offset) {
+        }
+
+        virtual void execute(Interpreter* interpreter) const {
         }
 
         virtual std::string disassemble(const uint8_t* bytecodes,
@@ -50,6 +54,10 @@ namespace Ciallang::VM {
     struct RetInstruction final : Instruction {
         constexpr RetInstruction():
             Instruction(S_InstName, 1) {
+        }
+
+        void execute(Interpreter* interpreter) const override {
+
         }
 
         [[nodiscard]] std::string disassemble(const uint8_t* bytecodes,
@@ -99,8 +107,8 @@ namespace Ciallang::VM {
             { Opcodes::Ret, &S_RetInst },
     };
 
-    inline const Instruction* Instruction::instance(uint8_t bytecodes) {
-        return instructions.at(static_cast<Opcodes>(bytecodes));
+    inline const Instruction* Instruction::instance(const Opcodes opcode) {
+        return instructions.at(opcode);
     }
 }
 

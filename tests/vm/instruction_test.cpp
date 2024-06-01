@@ -17,13 +17,26 @@
 
 #include <vm/VMChunk.hpp>
 
+#include <glog/logging.h>
+#include <init/GlogInit.hpp>
+using namespace Ciallang::VM;
+
+int main(int argc, char** argv) {
+    // Initialize Google's logging library.
+    Ciallang::Init::InitializeGlog(argv);
+    // Initialize GoogleTest.
+    ::testing::InitGoogleTest(&argc, argv);
+
+    return RUN_ALL_TESTS();
+}
+
 TEST(VM_Test, Instruction) {
-    Ciallang::VM::VMChunk vmChunk{ "test" };
+    VMChunk vmChunk{ "test" };
 
-    auto index = vmChunk.valueArray()->load(Ciallang::tjsReal(1.2));
+    auto index = vmChunk.load(Ciallang::tjsReal(1.2));
 
-    vmChunk.emit(Ciallang::VM::Opcodes::Const, 0);
-    vmChunk.emit(static_cast<uint8_t>(index), 0);
-    vmChunk.emit(Ciallang::VM::Opcodes::Ret, 2);
+    vmChunk.emit(0, Opcodes::Const, { static_cast<uint8_t>(index) });
+    vmChunk.emit(1, Opcodes::Ret);
+
     vmChunk.disassemble();
 }

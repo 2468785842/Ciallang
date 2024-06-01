@@ -13,7 +13,7 @@
  */
 
 #include "UTF8.hpp"
-#include "utf8proc.h"
+#include <utf8proc.h>
 
 namespace Ciallang::Common {
 
