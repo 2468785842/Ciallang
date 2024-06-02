@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024/5/6 下午8:16
+ * Copyright (c) 2024/6/2 下午5:03
  *
  * /\  _` \   __          /\_ \  /\_ \
  * \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -11,16 +11,40 @@
  *                                                            \_/__/
  *
  */
-
 #pragma once
 
-namespace Ciallang::Common {
+#include <sstream>
 
-    inline uint64_t align(const uint64_t size, const std::uint64_t align) {
-        if(align > 0) {
-            const auto result = size + align - 1;
-            return result - result % align;
-        }
-        return size;
-    }
-}
+#include <iostream>
+#include <string>
+
+#include <cstdint>
+#include <cassert>
+
+#include <stdexcept>
+#include <exception>
+
+#include <filesystem>
+#include <fstream>
+#include <utility>
+
+#include <set>
+#include <forward_list>
+#include <stack>
+#include <vector>
+#include <map>
+#include <unordered_map>
+
+#include <functional>
+
+
+#include <glog/logging.h>
+
+
+#include <frozen/unordered_map.h>
+#include <frozen/string.h>
+
+
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#include <fmt/color.h>

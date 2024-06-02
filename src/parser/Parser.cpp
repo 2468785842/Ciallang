@@ -14,9 +14,6 @@
 
 #include "Parser.hpp"
 
-#include <cassert>
-#include <fmt/format.h>
-
 #include "../ast/AstFormatter.hpp"
 
 #include "../ast/ExprNode.hpp"

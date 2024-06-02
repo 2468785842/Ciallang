@@ -13,13 +13,12 @@
  */
 #pragma once
 
-#include <cstdint>
-
+#include "types/TjsValue.hpp"
 #include "DataPool.hpp"
 #include "Rlc.hpp"
 
 namespace Ciallang::VM {
-    enum class Opcodes;
+    enum class Opcodes : uint8_t;
     // pd (direct / property direct) 直接,属性直接
     // pi (indirect / property indirect) 间接,属性间接
 
@@ -136,16 +135,17 @@ namespace Ciallang::VM {
             _valueArray.writeData(std::move(val));
             return _valueArray.count - 1;
         }
+
         [[nodiscard]] const Rlc* rlc() const { return &_rlc; }
 
-        [[nodiscard]] uint8_t* bytecodes() const { return _bytecodes; }
+        [[nodiscard]] uint8_t* bytecodes() const { return dataPool; }
 
         [[nodiscard]] TjsValue* constants() const { return _valueArray.dataPool; }
 
         void disassemble() const;
 
     private:
-        uint8_t*& _bytecodes = dataPool;
+        uint8_t* _bytecodes = dataPool;
 
         DataPool<TjsValue> _valueArray{};
 

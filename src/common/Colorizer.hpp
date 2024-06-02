@@ -12,39 +12,29 @@
 
 #pragma once
 
-#include <string>
-
-#include <fmt/color.h>
-
 namespace Ciallang::Common {
-
     // N.B. this is not thread safe
     extern bool G_ColorEnabled;
 
     class Colorizer {
     public:
+        static std::string colorize(
+            const std::string&,
+            fmt::color);
 
         static std::string colorize(
-                const std::string &,
-                fmt::color);
-
-        static std::string colorize(
-                const std::string &,
-                fmt::color,
-                fmt::color);
+            const std::string&,
+            fmt::color,
+            fmt::color);
 
         static std::string colorizeRange(
-                const std::string &,
-                size_t,
-                size_t,
-                fmt::color);
+            const std::string&,
+            size_t, size_t,
+            fmt::color);
 
         static std::string colorizeRange(
-                const std::string &,
-                size_t,
-                size_t,
-                fmt::color,
-                fmt::color);
-
+            const std::string&,
+            size_t, size_t,
+            fmt::color, fmt::color);
     };
 }

@@ -13,17 +13,18 @@
  */
 #pragma once
 
-#include <cstdint>
-
+#include "VMChunk.hpp"
 #include "../types/TjsValue.hpp"
+#define STACK_MAX 256
 
 namespace Ciallang::VM {
     class VMChunk;
 
     enum class InterpretResult {
-        OK,
-        COMPILE_ERROR,
-        RUNTIME_ERROR
+        OK, // 正常结束
+        CONTINUE, // 继续解释
+        COMPILE_ERROR, // 编译错误
+        RUNTIME_ERROR // 运行错误
     };
 
     class Interpreter {
@@ -36,11 +37,18 @@ namespace Ciallang::VM {
 
         TjsValue readConstant();
 
+        void push(TjsValue&& value);
+        TjsValue pop();
+        void printStack();
+
     private:
         struct {
             VMChunk* chunk;
             uint8_t* ip;
-            bool flags; /* 跳转标记 */
+            TjsValue stack[STACK_MAX];
+            TjsValue* sp = stack;
+
+            bool flags = false; /* 跳转标记 */
         } _vm;
     };
 }

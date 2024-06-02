@@ -51,6 +51,8 @@ add_executable(${PROJECT_NAME}
         ${SOURCE_FILES}
 )
 
+target_precompile_headers(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
+
 include(cmake/depend.cmake)
 
 find_package(fmt REQUIRED)

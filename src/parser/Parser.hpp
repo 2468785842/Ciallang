@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include <frozen/unordered_map.h>
-
 #include "../lexer/Lexer.hpp"
 #include "../common/SourceFile.hpp"
 #include "../ast/Ast.hpp"

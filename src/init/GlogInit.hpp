@@ -13,9 +13,6 @@
  */
 #pragma once
 
-#include <glog/logging.h>
-#include <fmt/format.h>
-
 namespace Ciallang::Init {
     inline void MyPrefixFormatter(std::ostream& s, const google::LogMessage& m, void* /*data*/) {
         using namespace std;

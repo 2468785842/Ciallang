@@ -12,7 +12,6 @@
  *
  */
 #include <gtest/gtest.h>
-#include <glog/logging.h>
 
 #include <types/TjsValue.hpp>
 
@@ -34,11 +33,12 @@ int main(int argc, char** argv) {
 
 TEST(VM_Test, Instruction) {
     VMChunk vmChunk{ "test" };
+    Interpreter interpreter{ &vmChunk };
 
     auto index = vmChunk.load(Ciallang::tjsReal(1.2));
 
-    vmChunk.emit(0, Opcodes::Const, { static_cast<uint8_t>(index) });
-    vmChunk.emit(1, Opcodes::Ret);
-
-    vmChunk.disassemble();
+    vmChunk.emit(122, Opcodes::Const, { static_cast<uint8_t>(index) });
+    vmChunk.emit(122, Opcodes::LNot);
+    vmChunk.emit(122, Opcodes::Ret);
+    EXPECT_EQ(interpreter.run(), InterpretResult::OK);
 }

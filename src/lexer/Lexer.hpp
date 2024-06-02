@@ -14,11 +14,6 @@
 
 #pragma once
 
-#include <cassert>
-#include <cstdint>
-#include <functional>
-#include <map>
-
 #include "../common/SourceFile.hpp"
 #include "../common/Result.hpp"
 #include "Token.hpp"

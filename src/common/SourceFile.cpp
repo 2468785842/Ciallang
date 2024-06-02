@@ -14,10 +14,6 @@
 
 #include "SourceFile.hpp"
 
-#include <fstream>
-
-#include <fmt/format.h>
-
 #include "Colorizer.hpp"
 #include "Defer.hpp"
 #include "UTF8.hpp"

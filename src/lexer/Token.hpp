@@ -14,9 +14,6 @@
 
 #pragma once
 
-#include <frozen/unordered_map.h>
-#include <frozen/string.h>
-
 #include "IEEETypes.hpp"
 #include "../common/SourceLocation.hpp"
 #include "../types/TjsValue.hpp"
@@ -281,7 +278,7 @@ namespace Ciallang::Syntax {
             Unknown[] = "unknown";
 
 
-    static constexpr inline auto S_TypeToName =
+    static constexpr auto S_TypeToName =
             frozen::make_unordered_map<TokenType, const char*>({
                     { TokenType::Comma, CommaLiteral },
                     { TokenType::Assignment, AssignmentLiteral },

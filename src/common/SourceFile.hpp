@@ -14,13 +14,6 @@
 
 #pragma once
 
-#include <filesystem>
-#include <map>
-
-#include <stack>
-#include <string>
-#include <utility>
-
 #include "Result.hpp"
 
 namespace Ciallang::Common {

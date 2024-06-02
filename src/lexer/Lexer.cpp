@@ -14,6 +14,8 @@
 
 #include "Lexer.hpp"
 
+#include "../types/TjsOctet.hpp"
+#include "../types/TjsString.hpp"
 #include "../types/TjsValue.hpp"
 #include "../common/Defer.hpp"
 #include "../common/UTF8.hpp"

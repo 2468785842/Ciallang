@@ -14,10 +14,6 @@
 
 #pragma once
 
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "SourceLocation.hpp"
 
 namespace Ciallang::Common {

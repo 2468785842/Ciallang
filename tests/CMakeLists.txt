@@ -44,8 +44,11 @@ target_link_libraries(
         vm_instruction_test
         PRIVATE
         GTest::gtest_main
-        fmt utf8proc frozen gtest gflags glog
+        fmt utf8proc frozen  gflags glog gtest
 )
+
+target_precompile_headers(vm_instruction_test PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
+
 
 include(GoogleTest)
 gtest_discover_tests(vm_instruction_test)

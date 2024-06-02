@@ -13,16 +13,16 @@
  */
 #pragma once
 
-#include "../types/TjsValue.hpp"
 #include "Memory.hpp"
 
 namespace Ciallang::VM {
-
     template <typename VT>
     struct DataPool {
         size_t count = 0;
-        size_t capacity = 0;
-        VT* dataPool{ nullptr };
+        size_t capacity = 8;
+        VT* dataPool{
+                Memory::growArray(static_cast<VT*>(nullptr), 0, 8)
+        };
 
         void writeData(VT&& value) {
             if(capacity < count + 1) {
@@ -40,5 +40,4 @@ namespace Ciallang::VM {
             Memory::freeArray(dataPool, capacity);
         }
     };
-
 }

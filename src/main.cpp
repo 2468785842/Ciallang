@@ -12,9 +12,6 @@
  *
  */
 
-#include <iostream>
-#include <string>
-
 #include "lexer/Lexer.hpp"
 #include "common/SourceFile.hpp"
 #include "compiler/Compiler.hpp"

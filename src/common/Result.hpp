@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "SourceLocation.hpp"
 #include "ResultMessage.hpp"
 

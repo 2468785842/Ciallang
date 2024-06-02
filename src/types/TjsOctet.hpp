@@ -12,19 +12,37 @@
 
 #pragma once
 
-#include <cstdint>
-#include <utility>
-#include <vector>
-
 #include "TjsTypes.hpp"
+#include "TjsValue.hpp"
 
 namespace Ciallang {
     class TjsOctet {
         std::vector<uint8_t> _buf;
-    public:
-        explicit TjsOctet(std::vector<uint8_t> buf) : _buf(std::move(buf)){}
 
-        static TjsValue tjsOctet(const std::vector<uint8_t >&);
+    public:
+        explicit TjsOctet(std::vector<uint8_t> buf) : _buf(std::move(buf)) {
+        }
+
+        static TjsValue tjsOctet(const std::vector<uint8_t>&);
     };
+
+
+    template <>
+    inline void TjsOctetHelper::copy(const TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+        dest._value._octet = new TjsOctet(*src._value._octet);
+    }
+
+    template <>
+    inline void TjsOctetHelper::move(TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+        dest._value._octet = src._value._octet;
+        src._value._octet = nullptr;
+    }
+
+    template <>
+    inline void TjsOctetHelper::destroy(TjsValue& value) const {
+        delete value._value._octet;
+    }
 
 }

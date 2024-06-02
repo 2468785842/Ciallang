@@ -13,12 +13,30 @@
 #pragma once
 
 #include "TjsTypes.hpp"
+#include "TjsValue.hpp"
 
 namespace Ciallang {
     class TjsObject {
     public:
-
         static TjsValue tjsObject();
     };
+
+    template <>
+    inline void TjsObjectHelper::copy(const TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+        dest._value._object = new TjsObject(*src._value._object);
+    }
+
+    template <>
+    inline void TjsObjectHelper::move(TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+        dest._value._object = src._value._object;
+        src._value._object = nullptr;
+    }
+
+    template <>
+    inline void TjsObjectHelper::destroy(TjsValue& value) const {
+        delete value._value._object;
+    }
 
 }

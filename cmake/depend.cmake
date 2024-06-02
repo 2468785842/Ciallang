@@ -56,14 +56,6 @@ FetchContent_Declare(
         OVERRIDE_FIND_PACKAGE
 )
 
-#FetchContent_GetProperties(gflags)
-#if (NOT gflags_POPULATE)
-#    FetchContent_Populate(gflags)
-##    set(CMAKE_INSTALL_PREFIX ${gflags_BINARY_DIR})
-#    add_subdirectory(${gflags_SOURCE_DIR} ${gflags_BINARY_DIR} EXCLUDE_FROM_ALL)
-#    set(gflags_DIR ${gflags_BINARY_DIR} CACHE STRING "" FORCE)
-#endif ()
-
 FetchContent_Declare(
         glog
         GIT_REPOSITORY https://github.com/google/glog.git

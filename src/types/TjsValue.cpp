@@ -12,12 +12,10 @@
 
 #include "TjsValue.hpp"
 
-#include <cassert>
-
 #include "TjsString.hpp"
 #include "TjsOctet.hpp"
 #include "TjsObject.hpp"
-#include "glog/logging.h"
+
 
 namespace Ciallang {
     TjsValue::TjsValue(const TjsString& value) :
@@ -36,92 +34,20 @@ namespace Ciallang {
     }
 
     TjsValue::TjsValue(const TjsValue& value) noexcept {
-        _type = value._type;
-
-        switch(_type) {
-            case TjsValueType::Integer:
-                _value._integer = value._value._integer;
-                break;
-            case TjsValueType::Real:
-                _value._real = value._value._real;
-                break;
-            case TjsValueType::String:
-                _value._string = new TjsString{ *value._value._string };
-                break;
-            case TjsValueType::Octet:
-                _value._octet = new TjsOctet{ *value._value._octet };
-                break;
-            case TjsValueType::Object:
-                _value._object = new TjsObject{ *value._value._object };
-                break;
-            case TjsValueType::Void:
-                // nothing to do
-                break;
-        }
+        TjsValueHelper::instance(value._type)->copy(value, *this);
     }
 
     TjsValue::TjsValue(TjsValue&& value) noexcept {
-        _type = value._type;
-
-        switch(_type) {
-            case TjsValueType::Integer:
-                _value._integer = value._value._integer;
-                break;
-            case TjsValueType::Real:
-                _value._real = value._value._real;
-                break;
-            case TjsValueType::String:
-                _value._string = value._value._string;
-                break;
-            case TjsValueType::Octet:
-                _value._octet = value._value._octet;
-                break;
-            case TjsValueType::Object:
-                _value._object = value._value._object;
-                break;
-            case TjsValueType::Void:
-                // nothing to do
-                break;
-        }
-
-        value._value = {};
+        TjsValueHelper::instance(value._type)->move(value, *this);
     }
 
     TjsValue& TjsValue::operator=(TjsValue&& value) noexcept {
-        _type = value._type;
-
-        switch(_type) {
-            case TjsValueType::Integer:
-                _value._integer = value._value._integer;
-                break;
-            case TjsValueType::Real:
-                _value._real = value._value._real;
-                break;
-            case TjsValueType::String:
-                _value._string = value._value._string;
-                break;
-            case TjsValueType::Octet:
-                _value._octet = value._value._octet;
-                break;
-            case TjsValueType::Object:
-                _value._object = value._value._object;
-                break;
-            case TjsValueType::Void:
-                // nothing to do
-                break;
-        }
-
-        value._value = {};
+        TjsValueHelper::instance(value._type)->move(value, *this);
         return *this;
     }
 
     TjsValue::~TjsValue() noexcept {
-        if(_type == TjsValueType::String)
-            delete _value._string;
-        if(_type == TjsValueType::Octet)
-            delete _value._octet;
-        if(_type == TjsValueType::Object)
-            delete _value._object;
+        TjsValueHelper::instance(_type)->destroy(*this);
     }
 
 
@@ -151,7 +77,6 @@ namespace Ciallang {
     }
 
     const char* TjsValue::name() const {
-        return S_TypeToName.at(_type);
+        return TjsValueHelper::instance(_type)->name();
     }
-
 }

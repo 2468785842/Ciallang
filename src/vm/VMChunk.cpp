@@ -13,8 +13,6 @@
  */
 #include "VMChunk.hpp"
 
-#include <fmt/format.h>
-
 #include "Instruction.hpp"
 
 namespace Ciallang::VM {
@@ -29,7 +27,7 @@ namespace Ciallang::VM {
                 static_cast<Opcodes>(_bytecodes[offset])
             );
             fmt::println("{}", inst->disassemble(_bytecodes, constants(), &_rlc, offset));
-            offset += inst->offset;
+            offset += inst->length();
         }
     }
 }

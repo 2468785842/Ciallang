@@ -13,8 +13,6 @@
  */
 #pragma once
 
-#include <exception>
-
 namespace Ciallang::VM::Memory {
     static constexpr size_t growCapacity(const size_t capacity) {
         return capacity < 8 ? 8 : capacity * 2;

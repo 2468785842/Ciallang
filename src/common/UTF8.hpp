@@ -14,9 +14,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-
 namespace Ciallang::Common {
     using namespace std;
 

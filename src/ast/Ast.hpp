@@ -14,9 +14,6 @@
 
 #pragma once
 
-#include <forward_list>
-#include <stack>
-
 #include "../lexer/Token.hpp"
 
 

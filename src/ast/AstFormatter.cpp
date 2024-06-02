@@ -14,11 +14,6 @@
 
 #include "AstFormatter.hpp"
 
-#include <cassert>
-#include <sstream>
-#include <set>
-#include <fmt/printf.h>
-
 #include "../types/TjsString.hpp"
 
 namespace Ciallang::Syntax {
@@ -39,7 +34,6 @@ namespace Ciallang::Syntax {
         assert(node->token != nullptr);
 
         std::string shape = "record";
-        std::string details;
         auto nodeVertexName = getVertexName(node);
         std::string style = ", fillcolor=goldenrod1, style=\"filled\"";
         const auto strPtr = node->token->value();
@@ -58,9 +52,9 @@ namespace Ciallang::Syntax {
                 assert(false);
         }
 
-        details = fmt::format(
-                              "|{{ {} }}",
-                              GraphvizFormatter::escapeChars(ss.str()));
+        std::string details = fmt::format(
+            "|{{ {} }}",
+            GraphvizFormatter::escapeChars(ss.str()));
 
         fmt::print(
                    _file,
@@ -181,7 +175,7 @@ namespace Ciallang::Syntax {
 
     void AstFormatter::visit(const BlockStmtNode* node) const {
         auto index = 0;
-        set<std::string> edges{};
+        std::set<std::string> edges{};
 
         auto nodeVertexName = getVertexName(node);
 
@@ -207,7 +201,7 @@ namespace Ciallang::Syntax {
 
     void AstFormatter::visit(const ExprStmtNode* node) const {
         auto index = 0;
-        set<std::string> edges{};
+        std::set<std::string> edges{};
 
         auto nodeVertexName = getVertexName(node);
 

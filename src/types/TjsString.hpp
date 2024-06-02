@@ -12,13 +12,10 @@
 
 #pragma once
 
-#include <string>
-#include <utility>
-
 #include "TjsTypes.hpp"
+#include "TjsValue.hpp"
 
 namespace Ciallang {
-
     class TjsString : std::string {
         // TODO: impl
     public:
@@ -29,8 +26,26 @@ namespace Ciallang {
             std::string::~string();
         }
 
-        static TjsValue tjsString(const std::string &);
-
+        static TjsValue tjsString(const std::string&);
     };
+
+
+    template <>
+    inline void TjsStringHelper::copy(const TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+        dest._value._string = new TjsString(*src._value._string);
+    }
+
+    template <>
+    inline void TjsStringHelper::move(TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+        dest._value._string = src._value._string;
+        src._value._string = nullptr;
+    }
+
+    template <>
+    inline void TjsStringHelper::destroy(TjsValue& value) const {
+        delete value._value._string;
+    }
 
 }

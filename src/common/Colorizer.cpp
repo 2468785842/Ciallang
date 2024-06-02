@@ -12,11 +12,6 @@
  *
  */
 
-#include <sstream>
-
-#include <glog/logging.h>
-#include <fmt/format.h>
-
 #include "Colorizer.hpp"
 
 namespace Ciallang::Common {

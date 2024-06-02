@@ -12,18 +12,13 @@
 
 #pragma once
 
-#include <stdexcept>
-#include <unordered_map>
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
 #include "TjsTypes.hpp"
-#include "TjsString.hpp"
-#include "TjsOctet.hpp"
-#include "TjsObject.hpp"
 
 namespace Ciallang {
     class TjsValue {
+        template <TjsValueName NAME>
+        friend struct MakeTjsValueHelper;
+
     public:
         TjsValue() = default;
 
@@ -63,6 +58,20 @@ namespace Ciallang {
 
         [[nodiscard]] const char* name() const;
 
+        TjsValue operator-() {
+            switch(type()) {
+                case TjsValueType::Integer:
+                    this->_value._integer = -asInteger();
+                    break;
+                case TjsValueType::Real:
+                    this->_value._real = -asReal();
+                    break;
+                default:
+                    LOG(FATAL) << "not number!! `operator-` can't use";
+            }
+            return *this;
+        }
+
     private:
         union {
             TjsInteger _integer;
@@ -92,14 +101,6 @@ namespace Ciallang {
         }
     };
 
-    static const std::unordered_map<TjsValueType, const char*> S_TypeToName{
-            { TjsValueType::Void, "Void" },
-            { TjsValueType::Object, "Object" },
-            { TjsValueType::String, "String" },
-            { TjsValueType::Octet, "Octet" }, // octet binary data
-            { TjsValueType::Integer, "Integer" },
-            { TjsValueType::Real, "Real" }
-    };
 
     static TjsValue tjsInteger(const TjsInteger value) {
         return TjsValue{ value };
@@ -108,6 +109,42 @@ namespace Ciallang {
     static TjsValue tjsReal(const TjsReal value) {
         return TjsValue{ value };
     }
+
+    template <>
+    inline void TjsIntegerHelper::copy(const TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+        dest._value._integer = src._value._integer;
+    }
+
+    template <>
+    inline void TjsIntegerHelper::move(TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+        dest._value._integer = src._value._integer;
+    }
+
+    template <>
+    inline void TjsIntegerHelper::destroy(TjsValue&) const {
+        // nothing to do
+    }
+
+
+    template <>
+    inline void TjsRealHelper::copy(const TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+        dest._value._real = src._value._real;
+    }
+
+    template <>
+    inline void TjsRealHelper::move(TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+        dest._value._real = src._value._real;
+    }
+
+    template <>
+    inline void TjsRealHelper::destroy(TjsValue&) const {
+        // nothing to do
+    }
+
 } // namespace Ciallang
 
 // support fmt::format
