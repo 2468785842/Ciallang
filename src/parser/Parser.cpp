@@ -359,11 +359,29 @@ namespace Ciallang::Syntax {
     DeclNode* VarDeclParser::parse(
         Result& r, Parser* parser, Token* token
     ) const {
+        VarDeclNode* varDeclNode{ nullptr };
+        if(!parser->peek(TokenType::Identifier)) return nullptr;
+
+        Token identiter;
+        parser->current(identiter);
+        parser->consume();
+
+        if(parser->peek(TokenType::SemiColon)) {
+            parser->consume();
+            varDeclNode = parser->astBuilder()->makeVarDeclNode(std::move(identiter));
+            varDeclNode->location = identiter.location;
+            return varDeclNode;
+        }
+
+        if(!parser->expect(r, &S_Assignment))
+            return nullptr;
+
         auto* rhs = parser->parseStatement(r);
 
         if(!rhs) return nullptr;
-        auto* expressionStatement = dynamic_cast<ExprStmtNode*>(rhs);
-        if(!expressionStatement) {
+
+        auto* exprStmtNode = dynamic_cast<ExprStmtNode*>(rhs);
+        if(!exprStmtNode) {
             parser->error(r,
                 "var declaration; right-hand-side expect expression statment",
                 rhs->location);
@@ -371,8 +389,10 @@ namespace Ciallang::Syntax {
             return nullptr;
         }
 
-        auto* varDeclNode = parser->astBuilder()->makeVarDeclNode(expressionStatement);
-        varDeclNode->location = expressionStatement->location;
+        varDeclNode = parser->astBuilder()
+                            ->makeVarDeclNode(std::move(identiter), exprStmtNode);
+        varDeclNode->location = exprStmtNode->location;
+
         return varDeclNode;
     }
 

@@ -17,16 +17,7 @@
 
 namespace Ciallang::Syntax {
     class ExprNode : public AstNode {
-    public:
-        const Token* token{ nullptr };
-
-        explicit ExprNode() = default;
-
-        explicit ExprNode(Token& token) : token(new Token{ std::move(token) }) {
-            location = this->token->location;
-        }
-
-        ~ExprNode() override { delete token; }
+        using AstNode::AstNode;
     };
 
     class ValueExprNode : public ExprNode {
@@ -36,7 +27,7 @@ namespace Ciallang::Syntax {
         explicit ValueExprNode(Token& token) : ExprNode(token) {
         }
 
-        void accept(const Visitor* visitor) const override {
+        void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
 
@@ -52,7 +43,7 @@ namespace Ciallang::Syntax {
         explicit SymbolExprNode(Token& token) : ExprNode(token) {
         }
 
-        void accept(const Visitor* visitor) const override {
+        void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
 
@@ -77,7 +68,7 @@ namespace Ciallang::Syntax {
             location.end(rhs->location.end());
         }
 
-        void accept(const Visitor* visitor) const override {
+        void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
 
@@ -99,7 +90,7 @@ namespace Ciallang::Syntax {
             location.end(rhs->location.end());
         }
 
-        void accept(const Visitor* visitor) const override {
+        void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
 
@@ -123,7 +114,7 @@ namespace Ciallang::Syntax {
             location.end(rhs->location.end());
         }
 
-        void accept(const Visitor* visitor) const override {
+        void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
 

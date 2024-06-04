@@ -19,7 +19,6 @@
 #include "DeclNode.hpp"
 #include "StmtNode.hpp"
 #include "ExprNode.hpp"
-#include "AstNode.hpp"
 
 namespace Ciallang::Syntax {
     class AstBuilder {
@@ -62,7 +61,7 @@ namespace Ciallang::Syntax {
 
         SymbolExprNode* makeSymbolExprNode(Token&& token);
 
-        VarDeclNode* makeVarDeclNode(const ExprStmtNode* rhs);
+        VarDeclNode* makeVarDeclNode(Token&& token, const ExprStmtNode* rhs = nullptr);
 
         AstNode* pairNode();
 

@@ -56,23 +56,23 @@ namespace Ciallang::Syntax {
 
         void format(const std::string& title);
 
-        void visit(const ValueExprNode*) const override;
+        void visit(const ValueExprNode*) override;
 
-        void visit(const SymbolExprNode*) const override;
+        void visit(const SymbolExprNode*) override;
 
-        void visit(const BinaryExprNode*) const override;
+        void visit(const BinaryExprNode*) override;
 
-        void visit(const UnaryExprNode*) const override;
+        void visit(const UnaryExprNode*) override;
 
-        void visit(const AssignExprNode*) const override;
+        void visit(const AssignExprNode*) override;
 
-        void visit(const BlockStmtNode*) const override;
+        void visit(const BlockStmtNode*) override;
 
-        void visit(const ExprStmtNode*) const override;
+        void visit(const ExprStmtNode*) override;
 
-        void visit(const IfStmtNode*) const override;
+        void visit(const IfStmtNode*) override;
 
-        void visit(const VarDeclNode*) const override;
+        void visit(const VarDeclNode*) override;
 
     private:
         static std::string getVertexName(const AstNode* node);

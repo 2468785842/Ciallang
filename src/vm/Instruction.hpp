@@ -16,11 +16,17 @@
 #include "Interpreter.hpp"
 #include "Rlc.hpp"
 #include "VMChunk.hpp"
+#include "types/TjsString.hpp"
 
 namespace Ciallang::VM {
 #define START (std::ostringstream{}
-#define PRINT_NAME fmt::format("{:#04x}\t{: ^10}", offset, name())
-#define PRINT_LINE fmt::format("{:<5}", rlc->firstAppear(offset) ? std::to_string(rlc->find(offset) + 1) : "~")
+#define PRINT_NAME fmt::format("{:#06x}\t{: ^10}", offset, name())
+#define PRINT_LINE (rlc->firstAppear(offset) ? \
+    fmt::format("{: <14}", \
+        fmt::format("@{}:{}", \
+            std::to_string(rlc->find(offset).start().line + 1), \
+            std::to_string(rlc->find(offset).start().column + 1) \
+    )) : fmt::format("{: <14}", "~"))
 #define END ' ').str()
 
     enum class Opcodes : uint8_t {
@@ -32,6 +38,16 @@ namespace Ciallang::VM {
         Sub,
         Mul,
         Div,
+
+        Pop,
+        PopN,
+        Push,
+        PVoid,
+
+        GGlobal,
+        DGlobal,
+        GLocal,
+        DLocal,
     };
 
     struct Instruction {
@@ -59,7 +75,8 @@ namespace Ciallang::VM {
          * @param interpreter 解释器
          * @return 解释结果
          */
-        virtual InterpretResult execute(Interpreter* interpreter) const = 0;
+        virtual InterpretResult execute(Common::Result& r,
+                                        Interpreter* interpreter) const = 0;
 
         virtual std::string disassemble(const uint8_t* bytecodes,
                                         const TjsValue* constants,
@@ -79,7 +96,7 @@ namespace Ciallang::VM {
 
     template <InstName NAME, size_t N>
     struct MakeInstruction : Instruction {
-        InterpretResult execute(Interpreter*) const override {
+        InterpretResult execute(Common::Result&, Interpreter*) const override {
             LOG(FATAL)
                     << "no implement insturction function `execute`: "
                     << _name;
@@ -127,6 +144,18 @@ constexpr auto S_##ValueName = ValueName()
     DEFINE_INST(MulInst, "mul", 1);
     DEFINE_INST(DivInst, "div", 1);
 
+    DEFINE_INST(PopInst, "pop", 1);
+    DEFINE_INST(PopNInst, "popn", 2);
+    DEFINE_INST(PushInst, "push", 2);
+
+    DEFINE_INST(PVoidInst, "pvoid", 1);
+
+    DEFINE_INST(GGlobalInst, "gglobal", 2);
+    DEFINE_INST(DGlobalInst, "dglobal", 2);
+    DEFINE_INST(GLocalInst, "glocal", 2);
+    DEFINE_INST(DLocalInst, "dlocal", 2);
+
+
 #undef DEFINE_INST
     // -------------------------------------------------------------------------//
     // ------------------------- reigst instruction ----------------------------//
@@ -142,6 +171,17 @@ constexpr auto S_##ValueName = ValueName()
                     { Opcodes::Sub, &S_SubInst },
                     { Opcodes::Mul, &S_MulInst },
                     { Opcodes::Div, &S_DivInst },
+
+                    { Opcodes::Pop, &S_PopInst },
+                    { Opcodes::PopN, &S_PopNInst },
+                    { Opcodes::Push, &S_PushInst },
+
+                    { Opcodes::PVoid, &S_PVoidInst },
+
+                    { Opcodes::GGlobal, &S_GGlobalInst },
+                    { Opcodes::DGlobal, &S_DGlobalInst },
+                    { Opcodes::GLocal, &S_GLocalInst },
+                    { Opcodes::DLocal, &S_DLocalInst }
             });
 
     inline const Instruction* Instruction::instance(const Opcodes opcode) {
@@ -158,10 +198,11 @@ constexpr auto S_##ValueName = ValueName()
     //------------------------------- execute ----------------------------------//
     //--------------------------------------------------------------------------//
 #define EXECUTE(Inst) template <> \
-inline InterpretResult Inst::execute(Interpreter* interpreter) const
+inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter) const
 
     EXECUTE(RetInst) {
         interpreter->printStack();
+        interpreter->printGlobal();
         return InterpretResult::OK;
     }
 
@@ -219,11 +260,80 @@ inline InterpretResult Inst::execute(Interpreter* interpreter) const
         return executeBinaryOperator<Opcodes::Div>(interpreter);
     }
 
+    EXECUTE(PopInst) {
+        interpreter->pop();
+        return InterpretResult::CONTINUE;
+    }
+
+    EXECUTE(PopNInst) {
+        interpreter->popN(interpreter->readByte());
+        return InterpretResult::CONTINUE;
+    }
+
+    EXECUTE(PushInst) {
+        interpreter->push(TjsValue{ static_cast<TjsInteger>(interpreter->readByte()) });
+        return InterpretResult::CONTINUE;
+    }
+
+    EXECUTE(PVoidInst) {
+        interpreter->pushVoid();
+        return InterpretResult::CONTINUE;
+    }
+
+    // get global value
+    // opcode: gglobal index,
+    // read id = constant[index],
+    // get value from global[id], push to stack top
+    EXECUTE(GGlobalInst) {
+        auto identitier = interpreter->readConstant().asString();
+        auto* value = interpreter->getGlobal(identitier);
+        if(!value) {
+            interpreter->error(r,
+                fmt::format(
+                    "Read failed Undefined variable: {}.", identitier
+                )
+            );
+            return InterpretResult::RUNTIME_ERROR;
+        }
+        interpreter->push(TjsValue{ *value });
+        return InterpretResult::CONTINUE;
+    }
+
+    // define(or assigment) global value
+    // opcode: dglobal index,
+    // read id = constant[index],
+    // pop value from stack top, put to global[id]
+    EXECUTE(DGlobalInst) {
+        auto identitier = interpreter->readConstant().asString();
+        interpreter->putGlobal(std::move(identitier), std::move(interpreter->pop()));
+        return InterpretResult::CONTINUE;
+    }
+
+    // get local value
+    // opcode: glocal slot,
+    // read value from stack[slot], push to stack top
+    EXECUTE(GLocalInst) {
+        auto slot = interpreter->readByte();
+        auto& value = interpreter->getStack(slot);
+        interpreter->push(TjsValue{ value });
+        return InterpretResult::CONTINUE;
+    }
+
+    // define(or assigment) local value
+    // opcode: dlocal slot,
+    // pop value from stack top, put to stack[slot]
+    EXECUTE(DLocalInst) {
+        auto& value = interpreter->pop();
+        auto slot = interpreter->readByte();
+        interpreter->putStack(slot, std::move(value));
+        return InterpretResult::CONTINUE;
+    }
+
     //--------------------------------------------------------------------------//
     //----------------------------- disassemble --------------------------------//
     //--------------------------------------------------------------------------//
 
-#define PRINT_CONSTANT fmt::format(" // {};", constants[bytecodes[offset + 1]])
+#define PRINT_CONSTANT fmt::format(" ; {}", constants[bytecodes[offset + 1]])
 
 #define DISASSEMBLE(Inst) template <> \
     inline std::string Inst::disassemble( \
@@ -231,6 +341,12 @@ inline InterpretResult Inst::execute(Interpreter* interpreter) const
         const TjsValue* constants, \
         const Rlc* rlc, size_t offset) const
 
+#define SIMPLE_DISASSEMBLE(Inst) \
+    DISASSEMBLE(Inst) { \
+       return START << PRINT_LINE << PRINT_NAME \
+                 << fmt::format("{}", bytecodes[offset + 1]) \
+                 << END; \
+    }
 
     DISASSEMBLE(ConstInst) {
         return START << PRINT_LINE << PRINT_NAME
@@ -238,6 +354,14 @@ inline InterpretResult Inst::execute(Interpreter* interpreter) const
                    << PRINT_CONSTANT << END;
     }
 
+    SIMPLE_DISASSEMBLE(PushInst)
+
+    SIMPLE_DISASSEMBLE(PopNInst)
+
+    SIMPLE_DISASSEMBLE(GGlobalInst)
+    SIMPLE_DISASSEMBLE(DGlobalInst)
+    SIMPLE_DISASSEMBLE(GLocalInst)
+    SIMPLE_DISASSEMBLE(DLocalInst)
 
 #undef EXECUTE_BINARY_OP
 #undef EXECUTE

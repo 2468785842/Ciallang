@@ -448,6 +448,10 @@ namespace Ciallang::Syntax {
             return *this;
         }
 
+        bool operator==(const Token& token) const {
+            return _type == token.type() && _value == token.value();
+        }
+
         [[nodiscard]] constexpr TokenType type() const noexcept { return _type; }
 
         [[nodiscard]] constexpr TjsValue* value() const noexcept {

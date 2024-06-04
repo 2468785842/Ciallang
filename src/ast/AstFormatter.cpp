@@ -30,7 +30,7 @@ namespace Ciallang::Syntax {
         fmt::print(_file, "}}\n");
     }
 
-    void AstFormatter::visit(const ValueExprNode* node) const {
+    void AstFormatter::visit(const ValueExprNode* node) {
         assert(node->token != nullptr);
 
         std::string shape = "record";
@@ -62,7 +62,7 @@ namespace Ciallang::Syntax {
             nodeVertexName, shape, node->name(), details, style);
     }
 
-    void AstFormatter::visit(const SymbolExprNode* node) const {
+    void AstFormatter::visit(const SymbolExprNode* node) {
         assert(node->token != nullptr);
 
         std::string shape = "record";
@@ -73,11 +73,11 @@ namespace Ciallang::Syntax {
             _file,
             "\t{}[shape={},label=\"<f1> {}|{{ {} }}\"{}];\n",
             nodeVertexName, shape, node->name(),
-            node->token->value()->asString()->c_str(),
+            node->token->value()->asString(),
             style);
     }
 
-    void AstFormatter::visit(const BinaryExprNode* node) const {
+    void AstFormatter::visit(const BinaryExprNode* node) {
         assert(node->token != nullptr);
         assert(node->lhs != nullptr);
         assert(node->rhs != nullptr);
@@ -106,7 +106,7 @@ namespace Ciallang::Syntax {
             nodeVertexName, getVertexName(node->rhs));
     }
 
-    void AstFormatter::visit(const UnaryExprNode* node) const {
+    void AstFormatter::visit(const UnaryExprNode* node) {
         assert(node->token != nullptr);
         assert(node->rhs != nullptr);
 
@@ -128,7 +128,7 @@ namespace Ciallang::Syntax {
             nodeVertexName, getVertexName(node->rhs));
     }
 
-    void AstFormatter::visit(const AssignExprNode* node) const {
+    void AstFormatter::visit(const AssignExprNode* node) {
         assert(node->lhs != nullptr);
         assert(node->rhs != nullptr);
 
@@ -149,7 +149,7 @@ namespace Ciallang::Syntax {
             nodeVertexName, getVertexName(node->rhs));
     }
 
-    void AstFormatter::visit(const BlockStmtNode* node) const {
+    void AstFormatter::visit(const BlockStmtNode* node) {
         auto index = 0;
         std::set<std::string> edges{};
 
@@ -172,7 +172,7 @@ namespace Ciallang::Syntax {
         }
     }
 
-    void AstFormatter::visit(const ExprStmtNode* node) const {
+    void AstFormatter::visit(const ExprStmtNode* node) {
         auto index = 0;
         std::set<std::string> edges{};
 
@@ -195,7 +195,7 @@ namespace Ciallang::Syntax {
         }
     }
 
-    void AstFormatter::visit(const IfStmtNode* node) const {
+    void AstFormatter::visit(const IfStmtNode* node) {
         assert(node->test != nullptr);
         assert(node->body != nullptr);
 
@@ -226,7 +226,7 @@ namespace Ciallang::Syntax {
         }
     }
 
-    void AstFormatter::visit(const VarDeclNode* node) const {
+    void AstFormatter::visit(const VarDeclNode* node) {
         assert(node->rhs != nullptr);
 
         auto nodeVertexName = getVertexName(node);

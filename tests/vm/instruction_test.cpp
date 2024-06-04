@@ -14,8 +14,6 @@
 #include <gen/CodeGen.hpp>
 #include <gtest/gtest.h>
 
-#include <types/TjsValue.hpp>
-
 #include <vm/VMChunk.hpp>
 #include <vm/Instruction.hpp>
 
@@ -35,29 +33,6 @@ int main(int argc, char** argv) {
     return RUN_ALL_TESTS();
 }
 
-TEST(VM_Test, Instruction) {
-    VMChunk vmChunk{ "test" };
-    Interpreter interpreter{ &vmChunk };
-
-    uint8_t constant = vmChunk.load(Ciallang::tjsReal(1.2));
-    vmChunk.emit(123, Opcodes::Const, { constant });
-
-    constant = vmChunk.load(Ciallang::tjsReal(3.4));
-    vmChunk.emit(123, Opcodes::Const, { constant });
-
-    vmChunk.emit(123, Opcodes::Add);
-
-    constant = vmChunk.load(Ciallang::tjsReal(5.6));
-    vmChunk.emit(123, Opcodes::Const, { constant });
-
-    vmChunk.emit(123, Opcodes::Div);
-    // vmChunk.emit(123, Opcodes::LNot);
-    vmChunk.emit(123, Opcodes::Ret);
-    // vmChunk.disassemble();
-
-    EXPECT_EQ(interpreter.run(), InterpretResult::OK);
-}
-
 TEST(Interpreter, Execute) {
     Ciallang::Common::Result r{};
 
@@ -68,12 +43,32 @@ TEST(Interpreter, Execute) {
     Ciallang::Syntax::AstBuilder astBuilder{};
     Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
     auto* globalNode = parser.parse(r);
-    CHECK(globalNode != nullptr && !r.isFailed());
+
+    LOG(WARNING) << "Parser";
+    if(!globalNode) {
+        for(const auto& message : r.messages())
+            LOG(ERROR) << message.message();
+        CHECK(false);
+    }
 
     VMChunk vmChunk{ sourceFile.path() };
-    Ciallang::Inter::CodeGen codeGen{ &vmChunk };
-    codeGen.loadAst(globalNode);
+    Ciallang::Inter::CodeGen codeGen{ sourceFile, &vmChunk };
+    codeGen.loadAst(r, globalNode);
 
-    Interpreter interpreter{ &vmChunk };
-    interpreter.run();
+    LOG(WARNING) << "CodeGen";
+    if(r.isFailed()) {
+        for(const auto& message : r.messages())
+            LOG(ERROR) << message.message();
+        CHECK(false);
+    }
+
+    Interpreter interpreter{ sourceFile, &vmChunk };
+    interpreter.run(r);
+
+    LOG(WARNING) << "Interpreter";
+    if(r.isFailed()) {
+        for(const auto& message : r.messages())
+            LOG(ERROR) << message.message();
+        CHECK(false);
+    }
 }

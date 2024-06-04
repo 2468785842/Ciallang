@@ -41,6 +41,18 @@ namespace Ciallang::VM {
             Memory::freeArray(addressHeader, capacity);
         }
 
+        virtual void reset() {
+            Memory::freeArray(addressHeader, capacity);
+
+            count = 0;
+            capacity = 8;
+            dataPool = Memory::growArray(
+                static_cast<VT*>(nullptr),
+                count, capacity
+            );
+            addressHeader = dataPool;
+        }
+
     private:
         // 指向开始的地址,不然改变 dataPool 无法释放内存
         VT* addressHeader = dataPool;

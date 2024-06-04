@@ -15,8 +15,7 @@
 #include "TjsValue.hpp"
 
 namespace Ciallang {
-
-    TjsValue TjsOctet::tjsOctet(const std::vector<uint8_t> &value) {
-        return TjsValue{TjsOctet{value}};
+    TjsValue TjsOctet::tjsOctet(const std::vector<uint8_t>& value) {
+        return TjsValue{ TjsOctet{ value } };
     }
 }

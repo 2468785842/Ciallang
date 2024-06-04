@@ -50,11 +50,11 @@ namespace Ciallang {
 
         [[nodiscard]] TjsReal asReal() const;
 
-        [[nodiscard]] TjsString* asString() const;
+        [[nodiscard]] TjsString asString() const;
 
-        [[nodiscard]] TjsOctet* asOctet() const;
+        [[nodiscard]] TjsOctet asOctet() const;
 
-        [[nodiscard]] TjsObject* asObject() const;
+        [[nodiscard]] TjsObject asObject() const;
 
         [[nodiscard]] const char* name() const;
 
@@ -116,6 +116,8 @@ namespace Ciallang {
             return *this;
         }
 
+        bool operator==(const TjsValue& tjsValue) const;
+
     private:
         union {
             TjsInteger _integer;
@@ -127,23 +129,7 @@ namespace Ciallang {
 
         TjsValueType _type{ TjsValueType::Void };
 
-        friend std::ostream& operator<<(std::ostream& os, const TjsValue& d) {
-            switch(d.type()) {
-                case TjsValueType::Integer:
-                    return os << d.asInteger();
-                case TjsValueType::Real:
-                    return os << d.asReal();
-                case TjsValueType::String:
-                    return os << d.asString();
-                case TjsValueType::Octet:
-                case TjsValueType::Object:
-                    throw std::logic_error("not support");
-                case TjsValueType::Void:
-                    return os << "void";
-            }
-            return os << "unknown";
-        }
-
+        friend std::ostream& operator<<(std::ostream& os, const TjsValue& d);
     };
 
 

@@ -17,16 +17,21 @@
 
 namespace Ciallang::Syntax {
     class DeclNode : public AstNode {
+        using AstNode::AstNode;
     };
 
     class VarDeclNode : public DeclNode {
     public:
         const ExprStmtNode* rhs;
 
-        explicit VarDeclNode(const ExprStmtNode* rhs) : rhs(rhs) {
+        VarDeclNode() = delete;
+
+        explicit VarDeclNode(
+            Token& token, const ExprStmtNode* rhs
+        ) : DeclNode(token), rhs(rhs) {
         }
 
-        void accept(const Visitor* visitor) const override {
+        void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
 

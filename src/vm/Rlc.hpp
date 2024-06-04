@@ -13,28 +13,32 @@
  */
 #pragma once
 
+#include "../common/SourceLocation.hpp"
+
 namespace Ciallang::VM {
     class Rlc {
     public:
         explicit Rlc(std::filesystem::path path) : _path(std::move(path)) {
         }
 
-        void addBytecodeLine(size_t bytecodeIndex, size_t sourceLine) {
+        void addBytecodeLine(size_t bytecodeIndex, Common::SourceLocation sourceLine) {
             if(!contains(sourceLine))
                 _bytecodeMapLine.emplace_back(bytecodeIndex, sourceLine);
         }
 
         [[nodiscard]] bool firstAppear(size_t bytecodeIndex) const;
 
-        [[nodiscard]] size_t find(size_t bytecodeIndex) const;
+        [[nodiscard]] Common::SourceLocation find(size_t bytecodeIndex) const;
 
-        [[nodiscard]] bool contains(size_t sourceLine) const;
+        [[nodiscard]] bool contains(Common::SourceLocation sourceLine) const;
 
         [[nodiscard]] std::string name() const { return _path.filename().generic_string(); }
 
+        void reset() { _bytecodeMapLine.clear(); }
+
     private:
         // 行默认是按序插入, from 0 start
-        std::vector<std::pair<size_t, size_t>> _bytecodeMapLine;
+        std::vector<std::pair<size_t, Common::SourceLocation>> _bytecodeMapLine;
         std::filesystem::path _path;
     };
 }

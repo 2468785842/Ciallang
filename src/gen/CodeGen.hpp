@@ -14,38 +14,66 @@
 
 #include "../ast/Ast.hpp"
 #include "../vm/Interpreter.hpp"
+#include "../common/Result.hpp"
+#include "../common/SourceFile.hpp"
 
 namespace Ciallang::Inter {
-
     class CodeGen;
 
-    class CodeGen :  Syntax::AstNode::Visitor {
+    class CodeGen : Syntax::AstNode::Visitor {
     public:
         friend class Syntax::AstNode;
-        explicit CodeGen(VM::VMChunk* vmChunk) : _vmChunk(vmChunk) {
+
+        explicit CodeGen(
+            Common::SourceFile& sourceFile, VM::VMChunk* vmChunk
+        ) : _vmChunk(vmChunk), _sourceFile(sourceFile) {
         }
 
-        void loadAst(const Syntax::AstNode* node) const;
+        void loadAst(Common::Result& r, const Syntax::AstNode* node);
+
+        void error(
+            Common::Result& r,
+            const std::string& message,
+            const Common::SourceLocation& location) const {
+            _sourceFile.error(r, message, location);
+        }
 
     private:
         VM::VMChunk* _vmChunk;
+        Common::SourceFile& _sourceFile;
+        Common::Result* _r{ nullptr };
 
-        void visit(const Syntax::ValueExprNode*) const override;
+        struct Local {
+            const Syntax::Token* token;
+            TjsInteger depth;
+        };
 
-        void visit(const Syntax::SymbolExprNode*) const override;
+        std::vector<Local> locals{};
 
-        void visit(const Syntax::BinaryExprNode*) const override;
+        // 1 is global scope
+        TjsInteger  scopeDepth{ 0 };
 
-        void visit(const Syntax::UnaryExprNode*) const override;
+        void visit(const Syntax::ValueExprNode*) override;
 
-        void visit(const Syntax::AssignExprNode*) const override;
+        void visit(const Syntax::SymbolExprNode*) override;
 
-        void visit(const Syntax::BlockStmtNode*) const override;
+        void visit(const Syntax::BinaryExprNode*) override;
 
-        void visit(const Syntax::ExprStmtNode*) const override;
+        void visit(const Syntax::UnaryExprNode*) override;
 
-        void visit(const Syntax::IfStmtNode*) const override;
+        void visit(const Syntax::AssignExprNode*) override;
 
-        void visit(const Syntax::VarDeclNode*) const override;
+        void visit(const Syntax::BlockStmtNode*) override;
+
+        void visit(const Syntax::ExprStmtNode*) override;
+
+        void visit(const Syntax::IfStmtNode*) override;
+
+        void visit(const Syntax::VarDeclNode*) override;
+
+        void beginScope();
+        void endScope(const Syntax::BlockStmtNode* node);
+
+        TjsInteger resolveLocal(const Syntax::Token* token) const;
     };
 }

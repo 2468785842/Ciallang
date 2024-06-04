@@ -26,7 +26,6 @@ namespace Ciallang {
         static TjsValue tjsOctet(const std::vector<uint8_t>&);
     };
 
-
     template <>
     inline void TjsOctetHelper::copy(const TjsValue& src, TjsValue& dest) const {
         dest._type = src._type;

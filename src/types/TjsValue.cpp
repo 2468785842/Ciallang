@@ -61,22 +61,59 @@ namespace Ciallang {
         return _value._real;
     }
 
-    TjsString* TjsValue::asString() const {
+    TjsString TjsValue::asString() const {
         CHECK(this->_type == TjsValueType::String) << "is not string";
-        return _value._string;
+        return *_value._string;
     }
 
-    TjsOctet* TjsValue::asOctet() const {
+    TjsOctet TjsValue::asOctet() const {
         CHECK(this->_type == TjsValueType::Octet) << "is not octet";
-        return _value._octet;
+        return *_value._octet;
     }
 
-    TjsObject* TjsValue::asObject() const {
+    TjsObject TjsValue::asObject() const {
         CHECK(_type == TjsValueType::Object) << "is not object";
-        return _value._object;
+        return *_value._object;
     }
 
     const char* TjsValue::name() const {
         return TjsValueHelper::instance(_type)->name();
+    }
+
+
+    bool TjsValue::operator==(const TjsValue& tjsValue) const {
+        if(type() != tjsValue.type()) return false;
+        switch(type()) {
+            case TjsValueType::Integer:
+                return asInteger() == tjsValue.asInteger();
+            case TjsValueType::Real:
+                return asReal() == tjsValue.asReal();
+            case TjsValueType::String:
+                return asString() == tjsValue.asString();
+            case TjsValueType::Object:
+            // return asObject() == asObject();
+            case TjsValueType::Octet:
+            default: ;
+        }
+
+        LOG(FATAL) << "no impl == funcition in TjsValue";
+        std::abort();
+    }
+
+    std::ostream& operator<<(std::ostream& os, const TjsValue& d) {
+        switch(d.type()) {
+            case TjsValueType::Integer:
+                return os << d.asInteger();
+            case TjsValueType::Real:
+                return os << d.asReal();
+            case TjsValueType::String:
+                return os << d.asString();
+            case TjsValueType::Octet:
+            case TjsValueType::Object:
+                throw std::logic_error("not support");
+            case TjsValueType::Void:
+                return os << "void";
+        }
+        return os << "unknown";
     }
 }

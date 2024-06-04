@@ -106,8 +106,8 @@ namespace Ciallang::Syntax {
         return makeNode<SymbolExprNode>(token);
     }
 
-    VarDeclNode* AstBuilder::makeVarDeclNode(const ExprStmtNode* rhs) {
-        return makeNode<VarDeclNode>(rhs);
+    VarDeclNode* AstBuilder::makeVarDeclNode(Token&& token, const ExprStmtNode* rhs) {
+        return makeNode<VarDeclNode>(token, rhs);
     }
 
     template <typename R, typename... Args>

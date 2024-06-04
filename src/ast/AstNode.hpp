@@ -48,18 +48,24 @@ namespace Ciallang::Syntax {
     public:
         struct Visitor;
 
+        const Token* token{ nullptr };
+
+        explicit AstNode() = default;
+
+        explicit AstNode(Token& token) : token(new Token{ std::move(token) }) {
+            location = this->token->location;
+        }
+
         // just for Gen Graphviz used
         const uint64_t id = serialId++;
 
         SourceLocation location{};
 
-        explicit AstNode() = default;
-
-        virtual void accept(const Visitor* visitor) const = 0;
+        virtual void accept(Visitor* visitor) const = 0;
 
         [[nodiscard]] virtual constexpr const char* name() const noexcept = 0;
 
-        virtual ~AstNode() = default;
+        virtual ~AstNode() noexcept { delete token; }
 
     private:
         static inline uint64_t serialId = 0;
@@ -68,22 +74,22 @@ namespace Ciallang::Syntax {
     struct AstNode::Visitor {
         virtual ~Visitor() = default;
 
-        virtual void visit(const VarDeclNode*) const = 0;
+        virtual void visit(const VarDeclNode*) = 0;
 
-        virtual void visit(const ValueExprNode*) const = 0;
+        virtual void visit(const ValueExprNode*) = 0;
 
-        virtual void visit(const SymbolExprNode*) const = 0;
+        virtual void visit(const SymbolExprNode*) = 0;
 
-        virtual void visit(const BinaryExprNode*) const = 0;
+        virtual void visit(const BinaryExprNode*) = 0;
 
-        virtual void visit(const UnaryExprNode*) const = 0;
+        virtual void visit(const UnaryExprNode*) = 0;
 
-        virtual void visit(const AssignExprNode*) const = 0;
+        virtual void visit(const AssignExprNode*) = 0;
 
-        virtual void visit(const BlockStmtNode*) const = 0;
+        virtual void visit(const BlockStmtNode*) = 0;
 
-        virtual void visit(const ExprStmtNode*) const = 0;
+        virtual void visit(const ExprStmtNode*) = 0;
 
-        virtual void visit(const IfStmtNode*) const = 0;
+        virtual void visit(const IfStmtNode*) = 0;
     };
 }

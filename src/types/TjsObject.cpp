@@ -17,6 +17,6 @@
 namespace Ciallang {
 
     TjsValue TjsObject::tjsObject() {
-        return TjsValue{TjsObject{}};
+        return TjsValue{ TjsObject{} };
     }
 }

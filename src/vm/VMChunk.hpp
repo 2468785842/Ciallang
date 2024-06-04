@@ -119,20 +119,40 @@ namespace Ciallang::VM {
 
     class VMChunk : DataPool<uint8_t> {
     public:
-
         explicit VMChunk(const std::filesystem::path& path): _rlc{ path } {
-        };
+        }
 
-        void emit(const size_t line, const Opcodes opcode,
-                  const std::initializer_list<uint8_t> args = {}) {
+
+        void emit(const Opcodes opcode,
+                  const Common::SourceLocation line
+        ) {
+            emit(opcode, std::initializer_list<uint8_t>{}, line);
+        }
+
+        template<typename NUMBER>
+        void emit(const Opcodes opcode,
+                  const std::initializer_list<NUMBER> args,
+                  const Common::SourceLocation line
+        ) {
+            // XXX: fixed to extension opcodes
             emit(static_cast<uint8_t>(opcode), line);
-            for(uint8_t arg : args) {
-                emit(arg, line);
-            }
+            for(size_t arg : args) emit(static_cast<uint8_t>(arg), line);
+        }
+
+        void emit(const Opcodes opcode,
+                  const std::initializer_list<uint8_t> args,
+                  const Common::SourceLocation line
+        ) {
+            emit(static_cast<uint8_t>(opcode), line);
+            for(uint8_t arg : args) emit(arg, line);
         }
 
         // index from 0 start
-        size_t load(TjsValue&& val) {
+        size_t addConstant(TjsValue&& val) {
+            for(size_t i = 0; i < _valueArray.count; i++) {
+                auto temp = _valueArray.dataPool[i];
+                if(temp == val) return i;
+            }
             _valueArray.writeData(std::move(val));
             return _valueArray.count - 1;
         }
@@ -145,15 +165,20 @@ namespace Ciallang::VM {
 
         [[nodiscard]] const TjsValue* constants() const { return _valueArray.dataPool; }
 
+        void reset() override {
+            DataPool::reset();
+            _valueArray.reset();
+            _rlc.reset();
+        }
+
         void disassemble() const;
 
     private:
-
         DataPool<TjsValue> _valueArray{};
 
         Rlc _rlc;
 
-        void emit(uint8_t byte, const size_t line) {
+        void emit(uint8_t byte, const Common::SourceLocation line) {
             _rlc.addBytecodeLine(count, line);
             writeData(std::forward<uint8_t>(byte));
         }

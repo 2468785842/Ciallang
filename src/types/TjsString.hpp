@@ -16,11 +16,9 @@
 #include "TjsValue.hpp"
 
 namespace Ciallang {
-    class TjsString : std::string {
+    class TjsString : public std::string {
         // TODO: impl
     public:
-        using std::string::string;
-        using std::string::c_str;
 
         ~TjsString() {
             std::string::~string();
@@ -47,5 +45,4 @@ namespace Ciallang {
     inline void TjsStringHelper::destroy(TjsValue& value) const {
         delete value._value._string;
     }
-
 }

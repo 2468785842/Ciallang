@@ -36,15 +36,6 @@ namespace Ciallang {
 
     class TjsValue;
 
-    struct TjsValueHelper {
-        static const TjsValueHelper* instance(TjsValueType type);
-        virtual ~TjsValueHelper() = default;
-        virtual void copy(const TjsValue& src, TjsValue& dest) const = 0;
-        virtual void move(TjsValue& src, TjsValue& dest) const = 0;
-        virtual void destroy(TjsValue& value) const = 0;
-        [[nodiscard]] virtual const char* name() const = 0;
-    };
-
     template <size_t N>
     struct TjsValueName {
         char value[N]{};
@@ -52,6 +43,15 @@ namespace Ciallang {
         constexpr explicit TjsValueName(const char (&value)[N]) {
             std::copy_n(value, N, this->value);
         }
+    };
+
+    struct TjsValueHelper {
+        static const TjsValueHelper* instance(TjsValueType type);
+        virtual ~TjsValueHelper() = default;
+        virtual void copy(const TjsValue& src, TjsValue& dest) const = 0;
+        virtual void move(TjsValue& src, TjsValue& dest) const = 0;
+        virtual void destroy(TjsValue& value) const = 0;
+        [[nodiscard]] virtual const char* name() const = 0;
     };
 
     template <TjsValueName NAME>

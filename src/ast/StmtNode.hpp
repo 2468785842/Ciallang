@@ -16,6 +16,7 @@
 
 namespace Ciallang::Syntax {
     class StmtNode : public DeclNode {
+
     };
 
     class BlockStmtNode : public StmtNode {
@@ -27,7 +28,7 @@ namespace Ciallang::Syntax {
         explicit BlockStmtNode(const char* name) : _name(name) {
         }
 
-        void accept(const Visitor* visitor) const override {
+        void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
 
@@ -49,7 +50,7 @@ namespace Ciallang::Syntax {
             expressions.push_back(expr);
         }
 
-        void accept(const Visitor* visitor) const override {
+        void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
 
@@ -72,7 +73,7 @@ namespace Ciallang::Syntax {
         ) : test(test), body(body) {
         }
 
-        void accept(const Visitor* visitor) const override {
+        void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
 

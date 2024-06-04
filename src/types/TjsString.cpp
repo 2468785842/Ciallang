@@ -17,6 +17,6 @@
 namespace Ciallang {
 
     TjsValue TjsString::tjsString(const std::string& value) {
-        return TjsValue{TjsString{value.c_str()}};
+        return TjsValue{TjsString{value}};
     }
 }
