@@ -20,13 +20,13 @@ namespace Ciallang::VM {
         #define RLC_NAME_LEN (_rlc.name().length() < 35 ? 35 - _rlc.name().length() : 35)
         #define RLC_NAME (RLC_NAME_LEN == 35 ? "-" : _rlc.name())
 
-        fmt::println("{:-^{}}", RLC_NAME, RLC_NAME_LEN);
+        fmt::println("{0:-^{1}}", ' ' + RLC_NAME + ' ', RLC_NAME_LEN);
 
         for(size_t offset = 0; offset < count;) {
             const auto* inst = Instruction::instance(
-                static_cast<Opcodes>(_bytecodes[offset])
+                static_cast<Opcodes>(bytecodes(offset))
             );
-            fmt::println("{}", inst->disassemble(_bytecodes, constants(), &_rlc, offset));
+            fmt::println("{}", inst->disassemble(dataPool, constants(), &_rlc, offset));
             offset += inst->length();
         }
     }

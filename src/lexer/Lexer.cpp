@@ -252,6 +252,8 @@ bool Lexer::next(Token*& token) {
         _sourceFile.restoreTopMark();
     }
 
+    LOG(FATAL) << "unknown char: " << static_cast<char>(rune);
+
     token = makeToken(S_Invalid);
     setTokenLocation(token);
 
@@ -267,13 +269,18 @@ void Lexer::skipComment() {
     while(true) {
         _sourceFile.pushMark();
         next(token);
-        assert(token != nullptr);
 
-        // 过滤注释, 匹配下一个
-        if(token->type() != TokenType::LineComment
-           && token->type() != TokenType::BlockComment) {
+        CHECK(token != nullptr);
+
+        auto isComment = token->type() == TokenType::LineComment
+                         || token->type() == TokenType::BlockComment;
+
+        _tokens.pop_back();
+
+        if(!isComment) {
             _sourceFile.restoreTopMark();
             _sourceFile.popMark();
+            _hasNext = true;
             return;
         }
 
@@ -317,17 +324,8 @@ bool Lexer::match(const string& literal) {
     _sourceFile.pushMark();
     DEFER { _sourceFile.popMark(); };
 
-    // 实际可以少循环一次, 因为ch一定和literal[0]匹配
-
-    //    for (const auto &targetCh: literal) {
-    //        if (targetCh != read(false)) {
-    //            _sourceFile.restoreTopMark();
-    //            return false;
-    //        }
-    //    }
-
-    return ranges::all_of(literal
-       ,
+    // 实际可以少循环一次, 因为 ch 一定和 literal[0] 匹配
+    return ranges::all_of(literal,
         [&](const auto targetCh) {
             if(targetCh != read(false)) {
                 _sourceFile.restoreTopMark();
@@ -341,19 +339,29 @@ bool Lexer::lineComment(Token*& token) {
     if(auto ch = read(); ch == '/') {
         ch = read(false);
         if(ch == '/') {
+            // usually we don't need comment
             token = makeToken(S_LineComment);
+            do {
+                ch = read(false);
+            } while(ch != '\n' && ch != runeEof);
+            rewindOneChar();
             return true;
         }
     }
     return false;
 }
 
+/**
+ * 匹配块注释, 支持嵌套
+ * @param token 返回的token
+ * @return 是否成功
+ */
 bool Lexer::blockComment(Token*& token) {
     if(match("/*")) {
         auto block_count = 1;
         token = makeToken(S_BlockComment);
 
-        std::stringstream stream{ string{} };
+        // std::stringstream stream{};
         while(true) {
             auto ch = read(false);
             if(ch == runeEof) {
@@ -381,8 +389,8 @@ bool Lexer::blockComment(Token*& token) {
                 rewindOneChar();
                 ch = read(false);
             }
-            const auto runeType = utf8Encode(ch);
-            stream << runeType.data;
+            // const auto runeType = utf8Encode(ch);
+            // stream << runeType.data;
         }
 
         // token.value = stream.str();
@@ -399,7 +407,6 @@ bool Lexer::numberConstVal(Token*& token) {
     auto hasDigits = false;
     auto valueType = TjsValueType::Integer;
 
-    // XXX: requires utf8 fix
     while(valid.find_first_of(static_cast<char>(ch)) != string::npos) {
         if(ch == '.') {
             if(valueType == TjsValueType::Real) {
@@ -657,7 +664,7 @@ void Lexer::extractNumber(int8_t (*validDigits)(char),
             } else if(ch == '.' && !pointFound) {
                 pointFound = true;
                 ss << ch;
-            } else if((ch == expMark[0] || ch == expMark[1])) {
+            } else if(ch == expMark[0] || ch == expMark[1]) {
                 expFound = true;
                 ss << ch;
                 ch = static_cast<char>(read());
@@ -707,7 +714,7 @@ string Lexer::readIdentifier() {
     if(!isRuneLetter(ch)) {
         return "";
     }
-    std::stringstream stream{ string{} };
+    std::stringstream stream{};
 
     auto runeType = utf8Encode(ch);
     stream << runeType.data;
@@ -762,7 +769,7 @@ bool Lexer::minus(Token*& token) {
 bool Lexer::mul(Token*& token) {
     static const OperatorTokenSet signArr{
             { AsteriskEqualLiteral, S_AsteriskEqual },
-            { AsteriskEqualLiteral, S_Asterisk },
+            { AsteriskLiteral, S_Asterisk },
     };
     return boringMatch(token, signArr);
 }

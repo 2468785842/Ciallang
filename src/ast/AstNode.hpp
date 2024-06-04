@@ -17,6 +17,8 @@
 namespace Ciallang::Syntax {
     class AstNode;
 
+    class DeclNode;
+
     class ExprNode;
 
     class StmtNode;
@@ -37,8 +39,10 @@ namespace Ciallang::Syntax {
 
     class IfStmtNode;
 
+    class VarDeclNode;
+
     using ExprNodeList = std::vector<ExprNode*>;
-    using StmtNodeList = std::vector<StmtNode*>;
+    using DeclNodeList = std::vector<DeclNode*>;
 
     class AstNode {
     public:
@@ -63,6 +67,8 @@ namespace Ciallang::Syntax {
 
     struct AstNode::Visitor {
         virtual ~Visitor() = default;
+
+        virtual void visit(const VarDeclNode*) const = 0;
 
         virtual void visit(const ValueExprNode*) const = 0;
 

@@ -73,7 +73,7 @@ namespace Ciallang::Syntax {
         void skipComment();
 
         bool tackOverToken(Token& token) {
-            assert(!_tokens.empty());
+            CHECK(!_tokens.empty());
 
             token = *_tokens.front();
 

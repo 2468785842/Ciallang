@@ -12,33 +12,40 @@
 
 #pragma once
 
-#include <functional>
-#include "Ast.hpp"
-#include "Prototype.hpp"
+#include "../ast/Ast.hpp"
+#include "../vm/Interpreter.hpp"
 
 namespace Ciallang::Inter {
-    using namespace Syntax;
-    using namespace VM;
 
     class CodeGen;
 
-    using NodeGenCallable = std::function<
-            bool(CodeGen *, AstNode *, std::shared_ptr<Prototype *>)
-    >;
-
-    class CodeGen {
+    class CodeGen :  Syntax::AstNode::Visitor {
     public:
-        CodeGen() {}
+        friend class Syntax::AstNode;
+        explicit CodeGen(VM::VMChunk* vmChunk) : _vmChunk(vmChunk) {
+        }
 
-        std::shared_ptr<Prototype *> load(AstNode *programNode);
+        void loadAst(const Syntax::AstNode* node) const;
 
-        bool parse(AstNode *node, std::shared_ptr<Prototype *> prototype);
+    private:
+        VM::VMChunk* _vmChunk;
 
-        bool global(AstNode *node, std::shared_ptr<Prototype *> prototype);
+        void visit(const Syntax::ValueExprNode*) const override;
 
-        bool statement(AstNode *node, std::shared_ptr<Prototype *> prototype);
+        void visit(const Syntax::SymbolExprNode*) const override;
 
-        bool binaryOperator(AstNode *node, std::shared_ptr<Prototype *> prototype);
+        void visit(const Syntax::BinaryExprNode*) const override;
+
+        void visit(const Syntax::UnaryExprNode*) const override;
+
+        void visit(const Syntax::AssignExprNode*) const override;
+
+        void visit(const Syntax::BlockStmtNode*) const override;
+
+        void visit(const Syntax::ExprStmtNode*) const override;
+
+        void visit(const Syntax::IfStmtNode*) const override;
+
+        void visit(const Syntax::VarDeclNode*) const override;
     };
-
 }

@@ -15,12 +15,12 @@
 #include "AstNode.hpp"
 
 namespace Ciallang::Syntax {
-    class StmtNode : public AstNode {
+    class StmtNode : public DeclNode {
     };
 
     class BlockStmtNode : public StmtNode {
     public:
-        StmtNodeList children;
+        DeclNodeList childrens;
 
         BlockStmtNode() = delete;
 

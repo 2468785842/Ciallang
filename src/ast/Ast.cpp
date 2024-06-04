@@ -106,12 +106,16 @@ namespace Ciallang::Syntax {
         return makeNode<SymbolExprNode>(token);
     }
 
+    VarDeclNode* AstBuilder::makeVarDeclNode(const ExprStmtNode* rhs) {
+        return makeNode<VarDeclNode>(rhs);
+    }
+
     template <typename R, typename... Args>
     R* AstBuilder::makeNode(Args&&... args) {
         static_assert(
-                      std::is_base_of_v<AstNode, R>,
-                      "Error: R must be a derived class of AstNode."
-                     );
+            std::is_base_of_v<AstNode, R>,
+            "Error: R must be a derived class of AstNode."
+        );
 
         R* node = new R{ std::forward<Args>(args)... };
         _nodes.push_front(node);

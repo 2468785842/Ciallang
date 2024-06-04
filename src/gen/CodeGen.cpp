@@ -11,65 +11,73 @@
 //
 
 #include "CodeGen.hpp"
-#include "Token.hpp"
+
+#include "../vm/Instruction.hpp"
 
 namespace Ciallang::Inter {
-
-    static const inline std::unordered_map<AstNodeType, NodeGenCallable> S_NodeGens{
-            {AstNodeType::global_list,     std::bind_front(&CodeGen::global)},
-            {AstNodeType::statement,       std::bind_front(&CodeGen::statement)},
-            {AstNodeType::binary_operator, std::bind_front(&CodeGen::binaryOperator)}
-    };
-
-    std::shared_ptr<Prototype*> CodeGen::load(AstNode *programNode) {
-        if (programNode->children.empty()) {
-            return nullptr;
-        }
-
-        auto pPrototype = std::make_shared<Prototype *>(new Prototype{});
-
-        if (!parse(programNode->children[0], pPrototype)) {
-            return nullptr;
-        }
-
-        return pPrototype;
+    void CodeGen::loadAst(const Syntax::AstNode* node) const {
+        node->accept(this);
+        _vmChunk->emit(node->location.start().line, VM::Opcodes::Ret);
     }
 
-    bool CodeGen::parse(AstNode *node, std::shared_ptr<Prototype *> prototype) {
-        auto it = S_NodeGens.find(node->type);
-        if (it != S_NodeGens.end()) {
-            return it->second(this, node, prototype);
+    void CodeGen::visit(const Syntax::BlockStmtNode* node) const {
+        for(const auto* children : node->childrens) {
+            children->accept(this);
         }
-        return false;
     }
 
-    bool CodeGen::global(AstNode *node, std::shared_ptr<Prototype *> prototype) {
-        if (node->children.empty()) {
-            return false;
+    void CodeGen::visit(const Syntax::ExprStmtNode* node) const {
+        for(auto expression : node->expressions) {
+            expression->accept(this);
         }
-        return parse(node, prototype);
     }
 
-    bool CodeGen::statement(AstNode *node, std::shared_ptr<Prototype *> prototype) {
-        if (!node->rhs) {
-            return false;
-        }
-        return parse(node->rhs, prototype);
+    void CodeGen::visit(const Syntax::ValueExprNode* node) const {
+        auto line = node->location.start().line;
+        auto index = _vmChunk->load(std::move(*node->token->value()));
+        _vmChunk->emit(line, VM::Opcodes::Const, { static_cast<uint8_t>(index) });
     }
 
-    bool CodeGen::binaryOperator(AstNode *node, std::shared_ptr<Prototype *> prototype) {
-        switch (node->token.type) {
-            case TokenType::Plus: {
+    void CodeGen::visit(const Syntax::BinaryExprNode* node) const {
+        auto line = node->location.start().line;
 
-                //TODO emit opcode;
-//                prototype.
-                return true;
-            }
-            case TokenType::Asterisk: {
-                return true;
-            }
+        node->lhs->accept(this);
+        node->rhs->accept(this);
+
+        switch(node->token->type()) {
+            case Syntax::TokenType::Plus:
+                _vmChunk->emit(line, VM::Opcodes::Add);
+                break;
+            case Syntax::TokenType::Minus:
+                _vmChunk->emit(line, VM::Opcodes::Sub);
+                break;
+            case Syntax::TokenType::Slash:
+                _vmChunk->emit(line, VM::Opcodes::Div);
+                break;
+            case Syntax::TokenType::Asterisk:
+                _vmChunk->emit(line, VM::Opcodes::Mul);
+                break;
+            default: ;
         }
-        return false;
     }
 
+    void CodeGen::visit(const Syntax::UnaryExprNode*) const {
+        LOG(FATAL) << "no impl";
+    }
+
+    void CodeGen::visit(const Syntax::AssignExprNode*) const {
+        LOG(FATAL) << "no impl";
+    }
+
+    void CodeGen::visit(const Syntax::VarDeclNode*) const {
+        LOG(FATAL) << "no impl";
+    }
+
+    void CodeGen::visit(const Syntax::IfStmtNode*) const {
+        LOG(FATAL) << "no impl";
+    }
+
+    void CodeGen::visit(const Syntax::SymbolExprNode*) const {
+        LOG(FATAL) << "no impl";
+    }
 }

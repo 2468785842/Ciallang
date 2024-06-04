@@ -18,14 +18,20 @@
 #include "VMChunk.hpp"
 
 namespace Ciallang::VM {
+#define START (std::ostringstream{}
+#define PRINT_NAME fmt::format("{:#04x}\t{: ^10}", offset, name())
+#define PRINT_LINE fmt::format("{:<5}", rlc->firstAppear(offset) ? std::to_string(rlc->find(offset) + 1) : "~")
+#define END ' ').str()
+
     enum class Opcodes : uint8_t {
         Ret,   // 程序正常返回
         Const, // 加载常量
+        BNot,  // 按位非
         LNot,  // 逻辑非 -number
         Add,
         Sub,
-        Div,
         Mul,
+        Div,
     };
 
     struct Instruction {
@@ -41,10 +47,10 @@ namespace Ciallang::VM {
          */
         std::string disassemble(const Interpreter* interpreter) const {
             return disassemble(
-                interpreter->_vm.ip,
+                interpreter->_vm.chunk->bytecodes(),
                 interpreter->_vm.chunk->constants(),
                 interpreter->_vm.chunk->rlc(),
-                interpreter->_vm.ip - interpreter->_vm.chunk->bytecodes()
+                interpreter->_vm.ip
             );
         }
 
@@ -73,16 +79,25 @@ namespace Ciallang::VM {
 
     template <InstName NAME, size_t N>
     struct MakeInstruction : Instruction {
-        InterpretResult execute(Interpreter* interpreter) const override {
-            LOG(FATAL) << "no implement insturction function `execute`";
+        InterpretResult execute(Interpreter*) const override {
+            LOG(FATAL)
+                    << "no implement insturction function `execute`: "
+                    << _name;
             std::abort();
         }
 
         std::string disassemble(const uint8_t* bytecodes,
                                 const TjsValue* constants,
-                                const Rlc* rlc, size_t ip) const override {
-            LOG(FATAL) << "no implement insturction function `disassemble`";
-            std::abort();
+                                const Rlc* rlc, size_t offset) const override {
+            // if instruction is 1 length, default implement
+            if constexpr(N == 1) {
+                return START << PRINT_LINE << PRINT_NAME << END;
+            } else {
+                LOG(FATAL)
+                        << "no implement insturction function `disassemble`"
+                        << _name;
+                std::abort();
+            }
         }
 
         [[nodiscard]] const char* name() const final {
@@ -104,12 +119,13 @@ constexpr auto S_##ValueName = ValueName()
 
     DEFINE_INST(RetInst, "ret", 1);
     DEFINE_INST(ConstInst, "const", 2);
+    DEFINE_INST(BNotInst, "bnot", 1);
     DEFINE_INST(LNotInst, "lnot", 1);
 
     DEFINE_INST(AddInst, "add", 1);
     DEFINE_INST(SubInst, "sub", 1);
-    DEFINE_INST(DivInst, "div", 1);
     DEFINE_INST(MulInst, "mul", 1);
+    DEFINE_INST(DivInst, "div", 1);
 
 #undef DEFINE_INST
     // -------------------------------------------------------------------------//
@@ -119,19 +135,20 @@ constexpr auto S_##ValueName = ValueName()
             frozen::make_unordered_map<Opcodes, const Instruction*>({
                     { Opcodes::Ret, &S_RetInst },
                     { Opcodes::Const, &S_ConstInst },
+                    { Opcodes::BNot, &S_BNotInst },
                     { Opcodes::LNot, &S_LNotInst },
 
                     { Opcodes::Add, &S_AddInst },
                     { Opcodes::Sub, &S_SubInst },
-                    { Opcodes::Div, &S_DivInst },
                     { Opcodes::Mul, &S_MulInst },
+                    { Opcodes::Div, &S_DivInst },
             });
 
     inline const Instruction* Instruction::instance(const Opcodes opcode) {
         const auto it = S_Instructions.find(opcode);
         if(it == S_Instructions.end()) {
             LOG(FATAL)
-                    << "not find instruction!! opcode enum: "
+                    << "not find instruction!! opcode enum: 0x"
                     << std::hex << static_cast<size_t>(opcode);
         }
         return it->second;
@@ -154,31 +171,60 @@ inline InterpretResult Inst::execute(Interpreter* interpreter) const
         return InterpretResult::CONTINUE;
     }
 
-    EXECUTE(LNotInst) {
+    EXECUTE(BNotInst) {
         interpreter->push(-interpreter->pop());
         return InterpretResult::CONTINUE;
     }
 
-#define EXECUTE_BINARY_OP(Inst, op) \
-    EXECUTE(Inst) { \
-        auto b = interpreter->pop(); \
-        auto a = interpreter->pop(); \
-        interpreter->push(a op b); \
-        return InterpretResult::CONTINUE; \
+    EXECUTE(LNotInst) {
+        // interpreter->push(!interpreter->pop());
+        return InterpretResult::CONTINUE;
     }
 
-    // EXECUTE_BINARY_OP(AddInst, +)
+    template <Opcodes OP>
+    static InterpretResult executeBinaryOperator(Interpreter* interpreter) {
+        auto b = interpreter->pop();
+        auto a = interpreter->pop();
 
-#undef EXECUTE
+        if constexpr(OP == Opcodes::Add) {
+            interpreter->push(a + b);
+        } else if constexpr(OP == Opcodes::Sub) {
+            interpreter->push(a - b);
+        } else if constexpr(OP == Opcodes::Mul) {
+            interpreter->push(a * b);
+        } else if constexpr(OP == Opcodes::Div) {
+            interpreter->push(a / b);
+        } else {
+            static_assert(
+                false,
+                "template error opcodes not support?: `executeBinaryOperator`"
+            );
+        }
+        return InterpretResult::CONTINUE;
+    }
+
+    EXECUTE(AddInst) {
+        return executeBinaryOperator<Opcodes::Add>(interpreter);
+    }
+
+    EXECUTE(SubInst) {
+        return executeBinaryOperator<Opcodes::Sub>(interpreter);
+    }
+
+    EXECUTE(MulInst) {
+        return executeBinaryOperator<Opcodes::Mul>(interpreter);
+    }
+
+    EXECUTE(DivInst) {
+        return executeBinaryOperator<Opcodes::Div>(interpreter);
+    }
+
     //--------------------------------------------------------------------------//
     //----------------------------- disassemble --------------------------------//
     //--------------------------------------------------------------------------//
 
-#define START (std::ostringstream{}
-#define PRINT_NAME fmt::format("{:#04x}\t{:<6}", offset, name())
-#define PRINT_LINE fmt::format("{:>5}", rlc->firstAppear(offset) ? std::to_string(rlc->find(offset) + 1) : "~")
 #define PRINT_CONSTANT fmt::format(" // {};", constants[bytecodes[offset + 1]])
-#define END ' ').str()
+
 #define DISASSEMBLE(Inst) template <> \
     inline std::string Inst::disassemble( \
         const uint8_t* bytecodes, \
@@ -186,17 +232,15 @@ inline InterpretResult Inst::execute(Interpreter* interpreter) const
         const Rlc* rlc, size_t offset) const
 
 
-    DISASSEMBLE(RetInst) {
-        return START << PRINT_NAME << PRINT_LINE << END;
-    }
-
     DISASSEMBLE(ConstInst) {
-        return START << PRINT_NAME << PRINT_LINE << PRINT_CONSTANT << END;
+        return START << PRINT_LINE << PRINT_NAME
+                   << fmt::format("{: ^4d}", bytecodes[offset + 1])
+                   << PRINT_CONSTANT << END;
     }
 
-    DISASSEMBLE(LNotInst) {
-        return START << PRINT_NAME << PRINT_LINE << END;
-    }
+
+#undef EXECUTE_BINARY_OP
+#undef EXECUTE
 
 #undef START
 #undef PRINT_NAME

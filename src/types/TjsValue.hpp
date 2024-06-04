@@ -58,6 +58,50 @@ namespace Ciallang {
 
         [[nodiscard]] const char* name() const;
 
+        TjsValue operator+(const TjsValue& tjsValue) const {
+            switch(tjsValue.type()) {
+                case TjsValueType::Integer:
+                    return TjsValue{ this->asInteger() + tjsValue.asInteger() };
+                case TjsValueType::Real:
+                    return TjsValue{ this->asReal() + tjsValue.asReal() };
+                default:
+                    throw std::logic_error("not support add operator");
+            }
+        }
+
+        TjsValue operator-(const TjsValue& tjsValue) const {
+            switch(tjsValue.type()) {
+                case TjsValueType::Integer:
+                    return TjsValue{ this->asInteger() + tjsValue.asInteger() };
+                case TjsValueType::Real:
+                    return TjsValue{ this->asReal() + tjsValue.asReal() };
+                default:
+                    throw std::logic_error("not support sub operator");
+            }
+        }
+
+        TjsValue operator*(const TjsValue& tjsValue) const {
+            switch(tjsValue.type()) {
+                case TjsValueType::Integer:
+                    return TjsValue{ this->asInteger() * tjsValue.asInteger() };
+                case TjsValueType::Real:
+                    return TjsValue{ this->asReal() * tjsValue.asReal() };
+                default:
+                    throw std::logic_error("not support mul operator");
+            }
+        }
+
+        TjsValue operator/(const TjsValue& tjsValue) const {
+            switch(tjsValue.type()) {
+                case TjsValueType::Integer:
+                    return TjsValue{ this->asInteger() / tjsValue.asInteger() };
+                case TjsValueType::Real:
+                    return TjsValue{ this->asReal() / tjsValue.asReal() };
+                default:
+                    throw std::logic_error("not support div operator");
+            }
+        }
+
         TjsValue operator-() {
             switch(type()) {
                 case TjsValueType::Integer:
@@ -99,6 +143,7 @@ namespace Ciallang {
             }
             return os << "unknown";
         }
+
     };
 
 
@@ -144,7 +189,6 @@ namespace Ciallang {
     inline void TjsRealHelper::destroy(TjsValue&) const {
         // nothing to do
     }
-
 } // namespace Ciallang
 
 // support fmt::format

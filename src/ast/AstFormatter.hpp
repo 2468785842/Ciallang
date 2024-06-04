@@ -72,6 +72,8 @@ namespace Ciallang::Syntax {
 
         void visit(const IfStmtNode*) const override;
 
+        void visit(const VarDeclNode*) const override;
+
     private:
         static std::string getVertexName(const AstNode* node);
     };

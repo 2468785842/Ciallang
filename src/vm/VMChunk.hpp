@@ -13,7 +13,7 @@
  */
 #pragma once
 
-#include "types/TjsValue.hpp"
+#include "../types/TjsValue.hpp"
 #include "DataPool.hpp"
 #include "Rlc.hpp"
 
@@ -119,6 +119,7 @@ namespace Ciallang::VM {
 
     class VMChunk : DataPool<uint8_t> {
     public:
+
         explicit VMChunk(const std::filesystem::path& path): _rlc{ path } {
         };
 
@@ -136,16 +137,17 @@ namespace Ciallang::VM {
             return _valueArray.count - 1;
         }
 
+        [[nodiscard]] uint8_t bytecodes(const size_t ip) const { return dataPool[ip]; }
+
         [[nodiscard]] const Rlc* rlc() const { return &_rlc; }
 
-        [[nodiscard]] uint8_t* bytecodes() const { return dataPool; }
+        [[nodiscard]] const uint8_t* bytecodes() const { return dataPool; }
 
-        [[nodiscard]] TjsValue* constants() const { return _valueArray.dataPool; }
+        [[nodiscard]] const TjsValue* constants() const { return _valueArray.dataPool; }
 
         void disassemble() const;
 
     private:
-        uint8_t* _bytecodes = dataPool;
 
         DataPool<TjsValue> _valueArray{};
 

@@ -41,7 +41,7 @@ namespace Ciallang::Syntax {
 
           if (root->type != AstNodeType::pair) {
               target->location = root->location;
-              target->children.push_back(root);
+              target->childrens.push_back(root);
               return;
           }
 
@@ -50,16 +50,16 @@ namespace Ciallang::Syntax {
           while (true) {
               if (currentPair->lhs->type != AstNodeType::pair) {
                   if (currentPair->rhs != nullptr)
-                      target->children.push_back(currentPair->rhs);
-                  target->children.push_back(currentPair->lhs);
+                      target->childrens.push_back(currentPair->rhs);
+                  target->childrens.push_back(currentPair->lhs);
                   target->location.end(currentPair->lhs->location.end());
                   break;
               }
-              target->children.push_back(currentPair->rhs);
+              target->childrens.push_back(currentPair->rhs);
               currentPair = currentPair->lhs;
           }
 
-          ranges::reverse(target->children);
+          ranges::reverse(target->childrens);
       }*/
 
     /* static StmtNode *createTypeDeclarationNode(
@@ -86,8 +86,8 @@ namespace Ciallang::Syntax {
         FILE* astOutputFile = stdout;
         if(!path.empty()) {
             fopen_s(&astOutputFile,
-                    path.string().c_str(),
-                    "wt");
+                path.string().c_str(),
+                "wt");
             closeRequired = true;
         }
 
@@ -98,17 +98,12 @@ namespace Ciallang::Syntax {
     }
 
     bool Parser::lookAhead(const size_t count) {
+        // _lexer.skipComment();
         while(count >= tokens().size() && _lexer.hasNext()) {
             Token* token{ nullptr };
-            if(_lexer.next(token)) {
-                assert(token != nullptr);
+            if(!_lexer.next(token)) break;
 
-                while(token->type() == TokenType::BlockComment
-                      || token->type() == TokenType::LineComment) {
-                    if(!_lexer.next(token))
-                        return !tokens().empty();
-                }
-            }
+            CHECK(token != nullptr);
         }
         return !tokens().empty();
     }
@@ -131,14 +126,14 @@ namespace Ciallang::Syntax {
         return _lexer.tackOverToken(token);
     }
 
-    bool Parser::current(Token*& token) {
+    bool Parser::current(Token& token) {
         // just check tokens is empty? current tokens is empty we lex,
         if(!lookAhead(0))
             return false;
 
-        token = tokens().front();
+        token = *tokens().front();
 
-        return token->type() != TokenType::EndOfFile;
+        return token.type() != TokenType::EndOfFile;
     }
 
     bool Parser::expect(Result& r, const Token* token) {
@@ -150,21 +145,21 @@ namespace Ciallang::Syntax {
 
         if(!_lexer.tackOverToken(tToken)) {
             error(r,
-                  fmt::format(
-                              "expected token '{}' but end of file.",
-                              expectedName,
-                              tToken.name()), tToken.location
-                 );
+                fmt::format(
+                    "expected token '{}' but end of file.",
+                    expectedName,
+                    tToken.name()), tToken.location
+            );
             return false;
         }
 
         if(tToken.type() != expectedType) {
             error(r,
-                  fmt::format(
-                              "expected token '{}' but found '{}'.",
-                              expectedName,
-                              tToken.name()), tToken.location
-                 );
+                fmt::format(
+                    "expected token '{}' but found '{}'.",
+                    expectedName,
+                    tToken.name()), tToken.location
+            );
             return false;
         }
 
@@ -180,8 +175,7 @@ namespace Ciallang::Syntax {
             return Precedence::lowest;
 
         const auto* token = tokens().front();
-        const auto infixParser = infixParserFor(token->type());
-        if(infixParser != nullptr)
+        if(auto infixParser = infixParserFor(token->type()))
             return infixParser->precedence();
 
         return Precedence::lowest;
@@ -189,10 +183,11 @@ namespace Ciallang::Syntax {
 
     void Parser::synchronize() {
         while(!peek(TokenType::EndOfFile)) {
-            Token* token{ nullptr };
+            Token token{};
             if(!current(token)) return;
+            if(token.type() == TokenType::Invalid) return;
 
-            switch(token->type()) {
+            switch(token.type()) {
                 case TokenType::Function:
                 case TokenType::Class:
                 case TokenType::Var:
@@ -217,9 +212,9 @@ namespace Ciallang::Syntax {
     void Parser::parseScope(
         Result& r, BlockStmtNode* blockStmtNode, const TokenType terminatorToken
     ) {
-        while(!peek(TokenType::EndOfFile)) {
+        while(_lexer.hasNext()) {
             if(peek(terminatorToken)) return;
-            auto* statement = parseStatement(r);
+            auto* statement = parseDeclaration(r);
 
             // error sync
             if(!statement) {
@@ -227,8 +222,20 @@ namespace Ciallang::Syntax {
                 continue;
             }
 
-            blockStmtNode->children.push_back(statement);
+            blockStmtNode->childrens.push_back(statement);
         }
+    }
+
+    DeclNode* Parser::parseDeclaration(Result& r) {
+        Token token{};
+        if(!current(token)) return nullptr;
+
+        if(const auto* declParser = declParserFor(token.type())) {
+            consume();
+            return declParser->parse(r, this, &token);
+        }
+
+        return parseStatement(r);
     }
 
     ExprNode* Parser::parseExpression(
@@ -240,38 +247,37 @@ namespace Ciallang::Syntax {
         // 前缀
         const auto* prefixParser = prefixParserFor(token.type());
 
-        if(prefixParser == nullptr) {
+        if(!prefixParser) {
             error(r,
-                  fmt::format("unable prefix parse for token '{}' not found parser.", token.name()),
-                  token.location);
+                fmt::format("unable prefix parse for token '{}'.", token.name()),
+                token.location);
             return nullptr;
         }
 
         ExprNode* lhs = prefixParser->parse(r, this, &token);
-        if(lhs == nullptr) {
+        if(!lhs) {
             error(r,
-                  "unexpected empty ast node.",
-                  token.location);
+                "unexpected empty ast node.",
+                token.location);
             return nullptr;
         }
 
         // 中缀
         while(precedence < currentInfixPrecedence()) {
-            if(!consume(token)) {
-                break;
-            }
+            if(!consume(token)) break;
 
             const auto infixParser = infixParserFor(token.type());
             if(infixParser == nullptr) {
                 error(
-                      r,
-                      fmt::format("unable infix parse for token '{}' not found parser.", token.name()),
-                      token.location);
+                    r,
+                    fmt::format("unable infix parse for token '{}' not found parser.", token.name()),
+                    token.location);
                 break;
             }
+
             lhs = infixParser->parse(r, this, lhs, &token);
-            if(lhs == nullptr || r.isFailed())
-                break;
+
+            if(lhs == nullptr || r.isFailed()) break;
         }
         return lhs;
     }
@@ -285,32 +291,34 @@ namespace Ciallang::Syntax {
      * }
      */
     StmtNode* Parser::parseStatement(Result& r) {
-        Token* token = nullptr;
+        Token token{};
+
         // just peek
         if(!current(token)) return nullptr;
 
-        const auto stmtParser = stmtParserFor(token->type());
-        StmtNode* statementNode = nullptr;
-
-        if(stmtParser != nullptr) {
-            Token consumeToken{};
-            consume(consumeToken);
-            statementNode = stmtParser->parse(r, this, &consumeToken);
-        } else {
-            // maybe ExpressionStatement
-            auto* expr = parseExpression(r);
-            if(expr != nullptr) {
-                statementNode = _astBuilder.makeExprStmtNode(expr);
-                statementNode->location = expr->location;
-
-                // ;
-                if(!expect(r, &S_SemiColon)) {
-                    return nullptr;
-                }
-            }
+        if(const auto stmtParser = stmtParserFor(token.type())) {
+            consume();
+            return stmtParser->parse(r, this, &token);
         }
 
-        return statementNode;
+        // maybe ExpressionStatement
+
+        if(auto* expr = parseExpression(r)) {
+            auto* statementNode = _astBuilder.makeExprStmtNode(expr);
+            statementNode->location = expr->location;
+
+            // ;
+            if(expect(r, &S_SemiColon)) return statementNode;
+        }
+
+        return nullptr;
+    }
+
+    const DeclParser* Parser::declParserFor(const TokenType type) {
+        const auto it = S_DeclParsers.find(type);
+        if(it != S_DeclParsers.end())
+            return it->second;
+        return nullptr;
     }
 
     const StmtParser* Parser::stmtParserFor(const TokenType type) {
@@ -323,8 +331,8 @@ namespace Ciallang::Syntax {
     /**
      * 尝试获取一个前缀表达式Token的解析器
      *
-     * @param type if(not has TokenParser) -> nullptr
-     *             else -> TokenParser
+     * @param type has TokenParser -> TokenParser
+     *             else -> nullptr
      * @return Token解析器
      */
     const PrefixParser* Parser::prefixParserFor(const TokenType type) {
@@ -337,8 +345,6 @@ namespace Ciallang::Syntax {
     /**
      * 尝试获取一个中缀表达式Token的解析器
      *
-     * @param type if(has TokenParser) -> nullptr
-     *             else -> TokenParser
      * @return Token解析器
      */
     const InfixParser* Parser::infixParserFor(const TokenType type) {
@@ -350,6 +356,26 @@ namespace Ciallang::Syntax {
 
     /////////////////////////////////////////////////////////////////
 
+    DeclNode* VarDeclParser::parse(
+        Result& r, Parser* parser, Token* token
+    ) const {
+        auto* rhs = parser->parseStatement(r);
+
+        if(!rhs) return nullptr;
+        auto* expressionStatement = dynamic_cast<ExprStmtNode*>(rhs);
+        if(!expressionStatement) {
+            parser->error(r,
+                "var declaration; right-hand-side expect expression statment",
+                rhs->location);
+
+            return nullptr;
+        }
+
+        auto* varDeclNode = parser->astBuilder()->makeVarDeclNode(expressionStatement);
+        varDeclNode->location = expressionStatement->location;
+        return varDeclNode;
+    }
+
     StmtNode* BlockStmtParser::parse(
         Result& r, Parser* parser, Token* token
     ) const {
@@ -358,23 +384,23 @@ namespace Ciallang::Syntax {
         scope->location.start(token->location.start());
 
         parser->parseScope(r,
-                           scope,
-                           TokenType::RightCurlyBrace);
+            scope,
+            TokenType::RightCurlyBrace);
 
         if(!parser->peek(TokenType::RightCurlyBrace)) {
             parser->error(r,
-                          "scope expected token '}'",
-                          token->location);
+                "scope expected token '}'",
+                token->location);
 
             parser->astBuilder()->endScope();
             return nullptr;
         }
 
-        Token* terminatorToken = nullptr;
+        Token terminatorToken{};
         parser->current(terminatorToken);
         parser->consume();
 
-        scope->location.end(terminatorToken->location.end());
+        scope->location.end(terminatorToken.location.end());
         return parser->astBuilder()->endScope();
     }
 
@@ -383,11 +409,11 @@ namespace Ciallang::Syntax {
     ) const {
         const auto* test = createExpressionNode(r, parser);
 
-        if(test == nullptr) return nullptr;
+        if(!test) return nullptr;
 
         const auto* body = parser->parseStatement(r);
 
-        if(body == nullptr) return nullptr;
+        if(!body) return nullptr;
 
         auto* ifNode = parser->astBuilder()
                              ->makeIfStmtNode(test, body);
@@ -396,7 +422,7 @@ namespace Ciallang::Syntax {
         ifNode->location.end(ifNode->body->location.end());
 
         if(parser->peek(TokenType::Else)) {
-            Token* elseToken;
+            Token elseToken{};
             parser->current(elseToken);
             parser->consume();
 
@@ -427,11 +453,11 @@ namespace Ciallang::Syntax {
         );
 
         const auto rhs = parser->parseExpression(r, associativePrecedence);
-        if(rhs == nullptr) {
+        if(!rhs) {
             parser->error(
-                          r,
-                          "binary operator expects right-hand-side expression",
-                          token->location);
+                r,
+                "binary operator expects right-hand-side expression",
+                token->location);
             return nullptr;
         }
 
@@ -445,8 +471,8 @@ namespace Ciallang::Syntax {
 
         if(!symbolExprNode) {
             parser->error(r,
-                          "assignment operator left-hand-side expects identifier",
-                          lhs->location);
+                "assignment operator left-hand-side expects identifier",
+                lhs->location);
             return nullptr;
         }
 
@@ -464,12 +490,12 @@ namespace Ciallang::Syntax {
     ExprNode* UnaryOperatorPrefixParser::parse(
         Result& r, Parser* parser, Token* token
     ) const {
-        const auto rhs = parser->parseExpression(r, _precedence);
-        if(rhs == nullptr) {
+        const auto* rhs = parser->parseExpression(r, _precedence);
+        if(!rhs) {
             parser->error(
-                          r,
-                          "unary operator expects right-hand-side expression",
-                          token->location);
+                r,
+                "unary operator expects right-hand-side expression",
+                token->location);
             return nullptr;
         }
 

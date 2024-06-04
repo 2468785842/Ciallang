@@ -58,7 +58,7 @@ namespace Ciallang {
     struct MakeTjsValueHelper : TjsValueHelper {
         void copy(const TjsValue&, TjsValue&) const override {
             LOG(FATAL)
-                    << "not implement function `copy` with type"
+                    << "not implement function `copy` with type "
                     << _name;
         }
 
@@ -117,7 +117,7 @@ namespace Ciallang {
     inline const TjsValueHelper* TjsValueHelper::instance(const TjsValueType type) {
         const auto it = S_Helpers.find(type);
         if(it == S_Helpers.end()) {
-            LOG(FATAL) << "not find helper!! type enum: " << std::hex << static_cast<size_t>(type);
+            LOG(FATAL) << "not find helper!! type enum: 0x" << std::hex << static_cast<size_t>(type);
         }
         return it->second;
     }

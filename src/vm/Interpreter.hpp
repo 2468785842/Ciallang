@@ -21,10 +21,10 @@ namespace Ciallang::VM {
     class VMChunk;
 
     enum class InterpretResult {
-        OK, // 正常结束
-        CONTINUE, // 继续解释
+        OK,            // 正常结束
+        CONTINUE,      // 继续解释
         COMPILE_ERROR, // 编译错误
-        RUNTIME_ERROR // 运行错误
+        RUNTIME_ERROR  // 运行错误
     };
 
     class Interpreter {
@@ -35,16 +35,17 @@ namespace Ciallang::VM {
 
         InterpretResult run();
 
-        TjsValue readConstant();
+        [[nodiscard]] TjsValue readConstant();
+        [[nodiscard]] TjsValue& peek(size_t distance) const;
 
         void push(TjsValue&& value);
-        TjsValue pop();
+        TjsValue& pop();
         void printStack();
 
     private:
-        struct {
+        struct VM {
             VMChunk* chunk;
-            uint8_t* ip;
+            size_t ip{ 0 }; // 栈是动态的, 满了重新分配,地址可能改变,不能用指针
             TjsValue stack[STACK_MAX];
             TjsValue* sp = stack;
 

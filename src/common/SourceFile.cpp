@@ -298,7 +298,6 @@ namespace Ciallang::Common {
         const auto it = _linesByIndexRange.find(
                 std::make_pair(index, index)
         );
-        // yes, we need, if not found return last iterator
         if (it == _linesByIndexRange.end()) return nullptr;
         return &it->second;
     }

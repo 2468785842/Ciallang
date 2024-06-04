@@ -47,25 +47,28 @@ namespace Ciallang::Syntax {
         call
     };
 
+    class DeclParser {
+    public:
+        virtual ~DeclParser() = default;
+
+        virtual DeclNode* parse(Result& r, Parser* parser,
+                                Token* token) const = 0;
+    };
+
     class StmtParser {
     public:
         virtual ~StmtParser() = default;
 
-        virtual StmtNode* parse(
-            Result& r,
-            Parser* parser,
-            Token* token) const = 0;
+        virtual StmtNode* parse(Result& r, Parser* parser,
+                                Token* token) const = 0;
     };
 
     class InfixParser {
     public:
         virtual ~InfixParser() = default;
 
-        virtual ExprNode* parse(
-            Result& r,
-            Parser* parser,
-            ExprNode* lhs,
-            Token* token) const = 0;
+        virtual ExprNode* parse(Result& r, Parser* parser,
+                                ExprNode* lhs, Token* token) const = 0;
 
         // 优先级
         [[nodiscard]] virtual Precedence precedence() const = 0;
@@ -75,10 +78,8 @@ namespace Ciallang::Syntax {
     public:
         virtual ~PrefixParser() = default;
 
-        virtual ExprNode* parse(
-            Result& r,
-            Parser* parser,
-            Token* token) const = 0;
+        virtual ExprNode* parse(Result& r, Parser* parser,
+                                Token* token) const = 0;
     };
 
     class Parser {
@@ -99,7 +100,7 @@ namespace Ciallang::Syntax {
 
         bool consume(Token& token);
 
-        bool current(Token*&);
+        bool current(Token&);
 
         bool lookAhead(size_t count);
 
@@ -110,6 +111,8 @@ namespace Ciallang::Syntax {
         StmtNode* parse(Result&);
 
         void parseScope(Result&, BlockStmtNode*, TokenType = TokenType::EndOfFile);
+
+        DeclNode* parseDeclaration(Result& r);
 
         ExprNode* parseExpression(Result&, Precedence = Precedence::lowest);
 
@@ -128,6 +131,8 @@ namespace Ciallang::Syntax {
 
         Precedence currentInfixPrecedence();
 
+        static const DeclParser* declParserFor(TokenType type);
+
         static const StmtParser* stmtParserFor(TokenType type);
 
         static const InfixParser* infixParserFor(TokenType type);
@@ -138,6 +143,24 @@ namespace Ciallang::Syntax {
             return _lexer.tokens();
         }
     };
+
+    /**
+     * +----------------------------------------------------------------------------+
+     * |                                declParser                                  |
+     * +----------------------------------------------------------------------------+
+     */
+    struct VarDeclParser final : DeclParser {
+        constexpr VarDeclParser() = default;
+
+        DeclNode* parse(Result& r, Parser* parser, Token* token) const override;
+    };
+
+    static constexpr VarDeclParser S_VarDeclParser{};
+
+    static constexpr auto S_DeclParsers =
+            frozen::make_unordered_map<TokenType, const DeclParser*>({
+                    { TokenType::Var, &S_VarDeclParser }
+            });
 
     /**
      * +----------------------------------------------------------------------------+
@@ -156,11 +179,10 @@ namespace Ciallang::Syntax {
         StmtNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
-    static constexpr inline BlockStmtParser S_BlockStmtParser{};
+    static constexpr BlockStmtParser S_BlockStmtParser{};
+    static constexpr IfStmtParser S_IfStmtParser{};
 
-    static constexpr inline IfStmtParser S_IfStmtParser{};
-
-    static constexpr inline auto S_StmtParsers =
+    static constexpr auto S_StmtParsers =
             frozen::make_unordered_map<TokenType, const StmtParser*>({
                     { TokenType::LeftCurlyBrace, &S_BlockStmtParser },
                     { TokenType::If, &S_IfStmtParser },
@@ -201,16 +223,15 @@ namespace Ciallang::Syntax {
     //        ExprNode *parse(Result &r, Parser *parser, Token *token) override;
     //    };
 
-    static constexpr inline ConstValPrefixParser S_ConstValPrefixParser{};
-    static constexpr inline UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
-    static constexpr inline SymbolPrefixParser S_SymbolPrefixParser;
-    static constexpr inline UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
+    static constexpr ConstValPrefixParser S_ConstValPrefixParser{};
+    static constexpr UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
+    static constexpr SymbolPrefixParser S_SymbolPrefixParser;
+    static constexpr UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
     //    static inline FunctionPrefixParser S_FunctionPrefixParser{};
 
-    static constexpr inline auto S_PrefixParsers =
+    static constexpr auto S_PrefixParsers =
             frozen::make_unordered_map<TokenType, const PrefixParser*>({
-                    { TokenType::Const, &S_PrefixParser },
-                    { TokenType::Var, &S_PrefixParser },
+                    // { TokenType::Const, &S_PrefixParser },
                     { TokenType::ConstVal, &S_ConstValPrefixParser },
                     { TokenType::Minus, &S_NegatePrefixParser }, // "-"
                     { TokenType::Identifier, &S_SymbolPrefixParser },
@@ -268,7 +289,7 @@ namespace Ciallang::Syntax {
         const bool _isRightAssociative;
     };
 
-    static constexpr inline BinaryOperatorInfixParser
+    static constexpr BinaryOperatorInfixParser
             S_SumSubBinOpInfixParser{ Precedence::sum_sub, false },
             S_ProductBinOpParser{ Precedence::product, false },
             S_AssignBinOpParser{ Precedence::assignment, true, true },
@@ -282,7 +303,7 @@ namespace Ciallang::Syntax {
             S_LogicalAndBinOpParser{ Precedence::logical_and, false },
             S_MemberAccessBinOpParser{ Precedence::postfix, false };
 
-    static constexpr inline auto S_InfixParsers =
+    static constexpr auto S_InfixParsers =
             frozen::make_unordered_map<TokenType, const InfixParser*>({
                     { TokenType::Swap, &S_AssignBinOpParser },                    // <->
                     { TokenType::Assignment, &S_AssignBinOpParser },              // =

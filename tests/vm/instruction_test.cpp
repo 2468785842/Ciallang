@@ -11,6 +11,7 @@
  *                                                            \_/__/
  *
  */
+#include <gen/CodeGen.hpp>
 #include <gtest/gtest.h>
 
 #include <types/TjsValue.hpp>
@@ -19,6 +20,9 @@
 #include <vm/Instruction.hpp>
 
 #include <init/GlogInit.hpp>
+#include <parser/Parser.hpp>
+
+#include "common/SourceFile.hpp"
 
 using namespace Ciallang::VM;
 
@@ -35,10 +39,41 @@ TEST(VM_Test, Instruction) {
     VMChunk vmChunk{ "test" };
     Interpreter interpreter{ &vmChunk };
 
-    auto index = vmChunk.load(Ciallang::tjsReal(1.2));
+    uint8_t constant = vmChunk.load(Ciallang::tjsReal(1.2));
+    vmChunk.emit(123, Opcodes::Const, { constant });
 
-    vmChunk.emit(122, Opcodes::Const, { static_cast<uint8_t>(index) });
-    vmChunk.emit(122, Opcodes::LNot);
-    vmChunk.emit(122, Opcodes::Ret);
+    constant = vmChunk.load(Ciallang::tjsReal(3.4));
+    vmChunk.emit(123, Opcodes::Const, { constant });
+
+    vmChunk.emit(123, Opcodes::Add);
+
+    constant = vmChunk.load(Ciallang::tjsReal(5.6));
+    vmChunk.emit(123, Opcodes::Const, { constant });
+
+    vmChunk.emit(123, Opcodes::Div);
+    // vmChunk.emit(123, Opcodes::LNot);
+    vmChunk.emit(123, Opcodes::Ret);
+    // vmChunk.disassemble();
+
     EXPECT_EQ(interpreter.run(), InterpretResult::OK);
+}
+
+TEST(Interpreter, Execute) {
+    Ciallang::Common::Result r{};
+
+    Ciallang::Common::SourceFile sourceFile{ R"(.\startup.tjs)" };
+    sourceFile.load(r);
+    CHECK(!r.isFailed());
+
+    Ciallang::Syntax::AstBuilder astBuilder{};
+    Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
+    auto* globalNode = parser.parse(r);
+    CHECK(globalNode != nullptr && !r.isFailed());
+
+    VMChunk vmChunk{ sourceFile.path() };
+    Ciallang::Inter::CodeGen codeGen{ &vmChunk };
+    codeGen.loadAst(globalNode);
+
+    Interpreter interpreter{ &vmChunk };
+    interpreter.run();
 }

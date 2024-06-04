@@ -30,6 +30,7 @@ namespace Ciallang::VM {
                 capacity = Memory::growCapacity(oldCapacity);
                 dataPool = Memory::growArray(dataPool,
                     oldCapacity, capacity);
+                addressHeader = dataPool;
             }
 
             dataPool[count] = std::forward<VT>(value);
@@ -37,7 +38,11 @@ namespace Ciallang::VM {
         }
 
         virtual ~DataPool() noexcept {
-            Memory::freeArray(dataPool, capacity);
+            Memory::freeArray(addressHeader, capacity);
         }
+
+    private:
+        // 指向开始的地址,不然改变 dataPool 无法释放内存
+        VT* addressHeader = dataPool;
     };
 }

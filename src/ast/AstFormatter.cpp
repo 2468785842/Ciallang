@@ -41,6 +41,7 @@ namespace Ciallang::Syntax {
 
         assert(strPtr != nullptr);
 
+        // ReSharper disable once CppDFANullDereference
         switch(strPtr->type()) {
             case TjsValueType::Integer:
                 ss << strPtr->asInteger();
@@ -57,13 +58,8 @@ namespace Ciallang::Syntax {
             GraphvizFormatter::escapeChars(ss.str()));
 
         fmt::print(
-                   _file,
-                   "\t{}[shape={},label=\"<f1> {}{}\"{}];\n",
-                   nodeVertexName,
-                   shape,
-                   node->name(),
-                   details,
-                   style);
+            _file, "\t{}[shape={},label=\"<f1> {}{}\"{}];\n",
+            nodeVertexName, shape, node->name(), details, style);
     }
 
     void AstFormatter::visit(const SymbolExprNode* node) const {
@@ -74,13 +70,11 @@ namespace Ciallang::Syntax {
         std::string style = ", fillcolor=goldenrod1, style=\"filled\"";
 
         fmt::print(
-                   _file,
-                   "\t{}[shape={},label=\"<f1> {}|{{ {} }}\"{}];\n",
-                   nodeVertexName,
-                   shape,
-                   node->name(),
-                   node->token->value()->asString()->c_str(),
-                   style);
+            _file,
+            "\t{}[shape={},label=\"<f1> {}|{{ {} }}\"{}];\n",
+            nodeVertexName, shape, node->name(),
+            node->token->value()->asString()->c_str(),
+            style);
     }
 
     void AstFormatter::visit(const BinaryExprNode* node) const {
@@ -93,29 +87,23 @@ namespace Ciallang::Syntax {
         std::string value = node->token->name();
 
         auto details = fmt::format(
-                                   "|{{ operator: '{}' }}",
-                                   GraphvizFormatter::escapeChars(value));
+            "|{{ operator: '{}' }}",
+            GraphvizFormatter::escapeChars(value));
 
         fmt::print(
-                   _file,
-                   "\t{}[shape=record,label=\"<f0> lhs|<f1> {}{}|<f2> rhs\"{}];\n",
-                   nodeVertexName,
-                   node->name(),
-                   details,
-                   style);
+            _file,
+            "\t{}[shape=record,label=\"<f0> lhs|<f1> {}{}|<f2> rhs\"{}];\n",
+            nodeVertexName, node->name(), details, style);
 
         node->lhs->accept(this);
         fmt::print(
-                   _file,
-                   "\t{}:f0 -> {}:f1;\n",
-                   nodeVertexName,
-                   getVertexName(node->lhs));
+            _file, "\t{}:f0 -> {}:f1;\n",
+            nodeVertexName, getVertexName(node->lhs));
+
         node->rhs->accept(this);
         fmt::print(
-                   _file,
-                   "\t{}:f2 -> {}:f1;\n",
-                   nodeVertexName,
-                   getVertexName(node->rhs));
+            _file, "\t{}:f2 -> {}:f1;\n",
+            nodeVertexName, getVertexName(node->rhs));
     }
 
     void AstFormatter::visit(const UnaryExprNode* node) const {
@@ -127,23 +115,17 @@ namespace Ciallang::Syntax {
         std::string value = node->token->name();
 
         auto details = fmt::format(
-                                   "|{{ operator: '{}' }}",
-                                   GraphvizFormatter::escapeChars(value));
+            "|{{ operator: '{}' }}",
+            GraphvizFormatter::escapeChars(value));
 
         fmt::print(
-                   _file,
-                   "\t{}[shape=record,label=\"<f0> {}{}|<f2> rhs\"{}];\n",
-                   nodeVertexName,
-                   node->name(),
-                   details,
-                   style);
+            _file, "\t{}[shape=record,label=\"<f0> {}{}|<f2> rhs\"{}];\n",
+            nodeVertexName, node->name(), details, style);
 
         node->rhs->accept(this);
         fmt::print(
-                   _file,
-                   "\t{}:f2 -> {}:f1;\n",
-                   nodeVertexName,
-                   getVertexName(node->rhs));
+            _file, "\t{}:f2 -> {}:f1;\n",
+            nodeVertexName, getVertexName(node->rhs));
     }
 
     void AstFormatter::visit(const AssignExprNode* node) const {
@@ -154,23 +136,17 @@ namespace Ciallang::Syntax {
         std::string style = ", fillcolor=goldenrod1, style=\"filled\"";
 
         fmt::print(
-                   _file,
-                   "\t{}[shape=record,label=\"<f0> lhs|<f1> =|<f2> rhs\"{}];\n",
-                   nodeVertexName,
-                   style);
+            _file, "\t{}[shape=record,label=\"<f0> lhs|<f1> =|<f2> rhs\"{}];\n",
+            nodeVertexName, style);
 
         node->lhs->accept(this);
         fmt::print(
-                   _file,
-                   "\t{}:f0 -> {}:f1;\n",
-                   nodeVertexName,
-                   getVertexName(node->lhs));
+            _file, "\t{}:f0 -> {}:f1;\n",
+            nodeVertexName, getVertexName(node->lhs));
         node->rhs->accept(this);
         fmt::print(
-                   _file,
-                   "\t{}:f2 -> {}:f1;\n",
-                   nodeVertexName,
-                   getVertexName(node->rhs));
+            _file, "\t{}:f2 -> {}:f1;\n",
+            nodeVertexName, getVertexName(node->rhs));
     }
 
     void AstFormatter::visit(const BlockStmtNode* node) const {
@@ -179,7 +155,7 @@ namespace Ciallang::Syntax {
 
         auto nodeVertexName = getVertexName(node);
 
-        for(const auto* child : node->children) {
+        for(const auto* child : node->childrens) {
             if(child == nullptr) break;
             child->accept(this);
             edges.insert(getVertexName(child));
@@ -190,11 +166,8 @@ namespace Ciallang::Syntax {
             index = 0;
             for(const auto& edge : edges)
                 fmt::print(
-                           _file,
-                           "\t{}:f1 -> {}:f1 [label=\"[{:02}]\"];\n",
-                           nodeVertexName,
-                           edge,
-                           index++);
+                    _file, "\t{}:f1 -> {}:f1 [label=\"[{:02}]\"];\n",
+                    nodeVertexName, edge, index++);
             fmt::print(_file, "\n");
         }
     }
@@ -216,11 +189,8 @@ namespace Ciallang::Syntax {
             index = 0;
             for(const auto& edge : edges)
                 fmt::print(
-                           _file,
-                           "\t{}:f1 -> {}:f1 [label=\"[{:02}]\"];\n",
-                           nodeVertexName,
-                           edge,
-                           index++);
+                    _file, "\t{}:f1 -> {}:f1 [label=\"[{:02}]\"];\n",
+                    nodeVertexName, edge, index++);
             fmt::print(_file, "\n");
         }
     }
@@ -234,34 +204,44 @@ namespace Ciallang::Syntax {
         std::string value = node->test->name();
 
         fmt::print(
-                   _file,
-                   "\t{}[shape=record,label=\"<f0> test|<f1> {}|<f2> body|<f3> else\"{}];\n",
-                   nodeVertexName,
-                   node->name(),
-                   style);
+            _file,
+            "\t{}[shape=record,label=\"<f0> test|<f1> {}|<f2> body|<f3> else\"{}];\n",
+            nodeVertexName, node->name(), style);
 
         node->test->accept(this);
         fmt::print(
-                   _file,
-                   "\t{}:f0 -> {}:f1;\n",
-                   nodeVertexName,
-                   getVertexName(node->test));
+            _file, "\t{}:f0 -> {}:f1;\n",
+            nodeVertexName, getVertexName(node->test));
 
         node->body->accept(this);
         fmt::print(
-                   _file,
-                   "\t{}:f2 -> {}:f1;\n",
-                   nodeVertexName,
-                   getVertexName(node->body));
+            _file, "\t{}:f2 -> {}:f1;\n",
+            nodeVertexName, getVertexName(node->body));
 
         if(node->elseBody) {
             node->elseBody->accept(this);
             fmt::print(
-                       _file,
-                       "\t{}:f3 -> {}:f1;\n",
-                       nodeVertexName,
-                       getVertexName(node->elseBody));
+                _file, "\t{}:f3 -> {}:f1;\n",
+                nodeVertexName, getVertexName(node->elseBody));
         }
+    }
+
+    void AstFormatter::visit(const VarDeclNode* node) const {
+        assert(node->rhs != nullptr);
+
+        auto nodeVertexName = getVertexName(node);
+        std::string style = ", fillcolor=goldenrod1, style=\"filled\"";
+        std::string value = node->name();
+
+        fmt::print(
+            _file,
+            "\t{}[shape=record,label=\"<f0> {} |<f1> expression \"{}];\n",
+            nodeVertexName, node->name(), style);
+
+        node->rhs->accept(this);
+        fmt::print(
+            _file, "\t{}:f1 -> {}:f0;\n",
+            nodeVertexName, getVertexName(node->rhs));
     }
 
     std::string AstFormatter::getVertexName(const AstNode* node) {

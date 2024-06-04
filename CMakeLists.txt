@@ -27,8 +27,11 @@ set(SOURCE_FILES
         src/ast/AstNode.hpp
         src/ast/ExprNode.hpp
         src/ast/StmtNode.hpp
+        src/ast/DeclNode.hpp
 
         src/compiler/Compiler.cpp
+
+        src/gen/CodeGen.cpp
 
         # ############################################
         src/vm/Interpreter.cpp

@@ -17,16 +17,13 @@
 #include "Instruction.hpp"
 
 namespace Ciallang::VM {
-    #define READ_BYTE() (*_vm.ip++)
-    #define READ_CONSTANT() (_vm.chunk->constants()[READ_BYTE()])
-
     Interpreter::Interpreter(VMChunk* chunk)
-        : _vm{ chunk, chunk->bytecodes() } {
+        : _vm{ chunk } {
     }
 
     InterpretResult Interpreter::run() {
         for(;;) {
-            auto opcode = static_cast<Opcodes>(*_vm.ip);
+            auto opcode = static_cast<Opcodes>(_vm.chunk->bytecodes(_vm.ip));
 
             const auto* inst = Instruction::instance(opcode);
 
@@ -36,21 +33,25 @@ namespace Ciallang::VM {
 
             auto result = inst->execute(this);
             if(result != InterpretResult::CONTINUE) {
+                LOG(INFO) << "VM return";
                 return result;
             }
-
         }
     }
 
     TjsValue Interpreter::readConstant() {
-        return READ_CONSTANT();
+        return _vm.chunk->constants()[_vm.chunk->bytecodes(_vm.ip++)];
     }
 
-    inline void Interpreter::push(TjsValue&& value) {
+    TjsValue& Interpreter::peek(const size_t distance) const {
+        return _vm.sp[distance - 1];
+    }
+
+    void Interpreter::push(TjsValue&& value) {
         *_vm.sp++ = std::move(value);
     }
 
-    inline TjsValue Interpreter::pop() {
+    TjsValue& Interpreter::pop() {
         return *--_vm.sp;
     }
 

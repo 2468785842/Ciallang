@@ -450,7 +450,7 @@ namespace Ciallang::Syntax {
 
         [[nodiscard]] constexpr TokenType type() const noexcept { return _type; }
 
-        [[nodiscard]] constexpr const TjsValue* value() const noexcept {
+        [[nodiscard]] constexpr TjsValue* value() const noexcept {
             return _value;
         }
 
@@ -474,7 +474,7 @@ namespace Ciallang::Syntax {
      */
     // use token->type() != TokenType::EndOfFile
     // not token != &S_EndOfFile, because location maybe change
-    static const constinit inline Token
+    static const constinit Token
             S_Invalid{ TokenType::Invalid },
             S_EndOfFile{ TokenType::EndOfFile },
             S_LineComment{ TokenType::LineComment },

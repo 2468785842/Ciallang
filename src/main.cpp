@@ -13,6 +13,7 @@
  */
 
 #include "lexer/Lexer.hpp"
+#include "types/TjsString.hpp"
 #include "common/SourceFile.hpp"
 #include "compiler/Compiler.hpp"
 #include "init/GlogInit.hpp"
@@ -53,23 +54,23 @@ void testLexer() {
 int main(int /* argc */, char* * argv) {
     Ciallang::Init::InitializeGlog(argv);
 
-    //    testLexer();
-    // Ciallang::Inter::Compiler compiler{
-    //         Ciallang::Inter::CompilerOptions{
-    //         },
-    //         R"(.\startup.tjs)"
-    // };
-    // compiler.initializeCoreTypes();
-    // compiler.compile();
-    // // compiler.elements();
-    // // compiler.writeCodeDomGraph(R"(.\startup.dom.dot)");
-    // for (const auto &message: compiler.result().messages()) {
-    //     if (message.isError()) {
-    //         fmt::println("{}", message.message());
-    //         if(!message.details().empty())
-    //             fmt::println("{}", message.details());
-    //         fmt::println("");
-    //     }
-    // }
+    // testLexer();
+    Ciallang::Inter::Compiler compiler{
+            Ciallang::Inter::CompilerOptions{
+            },
+            R"(.\startup.tjs)"
+    };
+    compiler.initializeCoreTypes();
+    compiler.compile();
+    // compiler.elements();
+    // compiler.writeCodeDomGraph(R"(.\startup.dom.dot)");
+    for(const auto& message : compiler.result().messages()) {
+        if(message.isError()) {
+            fmt::println("{}", message.message());
+            if(!message.details().empty())
+                fmt::println("{}", message.details());
+            fmt::println("");
+        }
+    }
     return 0;
 }

@@ -59,7 +59,7 @@ namespace Ciallang::Inter {
                 filename += "-ast";
                 astFilePath.append(filename);
                 astFilePath.replace_extension(".dot");
-                Ciallang::Syntax::Parser::writeAstGraph(astFilePath, globalNode);
+                Syntax::Parser::writeAstGraph(astFilePath, globalNode);
             }
         }
 

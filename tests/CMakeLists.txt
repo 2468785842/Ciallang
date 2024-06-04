@@ -11,7 +11,11 @@ macro(get_source_file directory)
     file(GLOB ${directory}_SOURCE_FILES "${CMAKE_SOURCE_DIR}/src/${directory}/*.[ch]pp")
 endmacro()
 
+get_source_file(ast)
 get_source_file(common)
+get_source_file(gen)
+get_source_file(lexer)
+get_source_file(parser)
 get_source_file(types)
 get_source_file(vm)
 
@@ -21,7 +25,11 @@ add_executable(
 
         ${CMAKE_SOURCE_DIR}/src/init/GlogInit.hpp
 
+        ${ast_SOURCE_FILES}
         ${common_SOURCE_FILES}
+        ${gen_SOURCE_FILES}
+        ${lexer_SOURCE_FILES}
+        ${parser_SOURCE_FILES}
         ${types_SOURCE_FILES}
         ${vm_SOURCE_FILES}
 )
