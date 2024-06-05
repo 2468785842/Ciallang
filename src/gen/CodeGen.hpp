@@ -38,6 +38,12 @@ namespace Ciallang::Inter {
             _sourceFile.error(r, message, location);
         }
 
+        ~CodeGen() noexcept override {
+            for(auto local : locals) {
+                delete local;
+            }
+        }
+
     private:
         VM::VMChunk* _vmChunk;
         Common::SourceFile& _sourceFile;
@@ -45,13 +51,14 @@ namespace Ciallang::Inter {
 
         struct Local {
             const Syntax::Token* token;
-            TjsInteger depth;
+            size_t depth;
+            bool init;
         };
 
-        std::vector<Local> locals{};
+        std::vector<Local*> locals{};
 
         // 1 is global scope
-        TjsInteger  scopeDepth{ 0 };
+        size_t scopeDepth{ 0 };
 
         void visit(const Syntax::ValueExprNode*) override;
 
@@ -71,9 +78,11 @@ namespace Ciallang::Inter {
 
         void visit(const Syntax::VarDeclNode*) override;
 
+        void visit(const Syntax::StmtDeclNode*) override;
+
         void beginScope();
         void endScope(const Syntax::BlockStmtNode* node);
 
-        TjsInteger resolveLocal(const Syntax::Token* token) const;
+        std::pair<size_t, Local*> resolveLocal(const Syntax::Token* token) const;
     };
 }

@@ -173,26 +173,19 @@ namespace Ciallang::Syntax {
     }
 
     void AstFormatter::visit(const ExprStmtNode* node) {
-        auto index = 0;
-        std::set<std::string> edges{};
-
         auto nodeVertexName = getVertexName(node);
+        std::string style = ", fillcolor=goldenrod1, style=\"filled\"";
+        std::string value = node->name();
 
-        for(const auto child : node->expressions) {
-            if(child == nullptr) break;
-            child->accept(this);
-            edges.insert(getVertexName(child));
-            index++;
-        }
+        fmt::print(
+            _file,
+            "\t{}[shape=record,label=\"<f0> {}\"{}];\n",
+            nodeVertexName, node->name(), style);
 
-        if(!edges.empty()) {
-            index = 0;
-            for(const auto& edge : edges)
-                fmt::print(
-                    _file, "\t{}:f1 -> {}:f1 [label=\"[{:02}]\"];\n",
-                    nodeVertexName, edge, index++);
-            fmt::print(_file, "\n");
-        }
+        node->expression->accept(this);
+        fmt::print(
+            _file, "\t{}:f0 -> {}:f1;\n",
+            nodeVertexName, getVertexName(node->expression));
     }
 
     void AstFormatter::visit(const IfStmtNode* node) {
@@ -227,21 +220,40 @@ namespace Ciallang::Syntax {
     }
 
     void AstFormatter::visit(const VarDeclNode* node) {
-        assert(node->rhs != nullptr);
-
         auto nodeVertexName = getVertexName(node);
         std::string style = ", fillcolor=goldenrod1, style=\"filled\"";
         std::string value = node->name();
 
         fmt::print(
             _file,
-            "\t{}[shape=record,label=\"<f0> {} |<f1> expression \"{}];\n",
+            "\t{}[shape=record,label=\"<f0> lhs |<f1> {} |<f2> rhs\"{}];\n",
             nodeVertexName, node->name(), style);
 
-        node->rhs->accept(this);
+        fmt::print(_file, "\t{}:f0 -> {}:f1",
+            nodeVertexName, node->token->value()->asString());
+
+        if(node->rhs) {
+            node->rhs->accept(this);
+            fmt::print(
+                _file, "\t{}:f2 -> {}:f1;\n",
+                nodeVertexName, getVertexName(node->rhs));
+        }
+    }
+
+    void AstFormatter::visit(const StmtDeclNode* node) {
+        auto nodeVertexName = getVertexName(node);
+        std::string style = ", fillcolor=goldenrod1, style=\"filled\"";
+        std::string value = node->name();
+
         fmt::print(
-            _file, "\t{}:f1 -> {}:f0;\n",
-            nodeVertexName, getVertexName(node->rhs));
+            _file,
+            "\t{}[shape=record,label=\"<f0> {}\"{}];\n",
+            nodeVertexName, node->name(), style);
+
+        node->statement->accept(this);
+        fmt::print(
+            _file, "\t{}:f0 -> {}:f1;\n",
+            nodeVertexName, getVertexName(node->statement));
     }
 
     std::string AstFormatter::getVertexName(const AstNode* node) {

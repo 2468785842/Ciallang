@@ -13,22 +13,11 @@
  */
 #pragma once
 
+#include "../common/ConstExpr.hpp"
 #include "Interpreter.hpp"
-#include "Rlc.hpp"
-#include "VMChunk.hpp"
-#include "types/TjsString.hpp"
+#include "../types/TjsString.hpp"
 
 namespace Ciallang::VM {
-#define START (std::ostringstream{}
-#define PRINT_NAME fmt::format("{:#06x}\t{: ^10}", offset, name())
-#define PRINT_LINE (rlc->firstAppear(offset) ? \
-    fmt::format("{: <14}", \
-        fmt::format("@{}:{}", \
-            std::to_string(rlc->find(offset).start().line + 1), \
-            std::to_string(rlc->find(offset).start().column + 1) \
-    )) : fmt::format("{: <14}", "~"))
-#define END ' ').str()
-
     enum class Opcodes : uint8_t {
         Ret,   // 程序正常返回
         Const, // 加载常量
@@ -50,6 +39,7 @@ namespace Ciallang::VM {
         DLocal,
     };
 
+
     struct Instruction {
         static const Instruction* instance(Opcodes opcode);
 
@@ -58,43 +48,21 @@ namespace Ciallang::VM {
 
         /**
          * 反汇编不会增加 ip
-         * @param interpreter 解释器
          * @return 反汇编内容
          */
-        std::string disassemble(const Interpreter* interpreter) const {
-            return disassemble(
-                interpreter->_vm.chunk->bytecodes(),
-                interpreter->_vm.chunk->constants(),
-                interpreter->_vm.chunk->rlc(),
-                interpreter->_vm.ip
-            );
-        }
+        virtual std::string disassemble(const Interpreter*) const = 0;
 
         /**
          * 执行会增加 ip, 默认已经ip+1,从ip+2开始取指令参数
-         * @param interpreter 解释器
          * @return 解释结果
          */
-        virtual InterpretResult execute(Common::Result& r,
-                                        Interpreter* interpreter) const = 0;
-
-        virtual std::string disassemble(const uint8_t* bytecodes,
-                                        const TjsValue* constants,
-                                        const Rlc* rlc, size_t offset) const = 0;
+        virtual InterpretResult execute(Common::Result&, Interpreter*) const = 0;
 
         virtual ~Instruction() = default;
     };
 
-    template <size_t N>
-    struct InstName {
-        char value[N]{};
 
-        constexpr explicit InstName(const char (&value)[N]) {
-            std::copy_n(value, N, this->value);
-        }
-    };
-
-    template <InstName NAME, size_t N>
+    template <Common::Name NAME, size_t N>
     struct MakeInstruction : Instruction {
         InterpretResult execute(Common::Result&, Interpreter*) const override {
             LOG(FATAL)
@@ -103,12 +71,13 @@ namespace Ciallang::VM {
             std::abort();
         }
 
-        std::string disassemble(const uint8_t* bytecodes,
-                                const TjsValue* constants,
-                                const Rlc* rlc, size_t offset) const override {
+        std::string disassemble(const Interpreter* interpreter) const override {
             // if instruction is 1 length, default implement
             if constexpr(N == 1) {
-                return START << PRINT_LINE << PRINT_NAME << END;
+                auto ss = std::ostringstream{}
+                        << disassembleLine(interpreter)
+                        << fmt::format("{:#06x}\t{: ^10}", interpreter->_vm.ip, name());
+                return ss.str();
             } else {
                 LOG(FATAL)
                         << "no implement insturction function `disassemble`"
@@ -131,7 +100,7 @@ namespace Ciallang::VM {
     };
 
 #define DEFINE_INST(ValueName, name, offset) \
-using ValueName = MakeInstruction<InstName(name), offset>; \
+using ValueName = MakeInstruction<Common::Name(name), offset>; \
 constexpr auto S_##ValueName = ValueName()
 
     DEFINE_INST(RetInst, "ret", 1);
@@ -302,10 +271,12 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     // define(or assigment) global value
     // opcode: dglobal index,
     // read id = constant[index],
-    // pop value from stack top, put to global[id]
+    // peek value from stack top, put to global[id]
+    // !!!not pop, this value still in stack top
     EXECUTE(DGlobalInst) {
         auto identitier = interpreter->readConstant().asString();
-        interpreter->putGlobal(std::move(identitier), std::move(interpreter->pop()));
+        auto& value = interpreter->peek(0);
+        interpreter->putGlobal(std::move(identitier), TjsValue(value));
         return InterpretResult::CONTINUE;
     }
 
@@ -321,11 +292,12 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
 
     // define(or assigment) local value
     // opcode: dlocal slot,
-    // pop value from stack top, put to stack[slot]
+    // peek value from stack top, put to stack[slot]
+    // !!!not pop, this value still in stack top
     EXECUTE(DLocalInst) {
-        auto& value = interpreter->pop();
+        auto& value = interpreter->peek(0); // because is not change sp
         auto slot = interpreter->readByte();
-        interpreter->putStack(slot, std::move(value));
+        interpreter->putStack(slot, TjsValue{ value });
         return InterpretResult::CONTINUE;
     }
 
@@ -333,43 +305,96 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     //----------------------------- disassemble --------------------------------//
     //--------------------------------------------------------------------------//
 
-#define PRINT_CONSTANT fmt::format(" ; {}", constants[bytecodes[offset + 1]])
-
 #define DISASSEMBLE(Inst) template <> \
-    inline std::string Inst::disassemble( \
-        const uint8_t* bytecodes, \
-        const TjsValue* constants, \
-        const Rlc* rlc, size_t offset) const
+    inline std::string Inst::disassemble(const Interpreter* interpreter) const
 
 #define SIMPLE_DISASSEMBLE(Inst) \
     DISASSEMBLE(Inst) { \
-       return START << PRINT_LINE << PRINT_NAME \
-                 << fmt::format("{}", bytecodes[offset + 1]) \
-                 << END; \
+         auto* chunk = interpreter->_vm.chunk; \
+         auto ip = interpreter->_vm.ip; \
+         auto ss = std::ostringstream{} \
+                   << disassembleLine(interpreter) \
+                   << fmt::format("{:#06x}\t{: ^10}", ip, name()) \
+                   << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1)); \
+         return ss.str(); \
     }
 
     DISASSEMBLE(ConstInst) {
-        return START << PRINT_LINE << PRINT_NAME
-                   << fmt::format("{: ^4d}", bytecodes[offset + 1])
-                   << PRINT_CONSTANT << END;
+        auto* chunk = interpreter->_vm.chunk;
+        auto ip = interpreter->_vm.ip;
+        auto ss = std::ostringstream{}
+                << disassembleLine(interpreter)
+                << fmt::format("{:#06x}\t{: ^10}", ip, name())
+                << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1))
+                << fmt::format(" ; {}", chunk->constants(chunk->bytecodes(ip + 1)));
+        return ss.str();
     }
 
     SIMPLE_DISASSEMBLE(PushInst)
 
     SIMPLE_DISASSEMBLE(PopNInst)
 
-    SIMPLE_DISASSEMBLE(GGlobalInst)
-    SIMPLE_DISASSEMBLE(DGlobalInst)
-    SIMPLE_DISASSEMBLE(GLocalInst)
-    SIMPLE_DISASSEMBLE(DLocalInst)
+    DISASSEMBLE(GGlobalInst) {
+        auto* chunk = interpreter->_vm.chunk;
+        auto ip = interpreter->_vm.ip;
+        auto& identitier = chunk->constants(chunk->bytecodes(ip + 1));
 
-#undef EXECUTE_BINARY_OP
+        auto ss = std::ostringstream{}
+               << disassembleLine(interpreter)
+               << fmt::format("{:#06x}\t{: ^10}", ip, name())
+               << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1))
+               << fmt::format(" ; {}", *interpreter->getGlobal(identitier.asString()));
+        return ss.str();
+    }
+
+    DISASSEMBLE(DGlobalInst) {
+        auto* chunk = interpreter->_vm.chunk;
+        auto ip = interpreter->_vm.ip;
+        auto& identitier = chunk->constants(chunk->bytecodes(ip + 1));
+        auto& value = interpreter->peek(0);
+
+        auto ss = std::ostringstream{}
+               << disassembleLine(interpreter)
+               << fmt::format("{:#06x}\t{: ^10}", ip, name())
+               << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1))
+               << fmt::format(" ; {}", identitier)
+               << fmt::format(" // put {}", value);
+        return ss.str();
+    }
+
+    DISASSEMBLE(GLocalInst) {
+        auto* chunk = interpreter->_vm.chunk;
+        auto ip = interpreter->_vm.ip;
+
+        auto slot = chunk->bytecodes(ip + 1);
+        auto& value = interpreter->getStack(slot);
+
+        auto ss = std::ostringstream{}
+               << disassembleLine(interpreter)
+               << fmt::format("{:#06x}\t{: ^10}", ip, name())
+               << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1))
+               << fmt::format(" ; stack[{}]", slot)
+               << fmt::format(" // get {}", value);
+        return ss.str();
+    }
+
+    DISASSEMBLE(DLocalInst) {
+        auto* chunk = interpreter->_vm.chunk;
+        auto ip = interpreter->_vm.ip;
+
+        auto& value = interpreter->peek(0);
+        auto slot = chunk->bytecodes(ip + 1);
+
+        auto ss = std::ostringstream{}
+                << disassembleLine(interpreter)
+                << fmt::format("{:#06x}\t{: ^10}", ip, name())
+                << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1))
+                << fmt::format(" ; stack[{}]", slot)
+                << fmt::format(" // put {}", value);
+        return ss.str();
+    }
+
 #undef EXECUTE
-
-#undef START
-#undef PRINT_NAME
-#undef PRINT_LINE
-#undef PRINT_CONSTANT
-#undef END
 #undef DISASSEMBLE
+#undef SIMPLE_DISASSEMBLE
 }

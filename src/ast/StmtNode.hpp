@@ -15,8 +15,7 @@
 #include "AstNode.hpp"
 
 namespace Ciallang::Syntax {
-    class StmtNode : public DeclNode {
-
+    class StmtNode : public AstNode {
     };
 
     class BlockStmtNode : public StmtNode {
@@ -42,12 +41,11 @@ namespace Ciallang::Syntax {
 
     class ExprStmtNode : public StmtNode {
     public:
-        ExprNodeList expressions;
+        const ExprNode* expression;
 
         ExprStmtNode() = delete;
 
-        explicit ExprStmtNode(ExprNode* expr) {
-            expressions.push_back(expr);
+        explicit ExprStmtNode(const ExprNode* expr): expression(expr) {
         }
 
         void accept(Visitor* visitor) const override {

@@ -13,6 +13,7 @@
 #include "CodeGen.hpp"
 
 #include "../vm/Instruction.hpp"
+#include "common/Defer.hpp"
 
 namespace Ciallang::Inter {
     void CodeGen::loadAst(Common::Result& r, const Syntax::AstNode* node) {
@@ -20,21 +21,10 @@ namespace Ciallang::Inter {
         node->accept(this);
         _vmChunk->emit(VM::Opcodes::Ret, node->location);
         if(_r->isFailed()) _vmChunk->reset();
-        _r = nullptr;
-    }
-
-    void CodeGen::visit(const Syntax::BlockStmtNode* node) {
-        beginScope();
-        for(const auto* children : node->childrens) {
-            children->accept(this);
-        }
-        endScope(node);
     }
 
     void CodeGen::visit(const Syntax::ExprStmtNode* node) {
-        for(auto expression : node->expressions) {
-            expression->accept(this);
-        }
+        node->expression->accept(this);
     }
 
     void CodeGen::visit(const Syntax::ValueExprNode* node) {
@@ -55,7 +45,6 @@ namespace Ciallang::Inter {
     }
 
     void CodeGen::visit(const Syntax::BinaryExprNode* node) {
-
         node->lhs->accept(this);
         node->rhs->accept(this);
 
@@ -64,7 +53,7 @@ namespace Ciallang::Inter {
                 _vmChunk->emit(VM::Opcodes::Add, node->location);
                 break;
             case Syntax::TokenType::Minus:
-                _vmChunk->emit( VM::Opcodes::Sub, node->location);
+                _vmChunk->emit(VM::Opcodes::Sub, node->location);
                 break;
             case Syntax::TokenType::Slash:
                 _vmChunk->emit(VM::Opcodes::Div, node->location);
@@ -85,26 +74,31 @@ namespace Ciallang::Inter {
 
         node->rhs->accept(this);
 
-        auto depth = resolveLocal(identiter);
+        const auto& [index, local] = resolveLocal(identiter);
 
-        // -1 not found in local scope, maybe in global scope
-        if(depth == -1) {
-            auto index = _vmChunk->addConstant(std::move(*identiter->value()));
-            _vmChunk->emit(VM::Opcodes::DGlobal, { index }, node->location);
+        if(!local) {
+            // global scope maybe? check it in runtime
+            auto constIndex = _vmChunk->addConstant(std::move(*identiter->value()));
+            _vmChunk->emit(VM::Opcodes::DGlobal, { constIndex }, node->location);
             return;
         }
 
-        // initialized or assignment ?
-        locals[locals.size() - 1].depth = scopeDepth;
-        _vmChunk->emit( VM::Opcodes::DLocal, { depth }, node->location);
+        // assignment local var
+        _vmChunk->emit(VM::Opcodes::DLocal, { index }, node->location);
+        local->init = true;
     }
 
     void CodeGen::visit(const Syntax::VarDeclNode* node) {
-        auto* identitier = node->token->value();
-        auto index = _vmChunk->addConstant(std::move(*identitier));
+        auto identitier = *node->token->value();
+        auto index = _vmChunk->addConstant(std::move(identitier));
+        DEFER {
+            if(node->rhs) {
+                _vmChunk->emit(VM::Opcodes::Pop, node->location);
+            }
+        };
 
         if(node->rhs)
-            // has assignement ?
+            // has intialized assignement ?
             node->rhs->accept(this);
         else
             // no have initialized void
@@ -117,14 +111,12 @@ namespace Ciallang::Inter {
         }
 
         // local scope
-        for(auto local : locals) {
+        for(auto local : locals | std::views::reverse) {
             // in different scope, can have same name variable
             // check this variable name. in this scope already have?
-            if(local.depth != -1 && local.depth < scopeDepth) {
-                break;
-            }
+            if(local->depth < scopeDepth) break;
             // in same scope. will check it!!
-            if(*local.token == *node->token) {
+            if(*local->token == *node->token) {
                 error(*_r,
                     "Already a variable with this name in the scope",
                     node->location);
@@ -133,17 +125,52 @@ namespace Ciallang::Inter {
         }
 
         // XXX: fixed max length
-        locals.push_back(Local{ node->token, node->rhs ? static_cast<uint8_t>(scopeDepth) : -1 });
+        locals.push_back(new Local{ node->token, scopeDepth, !!node->rhs });
         _vmChunk->emit(VM::Opcodes::DLocal, { locals.size() - 1 }, node->location);
+    }
+
+    void CodeGen::visit(const Syntax::SymbolExprNode* node) {
+        const auto& [index, local] = resolveLocal(node->token);
+
+        // global variable maybe?
+        if(!local) {
+            auto constIndex = _vmChunk->addConstant(std::move(*node->token->value()));
+            _vmChunk->emit(VM::Opcodes::GGlobal, { constIndex }, node->location);
+            return;
+        }
+
+        // not initialized
+        if(!local->init) {
+            error(*_r,
+                "variable must be initialzed with use before(except in global scope)",
+                node->location);
+
+            return;
+        }
+
+        _vmChunk->emit(VM::Opcodes::GLocal, { index }, node->location);
+    }
+
+    void CodeGen::visit(const Syntax::StmtDeclNode* node) {
+        node->statement->accept(this);
+        // expr stmt will push value in stack top, but is unuseful
+        if(dynamic_cast<const Syntax::ExprStmtNode*>(node->statement)) {
+            _vmChunk->emit(VM::Opcodes::Pop, node->location);
+        }
+    }
+
+    void CodeGen::visit(const Syntax::BlockStmtNode* node) {
+        beginScope();
+        for(const auto* children : node->childrens) {
+            children->accept(this);
+        }
+        endScope(node);
     }
 
     void CodeGen::visit(const Syntax::IfStmtNode*) {
         LOG(FATAL) << "no impl";
     }
 
-    void CodeGen::visit(const Syntax::SymbolExprNode*) {
-        LOG(FATAL) << "no impl";
-    }
 
     void CodeGen::beginScope() {
         ++scopeDepth;
@@ -151,25 +178,27 @@ namespace Ciallang::Inter {
 
     void CodeGen::endScope(const Syntax::BlockStmtNode* node) {
         --scopeDepth;
+
+        if(scopeDepth == 0) return;
+
         size_t count = std::ranges::count_if(
             locals.begin(), locals.end(),
-            [&](auto local) {
-                return local.depth > scopeDepth;
+            [&](auto* local) {
+                return local->depth > scopeDepth;
             });
         _vmChunk->emit(VM::Opcodes::PopN, { count }, node->location);
     }
 
-    TjsInteger CodeGen::resolveLocal(const Syntax::Token* token) const {
-        for(TjsInteger i = 0; i < locals.size(); i++) {
-            if(*locals[i].token == *token) {
-                if(locals[i].depth == -1) {
-                    error(*_r,
-                        "Can't read local variable in its own initializer.",
-                        token->location);
-                }
-                return i;
+    std::pair<size_t, CodeGen::Local*> CodeGen::resolveLocal(const Syntax::Token* token) const {
+        for(size_t i = 0; i < locals.size(); i++) {
+            auto* local = locals[i];
+
+            DCHECK(local->depth != 0);
+
+            if(*local->token == *token) {
+                return { i, local };
             }
         }
-        return -1;
+        return { 0, nullptr };
     }
 }

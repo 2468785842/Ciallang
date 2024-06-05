@@ -29,44 +29,47 @@ namespace Ciallang::Common {
         constexpr void succeed() noexcept { _success = true; }
 
         void info(
-                const string &message,
-                const SourceLocation &loc = {},
-                const string &details = {}) {
+            const string& message,
+            const SourceLocation& loc = {},
+            const string& details = {}) {
+            DLOG(INFO) << message;
             _messages.emplace_back(
-                    message,
-                    loc,
-                    details,
-                    ResultMessage::Types::info);
+                message,
+                loc,
+                details,
+                ResultMessage::Types::info);
         }
 
         void error(
-                const string &message,
-                const SourceLocation &loc = {},
-                const string &details = {}) {
+            const string& message,
+            const SourceLocation& loc = {},
+            const string& details = {}) {
+            DLOG(FATAL) << message;
             _messages.emplace_back(
-                    message,
-                    loc,
-                    details,
-                    ResultMessage::Types::error);
+                message,
+                loc,
+                details,
+                ResultMessage::Types::error);
             fail();
         }
 
         void warning(
-                const std::string &message,
-                const SourceLocation &loc = {},
-                const std::string &details = {}) {
+            const std::string& message,
+            const SourceLocation& loc = {},
+            const std::string& details = {}) {
+            DLOG(WARNING) << message;
             _messages.emplace_back(
-                    message,
-                    loc,
-                    details,
-                    ResultMessage::Types::warning);
+                message,
+                loc,
+                details,
+                ResultMessage::Types::warning);
         }
 
         [[nodiscard]] constexpr bool isFailed() const noexcept {
             return !_success;
         }
 
-        [[nodiscard]] constexpr const ResultMessageList &messages() const noexcept {
+        [[nodiscard]] constexpr const ResultMessageList& messages() const noexcept {
             return _messages;
         }
 

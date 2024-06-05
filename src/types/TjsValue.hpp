@@ -16,7 +16,7 @@
 
 namespace Ciallang {
     class TjsValue {
-        template <TjsValueName NAME>
+        template <Common::Name, bool>
         friend struct MakeTjsValueHelper;
 
     public:

@@ -36,39 +36,68 @@ namespace Ciallang::VM {
                 LOG(INFO) << "VM return";
                 return result;
             }
+
+            printStack();
         }
     }
 
     uint8_t Interpreter::readByte() {
-        return _vm.chunk->bytecodes()[_vm.ip++];
+        return _vm.chunk->bytecodes(_vm.ip++);
     }
 
     TjsValue Interpreter::readConstant() {
-        return _vm.chunk->constants()[readByte()];
+        return _vm.chunk->constants(readByte());
     }
 
     TjsValue& Interpreter::peek(const size_t distance) const {
-        return _vm.sp[distance - 1];
+        DCHECK_GE(
+            _vm.sp - _vm.stack - static_cast<intptr_t>(distance) - 1, 0
+        ) << "stack underflow `peek(distance)` method";
+
+        DCHECK_LE(
+            _vm.sp - _vm.stack - static_cast<intptr_t>(distance) - 1, STACK_MAX - 1
+        ) << "stack overflow `peek(distance)` method";
+
+        return _vm.sp[distance - 1]; // sp not stack start
     }
 
     void Interpreter::pushVoid() {
-        ++_vm.sp;
+        DCHECK_LE(_vm.sp - _vm.stack+ 1, STACK_MAX - 1)
+            << "stack overflow `push(value)` method";
+        *++_vm.sp = TjsValue{};
     }
 
     void Interpreter::push(TjsValue&& value) {
+        DCHECK_LE(
+            _vm.sp - _vm.stack + 1, STACK_MAX - 1
+        ) << "stack overflow `push(value)` method";
         *_vm.sp++ = std::move(value);
     }
 
     TjsValue& Interpreter::popN(const size_t n) {
+        DCHECK_GE(
+            reinterpret_cast<std::uintptr_t>(_vm.sp - n),
+            reinterpret_cast<std::uintptr_t>(_vm.stack)
+        ) << "stack underflow! `popN` method";
         _vm.sp -= n;
         return *_vm.sp;
     }
 
     TjsValue& Interpreter::pop() {
+        DCHECK_GE(
+            reinterpret_cast<std::uintptr_t>(_vm.sp - 1),
+            reinterpret_cast<std::uintptr_t>(_vm.stack)
+        ) << "stack underflow! `pop` method";
         return *--_vm.sp;
     }
 
-    TjsValue& Interpreter::getStack(const size_t slot) {
+    const TjsValue& Interpreter::getStack(const size_t slot) const {
+        DCHECK_GE(slot, 0)
+            << "stack underflow `getStack(slot)` method";
+
+        DCHECK_LE(slot, STACK_MAX - 1)
+            << "stack overflow `getStack(slot)` method";
+
         return _vm.stack[slot];
     }
 
@@ -112,10 +141,10 @@ namespace Ciallang::VM {
         fmt::print(
             "+{0:─^{2}}+\n"
             "|{1: ^{2}}|\n"
-            "+{0:─^{2}}+\n", "", "global variable", 40);
+            "+{0:─^{2}}+\n", "", "global variable", 41);
         for(auto& [str, val] : _vm.globals) {
-            fmt::println("|{0: ^{2}}|{1: ^{2}}|", str, *val, 19);
-            fmt::println("+{0:─^{1}}+", "", 40);
+            fmt::println("|{0: ^{2}}|{1: ^{2}}|", str, *val, 20);
+            fmt::println("+{0:─^{1}}+", "", 41);
         }
     }
 }

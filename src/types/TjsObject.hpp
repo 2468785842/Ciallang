@@ -38,5 +38,4 @@ namespace Ciallang {
     inline void TjsObjectHelper::destroy(TjsValue& value) const {
         delete value._value._object;
     }
-
 }

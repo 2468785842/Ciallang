@@ -65,7 +65,7 @@ namespace Ciallang::Syntax {
             _scopeStack.pop();
     }
 
-    ExprStmtNode* AstBuilder::makeExprStmtNode(ExprNode* rhs) {
+    ExprStmtNode* AstBuilder::makeExprStmtNode(const ExprNode* rhs) {
         return makeNode<ExprStmtNode>(rhs);
     }
 
@@ -108,6 +108,10 @@ namespace Ciallang::Syntax {
 
     VarDeclNode* AstBuilder::makeVarDeclNode(Token&& token, const ExprStmtNode* rhs) {
         return makeNode<VarDeclNode>(token, rhs);
+    }
+
+    StmtDeclNode* AstBuilder::makeStmtDeclNode(const StmtNode* stmtNode) {
+        return makeNode<StmtDeclNode>(stmtNode);
     }
 
     template <typename R, typename... Args>

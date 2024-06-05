@@ -721,7 +721,7 @@ string Lexer::readIdentifier() {
 
     while(true) {
         ch = read(false);
-        if(isRuneLetter(ch)) {
+        if(isRuneLetter(ch) || isRuneDigit(ch)) {
             runeType = utf8Encode(ch);
             stream << runeType.data;
             continue;

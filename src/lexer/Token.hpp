@@ -425,31 +425,31 @@ namespace Ciallang::Syntax {
         }
 
         Token& operator=(Token&& token) noexcept {
-            _type = token._type;
-            _value = token._value;
-            location = token.location;
+            if(this != &token) {
+                _type = token._type;
+                _value = token._value;
+                location = token.location;
 
-            token._value = nullptr;
+                token._value = nullptr;
+            }
             return *this;
         }
 
         Token& operator=(const Token& token) noexcept {
-            if(this == &token)
-                return *this;
+            if(this != &token) {
+                _type = token._type;
 
-            _type = token._type;
+                delete _value;
+                if(token._value)
+                    _value = new TjsValue{ *token._value };
 
-            delete _value;
-            if(token._value)
-                _value = new TjsValue{ *token._value };
-
-            location = token.location;
-
+                location = token.location;
+            }
             return *this;
         }
 
         bool operator==(const Token& token) const {
-            return _type == token.type() && _value == token.value();
+            return _type == token.type() && *_value == *token.value();
         }
 
         [[nodiscard]] constexpr TokenType type() const noexcept { return _type; }

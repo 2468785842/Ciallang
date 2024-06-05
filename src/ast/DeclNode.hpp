@@ -39,4 +39,23 @@ namespace Ciallang::Syntax {
             return "var_declaration";
         }
     };
+
+    class StmtDeclNode : public DeclNode {
+    public:
+        const StmtNode* statement;
+
+        StmtDeclNode() = delete;
+
+        explicit StmtDeclNode(const StmtNode* stmtNode): statement(stmtNode) {
+        }
+
+        void accept(Visitor* visitor) const override {
+            visitor->visit(this);
+        }
+
+        [[nodiscard]] const char* name() const noexcept override {
+            return "statement_declaration";
+        }
+    };
+
 }

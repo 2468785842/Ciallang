@@ -33,7 +33,8 @@ namespace Ciallang::VM {
                 addressHeader = dataPool;
             }
 
-            dataPool[count] = std::forward<VT>(value);
+            // need call constructor
+            new (addressHeader + count) VT(std::forward<VT>(value));
             count++;
         }
 

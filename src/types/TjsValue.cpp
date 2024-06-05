@@ -38,18 +38,21 @@ namespace Ciallang {
     }
 
     TjsValue::TjsValue(TjsValue&& value) noexcept {
+        TjsValueHelper::instance(this->_type)->destroy(*this);
         TjsValueHelper::instance(value._type)->move(value, *this);
     }
 
     TjsValue& TjsValue::operator=(TjsValue&& value) noexcept {
-        TjsValueHelper::instance(value._type)->move(value, *this);
+        if(this != &value) {
+            TjsValueHelper::instance(this->_type)->destroy(*this);
+            TjsValueHelper::instance(value._type)->move(value, *this);
+        }
         return *this;
     }
 
     TjsValue::~TjsValue() noexcept {
         TjsValueHelper::instance(_type)->destroy(*this);
     }
-
 
     TjsInteger TjsValue::asInteger() const {
         CHECK(this->_type == TjsValueType::Integer) << "is not integer";

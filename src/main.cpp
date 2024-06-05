@@ -35,7 +35,7 @@ void testLexer() {
                 } else if(token->value()->type() == Ciallang::TjsValueType::Real) {
                     std::cout << std::dec << token->value()->asReal();
                 } else if(token->value()->type() == Ciallang::TjsValueType::String)
-                    std::cout << "\"" << token->value()->asString()->c_str() << "\"";
+                    std::cout << "\"" << token->value()->asString() << "\"";
             }
         }
         if(token->type() == Ciallang::Syntax::TokenType::Invalid) {

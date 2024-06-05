@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024/5/6 下午8:16
+ * Copyright (c) 2024/6/5 下午5:00
  *
  * /\  _` \   __          /\_ \  /\_ \
  * \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -11,16 +11,16 @@
  *                                                            \_/__/
  *
  */
-
 #pragma once
 
 namespace Ciallang::Common {
 
-    inline uint64_t align(const uint64_t size, const std::uint64_t align) {
-        if(align > 0) {
-            const auto result = size + align - 1;
-            return result - result % align;
+    template <size_t N>
+    struct Name {
+        char value[N]{};
+
+        constexpr explicit Name(const char (&value)[N]) {
+            std::copy_n(value, N, this->value);
         }
-        return size;
-    }
+    };
 }

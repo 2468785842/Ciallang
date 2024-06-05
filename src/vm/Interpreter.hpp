@@ -16,6 +16,7 @@
 #include <ranges>
 
 #include "VMChunk.hpp"
+#include "../common/ConstExpr.hpp"
 #include "../types/TjsValue.hpp"
 #include "../common/SourceFile.hpp"
 
@@ -32,7 +33,8 @@ namespace Ciallang::VM {
     };
 
     class Interpreter {
-        friend struct Instruction;
+        template <Common::Name, size_t>
+        friend struct MakeInstruction;
 
     public:
         explicit Interpreter(Common::SourceFile& sourceFile, VMChunk*);
@@ -44,14 +46,16 @@ namespace Ciallang::VM {
             const std::string& message) const {
             _sourceFile.error(r, message,
                 _vm.chunk->rlc()->find(
-                    _vm.chunk->bytecodes()[_vm.ip]
+                    _vm.chunk->bytecodes(_vm.ip)
                 )
             );
         }
 
 
         [[nodiscard]] uint8_t readByte();
+
         [[nodiscard]] TjsValue readConstant();
+
         [[nodiscard]] TjsValue& peek(size_t distance) const;
 
         void pushVoid();
@@ -64,11 +68,11 @@ namespace Ciallang::VM {
 
         void putStack(size_t slot, TjsValue&& value);
 
-        TjsValue& getStack(size_t slot);
+        [[nodiscard]] const TjsValue& getStack(size_t slot) const;
 
         void putGlobal(std::string&& key, TjsValue&& value);
 
-        [[nodiscard]] TjsValue* getGlobal(const std::string_view &key) const;
+        [[nodiscard]] TjsValue* getGlobal(const std::string_view& key) const;
 
         void printStack();
         void printGlobal();
@@ -92,5 +96,17 @@ namespace Ciallang::VM {
 
             bool flags = false; /* 跳转标记 */
         } _vm;
+
+        friend std::string disassembleLine(const Interpreter* interpreter) {
+
+            auto ip = interpreter->_vm.ip;
+            auto* chunk = interpreter->_vm.chunk;
+            auto& [line, column] =
+                    chunk->rlc()->find(ip).start();
+
+            return !chunk->rlc()->firstAppear(ip)
+                   ? fmt::format("{: <14}", fmt::format("@{}:{}", line + 1, column + 1))
+                   : fmt::format("{: <14}", "~");
+        }
     };
 }

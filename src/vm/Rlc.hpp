@@ -22,8 +22,10 @@ namespace Ciallang::VM {
         }
 
         void addBytecodeLine(size_t bytecodeIndex, Common::SourceLocation sourceLine) {
-            if(!contains(sourceLine))
-                _bytecodeMapLine.emplace_back(bytecodeIndex, sourceLine);
+            if(contains(sourceLine)) {
+                _bytecodeMapLine.pop_back();
+            }
+            _bytecodeMapLine.emplace_back(bytecodeIndex, sourceLine);
         }
 
         [[nodiscard]] bool firstAppear(size_t bytecodeIndex) const;

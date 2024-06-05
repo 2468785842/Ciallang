@@ -235,7 +235,11 @@ namespace Ciallang::Syntax {
             return declParser->parse(r, this, &token);
         }
 
-        return parseStatement(r);
+        if(auto *stmt = parseStatement(r)) {
+            return _astBuilder.makeStmtDeclNode(stmt);
+        }
+
+        return nullptr;
     }
 
     ExprNode* Parser::parseExpression(

@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include "../common/ConstExpr.hpp"
+
 namespace Ciallang {
 #if defined (LLONG_MAX)
     using TjsInteger = long long;
@@ -36,15 +38,6 @@ namespace Ciallang {
 
     class TjsValue;
 
-    template <size_t N>
-    struct TjsValueName {
-        char value[N]{};
-
-        constexpr explicit TjsValueName(const char (&value)[N]) {
-            std::copy_n(value, N, this->value);
-        }
-    };
-
     struct TjsValueHelper {
         static const TjsValueHelper* instance(TjsValueType type);
         virtual ~TjsValueHelper() = default;
@@ -54,24 +47,30 @@ namespace Ciallang {
         [[nodiscard]] virtual const char* name() const = 0;
     };
 
-    template <TjsValueName NAME>
+    template <Common::Name NAME, bool DefaultImpl = false>
     struct MakeTjsValueHelper : TjsValueHelper {
         void copy(const TjsValue&, TjsValue&) const override {
-            LOG(FATAL)
-                    << "not implement function `copy` with type "
-                    << _name;
+            if constexpr(!DefaultImpl) {
+                LOG(FATAL)
+                        << "not implement function `copy` with type "
+                        << _name;
+            }
         }
 
         void move(TjsValue&, TjsValue&) const override {
-            LOG(FATAL)
-                    << "not implement function `move` with type "
-                    << _name;
+            if constexpr(!DefaultImpl) {
+                LOG(FATAL)
+                        << "not implement function `move` with type "
+                        << _name;
+            }
         }
 
         void destroy(TjsValue&) const override {
-            LOG(FATAL)
-                    << "not implement function `destory` with type "
-                    << _name;
+            if constexpr(!DefaultImpl) {
+                LOG(FATAL)
+                        << "not implement function `destory` with type "
+                        << _name;
+            }
         }
 
         [[nodiscard]] const char* name() const final {
@@ -82,20 +81,13 @@ namespace Ciallang {
         const char* _name = NAME.value;
     };
 
-    using TjsRealHelper = MakeTjsValueHelper<TjsValueName("real")>;
-    using TjsIntegerHelper = MakeTjsValueHelper<TjsValueName("integer")>;
-    using TjsStringHelper = MakeTjsValueHelper<TjsValueName("string")>;
-    using TjsOctetHelper = MakeTjsValueHelper<TjsValueName("octet")>;
-    using TjsObjectHelper = MakeTjsValueHelper<TjsValueName("object")>;
+    using TjsRealHelper = MakeTjsValueHelper<Common::Name("real")>;
+    using TjsIntegerHelper = MakeTjsValueHelper<Common::Name("integer")>;
+    using TjsStringHelper = MakeTjsValueHelper<Common::Name("string")>;
+    using TjsOctetHelper = MakeTjsValueHelper<Common::Name("octet")>;
+    using TjsObjectHelper = MakeTjsValueHelper<Common::Name("object")>;
 
-    static constexpr MakeTjsValueHelper<TjsValueName("void")> S_TjsVoidHelper{};
-    using TjsVoidValueHelper = decltype(S_TjsVoidHelper);
-
-    template<>
-    inline void TjsVoidValueHelper::destroy(TjsValue &) const {
-        // no nothing to do, beause the void type really not manager anything,
-        // and no have error, void type is free
-    }
+    static constexpr MakeTjsValueHelper<Common::Name("void"), true> S_TjsVoidHelper{};
 
     static constexpr TjsIntegerHelper S_TjsIntegerHelper{};
     static constexpr TjsRealHelper S_TjsRealHelper{};

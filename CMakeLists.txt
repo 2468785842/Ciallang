@@ -10,7 +10,7 @@ set(SOURCE_FILES
         src/lexer/Token.hpp
         src/lexer/IEEETypes.hpp
 
-        src/common/Bytes.hpp
+        src/common/ConstExpr.hpp
         src/common/SourceLocation.cpp
         src/common/Result.hpp
         src/common/ResultMessage.hpp

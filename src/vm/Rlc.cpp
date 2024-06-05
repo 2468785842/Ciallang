@@ -16,19 +16,24 @@
 namespace Ciallang::VM {
     // 字节码索引是否是这行的第一个
     [[nodiscard]] bool Rlc::firstAppear(const size_t bytecodeIndex) const {
-        return std::ranges::any_of(_bytecodeMapLine.begin(), _bytecodeMapLine.end(),
-            [&](const std::pair<size_t, Common::SourceLocation>& lineMap) {
+        return std::ranges::any_of(
+            _bytecodeMapLine.begin(), _bytecodeMapLine.end(),
+            [&](const auto& lineMap) {
                 return bytecodeIndex == lineMap.first;
             });
     }
 
     [[nodiscard]] Common::SourceLocation Rlc::find(const size_t bytecodeIndex) const {
+        if(_bytecodeMapLine.empty()) {
+            LOG(FATAL) << "rlc is empty";
+        }
+
         Common::SourceLocation preSIndex{};
 
         for(auto [bcIndex, sIndex] : _bytecodeMapLine) {
+            preSIndex = sIndex;
             if(bytecodeIndex == bcIndex) return sIndex;
             if(bytecodeIndex < bcIndex) return preSIndex;
-            preSIndex = sIndex;
         }
 
         throw std::logic_error(

@@ -129,22 +129,14 @@ namespace Ciallang::VM {
             emit(opcode, std::initializer_list<uint8_t>{}, line);
         }
 
-        template<typename NUMBER>
+        template <typename NUMBER>
         void emit(const Opcodes opcode,
                   const std::initializer_list<NUMBER> args,
                   const Common::SourceLocation line
         ) {
             // XXX: fixed to extension opcodes
             emit(static_cast<uint8_t>(opcode), line);
-            for(size_t arg : args) emit(static_cast<uint8_t>(arg), line);
-        }
-
-        void emit(const Opcodes opcode,
-                  const std::initializer_list<uint8_t> args,
-                  const Common::SourceLocation line
-        ) {
-            emit(static_cast<uint8_t>(opcode), line);
-            for(uint8_t arg : args) emit(arg, line);
+            for(NUMBER arg : args) emit(static_cast<uint8_t>(arg), line);
         }
 
         // index from 0 start
@@ -161,9 +153,9 @@ namespace Ciallang::VM {
 
         [[nodiscard]] const Rlc* rlc() const { return &_rlc; }
 
-        [[nodiscard]] const uint8_t* bytecodes() const { return dataPool; }
+        [[nodiscard]] uint8_t bytecodes(const uint8_t offset) const { return dataPool[offset]; }
 
-        [[nodiscard]] const TjsValue* constants() const { return _valueArray.dataPool; }
+        [[nodiscard]] const TjsValue& constants(const size_t offset) const { return _valueArray.dataPool[offset]; }
 
         void reset() override {
             DataPool::reset();

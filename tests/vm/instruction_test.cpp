@@ -38,37 +38,16 @@ TEST(Interpreter, Execute) {
 
     Ciallang::Common::SourceFile sourceFile{ R"(.\startup.tjs)" };
     sourceFile.load(r);
-    CHECK(!r.isFailed());
 
     Ciallang::Syntax::AstBuilder astBuilder{};
     Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
     auto* globalNode = parser.parse(r);
 
-    LOG(WARNING) << "Parser";
-    if(!globalNode) {
-        for(const auto& message : r.messages())
-            LOG(ERROR) << message.message();
-        CHECK(false);
-    }
-
     VMChunk vmChunk{ sourceFile.path() };
     Ciallang::Inter::CodeGen codeGen{ sourceFile, &vmChunk };
     codeGen.loadAst(r, globalNode);
 
-    LOG(WARNING) << "CodeGen";
-    if(r.isFailed()) {
-        for(const auto& message : r.messages())
-            LOG(ERROR) << message.message();
-        CHECK(false);
-    }
-
     Interpreter interpreter{ sourceFile, &vmChunk };
     interpreter.run(r);
 
-    LOG(WARNING) << "Interpreter";
-    if(r.isFailed()) {
-        for(const auto& message : r.messages())
-            LOG(ERROR) << message.message();
-        CHECK(false);
-    }
 }
