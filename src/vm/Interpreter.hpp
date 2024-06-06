@@ -54,7 +54,7 @@ namespace Ciallang::VM {
 
         [[nodiscard]] uint8_t readByte();
 
-        [[nodiscard]] TjsValue readConstant();
+        [[nodiscard]] TjsValue readConstant(size_t index) const;
 
         [[nodiscard]] TjsValue& peek(size_t distance) const;
 
@@ -93,12 +93,9 @@ namespace Ciallang::VM {
             size_t ip{ 0 }; // 栈是动态的, 满了重新分配,地址可能改变,不能用指针
             TjsValue stack[STACK_MAX];
             TjsValue* sp = stack;
-
-            bool flags = false; /* 跳转标记 */
         } _vm;
 
         friend std::string disassembleLine(const Interpreter* interpreter) {
-
             auto ip = interpreter->_vm.ip;
             auto* chunk = interpreter->_vm.chunk;
             auto& [line, column] =

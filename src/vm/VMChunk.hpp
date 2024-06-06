@@ -18,126 +18,30 @@
 #include "Rlc.hpp"
 
 namespace Ciallang::VM {
-    enum class Opcodes : uint8_t;
-    // pd (direct / property direct) 直接,属性直接
-    // pi (indirect / property indirect) 间接,属性间接
-
-    //     enum class Opcodes : uint8_t {
-    //         NOP,
-    //         CONST,
-    //         CP,
-    //         CL,
-    //         CCL,
-    //         TT,
-    //         TF,
-    //         CEQ,
-    //         CDEQ,
-    //         CLT,
-    //         CGT,
-    //         SETF,
-    //         SETNF,
-    //         LNOT,
-    //         NF,
-    //         JF,
-    //         JNF,
-    //         JMP,
-    // #define TJS_NORMAL_AND_PROPERTY_ACCESSER(x) x, x##PD, x##PI, x##P
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(INC),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(DEC),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(LOR),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(LAND),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(BOR),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(BXOR),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(BAND),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(SAR),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(SAL),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(SR),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(ADD),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(SUB),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(MOD),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(DIV),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(IDIV),
-    //         TJS_NORMAL_AND_PROPERTY_ACCESSER(MUL),
-    // #undef TJS_NORMAL_AND_PROPERTY_ACCESSER
-    //
-    //         BNOT,
-    //         TYPEOF,
-    //         TYPEOFD,
-    //         TYPEOFI,
-    //         EVAL,
-    //         EEXP,
-    //         CHKINS,
-    //         ASC,
-    //         CHR,
-    //         NUM,
-    //         CHS,
-    //         INV,
-    //         CHKINV,
-    //         INT,
-    //         REAL,
-    //         STR,
-    //         OCTET,
-    //         CALL,
-    //         CALLD,
-    //         CALLI,
-    //         NEW,
-    //         GPD,
-    //         SPD, SPDE, SPDEH,
-    //         GPI,
-    //         SPI,
-    //         SPIE,
-    //         GPDS, SPDS, GPIS, SPIS,
-    //         SETP, GETP,
-    //         DELD,
-    //         DELI,
-    //         SRV,
-    //         RET,
-    //         ENTRY,
-    //         EXTRY,
-    //         THROW,
-    //         CHGTHIS,
-    //         GLOBAL,
-    //         ADDCI,
-    //         REGMEMBER,
-    //         DEBUGGER,
-    //     };
-
-    enum class OperandTypes {
-        Register,
-        Constants
-    };
-
-    // inline static std::unordered_map<Opcodes, std::string> S_OpcodeToName{
-    //         { Opcodes::NOP, "NOP" },
-    //         { Opcodes::CONST, "CONST" },
-    //         { Opcodes::GPD, "GPD" },
-    //         { Opcodes::CALL, "CALL" },
-    //         { Opcodes::SRV, "SRV", },
-    //         { Opcodes::RET, "RET" }
-    // };
-
+    enum class Opcode : uint8_t;
 
     class VMChunk : DataPool<uint8_t> {
     public:
         explicit VMChunk(const std::filesystem::path& path): _rlc{ path } {
         }
 
-
-        void emit(const Opcodes opcode,
-                  const Common::SourceLocation line
-        ) {
-            emit(opcode, std::initializer_list<uint8_t>{}, line);
-        }
-
-        template <typename NUMBER>
-        void emit(const Opcodes opcode,
-                  const std::initializer_list<NUMBER> args,
-                  const Common::SourceLocation line
-        ) {
-            // XXX: fixed to extension opcodes
+        template <typename A = std::initializer_list<uint8_t>>
+            requires (std::is_same_v<std::initializer_list<uint8_t>, A>
+                      || std::is_same_v<std::vector<uint8_t>, A>)
+        void emit(const Opcode opcode,
+                  const Common::SourceLocation line,
+                  const A& args = {}) {
             emit(static_cast<uint8_t>(opcode), line);
-            for(NUMBER arg : args) emit(static_cast<uint8_t>(arg), line);
+            for(uint8_t arg : args) emit(arg, line);
         }
+
+        size_t emitJmp(
+            const Opcode& opcode,
+            const Common::SourceLocation& line,
+            const std::initializer_list<uint8_t>& addr = { 0xFF, 0xFF }
+        );
+
+        void patchJmp(size_t offset) const;
 
         // index from 0 start
         size_t addConstant(TjsValue&& val) {
@@ -149,9 +53,11 @@ namespace Ciallang::VM {
             return _valueArray.count - 1;
         }
 
-        [[nodiscard]] uint8_t bytecodes(const size_t ip) const { return dataPool[ip]; }
-
         [[nodiscard]] const Rlc* rlc() const { return &_rlc; }
+
+        void addBytecode(const uint16_t offset) {
+            dataPool += offset;
+        }
 
         [[nodiscard]] uint8_t bytecodes(const uint8_t offset) const { return dataPool[offset]; }
 
@@ -162,8 +68,6 @@ namespace Ciallang::VM {
             _valueArray.reset();
             _rlc.reset();
         }
-
-        void disassemble() const;
 
     private:
         DataPool<TjsValue> _valueArray{};

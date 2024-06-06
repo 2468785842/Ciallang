@@ -98,7 +98,7 @@ namespace Ciallang::Syntax {
     }
 
     bool Parser::lookAhead(const size_t count) {
-        // _lexer.skipComment();
+        _lexer.skipComment();
         while(count >= tokens().size() && _lexer.hasNext()) {
             Token* token{ nullptr };
             if(!_lexer.next(token)) break;

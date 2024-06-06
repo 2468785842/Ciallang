@@ -23,7 +23,7 @@ namespace Ciallang::VM {
 
     InterpretResult Interpreter::run(Common::Result& r) {
         for(;;) {
-            auto opcode = static_cast<Opcodes>(_vm.chunk->bytecodes(_vm.ip));
+            auto opcode = static_cast<Opcode>(_vm.chunk->bytecodes(_vm.ip));
 
             const auto* inst = Instruction::instance(opcode);
 
@@ -45,8 +45,8 @@ namespace Ciallang::VM {
         return _vm.chunk->bytecodes(_vm.ip++);
     }
 
-    TjsValue Interpreter::readConstant() {
-        return _vm.chunk->constants(readByte());
+    TjsValue Interpreter::readConstant(const size_t index) const {
+        return _vm.chunk->constants(index);
     }
 
     TjsValue& Interpreter::peek(const size_t distance) const {

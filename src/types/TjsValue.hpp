@@ -55,6 +55,7 @@ namespace Ciallang {
         [[nodiscard]] TjsOctet asOctet() const;
 
         [[nodiscard]] TjsObject asObject() const;
+        [[nodiscard]] bool asBool() const;
 
         [[nodiscard]] const char* name() const;
 

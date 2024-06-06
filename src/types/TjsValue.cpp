@@ -74,6 +74,13 @@ namespace Ciallang {
         return *_value._octet;
     }
 
+    bool TjsValue::asBool() const {
+        if(_type == TjsValueType::Integer) {
+            return asInteger() != 0;
+        }
+        return _type != TjsValueType::Void;
+    }
+
     TjsObject TjsValue::asObject() const {
         CHECK(_type == TjsValueType::Object) << "is not object";
         return *_value._object;

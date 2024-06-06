@@ -12,6 +12,7 @@
  *
  */
 #include <gen/CodeGen.hpp>
+#include <gtest/gtest-spi.h>
 #include <gtest/gtest.h>
 
 #include <vm/VMChunk.hpp>
@@ -23,14 +24,25 @@
 #include "common/SourceFile.hpp"
 
 using namespace Ciallang::VM;
-
+class ThrowListener : public testing::EmptyTestEventListener {
+  void OnTestPartResult(const testing::TestPartResult& result) override {
+    if (result.type() == testing::TestPartResult::kFatalFailure) {
+      throw testing::AssertionException(result);
+    }
+  }
+};
 int main(int argc, char** argv) {
     // Initialize Google's logging library.
     Ciallang::Init::InitializeGlog(argv);
     // Initialize GoogleTest.
     ::testing::InitGoogleTest(&argc, argv);
+    testing::UnitTest::GetInstance()->listeners().Append(new ThrowListener);
 
     return RUN_ALL_TESTS();
+}
+
+TEST(Instruction, op) {
+
 }
 
 TEST(Interpreter, Execute) {

@@ -13,13 +13,12 @@
 #include "CodeGen.hpp"
 
 #include "../vm/Instruction.hpp"
-#include "common/Defer.hpp"
 
 namespace Ciallang::Inter {
     void CodeGen::loadAst(Common::Result& r, const Syntax::AstNode* node) {
         _r = &r;
         node->accept(this);
-        _vmChunk->emit(VM::Opcodes::Ret, node->location);
+        _vmChunk->emit(VM::Opcode::Ret, node->location);
         if(_r->isFailed()) _vmChunk->reset();
     }
 
@@ -32,16 +31,16 @@ namespace Ciallang::Inter {
 
         // val <= 255, embed opcode
         if(val->type() == TjsValueType::Integer && val->asInteger() <= 255) {
-            _vmChunk->emit(VM::Opcodes::Push,
-                { static_cast<uint8_t>(val->asInteger()) },
-                node->location
+            _vmChunk->emit(VM::Opcode::Push,
+                node->location,
+                { static_cast<uint8_t>(val->asInteger()) }
             );
             return;
         }
 
         auto index = _vmChunk->addConstant(std::move(*node->token->value()));
 
-        _vmChunk->emit(VM::Opcodes::Const, { index }, node->location);
+        _vmChunk->emit(VM::Opcode::Load, node->location, VM::encodeIEX(index));
     }
 
     void CodeGen::visit(const Syntax::BinaryExprNode* node) {
@@ -50,16 +49,16 @@ namespace Ciallang::Inter {
 
         switch(node->token->type()) {
             case Syntax::TokenType::Plus:
-                _vmChunk->emit(VM::Opcodes::Add, node->location);
+                _vmChunk->emit(VM::Opcode::Add, node->location);
                 break;
             case Syntax::TokenType::Minus:
-                _vmChunk->emit(VM::Opcodes::Sub, node->location);
+                _vmChunk->emit(VM::Opcode::Sub, node->location);
                 break;
             case Syntax::TokenType::Slash:
-                _vmChunk->emit(VM::Opcodes::Div, node->location);
+                _vmChunk->emit(VM::Opcode::Div, node->location);
                 break;
             case Syntax::TokenType::Asterisk:
-                _vmChunk->emit(VM::Opcodes::Mul, node->location);
+                _vmChunk->emit(VM::Opcode::Mul, node->location);
                 break;
             default: ;
         }
@@ -79,34 +78,30 @@ namespace Ciallang::Inter {
         if(!local) {
             // global scope maybe? check it in runtime
             auto constIndex = _vmChunk->addConstant(std::move(*identiter->value()));
-            _vmChunk->emit(VM::Opcodes::DGlobal, { constIndex }, node->location);
+            _vmChunk->emit(VM::Opcode::DGlobal, node->location, VM::encodeIEX(constIndex));
             return;
         }
 
         // assignment local var
-        _vmChunk->emit(VM::Opcodes::DLocal, { index }, node->location);
+        _vmChunk->emit(VM::Opcode::DLocal, node->location, VM::encodeIEX(index));
         local->init = true;
     }
 
     void CodeGen::visit(const Syntax::VarDeclNode* node) {
         auto identitier = *node->token->value();
         auto index = _vmChunk->addConstant(std::move(identitier));
-        DEFER {
-            if(node->rhs) {
-                _vmChunk->emit(VM::Opcodes::Pop, node->location);
-            }
-        };
 
         if(node->rhs)
             // has intialized assignement ?
             node->rhs->accept(this);
         else
             // no have initialized void
-            _vmChunk->emit(VM::Opcodes::PVoid, node->location);
+            _vmChunk->emit(VM::Opcode::PVoid, node->location);
 
         // global scope
         if(scopeDepth == 1) {
-            _vmChunk->emit(VM::Opcodes::DGlobal, { index }, node->location);
+            _vmChunk->emit(VM::Opcode::DGlobal, node->location, VM::encodeIEX(index));
+            _vmChunk->emit(VM::Opcode::Pop, node->location);
             return;
         }
 
@@ -126,7 +121,7 @@ namespace Ciallang::Inter {
 
         // XXX: fixed max length
         locals.push_back(new Local{ node->token, scopeDepth, !!node->rhs });
-        _vmChunk->emit(VM::Opcodes::DLocal, { locals.size() - 1 }, node->location);
+        _vmChunk->emit(VM::Opcode::DLocal, node->location, VM::encodeIEX(locals.size() - 1));
     }
 
     void CodeGen::visit(const Syntax::SymbolExprNode* node) {
@@ -135,7 +130,7 @@ namespace Ciallang::Inter {
         // global variable maybe?
         if(!local) {
             auto constIndex = _vmChunk->addConstant(std::move(*node->token->value()));
-            _vmChunk->emit(VM::Opcodes::GGlobal, { constIndex }, node->location);
+            _vmChunk->emit(VM::Opcode::GGlobal, node->location, VM::encodeIEX(constIndex));
             return;
         }
 
@@ -148,14 +143,14 @@ namespace Ciallang::Inter {
             return;
         }
 
-        _vmChunk->emit(VM::Opcodes::GLocal, { index }, node->location);
+        _vmChunk->emit(VM::Opcode::GLocal, node->location, VM::encodeIEX(index));
     }
 
     void CodeGen::visit(const Syntax::StmtDeclNode* node) {
         node->statement->accept(this);
         // expr stmt will push value in stack top, but is unuseful
         if(dynamic_cast<const Syntax::ExprStmtNode*>(node->statement)) {
-            _vmChunk->emit(VM::Opcodes::Pop, node->location);
+            _vmChunk->emit(VM::Opcode::Pop, node->location);
         }
     }
 
@@ -180,13 +175,25 @@ namespace Ciallang::Inter {
         --scopeDepth;
 
         if(scopeDepth == 0) return;
+        size_t count = 0;
+        for(auto local : locals | std::views::reverse) {
+            if(local->depth <= scopeDepth) break;
 
-        size_t count = std::ranges::count_if(
-            locals.begin(), locals.end(),
-            [&](auto* local) {
-                return local->depth > scopeDepth;
-            });
-        _vmChunk->emit(VM::Opcodes::PopN, { count }, node->location);
+            ++count;
+        }
+
+        if(count == 0) return;
+
+        size_t i = count;
+        while(i-- > 0) locals.pop_back();
+
+        if(count > 255)
+            DLOG(FATAL) << "to big > 255 ... popn scope.." << count;
+
+        if(count == 1)
+            _vmChunk->emit(VM::Opcode::Pop, node->location);
+        else
+            _vmChunk->emit(VM::Opcode::PopN, node->location, { static_cast<uint8_t>(count) });
     }
 
     std::pair<size_t, CodeGen::Local*> CodeGen::resolveLocal(const Syntax::Token* token) const {
