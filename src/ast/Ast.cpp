@@ -69,11 +69,11 @@ namespace Ciallang::Syntax {
         return makeNode<ExprStmtNode>(rhs);
     }
 
-    IfStmtNode* AstBuilder::makeIfStmtNode(const ExprNode* test, const StmtNode* body) {
+    IfStmtNode* AstBuilder::makeIfStmtNode(const ExprNode* test, const BlockStmtNode* body) {
         return makeNode<IfStmtNode>(test, body);
     }
 
-    WhileStmtNode* AstBuilder::makeWhileStmtNode(const ExprNode* test, const StmtNode* body) {
+    WhileStmtNode* AstBuilder::makeWhileStmtNode(const ExprNode* test, const BlockStmtNode* body) {
         return makeNode<WhileStmtNode>(test, body);
     }
 
@@ -116,6 +116,14 @@ namespace Ciallang::Syntax {
 
     StmtDeclNode* AstBuilder::makeStmtDeclNode(const StmtNode* stmtNode) {
         return makeNode<StmtDeclNode>(stmtNode);
+    }
+
+    BreakStmtNode* AstBuilder::makeBreakStmtNode() {
+        return makeNode<BreakStmtNode>();
+    }
+
+    ContinueStmtNode* AstBuilder::makeContinueStmtNode() {
+        return makeNode<ContinueStmtNode>();
     }
 
     template <typename R, typename... Args>

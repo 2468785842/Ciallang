@@ -51,11 +51,19 @@ namespace Ciallang::Inter {
 
         struct Local {
             const Syntax::Token* token;
-            size_t depth;
+            const size_t depth;
             bool init;
         };
 
         std::vector<Local*> locals{};
+
+        struct Loop {
+            const int16_t addr;
+            const size_t depth;
+            std::vector<int16_t> controls{}; // break or continue for this loop
+        };
+
+        std::vector<Loop> loops{};
 
         // 1 is global scope
         size_t scopeDepth{ 0 };
@@ -81,6 +89,10 @@ namespace Ciallang::Inter {
         void visit(const Syntax::StmtDeclNode*) override;
 
         void visit(const Syntax::WhileStmtNode*) override;
+
+        void visit(const Syntax::BreakStmtNode*) override;
+
+        void visit(const Syntax::ContinueStmtNode*) override;
 
         void beginScope();
 

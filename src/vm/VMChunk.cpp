@@ -16,38 +16,23 @@
 #include "Instruction.hpp"
 
 namespace Ciallang::VM {
-    // void VMChunk::disassemble() const {
-    //     #define RLC_NAME_LEN (_rlc.name().length() < 35 ? 35 - _rlc.name().length() : 35)
-    //     #define RLC_NAME (RLC_NAME_LEN == 35 ? "-" : _rlc.name())
-    //
-    //     fmt::println("{0:-^{1}}", ' ' + RLC_NAME + ' ', RLC_NAME_LEN);
-    //
-    //     for(size_t offset = 0; offset < count;) {
-    //         const auto* inst = Instruction::instance(
-    //             static_cast<Opcode>(bytecodes(offset))
-    //         );
-    //         fmt::println("{}", inst->disassemble(dataPool, constants(), &_rlc, offset));
-    //         offset += inst->length();
-    //     }
-    // }
-
     /**
-     * abs jmp
+     * relative jmp
      * @return address offset
      */
-    size_t VMChunk::emitJmp(
+    int16_t VMChunk::emitJmp(
         const Opcode& opcode,
         const Common::SourceLocation& line,
-        const uint16_t addr) {
+        const int16_t addr) {
         emit(opcode, line, {
                 static_cast<uint8_t>(addr >> 8 & 0xFF),
                 static_cast<uint8_t>(addr & 0xFF)
         });
-        return count - 2;
+        return static_cast<int16_t>(count() - 2);
     }
 
     void VMChunk::patchJmp(const size_t offset) const {
-        uint16_t jump = count - offset - 2;
+        uint16_t jump = count() - offset - 2;
 
         if(jump > UINT16_MAX) {
             DLOG(FATAL) << "Too much code to jump over.";
@@ -56,4 +41,5 @@ namespace Ciallang::VM {
         dataPool[offset] = static_cast<uint8_t>(jump >> 8 & 0xFF);
         dataPool[offset + 1] = static_cast<uint8_t>(jump & 0xFF);
     }
+
 }

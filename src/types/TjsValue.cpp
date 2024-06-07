@@ -55,22 +55,26 @@ namespace Ciallang {
     }
 
     TjsInteger TjsValue::asInteger() const {
-        CHECK(this->_type == TjsValueType::Integer) << "is not integer";
+        CHECK(this->_type == TjsValueType::Integer)
+        << "is not integer" << "is " << name();
         return _value._integer;
     }
 
     TjsReal TjsValue::asReal() const {
-        CHECK(this->_type == TjsValueType::Real) << "is not real";
+        CHECK(this->_type == TjsValueType::Real)
+        << "is not real" << "is " << name();
         return _value._real;
     }
 
     TjsString TjsValue::asString() const {
-        CHECK(this->_type == TjsValueType::String) << "is not string";
+        CHECK(this->_type == TjsValueType::String)
+        << "is not string" << "is " << name();
         return *_value._string;
     }
 
     TjsOctet TjsValue::asOctet() const {
-        CHECK(this->_type == TjsValueType::Octet) << "is not octet";
+        CHECK(this->_type == TjsValueType::Octet)
+        << "is not octet" << "is " << name();
         return *_value._octet;
     }
 
@@ -82,7 +86,8 @@ namespace Ciallang {
     }
 
     TjsObject TjsValue::asObject() const {
-        CHECK(_type == TjsValueType::Object) << "is not object";
+        CHECK(_type == TjsValueType::Object)
+        << "is not object" << "is " << name();
         return *_value._object;
     }
 

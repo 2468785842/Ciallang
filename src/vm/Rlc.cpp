@@ -36,9 +36,8 @@ namespace Ciallang::VM {
             if(bytecodeIndex < bcIndex) return preSIndex;
         }
 
-        throw std::logic_error(
-            "chunk bytecode map to source line exception, not found"
-        );
+        LOG(WARNING) << "chunk bytecode map to source line, not found";
+        return preSIndex;
     }
 
     [[nodiscard]] bool Rlc::contains(const Common::SourceLocation sourceLine) const {

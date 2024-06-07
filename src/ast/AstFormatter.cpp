@@ -48,7 +48,8 @@ namespace Ciallang::Syntax {
         fmt::print(_file, "\t{}:{} -> {}:{}{};\n", from, fromPort, to, toPort, style);
     }
 
-    std::string AstFormatter::formatStyle(const std::string& fillColor, const std::string& fontColor = "black",
+    std::string AstFormatter::formatStyle(const std::string& fillColor,
+                                          const std::string& fontColor = "black",
                                           const std::string& shape = "record") {
         return fmt::format(", fillcolor={}, fontcolor={}, shape={}", fillColor, fontColor, shape);
     }
@@ -68,23 +69,31 @@ namespace Ciallang::Syntax {
                 assert(false);
         }
 
-        std::string details = fmt::format("|{{ {} }}", GraphvizFormatter::escapeChars(ss.str()));
-        std::string style = formatStyle("lightblue", "black", "ellipse");
-        printNode(getVertexName(node), fmt::format("<f1> {}", node->name()), details, style);
+        std::string details = fmt::format(": {}",
+            GraphvizFormatter::escapeChars(ss.str())
+        );
+        std::string style = formatStyle(
+            "lightblue", "black", "ellipse"
+        );
+        printNode(getVertexName(node), fmt::format("{}", node->name()), details, style);
     }
 
     void AstFormatter::visit(const SymbolExprNode* node) {
         assert(node->token != nullptr);
 
-        std::string details = fmt::format("|{{ {} }}", node->token->value()->asString());
-        std::string style = formatStyle("lightgreen", "black", "box");
-        printNode(getVertexName(node), fmt::format("<f1> {}", node->name()), details, style);
+        std::string details = fmt::format(": {}", node->token->value()->asString());
+        std::string style = formatStyle(""
+            "lightgreen", "black", "box"
+        );
+        printNode(getVertexName(node), fmt::format("{}", node->name()), details, style);
     }
 
     void AstFormatter::visitBinaryUnaryNode(const std::string& vertexName, const std::string& nodeName,
                                             const std::string& details, const std::string& lhsPort, const AstNode* lhs,
                                             const std::string& rhsPort, const AstNode* rhs) {
-        std::string style = formatStyle("goldenrod1", "black", "record");
+        std::string style = formatStyle(
+            "goldenrod1", "black", "record"
+        );
         printNode(vertexName, nodeName, details, style);
         if(lhs) {
             lhs->accept(this);
@@ -108,14 +117,21 @@ namespace Ciallang::Syntax {
         assert(node->token != nullptr && node->rhs != nullptr);
 
         std::string details = fmt::format("|{{ operator: '{}' }}", GraphvizFormatter::escapeChars(node->token->name()));
-        visitBinaryUnaryNode(getVertexName(node), fmt::format("<f0> {}{}|<f2> rhs", node->name(), details), "", "",
-            nullptr, "f2", node->rhs);
+        visitBinaryUnaryNode(getVertexName(node),
+            fmt::format("<f0> {}{}|<f2> rhs", node->name(), details),
+            "", "",
+            nullptr, "f2", node->rhs
+        );
     }
 
     void AstFormatter::visit(const AssignExprNode* node) {
         assert(node->lhs != nullptr && node->rhs != nullptr);
 
-        visitBinaryUnaryNode(getVertexName(node), "<f0> lhs|<f1> =|<f2> rhs", "", "f0", node->lhs, "f2", node->rhs);
+        visitBinaryUnaryNode(
+            getVertexName(node),
+            "<f0> lhs|<f1> {}|<f2> rhs", node->name(),
+            "f0", node->lhs, "f2", node->rhs
+        );
     }
 
     void AstFormatter::visit(const BlockStmtNode* node) {
@@ -235,6 +251,23 @@ namespace Ciallang::Syntax {
             "f2", getVertexName(node->body), "f1"
         );
     }
+
+    void AstFormatter::visit(const BreakStmtNode* node) {
+        std::string details = fmt::format("{}", node->name());
+        std::string style = formatStyle(""
+            "lightcyan", "black", "record"
+        );
+        printNode(getVertexName(node), "", details, style);
+    }
+
+    void AstFormatter::visit(const ContinueStmtNode* node) {
+        std::string details = fmt::format("{}", node->name());
+        std::string style = formatStyle(""
+            "lightcyan", "black", "record"
+        );
+        printNode(getVertexName(node), "", details, style);
+    }
+
 
     std::string AstFormatter::getVertexName(const AstNode* node) {
         return fmt::format("{}{}", node->name(), node->id);

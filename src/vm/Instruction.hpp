@@ -47,9 +47,9 @@ namespace Ciallang::VM {
         GLocal,
         DLocal,
 
-        Jmp,
-        JmpE,
-        JmpNE,
+        Jmp,   // sign
+        JmpE,  // sign
+        JmpNE, // sign
     };
 
     template <typename T>
@@ -88,24 +88,6 @@ namespace Ciallang::VM {
         return { static_cast<uint8_t>(0x80 | index) };
     }
 
-    template <OpcodeMode MD>
-    static size_t disassembleExtIndex(const VMChunk* chunk, const size_t ip) {
-        if constexpr(MD == OpcodeMode::IEX) {
-            uint8_t x = chunk->bytecodes(ip + 1);
-            bool immediateMode = (x & 0x80) >> 7; // x000_0000
-            uint8_t extLen = x & 0x7F;            // 0xxx_xxxx
-
-            if(immediateMode) return extLen;
-
-            size_t index = 0;
-            for(uint8_t i = 0; i < static_cast<uint8_t>(extLen >> 4) + 1; i++) {
-                index <<= 8;
-                index += chunk->bytecodes(ip + i + 2);
-            }
-            return index;
-        }
-        return 0;
-    }
 
     template <OpcodeMode MD>
     static size_t getExtIndex(Interpreter* interpreter) {
@@ -130,13 +112,17 @@ namespace Ciallang::VM {
         static const Instruction* instance(Opcode opcode);
 
         [[nodiscard]] virtual const char* name() const = 0;
-        [[nodiscard]] virtual size_t length() const = 0;
+        [[nodiscard]] virtual uint8_t length() const = 0;
+
+        std::string disassemble(const Interpreter* intprter) const {
+            return disassemble(intprter, true);
+        }
 
         /**
          * 反汇编不会增加 ip
          * @return 反汇编内容
          */
-        virtual std::string disassemble(const Interpreter*) const = 0;
+        virtual std::string disassemble(const Interpreter*, bool) const = 0;
 
         /**
          * 执行会增加 ip, 默认已经ip+1,从ip+2开始取指令参数
@@ -147,8 +133,12 @@ namespace Ciallang::VM {
         virtual ~Instruction() = default;
     };
 
+    template <Opcode OP>
+    static std::string disassembleIns(const Instruction* instruction,
+                                      const Interpreter* interpreter,
+                                      const VMChunk* chunk, bool stic);
 
-    template <Common::Name NAME, size_t N>
+    template <Common::Name NAME, size_t N, Opcode OP>
     struct MakeInstruction : Instruction {
         InterpretResult execute(Common::Result&, Interpreter*) const override {
             LOG(FATAL)
@@ -157,18 +147,18 @@ namespace Ciallang::VM {
             std::abort();
         }
 
-        std::string disassemble(const Interpreter* interpreter) const override {
+        std::string disassemble(const Interpreter* interpreter, const bool stic) const override {
             // if instruction is 1 length, default implement
             if constexpr(N == 1) {
                 auto ss = std::ostringstream{}
                           << interpreter->disassembleLine()
-                          << fmt::format("{:#06x}\t{: ^10}", interpreter->_vm.ip, name());
+                          << fmt::format("{:#06x}\t{: ^10}",
+                              interpreter->ip(),
+                              name()
+                          );
                 return ss.str();
             } else {
-                LOG(FATAL)
-                        << "no implement insturction function `disassemble`"
-                        << _name;
-                std::abort();
+                return disassembleIns<OP>(this, interpreter, interpreter->_vm.chunk, stic);
             }
         }
 
@@ -176,7 +166,7 @@ namespace Ciallang::VM {
             return _name;
         }
 
-        [[nodiscard]] size_t length() const final {
+        [[nodiscard]] uint8_t length() const final {
             return _length;
         }
 
@@ -185,34 +175,34 @@ namespace Ciallang::VM {
         const size_t _length = N;
     };
 
-#define DEFINE_INST(ValueName, name, offset) \
-using ValueName = MakeInstruction<Common::Name(name), offset>; \
-constexpr auto S_##ValueName = ValueName()
+#define DEFINE_INST(InsName, name, offset) \
+using InsName##Ins = MakeInstruction<Common::Name(name), offset, Opcode::InsName>; \
+constexpr auto S_##InsName##Ins = InsName##Ins()
 
-    DEFINE_INST(RetInst, "ret", 1);
-    DEFINE_INST(LoadInst, "load", 1);
-    DEFINE_INST(BNotInst, "bnot", 1);
-    DEFINE_INST(LNotInst, "lnot", 1);
+    DEFINE_INST(Ret, "ret", 1);
+    DEFINE_INST(Load, "load", 1);
+    DEFINE_INST(BNot, "bnot", 1);
+    DEFINE_INST(LNot, "lnot", 1);
 
-    DEFINE_INST(AddInst, "add", 1);
-    DEFINE_INST(SubInst, "sub", 1);
-    DEFINE_INST(MulInst, "mul", 1);
-    DEFINE_INST(DivInst, "div", 1);
+    DEFINE_INST(Add, "add", 1);
+    DEFINE_INST(Sub, "sub", 1);
+    DEFINE_INST(Mul, "mul", 1);
+    DEFINE_INST(Div, "div", 1);
 
-    DEFINE_INST(PopInst, "pop", 1);
-    DEFINE_INST(PopNInst, "popn", 2);
-    DEFINE_INST(PushInst, "push", 2);
+    DEFINE_INST(Pop, "pop", 1);
+    DEFINE_INST(PopN, "popn", 2);
+    DEFINE_INST(Push, "push", 2);
 
-    DEFINE_INST(PVoidInst, "pvoid", 1);
+    DEFINE_INST(PVoid, "pvoid", 1);
 
-    DEFINE_INST(GGlobalInst, "gglobal", 2);
-    DEFINE_INST(DGlobalInst, "dglobal", 2);
-    DEFINE_INST(GLocalInst, "glocal", 2);
-    DEFINE_INST(DLocalInst, "dlocal", 2);
+    DEFINE_INST(GGlobal, "gglobal", 2);
+    DEFINE_INST(DGlobal, "dglobal", 2);
+    DEFINE_INST(GLocal, "glocal", 2);
+    DEFINE_INST(DLocal, "dlocal", 2);
 
-    DEFINE_INST(JmpInst, "jmp", 3);
-    DEFINE_INST(JmpEInst, "jmpe", 3);
-    DEFINE_INST(JmpNEInst, "jmpne", 3);
+    DEFINE_INST(Jmp, "jmp", 3);
+    DEFINE_INST(JmpE, "jmpe", 3);
+    DEFINE_INST(JmpNE, "jmpne", 3);
 
 #undef DEFINE_INST
     // -------------------------------------------------------------------------//
@@ -220,30 +210,30 @@ constexpr auto S_##ValueName = ValueName()
     // -------------------------------------------------------------------------//
     static constinit auto S_Instructions =
             frozen::make_unordered_map<Opcode, const Instruction*>({
-                    { Opcode::Ret, &S_RetInst },
-                    { Opcode::Load, &S_LoadInst },
-                    { Opcode::BNot, &S_BNotInst },
-                    { Opcode::LNot, &S_LNotInst },
+                    { Opcode::Ret, &S_RetIns },
+                    { Opcode::Load, &S_LoadIns },
+                    { Opcode::BNot, &S_BNotIns },
+                    { Opcode::LNot, &S_LNotIns },
 
-                    { Opcode::Add, &S_AddInst },
-                    { Opcode::Sub, &S_SubInst },
-                    { Opcode::Mul, &S_MulInst },
-                    { Opcode::Div, &S_DivInst },
+                    { Opcode::Add, &S_AddIns },
+                    { Opcode::Sub, &S_SubIns },
+                    { Opcode::Mul, &S_MulIns },
+                    { Opcode::Div, &S_DivIns },
 
-                    { Opcode::Pop, &S_PopInst },
-                    { Opcode::PopN, &S_PopNInst },
-                    { Opcode::Push, &S_PushInst },
+                    { Opcode::Pop, &S_PopIns },
+                    { Opcode::PopN, &S_PopNIns },
+                    { Opcode::Push, &S_PushIns },
 
-                    { Opcode::PVoid, &S_PVoidInst },
+                    { Opcode::PVoid, &S_PVoidIns },
 
-                    { Opcode::GGlobal, &S_GGlobalInst },
-                    { Opcode::DGlobal, &S_DGlobalInst },
-                    { Opcode::GLocal, &S_GLocalInst },
-                    { Opcode::DLocal, &S_DLocalInst },
+                    { Opcode::GGlobal, &S_GGlobalIns },
+                    { Opcode::DGlobal, &S_DGlobalIns },
+                    { Opcode::GLocal, &S_GLocalIns },
+                    { Opcode::DLocal, &S_DLocalIns },
 
-                    { Opcode::Jmp, &S_JmpInst },
-                    { Opcode::JmpE, &S_JmpEInst },
-                    { Opcode::JmpNE, &S_JmpNEInst },
+                    { Opcode::Jmp, &S_JmpIns },
+                    { Opcode::JmpE, &S_JmpEIns },
+                    { Opcode::JmpNE, &S_JmpNEIns },
             });
 
     inline const Instruction* Instruction::instance(const Opcode opcode) {
@@ -262,25 +252,25 @@ constexpr auto S_##ValueName = ValueName()
 #define EXECUTE(Inst) template <> \
 inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter) const
 
-    EXECUTE(RetInst) {
+    EXECUTE(RetIns) {
         interpreter->printStack();
         interpreter->printGlobal();
         return InterpretResult::OK;
     }
 
-    EXECUTE(LoadInst) {
+    EXECUTE(LoadIns) {
         auto index = getExtIndex<OpcodeMode::IEX>(interpreter);
         auto constant = interpreter->readConstant(index);
         interpreter->push(std::move(constant));
         return InterpretResult::CONTINUE;
     }
 
-    EXECUTE(BNotInst) {
+    EXECUTE(BNotIns) {
         interpreter->push(-interpreter->pop());
         return InterpretResult::CONTINUE;
     }
 
-    EXECUTE(LNotInst) {
+    EXECUTE(LNotIns) {
         // interpreter->push(!interpreter->pop());
         return InterpretResult::CONTINUE;
     }
@@ -307,38 +297,38 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
         return InterpretResult::CONTINUE;
     }
 
-    EXECUTE(AddInst) {
+    EXECUTE(AddIns) {
         return executeBinary<Opcode::Add>(interpreter);
     }
 
-    EXECUTE(SubInst) {
+    EXECUTE(SubIns) {
         return executeBinary<Opcode::Sub>(interpreter);
     }
 
-    EXECUTE(MulInst) {
+    EXECUTE(MulIns) {
         return executeBinary<Opcode::Mul>(interpreter);
     }
 
-    EXECUTE(DivInst) {
+    EXECUTE(DivIns) {
         return executeBinary<Opcode::Div>(interpreter);
     }
 
-    EXECUTE(PopInst) {
+    EXECUTE(PopIns) {
         interpreter->pop();
         return InterpretResult::CONTINUE;
     }
 
-    EXECUTE(PopNInst) {
+    EXECUTE(PopNIns) {
         interpreter->popN(interpreter->readByte());
         return InterpretResult::CONTINUE;
     }
 
-    EXECUTE(PushInst) {
+    EXECUTE(PushIns) {
         interpreter->push(TjsValue{ static_cast<TjsInteger>(interpreter->readByte()) });
         return InterpretResult::CONTINUE;
     }
 
-    EXECUTE(PVoidInst) {
+    EXECUTE(PVoidIns) {
         interpreter->pushVoid();
         return InterpretResult::CONTINUE;
     }
@@ -347,7 +337,7 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     // opcode: gglobal index,
     // read id = constant[index],
     // get value from global[id], push to stack top
-    EXECUTE(GGlobalInst) {
+    EXECUTE(GGlobalIns) {
         auto index = getExtIndex<OpcodeMode::IEX>(interpreter);
 
         auto identitier = interpreter->readConstant(index).asString();
@@ -369,7 +359,7 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     // read id = constant[index],
     // peek value from stack top, put to global[id]
     // !!!not pop, this value still in stack top
-    EXECUTE(DGlobalInst) {
+    EXECUTE(DGlobalIns) {
         auto index = getExtIndex<OpcodeMode::IEX>(interpreter);
         auto identitier = interpreter->readConstant(index).asString();
         auto& value = interpreter->peek(0);
@@ -380,7 +370,7 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     // get local value
     // opcode: glocal slot,
     // read value from stack[slot], push to stack top
-    EXECUTE(GLocalInst) {
+    EXECUTE(GLocalIns) {
         auto slot = getExtIndex<OpcodeMode::IEX>(interpreter);
         auto& value = interpreter->getStack(slot);
         interpreter->push(TjsValue{ value });
@@ -391,7 +381,7 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     // opcode: dlocal slot,
     // peek value from stack top, put to stack[slot]
     // !!!not pop, this value still in stack top
-    EXECUTE(DLocalInst) {
+    EXECUTE(DLocalIns) {
         auto slot = getExtIndex<OpcodeMode::IEX>(interpreter);
         auto& value = interpreter->peek(0); // because is not change sp
         interpreter->putStack(slot, TjsValue{ value });
@@ -400,20 +390,19 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
 
 
     template <Opcode OP>
-    static InterpretResult executeJmp(Interpreter* interpreter,
-                                      VMChunk* vmChunk) {
+    static InterpretResult executeJmp(Interpreter* interpreter) {
         uint16_t offset = interpreter->readByte();
         offset <<= 8;
         offset += interpreter->readByte();
 
         if constexpr(OP == Opcode::Jmp) {
-            vmChunk->addBytecode(offset);
+            interpreter->ip(static_cast<int16_t>(offset));
         } else if constexpr(OP == Opcode::JmpE) {
             if(interpreter->peek(0).asBool())
-                vmChunk->addBytecode(offset);
+                interpreter->ip(static_cast<int16_t>(offset));
         } else if constexpr(OP == Opcode::JmpNE) {
             if(!interpreter->peek(0).asBool())
-                vmChunk->addBytecode(offset);
+                interpreter->ip(static_cast<int16_t>(offset));
         } else {
             static_assert(false,
                 "template error opcodes not support?: `executeJmp`"
@@ -423,68 +412,73 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
         return InterpretResult::CONTINUE;
     }
 
-    EXECUTE(JmpInst) {
-        return executeJmp<Opcode::Jmp>(
-            interpreter,
-            interpreter->_vm.chunk);
+    EXECUTE(JmpIns) {
+        return executeJmp<Opcode::Jmp>(interpreter);
     }
 
-    EXECUTE(JmpEInst) {
-        return executeJmp<Opcode::JmpE>(
-            interpreter,
-            interpreter->_vm.chunk);
+    EXECUTE(JmpEIns) {
+        return executeJmp<Opcode::JmpE>(interpreter);
     }
 
-    EXECUTE(JmpNEInst) {
-        return executeJmp<Opcode::JmpNE>(
-            interpreter,
-            interpreter->_vm.chunk);
+    EXECUTE(JmpNEIns) {
+        return executeJmp<Opcode::JmpNE>(interpreter);
     }
 
+#undef EXECUTE
     //--------------------------------------------------------------------------//
     //----------------------------- disassemble --------------------------------//
     //--------------------------------------------------------------------------//
 
-#define DISASSEMBLE(Inst) template <> \
-    inline std::string Inst::disassemble(const Interpreter* interpreter) const
+    template <OpcodeMode MD>
+    static size_t disassembleExtIndex(const VMChunk* chunk, const size_t ip) {
+        if constexpr(MD == OpcodeMode::IEX) {
+            uint8_t x = chunk->bytecodes(ip + 1);
+            bool immediateMode = (x & 0x80) >> 7; // x000_0000
+            uint8_t extLen = x & 0x7F;            // 0xxx_xxxx
 
-#define SIMPLE_DISASSEMBLE(Inst) \
-    DISASSEMBLE(Inst) { \
-         auto* chunk = interpreter->_vm.chunk; \
-         auto ip = interpreter->_vm.ip; \
-         auto ss = std::ostringstream{} \
-                   << interpreter->disassembleLine() \
-                   << fmt::format("{:#06x}\t{: ^10}", ip, name()) \
-                   << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1)); \
-         return ss.str(); \
+            if(immediateMode) return extLen;
+
+            size_t index = 0;
+            for(uint8_t i = 0; i < static_cast<uint8_t>(extLen >> 4) + 1; i++) {
+                index <<= 8;
+                index += chunk->bytecodes(ip + i + 2);
+            }
+            return index;
+        }
+        return 0;
     }
 
     template <Opcode OP>
     static std::string disassembleIns(const Instruction* instruction,
                                       const Interpreter* interpreter,
-                                      const VMChunk* chunk, const size_t ip) {
+                                      const VMChunk* chunk, const bool stic) {
+        const size_t ip = interpreter->ip();
         // source line and opcode name
         auto ss = std::ostringstream{}
                   << interpreter->disassembleLine()
                   << fmt::format("{:#06x}\t{: ^10}", ip, instruction->name());
 
-        if constexpr(OP == Opcode::Jmp
-                     || OP == Opcode::JmpE
-                     || OP == Opcode::JmpNE) {
+        if constexpr(OP == Opcode::Pop || OP == Opcode::Push) {
+            ss << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1));
+        } else if constexpr(OP == Opcode::Jmp
+                            || OP == Opcode::JmpE
+                            || OP == Opcode::JmpNE) {
             uint16_t offset = chunk->bytecodes(ip + 1);
             offset <<= 8;
-            offset += chunk->bytecodes(ip + 2);
+            offset |= chunk->bytecodes(ip + 2);
 
-            ss << fmt::format("; abs {:#06x}", offset);
-        }
-
-        if constexpr(OP == Opcode::Load
-                     || OP == Opcode::GGlobal
-                     || OP == Opcode::DGlobal
-                     || OP == Opcode::GLocal
-                     || OP == Opcode::DLocal) {
+            ss << fmt::format("{:#06x} ; abs {:#06x}",
+                static_cast<int16_t>(offset),
+                ip + static_cast<int16_t>(offset));
+        } else if constexpr(OP == Opcode::Load
+                            || OP == Opcode::GGlobal
+                            || OP == Opcode::DGlobal
+                            || OP == Opcode::GLocal
+                            || OP == Opcode::DLocal) {
             auto index = disassembleExtIndex<OpcodeMode::IEX>(chunk, ip);
             ss << fmt::format("{: ^4d}", index);
+
+            if(stic) return ss.str();
 
             if constexpr(OP == Opcode::Load) {
                 ss << fmt::format(" ; {}", chunk->constants(index));
@@ -522,76 +516,4 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
 
         return ss.str();
     }
-
-    DISASSEMBLE(LoadInst) {
-        return disassembleIns<Opcode::Load>(
-            this, interpreter,
-            interpreter->_vm.chunk,
-            interpreter->_vm.ip
-        );
-    }
-
-    SIMPLE_DISASSEMBLE(PushInst)
-
-    SIMPLE_DISASSEMBLE(PopNInst)
-
-    DISASSEMBLE(GGlobalInst) {
-        return disassembleIns<Opcode::GGlobal>(
-            this, interpreter,
-            interpreter->_vm.chunk,
-            interpreter->_vm.ip
-        );
-    }
-
-    DISASSEMBLE(DGlobalInst) {
-        return disassembleIns<Opcode::DGlobal>(
-            this, interpreter,
-            interpreter->_vm.chunk,
-            interpreter->_vm.ip
-        );
-    }
-
-    DISASSEMBLE(GLocalInst) {
-        return disassembleIns<Opcode::GLocal>(
-            this, interpreter,
-            interpreter->_vm.chunk,
-            interpreter->_vm.ip
-        );
-    }
-
-    DISASSEMBLE(DLocalInst) {
-        return disassembleIns<Opcode::DLocal>(
-            this, interpreter,
-            interpreter->_vm.chunk,
-            interpreter->_vm.ip
-        );
-    }
-
-
-    DISASSEMBLE(JmpInst) {
-        return disassembleIns<Opcode::Jmp>(
-            this, interpreter,
-            interpreter->_vm.chunk,
-            interpreter->_vm.ip
-        );
-    }
-
-    DISASSEMBLE(JmpEInst) {
-        return disassembleIns<Opcode::Jmp>(
-            this, interpreter,
-            interpreter->_vm.chunk,
-            interpreter->_vm.ip
-        );
-    }
-
-    DISASSEMBLE(JmpNEInst) {
-        return disassembleIns<Opcode::Jmp>(
-            this, interpreter,
-            interpreter->_vm.chunk,
-            interpreter->_vm.ip
-        );
-    }
-#undef EXECUTE
-#undef DISASSEMBLE
-#undef SIMPLE_DISASSEMBLE
 }

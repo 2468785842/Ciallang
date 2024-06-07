@@ -563,7 +563,13 @@ namespace Ciallang::Syntax {
 
             S_Int{ TokenType::Int },
             S_Real{ TokenType::Real },
-            S_String{ TokenType::String };
+            S_String{ TokenType::String },
+
+            S_Do{ TokenType::Do },
+            S_While{ TokenType::While },
+            S_For{ TokenType::For },
+            S_Break{ TokenType::Break },
+            S_Continue{ TokenType::Continue };
 
     static const inline Token
             S_True{ TokenType::ConstVal, tjsInteger(1) },

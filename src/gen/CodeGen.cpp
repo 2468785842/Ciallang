@@ -79,8 +79,6 @@ namespace Ciallang::Inter {
                 return;
             case Syntax::TokenType::Asterisk:
                 _vmChunk->emit(VM::Opcode::Mul, node->location);
-                return;
-
             default: ;
         }
     }
@@ -187,28 +185,69 @@ namespace Ciallang::Inter {
         auto line = node->location;
         node->test->accept(this);
 
-        auto skipThenOffset = _vmChunk->emitJmp(VM::Opcode::JmpNE, line);
+        auto jmpAddr = _vmChunk->emitJmp(VM::Opcode::JmpNE, line);
         node->body->accept(this);
 
-        size_t skipElseOffset = 0;
+        size_t addrOffset = 0;
         if(node->elseBody) {
-            skipElseOffset = _vmChunk->emitJmp(VM::Opcode::Jmp, line);
+            addrOffset = _vmChunk->emitJmp(VM::Opcode::Jmp, line);
         }
 
-        _vmChunk->patchJmp(skipThenOffset);
+        _vmChunk->patchJmp(jmpAddr);
 
         if(node->elseBody) {
             node->elseBody->accept(this);
-            _vmChunk->patchJmp(skipElseOffset);
+            _vmChunk->patchJmp(addrOffset);
         }
 
         _vmChunk->emit(VM::Opcode::Pop, line);
     }
 
     void CodeGen::visit(const Syntax::WhileStmtNode* node) {
+        auto line = node->location;
 
+        node->test->accept(this);
+
+        auto jmpNeAddr = _vmChunk->emitJmp(VM::Opcode::JmpNE, line);
+        _vmChunk->emit(VM::Opcode::Pop, line);
+
+        loops.push_back({ jmpNeAddr, scopeDepth });
+        node->body->accept(this);
+
+        _vmChunk->emitJmp(VM::Opcode::Jmp,
+            line, static_cast<int16_t>(jmpNeAddr - _vmChunk->count() - 6)
+        );
+
+        _vmChunk->patchJmp(jmpNeAddr);
+        _vmChunk->emit(VM::Opcode::Pop, line);
+
+        for(auto& addr : loops.back().controls) {
+            _vmChunk->patchJmp(addr);
+        }
+
+        loops.pop_back();
     }
 
+    void CodeGen::visit(const Syntax::BreakStmtNode* node) {
+        if(loops.empty()) {
+            error(*_r, "break; must be in loop Statement", node->location);
+            return;
+        }
+
+        auto offset = _vmChunk->emitJmp(VM::Opcode::Jmp, node->location);
+        loops.back().controls.push_back({ offset });
+    }
+
+    void CodeGen::visit(const Syntax::ContinueStmtNode* node) {
+        if(loops.empty()) {
+            error(*_r, "continue; must be in loop Statement", node->location);
+            return;
+        }
+
+        _vmChunk->emitJmp(VM::Opcode::Jmp, node->location,
+            static_cast<int16_t>(loops.back().addr - _vmChunk->count() - 6)
+        );
+    }
 
     void CodeGen::beginScope() {
         ++scopeDepth;

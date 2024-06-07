@@ -439,12 +439,22 @@ namespace Ciallang::Syntax {
 
         if(!test) return nullptr;
 
-        const auto* body = parser->parseStatement(r);
+        auto* body = parser->parseStatement(r);
 
         if(!body) return nullptr;
 
-        auto* ifNode = parser->astBuilder()
-                             ->makeIfStmtNode(test, body);
+        parser->astBuilder()
+              ->beginScope()
+              ->childrens.push_back(
+                  parser->astBuilder()->makeStmtDeclNode(body)
+              );
+
+        auto* ifNode = parser
+                       ->astBuilder()
+                       ->makeIfStmtNode(test,
+                           parser->astBuilder()->endScope()
+                       );
+
 
         ifNode->location.start(token->location.start());
         ifNode->location.end(ifNode->body->location.end());
@@ -454,9 +464,16 @@ namespace Ciallang::Syntax {
             parser->current(elseToken);
             parser->consume();
 
-            ifNode->elseBody = parser->parseStatement(r);
+            auto* elseBody = parser->parseStatement(r);
 
             if(!ifNode->elseBody) return nullptr;
+
+            parser->astBuilder()
+                  ->beginScope()
+                  ->childrens.push_back(
+                      parser->astBuilder()->makeStmtDeclNode(elseBody)
+                  );
+            ifNode->elseBody = parser->astBuilder()->endScope();
 
             ifNode->location.end(ifNode->elseBody->location.end());
         }
@@ -471,13 +488,33 @@ namespace Ciallang::Syntax {
         const auto* body = parser->parseStatement(r);
         if(!body) return nullptr;
 
+        parser->astBuilder()
+              ->beginScope()
+              ->childrens.push_back(
+                  parser->astBuilder()->makeStmtDeclNode(body)
+              );
+
         auto whileNode = parser->astBuilder()
-                               ->makeWhileStmtNode(test, body);
+                               ->makeWhileStmtNode(test,
+                                   parser->astBuilder()->endScope()
+                               );
 
         whileNode->location.start(token->location.start());
         whileNode->location.end(token->location.end());
 
         return whileNode;
+    }
+
+    StmtNode* BreakStmtParser::parse(Result& r, Parser* parser, Token* token) const {
+        if(!parser->expect(r, &S_SemiColon)) return nullptr;
+
+        return parser->astBuilder()->makeBreakStmtNode();
+    }
+
+    StmtNode* ContinueStmtParser::parse(Result& r, Parser* parser, Token* token) const {
+        if(!parser->expect(r, &S_SemiColon)) return nullptr;
+
+        return parser->astBuilder()->makeContinueStmtNode();
     }
 
 

@@ -106,5 +106,10 @@ namespace Ciallang::Syntax {
         void visit(const StmtDeclNode*) override;
 
         void visit(const VarDeclNode*) override;
+
+        void visit(const BreakStmtNode*) override;
+
+        void visit(const ContinueStmtNode*) override;
+
     };
 }

@@ -33,7 +33,7 @@ namespace Ciallang::VM {
     };
 
     class Interpreter {
-        template <Common::Name, size_t>
+        template <Common::Name, size_t, Opcode>
         friend struct MakeInstruction;
 
     public:
@@ -46,11 +46,18 @@ namespace Ciallang::VM {
             const std::string& message) const {
             _sourceFile.error(r, message,
                 _vm.chunk->rlc()->find(
-                    _vm.chunk->bytecodes(_vm.ip)
+                    _vm.chunk->bytecodes(*_vm.ip)
                 )
             );
         }
 
+        void ip(const int16_t absIdx) noexcept {
+            _vm.ip += absIdx;
+        }
+
+        [[nodiscard]] size_t ip() const noexcept {
+            return _vm.ip - _vm.chunk->baseAddress();
+        }
 
         [[nodiscard]] uint8_t readByte();
 
@@ -90,21 +97,22 @@ namespace Ciallang::VM {
             std::unordered_map<std::string, TjsValue*> globals{};
 
             VMChunk* chunk;
-            size_t ip{ 0 }; // 栈是动态的, 满了重新分配,地址可能改变,不能用指针
+            uint8_t* ip; // 栈是动态的, 满了重新分配,地址可能改变,不能用指针
             TjsValue stack[STACK_MAX];
             TjsValue* sp = stack;
         } _vm;
 
     public:
         [[nodiscard]] std::string disassembleLine() const {
-            auto ip = _vm.ip;
             auto* chunk = _vm.chunk;
             auto& [line, column] =
-                    chunk->rlc()->find(ip).start();
+                    chunk->rlc()->find(ip()).start();
 
-            return !chunk->rlc()->firstAppear(ip)
+            return !chunk->rlc()->firstAppear(ip())
                    ? fmt::format("{: <14}", fmt::format("@{}:{}", line + 1, column + 1))
                    : fmt::format("{: <14}", "~");
         }
+
+        void dump(Common::Result& r);
     };
 }

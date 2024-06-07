@@ -18,20 +18,20 @@
 
 namespace Ciallang::VM {
     Interpreter::Interpreter(Common::SourceFile& sourceFile, VMChunk* chunk)
-        : _sourceFile(sourceFile), _vm{ .chunk = chunk } {
+        : _sourceFile(sourceFile), _vm{ .chunk = chunk, .ip = chunk->dataPool } {
     }
 
     InterpretResult Interpreter::run(Common::Result& r) {
         for(;;) {
-            auto opcode = static_cast<Opcode>(_vm.chunk->bytecodes(_vm.ip));
+            auto opcode = static_cast<Opcode>(*_vm.ip);
 
-            const auto* inst = Instruction::instance(opcode);
+            const auto* ins = Instruction::instance(opcode);
 
-            LOG(INFO) << inst->disassemble(this);
+            LOG(INFO) << ins->disassemble(this, false);
 
             ++_vm.ip;
 
-            auto result = inst->execute(r, this);
+            auto result = ins->execute(r, this);
             if(result != InterpretResult::CONTINUE) {
                 LOG(INFO) << "VM return";
                 return result;
@@ -42,7 +42,7 @@ namespace Ciallang::VM {
     }
 
     uint8_t Interpreter::readByte() {
-        return _vm.chunk->bytecodes(_vm.ip++);
+        return *_vm.ip++;
     }
 
     TjsValue Interpreter::readConstant(const size_t index) const {
@@ -145,6 +145,23 @@ namespace Ciallang::VM {
         for(auto& [str, val] : _vm.globals) {
             fmt::println("|{0: ^{2}}|{1: ^{2}}|", str, *val, 20);
             fmt::println("+{0:─^{1}}+", "", 41);
+        }
+    }
+
+    void Interpreter::dump(Common::Result& r) {
+        const auto* chunk = _vm.chunk;
+        const auto* rlc = chunk->rlc();
+
+        #define RLC_NAME_LEN (rlc->name().length() < 35 ? 35 - rlc->name().length() : 35)
+        #define RLC_NAME (RLC_NAME_LEN == 35 ? "-" : rlc->name())
+
+        fmt::println("{0:-^{1}}", ' ' + RLC_NAME + ' ', RLC_NAME_LEN);
+
+        while(ip() < chunk->count()) {
+            auto op = static_cast<Opcode>(*_vm.ip);
+            const auto* ins = Instruction::instance(op);
+            fmt::println("{}", ins->disassemble(this));
+            ip(ins->length());
         }
     }
 }

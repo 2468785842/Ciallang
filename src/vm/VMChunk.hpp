@@ -21,7 +21,12 @@ namespace Ciallang::VM {
     enum class Opcode : uint8_t;
 
     class VMChunk : DataPool<uint8_t> {
+        friend class Interpreter;
+
     public:
+        using DataPool::count;
+        using DataPool::baseAddress;
+
         explicit VMChunk(const std::filesystem::path& path): _rlc{ path } {
         }
 
@@ -35,33 +40,33 @@ namespace Ciallang::VM {
             for(uint8_t arg : args) emit(arg, line);
         }
 
-        size_t emitJmp(
+        int16_t emitJmp(
             const Opcode& opcode,
             const Common::SourceLocation& line,
-            uint16_t addr = 0xFFFF
+            int16_t addr = 0x7FFF
         );
 
         void patchJmp(size_t offset) const;
 
         // index from 0 start
         size_t addConstant(TjsValue&& val) {
-            for(size_t i = 0; i < _valueArray.count; i++) {
+            for(size_t i = 0; i < _valueArray.count(); i++) {
                 auto temp = _valueArray.dataPool[i];
                 if(temp == val) return i;
             }
             _valueArray.writeData(std::move(val));
-            return _valueArray.count - 1;
+            return _valueArray.count() - 1;
         }
 
         [[nodiscard]] const Rlc* rlc() const { return &_rlc; }
 
-        void addBytecode(const uint16_t offset) {
-            dataPool += offset;
+        [[nodiscard]] uint8_t bytecodes(const uint8_t offset) const {
+            return dataPool[offset];
         }
 
-        [[nodiscard]] uint8_t bytecodes(const uint8_t offset) const { return dataPool[offset]; }
-
-        [[nodiscard]] const TjsValue& constants(const size_t offset) const { return _valueArray.dataPool[offset]; }
+        [[nodiscard]] const TjsValue& constants(const size_t offset) const {
+            return _valueArray.dataPool[offset];
+        }
 
         void reset() override {
             DataPool::reset();
@@ -75,7 +80,7 @@ namespace Ciallang::VM {
         Rlc _rlc;
 
         void emit(uint8_t byte, const Common::SourceLocation line) {
-            _rlc.addBytecodeLine(count, line);
+            _rlc.addBytecodeLine(count(), line);
             writeData(std::forward<uint8_t>(byte));
         }
     };

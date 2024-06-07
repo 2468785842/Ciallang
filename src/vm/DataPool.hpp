@@ -18,14 +18,13 @@
 namespace Ciallang::VM {
     template <typename VT>
     struct DataPool {
-        size_t count = 0;
         size_t capacity = 8;
         VT* dataPool{
                 Memory::growArray(static_cast<VT*>(nullptr), 0, 8)
         };
 
         void writeData(VT&& value) {
-            if(capacity < count + 1) {
+            if(capacity < _count + 1) {
                 int oldCapacity = capacity;
                 capacity = Memory::growCapacity(oldCapacity);
                 dataPool = Memory::growArray(dataPool,
@@ -34,8 +33,8 @@ namespace Ciallang::VM {
             }
 
             // need call constructor
-            new (addressHeader + count) VT(std::forward<VT>(value));
-            count++;
+            new(addressHeader + _count) VT(std::forward<VT>(value));
+            _count++;
         }
 
         virtual ~DataPool() noexcept {
@@ -45,16 +44,21 @@ namespace Ciallang::VM {
         virtual void reset() {
             Memory::freeArray(addressHeader, capacity);
 
-            count = 0;
+            _count = 0;
             capacity = 8;
             dataPool = Memory::growArray(
                 static_cast<VT*>(nullptr),
-                count, capacity
+                _count, capacity
             );
             addressHeader = dataPool;
         }
 
+        [[nodiscard]] VT* baseAddress() const noexcept { return addressHeader; }
+
+        [[nodiscard]] size_t count() const noexcept { return _count; }
+
     private:
+        size_t _count = 0;
         // 指向开始的地址,不然改变 dataPool 无法释放内存
         VT* addressHeader = dataPool;
     };

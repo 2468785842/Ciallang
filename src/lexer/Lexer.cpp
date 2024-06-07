@@ -103,10 +103,15 @@ std::unordered_map<std::string, const Token&> Lexer::S_Keywords{
         { "string", S_String },
 
         { "new", S_New },
+
+        { "do", S_Do },
+        { "while", S_While },
+        { "for", S_For },
+        { "break", S_Break },
+        { "continue", S_Continue }
 };
 
-Lexer::Lexer(SourceFile& sourceFile) :
-    _sourceFile(sourceFile) {
+Lexer::Lexer(SourceFile& sourceFile) : _sourceFile(sourceFile) {
 }
 
 bool Lexer::boringMatch(

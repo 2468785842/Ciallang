@@ -61,5 +61,6 @@ TEST(Interpreter, Execute) {
 
     Interpreter interpreter{ sourceFile, &vmChunk };
     interpreter.run(r);
+    // interpreter.dump(r);
 
 }

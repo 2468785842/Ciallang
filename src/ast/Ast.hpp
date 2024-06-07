@@ -47,9 +47,9 @@ namespace Ciallang::Syntax {
 
         ExprStmtNode* makeExprStmtNode(const ExprNode* rhs);
 
-        IfStmtNode* makeIfStmtNode(const ExprNode* test, const StmtNode* body);
+        IfStmtNode* makeIfStmtNode(const ExprNode* test, const BlockStmtNode* body);
 
-        WhileStmtNode* makeWhileStmtNode(const ExprNode* test, const StmtNode* body);
+        WhileStmtNode* makeWhileStmtNode(const ExprNode* test, const BlockStmtNode* body);
 
         ValueExprNode* makeValueExprNode(Token&& op);
 
@@ -67,6 +67,8 @@ namespace Ciallang::Syntax {
 
         StmtDeclNode* makeStmtDeclNode(const StmtNode* stmtNode);
 
+        BreakStmtNode* makeBreakStmtNode();
+        ContinueStmtNode* makeContinueStmtNode();
 
         AstNode* pairNode();
 

@@ -41,6 +41,10 @@ namespace Ciallang::Syntax {
 
     class WhileStmtNode;
 
+    class BreakStmtNode;
+
+    class ContinueStmtNode;
+
     class VarDeclNode;
 
     class StmtDeclNode;
@@ -98,5 +102,9 @@ namespace Ciallang::Syntax {
         virtual void visit(const IfStmtNode*) = 0;
 
         virtual void visit(const WhileStmtNode*) = 0;
+
+        virtual void visit(const BreakStmtNode*) = 0;
+
+        virtual void visit(const ContinueStmtNode*) = 0;
     };
 }
