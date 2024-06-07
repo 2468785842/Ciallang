@@ -49,6 +49,8 @@ namespace Ciallang::Syntax {
 
         IfStmtNode* makeIfStmtNode(const ExprNode* test, const StmtNode* body);
 
+        WhileStmtNode* makeWhileStmtNode(const ExprNode* test, const StmtNode* body);
+
         ValueExprNode* makeValueExprNode(Token&& op);
 
         BinaryExprNode* makeBinaryExprNode(Token&& op, const ExprNode* lhs,
@@ -64,6 +66,7 @@ namespace Ciallang::Syntax {
         VarDeclNode* makeVarDeclNode(Token&& token, const ExprStmtNode* rhs = nullptr);
 
         StmtDeclNode* makeStmtDeclNode(const StmtNode* stmtNode);
+
 
         AstNode* pairNode();
 

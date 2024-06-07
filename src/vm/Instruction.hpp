@@ -161,7 +161,7 @@ namespace Ciallang::VM {
             // if instruction is 1 length, default implement
             if constexpr(N == 1) {
                 auto ss = std::ostringstream{}
-                          << disassembleLine(interpreter)
+                          << interpreter->disassembleLine()
                           << fmt::format("{:#06x}\t{: ^10}", interpreter->_vm.ip, name());
                 return ss.str();
             } else {
@@ -401,19 +401,19 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
 
     template <Opcode OP>
     static InterpretResult executeJmp(Interpreter* interpreter,
-                                      const std::function<void(uint16_t)>& jmpF) {
+                                      VMChunk* vmChunk) {
         uint16_t offset = interpreter->readByte();
         offset <<= 8;
         offset += interpreter->readByte();
 
         if constexpr(OP == Opcode::Jmp) {
-            jmpF(offset);
+            vmChunk->addBytecode(offset);
         } else if constexpr(OP == Opcode::JmpE) {
             if(interpreter->peek(0).asBool())
-                jmpF(offset);
+                vmChunk->addBytecode(offset);
         } else if constexpr(OP == Opcode::JmpNE) {
             if(!interpreter->peek(0).asBool())
-                jmpF(offset);
+                vmChunk->addBytecode(offset);
         } else {
             static_assert(false,
                 "template error opcodes not support?: `executeJmp`"
@@ -424,21 +424,21 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     }
 
     EXECUTE(JmpInst) {
-        executeJmp<Opcode::Jmp>(
+        return executeJmp<Opcode::Jmp>(
             interpreter,
-            interpreter->_vm.chunk->addBytecode);
+            interpreter->_vm.chunk);
     }
 
     EXECUTE(JmpEInst) {
-        executeJmp<Opcode::JmpE>(
+        return executeJmp<Opcode::JmpE>(
             interpreter,
-            interpreter->_vm.chunk->addBytecode);
+            interpreter->_vm.chunk);
     }
 
     EXECUTE(JmpNEInst) {
-        executeJmp<Opcode::JmpNE>(
+        return executeJmp<Opcode::JmpNE>(
             interpreter,
-            interpreter->_vm.chunk->addBytecode);
+            interpreter->_vm.chunk);
     }
 
     //--------------------------------------------------------------------------//
@@ -453,7 +453,7 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
          auto* chunk = interpreter->_vm.chunk; \
          auto ip = interpreter->_vm.ip; \
          auto ss = std::ostringstream{} \
-                   << disassembleLine(interpreter) \
+                   << interpreter->disassembleLine() \
                    << fmt::format("{:#06x}\t{: ^10}", ip, name()) \
                    << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1)); \
          return ss.str(); \
@@ -465,54 +465,59 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
                                       const VMChunk* chunk, const size_t ip) {
         // source line and opcode name
         auto ss = std::ostringstream{}
-                  << disassembleLine(interpreter)
+                  << interpreter->disassembleLine()
                   << fmt::format("{:#06x}\t{: ^10}", ip, instruction->name());
 
-        switch(OP) {
-            case Opcode::Jmp:
-            case Opcode::JmpE:
-            case Opcode::JmpNE:
+        if constexpr(OP == Opcode::Jmp
+                     || OP == Opcode::JmpE
+                     || OP == Opcode::JmpNE) {
+            uint16_t offset = chunk->bytecodes(ip + 1);
+            offset <<= 8;
+            offset += chunk->bytecodes(ip + 2);
 
-                uint16_t offset = chunk->bytecodes(ip + 1);
-                offset <<= 8;
-                offset += chunk->bytecodes(ip + 2);
-
-                ss << fmt::format("; {}", offset);
-
-            default: ;
+            ss << fmt::format("; abs {:#06x}", offset);
         }
 
-        switch(OP) {
-            case Opcode::Load:
-            case Opcode::GGlobal:
-            case Opcode::DGlobal:
-                auto index = disassembleExtIndex<OpcodeMode::IEX>(chunk, ip);
-                ss << fmt::format("{: ^4d}", index);
+        if constexpr(OP == Opcode::Load
+                     || OP == Opcode::GGlobal
+                     || OP == Opcode::DGlobal
+                     || OP == Opcode::GLocal
+                     || OP == Opcode::DLocal) {
+            auto index = disassembleExtIndex<OpcodeMode::IEX>(chunk, ip);
+            ss << fmt::format("{: ^4d}", index);
 
-                if constexpr(OP == Opcode::Load) {
-                    ss << fmt::format(" ; {}", chunk->constants(index));
-                } else if constexpr(OP == Opcode::GGlobal) {
-                    auto& identitier = chunk->constants(index);
-                    auto val = interpreter->getGlobal(identitier.asString());
+            if constexpr(OP == Opcode::Load) {
+                ss << fmt::format(" ; {}", chunk->constants(index));
+            } else if constexpr(OP == Opcode::GGlobal) {
+                auto& identitier = chunk->constants(index);
+                auto val = interpreter->getGlobal(identitier.asString());
 
-                    if(!val) {
-                        ss << "(get) in global no have " << identitier.asString();
-                        return ss.str();
-                    }
-
-                    ss << fmt::format(" ; {}", *val);
-                } else if constexpr(OP == Opcode::DGlobal) {
-                    auto& identitier = chunk->constants(index);
-                    auto& value = interpreter->peek(0);
-
-                    if(!interpreter->getGlobal(identitier.asString())) {
-                        ss << "(define) in global no have " << identitier.asString();
-                        return ss.str();
-                    }
-
-                    ss << fmt::format(" ; {} // put {}", identitier, value);
+                if(!val) {
+                    ss << "(get) in global no have " << identitier.asString();
+                    return ss.str();
                 }
-            default: ;
+
+                ss << fmt::format(" ; {}", *val);
+            } else if constexpr(OP == Opcode::DGlobal) {
+                auto& identitier = chunk->constants(index);
+                auto& value = interpreter->peek(0);
+
+                if(!interpreter->getGlobal(identitier.asString())) {
+                    ss << "(declare) " << identitier.asString();
+                    return ss.str();
+                }
+
+                ss << fmt::format(" ; {} // put {}", identitier, value);
+            } else if constexpr(OP == Opcode::GLocal) {
+                auto& value = interpreter->getStack(index);
+
+                ss << fmt::format(" ; stack[{}]", index)
+                        << fmt::format(" // get {}", value);
+            } else /* if constexpr(OP == Opcode::DLocal) */ {
+                auto& value = interpreter->peek(0);
+                ss << fmt::format(" ; stack[{}]", index)
+                        << fmt::format(" // put {}", value);
+            }
         }
 
         return ss.str();
@@ -547,36 +552,19 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     }
 
     DISASSEMBLE(GLocalInst) {
-        auto* chunk = interpreter->_vm.chunk;
-        auto ip = interpreter->_vm.ip;
-
-        auto slot = disassembleExtIndex<OpcodeMode::IEX>(chunk, ip);
-        auto& value = interpreter->getStack(slot);
-
-        auto ss = std::ostringstream{}
-                  << disassembleLine(interpreter)
-                  << fmt::format("{:#06x}\t{: ^10}", ip, name())
-                  << fmt::format("{: ^4d}", slot)
-                  << fmt::format(" ; stack[{}]", slot)
-                  << fmt::format(" // get {}", value);
-        return ss.str();
+        return disassembleIns<Opcode::GLocal>(
+            this, interpreter,
+            interpreter->_vm.chunk,
+            interpreter->_vm.ip
+        );
     }
 
     DISASSEMBLE(DLocalInst) {
-        auto* chunk = interpreter->_vm.chunk;
-        auto ip = interpreter->_vm.ip;
-
-        auto& value = interpreter->peek(0);
-
-        auto slot = disassembleExtIndex<OpcodeMode::IEX>(chunk, ip);
-
-        auto ss = std::ostringstream{}
-                  << disassembleLine(interpreter)
-                  << fmt::format("{:#06x}\t{: ^10}", ip, name())
-                  << fmt::format("{: ^4d}", slot)
-                  << fmt::format(" ; stack[{}]", slot)
-                  << fmt::format(" // put {}", value);
-        return ss.str();
+        return disassembleIns<Opcode::DLocal>(
+            this, interpreter,
+            interpreter->_vm.chunk,
+            interpreter->_vm.ip
+        );
     }
 
 

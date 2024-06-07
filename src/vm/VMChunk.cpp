@@ -38,21 +38,22 @@ namespace Ciallang::VM {
     size_t VMChunk::emitJmp(
         const Opcode& opcode,
         const Common::SourceLocation& line,
-        const std::initializer_list<uint8_t>& addr) {
-
-        auto addrs = encodeIEX(addr);
-        emit(opcode, line, addr);
+        const uint16_t addr) {
+        emit(opcode, line, {
+                static_cast<uint8_t>(addr >> 8 & 0xFF),
+                static_cast<uint8_t>(addr & 0xFF)
+        });
         return count - 2;
     }
 
     void VMChunk::patchJmp(const size_t offset) const {
-        size_t jump = count - offset - 2;
+        uint16_t jump = count - offset - 2;
 
         if(jump > UINT16_MAX) {
             DLOG(FATAL) << "Too much code to jump over.";
         }
 
-        dataPool[offset] = static_cast<uint8_t>(jump >> 8 & 0xff);
-        dataPool[offset + 1] = static_cast<uint8_t>(jump & 0xff);
+        dataPool[offset] = static_cast<uint8_t>(jump >> 8 & 0xFF);
+        dataPool[offset + 1] = static_cast<uint8_t>(jump & 0xFF);
     }
 }

@@ -80,7 +80,10 @@ namespace Ciallang::Inter {
 
         void visit(const Syntax::StmtDeclNode*) override;
 
+        void visit(const Syntax::WhileStmtNode*) override;
+
         void beginScope();
+
         void endScope(const Syntax::BlockStmtNode* node);
 
         std::pair<size_t, Local*> resolveLocal(const Syntax::Token* token) const;

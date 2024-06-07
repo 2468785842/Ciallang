@@ -79,4 +79,26 @@ namespace Ciallang::Syntax {
             return "if_statement";
         }
     };
+    class WhileStmtNode : public StmtNode {
+    public:
+        const ExprNode* test;
+        const StmtNode* body;
+
+        WhileStmtNode() = delete;
+
+        explicit WhileStmtNode(
+            const ExprNode* test,
+            const StmtNode* body
+        ):test(test), body(body) {
+
+        }
+
+        void accept(Visitor* visitor) const override {
+            visitor->visit(this);
+        }
+
+        [[nodiscard]] const char * name() const noexcept override {
+            return "while_statement";
+        }
+    };
 }

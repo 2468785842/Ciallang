@@ -98,10 +98,14 @@ namespace Ciallang::Syntax {
     }
 
     bool Parser::lookAhead(const size_t count) {
-        _lexer.skipComment();
         while(count >= tokens().size() && _lexer.hasNext()) {
             Token* token{ nullptr };
             if(!_lexer.next(token)) break;
+
+            if(token->type() == TokenType::LineComment
+               || token->type() == TokenType::BlockComment) {
+                _lexer.tackOverToken(*token);
+            }
 
             CHECK(token != nullptr);
         }
@@ -235,7 +239,7 @@ namespace Ciallang::Syntax {
             return declParser->parse(r, this, &token);
         }
 
-        if(auto *stmt = parseStatement(r)) {
+        if(auto* stmt = parseStatement(r)) {
             return _astBuilder.makeStmtDeclNode(stmt);
         }
 
@@ -459,6 +463,23 @@ namespace Ciallang::Syntax {
 
         return ifNode;
     }
+
+    StmtNode* WhileStmtParser::parse(Result& r, Parser* parser, Token* token) const {
+        const auto* test = createExpressionNode(r, parser);
+        if(!test) return nullptr;
+
+        const auto* body = parser->parseStatement(r);
+        if(!body) return nullptr;
+
+        auto whileNode = parser->astBuilder()
+                               ->makeWhileStmtNode(test, body);
+
+        whileNode->location.start(token->location.start());
+        whileNode->location.end(token->location.end());
+
+        return whileNode;
+    }
+
 
     /**
      * 中缀二目运算符解析

@@ -39,7 +39,10 @@ namespace Ciallang::Syntax {
 
     class IfStmtNode;
 
+    class WhileStmtNode;
+
     class VarDeclNode;
+
     class StmtDeclNode;
 
     using DeclNodeList = std::vector<DeclNode*>;
@@ -93,5 +96,7 @@ namespace Ciallang::Syntax {
         virtual void visit(const ExprStmtNode*) = 0;
 
         virtual void visit(const IfStmtNode*) = 0;
+
+        virtual void visit(const WhileStmtNode*) = 0;
     };
 }

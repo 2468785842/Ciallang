@@ -95,9 +95,10 @@ namespace Ciallang::VM {
             TjsValue* sp = stack;
         } _vm;
 
-        friend std::string disassembleLine(const Interpreter* interpreter) {
-            auto ip = interpreter->_vm.ip;
-            auto* chunk = interpreter->_vm.chunk;
+    public:
+        [[nodiscard]] std::string disassembleLine() const {
+            auto ip = _vm.ip;
+            auto* chunk = _vm.chunk;
             auto& [line, column] =
                     chunk->rlc()->find(ip).start();
 

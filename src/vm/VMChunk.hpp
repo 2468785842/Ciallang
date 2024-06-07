@@ -38,7 +38,7 @@ namespace Ciallang::VM {
         size_t emitJmp(
             const Opcode& opcode,
             const Common::SourceLocation& line,
-            const std::initializer_list<uint8_t>& addr = { 0xFF, 0xFF }
+            uint16_t addr = 0xFFFF
         );
 
         void patchJmp(size_t offset) const;

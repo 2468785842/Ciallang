@@ -73,9 +73,9 @@ namespace Ciallang {
         TjsValue operator-(const TjsValue& tjsValue) const {
             switch(tjsValue.type()) {
                 case TjsValueType::Integer:
-                    return TjsValue{ this->asInteger() + tjsValue.asInteger() };
+                    return TjsValue{ this->asInteger() - tjsValue.asInteger() };
                 case TjsValueType::Real:
-                    return TjsValue{ this->asReal() + tjsValue.asReal() };
+                    return TjsValue{ this->asReal() - tjsValue.asReal() };
                 default:
                     throw std::logic_error("not support sub operator");
             }

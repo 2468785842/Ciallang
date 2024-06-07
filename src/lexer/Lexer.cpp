@@ -264,6 +264,7 @@ bool Lexer::next(Token*& token) {
  * 跳过注释
  */
 void Lexer::skipComment() {
+    // 性能不好, 如果不是注释会回退,导致两次扫描完全没必要
     Token* token{ nullptr };
 
     while(true) {
@@ -437,9 +438,8 @@ bool Lexer::numberConstVal(Token*& token) {
             if(string{ "+-.0123456789" }.find_first_of(static_cast<char>(tCh)) != -1)
                 // octal, 八进制
                 return parseNonDecimalNumber(token, stream, getOctNum, 3);
-            // 啥也不是
+
             rewindOneChar();
-            return false;
         }
 
         // 科学计数法

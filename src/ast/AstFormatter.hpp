@@ -51,10 +51,39 @@ namespace Ciallang::Syntax {
         FILE* _file = nullptr;
         AstNode* _root = nullptr;
 
+        friend class AstNode;
+
     public:
         AstFormatter(AstNode* root, FILE* file);
 
         void format(const std::string& title);
+
+    private:
+        void printNode(const std::string& vertexName,
+                       const std::string& label,
+                       const std::string& details,
+                       const std::string& style);
+
+        void printEdge(const std::string& from,
+                       const std::string& fromPort,
+                       const std::string& to,
+                       const std::string& toPort,
+                       const std::string& style);
+
+
+        void visitBinaryUnaryNode(const std::string& vertexName,
+                                  const std::string& nodeName,
+                                  const std::string& details,
+                                  const std::string& lhsPort,
+                                  const AstNode* lhs,
+                                  const std::string& rhsPort,
+                                  const AstNode* rhs);
+
+        static std::string formatStyle(const std::string& fillColor,
+                                       const std::string& fontColor,
+                                       const std::string& shape);
+
+        static std::string getVertexName(const AstNode* node);
 
         void visit(const ValueExprNode*) override;
 
@@ -72,11 +101,10 @@ namespace Ciallang::Syntax {
 
         void visit(const IfStmtNode*) override;
 
-        void visit(const VarDeclNode*) override;
+        void visit(const WhileStmtNode*) override;
 
         void visit(const StmtDeclNode*) override;
 
-    private:
-        static std::string getVertexName(const AstNode* node);
+        void visit(const VarDeclNode*) override;
     };
 }

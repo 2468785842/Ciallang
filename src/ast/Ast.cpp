@@ -73,6 +73,10 @@ namespace Ciallang::Syntax {
         return makeNode<IfStmtNode>(test, body);
     }
 
+    WhileStmtNode* AstBuilder::makeWhileStmtNode(const ExprNode* test, const StmtNode* body) {
+        return makeNode<WhileStmtNode>(test, body);
+    }
+
     ValueExprNode* AstBuilder::makeValueExprNode(Token&& op) {
         return makeNode<ValueExprNode>(op);
     }

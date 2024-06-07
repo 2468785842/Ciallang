@@ -44,22 +44,43 @@ namespace Ciallang::Inter {
     }
 
     void CodeGen::visit(const Syntax::BinaryExprNode* node) {
+        auto type = node->token->type();
+
+        if(type == Syntax::TokenType::LogicalAnd) {
+            node->lhs->accept(this);
+            auto offset = _vmChunk->emitJmp(VM::Opcode::JmpNE, node->location);
+            _vmChunk->emit(VM::Opcode::Pop, node->location);
+            node->rhs->accept(this);
+            _vmChunk->patchJmp(offset);
+            return;
+        }
+
+        if(type == Syntax::TokenType::LogicalOr) {
+            node->lhs->accept(this);
+            auto offset = _vmChunk->emitJmp(VM::Opcode::JmpE, node->location);
+            _vmChunk->emit(VM::Opcode::Pop, node->location);
+            node->rhs->accept(this);
+            _vmChunk->patchJmp(offset);
+            return;
+        }
+
         node->lhs->accept(this);
         node->rhs->accept(this);
 
-        switch(node->token->type()) {
+        switch(type) {
             case Syntax::TokenType::Plus:
                 _vmChunk->emit(VM::Opcode::Add, node->location);
-                break;
+                return;
             case Syntax::TokenType::Minus:
                 _vmChunk->emit(VM::Opcode::Sub, node->location);
-                break;
+                return;
             case Syntax::TokenType::Slash:
                 _vmChunk->emit(VM::Opcode::Div, node->location);
-                break;
+                return;
             case Syntax::TokenType::Asterisk:
                 _vmChunk->emit(VM::Opcode::Mul, node->location);
-                break;
+                return;
+
             default: ;
         }
     }
@@ -162,8 +183,30 @@ namespace Ciallang::Inter {
         endScope(node);
     }
 
-    void CodeGen::visit(const Syntax::IfStmtNode*) {
-        LOG(FATAL) << "no impl";
+    void CodeGen::visit(const Syntax::IfStmtNode* node) {
+        auto line = node->location;
+        node->test->accept(this);
+
+        auto skipThenOffset = _vmChunk->emitJmp(VM::Opcode::JmpNE, line);
+        node->body->accept(this);
+
+        size_t skipElseOffset = 0;
+        if(node->elseBody) {
+            skipElseOffset = _vmChunk->emitJmp(VM::Opcode::Jmp, line);
+        }
+
+        _vmChunk->patchJmp(skipThenOffset);
+
+        if(node->elseBody) {
+            node->elseBody->accept(this);
+            _vmChunk->patchJmp(skipElseOffset);
+        }
+
+        _vmChunk->emit(VM::Opcode::Pop, line);
+    }
+
+    void CodeGen::visit(const Syntax::WhileStmtNode* node) {
+
     }
 
 
