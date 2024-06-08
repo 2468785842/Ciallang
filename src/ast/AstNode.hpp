@@ -47,6 +47,8 @@ namespace Ciallang::Syntax {
 
     class VarDeclNode;
 
+    class FunctionDeclNode;
+
     class StmtDeclNode;
 
     using DeclNodeList = std::vector<DeclNode*>;
@@ -84,6 +86,8 @@ namespace Ciallang::Syntax {
         virtual void visit(const StmtDeclNode*) = 0;
 
         virtual void visit(const VarDeclNode*) = 0;
+
+        virtual void visit(const FunctionDeclNode*) = 0;
 
         virtual void visit(const ValueExprNode*) = 0;
 

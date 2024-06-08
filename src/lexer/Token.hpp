@@ -417,7 +417,6 @@ namespace Ciallang::Syntax {
         Token(const Token& token) noexcept {
             _type = token._type;
 
-            delete _value;
             if(token._value)
                 _value = new TjsValue{ *token._value };
 
@@ -427,6 +426,8 @@ namespace Ciallang::Syntax {
         Token& operator=(Token&& token) noexcept {
             if(this != &token) {
                 _type = token._type;
+
+                delete _value;
                 _value = token._value;
                 location = token.location;
 

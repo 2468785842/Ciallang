@@ -40,6 +40,26 @@ namespace Ciallang::Syntax {
         }
     };
 
+    class FunctionDeclNode : public DeclNode {
+    public:
+        BlockStmtNode* body{ nullptr };
+        // name, default value
+        std::vector<ExprNode*> parameters{};
+
+        FunctionDeclNode() = delete;
+
+        explicit FunctionDeclNode(Token& token): DeclNode(token) {
+        }
+
+        void accept(Visitor* visitor) const override {
+            visitor->visit(this);
+        }
+
+        [[nodiscard]] const char* name() const noexcept override {
+            return "function_declaration";
+        }
+    };
+
     class StmtDeclNode : public DeclNode {
     public:
         const StmtNode* statement;
@@ -57,5 +77,4 @@ namespace Ciallang::Syntax {
             return "statement_declaration";
         }
     };
-
 }

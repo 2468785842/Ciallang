@@ -18,13 +18,17 @@
 namespace Ciallang {
     class TjsObject {
     public:
-        static TjsValue tjsObject();
+        virtual ~TjsObject() = default;
+
+        [[nodiscard]] virtual std::string_view name() const noexcept = 0;
+
+        [[nodiscard]] virtual std::unique_ptr<TjsObject> clone() const noexcept = 0;
     };
 
     template <>
     inline void TjsObjectHelper::copy(const TjsValue& src, TjsValue& dest) const {
         dest._type = src._type;
-        dest._value._object = new TjsObject(*src._value._object);
+        dest._value._object = src._value._object->clone().release();
     }
 
     template <>

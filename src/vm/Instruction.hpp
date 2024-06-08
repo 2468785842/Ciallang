@@ -50,6 +50,12 @@ namespace Ciallang::VM {
         Jmp,   // sign
         JmpE,  // sign
         JmpNE, // sign
+
+        Equals,
+        NEquals,
+
+        SEquals, //strict type and value equals
+        SNEquals
     };
 
     template <typename T>
@@ -136,7 +142,7 @@ namespace Ciallang::VM {
     template <Opcode OP>
     static std::string disassembleIns(const Instruction* instruction,
                                       const Interpreter* interpreter,
-                                      const VMChunk* chunk, bool stic);
+                                      bool stic);
 
     template <Common::Name NAME, size_t N, Opcode OP>
     struct MakeInstruction : Instruction {
@@ -158,7 +164,7 @@ namespace Ciallang::VM {
                           );
                 return ss.str();
             } else {
-                return disassembleIns<OP>(this, interpreter, interpreter->_vm.chunk, stic);
+                return disassembleIns<OP>(this, interpreter, stic);
             }
         }
 
@@ -175,36 +181,39 @@ namespace Ciallang::VM {
         const size_t _length = N;
     };
 
-#define DEFINE_INST(InsName, name, offset) \
+#define DEFINE_INS(InsName, name, offset) \
 using InsName##Ins = MakeInstruction<Common::Name(name), offset, Opcode::InsName>; \
 constexpr auto S_##InsName##Ins = InsName##Ins()
 
-    DEFINE_INST(Ret, "ret", 1);
-    DEFINE_INST(Load, "load", 1);
-    DEFINE_INST(BNot, "bnot", 1);
-    DEFINE_INST(LNot, "lnot", 1);
+    DEFINE_INS(Ret, "ret", 1);
+    DEFINE_INS(Load, "load", 1);
+    DEFINE_INS(BNot, "bnot", 1);
+    DEFINE_INS(LNot, "lnot", 1);
 
-    DEFINE_INST(Add, "add", 1);
-    DEFINE_INST(Sub, "sub", 1);
-    DEFINE_INST(Mul, "mul", 1);
-    DEFINE_INST(Div, "div", 1);
+    DEFINE_INS(Add, "add", 1);
+    DEFINE_INS(Sub, "sub", 1);
+    DEFINE_INS(Mul, "mul", 1);
+    DEFINE_INS(Div, "div", 1);
 
-    DEFINE_INST(Pop, "pop", 1);
-    DEFINE_INST(PopN, "popn", 2);
-    DEFINE_INST(Push, "push", 2);
+    DEFINE_INS(Pop, "pop", 1);
+    DEFINE_INS(PopN, "popn", 2);
+    DEFINE_INS(Push, "push", 2);
 
-    DEFINE_INST(PVoid, "pvoid", 1);
+    DEFINE_INS(PVoid, "pvoid", 1);
 
-    DEFINE_INST(GGlobal, "gglobal", 2);
-    DEFINE_INST(DGlobal, "dglobal", 2);
-    DEFINE_INST(GLocal, "glocal", 2);
-    DEFINE_INST(DLocal, "dlocal", 2);
+    DEFINE_INS(GGlobal, "gglobal", 2);
+    DEFINE_INS(DGlobal, "dglobal", 2);
+    DEFINE_INS(GLocal, "glocal", 2);
+    DEFINE_INS(DLocal, "dlocal", 2);
 
-    DEFINE_INST(Jmp, "jmp", 3);
-    DEFINE_INST(JmpE, "jmpe", 3);
-    DEFINE_INST(JmpNE, "jmpne", 3);
+    DEFINE_INS(Jmp, "jmp", 3);
+    DEFINE_INS(JmpE, "jmpe", 3);
+    DEFINE_INS(JmpNE, "jmpne", 3);
 
-#undef DEFINE_INST
+    DEFINE_INS(Equals, "equals", 1);
+    DEFINE_INS(NEquals, "nequals", 1);
+
+#undef DEFINE_INS
     // -------------------------------------------------------------------------//
     // ------------------------- reigst instruction ----------------------------//
     // -------------------------------------------------------------------------//
@@ -234,6 +243,9 @@ constexpr auto S_##InsName##Ins = InsName##Ins()
                     { Opcode::Jmp, &S_JmpIns },
                     { Opcode::JmpE, &S_JmpEIns },
                     { Opcode::JmpNE, &S_JmpNEIns },
+
+                    { Opcode::Equals, &S_EqualsIns },
+                    { Opcode::NEquals, &S_NEqualsIns }
             });
 
     inline const Instruction* Instruction::instance(const Opcode opcode) {
@@ -255,7 +267,11 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     EXECUTE(RetIns) {
         interpreter->printStack();
         interpreter->printGlobal();
-        return InterpretResult::OK;
+        interpreter->callFrameRet();
+        if(!interpreter->isCallFrameTop()) {
+            return InterpretResult::OK;
+        }
+        return InterpretResult::CONTINUE;
     }
 
     EXECUTE(LoadIns) {
@@ -277,8 +293,8 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
 
     template <Opcode OP>
     static InterpretResult executeBinary(Interpreter* interpreter) {
-        auto b = interpreter->pop();
-        auto a = interpreter->pop();
+        auto& b = interpreter->pop();
+        auto& a = interpreter->pop();
 
         if constexpr(OP == Opcode::Add) {
             interpreter->push(a + b);
@@ -288,6 +304,10 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
             interpreter->push(a * b);
         } else if constexpr(OP == Opcode::Div) {
             interpreter->push(a / b);
+        } else if constexpr(OP == Opcode::Equals) {
+            interpreter->push(TjsValue{ static_cast<TjsInteger>(a == b) });
+        } else if constexpr(OP == Opcode::NEquals) {
+            interpreter->push(TjsValue{ static_cast<TjsInteger>(a != b) });
         } else {
             static_assert(
                 false,
@@ -311,6 +331,14 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
 
     EXECUTE(DivIns) {
         return executeBinary<Opcode::Div>(interpreter);
+    }
+
+    EXECUTE(EqualsIns) {
+        return executeBinary<Opcode::Equals>(interpreter);
+    }
+
+    EXECUTE(NEqualsIns) {
+        return executeBinary<Opcode::NEquals>(interpreter);
     }
 
     EXECUTE(PopIns) {
@@ -341,16 +369,16 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
         auto index = getExtIndex<OpcodeMode::IEX>(interpreter);
 
         auto identitier = interpreter->readConstant(index).asString();
-        auto* value = interpreter->getGlobal(identitier);
+        auto* value = interpreter->getGlobal(*identitier);
         if(!value) {
             interpreter->error(r,
                 fmt::format(
-                    "Read failed Undefined variable: {}.", identitier
+                    "Read failed Undefined variable: {}.", *identitier
                 )
             );
             return InterpretResult::RUNTIME_ERROR;
         }
-        interpreter->push(TjsValue{ *value });
+        interpreter->push(*value);
         return InterpretResult::CONTINUE;
     }
 
@@ -361,9 +389,10 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     // !!!not pop, this value still in stack top
     EXECUTE(DGlobalIns) {
         auto index = getExtIndex<OpcodeMode::IEX>(interpreter);
-        auto identitier = interpreter->readConstant(index).asString();
-        auto& value = interpreter->peek(0);
-        interpreter->putGlobal(std::move(identitier), TjsValue(value));
+        auto constant = interpreter->readConstant(index);
+        auto *identitier = constant .asString();
+        auto value = interpreter->peek(0);
+        interpreter->putGlobal(std::move(*identitier), std::move(value));
         return InterpretResult::CONTINUE;
     }
 
@@ -373,7 +402,7 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     EXECUTE(GLocalIns) {
         auto slot = getExtIndex<OpcodeMode::IEX>(interpreter);
         auto& value = interpreter->getStack(slot);
-        interpreter->push(TjsValue{ value });
+        interpreter->push(value);
         return InterpretResult::CONTINUE;
     }
 
@@ -383,8 +412,8 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     // !!!not pop, this value still in stack top
     EXECUTE(DLocalIns) {
         auto slot = getExtIndex<OpcodeMode::IEX>(interpreter);
-        auto& value = interpreter->peek(0); // because is not change sp
-        interpreter->putStack(slot, TjsValue{ value });
+        auto value = interpreter->peek(0); // because is not change sp
+        interpreter->putStack(slot, std::move(value));
         return InterpretResult::CONTINUE;
     }
 
@@ -424,15 +453,16 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
         return executeJmp<Opcode::JmpNE>(interpreter);
     }
 
+
 #undef EXECUTE
     //--------------------------------------------------------------------------//
     //----------------------------- disassemble --------------------------------//
     //--------------------------------------------------------------------------//
 
     template <OpcodeMode MD>
-    static size_t disassembleExtIndex(const VMChunk* chunk, const size_t ip) {
+    static size_t disassembleExtIndex(const VMChunk& chunk, const size_t ip) {
         if constexpr(MD == OpcodeMode::IEX) {
-            uint8_t x = chunk->bytecodes(ip + 1);
+            uint8_t x = chunk.bytecodes(ip + 1);
             bool immediateMode = (x & 0x80) >> 7; // x000_0000
             uint8_t extLen = x & 0x7F;            // 0xxx_xxxx
 
@@ -441,7 +471,7 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
             size_t index = 0;
             for(uint8_t i = 0; i < static_cast<uint8_t>(extLen >> 4) + 1; i++) {
                 index <<= 8;
-                index += chunk->bytecodes(ip + i + 2);
+                index += chunk.bytecodes(ip + i + 2);
             }
             return index;
         }
@@ -450,8 +480,8 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
 
     template <Opcode OP>
     static std::string disassembleIns(const Instruction* instruction,
-                                      const Interpreter* interpreter,
-                                      const VMChunk* chunk, const bool stic) {
+                                      const Interpreter* interpreter, const bool stic) {
+        const auto& chunk = interpreter->chunk();
         const size_t ip = interpreter->ip();
         // source line and opcode name
         auto ss = std::ostringstream{}
@@ -459,13 +489,13 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
                   << fmt::format("{:#06x}\t{: ^10}", ip, instruction->name());
 
         if constexpr(OP == Opcode::Pop || OP == Opcode::Push) {
-            ss << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1));
+            ss << fmt::format("{: ^4d}", chunk.bytecodes(ip + 1));
         } else if constexpr(OP == Opcode::Jmp
                             || OP == Opcode::JmpE
                             || OP == Opcode::JmpNE) {
-            uint16_t offset = chunk->bytecodes(ip + 1);
+            uint16_t offset = chunk.bytecodes(ip + 1);
             offset <<= 8;
-            offset |= chunk->bytecodes(ip + 2);
+            offset |= chunk.bytecodes(ip + 2);
 
             ss << fmt::format("{:#06x} ; abs {:#06x}",
                 static_cast<int16_t>(offset),
@@ -481,34 +511,34 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
             if(stic) return ss.str();
 
             if constexpr(OP == Opcode::Load) {
-                ss << fmt::format(" ; {}", chunk->constants(index));
+                ss << fmt::format(" ; {}", chunk.constants(index));
             } else if constexpr(OP == Opcode::GGlobal) {
-                auto& identitier = chunk->constants(index);
-                auto val = interpreter->getGlobal(identitier.asString());
+                auto& identitier = chunk.constants(index);
+                auto val = interpreter->getGlobal(*identitier.asString());
 
                 if(!val) {
-                    ss << "(get) in global no have " << identitier.asString();
+                    ss << "(get) in global no have " << *identitier.asString();
                     return ss.str();
                 }
 
                 ss << fmt::format(" ; {}", *val);
             } else if constexpr(OP == Opcode::DGlobal) {
-                auto& identitier = chunk->constants(index);
-                auto& value = interpreter->peek(0);
+                auto& identitier = chunk.constants(index);
+                auto value = interpreter->peek(0);
 
-                if(!interpreter->getGlobal(identitier.asString())) {
+                if(!interpreter->getGlobal(*identitier.asString())) {
                     ss << "(declare) " << identitier.asString();
                     return ss.str();
                 }
 
                 ss << fmt::format(" ; {} // put {}", identitier, value);
             } else if constexpr(OP == Opcode::GLocal) {
-                auto& value = interpreter->getStack(index);
+                const auto& value = interpreter->getStack(index);
 
                 ss << fmt::format(" ; stack[{}]", index)
                         << fmt::format(" // get {}", value);
             } else /* if constexpr(OP == Opcode::DLocal) */ {
-                auto& value = interpreter->peek(0);
+                auto value = interpreter->peek(0);
                 ss << fmt::format(" ; stack[{}]", index)
                         << fmt::format(" // put {}", value);
             }

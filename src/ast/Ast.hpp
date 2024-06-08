@@ -65,19 +65,13 @@ namespace Ciallang::Syntax {
 
         VarDeclNode* makeVarDeclNode(Token&& token, const ExprStmtNode* rhs = nullptr);
 
+        FunctionDeclNode* makeFunctionDeclNode(Token&& token);
+
         StmtDeclNode* makeStmtDeclNode(const StmtNode* stmtNode);
 
         BreakStmtNode* makeBreakStmtNode();
+
         ContinueStmtNode* makeContinueStmtNode();
-
-        AstNode* pairNode();
-
-        AstNode* procCallNode();
-
-        // 实参list
-        AstNode* argumentListNode();
-
-        AstNode* functionNode();
 
         template <typename R, typename... Args>
         R* makeNode(Args&&... args);

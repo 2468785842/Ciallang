@@ -17,19 +17,25 @@
 #include "Instruction.hpp"
 
 namespace Ciallang::VM {
-    Interpreter::Interpreter(Common::SourceFile& sourceFile, VMChunk* chunk)
-        : _sourceFile(sourceFile), _vm{ .chunk = chunk, .ip = chunk->dataPool } {
+    Interpreter::Interpreter(Common::SourceFile& sourceFile, VMChunk&& chunk)
+        : _main(new TjsFunction{ std::move(chunk), "main" }),
+          _sourceFile(sourceFile) {
+        _vm.frames[0] = new VM::CallFrame{
+                .function = _main,
+                .ip = 0,
+                .slots = _vm.stack
+        };
     }
 
     InterpretResult Interpreter::run(Common::Result& r) {
         for(;;) {
-            auto opcode = static_cast<Opcode>(*_vm.ip);
+            auto opcode = static_cast<Opcode>(chunk().bytecodes(callFrame()->ip));
 
             const auto* ins = Instruction::instance(opcode);
 
             LOG(INFO) << ins->disassemble(this, false);
 
-            ++_vm.ip;
+            ip(1);
 
             auto result = ins->execute(r, this);
             if(result != InterpretResult::CONTINUE) {
@@ -41,15 +47,17 @@ namespace Ciallang::VM {
         }
     }
 
-    uint8_t Interpreter::readByte() {
-        return *_vm.ip++;
+    uint8_t Interpreter::readByte() const {
+        return chunk().bytecodes(callFrame()->ip++);
     }
 
+    // TODO: 返回的将亡值
     TjsValue Interpreter::readConstant(const size_t index) const {
-        return _vm.chunk->constants(index);
+        return chunk().constants(index);
     }
 
-    TjsValue& Interpreter::peek(const size_t distance) const {
+    // TODO: 返回的将亡值
+    TjsValue Interpreter::peek(const size_t distance) const {
         DCHECK_GE(
             _vm.sp - _vm.stack - static_cast<intptr_t>(distance) - 1, 0
         ) << "stack underflow `peek(distance)` method";
@@ -67,14 +75,14 @@ namespace Ciallang::VM {
         *++_vm.sp = TjsValue{};
     }
 
-    void Interpreter::push(TjsValue&& value) {
+    void Interpreter::push(TjsValue value) {
         DCHECK_LE(
             _vm.sp - _vm.stack + 1, STACK_MAX - 1
         ) << "stack overflow `push(value)` method";
         *_vm.sp++ = std::move(value);
     }
 
-    TjsValue& Interpreter::popN(const size_t n) {
+    const TjsValue& Interpreter::popN(const size_t n) {
         DCHECK_GE(
             reinterpret_cast<std::uintptr_t>(_vm.sp - n),
             reinterpret_cast<std::uintptr_t>(_vm.stack)
@@ -83,7 +91,7 @@ namespace Ciallang::VM {
         return *_vm.sp;
     }
 
-    TjsValue& Interpreter::pop() {
+    const TjsValue& Interpreter::pop() {
         DCHECK_GE(
             reinterpret_cast<std::uintptr_t>(_vm.sp - 1),
             reinterpret_cast<std::uintptr_t>(_vm.stack)
@@ -148,17 +156,16 @@ namespace Ciallang::VM {
         }
     }
 
-    void Interpreter::dump(Common::Result& r) {
-        const auto* chunk = _vm.chunk;
-        const auto* rlc = chunk->rlc();
+    void Interpreter::dump() const {
+        const auto* rlc = chunk().rlc();
 
         #define RLC_NAME_LEN (rlc->name().length() < 35 ? 35 - rlc->name().length() : 35)
         #define RLC_NAME (RLC_NAME_LEN == 35 ? "-" : rlc->name())
 
         fmt::println("{0:-^{1}}", ' ' + RLC_NAME + ' ', RLC_NAME_LEN);
 
-        while(ip() < chunk->count()) {
-            auto op = static_cast<Opcode>(*_vm.ip);
+        while(ip() < chunk().count()) {
+            auto op = static_cast<Opcode>(readByte());
             const auto* ins = Instruction::instance(op);
             fmt::println("{}", ins->disassemble(this));
             ip(ins->length());

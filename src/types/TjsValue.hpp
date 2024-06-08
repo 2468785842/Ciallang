@@ -22,21 +22,32 @@ namespace Ciallang {
     public:
         TjsValue() = default;
 
-        explicit TjsValue(const TjsInteger& value) : _value{ ._integer = value }, _type(TjsValueType::Integer) {
+        explicit TjsValue(const TjsInteger& value) :
+            _value{ ._integer = value },
+            _type(TjsValueType::Integer) {
         }
 
-        explicit TjsValue(const TjsReal& value) : _value{ ._real = value }, _type(TjsValueType::Real) {
+        explicit TjsValue(const TjsReal& value) :
+            _value{ ._real = value },
+            _type(TjsValueType::Real) {
         }
 
         explicit TjsValue(const TjsString&);
 
         explicit TjsValue(const TjsOctet&);
 
-        explicit TjsValue(const TjsObject&);
+        template <typename T>
+            requires std::is_base_of_v<TjsObject, T>
+        explicit TjsValue(const T& value) :
+            _type(TjsValueType::Object) {
+            _value._object = new T{ value };
+        }
 
-        TjsValue(const TjsValue&) noexcept;
+        TjsValue(const TjsValue& value) noexcept;
 
         TjsValue(TjsValue&&) noexcept;
+
+        TjsValue& operator=(const TjsValue& value) = delete;
 
         TjsValue& operator=(TjsValue&& value) noexcept;
 
@@ -50,11 +61,12 @@ namespace Ciallang {
 
         [[nodiscard]] TjsReal asReal() const;
 
-        [[nodiscard]] TjsString asString() const;
+        [[nodiscard]] TjsString* asString() const;
 
-        [[nodiscard]] TjsOctet asOctet() const;
+        [[nodiscard]] TjsOctet* asOctet() const;
 
-        [[nodiscard]] TjsObject asObject() const;
+        [[nodiscard]] TjsObject* asObject() const;
+
         [[nodiscard]] bool asBool() const;
 
         [[nodiscard]] const char* name() const;
@@ -103,18 +115,15 @@ namespace Ciallang {
             }
         }
 
-        TjsValue operator-() {
+        TjsValue operator-() const {
             switch(type()) {
                 case TjsValueType::Integer:
-                    this->_value._integer = -asInteger();
-                    break;
+                    return TjsValue{ -asInteger() };
                 case TjsValueType::Real:
-                    this->_value._real = -asReal();
-                    break;
+                    return TjsValue{ -asReal() };
                 default:
-                    LOG(FATAL) << "not number!! `operator-` can't use";
+                    throw std::logic_error("not number!! `operator-` can't use");
             }
-            return *this;
         }
 
         bool operator==(const TjsValue& tjsValue) const;

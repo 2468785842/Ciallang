@@ -41,6 +41,7 @@ set(SOURCE_FILES
         src/vm/Instruction.hpp
         src/vm/DataPool.hpp
 
+        src/types/TjsFunction.cpp
         src/types/TjsOctet.cpp
         src/types/TjsString.cpp
         src/types/TjsObject.cpp

@@ -114,6 +114,10 @@ namespace Ciallang::Syntax {
         return makeNode<VarDeclNode>(token, rhs);
     }
 
+    FunctionDeclNode* AstBuilder::makeFunctionDeclNode(Token&& token) {
+        return makeNode<FunctionDeclNode>(token);
+    }
+
     StmtDeclNode* AstBuilder::makeStmtDeclNode(const StmtNode* stmtNode) {
         return makeNode<StmtDeclNode>(stmtNode);
     }

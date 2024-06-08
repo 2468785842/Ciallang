@@ -12,11 +12,6 @@
 
 #include "TjsObject.hpp"
 
-#include "TjsValue.hpp"
-
 namespace Ciallang {
 
-    TjsValue TjsObject::tjsObject() {
-        return TjsValue{ TjsObject{} };
-    }
 }

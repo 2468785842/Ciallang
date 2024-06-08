@@ -15,7 +15,6 @@
 #include <gtest/gtest-spi.h>
 #include <gtest/gtest.h>
 
-#include <vm/VMChunk.hpp>
 #include <vm/Instruction.hpp>
 
 #include <init/GlogInit.hpp>
@@ -24,19 +23,12 @@
 #include "common/SourceFile.hpp"
 
 using namespace Ciallang::VM;
-class ThrowListener : public testing::EmptyTestEventListener {
-  void OnTestPartResult(const testing::TestPartResult& result) override {
-    if (result.type() == testing::TestPartResult::kFatalFailure) {
-      throw testing::AssertionException(result);
-    }
-  }
-};
+
 int main(int argc, char** argv) {
     // Initialize Google's logging library.
     Ciallang::Init::InitializeGlog(argv);
     // Initialize GoogleTest.
-    ::testing::InitGoogleTest(&argc, argv);
-    testing::UnitTest::GetInstance()->listeners().Append(new ThrowListener);
+    testing::InitGoogleTest(&argc, argv);
 
     return RUN_ALL_TESTS();
 }
@@ -55,12 +47,11 @@ TEST(Interpreter, Execute) {
     Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
     auto* globalNode = parser.parse(r);
 
-    VMChunk vmChunk{ sourceFile.path() };
-    Ciallang::Inter::CodeGen codeGen{ sourceFile, &vmChunk };
-    codeGen.loadAst(r, globalNode);
+    Ciallang::Inter::CodeGen codeGen{ sourceFile};
+    auto chunk = codeGen.parseAst(r, globalNode);
 
-    Interpreter interpreter{ sourceFile, &vmChunk };
+    Interpreter interpreter{ sourceFile, std::move(*chunk.release()) };
+    // interpreter.dump();
     interpreter.run(r);
-    // interpreter.dump(r);
 
 }

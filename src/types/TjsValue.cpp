@@ -28,17 +28,11 @@ namespace Ciallang {
         _value._octet = new TjsOctet{ value };
     }
 
-    TjsValue::TjsValue(const TjsObject& value) :
-        _type(TjsValueType::Object) {
-        _value._object = new TjsObject{ value };
-    }
-
     TjsValue::TjsValue(const TjsValue& value) noexcept {
         TjsValueHelper::instance(value._type)->copy(value, *this);
     }
 
     TjsValue::TjsValue(TjsValue&& value) noexcept {
-        TjsValueHelper::instance(this->_type)->destroy(*this);
         TjsValueHelper::instance(value._type)->move(value, *this);
     }
 
@@ -66,16 +60,23 @@ namespace Ciallang {
         return _value._real;
     }
 
-    TjsString TjsValue::asString() const {
+    TjsString* TjsValue::asString() const {
         CHECK(this->_type == TjsValueType::String)
         << "is not string" << "is " << name();
-        return *_value._string;
+        return _value._string;
     }
 
-    TjsOctet TjsValue::asOctet() const {
+    TjsOctet* TjsValue::asOctet() const {
         CHECK(this->_type == TjsValueType::Octet)
         << "is not octet" << "is " << name();
-        return *_value._octet;
+        return _value._octet;
+    }
+
+
+    TjsObject* TjsValue::asObject() const {
+        CHECK(_type == TjsValueType::Object)
+        << "is not object" << "is " << name();
+        return _value._object;
     }
 
     bool TjsValue::asBool() const {
@@ -83,12 +84,6 @@ namespace Ciallang {
             return asInteger() != 0;
         }
         return _type != TjsValueType::Void;
-    }
-
-    TjsObject TjsValue::asObject() const {
-        CHECK(_type == TjsValueType::Object)
-        << "is not object" << "is " << name();
-        return *_value._object;
     }
 
     const char* TjsValue::name() const {
@@ -124,8 +119,9 @@ namespace Ciallang {
             case TjsValueType::String:
                 return os << d.asString();
             case TjsValueType::Octet:
-            case TjsValueType::Object:
                 throw std::logic_error("not support");
+            case TjsValueType::Object:
+                return os << "<object>[" << d.asObject()->name() << ']';
             case TjsValueType::Void:
                 return os << "void";
         }

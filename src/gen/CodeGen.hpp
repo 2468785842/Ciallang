@@ -25,11 +25,12 @@ namespace Ciallang::Inter {
         friend class Syntax::AstNode;
 
         explicit CodeGen(
-            Common::SourceFile& sourceFile, VM::VMChunk* vmChunk
-        ) : _vmChunk(vmChunk), _sourceFile(sourceFile) {
+            Common::SourceFile& sourceFile
+        ) : _sourceFile(sourceFile) {
         }
 
-        void loadAst(Common::Result& r, const Syntax::AstNode* node);
+        std::unique_ptr<VM::VMChunk> parseAst(Common::Result& r,
+                                              const Syntax::AstNode* node);
 
         void error(
             Common::Result& r,
@@ -39,13 +40,17 @@ namespace Ciallang::Inter {
         }
 
         ~CodeGen() noexcept override {
-            for(auto local : locals) {
+            for(auto local : _locals) {
                 delete local;
+            }
+            for(auto chunk : _chunks) {
+                delete chunk;
             }
         }
 
     private:
-        VM::VMChunk* _vmChunk;
+        std::vector<VM::VMChunk*> _chunks{};
+
         Common::SourceFile& _sourceFile;
         Common::Result* _r{ nullptr };
 
@@ -55,7 +60,7 @@ namespace Ciallang::Inter {
             bool init;
         };
 
-        std::vector<Local*> locals{};
+        std::vector<Local*> _locals{};
 
         struct Loop {
             const int16_t addr;
@@ -63,10 +68,10 @@ namespace Ciallang::Inter {
             std::vector<int16_t> controls{}; // break or continue for this loop
         };
 
-        std::vector<Loop> loops{};
+        std::vector<Loop> _loops{};
 
         // 1 is global scope
-        size_t scopeDepth{ 0 };
+        size_t _scopeDepth{ 0 };
 
         void visit(const Syntax::ValueExprNode*) override;
 
@@ -85,6 +90,8 @@ namespace Ciallang::Inter {
         void visit(const Syntax::IfStmtNode*) override;
 
         void visit(const Syntax::VarDeclNode*) override;
+
+        void visit(const Syntax::FunctionDeclNode*) override;
 
         void visit(const Syntax::StmtDeclNode*) override;
 

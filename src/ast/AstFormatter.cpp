@@ -81,7 +81,7 @@ namespace Ciallang::Syntax {
     void AstFormatter::visit(const SymbolExprNode* node) {
         assert(node->token != nullptr);
 
-        std::string details = fmt::format(": {}", node->token->value()->asString());
+        std::string details = fmt::format(": {}", *node->token->value());
         std::string style = formatStyle(""
             "lightgreen", "black", "box"
         );
@@ -203,7 +203,7 @@ namespace Ciallang::Syntax {
 
         fmt::print(_file, "\t{}:f0 -> {}:f1",
             nodeVertexName,
-            node->token->value()->asString()
+            *node->token->value()
         );
 
         if(node->rhs) {
@@ -213,6 +213,27 @@ namespace Ciallang::Syntax {
             );
         }
     }
+
+    void AstFormatter::visit(const FunctionDeclNode* node) {
+        auto nodeVertexName = getVertexName(node);
+        std::string details = fmt::format("|<f0> lhs |<f1> {} |<f2> rhs", node->name());
+        std::string style = formatStyle(""
+            "lightcyan", "black", "record"
+        );
+        printNode(nodeVertexName, "", details, style);
+
+        fmt::print(_file, "\t{}:f0 -> {}:f1",
+            nodeVertexName,
+            *node->token->value()
+        );
+
+        // XXX: print parameters
+        node->body->accept(this);
+        printEdge(nodeVertexName,
+            "f2", getVertexName(node->body), "f1"
+        );
+    }
+
 
     void AstFormatter::visit(const StmtDeclNode* node) {
         auto nodeVertexName = getVertexName(node);

@@ -155,11 +155,19 @@ namespace Ciallang::Syntax {
         DeclNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
+    struct FunctionDeclParser final : DeclParser {
+        constexpr FunctionDeclParser() = default;
+
+        DeclNode* parse(Result& r, Parser* parser, Token* token) const override;
+    };
+
     static constexpr VarDeclParser S_VarDeclParser{};
+    static constexpr FunctionDeclParser S_FunctionDeclParser{};
 
     static constexpr auto S_DeclParsers =
             frozen::make_unordered_map<TokenType, const DeclParser*>({
-                    { TokenType::Var, &S_VarDeclParser }
+                    { TokenType::Var, &S_VarDeclParser },
+                    { TokenType::Function, &S_FunctionDeclParser }
             });
 
     /**

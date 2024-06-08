@@ -35,49 +35,37 @@ namespace Ciallang::Syntax {
         return node;
     }
 
-    /*  static void pairsToList(AstNode *target, AstNode *root) {
-          if (root == nullptr)
-              return;
+    // static bool parseArguments(Result &r, Parser* parser, );
 
-          if (root->type != AstNodeType::pair) {
-              target->location = root->location;
-              target->childrens.push_back(root);
-              return;
-          }
+    static bool parseParameters(Result& r, Parser* parser, FunctionDeclNode* funNode) {
+        if(!parser->expect(r, &S_LParenthesis)) return false;
 
-          auto currentPair = root;
-          target->location.start(currentPair->location.start());
-          while (true) {
-              if (currentPair->lhs->type != AstNodeType::pair) {
-                  if (currentPair->rhs != nullptr)
-                      target->childrens.push_back(currentPair->rhs);
-                  target->childrens.push_back(currentPair->lhs);
-                  target->location.end(currentPair->lhs->location.end());
-                  break;
-              }
-              target->childrens.push_back(currentPair->rhs);
-              currentPair = currentPair->lhs;
-          }
+        for(;;) {
+            if(!parser->peek(TokenType::Identifier)) return false;
 
-          ranges::reverse(target->childrens);
-      }*/
+            Token token{};
+            parser->current(token);
 
-    /* static StmtNode *createTypeDeclarationNode(
-             Result &r, Parser *parser, AstNode *lhs, const Token &token
-     ) {
-         const auto node = parser->astBuilder()->typeDeclarationNode();
-         node->location.start(token.location.start());
+            // default value
+            ExprNode* expr = nullptr;
+            if(parser->peek(TokenType::Assignment)) {
+                Token assgnmentToken{};
+                parser->current(assgnmentToken);
+                expr = parser->parseExpression(r);
+                if(!expr) return false;
+            }
 
-         node->lhs = parser->parseExpression(r, Precedence::type);
-         node->location.end(node->lhs->location.end());
+            funNode->parameters.push_back(expr);
 
-         if (lhs != nullptr) {
-             lhs->rhs = node;
-             return lhs;
-         }
+            if(parser->peek(TokenType::RParenthesis)) break;
 
-         return node;
-     }*/
+            if(!parser->expect(r, &S_Comma)) return false;
+        }
+
+        parser->consume();
+
+        return true;
+    }
 
     void Parser::writeAstGraph(
         const filesystem::path& path, AstNode* programNode
@@ -371,13 +359,14 @@ namespace Ciallang::Syntax {
         if(!parser->peek(TokenType::Identifier)) return nullptr;
 
         Token identiter;
+        auto line = identiter.location;
         parser->current(identiter);
         parser->consume();
 
         if(parser->peek(TokenType::SemiColon)) {
             parser->consume();
             varDeclNode = parser->astBuilder()->makeVarDeclNode(std::move(identiter));
-            varDeclNode->location = identiter.location;
+            varDeclNode->location = line;
             return varDeclNode;
         }
 
@@ -403,6 +392,34 @@ namespace Ciallang::Syntax {
 
         return varDeclNode;
     }
+
+    DeclNode* FunctionDeclParser::parse(Result& r, Parser* parser, Token* token) const {
+        Token identitier{};
+        if(!parser->consume(identitier)) return nullptr;
+
+        auto* functionDeclNode = parser
+                                 ->astBuilder()
+                                 ->makeFunctionDeclNode(std::move(identitier));
+        if(!parseParameters(r, parser, functionDeclNode)) {
+            return nullptr;
+        }
+
+        if(!parser->peek(TokenType::LeftCurlyBrace)) {
+            parser->error(r, "function expect {", token->location);
+            return nullptr;
+        }
+
+        auto* body = dynamic_cast<BlockStmtNode*>(parser->parseStatement(r));
+
+        // unlikely
+        if(!body) return nullptr;
+
+        functionDeclNode->body = body;
+        functionDeclNode->location = body->location;
+
+        return functionDeclNode;
+    }
+
 
     StmtNode* BlockStmtParser::parse(
         Result& r, Parser* parser, Token* token

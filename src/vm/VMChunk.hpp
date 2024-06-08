@@ -21,7 +21,6 @@ namespace Ciallang::VM {
     enum class Opcode : uint8_t;
 
     class VMChunk : DataPool<uint8_t> {
-        friend class Interpreter;
 
     public:
         using DataPool::count;
@@ -51,7 +50,7 @@ namespace Ciallang::VM {
         // index from 0 start
         size_t addConstant(TjsValue&& val) {
             for(size_t i = 0; i < _valueArray.count(); i++) {
-                auto temp = _valueArray.dataPool[i];
+                const auto &temp = _valueArray.dataPool[i];
                 if(temp == val) return i;
             }
             _valueArray.writeData(std::move(val));
@@ -60,7 +59,7 @@ namespace Ciallang::VM {
 
         [[nodiscard]] const Rlc* rlc() const { return &_rlc; }
 
-        [[nodiscard]] uint8_t bytecodes(const uint8_t offset) const {
+        [[nodiscard]] uint8_t bytecodes(const size_t offset) const {
             return dataPool[offset];
         }
 
