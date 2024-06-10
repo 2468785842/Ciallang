@@ -49,3 +49,4 @@
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <fmt/color.h>
+#include <fmt/printf.h>

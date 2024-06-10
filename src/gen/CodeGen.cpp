@@ -125,18 +125,20 @@ namespace Ciallang::Inter {
     }
 
     void CodeGen::visit(const Syntax::ProcCallExprNode* node) {
-        node->memberAccess->accept(this);
+
+        for(const auto argument : node->arguments) {
+            argument->accept(this);
+        }
 
         CHECK_LE(node->arguments.size(), 255) << "arguments too many must <= 255";
         _chunks.back()->emit(VM::Opcode::Push, node->location, {
                 static_cast<uint8_t>(node->arguments.size())
         });
 
+        node->memberAccess->accept(this);
+
         _chunks.back()->emit(VM::Opcode::Call, node->location);
 
-        for(const auto argument : node->arguments) {
-            argument->accept(this);
-        }
     }
 
 

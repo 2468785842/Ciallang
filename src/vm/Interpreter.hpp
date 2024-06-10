@@ -16,9 +16,12 @@
 
 #include "VMChunk.hpp"
 #include "../common/ConstExpr.hpp"
-#include "../types/TjsValue.hpp"
 #include "../common/SourceFile.hpp"
+
+#include "../types/TjsValue.hpp"
 #include "../types/TjsFunction.hpp"
+
+#include "../types/TjsNativeFunction.hpp"
 
 #define STACK_MAX 256
 
@@ -84,9 +87,13 @@ namespace Ciallang::VM {
 
         TjsValue pop();
 
+        TjsValue* popArgs(size_t count);
+
         void putStack(size_t slot, TjsValue&& value);
 
         [[nodiscard]] const TjsValue& getStack(size_t slot) const;
+
+        void addNative(const TjsNativeFunction& nFun);
 
         void putGlobal(std::string&& key, TjsValue&& value);
 
@@ -103,15 +110,16 @@ namespace Ciallang::VM {
         }
 
         bool call(const TjsFunction* const fun) {
+            auto slot = _vm.sp - fun->arity();
 
             _vm.frames[++_vm.frameCount] = {
-                    fun->chunk().get(), 0, _vm.sp - 1, false
+                    fun->chunk().get(), 0, slot, false
             };
 
             // default parameter;
-            for(size_t i = 0; i < fun->parameters()->size(); i++) {
+            for(size_t i = 0; i < fun->arity(); i++) {
                 _vm.frames[++_vm.frameCount] = {
-                        fun->parameters()->at(i).get(), 0, _vm.sp + i - 1, true
+                        fun->parameters()->at(i).get(), 0, slot + i, true
                 };
             }
 

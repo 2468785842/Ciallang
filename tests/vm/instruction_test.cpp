@@ -20,6 +20,7 @@
 #include <parser/Parser.hpp>
 
 #include "common/SourceFile.hpp"
+#include "core/print.hpp"
 
 using namespace Ciallang::VM;
 
@@ -33,7 +34,6 @@ int main(int argc, char** argv) {
 }
 
 TEST(Instruction, op) {
-
 }
 
 TEST(Interpreter, Execute) {
@@ -46,11 +46,12 @@ TEST(Interpreter, Execute) {
     Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
     auto* globalNode = parser.parse(r);
 
-    Ciallang::Inter::CodeGen codeGen{ sourceFile};
+    Ciallang::Inter::CodeGen codeGen{ sourceFile };
     auto chunk = codeGen.parseAst(r, globalNode);
 
     Interpreter interpreter{ sourceFile, std::move(*chunk.release()) };
     // interpreter.dump();
+    interpreter.addNative(Ciallang::Core::S_PrintFunction);
+    interpreter.addNative(Ciallang::Core::S_PrintlnFunction);
     interpreter.run(r);
-
 }

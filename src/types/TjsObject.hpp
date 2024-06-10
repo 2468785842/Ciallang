@@ -16,13 +16,19 @@
 #include "TjsValue.hpp"
 
 namespace Ciallang {
+
     class TjsObject {
     public:
-        virtual ~TjsObject() = default;
+
+        virtual ~TjsObject() noexcept = default;
 
         [[nodiscard]] virtual std::string_view name() const noexcept = 0;
 
         [[nodiscard]] virtual std::unique_ptr<TjsObject> clone() const noexcept = 0;
+
+        [[nodiscard]] virtual bool isNative() const noexcept = 0;
+
+        [[nodiscard]] virtual size_t arity() const noexcept = 0;
     };
 
     template <>

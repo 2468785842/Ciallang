@@ -45,7 +45,6 @@ namespace Ciallang::VM {
                 return result;
             }
 
-            printStack();
         }
     }
 
@@ -99,6 +98,15 @@ namespace Ciallang::VM {
         return std::move(*--_vm.sp);
     }
 
+    TjsValue* Interpreter::popArgs(const size_t count) {
+        DCHECK_GE(
+            reinterpret_cast<std::uintptr_t>(_vm.sp - count),
+            reinterpret_cast<std::uintptr_t>(_vm.stack)
+        ) << "stack underflow! `popN` method";
+        _vm.sp -= count;
+        return _vm.sp;
+    }
+
     const TjsValue& Interpreter::getStack(const size_t slot) const {
         DCHECK_GE(slot, 0)
             << "stack underflow `getStack(slot)` method";
@@ -111,6 +119,10 @@ namespace Ciallang::VM {
 
     void Interpreter::putStack(const size_t slot, TjsValue&& value) {
         _vm.stack[slot] = std::move(value);
+    }
+
+    void Interpreter::addNative(const TjsNativeFunction& nFun) {
+        _vm.globals.emplace(nFun.name(), new TjsValue{ nFun });
     }
 
     void Interpreter::putGlobal(std::string&& key, TjsValue&& value) {

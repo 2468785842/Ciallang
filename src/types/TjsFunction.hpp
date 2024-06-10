@@ -47,12 +47,24 @@ namespace Ciallang {
         ): _defParameters(defParameters), _chunk(chunk), _name(name) {
         }
 
-        [[nodiscard]] std::string_view name() const noexcept override { return _name; }
+        [[nodiscard]] std::string_view name() const noexcept override {
+            return _name;
+        }
 
-        [[nodiscard]] const auto& chunk() const { return _chunk; }
+        [[nodiscard]] const auto& chunk() const {
+            return _chunk;
+        }
 
         [[nodiscard]] const DefParametersPtr& parameters() const noexcept {
             return _defParameters;
+        }
+
+        [[nodiscard]] size_t arity() const noexcept override {
+            return _defParameters->size();
+        }
+
+        [[nodiscard]] bool isNative() const noexcept override {
+            return false;
         }
 
         [[nodiscard]] std::unique_ptr<TjsObject> clone() const noexcept override {

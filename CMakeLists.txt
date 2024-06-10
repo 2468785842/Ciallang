@@ -41,7 +41,8 @@ set(SOURCE_FILES
         src/vm/Instruction.hpp
         src/vm/DataPool.hpp
 
-        src/types/TjsFunction.cpp
+        src/types/TjsNativeFunction.hpp
+        src/types/TjsFunction.hpp
         src/types/TjsOctet.cpp
         src/types/TjsString.cpp
         src/types/TjsObject.cpp
@@ -49,6 +50,8 @@ set(SOURCE_FILES
         src/types/TjsTypes.hpp
 
         src/init/GlogInit.hpp
+
+        src/core/print.hpp
 )
 add_executable(${PROJECT_NAME}
         src/main.cpp

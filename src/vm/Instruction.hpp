@@ -16,6 +16,7 @@
 #include "../common/ConstExpr.hpp"
 #include "Interpreter.hpp"
 #include "../types/TjsString.hpp"
+#include "types/TjsNativeFunction.hpp"
 
 namespace Ciallang::VM {
     enum class OpcodeMode : uint8_t {
@@ -271,7 +272,6 @@ constexpr auto S_##InsName##Ins = InsName##Ins()
 inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter) const
 
     EXECUTE(RetIns) {
-        interpreter->printStack();
 
         if(interpreter->isCallFrameTop()) {
             return InterpretResult::OK;
@@ -475,31 +475,42 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     }
 
     EXECUTE(CallIns) {
+        const auto value = interpreter->pop();
+
         auto argumentsCount = interpreter->pop().asInteger();
 
-        const auto fun = interpreter->pop();
 
-        auto* funPtr = dynamic_cast<TjsFunction*>(fun.asObject());
+        auto* obj = value.asObject();
 
-        if(funPtr == nullptr) {
-            r.error("is not function call error");
-            return InterpretResult::RUNTIME_ERROR;
+        // much more, pop
+        if(argumentsCount > obj->arity()) {
+            interpreter->popN(argumentsCount - obj->arity());
         }
 
-        auto parameters = funPtr->parameters()->size();
-
-        if(argumentsCount > parameters) {
-            interpreter->popN(argumentsCount - parameters);
-        }
-
-        if(argumentsCount < parameters) {
-            while(argumentsCount < funPtr->parameters()->size()) {
+        // much less, push void
+        if(argumentsCount < obj->arity()) {
+            while(argumentsCount < obj->arity()) {
                 interpreter->pushVoid();
                 ++argumentsCount;
             }
         }
 
-        interpreter->call(funPtr);
+        if(obj->isNative()) {
+            auto* nativeFun = dynamic_cast<TjsNativeFunction*>(obj);
+            auto* args = interpreter->popArgs(argumentsCount);
+            interpreter->push(nativeFun->callProc(args));
+
+            return InterpretResult::CONTINUE;
+        }
+
+        auto* fun = dynamic_cast<TjsFunction*>(obj);
+
+        if(fun == nullptr) {
+            r.error("is not function call error");
+            return InterpretResult::RUNTIME_ERROR;
+        }
+
+        interpreter->call(fun);
 
         return InterpretResult::CONTINUE;
     }
