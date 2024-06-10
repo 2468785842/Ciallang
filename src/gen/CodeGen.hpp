@@ -43,6 +43,7 @@ namespace Ciallang::Inter {
             for(auto local : _locals) {
                 delete local;
             }
+
             for(auto chunk : _chunks) {
                 delete chunk;
             }
@@ -58,13 +59,14 @@ namespace Ciallang::Inter {
             const Syntax::Token* token;
             const size_t depth;
             bool init;
+            size_t abs;
         };
 
         std::vector<Local*> _locals{};
 
         struct Loop {
-            const int16_t addr;
-            const size_t depth;
+            const int16_t addr{};
+            const size_t depth{};
             std::vector<int16_t> controls{}; // break or continue for this loop
         };
 
@@ -73,6 +75,8 @@ namespace Ciallang::Inter {
         // 1 is global scope
         size_t _scopeDepth{ 0 };
 
+        std::unique_ptr<VM::VMChunk> parseAstSegment(const Syntax::AstNode*);
+
         void visit(const Syntax::ValueExprNode*) override;
 
         void visit(const Syntax::SymbolExprNode*) override;
@@ -80,6 +84,8 @@ namespace Ciallang::Inter {
         void visit(const Syntax::BinaryExprNode*) override;
 
         void visit(const Syntax::UnaryExprNode*) override;
+
+        void visit(const Syntax::ProcCallExprNode*) override;
 
         void visit(const Syntax::AssignExprNode*) override;
 

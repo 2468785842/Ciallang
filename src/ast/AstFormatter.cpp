@@ -16,6 +16,9 @@
 
 #include "../types/TjsString.hpp"
 
+#include "../ast/DeclNode.hpp"
+#include "../ast/ExprNode.hpp"
+#include "../ast/StmtNode.hpp"
 
 namespace Ciallang::Syntax {
     AstFormatter::AstFormatter(AstNode* root, FILE* file)
@@ -124,12 +127,39 @@ namespace Ciallang::Syntax {
         );
     }
 
+    void AstFormatter::visit(const ProcCallExprNode* node) {
+        auto nodeVertexName = getVertexName(node);
+        std::set<std::string> edges;
+
+        std::string style = formatStyle("pink", "black", "record");
+        printNode(nodeVertexName,
+            fmt::format("<f0> lhs | <f1> {} | <f2> rhs", node->name()),
+            "", style
+        );
+        node->memberAccess->accept(this);
+        printEdge(nodeVertexName,
+            "f0", getVertexName(node->memberAccess), "f1"
+        );
+        for(auto argument : node->arguments) {
+            argument->accept(this);
+            edges.insert(getVertexName(argument));
+        }
+        int index = 0;
+        for(const auto& edge : edges)
+            fmt::print(_file,
+                "\t{}:f2 -> {}:f1 [label=\"[{:02}]\"];\n",
+                nodeVertexName, edge, index++
+            );
+        fmt::print(_file, "\n");
+    }
+
+
     void AstFormatter::visit(const AssignExprNode* node) {
         assert(node->lhs != nullptr && node->rhs != nullptr);
 
         visitBinaryUnaryNode(
             getVertexName(node),
-            "<f0> lhs|<f1> {}|<f2> rhs", node->name(),
+            "<f0> lhs|<f1> {}|<f2> rhs", std::string{ node->name() },
             "f0", node->lhs, "f2", node->rhs
         );
     }
@@ -216,7 +246,7 @@ namespace Ciallang::Syntax {
 
     void AstFormatter::visit(const FunctionDeclNode* node) {
         auto nodeVertexName = getVertexName(node);
-        std::string details = fmt::format("|<f0> lhs |<f1> {} |<f2> rhs", node->name());
+        std::string details = fmt::format("<f0> lhs |<f1> {} |<f2> rhs", node->name());
         std::string style = formatStyle(""
             "lightcyan", "black", "record"
         );

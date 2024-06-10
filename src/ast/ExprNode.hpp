@@ -17,42 +17,35 @@
 
 namespace Ciallang::Syntax {
     class ExprNode : public AstNode {
+    protected:
         using AstNode::AstNode;
     };
 
-    class ValueExprNode : public ExprNode {
+    class ValueExprNode final : public ExprNode {
     public:
         ValueExprNode() = delete;
 
-        explicit ValueExprNode(Token& token) : ExprNode(token) {
+        explicit ValueExprNode(Token& token) : ExprNode(token, "value") {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "value";
-        }
     };
 
-    class SymbolExprNode : public ExprNode {
+    class SymbolExprNode final : public ExprNode {
     public:
         SymbolExprNode() = delete;
 
-        explicit SymbolExprNode(Token& token) : ExprNode(token) {
+        explicit SymbolExprNode(Token& token) : ExprNode(token, "symbol") {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "symbol";
-        }
     };
 
-    class BinaryExprNode : public ExprNode {
+    class BinaryExprNode final : public ExprNode {
     public:
         const ExprNode* lhs;
         const ExprNode* rhs;
@@ -63,7 +56,7 @@ namespace Ciallang::Syntax {
             Token& token,
             const ExprNode* lhs,
             const ExprNode* rhs
-        ) : ExprNode(token), lhs(lhs), rhs(rhs) {
+        ) : ExprNode(token, "binary_operator"), lhs(lhs), rhs(rhs) {
             location.start(lhs->location.start());
             location.end(rhs->location.end());
         }
@@ -71,13 +64,25 @@ namespace Ciallang::Syntax {
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
+    };
 
-        [[nodiscard]] const char* name() const noexcept override {
-            return "binary_operator";
+    class ProcCallExprNode final : public ExprNode {
+    public:
+        const ExprNode* memberAccess;
+        std::vector<ExprNode*> arguments{};
+
+        explicit ProcCallExprNode(
+            const ExprNode* memberAccess
+        ): ExprNode("call"), memberAccess(memberAccess) {
+            location = memberAccess->location;
+        }
+
+        void accept(Visitor* visitor) const override {
+            visitor->visit(this);
         }
     };
 
-    class UnaryExprNode : public ExprNode {
+    class UnaryExprNode final : public ExprNode {
     public:
         const ExprNode* rhs;
 
@@ -86,20 +91,16 @@ namespace Ciallang::Syntax {
         explicit UnaryExprNode(
             Token& token,
             const ExprNode* rhs
-        ) : ExprNode(token), rhs(rhs) {
+        ) : ExprNode(token, "unary_operator"), rhs(rhs) {
             location.end(rhs->location.end());
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "unary_operator";
-        }
     };
 
-    class AssignExprNode : public ExprNode {
+    class AssignExprNode final : public ExprNode {
     public:
         const SymbolExprNode* lhs;
         const ExprNode* rhs;
@@ -109,17 +110,13 @@ namespace Ciallang::Syntax {
         explicit AssignExprNode(
             const SymbolExprNode* lhs,
             const ExprNode* rhs
-        ) : lhs(lhs), rhs(rhs) {
+        ) : ExprNode("assignment_expression"), lhs(lhs), rhs(rhs) {
             location.start(lhs->location.start());
             location.end(rhs->location.end());
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
-        }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "assignment_expression";
         }
     };
 }

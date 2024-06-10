@@ -12,7 +12,6 @@
  *
  */
 #include <gen/CodeGen.hpp>
-#include <gtest/gtest-spi.h>
 #include <gtest/gtest.h>
 
 #include <vm/Instruction.hpp>

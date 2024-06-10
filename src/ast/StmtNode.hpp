@@ -16,48 +16,42 @@
 
 namespace Ciallang::Syntax {
     class StmtNode : public AstNode {
+    protected:
+        using AstNode::AstNode;
     };
 
-    class BlockStmtNode : public StmtNode {
+    class BlockStmtNode final : public StmtNode {
     public:
         DeclNodeList childrens;
 
         BlockStmtNode() = delete;
 
-        explicit BlockStmtNode(const char* name) : _name(name) {
+        explicit BlockStmtNode(std::string&& name) : StmtNode(std::move(name)) {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
 
-        [[nodiscard]] const char* name() const noexcept override {
-            return _name;
-        }
-
-    private:
-        const char* _name;
     };
 
-    class ExprStmtNode : public StmtNode {
+    class ExprStmtNode final : public StmtNode {
     public:
         const ExprNode* expression;
 
         ExprStmtNode() = delete;
 
-        explicit ExprStmtNode(const ExprNode* expr): expression(expr) {
+        explicit ExprStmtNode(const ExprNode* expr):
+            StmtNode("expression_statement"),
+            expression(expr) {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "expression_statement";
-        }
     };
 
-    class IfStmtNode : public StmtNode {
+    class IfStmtNode final : public StmtNode {
     public:
         const ExprNode* test;
         const BlockStmtNode* body;
@@ -68,19 +62,15 @@ namespace Ciallang::Syntax {
         explicit IfStmtNode(
             const ExprNode* test,
             const BlockStmtNode* body
-        ) : test(test), body(body) {
+        ) : StmtNode("if_statement"), test(test), body(body) {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "if_statement";
-        }
     };
 
-    class WhileStmtNode : public StmtNode {
+    class WhileStmtNode final : public StmtNode {
     public:
         const ExprNode* test;
         const BlockStmtNode* body;
@@ -90,41 +80,31 @@ namespace Ciallang::Syntax {
         explicit WhileStmtNode(
             const ExprNode* test,
             const BlockStmtNode* body
-        ): test(test), body(body) {
+        ): StmtNode("while_statement"), test(test), body(body) {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "while_statement";
-        }
     };
 
-    class BreakStmtNode : public StmtNode {
+    class BreakStmtNode final : public StmtNode {
     public:
-        BreakStmtNode() = default;
+        BreakStmtNode() : StmtNode("break_statement") {
+        }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "break_statement";
-        }
     };
 
-   class ContinueStmtNode : public StmtNode {
-   public:
-       ContinueStmtNode() = default;
+    class ContinueStmtNode final : public StmtNode {
+    public:
+        ContinueStmtNode() : StmtNode("continue_statement") {
+        }
 
-       void accept(Visitor* visitor) const override {
-           visitor->visit(this);
-       }
-
-       [[nodiscard]] const char * name() const noexcept override {
-           return "continue_statement";
-       }
-   };
+        void accept(Visitor* visitor) const override {
+            visitor->visit(this);
+        }
+    };
 }

@@ -20,8 +20,8 @@ namespace Ciallang::VM {
     Interpreter::Interpreter(Common::SourceFile& sourceFile, VMChunk&& chunk)
         : _main(new TjsFunction{ std::move(chunk), "main" }),
           _sourceFile(sourceFile) {
-        _vm.frames[0] = new VM::CallFrame{
-                .function = _main,
+        _vm.frames[0] = CallFrame{
+                .vmChunk = _main->chunk().get(),
                 .ip = 0,
                 .slots = _vm.stack
         };
@@ -29,7 +29,7 @@ namespace Ciallang::VM {
 
     InterpretResult Interpreter::run(Common::Result& r) {
         for(;;) {
-            auto opcode = static_cast<Opcode>(chunk().bytecodes(callFrame()->ip));
+            auto opcode = static_cast<Opcode>(chunk()->bytecodes(callFrame().ip));
 
             const auto* ins = Instruction::instance(opcode);
 
@@ -40,6 +40,8 @@ namespace Ciallang::VM {
             auto result = ins->execute(r, this);
             if(result != InterpretResult::CONTINUE) {
                 LOG(INFO) << "VM return";
+
+                printGlobal();
                 return result;
             }
 
@@ -47,17 +49,15 @@ namespace Ciallang::VM {
         }
     }
 
-    uint8_t Interpreter::readByte() const {
-        return chunk().bytecodes(callFrame()->ip++);
+    uint8_t Interpreter::readByte() {
+        return chunk()->bytecodes(_vm.frames[_vm.frameCount].ip++);
     }
 
-    // TODO: 返回的将亡值
-    TjsValue Interpreter::readConstant(const size_t index) const {
-        return chunk().constants(index);
+    const TjsValue& Interpreter::readConstant(const size_t index) const {
+        return chunk()->constants(index);
     }
 
-    // TODO: 返回的将亡值
-    TjsValue Interpreter::peek(const size_t distance) const {
+    const TjsValue& Interpreter::peek(const size_t distance) const {
         DCHECK_GE(
             _vm.sp - _vm.stack - static_cast<intptr_t>(distance) - 1, 0
         ) << "stack underflow `peek(distance)` method";
@@ -66,37 +66,37 @@ namespace Ciallang::VM {
             _vm.sp - _vm.stack - static_cast<intptr_t>(distance) - 1, STACK_MAX - 1
         ) << "stack overflow `peek(distance)` method";
 
-        return _vm.sp[distance - 1]; // sp not stack start
+        return _vm.sp[distance - 1];
     }
 
     void Interpreter::pushVoid() {
         DCHECK_LE(_vm.sp - _vm.stack+ 1, STACK_MAX - 1)
             << "stack overflow `push(value)` method";
-        *++_vm.sp = TjsValue{};
+        *_vm.sp++ = TjsValue{};
     }
 
-    void Interpreter::push(TjsValue value) {
+    void Interpreter::push(TjsValue&& value) {
         DCHECK_LE(
             _vm.sp - _vm.stack + 1, STACK_MAX - 1
         ) << "stack overflow `push(value)` method";
         *_vm.sp++ = std::move(value);
     }
 
-    const TjsValue& Interpreter::popN(const size_t n) {
+    TjsValue Interpreter::popN(const size_t n) {
         DCHECK_GE(
             reinterpret_cast<std::uintptr_t>(_vm.sp - n),
             reinterpret_cast<std::uintptr_t>(_vm.stack)
         ) << "stack underflow! `popN` method";
         _vm.sp -= n;
-        return *_vm.sp;
+        return std::move(*_vm.sp);
     }
 
-    const TjsValue& Interpreter::pop() {
+    TjsValue Interpreter::pop() {
         DCHECK_GE(
             reinterpret_cast<std::uintptr_t>(_vm.sp - 1),
             reinterpret_cast<std::uintptr_t>(_vm.stack)
         ) << "stack underflow! `pop` method";
-        return *--_vm.sp;
+        return std::move(*--_vm.sp);
     }
 
     const TjsValue& Interpreter::getStack(const size_t slot) const {
@@ -156,15 +156,15 @@ namespace Ciallang::VM {
         }
     }
 
-    void Interpreter::dump() const {
-        const auto* rlc = chunk().rlc();
+    void Interpreter::dump() {
+        const auto* rlc = chunk()->rlc();
 
         #define RLC_NAME_LEN (rlc->name().length() < 35 ? 35 - rlc->name().length() : 35)
         #define RLC_NAME (RLC_NAME_LEN == 35 ? "-" : rlc->name())
 
         fmt::println("{0:-^{1}}", ' ' + RLC_NAME + ' ', RLC_NAME_LEN);
 
-        while(ip() < chunk().count()) {
+        while(ip() < chunk()->count()) {
             auto op = static_cast<Opcode>(readByte());
             const auto* ins = Instruction::instance(op);
             fmt::println("{}", ins->disassemble(this));

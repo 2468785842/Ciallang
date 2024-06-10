@@ -17,10 +17,11 @@
 
 namespace Ciallang::Syntax {
     class DeclNode : public AstNode {
+    protected:
         using AstNode::AstNode;
     };
 
-    class VarDeclNode : public DeclNode {
+    class VarDeclNode final : public DeclNode {
     public:
         const ExprStmtNode* rhs;
 
@@ -28,53 +29,44 @@ namespace Ciallang::Syntax {
 
         explicit VarDeclNode(
             Token& token, const ExprStmtNode* rhs
-        ) : DeclNode(token), rhs(rhs) {
+        ) : DeclNode(token, "var_declaration"), rhs(rhs) {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "var_declaration";
-        }
     };
 
-    class FunctionDeclNode : public DeclNode {
+    class FunctionDeclNode final : public DeclNode {
     public:
         BlockStmtNode* body{ nullptr };
         // name, default value
-        std::vector<ExprNode*> parameters{};
+        std::vector<std::pair<Token, ExprNode*>> parameters{};
 
         FunctionDeclNode() = delete;
 
-        explicit FunctionDeclNode(Token& token): DeclNode(token) {
+        explicit FunctionDeclNode(Token& token):
+            DeclNode(token, "function_declaration") {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "function_declaration";
-        }
     };
 
-    class StmtDeclNode : public DeclNode {
+    class StmtDeclNode final : public DeclNode {
     public:
         const StmtNode* statement;
 
         StmtDeclNode() = delete;
 
-        explicit StmtDeclNode(const StmtNode* stmtNode): statement(stmtNode) {
+        explicit StmtDeclNode(const StmtNode* stmtNode):
+            DeclNode("statement_declaration"),
+            statement(stmtNode) {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
-        }
-
-        [[nodiscard]] const char* name() const noexcept override {
-            return "statement_declaration";
         }
     };
 }

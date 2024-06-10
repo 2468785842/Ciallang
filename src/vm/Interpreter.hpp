@@ -13,13 +13,12 @@
  */
 #pragma once
 
-#include <ranges>
 
 #include "VMChunk.hpp"
 #include "../common/ConstExpr.hpp"
 #include "../types/TjsValue.hpp"
 #include "../common/SourceFile.hpp"
-#include "types/TjsFunction.hpp"
+#include "../types/TjsFunction.hpp"
 
 #define STACK_MAX 256
 
@@ -31,6 +30,13 @@ namespace Ciallang::VM {
         CONTINUE,      // 继续解释
         COMPILE_ERROR, // 编译错误
         RUNTIME_ERROR  // 运行错误
+    };
+
+    struct CallFrame {
+        const VMChunk* vmChunk;
+        size_t ip;
+        TjsValue* slots;
+        bool sub;
     };
 
     class Interpreter {
@@ -46,37 +52,37 @@ namespace Ciallang::VM {
             Common::Result& r,
             const std::string& message) const {
             _sourceFile.error(r, message,
-                chunk().rlc()->find(
-                    chunk().bytecodes(callFrame()->ip)
+                chunk()->rlc()->find(
+                    chunk()->bytecodes(callFrame().ip)
                 )
             );
         }
 
-        void ip(const int16_t absIdx) const noexcept {
-            callFrame()->ip += absIdx;
+        void ip(const int16_t relativeIdx) noexcept {
+            _vm.frames[_vm.frameCount].ip += relativeIdx;
         }
 
         [[nodiscard]] size_t ip() const noexcept {
-            return callFrame()->ip;
+            return callFrame().ip;
         }
 
-        [[nodiscard]] const VMChunk& chunk() const {
-            return callFrame()->function->chunk();
+        [[nodiscard]] const VMChunk* chunk() const {
+            return callFrame().vmChunk;
         }
 
-        [[nodiscard]] uint8_t readByte() const;
+        [[nodiscard]] uint8_t readByte();
 
-        [[nodiscard]] TjsValue readConstant(size_t index) const;
+        [[nodiscard]] const TjsValue& readConstant(size_t index) const;
 
-        [[nodiscard]] TjsValue peek(size_t distance) const;
+        [[nodiscard]] const TjsValue& peek(size_t distance) const;
 
         void pushVoid();
 
-        void push(TjsValue value);
+        void push(TjsValue&& value);
 
-        const TjsValue& popN(size_t n);
+        TjsValue popN(size_t n);
 
-        const TjsValue& pop();
+        TjsValue pop();
 
         void putStack(size_t slot, TjsValue&& value);
 
@@ -96,26 +102,31 @@ namespace Ciallang::VM {
             delete _main;
         }
 
-    private:
-        TjsFunction* _main;
-        Common::SourceFile& _sourceFile;
+        bool call(const TjsFunction* const fun) {
 
-        struct VM {
-            std::unordered_map<std::string, TjsValue*> globals{};
-
-            struct CallFrame {
-                TjsFunction* function;
-                size_t ip;
-                TjsValue* slots;
+            _vm.frames[++_vm.frameCount] = {
+                    fun->chunk().get(), 0, _vm.sp - 1, false
             };
 
-            CallFrame* frames[64];
-            size_t frameCount{ 0 };
-            TjsValue stack[STACK_MAX];
-            TjsValue* sp = stack;
-        } _vm{};
+            // default parameter;
+            for(size_t i = 0; i < fun->parameters()->size(); i++) {
+                _vm.frames[++_vm.frameCount] = {
+                        fun->parameters()->at(i).get(), 0, _vm.sp + i - 1, true
+                };
+            }
 
-        [[nodiscard]] VM::CallFrame* callFrame() const {
+            return true;
+        }
+
+        void resovleParameter(TjsValue&& val) const {
+            if(_vm.frames[_vm.frameCount].slots->type() == TjsValueType::Void) {
+                *_vm.frames[_vm.frameCount].slots = std::move(val);
+            }
+        }
+
+        [[nodiscard]] bool isSubCallFrame() const { return callFrame().sub; }
+
+        [[nodiscard]] const CallFrame& callFrame() const {
             DCHECK_GE(_vm.frameCount, 0) << "call frames underflow";
             return _vm.frames[_vm.frameCount];
         }
@@ -124,16 +135,29 @@ namespace Ciallang::VM {
 
         [[nodiscard]] bool isCallFrameTop() const { return _vm.frameCount == 0; }
 
+    private:
+        TjsFunction* _main;
+        Common::SourceFile& _sourceFile;
+
+        struct {
+            std::unordered_map<std::string, TjsValue*> globals{};
+
+            CallFrame frames[64];
+            size_t frameCount{ 0 };
+            TjsValue stack[STACK_MAX];
+            TjsValue* sp = stack;
+        } _vm{};
+
     public:
         [[nodiscard]] std::string disassembleLine() const {
             auto& [line, column] =
-                    chunk().rlc()->find(ip()).start();
+                    chunk()->rlc()->find(ip()).start();
 
-            return !chunk().rlc()->firstAppear(ip())
+            return !chunk()->rlc()->firstAppear(ip())
                    ? fmt::format("{: <14}", fmt::format("@{}:{}", line + 1, column + 1))
                    : fmt::format("{: <14}", "~");
         }
 
-        void dump() const;
+        void dump();
     };
 }

@@ -16,6 +16,7 @@
 
 #include "ExprNode.hpp"
 #include "StmtNode.hpp"
+#include "DeclNode.hpp"
 
 namespace Ciallang::Syntax {
     BlockStmtNode* AstBuilder::popScope() {
@@ -100,6 +101,10 @@ namespace Ciallang::Syntax {
 
     UnaryExprNode* AstBuilder::makeUnaryExprNode(Token&& op, const ExprNode* rhs) {
         return makeNode<UnaryExprNode>(op, rhs);
+    }
+
+    ProcCallExprNode* AstBuilder::makeProcCallExprNode(const ExprNode* lhs) {
+        return makeNode<ProcCallExprNode>(lhs);
     }
 
     AssignExprNode* AstBuilder::makeAssignExprNode(const SymbolExprNode* lhs, const ExprNode* rhs) {

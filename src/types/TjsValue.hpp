@@ -16,7 +16,7 @@
 
 namespace Ciallang {
     class TjsValue {
-        template <Common::Name, bool>
+        template <Common::Name>
         friend struct MakeTjsValueHelper;
 
     public:
@@ -183,6 +183,21 @@ namespace Ciallang {
 
     template <>
     inline void TjsRealHelper::destroy(TjsValue&) const {
+        // nothing to do
+    }
+
+    template <>
+    inline void TjsVoidHelper::copy(const TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+    }
+
+    template <>
+    inline void TjsVoidHelper::move(TjsValue& src, TjsValue& dest) const {
+        dest._type = src._type;
+    }
+
+    template <>
+    inline void TjsVoidHelper::destroy(TjsValue&) const {
         // nothing to do
     }
 } // namespace Ciallang

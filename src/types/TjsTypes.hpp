@@ -47,30 +47,24 @@ namespace Ciallang {
         [[nodiscard]] virtual const char* name() const = 0;
     };
 
-    template <Common::Name NAME, bool DefaultImpl = false>
+    template <Common::Name NAME>
     struct MakeTjsValueHelper : TjsValueHelper {
         void copy(const TjsValue&, TjsValue&) const override {
-            if constexpr(!DefaultImpl) {
                 LOG(FATAL)
                         << "not implement function `copy` with type "
                         << _name;
-            }
         }
 
         void move(TjsValue&, TjsValue&) const override {
-            if constexpr(!DefaultImpl) {
                 LOG(FATAL)
                         << "not implement function `move` with type "
                         << _name;
-            }
         }
 
         void destroy(TjsValue&) const override {
-            if constexpr(!DefaultImpl) {
                 LOG(FATAL)
                         << "not implement function `destory` with type "
                         << _name;
-            }
         }
 
         [[nodiscard]] const char* name() const final {
@@ -81,13 +75,14 @@ namespace Ciallang {
         const char* _name = NAME.value;
     };
 
+    using TjsVoidHelper = MakeTjsValueHelper<Common::Name("void")>;
     using TjsRealHelper = MakeTjsValueHelper<Common::Name("real")>;
     using TjsIntegerHelper = MakeTjsValueHelper<Common::Name("integer")>;
     using TjsStringHelper = MakeTjsValueHelper<Common::Name("string")>;
     using TjsOctetHelper = MakeTjsValueHelper<Common::Name("octet")>;
     using TjsObjectHelper = MakeTjsValueHelper<Common::Name("object")>;
 
-    static constexpr MakeTjsValueHelper<Common::Name("void"), true> S_TjsVoidHelper{};
+    static constexpr TjsVoidHelper S_TjsVoidHelper{};
 
     static constexpr TjsIntegerHelper S_TjsIntegerHelper{};
     static constexpr TjsRealHelper S_TjsRealHelper{};
@@ -113,4 +108,5 @@ namespace Ciallang {
         }
         return it->second;
     }
+
 }

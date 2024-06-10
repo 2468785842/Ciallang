@@ -31,6 +31,8 @@ namespace Ciallang::Syntax {
 
     class UnaryExprNode;
 
+    class ProcCallExprNode;
+
     class AssignExprNode;
 
     class BlockStmtNode;
@@ -54,16 +56,22 @@ namespace Ciallang::Syntax {
     using DeclNodeList = std::vector<DeclNode*>;
 
     class AstNode {
+    protected:
+        explicit AstNode(std::string&& name) : _name(std::move(name)) {
+        }
+
+        explicit AstNode(
+            Token& token, std::string&& name
+        ) : token(new Token{ std::move(token) }), _name(std::move(name)) {
+            location = this->token->location;
+        }
+
     public:
         struct Visitor;
 
-        const Token* token{ nullptr };
+        const std::unique_ptr<Token> token{ nullptr };
 
-        explicit AstNode() = default;
-
-        explicit AstNode(Token& token) : token(new Token{ std::move(token) }) {
-            location = this->token->location;
-        }
+        AstNode() = delete;
 
         // just for Gen Graphviz used
         const uint64_t id = serialId++;
@@ -72,12 +80,15 @@ namespace Ciallang::Syntax {
 
         virtual void accept(Visitor* visitor) const = 0;
 
-        [[nodiscard]] virtual constexpr const char* name() const noexcept = 0;
+        [[nodiscard]] std::string_view name() const noexcept {
+            return _name;
+        };
 
-        virtual ~AstNode() noexcept { delete token; }
+        virtual ~AstNode() = default;
 
     private:
         static inline uint64_t serialId = 0;
+        const std::string _name{};
     };
 
     struct AstNode::Visitor {
@@ -96,6 +107,8 @@ namespace Ciallang::Syntax {
         virtual void visit(const BinaryExprNode*) = 0;
 
         virtual void visit(const UnaryExprNode*) = 0;
+
+        virtual void visit(const ProcCallExprNode*) = 0;
 
         virtual void visit(const AssignExprNode*) = 0;
 

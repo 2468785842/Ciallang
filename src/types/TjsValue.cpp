@@ -50,32 +50,32 @@ namespace Ciallang {
 
     TjsInteger TjsValue::asInteger() const {
         CHECK(this->_type == TjsValueType::Integer)
-        << "is not integer" << "is " << name();
+        << "is not integer " << "is " << name();
         return _value._integer;
     }
 
     TjsReal TjsValue::asReal() const {
         CHECK(this->_type == TjsValueType::Real)
-        << "is not real" << "is " << name();
+        << "is not real " << "is " << name();
         return _value._real;
     }
 
     TjsString* TjsValue::asString() const {
         CHECK(this->_type == TjsValueType::String)
-        << "is not string" << "is " << name();
+        << "is not string " << "is " << name();
         return _value._string;
     }
 
     TjsOctet* TjsValue::asOctet() const {
         CHECK(this->_type == TjsValueType::Octet)
-        << "is not octet" << "is " << name();
+        << "is not octet " << "is " << name();
         return _value._octet;
     }
 
 
     TjsObject* TjsValue::asObject() const {
         CHECK(_type == TjsValueType::Object)
-        << "is not object" << "is " << name();
+        << "is not object " << "is " << name();
         return _value._object;
     }
 
@@ -99,7 +99,7 @@ namespace Ciallang {
             case TjsValueType::Real:
                 return asReal() == tjsValue.asReal();
             case TjsValueType::String:
-                return asString() == tjsValue.asString();
+                return *asString() == *tjsValue.asString();
             case TjsValueType::Object:
             // return asObject() == asObject();
             case TjsValueType::Octet:
@@ -117,7 +117,7 @@ namespace Ciallang {
             case TjsValueType::Real:
                 return os << d.asReal();
             case TjsValueType::String:
-                return os << d.asString();
+                return os << *d.asString();
             case TjsValueType::Octet:
                 throw std::logic_error("not support");
             case TjsValueType::Object:

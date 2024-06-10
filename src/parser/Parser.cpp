@@ -18,6 +18,7 @@
 
 #include "../ast/ExprNode.hpp"
 #include "../ast/StmtNode.hpp"
+#include "../ast/DeclNode.hpp"
 
 namespace Ciallang::Syntax {
     using namespace Common;
@@ -35,34 +36,68 @@ namespace Ciallang::Syntax {
         return node;
     }
 
-    // static bool parseArguments(Result &r, Parser* parser, );
+    static bool parseArguments(Result& r, Parser* parser, ProcCallExprNode* node) {
+        // a(,) -> a(void, void)
+
+        while(!parser->peek(TokenType::RParenthesis)) {
+            if(parser->peek(TokenType::Comma)) {
+                parser->consume();
+                node->arguments.push_back(parser->astBuilder()
+                                                       ->makeValueExprNode(Token{}));
+
+                if(parser->peek(TokenType::RParenthesis)) {
+                    node->arguments.push_back(parser->astBuilder()
+                                                           ->makeValueExprNode(Token{}));
+                }
+                continue;
+            }
+            auto* expr = parser->parseExpression(r);
+            if(!expr) return false;
+            node->arguments.push_back(expr);
+        }
+
+        return true;
+    }
 
     static bool parseParameters(Result& r, Parser* parser, FunctionDeclNode* funNode) {
         if(!parser->expect(r, &S_LParenthesis)) return false;
 
-        for(;;) {
-            if(!parser->peek(TokenType::Identifier)) return false;
+        if(parser->peek(TokenType::RParenthesis)) {
+            parser->consume();
+            return true;
+        }
 
-            Token token{};
-            parser->current(token);
+        for(;;) {
+            if(!parser->peek(TokenType::Identifier)) {
+                parser->error(r,
+                    "function parameter expect a identitier",
+                    funNode->location);
+                return false;
+            }
+            Token identiter{};
+            parser->current(identiter);
+            parser->consume();
+
 
             // default value
             ExprNode* expr = nullptr;
             if(parser->peek(TokenType::Assignment)) {
+                parser->consume();
                 Token assgnmentToken{};
                 parser->current(assgnmentToken);
                 expr = parser->parseExpression(r);
                 if(!expr) return false;
             }
 
-            funNode->parameters.push_back(expr);
+            funNode->parameters.emplace_back(identiter, expr);
 
-            if(parser->peek(TokenType::RParenthesis)) break;
+            if(parser->peek(TokenType::RParenthesis)) {
+                parser->consume();
+                break;
+            }
 
             if(!parser->expect(r, &S_Comma)) return false;
         }
-
-        parser->consume();
 
         return true;
     }
@@ -195,7 +230,7 @@ namespace Ciallang::Syntax {
         }
     }
 
-    StmtNode* Parser::parse(Result& r) {
+    AstNode* Parser::parse(Result& r) {
         auto* global = _astBuilder.beginScope();
         parseScope(r, global);
         return _astBuilder.endScope();
@@ -400,8 +435,14 @@ namespace Ciallang::Syntax {
         auto* functionDeclNode = parser
                                  ->astBuilder()
                                  ->makeFunctionDeclNode(std::move(identitier));
-        if(!parseParameters(r, parser, functionDeclNode)) {
-            return nullptr;
+
+        // it's ok
+        // function a {
+        // }
+        if(parser->peek(TokenType::LParenthesis)) {
+            if(!parseParameters(r, parser, functionDeclNode)) {
+                return nullptr;
+            }
         }
 
         if(!parser->peek(TokenType::LeftCurlyBrace)) {
@@ -411,7 +452,6 @@ namespace Ciallang::Syntax {
 
         auto* body = dynamic_cast<BlockStmtNode*>(parser->parseStatement(r));
 
-        // unlikely
         if(!body) return nullptr;
 
         functionDeclNode->body = body;
@@ -581,6 +621,32 @@ namespace Ciallang::Syntax {
 
         return parser->astBuilder()->makeAssignExprNode(symbolExprNode, rhs);
     }
+
+    ExprNode* ProcCallInfixParser::parse(Result& r, Parser* parser,
+                                         ExprNode* lhs, Token* token) const {
+        // check
+        if(!dynamic_cast<SymbolExprNode*>(lhs)) {
+            if(auto binaryExprNode = dynamic_cast<BinaryExprNode*>(lhs);
+                !binaryExprNode || *binaryExprNode->token != S_Dot) {
+                parser->error(r,
+                    "proc call expect '.' or identitier",
+                    token->location);
+                return nullptr;
+            }
+        }
+        auto procCallExprNode = parser->astBuilder()->makeProcCallExprNode(lhs);
+
+        if(!parser->peek(TokenType::RParenthesis)) {
+            if(!parseArguments(r, parser, procCallExprNode)) {
+                return nullptr;
+            }
+        }
+
+        if(!parser->expect(r, &S_RParenthesis)) return nullptr;
+
+        return procCallExprNode;
+    }
+
 
     ExprNode* ConstValPrefixParser::parse(Result&, Parser* parser, Token* token) const {
         return parser->astBuilder()->makeValueExprNode(std::move(*token));

@@ -108,7 +108,7 @@ namespace Ciallang::Syntax {
 
         void synchronize();
 
-        StmtNode* parse(Result&);
+        AstNode* parse(Result&);
 
         void parseScope(Result&, BlockStmtNode*, TokenType = TokenType::EndOfFile);
 
@@ -304,9 +304,8 @@ namespace Ciallang::Syntax {
         }
 
 
-        ExprNode* parse(
-            Result& r, Parser* parser,
-            ExprNode* lhs, Token* token) const override;
+        ExprNode* parse(Result& r, Parser* parser,
+                        ExprNode* lhs, Token* token) const override;
 
         [[nodiscard]] constexpr Precedence precedence() const override {
             return _precedence;
@@ -316,6 +315,17 @@ namespace Ciallang::Syntax {
         const Precedence _precedence;
         const bool _withAssignment;
         const bool _isRightAssociative;
+    };
+
+    struct ProcCallInfixParser final : InfixParser {
+        constexpr explicit ProcCallInfixParser() = default;
+
+        ExprNode* parse(Result& r, Parser* parser,
+                        ExprNode* lhs, Token* token) const override;
+
+        [[nodiscard]] constexpr Precedence precedence() const override {
+            return Precedence::call;
+        }
     };
 
     static constexpr BinaryOperatorInfixParser
@@ -331,6 +341,8 @@ namespace Ciallang::Syntax {
             S_LogicalOrBinOpParser{ Precedence::logical_or, false },
             S_LogicalAndBinOpParser{ Precedence::logical_and, false },
             S_MemberAccessBinOpParser{ Precedence::postfix, false };
+
+    static constexpr ProcCallInfixParser S_ProcCallInfixParser{};
 
     static constexpr auto S_InfixParsers =
             frozen::make_unordered_map<TokenType, const InfixParser*>({
@@ -375,5 +387,6 @@ namespace Ciallang::Syntax {
                     { TokenType::LogicalOr, &S_LogicalOrBinOpParser },            // ||
                     //            {TokenType::Question,         &S_ConditionalTernaryBinOpParser}, // cond ? expr : expr
                     { TokenType::Dot, &S_MemberAccessBinOpParser },
+                    { TokenType::LParenthesis, &S_ProcCallInfixParser }
             });
 }

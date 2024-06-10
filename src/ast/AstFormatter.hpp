@@ -95,6 +95,8 @@ namespace Ciallang::Syntax {
 
         void visit(const AssignExprNode*) override;
 
+        void visit(const ProcCallExprNode*) override;
+
         void visit(const BlockStmtNode*) override;
 
         void visit(const ExprStmtNode*) override;

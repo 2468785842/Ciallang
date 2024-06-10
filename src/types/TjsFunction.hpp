@@ -14,15 +14,15 @@
 #pragma once
 
 #include "TjsObject.hpp"
-#include "vm/VMChunk.hpp"
+#include "../vm/VMChunk.hpp"
 
 namespace Ciallang {
     class TjsFunction final : public TjsObject {
-        using DefParameters = std::vector<VM::VMChunk>;
-        using DefParametersPtr = std::shared_ptr<DefParameters>;
-        using VMChunkPtr = std::shared_ptr<VM::VMChunk>;
-
     public:
+        using VMChunkPtr = std::shared_ptr<VM::VMChunk>;
+        using DefParameters = std::vector<std::unique_ptr<VM::VMChunk>>;
+        using DefParametersPtr = std::shared_ptr<DefParameters>;
+
         TjsFunction() = delete;
 
         explicit TjsFunction(
@@ -39,6 +39,7 @@ namespace Ciallang {
            _chunk(std::make_shared<VM::VMChunk>(std::move(chunk))), _name(name) {
         }
 
+        // clone
         explicit TjsFunction(
             const DefParametersPtr& defParameters,
             const VMChunkPtr& chunk,
@@ -48,7 +49,11 @@ namespace Ciallang {
 
         [[nodiscard]] std::string_view name() const noexcept override { return _name; }
 
-        [[nodiscard]] const VM::VMChunk& chunk() const { return *_chunk; }
+        [[nodiscard]] const auto& chunk() const { return _chunk; }
+
+        [[nodiscard]] const DefParametersPtr& parameters() const noexcept {
+            return _defParameters;
+        }
 
         [[nodiscard]] std::unique_ptr<TjsObject> clone() const noexcept override {
             return std::make_unique<TjsFunction>(

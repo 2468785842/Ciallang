@@ -34,6 +34,7 @@
 #include <vector>
 #include <map>
 #include <unordered_map>
+#include <ranges>
 
 #include <functional>
 

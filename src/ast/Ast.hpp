@@ -16,9 +16,7 @@
 
 #include "../lexer/Token.hpp"
 
-#include "DeclNode.hpp"
-#include "StmtNode.hpp"
-#include "ExprNode.hpp"
+#include "AstNode.hpp"
 
 namespace Ciallang::Syntax {
     class AstBuilder {
@@ -57,6 +55,8 @@ namespace Ciallang::Syntax {
                                            const ExprNode* rhs);
 
         UnaryExprNode* makeUnaryExprNode(Token&& op, const ExprNode* rhs);
+
+        ProcCallExprNode* makeProcCallExprNode(const ExprNode* lhs);
 
         AssignExprNode* makeAssignExprNode(const SymbolExprNode* lhs,
                                            const ExprNode* rhs);

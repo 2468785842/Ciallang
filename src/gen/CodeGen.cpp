@@ -13,6 +13,9 @@
 #include "CodeGen.hpp"
 
 #include "../vm/Instruction.hpp"
+#include "../ast/DeclNode.hpp"
+#include "../ast/StmtNode.hpp"
+#include "../ast/ExprNode.hpp"
 
 namespace Ciallang::Inter {
     std::unique_ptr<VM::VMChunk> CodeGen::parseAst(Common::Result& r,
@@ -23,6 +26,20 @@ namespace Ciallang::Inter {
         node->accept(this);
 
         _chunks.back()->emit(VM::Opcode::Ret, node->location);
+
+        if(_r->isFailed()) return nullptr;
+
+        auto* p = _chunks.back();
+
+        _chunks.pop_back();
+
+        return std::make_unique<VM::VMChunk>(std::move(*p));
+    }
+
+    std::unique_ptr<VM::VMChunk> CodeGen::parseAstSegment(const Syntax::AstNode* node) {
+        _chunks.push_back(new VM::VMChunk{ _sourceFile.path() });
+
+        node->accept(this);
 
         if(_r->isFailed()) return nullptr;
 
@@ -103,16 +120,32 @@ namespace Ciallang::Inter {
         LOG(FATAL) << "no impl `binary code gen`" << node->name();
     }
 
-    void CodeGen::visit(const Syntax::UnaryExprNode*) {
+    void CodeGen::visit(const Syntax::UnaryExprNode* node) {
         LOG(FATAL) << "no impl";
     }
 
+    void CodeGen::visit(const Syntax::ProcCallExprNode* node) {
+        node->memberAccess->accept(this);
+
+        CHECK_LE(node->arguments.size(), 255) << "arguments too many must <= 255";
+        _chunks.back()->emit(VM::Opcode::Push, node->location, {
+                static_cast<uint8_t>(node->arguments.size())
+        });
+
+        _chunks.back()->emit(VM::Opcode::Call, node->location);
+
+        for(const auto argument : node->arguments) {
+            argument->accept(this);
+        }
+    }
+
+
     void CodeGen::visit(const Syntax::AssignExprNode* node) {
-        auto* identiter = node->lhs->token;
+        auto& identiter = node->lhs->token;
 
         node->rhs->accept(this);
 
-        const auto& [index, local] = resolveLocal(identiter);
+        const auto& [index, local] = resolveLocal(identiter.get());
 
         if(!local) {
             // global scope maybe? check it in runtime
@@ -162,30 +195,39 @@ namespace Ciallang::Inter {
         }
 
         // XXX: fixed max length
-        _locals.push_back(new Local{ node->token, _scopeDepth, !!node->rhs });
+        _locals.push_back(new Local{ node->token.get(), _scopeDepth, !!node->rhs, 0 });
         _chunks.back()->emit(VM::Opcode::DLocal, node->location, VM::encodeIEX(_locals.size() - 1));
     }
 
     void CodeGen::visit(const Syntax::FunctionDeclNode* node) {
         auto name = node->token->value();
 
-        auto chunk = parseAst(*_r, node->body);
-        std::vector<VM::VMChunk> parameters{};
+        std::vector<std::unique_ptr<VM::VMChunk>> parameters{};
 
-        for(const auto& paramNode : node->parameters) {
+        for(auto& [identiter, exprNode] : node->parameters) {
             std::unique_ptr<VM::VMChunk> paramChunk = nullptr;
-            if(paramNode) {
-                paramChunk = parseAst(*_r, paramNode);
+            if(exprNode) {
+                paramChunk = parseAstSegment(exprNode);
                 if(!paramChunk) return;
+                paramChunk->emit(VM::Opcode::Ret, exprNode->location);
             }
+            _locals.push_back(new Local{ &identiter, _scopeDepth + 1, true, -_locals.size() });
 
-            parameters.push_back(std::move(*paramChunk));
+            parameters.push_back(std::move(paramChunk));
         }
 
+        auto chunk = parseAstSegment(node->body);
+        if(!chunk) return;
+
+        // TODO: add return statement
+        chunk->emit(VM::Opcode::PVoid, node->location);
+        chunk->emit(VM::Opcode::Ret, node->location);
+
+        // add to global var
         auto index = _chunks.back()->addConstant(TjsValue{
                 TjsFunction{
                         std::move(parameters),
-                        std::move(*chunk),
+                        std::move(*chunk.release()),
                         *name->asString()
                 }
         });
@@ -193,11 +235,12 @@ namespace Ciallang::Inter {
         _chunks.back()->emit(VM::Opcode::Load, node->location, VM::encodeIEX(index));
         index = _chunks.back()->addConstant(std::move(*name));
         _chunks.back()->emit(VM::Opcode::DGlobal, node->location, VM::encodeIEX(index));
+        _chunks.back()->emit(VM::Opcode::Pop, node->location);
     }
 
 
     void CodeGen::visit(const Syntax::SymbolExprNode* node) {
-        const auto& [index, local] = resolveLocal(node->token);
+        const auto& [index, local] = resolveLocal(node->token.get());
 
         // global variable maybe?
         if(!local) {
@@ -257,11 +300,11 @@ namespace Ciallang::Inter {
     }
 
     void CodeGen::visit(const Syntax::WhileStmtNode* node) {
-        auto line = node->location;
+        const auto line = node->location;
 
         node->test->accept(this);
 
-        auto jmpNeAddr = _chunks.back()->emitJmp(VM::Opcode::JmpNE, line);
+        const auto jmpNeAddr = _chunks.back()->emitJmp(VM::Opcode::JmpNE, line);
         _chunks.back()->emit(VM::Opcode::Pop, line);
 
         _loops.push_back({ jmpNeAddr, _scopeDepth });
@@ -338,7 +381,7 @@ namespace Ciallang::Inter {
             DCHECK(local->depth != 0);
 
             if(*local->token == *token) {
-                return { i, local };
+                return { i + local->abs, local };
             }
         }
         return { 0, nullptr };
