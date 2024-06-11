@@ -73,6 +73,8 @@ namespace Ciallang::Syntax {
 
         ContinueStmtNode* makeContinueStmtNode();
 
+        ReturnStmtNode* makeReturnStmtNode(const ExprNode* node);
+
         template <typename R, typename... Args>
         R* makeNode(Args&&... args);
     };

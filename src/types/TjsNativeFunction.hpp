@@ -18,6 +18,7 @@
 namespace Ciallang {
     class TjsNativeFunction final : public TjsObject {
         using Callback = std::function<TjsValue(TjsValue*)>;
+        using CallbackVoid = std::function<void(TjsValue*)>;
 
     public:
         TjsNativeFunction() = delete;
@@ -26,7 +27,7 @@ namespace Ciallang {
             const Callback& callback,
             const size_t arity,
             std::string&& name
-        ): _callback(callback), _arity(arity), _name(name) {
+        ): _callback(callback), _arity(arity), _name(std::move(name)) {
         }
 
         explicit TjsNativeFunction(
@@ -36,8 +37,20 @@ namespace Ciallang {
         ): _callback(callback), _arity(arity), _name(name) {
         }
 
+        explicit TjsNativeFunction(
+            const CallbackVoid& callback,
+            const size_t arity,
+            const std::string& name
+        ): _callback([=](auto* values) {
+               // just warp
+               callback(values);
+               return TjsValue{};
+           }),
+           _arity(arity), _name(name) {
+        }
+
         TjsValue callProc(TjsValue* values) const {
-            return std::move(_callback(values));
+            return _callback(values);
         }
 
         [[nodiscard]] std::string_view name() const noexcept override {

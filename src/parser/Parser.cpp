@@ -43,11 +43,11 @@ namespace Ciallang::Syntax {
             if(parser->peek(TokenType::Comma)) {
                 parser->consume();
                 node->arguments.push_back(parser->astBuilder()
-                                                       ->makeValueExprNode(Token{}));
+                                                ->makeValueExprNode(Token{}));
 
                 if(parser->peek(TokenType::RParenthesis)) {
                     node->arguments.push_back(parser->astBuilder()
-                                                           ->makeValueExprNode(Token{}));
+                                                    ->makeValueExprNode(Token{}));
                 }
                 continue;
             }
@@ -181,11 +181,11 @@ namespace Ciallang::Syntax {
         }
 
         if(tToken.type() != expectedType) {
-            error(r,
-                fmt::format(
+            error(r, fmt::format(
                     "expected token '{}' but found '{}'.",
                     expectedName,
-                    tToken.name()), tToken.location
+                    tToken.name()
+                ), tToken.location
             );
             return false;
         }
@@ -574,6 +574,18 @@ namespace Ciallang::Syntax {
         return parser->astBuilder()->makeContinueStmtNode();
     }
 
+    StmtNode* ReturnStmtParser::parse(Result& r, Parser* parser, Token* token) const {
+        if(!parser->peek(TokenType::SemiColon)) {
+            auto expr = parser->parseExpression(r);
+
+            if(!parser->expect(r, &S_SemiColon)) return nullptr;
+            return parser->astBuilder()->makeReturnStmtNode(expr);
+        }
+
+        if(!parser->expect(r, &S_SemiColon)) return nullptr;
+
+        return parser->astBuilder()->makeReturnStmtNode(nullptr);
+    }
 
     /**
      * 中缀二目运算符解析
@@ -629,7 +641,7 @@ namespace Ciallang::Syntax {
             if(auto binaryExprNode = dynamic_cast<BinaryExprNode*>(lhs);
                 !binaryExprNode || *binaryExprNode->token != S_Dot) {
                 parser->error(r,
-                    "proc call expect '.' or identitier",
+                    "proc call expect identitier",
                     token->location);
                 return nullptr;
             }

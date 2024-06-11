@@ -319,6 +319,10 @@ namespace Ciallang::Syntax {
         printNode(getVertexName(node), "", details, style);
     }
 
+    void AstFormatter::visit(const ReturnStmtNode* node) {
+       // TODO: return ast node formatter
+    }
+
 
     std::string AstFormatter::getVertexName(const AstNode* node) {
         return fmt::format("{}{}", node->name(), node->id);

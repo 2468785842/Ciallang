@@ -128,6 +128,18 @@ namespace Ciallang {
 
         bool operator==(const TjsValue& tjsValue) const;
 
+        std::partial_ordering operator<=>(const TjsValue& tjsValue) const {
+            if(_type == TjsValueType::Integer
+               && tjsValue._type == TjsValueType::Integer) {
+                return asInteger() <=> tjsValue.asInteger();
+            }
+            if(_type != TjsValueType::String
+               || tjsValue._type != TjsValueType::String) {
+                return asReal() <=> tjsValue.asReal();
+            }
+            return asString() <=> tjsValue.asString();
+        }
+
     private:
         union {
             TjsInteger _integer;

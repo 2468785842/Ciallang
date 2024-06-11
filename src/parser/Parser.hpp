@@ -202,11 +202,17 @@ namespace Ciallang::Syntax {
         StmtNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
+    struct ReturnStmtParser final : StmtParser {
+        constexpr ReturnStmtParser() = default;
+        StmtNode* parse(Result& r, Parser* parser, Token* token) const override;
+    };
+
     static constexpr BlockStmtParser S_BlockStmtParser{};
     static constexpr IfStmtParser S_IfStmtParser{};
     static constexpr WhileStmtParser S_WhileStmtParser{};
     static constexpr BreakStmtParser S_BreakStmtParser{};
     static constexpr ContinueStmtParser S_ContinueStmtParser{};
+    static constexpr ReturnStmtParser S_ReturnStmtParser{};
 
     static constexpr auto S_StmtParsers =
             frozen::make_unordered_map<TokenType, const StmtParser*>({
@@ -215,6 +221,7 @@ namespace Ciallang::Syntax {
                     { TokenType::While, &S_WhileStmtParser },
                     { TokenType::Break, &S_BreakStmtParser },
                     { TokenType::Continue, &S_ContinueStmtParser },
+                    { TokenType::Return, &S_ReturnStmtParser },
             });
 
     /**

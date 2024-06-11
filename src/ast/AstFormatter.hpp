@@ -114,5 +114,7 @@ namespace Ciallang::Syntax {
         void visit(const BreakStmtNode*) override;
 
         void visit(const ContinueStmtNode*) override;
+
+        void visit(const ReturnStmtNode*) override;
     };
 }

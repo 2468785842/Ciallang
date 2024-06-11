@@ -32,7 +32,6 @@ namespace Ciallang::Syntax {
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
-
     };
 
     class ExprStmtNode final : public StmtNode {
@@ -107,4 +106,18 @@ namespace Ciallang::Syntax {
             visitor->visit(this);
         }
     };
+
+    class ReturnStmtNode final : public StmtNode {
+    public:
+        const ExprNode* expr;
+
+        explicit ReturnStmtNode(const ExprNode* expr) :
+            StmtNode("return_statement"), expr(expr) {
+        }
+
+        void accept(Visitor* visitor) const override {
+            visitor->visit(this);
+        }
+    };
+
 }

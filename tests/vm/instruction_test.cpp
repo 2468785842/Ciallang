@@ -33,9 +33,6 @@ int main(int argc, char** argv) {
     return RUN_ALL_TESTS();
 }
 
-TEST(Instruction, op) {
-}
-
 TEST(Interpreter, Execute) {
     Ciallang::Common::Result r{};
 

@@ -37,7 +37,7 @@
 #include <ranges>
 
 #include <functional>
-
+#include <compare>
 
 #include <glog/logging.h>
 

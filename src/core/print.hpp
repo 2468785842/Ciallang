@@ -19,7 +19,6 @@ namespace Ciallang::Core {
     static const auto S_PrintFunction = TjsNativeFunction{
             [](TjsValue* values) {
                 fmt::print("{}", *values);
-                return TjsValue{};
             },
             1, "print"
     };
@@ -27,7 +26,6 @@ namespace Ciallang::Core {
     static const auto S_PrintlnFunction = TjsNativeFunction{
             [](TjsValue* values) {
                 fmt::println("{}", *values);
-                return TjsValue{};
             },
             1, "println"
     };

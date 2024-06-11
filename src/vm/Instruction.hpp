@@ -16,7 +16,7 @@
 #include "../common/ConstExpr.hpp"
 #include "Interpreter.hpp"
 #include "../types/TjsString.hpp"
-#include "types/TjsNativeFunction.hpp"
+#include "../types/TjsNativeFunction.hpp"
 
 namespace Ciallang::VM {
     enum class OpcodeMode : uint8_t {
@@ -59,6 +59,11 @@ namespace Ciallang::VM {
 
         SEquals, //strict type and value equals
         SNEquals,
+
+        Gt,
+        Lt,
+        Ge,
+        Le
     };
 
     template <typename T>
@@ -102,8 +107,8 @@ namespace Ciallang::VM {
     static size_t getExtIndex(Interpreter* interpreter) {
         if constexpr(MD == OpcodeMode::IEX) {
             uint8_t x = interpreter->readByte();
-            bool immediateMode = (x & 0x80) >> 7; // x000_0000
-            uint8_t extLen = x & 0x7F;            // 0xxx_xxxx
+            const bool immediateMode = (x & 0x80) >> 7; // x000_0000
+            uint8_t extLen = x & 0x7F;                  // 0xxx_xxxx
 
             if(immediateMode) return extLen;
 
@@ -121,7 +126,7 @@ namespace Ciallang::VM {
         static const Instruction* instance(Opcode opcode);
 
         [[nodiscard]] virtual const char* name() const = 0;
-        [[nodiscard]] virtual uint8_t length() const = 0;
+        [[nodiscard]] virtual intptr_t length() const = 0;
 
         std::string disassemble(const Interpreter* intprter) const {
             return disassemble(intprter, true);
@@ -147,7 +152,7 @@ namespace Ciallang::VM {
                                       const Interpreter* interpreter,
                                       bool stic);
 
-    template <Common::Name NAME, size_t N, Opcode OP>
+    template <Common::Name NAME, intptr_t N, Opcode OP>
     struct MakeInstruction : Instruction {
         InterpretResult execute(Common::Result&, Interpreter*) const override {
             LOG(FATAL)
@@ -175,13 +180,13 @@ namespace Ciallang::VM {
             return _name;
         }
 
-        [[nodiscard]] uint8_t length() const final {
+        [[nodiscard]] intptr_t length() const final {
             return _length;
         }
 
     private:
         const char* _name = NAME.value;
-        const size_t _length = N;
+        const intptr_t _length = N;
     };
 
 #define DEFINE_INS(InsName, name, offset) \
@@ -189,7 +194,7 @@ using InsName##Ins = MakeInstruction<Common::Name(name), offset, Opcode::InsName
 constexpr auto S_##InsName##Ins = InsName##Ins()
 
     DEFINE_INS(Ret, "ret", 1);
-    DEFINE_INS(Load, "load", 2); // offset is changable
+    DEFINE_INS(Load, "load", -1); // offset is changable
     DEFINE_INS(BNot, "bnot", 1);
     DEFINE_INS(LNot, "lnot", 1);
 
@@ -204,19 +209,24 @@ constexpr auto S_##InsName##Ins = InsName##Ins()
 
     DEFINE_INS(PVoid, "pvoid", 1);
 
-    DEFINE_INS(GGlobal, "gglobal", 2); // offset is changable
-    DEFINE_INS(DGlobal, "dglobal", 2); // offset is changable
-    DEFINE_INS(GLocal, "glocal", 2);   // offset is changable
-    DEFINE_INS(DLocal, "dlocal", 2);   // offset is changable
+    DEFINE_INS(GGlobal, "gglobal", -1);
+    DEFINE_INS(DGlobal, "dglobal", -1);
+    DEFINE_INS(GLocal, "glocal", -1);
+    DEFINE_INS(DLocal, "dlocal", -1); // offset is changable
 
     DEFINE_INS(Jmp, "jmp", 3);
     DEFINE_INS(JmpE, "jmpe", 3);
     DEFINE_INS(JmpNE, "jmpne", 3);
 
-    DEFINE_INS(Call, "call", 2);
+    DEFINE_INS(Call, "call", 1);
 
     DEFINE_INS(Equals, "equals", 1);
     DEFINE_INS(NEquals, "nequals", 1);
+
+    DEFINE_INS(Gt, "gt", 1);
+    DEFINE_INS(Lt, "lt", 1);
+    DEFINE_INS(Ge, "ge", 1);
+    DEFINE_INS(Le, "le", 1);
 
 #undef DEFINE_INS
     // -------------------------------------------------------------------------//
@@ -252,7 +262,12 @@ constexpr auto S_##InsName##Ins = InsName##Ins()
                     { Opcode::Call, &S_CallIns },
 
                     { Opcode::Equals, &S_EqualsIns },
-                    { Opcode::NEquals, &S_NEqualsIns }
+                    { Opcode::NEquals, &S_NEqualsIns },
+
+                    { Opcode::Gt, &S_GtIns },
+                    { Opcode::Lt, &S_LtIns },
+                    { Opcode::Ge, &S_GeIns },
+                    { Opcode::Le, &S_LeIns },
             });
 
     inline const Instruction* Instruction::instance(const Opcode opcode) {
@@ -272,8 +287,10 @@ constexpr auto S_##InsName##Ins = InsName##Ins()
 inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter) const
 
     EXECUTE(RetIns) {
+        interpreter->printStack();
 
         if(interpreter->isCallFrameTop()) {
+            interpreter->printGlobal();
             return InterpretResult::OK;
         }
 
@@ -330,6 +347,14 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
             interpreter->push(TjsValue{ static_cast<TjsInteger>(a == b) });
         } else if constexpr(OP == Opcode::NEquals) {
             interpreter->push(TjsValue{ static_cast<TjsInteger>(a != b) });
+        } else if constexpr(OP == Opcode::Gt) {
+            interpreter->push(TjsValue{ static_cast<TjsInteger>(a > b) });
+        } else if constexpr(OP == Opcode::Lt) {
+            interpreter->push(TjsValue{ static_cast<TjsInteger>(a < b) });
+        } else if constexpr(OP == Opcode::Ge) {
+            interpreter->push(TjsValue{ static_cast<TjsInteger>(a >= b) });
+        } else if constexpr(OP == Opcode::Le) {
+            interpreter->push(TjsValue{ static_cast<TjsInteger>(a <= b) });
         } else {
             static_assert(
                 false,
@@ -361,6 +386,22 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
 
     EXECUTE(NEqualsIns) {
         return executeBinary<Opcode::NEquals>(interpreter);
+    }
+
+    EXECUTE(GtIns) {
+        return executeBinary<Opcode::Gt>(interpreter);
+    }
+
+    EXECUTE(LtIns) {
+        return executeBinary<Opcode::Lt>(interpreter);
+    }
+
+    EXECUTE(GeIns) {
+        return executeBinary<Opcode::Ge>(interpreter);
+    }
+
+    EXECUTE(LeIns) {
+        return executeBinary<Opcode::Le>(interpreter);
     }
 
     EXECUTE(PopIns) {
@@ -423,6 +464,10 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     EXECUTE(GLocalIns) {
         auto slot = getExtIndex<OpcodeMode::IEX>(interpreter);
         const auto& value = interpreter->getStack(slot);
+        if(value.type() == TjsValueType::Void) {
+            interpreter->error(r, "cann't read local value, no exist");
+            return InterpretResult::RUNTIME_ERROR;
+        }
         interpreter->push(TjsValue{ value });
         return InterpretResult::CONTINUE;
     }
@@ -521,10 +566,7 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
     //----------------------------- disassemble --------------------------------//
     //--------------------------------------------------------------------------//
 
-    template
-    <
-        OpcodeMode MD
-    >
+    template <OpcodeMode MD>
     static size_t disassembleExtIndex(const VMChunk& chunk, const size_t ip) {
         if constexpr(MD == OpcodeMode::IEX) {
             uint8_t x = chunk.bytecodes(ip + 1);
@@ -543,10 +585,7 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
         return 0;
     }
 
-    template
-    <
-        Opcode OP
-    >
+    template <Opcode OP>
     static std::string disassembleIns(const Instruction* instruction,
                                       const Interpreter* interpreter, const bool stic) {
         const auto& chunk = interpreter->chunk();
@@ -555,9 +594,7 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
         auto ss = std::ostringstream{}
                   << interpreter->disassembleLine()
                   << fmt::format("{:#06x}\t{: ^10}", ip, instruction->name());
-        if constexpr(OP == Opcode::Call) {
-            ss << fmt::format(" ; {}", interpreter->peek(0));
-        } else if constexpr(OP == Opcode::Pop || OP == Opcode::Push) {
+        if constexpr(OP == Opcode::Pop || OP == Opcode::Push) {
             ss << fmt::format("{: ^4d}", chunk->bytecodes(ip + 1));
         } else if constexpr(OP == Opcode::Jmp
                             || OP == Opcode::JmpE
@@ -593,23 +630,20 @@ inline InterpretResult Inst::execute(Common::Result &r, Interpreter* interpreter
                 ss << fmt::format(" ; {}", *val);
             } else if constexpr(OP == Opcode::DGlobal) {
                 const auto& identitier = chunk->constants(index);
-                const auto& value = interpreter->peek(0);
 
                 if(!interpreter->getGlobal(*identitier.asString())) {
                     ss << "(declare) " << identitier;
                     return ss.str();
                 }
 
-                ss << fmt::format(" ; {} // put {}", identitier, value);
+                ss << fmt::format(" ; {}", identitier);
             } else if constexpr(OP == Opcode::GLocal) {
                 const auto& value = interpreter->getStack(index);
 
                 ss << fmt::format(" ; stack[{}]", index)
                         << fmt::format(" // get {}", value);
             } else /* if constexpr(OP == Opcode::DLocal) */ {
-                const auto& value = interpreter->peek(0);
-                ss << fmt::format(" ; stack[{}]", index)
-                        << fmt::format(" // put {}", value);
+                ss << fmt::format(" ; stack[{}]", index);
             }
         }
 

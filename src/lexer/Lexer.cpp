@@ -91,6 +91,7 @@ std::unordered_map<std::string, const Token&> Lexer::S_Keywords{
         { "NaN", S_NaN },
 
         { "function", S_Function },
+        { "return", S_Return },
 
         { "var", S_Var },
         { "const", S_Const },
@@ -1151,16 +1152,15 @@ StringParseState Lexer::internalStringParser(
             if(ch == runeEof) {
                 rewindOneChar();
                 strPsState = StringParseState::Delimiter;
-                if(templateOver)
-                    *templateOver = true;
+                if(templateOver) *templateOver = true;
                 break;
             }
             // sequence of 'A' 'B' will be combined as 'AB'
-            if(ch == delimiter)
-                continue;
+            if(ch == delimiter) continue;
             strPsState = StringParseState::Delimiter;
-            if(templateOver)
-                *templateOver = true;
+            if(templateOver) *templateOver = true;
+
+            rewindOneChar();
             break;
         }
         if(templateMode && ch == '&') {

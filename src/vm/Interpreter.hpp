@@ -23,7 +23,7 @@
 
 #include "../types/TjsNativeFunction.hpp"
 
-#define STACK_MAX 256
+#define STACK_MAX 2048
 
 namespace Ciallang::VM {
     class VMChunk;
@@ -43,7 +43,7 @@ namespace Ciallang::VM {
     };
 
     class Interpreter {
-        template <Common::Name, size_t, Opcode>
+        template <Common::Name, intptr_t, Opcode>
         friend struct MakeInstruction;
 
     public:
@@ -89,7 +89,7 @@ namespace Ciallang::VM {
 
         TjsValue* popArgs(size_t count);
 
-        void putStack(size_t slot, TjsValue&& value);
+        void putStack(size_t slot, TjsValue&& value) const;
 
         [[nodiscard]] const TjsValue& getStack(size_t slot) const;
 
@@ -100,6 +100,7 @@ namespace Ciallang::VM {
         [[nodiscard]] TjsValue* getGlobal(const std::string_view& key) const;
 
         void printStack();
+
         void printGlobal();
 
         ~Interpreter() noexcept {
@@ -118,9 +119,11 @@ namespace Ciallang::VM {
 
             // default parameter;
             for(size_t i = 0; i < fun->arity(); i++) {
-                _vm.frames[++_vm.frameCount] = {
-                        fun->parameters()->at(i).get(), 0, slot + i, true
-                };
+                if(auto chunk = fun->parameters()->at(i).get()) {
+                    _vm.frames[++_vm.frameCount] = {
+                            chunk, 0, slot + i, true
+                    };
+                }
             }
 
             return true;
@@ -139,7 +142,10 @@ namespace Ciallang::VM {
             return _vm.frames[_vm.frameCount];
         }
 
-        void callFrameRet() { --_vm.frameCount; }
+        void callFrameRet() {
+            _vm.sp = _vm.frames[_vm.frameCount].slots;
+            --_vm.frameCount;
+        }
 
         [[nodiscard]] bool isCallFrameTop() const { return _vm.frameCount == 0; }
 

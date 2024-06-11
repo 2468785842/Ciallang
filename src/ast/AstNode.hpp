@@ -47,6 +47,8 @@ namespace Ciallang::Syntax {
 
     class ContinueStmtNode;
 
+    class ReturnStmtNode;
+
     class VarDeclNode;
 
     class FunctionDeclNode;
@@ -123,5 +125,7 @@ namespace Ciallang::Syntax {
         virtual void visit(const BreakStmtNode*) = 0;
 
         virtual void visit(const ContinueStmtNode*) = 0;
+
+        virtual void visit(const ReturnStmtNode*) = 0;
     };
 }

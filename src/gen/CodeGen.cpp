@@ -115,6 +115,18 @@ namespace Ciallang::Inter {
             case Syntax::TokenType::NotEqual:
                 _chunks.back()->emit(VM::Opcode::NEquals, node->location);
                 return;
+            case Syntax::TokenType::Gt:
+                _chunks.back()->emit(VM::Opcode::Gt, node->location);
+                return;
+            case Syntax::TokenType::Lt:
+                _chunks.back()->emit(VM::Opcode::Lt, node->location);
+                return;
+            case Syntax::TokenType::GtOrEqual:
+                _chunks.back()->emit(VM::Opcode::Ge, node->location);
+                return;
+            case Syntax::TokenType::LtOrEqual:
+                _chunks.back()->emit(VM::Opcode::Le, node->location);
+                return;
         }
 
         LOG(FATAL) << "no impl `binary code gen`" << node->name();
@@ -125,7 +137,6 @@ namespace Ciallang::Inter {
     }
 
     void CodeGen::visit(const Syntax::ProcCallExprNode* node) {
-
         for(const auto argument : node->arguments) {
             argument->accept(this);
         }
@@ -138,7 +149,6 @@ namespace Ciallang::Inter {
         node->memberAccess->accept(this);
 
         _chunks.back()->emit(VM::Opcode::Call, node->location);
-
     }
 
 
@@ -149,9 +159,9 @@ namespace Ciallang::Inter {
 
         const auto& [index, local] = resolveLocal(identiter.get());
 
-        if(!local) {
+        if(!local || local->depth != _scopeDepth) {
             // global scope maybe? check it in runtime
-            auto constIndex = _chunks.back()->addConstant(std::move(*identiter->value()));
+            const auto constIndex = _chunks.back()->addConstant(std::move(*identiter->value()));
             _chunks.back()->emit(VM::Opcode::DGlobal,
                 node->location,
                 VM::encodeIEX(constIndex)
@@ -202,6 +212,7 @@ namespace Ciallang::Inter {
     }
 
     void CodeGen::visit(const Syntax::FunctionDeclNode* node) {
+        _inFun = true;
         auto name = node->token->value();
 
         std::vector<std::unique_ptr<VM::VMChunk>> parameters{};
@@ -221,7 +232,8 @@ namespace Ciallang::Inter {
         auto chunk = parseAstSegment(node->body);
         if(!chunk) return;
 
-        // TODO: add return statement
+        // actually is do not affect, just increase vmchunk size
+        // not have return will use this
         chunk->emit(VM::Opcode::PVoid, node->location);
         chunk->emit(VM::Opcode::Ret, node->location);
 
@@ -238,6 +250,8 @@ namespace Ciallang::Inter {
         index = _chunks.back()->addConstant(std::move(*name));
         _chunks.back()->emit(VM::Opcode::DGlobal, node->location, VM::encodeIEX(index));
         _chunks.back()->emit(VM::Opcode::Pop, node->location);
+
+        _inFun = false;
     }
 
 
@@ -245,7 +259,17 @@ namespace Ciallang::Inter {
         const auto& [index, local] = resolveLocal(node->token.get());
 
         // global variable maybe?
-        if(!local) {
+        if(!local || local->depth != _scopeDepth) {
+            // var x = "global";
+            // function outer() {
+            //   var x = "outer";
+            //   function inner() {
+            //     println(x);
+            //   }
+            //   inner();
+            // }
+            // outer();
+            // result:  "global"(tjs not support closure)
             auto constIndex = _chunks.back()->addConstant(std::move(*node->token->value()));
             _chunks.back()->emit(VM::Opcode::GGlobal, node->location, VM::encodeIEX(constIndex));
             return;
@@ -345,6 +369,20 @@ namespace Ciallang::Inter {
         _chunks.back()->emitJmp(VM::Opcode::Jmp, node->location,
             static_cast<int16_t>(_loops.back().addr - _chunks.back()->count() - 6)
         );
+    }
+
+    void CodeGen::visit(const Syntax::ReturnStmtNode* node) {
+        if(!_inFun) {
+            error(*_r, "return; must be in function declartion", node->location);
+            return;
+        }
+
+        if(node->expr)
+            node->expr->accept(this);
+        else
+            _chunks.back()->emit(VM::Opcode::PVoid, node->location);
+
+        _chunks.back()->emit(VM::Opcode::Ret, node->location);
     }
 
     void CodeGen::beginScope() {

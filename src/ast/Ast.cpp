@@ -135,6 +135,10 @@ namespace Ciallang::Syntax {
         return makeNode<ContinueStmtNode>();
     }
 
+    ReturnStmtNode* AstBuilder::makeReturnStmtNode(const ExprNode* node) {
+        return makeNode<ReturnStmtNode>(node);
+    }
+
     template <typename R, typename... Args>
     R* AstBuilder::makeNode(Args&&... args) {
         static_assert(

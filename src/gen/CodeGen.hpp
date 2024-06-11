@@ -72,6 +72,8 @@ namespace Ciallang::Inter {
 
         std::vector<Loop> _loops{};
 
+        bool _inFun = false;
+
         // 1 is global scope
         size_t _scopeDepth{ 0 };
 
@@ -106,6 +108,8 @@ namespace Ciallang::Inter {
         void visit(const Syntax::BreakStmtNode*) override;
 
         void visit(const Syntax::ContinueStmtNode*) override;
+
+        void visit(const Syntax::ReturnStmtNode*) override;
 
         void beginScope();
 

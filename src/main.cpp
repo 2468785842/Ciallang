@@ -15,8 +15,10 @@
 #include "lexer/Lexer.hpp"
 #include "types/TjsString.hpp"
 #include "common/SourceFile.hpp"
-#include "compiler/Compiler.hpp"
+#include "core/print.hpp"
+#include "gen/CodeGen.hpp"
 #include "init/GlogInit.hpp"
+#include "parser/Parser.hpp"
 
 void testLexer() {
     Ciallang::Common::SourceFile source_file{ R"(.\startup.tjs)" };
@@ -54,8 +56,35 @@ void testLexer() {
 int main(int /* argc */, char* * argv) {
     Ciallang::Init::InitializeGlog(argv);
 
+    Ciallang::Common::Result r{};
+
+    Ciallang::Common::SourceFile sourceFile{ R"(.\startup.tjs)" };
+    sourceFile.load(r);
+
+    Ciallang::Syntax::AstBuilder astBuilder{};
+    Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
+    auto* globalNode = parser.parse(r);
+
+    Ciallang::Inter::CodeGen codeGen{ sourceFile };
+    auto chunk = codeGen.parseAst(r, globalNode);
+    for(const auto& message : r.messages()) {
+        if(message.isError()) {
+            fmt::println("{}", message.message());
+            if(!message.details().empty())
+                fmt::println("{}", message.details());
+            fmt::println("");
+        }
+    }
+
+    Ciallang::VM::Interpreter interpreter{ sourceFile, std::move(*chunk.release()) };
+
+    interpreter.addNative(Ciallang::Core::S_PrintFunction);
+    interpreter.addNative(Ciallang::Core::S_PrintlnFunction);
+    // interpreter.dump();
+
+    interpreter.run(r);
     // testLexer();
-    Ciallang::Inter::Compiler compiler{
+    /*Ciallang::Inter::Compiler compiler{
             Ciallang::Inter::CompilerOptions{
             },
             R"(.\startup.tjs)"
@@ -71,6 +100,6 @@ int main(int /* argc */, char* * argv) {
                 fmt::println("{}", message.details());
             fmt::println("");
         }
-    }
+    }*/
     return 0;
 }

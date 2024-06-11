@@ -41,10 +41,8 @@ namespace Ciallang::VM {
             if(result != InterpretResult::CONTINUE) {
                 LOG(INFO) << "VM return";
 
-                printGlobal();
                 return result;
             }
-
         }
     }
 
@@ -69,7 +67,7 @@ namespace Ciallang::VM {
     }
 
     void Interpreter::pushVoid() {
-        DCHECK_LE(_vm.sp - _vm.stack+ 1, STACK_MAX - 1)
+        DCHECK_LE(_vm.sp - _vm.stack + 1, STACK_MAX - 1)
             << "stack overflow `push(value)` method";
         *_vm.sp++ = TjsValue{};
     }
@@ -108,17 +106,14 @@ namespace Ciallang::VM {
     }
 
     const TjsValue& Interpreter::getStack(const size_t slot) const {
-        DCHECK_GE(slot, 0)
-            << "stack underflow `getStack(slot)` method";
-
-        DCHECK_LE(slot, STACK_MAX - 1)
-            << "stack overflow `getStack(slot)` method";
-
-        return _vm.stack[slot];
+        if(_vm.frames[_vm.frameCount].slots == _vm.sp) {
+            return TjsValue{}; // dying value
+        }
+        return _vm.frames[_vm.frameCount].slots[slot];
     }
 
-    void Interpreter::putStack(const size_t slot, TjsValue&& value) {
-        _vm.stack[slot] = std::move(value);
+    void Interpreter::putStack(const size_t slot, TjsValue&& value) const {
+        _vm.frames[_vm.frameCount].slots[slot] = std::move(value);
     }
 
     void Interpreter::addNative(const TjsNativeFunction& nFun) {
@@ -177,10 +172,14 @@ namespace Ciallang::VM {
         fmt::println("{0:-^{1}}", ' ' + RLC_NAME + ' ', RLC_NAME_LEN);
 
         while(ip() < chunk()->count()) {
-            auto op = static_cast<Opcode>(readByte());
+            auto op = static_cast<Opcode>(chunk()->bytecodes(callFrame().ip));
             const auto* ins = Instruction::instance(op);
             fmt::println("{}", ins->disassemble(this));
-            ip(ins->length());
+            intptr_t index = ins->length();
+            if(index == -1) {
+                index = disassembleExtIndex<OpcodeMode::IEX>(*chunk(), ip());
+            }
+            ip(index);
         }
     }
 }

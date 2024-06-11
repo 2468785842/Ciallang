@@ -561,6 +561,7 @@ namespace Ciallang::Syntax {
 
             S_New{ TokenType::New },
             S_Function{ TokenType::Function },
+            S_Return{ TokenType::Return },
 
             S_Int{ TokenType::Int },
             S_Real{ TokenType::Real },

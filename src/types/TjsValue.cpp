@@ -101,7 +101,7 @@ namespace Ciallang {
             case TjsValueType::String:
                 return *asString() == *tjsValue.asString();
             case TjsValueType::Object:
-            // return asObject() == asObject();
+                return asObject() == tjsValue.asObject();
             case TjsValueType::Octet:
             default: ;
         }

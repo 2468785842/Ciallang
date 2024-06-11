@@ -44,7 +44,7 @@ namespace Ciallang::Common {
             const string& message,
             const SourceLocation& loc = {},
             const string& details = {}) {
-            DLOG(FATAL) << message;
+            DLOG(ERROR) << message;
             _messages.emplace_back(
                 message,
                 loc,
