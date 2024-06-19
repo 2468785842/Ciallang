@@ -14,9 +14,11 @@
 
 #pragma once
 
+#include "pch.h"
+
 #include "IEEETypes.hpp"
-#include "../common/SourceLocation.hpp"
-#include "../types/TjsValue.hpp"
+#include "common/SourceLocation.hpp"
+#include "types/TjsValue.hpp"
 
 namespace Ciallang::Syntax {
     using namespace Common;
@@ -424,15 +426,14 @@ namespace Ciallang::Syntax {
         }
 
         Token& operator=(Token&& token) noexcept {
-            if(this != &token) {
-                _type = token._type;
+            if(this == &token) return *this;
+            _type = token._type;
 
-                delete _value;
-                _value = token._value;
-                location = token.location;
+            delete _value;
+            _value = token._value;
+            location = token.location;
 
-                token._value = nullptr;
-            }
+            token._value = nullptr;
             return *this;
         }
 
@@ -577,9 +578,9 @@ namespace Ciallang::Syntax {
             S_True{ TokenType::ConstVal, tjsInteger(1) },
             S_False{ TokenType::ConstVal, tjsInteger(0) },
 
-            S_Infinity{ TokenType::ConstVal, tjsReal(static_cast<double>(IEEE_D_N_INF)) },
+            S_Infinity{ TokenType::ConstVal, tjsReal(IEEE_D_N_INF) },
 
-            S_NaN{ TokenType::ConstVal, tjsReal(static_cast<double>(IEEE_D_N_NaN)) };
+            S_NaN{ TokenType::ConstVal, tjsReal(IEEE_D_N_NaN) };
 
     enum class StringParseState {
         None,

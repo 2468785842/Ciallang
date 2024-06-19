@@ -16,7 +16,7 @@
 /*---------------------------------------------------------------------------*/
 /* "TJS2" type definitions                                                   */
 /*---------------------------------------------------------------------------*/
-#include <cstdint>
+#include "pch.h"
 
 /* IEEE double manipulation support
  * (TJS requires IEEE double(64-bit float) native support on machine or C++ compiler)

@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "pch.h"
+
 namespace Ciallang::Common {
     using namespace std;
 

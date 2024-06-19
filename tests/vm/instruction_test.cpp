@@ -11,18 +11,16 @@
  *                                                            \_/__/
  *
  */
-#include <gen/CodeGen.hpp>
+
 #include <gtest/gtest.h>
 
-#include <vm/Instruction.hpp>
+#include "vm/Interpreter.hpp"
 
-#include <init/GlogInit.hpp>
-#include <parser/Parser.hpp>
-
+#include "init/GlogInit.hpp"
+#include "parser/Parser.hpp"
+#include "ast/AstFormatter.hpp"
+#include "gen/BytecodeGen.hpp"
 #include "common/SourceFile.hpp"
-#include "core/print.hpp"
-
-using namespace Ciallang::VM;
 
 int main(int argc, char** argv) {
     // Initialize Google's logging library.
@@ -42,13 +40,15 @@ TEST(Interpreter, Execute) {
     Ciallang::Syntax::AstBuilder astBuilder{};
     Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
     auto* globalNode = parser.parse(r);
+    Ciallang::AstFormatter formatter{};
+    formatter.formatAst(globalNode);
 
-    Ciallang::Inter::CodeGen codeGen{ sourceFile };
+    Ciallang::Inter::BytecodeGen codeGen{ sourceFile };
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Interpreter interpreter{ sourceFile, std::move(*chunk.release()) };
-    // interpreter.dump();
-    interpreter.addNative(Ciallang::Core::S_PrintFunction);
-    interpreter.addNative(Ciallang::Core::S_PrintlnFunction);
-    interpreter.run(r);
+    Ciallang::Bytecode::Interpreter interpreter{};
+
+    fmt::println("{}", interpreter.dumpInstruction(*chunk));
+    interpreter.run(chunk.get());
+    fmt::println("{}", interpreter.dumpRegisters());
 }

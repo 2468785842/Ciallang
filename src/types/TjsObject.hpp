@@ -12,8 +12,7 @@
 
 #pragma once
 
-#include "TjsTypes.hpp"
-#include "TjsValue.hpp"
+#include "pch.h"
 
 namespace Ciallang {
 
@@ -24,28 +23,9 @@ namespace Ciallang {
 
         [[nodiscard]] virtual std::string_view name() const noexcept = 0;
 
-        [[nodiscard]] virtual std::unique_ptr<TjsObject> clone() const noexcept = 0;
-
         [[nodiscard]] virtual bool isNative() const noexcept = 0;
 
         [[nodiscard]] virtual size_t arity() const noexcept = 0;
     };
 
-    template <>
-    inline void TjsObjectHelper::copy(const TjsValue& src, TjsValue& dest) const {
-        dest._type = src._type;
-        dest._value._object = src._value._object->clone().release();
-    }
-
-    template <>
-    inline void TjsObjectHelper::move(TjsValue& src, TjsValue& dest) const {
-        dest._type = src._type;
-        dest._value._object = src._value._object;
-        src._value._object = nullptr;
-    }
-
-    template <>
-    inline void TjsObjectHelper::destroy(TjsValue& value) const {
-        delete value._value._object;
-    }
 }

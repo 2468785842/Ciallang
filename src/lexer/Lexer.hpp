@@ -14,8 +14,10 @@
 
 #pragma once
 
-#include "../common/SourceFile.hpp"
-#include "../common/Result.hpp"
+#include "pch.h"
+
+#include "common/SourceFile.hpp"
+#include "common/Result.hpp"
 #include "Token.hpp"
 
 namespace Ciallang::Syntax {
@@ -127,7 +129,7 @@ namespace Ciallang::Syntax {
 
         void rewindOneChar() const;
 
-        string readIdentifier();
+        std::string readIdentifier();
 
         bool lineTerminator(Token*&);
 
@@ -135,7 +137,7 @@ namespace Ciallang::Syntax {
 
         [[nodiscard]] pair<uint32_t, uint32_t> getCurrentRowCol() const;
 
-        bool match(const string& literal);
+        bool match(const std::string& literal);
 
         // <
         bool gtSign(Token*&);

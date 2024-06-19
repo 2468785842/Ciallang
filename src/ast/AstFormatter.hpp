@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024/5/6 下午8:16
+ * Copyright (c) 2024/6/14 下午9:51
  *
  * /\  _` \   __          /\_ \  /\_ \
  * \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -11,110 +11,221 @@
  *                                                            \_/__/
  *
  */
-
 #pragma once
 
-#include "Ast.hpp"
+#include "pch.h"
 
-namespace Ciallang::Syntax {
-    struct GraphvizFormatter {
-        static std::string escapeChars(const std::string& value) noexcept {
-            std::string buffer;
-            for(const auto& c : value) {
-                if(c == '\"') {
-                    buffer += "\\\"";
-                } else if(c == '{') {
-                    buffer += "\\{";
-                } else if(c == '}') {
-                    buffer += "\\}";
-                } else if(c == '.') {
-                    buffer += "\\.";
-                } else if(c == '|') {
-                    buffer += "\\|";
-                } else if(c == '<') {
-                    buffer += "\\<";
-                } else if(c == '>') {
-                    buffer += "\\>";
-                } else if(c == '=') {
-                    buffer += "\\=";
-                } else if(c == '\\') {
-                    buffer += "\\\\";
+#include "lexer/Token.hpp"
+#include "AstNode.hpp"
+#include "DeclNode.hpp"
+#include "ExprNode.hpp"
+#include "StmtNode.hpp"
+
+namespace Ciallang {
+    class AstFormatter final : public Syntax::AstNode::Visitor {
+    public:
+        explicit AstFormatter(const size_t initialIndent = 2) : leftPadding(initialIndent) {
+        }
+
+        void formatAst(const Syntax::AstNode* node) {
+            node->accept(this);
+        }
+
+        template <typename T = Syntax::AstNode>
+        void printNode(const std::string& type, const T* value = nullptr) {
+            fmt::print("{0: <{2}}{1}", "", type, leftPadding);
+            if(value) {
+                if constexpr(std::is_base_of_v<Syntax::AstNode, T>) {
+                    fmt::print("(");
+                    value->accept(this);
+                    fmt::print(")");
+                } else if constexpr(std::is_same_v<TjsValue, T>) {
+                    fmt::print(" ({})", *value);
+                } else if constexpr(std::is_same_v<char, T>) {
+                    fmt::print(" ({})", value);
                 } else {
-                    buffer += c;
+                    static_assert(false, "not support");
                 }
             }
-            return buffer;
+            fmt::println("{}", "");
         }
-    };
 
-    class AstFormatter : AstNode::Visitor {
-        FILE* _file = nullptr;
-        AstNode* _root = nullptr;
+        void visit(const Syntax::StmtDeclNode* node) override {
+            node->statement->accept(this);
+        }
 
-        friend class AstNode;
+        void visit(const Syntax::VarDeclNode* node) override {
+            printNode("DeclareVar");
+            increaseIndent();
 
-    public:
-        AstFormatter(AstNode* root, FILE* file);
+            CHECK(node->token->value()->isString());
+            printNode("Variable", node->token->value());
 
-        void format(const std::string& title);
+            printNode("=");
+            node->rhs->accept(this);
+
+            decreaseIndent();
+        }
+
+        void visit(const Syntax::FunctionDeclNode* node) override {
+            printNode("FunctionDecl");
+            increaseIndent();
+
+            printNode("(Parameters)");
+
+            increaseIndent();
+            for(auto& [token,exprNode] : node->parameters) {
+                CHECK(token.value()->isString());
+                printNode(*token.value()->asString(), exprNode);
+            }
+            decreaseIndent();
+
+            printNode("(Body)");
+            increaseIndent();
+            node->body->accept(this);
+            decreaseIndent();
+
+            decreaseIndent();
+        }
+
+        void visit(const Syntax::ValueExprNode* node) override {
+            printNode("Value", node->token->value());
+        }
+
+        void visit(const Syntax::IdentifierExprNode* node) override {
+            CHECK(node->token->value()->isString());
+            printNode("Identifier", node->token->value());
+        }
+
+        void visit(const Syntax::BinaryExprNode* node) override {
+            printNode("BinaryExpression");
+            increaseIndent();
+
+            node->lhs->accept(this);
+            printNode("Operator", node->token->name());
+            node->rhs->accept(this);
+
+            decreaseIndent();
+        }
+
+        void visit(const Syntax::UnaryExprNode* node) override {
+            printNode("UnaryExpression");
+            increaseIndent();
+
+            printNode("Operator", node->token->name());
+            node->rhs->accept(this);
+
+            decreaseIndent();
+        }
+
+        void visit(const Syntax::ProcCallExprNode* node) override {
+            printNode("ProcCall");
+            increaseIndent();
+
+            printNode("(Arguments)");
+
+            increaseIndent();
+            for(auto argument : node->arguments) {
+                argument->accept(this);
+            }
+            decreaseIndent();
+
+            decreaseIndent();
+        }
+
+        void visit(const Syntax::AssignExprNode* node) override {
+            printNode("AssignmentExpression");
+            increaseIndent();
+
+            node->lhs->accept(this);
+            printNode("=");
+            node->rhs->accept(this);
+
+            decreaseIndent();
+        }
+
+        void visit(const Syntax::BlockStmtNode* node) override {
+            printNode("BlockStatement");
+            increaseIndent();
+
+            printNode("(Children)");
+
+            increaseIndent();
+            for(auto* child : node->childrens) {
+                child->accept(this);
+            }
+            decreaseIndent();
+
+            decreaseIndent();
+        }
+
+        void visit(const Syntax::ExprStmtNode* node) override {
+            node->expression->accept(this);
+        }
+
+        void visit(const Syntax::IfStmtNode* node) override {
+            printNode("IfStatement");
+            increaseIndent();
+
+            printNode("(Condition)");
+
+            increaseIndent();
+            node->test->accept(this);
+            decreaseIndent();
+
+            printNode("(Body)");
+
+            increaseIndent();
+            node->body->accept(this);
+            decreaseIndent();
+
+            if(node->elseBody) {
+                printNode("(ElseBody)");
+                increaseIndent();
+                node->elseBody->accept(this);
+                decreaseIndent();
+            }
+
+            decreaseIndent();
+        }
+
+        void visit(const Syntax::WhileStmtNode* node) override {
+            printNode("WhileStatement");
+            increaseIndent();
+
+            printNode("(Condition)");
+            increaseIndent();
+            node->test->accept(this);
+            decreaseIndent();
+
+            printNode("(Body)");
+            increaseIndent();
+            node->body->accept(this);
+            decreaseIndent();
+
+            decreaseIndent();
+        }
+
+        void visit(const Syntax::BreakStmtNode* node) override {
+            printNode("BreakStatement");
+        }
+
+        void visit(const Syntax::ContinueStmtNode* node) override {
+            printNode("ContinueStatement");
+        }
+
+        void visit(const Syntax::ReturnStmtNode* node) override {
+            printNode("ReturnStatement");
+            increaseIndent();
+            node->expr->accept(this);
+
+            decreaseIndent();
+        }
+
+        void increaseIndent() { leftPadding += 2; }
+        void decreaseIndent() { leftPadding = std::max(leftPadding - 2, static_cast<size_t>(0)); }
 
     private:
-        void printNode(const std::string& vertexName,
-                       const std::string& label,
-                       const std::string& details,
-                       const std::string& style);
-
-        void printEdge(const std::string& from,
-                       const std::string& fromPort,
-                       const std::string& to,
-                       const std::string& toPort,
-                       const std::string& style);
-
-
-        void visitBinaryUnaryNode(const std::string& vertexName,
-                                  const std::string& nodeName,
-                                  const std::string& details,
-                                  const std::string& lhsPort,
-                                  const AstNode* lhs,
-                                  const std::string& rhsPort,
-                                  const AstNode* rhs);
-
-        static std::string formatStyle(const std::string& fillColor,
-                                       const std::string& fontColor,
-                                       const std::string& shape);
-
-        static std::string getVertexName(const AstNode* node);
-
-        void visit(const ValueExprNode*) override;
-
-        void visit(const SymbolExprNode*) override;
-
-        void visit(const BinaryExprNode*) override;
-
-        void visit(const UnaryExprNode*) override;
-
-        void visit(const AssignExprNode*) override;
-
-        void visit(const ProcCallExprNode*) override;
-
-        void visit(const BlockStmtNode*) override;
-
-        void visit(const ExprStmtNode*) override;
-
-        void visit(const IfStmtNode*) override;
-
-        void visit(const WhileStmtNode*) override;
-
-        void visit(const StmtDeclNode*) override;
-
-        void visit(const VarDeclNode*) override;
-
-        void visit(const FunctionDeclNode*) override;
-
-        void visit(const BreakStmtNode*) override;
-
-        void visit(const ContinueStmtNode*) override;
-
-        void visit(const ReturnStmtNode*) override;
+        size_t leftPadding{ 0 };
     };
 }

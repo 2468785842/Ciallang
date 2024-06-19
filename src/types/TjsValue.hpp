@@ -12,27 +12,22 @@
 
 #pragma once
 
+#include "pch.h"
+
 #include "TjsTypes.hpp"
 
 namespace Ciallang {
     class TjsValue {
-        template <Common::Name>
-        friend struct MakeTjsValueHelper;
+        friend struct TjsValueHelper;
 
     public:
         TjsValue() = default;
 
-        explicit TjsValue(const TjsInteger& value) :
-            _value{ ._integer = value },
-            _type(TjsValueType::Integer) {
-        }
+        explicit TjsValue(const TjsInteger& value);
 
-        explicit TjsValue(const TjsReal& value) :
-            _value{ ._real = value },
-            _type(TjsValueType::Real) {
-        }
+        explicit TjsValue(const TjsReal& value);
 
-        explicit TjsValue(const TjsString&);
+        explicit TjsValue(const std::string&);
 
         explicit TjsValue(const TjsOctet&);
 
@@ -61,90 +56,59 @@ namespace Ciallang {
 
         [[nodiscard]] TjsReal asReal() const;
 
-        [[nodiscard]] TjsString* asString() const;
+        [[nodiscard]] std::string* asString() const;
 
         [[nodiscard]] TjsOctet* asOctet() const;
 
         [[nodiscard]] TjsObject* asObject() const;
 
+        [[nodiscard]] bool isVoid() const {
+            return _type == TjsValueType::Void;
+        }
+
+        [[nodiscard]] bool isInteger() const {
+            return _type == TjsValueType::Integer;
+        }
+
+        [[nodiscard]] bool isReal() const {
+            return _type == TjsValueType::Real;
+        }
+
+        [[nodiscard]] bool isString() const {
+            return _type == TjsValueType::String;
+        }
+
+        [[nodiscard]] bool isOctet() const {
+            return _type == TjsValueType::String;
+        }
+
+        [[nodiscard]] bool isObject() const {
+            return _type == TjsValueType::Object;
+        }
+
         [[nodiscard]] bool asBool() const;
 
-        [[nodiscard]] const char* name() const;
+        [[nodiscard]] std::string name() const;
 
-        TjsValue operator+(const TjsValue& tjsValue) const {
-            switch(tjsValue.type()) {
-                case TjsValueType::Integer:
-                    return TjsValue{ this->asInteger() + tjsValue.asInteger() };
-                case TjsValueType::Real:
-                    return TjsValue{ this->asReal() + tjsValue.asReal() };
-                default:
-                    throw std::logic_error("not support add operator");
-            }
-        }
+        TjsValue operator+(const TjsValue& tjsValue) const;
 
-        TjsValue operator-(const TjsValue& tjsValue) const {
-            switch(tjsValue.type()) {
-                case TjsValueType::Integer:
-                    return TjsValue{ this->asInteger() - tjsValue.asInteger() };
-                case TjsValueType::Real:
-                    return TjsValue{ this->asReal() - tjsValue.asReal() };
-                default:
-                    throw std::logic_error("not support sub operator");
-            }
-        }
+        TjsValue operator-(const TjsValue& tjsValue) const;
 
-        TjsValue operator*(const TjsValue& tjsValue) const {
-            switch(tjsValue.type()) {
-                case TjsValueType::Integer:
-                    return TjsValue{ this->asInteger() * tjsValue.asInteger() };
-                case TjsValueType::Real:
-                    return TjsValue{ this->asReal() * tjsValue.asReal() };
-                default:
-                    throw std::logic_error("not support mul operator");
-            }
-        }
+        TjsValue operator*(const TjsValue& tjsValue) const;
 
-        TjsValue operator/(const TjsValue& tjsValue) const {
-            switch(tjsValue.type()) {
-                case TjsValueType::Integer:
-                    return TjsValue{ this->asInteger() / tjsValue.asInteger() };
-                case TjsValueType::Real:
-                    return TjsValue{ this->asReal() / tjsValue.asReal() };
-                default:
-                    throw std::logic_error("not support div operator");
-            }
-        }
+        TjsValue operator/(const TjsValue& tjsValue) const;
 
-        TjsValue operator-() const {
-            switch(type()) {
-                case TjsValueType::Integer:
-                    return TjsValue{ -asInteger() };
-                case TjsValueType::Real:
-                    return TjsValue{ -asReal() };
-                default:
-                    throw std::logic_error("not number!! `operator-` can't use");
-            }
-        }
+        TjsValue operator-() const;
 
         bool operator==(const TjsValue& tjsValue) const;
 
-        std::partial_ordering operator<=>(const TjsValue& tjsValue) const {
-            if(_type == TjsValueType::Integer
-               && tjsValue._type == TjsValueType::Integer) {
-                return asInteger() <=> tjsValue.asInteger();
-            }
-            if(_type != TjsValueType::String
-               || tjsValue._type != TjsValueType::String) {
-                return asReal() <=> tjsValue.asReal();
-            }
-            return asString() <=> tjsValue.asString();
-        }
+        std::partial_ordering operator<=>(const TjsValue& tjsValue) const;
 
     private:
         union {
             TjsInteger _integer;
             TjsReal _real;
-            TjsString* _string;
+            std::string* _string;
             TjsOctet* _octet;
             TjsObject* _object;
         } _value{};
@@ -161,56 +125,6 @@ namespace Ciallang {
 
     static TjsValue tjsReal(const TjsReal value) {
         return TjsValue{ value };
-    }
-
-    template <>
-    inline void TjsIntegerHelper::copy(const TjsValue& src, TjsValue& dest) const {
-        dest._type = src._type;
-        dest._value._integer = src._value._integer;
-    }
-
-    template <>
-    inline void TjsIntegerHelper::move(TjsValue& src, TjsValue& dest) const {
-        dest._type = src._type;
-        dest._value._integer = src._value._integer;
-    }
-
-    template <>
-    inline void TjsIntegerHelper::destroy(TjsValue&) const {
-        // nothing to do
-    }
-
-
-    template <>
-    inline void TjsRealHelper::copy(const TjsValue& src, TjsValue& dest) const {
-        dest._type = src._type;
-        dest._value._real = src._value._real;
-    }
-
-    template <>
-    inline void TjsRealHelper::move(TjsValue& src, TjsValue& dest) const {
-        dest._type = src._type;
-        dest._value._real = src._value._real;
-    }
-
-    template <>
-    inline void TjsRealHelper::destroy(TjsValue&) const {
-        // nothing to do
-    }
-
-    template <>
-    inline void TjsVoidHelper::copy(const TjsValue& src, TjsValue& dest) const {
-        dest._type = src._type;
-    }
-
-    template <>
-    inline void TjsVoidHelper::move(TjsValue& src, TjsValue& dest) const {
-        dest._type = src._type;
-    }
-
-    template <>
-    inline void TjsVoidHelper::destroy(TjsValue&) const {
-        // nothing to do
     }
 } // namespace Ciallang
 

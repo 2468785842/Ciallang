@@ -4,8 +4,8 @@ enable_testing()
 
 project(Ciallang CXX)
 
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 macro(get_source_file directory)
     file(GLOB ${directory}_SOURCE_FILES "${CMAKE_SOURCE_DIR}/src/${directory}/*.[ch]pp")
@@ -34,9 +34,12 @@ add_executable(
         ${vm_SOURCE_FILES}
 )
 
-target_include_directories(vm_instruction_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/src
-)
+if(MSVC)
+  target_compile_options(vm_instruction_test PUBLIC "/ZI")
+  target_link_options(vm_instruction_test PUBLIC "/INCREMENTAL")
+endif()
+
+include_directories(${CMAKE_SOURCE_DIR}/src)
 
 include(cmake/depend.cmake)
 find_package(gtest REQUIRED)
@@ -56,7 +59,6 @@ target_link_libraries(
 )
 
 target_precompile_headers(vm_instruction_test PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
-
 
 include(GoogleTest)
 gtest_discover_tests(vm_instruction_test)

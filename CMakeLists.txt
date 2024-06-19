@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(Ciallang CXX)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+
+
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 
 set(SOURCE_FILES
@@ -10,7 +13,6 @@ set(SOURCE_FILES
         src/lexer/Token.hpp
         src/lexer/IEEETypes.hpp
 
-        src/common/ConstExpr.hpp
         src/common/SourceLocation.cpp
         src/common/Result.hpp
         src/common/ResultMessage.hpp
@@ -22,29 +24,27 @@ set(SOURCE_FILES
         src/parser/Parser.cpp
 
         src/ast/Ast.cpp
-        src/ast/AstFormatter.cpp
 
         src/ast/AstNode.hpp
         src/ast/ExprNode.hpp
         src/ast/StmtNode.hpp
         src/ast/DeclNode.hpp
+        src/ast/AstFormatter.hpp
 
-        src/compiler/Compiler.cpp
+        src/gen/BytecodeGen.cpp
 
-        src/gen/CodeGen.cpp
 
         # ############################################
         src/vm/Interpreter.cpp
-        src/vm/VMChunk.cpp
+        src/vm/Chunk.cpp
         src/vm/Rlc.cpp
-        src/vm/Memory.hpp
-        src/vm/Instruction.hpp
-        src/vm/DataPool.hpp
+        src/vm/Instruction.cpp
+        src/vm/Register.hpp
+        src/vm/Label.hpp
 
         src/types/TjsNativeFunction.hpp
         src/types/TjsFunction.hpp
         src/types/TjsOctet.cpp
-        src/types/TjsString.cpp
         src/types/TjsObject.cpp
         src/types/TjsValue.cpp
         src/types/TjsTypes.hpp
@@ -58,6 +58,12 @@ add_executable(${PROJECT_NAME}
         ${SOURCE_FILES}
 )
 
+if(MSVC)
+  target_compile_options(${PROJECT_NAME} PUBLIC "/ZI")
+  target_link_options(${PROJECT_NAME} PUBLIC "/INCREMENTAL")
+endif()
+
+include_directories(${CMAKE_SOURCE_DIR}/src)
 target_precompile_headers(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
 
 include(cmake/depend.cmake)

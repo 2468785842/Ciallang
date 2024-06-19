@@ -12,7 +12,13 @@
 
 #pragma once
 
-#include "../common/SourceLocation.hpp"
+#include "common/SourceLocation.hpp"
+#include "vm/Chunk.hpp"
+#include "vm/Register.hpp"
+
+namespace Ciallang::Inter {
+    class BytecodeGen;
+}
 
 namespace Ciallang::Syntax {
     class AstNode;
@@ -25,7 +31,7 @@ namespace Ciallang::Syntax {
 
     class ValueExprNode;
 
-    class SymbolExprNode;
+    class IdentifierExprNode;
 
     class BinaryExprNode;
 
@@ -64,7 +70,7 @@ namespace Ciallang::Syntax {
 
         explicit AstNode(
             Token& token, std::string&& name
-        ) : token(new Token{ std::move(token) }), _name(std::move(name)) {
+        ) : token(std::make_unique<Token>(std::move(token))), _name(std::move(name)) {
             location = this->token->location;
         }
 
@@ -75,12 +81,11 @@ namespace Ciallang::Syntax {
 
         AstNode() = delete;
 
-        // just for Gen Graphviz used
-        const uint64_t id = serialId++;
-
         SourceLocation location{};
 
-        virtual void accept(Visitor* visitor) const = 0;
+        virtual void accept(Visitor*) const = 0;
+
+        virtual std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen*) const = 0;
 
         [[nodiscard]] std::string_view name() const noexcept {
             return _name;
@@ -89,7 +94,6 @@ namespace Ciallang::Syntax {
         virtual ~AstNode() = default;
 
     private:
-        static inline uint64_t serialId = 0;
         const std::string _name{};
     };
 
@@ -104,7 +108,7 @@ namespace Ciallang::Syntax {
 
         virtual void visit(const ValueExprNode*) = 0;
 
-        virtual void visit(const SymbolExprNode*) = 0;
+        virtual void visit(const IdentifierExprNode*) = 0;
 
         virtual void visit(const BinaryExprNode*) = 0;
 

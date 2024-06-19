@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include "pch.h"
+
 namespace Ciallang::Common {
     // N.B. this is not thread safe
     extern bool G_ColorEnabled;

@@ -15,6 +15,8 @@
 
 #include "AstNode.hpp"
 
+#include "gen/BytecodeGen.hpp"
+
 namespace Ciallang::Syntax {
     class DeclNode : public AstNode {
     protected:
@@ -23,17 +25,21 @@ namespace Ciallang::Syntax {
 
     class VarDeclNode final : public DeclNode {
     public:
-        const ExprStmtNode* rhs;
+        const ExprNode* rhs;
 
         VarDeclNode() = delete;
 
         explicit VarDeclNode(
-            Token& token, const ExprStmtNode* rhs
+            Token& token, const ExprNode* rhs
         ) : DeclNode(token, "var_declaration"), rhs(rhs) {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
+        }
+
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+            return gen->generate(this);
         }
     };
 
@@ -52,6 +58,10 @@ namespace Ciallang::Syntax {
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
+
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+            return gen->generate(this);
+        }
     };
 
     class StmtDeclNode final : public DeclNode {
@@ -67,6 +77,10 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
+        }
+
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+            return gen->generate(this);
         }
     };
 }

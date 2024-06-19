@@ -19,51 +19,12 @@
 #include "DeclNode.hpp"
 
 namespace Ciallang::Syntax {
-    BlockStmtNode* AstBuilder::popScope() {
-        if(_scopeStack.empty())
-            return nullptr;
-        const auto top = _scopeStack.top();
-        _scopeStack.pop();
-        return top;
-    }
 
-    BlockStmtNode* AstBuilder::endScope() {
-        return popScope();
-    }
-
-    BlockStmtNode* AstBuilder::beginScope() {
-        if(_scopeStack.empty()) {
-            return globalNode();
-        }
-        return basicBlockNode();
-    }
-
-    BlockStmtNode* AstBuilder::globalNode() {
-        auto* scope = makeNode<BlockStmtNode>("global_scope");
-        _scopeStack.push(scope);
-        return scope;
-    }
-
-    BlockStmtNode* AstBuilder::basicBlockNode() {
-        auto* scope = makeNode<BlockStmtNode>("basic_scope");
-        _scopeStack.push(scope);
-        return scope;
-    }
-
-    void AstBuilder::pushScope(BlockStmtNode* node) {
-        _scopeStack.push(node);
-    }
 
     AstBuilder::~AstBuilder() {
-        reset();
         for(const auto& val : _nodes)
             delete val;
         _nodes.clear();
-    }
-
-    void AstBuilder::reset() {
-        while(!_scopeStack.empty())
-            _scopeStack.pop();
     }
 
     ExprStmtNode* AstBuilder::makeExprStmtNode(const ExprNode* rhs) {
@@ -107,16 +68,12 @@ namespace Ciallang::Syntax {
         return makeNode<ProcCallExprNode>(lhs);
     }
 
-    AssignExprNode* AstBuilder::makeAssignExprNode(const SymbolExprNode* lhs, const ExprNode* rhs) {
+    AssignExprNode* AstBuilder::makeAssignExprNode(const IdentifierExprNode* lhs, const ExprNode* rhs) {
         return makeNode<AssignExprNode>(lhs, rhs);
     }
 
-    SymbolExprNode* AstBuilder::makeSymbolExprNode(Token&& token) {
-        return makeNode<SymbolExprNode>(token);
-    }
-
-    VarDeclNode* AstBuilder::makeVarDeclNode(Token&& token, const ExprStmtNode* rhs) {
-        return makeNode<VarDeclNode>(token, rhs);
+    IdentifierExprNode* AstBuilder::makeSymbolExprNode(Token&& token) {
+        return makeNode<IdentifierExprNode>(token);
     }
 
     FunctionDeclNode* AstBuilder::makeFunctionDeclNode(Token&& token) {
@@ -139,15 +96,4 @@ namespace Ciallang::Syntax {
         return makeNode<ReturnStmtNode>(node);
     }
 
-    template <typename R, typename... Args>
-    R* AstBuilder::makeNode(Args&&... args) {
-        static_assert(
-            std::is_base_of_v<AstNode, R>,
-            "Error: R must be a derived class of AstNode."
-        );
-
-        R* node = new R{ std::forward<Args>(args)... };
-        _nodes.push_front(node);
-        return node;
-    }
 }

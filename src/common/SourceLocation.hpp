@@ -14,8 +14,9 @@
 
 #pragma once
 
+#include "pch.h"
+
 namespace Ciallang::Common {
-    using namespace std;
 
     struct LocationType {
         uint32_t line = 0;

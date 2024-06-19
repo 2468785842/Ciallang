@@ -13,9 +13,10 @@
  */
 #pragma once
 
-#include "../common/SourceLocation.hpp"
+#include "pch.h"
+#include "common/SourceLocation.hpp"
 
-namespace Ciallang::VM {
+namespace Ciallang::Bytecode {
     class Rlc {
     public:
         explicit Rlc(std::filesystem::path path) : _path(std::move(path)) {

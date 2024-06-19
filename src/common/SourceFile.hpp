@@ -14,11 +14,12 @@
 
 #pragma once
 
+#include "pch.h"
+
 #include "Result.hpp"
 
 namespace Ciallang::Common {
-    using namespace std;
-    using SourceFileRangeType = pair<size_t, size_t>;
+    using SourceFileRangeType = std::pair<size_t, size_t>;
 
     struct SourceFileRangeCompareType {
         bool operator()(
@@ -39,7 +40,7 @@ namespace Ciallang::Common {
     public:
         SourceFile() = default;
 
-        explicit SourceFile(filesystem::path path) : _path(std::move(path)) {
+        explicit SourceFile(std::filesystem::path path) : _path(std::move(path)) {
         }
 
         ~SourceFile() = default;
@@ -50,7 +51,7 @@ namespace Ciallang::Common {
 
         void error(
                 Result &r,
-                const string &message,
+                const std::string &message,
                 const SourceLocation &location) const;
 
         [[nodiscard]] bool eof() const;
@@ -83,7 +84,7 @@ namespace Ciallang::Common {
 
         [[nodiscard]] uint32_t columnByIndex(size_t index) const;
 
-        [[nodiscard]] string substring(size_t start, size_t end) const;
+        [[nodiscard]] std::string substring(size_t start, size_t end) const;
 
         [[nodiscard]] const SourceFileLineType *lineByNumber(size_t line) const;
 
@@ -95,11 +96,11 @@ namespace Ciallang::Common {
         void buildLines(Result &r);
 
         size_t _index = 0;
-        filesystem::path _path;
-        vector<uint8_t> _buffer;
-        stack<size_t> _markStack{};
-        map<size_t, SourceFileLineType *> _linesByNumber{};
-        map<
+        std::filesystem::path _path;
+        std::vector<uint8_t> _buffer;
+        std::stack<size_t> _markStack{};
+        std::map<size_t, SourceFileLineType *> _linesByNumber{};
+        std::map<
                 SourceFileRangeType,
                 SourceFileLineType,
                 SourceFileRangeCompareType> _linesByIndexRange{};

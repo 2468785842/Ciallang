@@ -13,71 +13,61 @@
  */
 #pragma once
 
+#include "pch.h"
+
 #include "TjsObject.hpp"
-#include "../vm/VMChunk.hpp"
+#include "vm/Chunk.hpp"
 
 namespace Ciallang {
     class TjsFunction final : public TjsObject {
     public:
-        using VMChunkPtr = std::shared_ptr<VM::VMChunk>;
-        using DefParameters = std::vector<std::unique_ptr<VM::VMChunk>>;
-        using DefParametersPtr = std::shared_ptr<DefParameters>;
+        using VMChunkPtr = std::shared_ptr<Bytecode::Chunk>;
 
         TjsFunction() = delete;
 
         explicit TjsFunction(
-            VM::VMChunk&& chunk,
+            Bytecode::Chunk&& chunk,
             const std::string& name
-        ): _chunk(std::make_shared<VM::VMChunk>(std::move(chunk))), _name(name) {
+        ): _chunk(std::make_shared<Bytecode::Chunk>(std::move(chunk))), _name(name) {
         }
 
         explicit TjsFunction(
-            DefParameters&& defParameters,
-            VM::VMChunk&& chunk,
-            const std::string& name
-        ): _defParameters(std::make_shared<DefParameters>(std::move(defParameters))),
-           _chunk(std::make_shared<VM::VMChunk>(std::move(chunk))), _name(name) {
+            Bytecode::Chunk&& chunk,
+            const std::string& name,
+            const size_t arity
+        ): _chunk(std::make_shared<Bytecode::Chunk>(std::move(chunk))),
+           _name(name), _arity(arity) {
         }
 
         // clone
         explicit TjsFunction(
-            const DefParametersPtr& defParameters,
-            const VMChunkPtr& chunk,
-            const std::string& name
-        ): _defParameters(defParameters), _chunk(chunk), _name(name) {
+            VMChunkPtr& chunk,
+            std::string& name,
+            const size_t arity
+        ): _chunk(chunk), _name(name), _arity(arity) {
         }
 
         [[nodiscard]] std::string_view name() const noexcept override {
             return _name;
         }
 
-        [[nodiscard]] const auto& chunk() const {
-            return _chunk;
-        }
-
-        [[nodiscard]] const DefParametersPtr& parameters() const noexcept {
-            return _defParameters;
+        [[nodiscard]] Bytecode::Chunk* chunk() const {
+            return _chunk.get();
         }
 
         [[nodiscard]] size_t arity() const noexcept override {
-            return _defParameters->size();
+            return _arity;
         }
 
         [[nodiscard]] bool isNative() const noexcept override {
             return false;
         }
 
-        [[nodiscard]] std::unique_ptr<TjsObject> clone() const noexcept override {
-            return std::make_unique<TjsFunction>(
-                _defParameters, _chunk, _name
-            );
-        }
-
         ~TjsFunction() noexcept override = default;
 
     private:
-        const DefParametersPtr _defParameters{ nullptr };
         const VMChunkPtr _chunk{ nullptr };
         const std::string _name{};
+        const size_t _arity{};
     };
 }

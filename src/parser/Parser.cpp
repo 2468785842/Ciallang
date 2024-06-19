@@ -14,11 +14,9 @@
 
 #include "Parser.hpp"
 
-#include "../ast/AstFormatter.hpp"
-
-#include "../ast/ExprNode.hpp"
-#include "../ast/StmtNode.hpp"
-#include "../ast/DeclNode.hpp"
+#include "ast/ExprNode.hpp"
+#include "ast/StmtNode.hpp"
+#include "ast/DeclNode.hpp"
 
 namespace Ciallang::Syntax {
     using namespace Common;
@@ -70,12 +68,12 @@ namespace Ciallang::Syntax {
         for(;;) {
             if(!parser->peek(TokenType::Identifier)) {
                 parser->error(r,
-                    "function parameter expect a identitier",
+                    "function parameter expect a identifier",
                     funNode->location);
                 return false;
             }
-            Token identiter{};
-            parser->current(identiter);
+            Token identifier{};
+            parser->current(identifier);
             parser->consume();
 
 
@@ -89,7 +87,7 @@ namespace Ciallang::Syntax {
                 if(!expr) return false;
             }
 
-            funNode->parameters.emplace_back(identiter, expr);
+            funNode->parameters.emplace_back(identifier, expr);
 
             if(parser->peek(TokenType::RParenthesis)) {
                 parser->consume();
@@ -100,24 +98,6 @@ namespace Ciallang::Syntax {
         }
 
         return true;
-    }
-
-    void Parser::writeAstGraph(
-        const filesystem::path& path, AstNode* programNode
-    ) {
-        auto closeRequired = false;
-        FILE* astOutputFile = stdout;
-        if(!path.empty()) {
-            fopen_s(&astOutputFile,
-                path.string().c_str(),
-                "wt");
-            closeRequired = true;
-        }
-
-        AstFormatter formatter(programNode, astOutputFile);
-        formatter.format(fmt::format("AST Graph: {}", path.string()));
-
-        if(closeRequired) fclose(astOutputFile);
     }
 
     bool Parser::lookAhead(const size_t count) {
@@ -231,9 +211,9 @@ namespace Ciallang::Syntax {
     }
 
     AstNode* Parser::parse(Result& r) {
-        auto* global = _astBuilder.beginScope();
+        auto* global = _astBuilder.makeNode<BlockStmtNode>();
         parseScope(r, global);
-        return _astBuilder.endScope();
+        return global;
     }
 
     void Parser::parseScope(
@@ -393,14 +373,16 @@ namespace Ciallang::Syntax {
         VarDeclNode* varDeclNode{ nullptr };
         if(!parser->peek(TokenType::Identifier)) return nullptr;
 
-        Token identiter;
-        auto line = identiter.location;
-        parser->current(identiter);
+        Token identifier;
+        auto line = identifier.location;
+        parser->current(identifier);
         parser->consume();
 
         if(parser->peek(TokenType::SemiColon)) {
             parser->consume();
-            varDeclNode = parser->astBuilder()->makeVarDeclNode(std::move(identiter));
+            varDeclNode = parser
+                          ->astBuilder()
+                          ->makeNode<VarDeclNode>(identifier, nullptr);
             varDeclNode->location = line;
             return varDeclNode;
         }
@@ -408,33 +390,28 @@ namespace Ciallang::Syntax {
         if(!parser->expect(r, &S_Assignment))
             return nullptr;
 
-        auto* rhs = parser->parseStatement(r);
+        auto* rhs = parser->parseExpression(r);
 
         if(!rhs) return nullptr;
 
-        auto* exprStmtNode = dynamic_cast<ExprStmtNode*>(rhs);
-        if(!exprStmtNode) {
-            parser->error(r,
-                "var declaration; right-hand-side expect expression statment",
-                rhs->location);
-
+        if(!parser->expect(r, &S_SemiColon)) {
             return nullptr;
         }
 
         varDeclNode = parser->astBuilder()
-                            ->makeVarDeclNode(std::move(identiter), exprStmtNode);
-        varDeclNode->location = exprStmtNode->location;
+                            ->makeNode<VarDeclNode>(identifier, rhs);
+        varDeclNode->location = rhs->location;
 
         return varDeclNode;
     }
 
     DeclNode* FunctionDeclParser::parse(Result& r, Parser* parser, Token* token) const {
-        Token identitier{};
-        if(!parser->consume(identitier)) return nullptr;
+        Token identifier{};
+        if(!parser->consume(identifier)) return nullptr;
 
         auto* functionDeclNode = parser
                                  ->astBuilder()
-                                 ->makeFunctionDeclNode(std::move(identitier));
+                                 ->makeFunctionDeclNode(std::move(identifier));
 
         // it's ok
         // function a {
@@ -464,7 +441,7 @@ namespace Ciallang::Syntax {
     StmtNode* BlockStmtParser::parse(
         Result& r, Parser* parser, Token* token
     ) const {
-        auto* scope = parser->astBuilder()->beginScope();
+        auto* scope = parser->astBuilder()->makeNode<BlockStmtNode>();
 
         scope->location.start(token->location.start());
 
@@ -477,7 +454,6 @@ namespace Ciallang::Syntax {
                 "scope expected token '}'",
                 token->location);
 
-            parser->astBuilder()->endScope();
             return nullptr;
         }
 
@@ -486,7 +462,7 @@ namespace Ciallang::Syntax {
         parser->consume();
 
         scope->location.end(terminatorToken.location.end());
-        return parser->astBuilder()->endScope();
+        return scope;
     }
 
     StmtNode* IfStmtParser::parse(
@@ -500,18 +476,19 @@ namespace Ciallang::Syntax {
 
         if(!body) return nullptr;
 
-        parser->astBuilder()
-              ->beginScope()
-              ->childrens.push_back(
-                  parser->astBuilder()->makeStmtDeclNode(body)
-              );
+        auto* bodyScope = dynamic_cast<BlockStmtNode*>(body);
+
+        if(!bodyScope) {
+            bodyScope = parser->astBuilder()
+                              ->makeNode<BlockStmtNode>();
+            bodyScope->childrens.push_back(
+                parser->astBuilder()->makeStmtDeclNode(body)
+            );
+        }
 
         auto* ifNode = parser
                        ->astBuilder()
-                       ->makeIfStmtNode(test,
-                           parser->astBuilder()->endScope()
-                       );
-
+                       ->makeIfStmtNode(test, bodyScope);
 
         ifNode->location.start(token->location.start());
         ifNode->location.end(ifNode->body->location.end());
@@ -523,14 +500,18 @@ namespace Ciallang::Syntax {
 
             auto* elseBody = parser->parseStatement(r);
 
-            if(!ifNode->elseBody) return nullptr;
+            if(!elseBody) return nullptr;
 
-            parser->astBuilder()
-                  ->beginScope()
-                  ->childrens.push_back(
-                      parser->astBuilder()->makeStmtDeclNode(elseBody)
-                  );
-            ifNode->elseBody = parser->astBuilder()->endScope();
+            auto* elseBodyScope = dynamic_cast<BlockStmtNode*>(elseBody);
+
+            if(!elseBodyScope) {
+                elseBodyScope = parser->astBuilder()
+                                      ->makeNode<BlockStmtNode>();
+                elseBodyScope->childrens.push_back(
+                    parser->astBuilder()->makeStmtDeclNode(elseBody)
+                );
+            }
+            ifNode->elseBody = elseBodyScope;
 
             ifNode->location.end(ifNode->elseBody->location.end());
         }
@@ -542,19 +523,20 @@ namespace Ciallang::Syntax {
         const auto* test = createExpressionNode(r, parser);
         if(!test) return nullptr;
 
-        const auto* body = parser->parseStatement(r);
+        auto* body = parser->parseStatement(r);
         if(!body) return nullptr;
 
-        parser->astBuilder()
-              ->beginScope()
-              ->childrens.push_back(
-                  parser->astBuilder()->makeStmtDeclNode(body)
-              );
+        auto* bodyScope = dynamic_cast<BlockStmtNode*>(body);
+        if(!bodyScope) {
+            bodyScope = parser->astBuilder()
+                              ->makeNode<BlockStmtNode>();
+            bodyScope->childrens.push_back(
+                parser->astBuilder()->makeStmtDeclNode(body)
+            );
+        }
 
         auto whileNode = parser->astBuilder()
-                               ->makeWhileStmtNode(test,
-                                   parser->astBuilder()->endScope()
-                               );
+                               ->makeWhileStmtNode(test, bodyScope);
 
         whileNode->location.start(token->location.start());
         whileNode->location.end(token->location.end());
@@ -618,7 +600,7 @@ namespace Ciallang::Syntax {
 
         if(!_withAssignment) return binOpNode;
 
-        const SymbolExprNode* symbolExprNode = dynamic_cast<SymbolExprNode*>(lhs);
+        const IdentifierExprNode* symbolExprNode = dynamic_cast<IdentifierExprNode*>(lhs);
 
         if(!symbolExprNode) {
             parser->error(r,
@@ -637,11 +619,11 @@ namespace Ciallang::Syntax {
     ExprNode* ProcCallInfixParser::parse(Result& r, Parser* parser,
                                          ExprNode* lhs, Token* token) const {
         // check
-        if(!dynamic_cast<SymbolExprNode*>(lhs)) {
+        if(!dynamic_cast<IdentifierExprNode*>(lhs)) {
             if(auto binaryExprNode = dynamic_cast<BinaryExprNode*>(lhs);
                 !binaryExprNode || *binaryExprNode->token != S_Dot) {
                 parser->error(r,
-                    "proc call expect identitier",
+                    "proc call expect identifier",
                     token->location);
                 return nullptr;
             }

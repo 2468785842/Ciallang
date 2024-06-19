@@ -29,24 +29,24 @@
 #include <utility>
 
 #include <set>
-#include <forward_list>
 #include <stack>
 #include <vector>
 #include <map>
 #include <unordered_map>
 #include <ranges>
+#include <optional>
 
 #include <functional>
 #include <compare>
 
 #include <glog/logging.h>
 
-
 #include <frozen/unordered_map.h>
 #include <frozen/string.h>
-
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <fmt/color.h>
 #include <fmt/printf.h>
+#include <fmt/core.h>
+#include <fmt/args.h>

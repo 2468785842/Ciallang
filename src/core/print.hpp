@@ -13,7 +13,9 @@
  */
 #pragma once
 
-#include "../types/TjsNativeFunction.hpp"
+#include "pch.h"
+
+#include "types/TjsNativeFunction.hpp"
 
 namespace Ciallang::Core {
     static const auto S_PrintFunction = TjsNativeFunction{

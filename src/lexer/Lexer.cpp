@@ -14,11 +14,10 @@
 
 #include "Lexer.hpp"
 
-#include "../types/TjsOctet.hpp"
-#include "../types/TjsString.hpp"
-#include "../types/TjsValue.hpp"
-#include "../common/Defer.hpp"
-#include "../common/UTF8.hpp"
+#include "types/TjsOctet.hpp"
+#include "types/TjsValue.hpp"
+#include "common/Defer.hpp"
+#include "common/UTF8.hpp"
 
 #include "IEEETypes.hpp"
 
@@ -711,11 +710,11 @@ bool Lexer::identifier(Token*& token) {
         return true;
     }
 
-    token = makeToken(TokenType::Identifier, TjsString::tjsString(name));
+    token = makeToken(TokenType::Identifier, TjsValue{ std::move(name) });
     return true;
 }
 
-string Lexer::readIdentifier() {
+std::string Lexer::readIdentifier() {
     auto ch = read(false);
     if(!isRuneLetter(ch)) {
         return "";
@@ -1198,7 +1197,7 @@ StringParseState Lexer::internalStringParser(
         str << runeType.data;
     }
 
-    token = makeToken(TokenType::ConstVal, TjsString::tjsString(str.str()));
+    token = makeToken(TokenType::ConstVal, TjsValue{ std::move(str.str()) });
 
     return strPsState;
 }

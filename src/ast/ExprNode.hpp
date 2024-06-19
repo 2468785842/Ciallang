@@ -12,8 +12,10 @@
 
 #pragma once
 
-#include "../lexer/Token.hpp"
 #include "AstNode.hpp"
+
+#include "lexer/Token.hpp"
+#include "gen/BytecodeGen.hpp"
 
 namespace Ciallang::Syntax {
     class ExprNode : public AstNode {
@@ -31,17 +33,25 @@ namespace Ciallang::Syntax {
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
+
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+            return gen->generate(this);
+        }
     };
 
-    class SymbolExprNode final : public ExprNode {
+    class IdentifierExprNode final : public ExprNode {
     public:
-        SymbolExprNode() = delete;
+        IdentifierExprNode() = delete;
 
-        explicit SymbolExprNode(Token& token) : ExprNode(token, "symbol") {
+        explicit IdentifierExprNode(Token& token) : ExprNode(token, "identifier") {
         }
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
+        }
+
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+            return gen->generate(this);
         }
     };
 
@@ -64,6 +74,10 @@ namespace Ciallang::Syntax {
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
+
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+            return gen->generate(this);
+        }
     };
 
     class ProcCallExprNode final : public ExprNode {
@@ -79,6 +93,10 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
+        }
+
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+            return gen->generate(this);
         }
     };
 
@@ -98,17 +116,21 @@ namespace Ciallang::Syntax {
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
         }
+
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+            return gen->generate(this);
+        }
     };
 
     class AssignExprNode final : public ExprNode {
     public:
-        const SymbolExprNode* lhs;
+        const IdentifierExprNode* lhs;
         const ExprNode* rhs;
 
         AssignExprNode() = delete;
 
         explicit AssignExprNode(
-            const SymbolExprNode* lhs,
+            const IdentifierExprNode* lhs,
             const ExprNode* rhs
         ) : ExprNode("assignment_expression"), lhs(lhs), rhs(rhs) {
             location.start(lhs->location.start());
@@ -117,6 +139,10 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor* visitor) const override {
             visitor->visit(this);
+        }
+
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+            return gen->generate(this);
         }
     };
 }

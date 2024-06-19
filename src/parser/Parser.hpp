@@ -14,9 +14,11 @@
 
 #pragma once
 
-#include "../lexer/Lexer.hpp"
-#include "../common/SourceFile.hpp"
-#include "../ast/Ast.hpp"
+#include "pch.h"
+
+#include "lexer/Lexer.hpp"
+#include "common/SourceFile.hpp"
+#include "ast/Ast.hpp"
 
 namespace Ciallang::Syntax {
     using namespace Common;
@@ -118,8 +120,6 @@ namespace Ciallang::Syntax {
 
         StmtNode* parseStatement(Result&);
 
-        static void writeAstGraph(const filesystem::path&, AstNode* programNode);
-
         bool expect(Result&, const Token*);
 
         [[nodiscard]] AstBuilder* astBuilder() const { return &_astBuilder; }
@@ -139,7 +139,7 @@ namespace Ciallang::Syntax {
 
         static const PrefixParser* prefixParserFor(TokenType type);
 
-        [[nodiscard]] constexpr const std::vector<Token*>& tokens() const {
+        [[nodiscard]] const std::vector<Token*>& tokens() const {
             return _lexer.tokens();
         }
     };
@@ -150,21 +150,21 @@ namespace Ciallang::Syntax {
      * +----------------------------------------------------------------------------+
      */
     struct VarDeclParser final : DeclParser {
-        constexpr VarDeclParser() = default;
+        VarDeclParser() = default;
 
         DeclNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
     struct FunctionDeclParser final : DeclParser {
-        constexpr FunctionDeclParser() = default;
+        FunctionDeclParser() = default;
 
         DeclNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
-    static constexpr VarDeclParser S_VarDeclParser{};
-    static constexpr FunctionDeclParser S_FunctionDeclParser{};
+    static constinit VarDeclParser S_VarDeclParser{};
+    static constinit FunctionDeclParser S_FunctionDeclParser{};
 
-    static constexpr auto S_DeclParsers =
+    static constinit auto S_DeclParsers =
             frozen::make_unordered_map<TokenType, const DeclParser*>({
                     { TokenType::Var, &S_VarDeclParser },
                     { TokenType::Function, &S_FunctionDeclParser }
@@ -176,45 +176,43 @@ namespace Ciallang::Syntax {
      * +----------------------------------------------------------------------------+
      */
     struct BlockStmtParser final : StmtParser {
-        constexpr BlockStmtParser() = default;
-
+        BlockStmtParser() = default;
         StmtNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
     struct IfStmtParser final : StmtParser {
-        constexpr IfStmtParser() = default;
-
+        IfStmtParser() = default;
         StmtNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
     struct WhileStmtParser final : StmtParser {
-        constexpr WhileStmtParser() = default;
+        WhileStmtParser() = default;
         StmtNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
     struct BreakStmtParser final : StmtParser {
-        constexpr BreakStmtParser() = default;
+        BreakStmtParser() = default;
         StmtNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
     struct ContinueStmtParser final : StmtParser {
-        constexpr ContinueStmtParser() = default;
+        ContinueStmtParser() = default;
         StmtNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
     struct ReturnStmtParser final : StmtParser {
-        constexpr ReturnStmtParser() = default;
+        ReturnStmtParser() = default;
         StmtNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
 
-    static constexpr BlockStmtParser S_BlockStmtParser{};
-    static constexpr IfStmtParser S_IfStmtParser{};
-    static constexpr WhileStmtParser S_WhileStmtParser{};
-    static constexpr BreakStmtParser S_BreakStmtParser{};
-    static constexpr ContinueStmtParser S_ContinueStmtParser{};
-    static constexpr ReturnStmtParser S_ReturnStmtParser{};
+    static constinit BlockStmtParser S_BlockStmtParser{};
+    static constinit IfStmtParser S_IfStmtParser{};
+    static constinit WhileStmtParser S_WhileStmtParser{};
+    static constinit BreakStmtParser S_BreakStmtParser{};
+    static constinit ContinueStmtParser S_ContinueStmtParser{};
+    static constinit ReturnStmtParser S_ReturnStmtParser{};
 
-    static constexpr auto S_StmtParsers =
+    static constinit auto S_StmtParsers =
             frozen::make_unordered_map<TokenType, const StmtParser*>({
                     { TokenType::LeftCurlyBrace, &S_BlockStmtParser },
                     { TokenType::If, &S_IfStmtParser },
@@ -231,7 +229,7 @@ namespace Ciallang::Syntax {
      */
 
     struct ConstValPrefixParser final : PrefixParser {
-        constexpr ConstValPrefixParser() = default;
+        ConstValPrefixParser() = default;
 
         ExprNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
@@ -248,7 +246,7 @@ namespace Ciallang::Syntax {
     };
 
     struct SymbolPrefixParser final : PrefixParser {
-        constexpr SymbolPrefixParser() = default;
+        SymbolPrefixParser() = default;
 
         ExprNode* parse(Result& r, Parser* parser, Token* token) const override;
     };
@@ -259,13 +257,13 @@ namespace Ciallang::Syntax {
     //        ExprNode *parse(Result &r, Parser *parser, Token *token) override;
     //    };
 
-    static constexpr ConstValPrefixParser S_ConstValPrefixParser{};
-    static constexpr UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
-    static constexpr SymbolPrefixParser S_SymbolPrefixParser;
-    static constexpr UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
+    static constinit ConstValPrefixParser S_ConstValPrefixParser{};
+    static constinit UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
+    static constinit SymbolPrefixParser S_SymbolPrefixParser;
+    static constinit UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
     //    static inline FunctionPrefixParser S_FunctionPrefixParser{};
 
-    static constexpr auto S_PrefixParsers =
+    static constinit auto S_PrefixParsers =
             frozen::make_unordered_map<TokenType, const PrefixParser*>({
                     // { TokenType::Const, &S_PrefixParser },
                     { TokenType::ConstVal, &S_ConstValPrefixParser },
@@ -305,16 +303,16 @@ namespace Ciallang::Syntax {
             const Precedence precedence,
             const bool isRightAssociative,
             const bool withAssignment = false
-        ) noexcept: _precedence(precedence),
-                    _withAssignment(withAssignment),
-                    _isRightAssociative(isRightAssociative) {
+        ) : _precedence(precedence),
+            _withAssignment(withAssignment),
+            _isRightAssociative(isRightAssociative) {
         }
 
 
         ExprNode* parse(Result& r, Parser* parser,
                         ExprNode* lhs, Token* token) const override;
 
-        [[nodiscard]] constexpr Precedence precedence() const override {
+        [[nodiscard]] Precedence precedence() const override {
             return _precedence;
         }
 
@@ -325,17 +323,17 @@ namespace Ciallang::Syntax {
     };
 
     struct ProcCallInfixParser final : InfixParser {
-        constexpr explicit ProcCallInfixParser() = default;
+        explicit ProcCallInfixParser() = default;
 
         ExprNode* parse(Result& r, Parser* parser,
                         ExprNode* lhs, Token* token) const override;
 
-        [[nodiscard]] constexpr Precedence precedence() const override {
+        [[nodiscard]] Precedence precedence() const override {
             return Precedence::call;
         }
     };
 
-    static constexpr BinaryOperatorInfixParser
+    static constinit BinaryOperatorInfixParser
             S_SumSubBinOpInfixParser{ Precedence::sum_sub, false },
             S_ProductBinOpParser{ Precedence::product, false },
             S_AssignBinOpParser{ Precedence::assignment, true, true },
@@ -349,9 +347,9 @@ namespace Ciallang::Syntax {
             S_LogicalAndBinOpParser{ Precedence::logical_and, false },
             S_MemberAccessBinOpParser{ Precedence::postfix, false };
 
-    static constexpr ProcCallInfixParser S_ProcCallInfixParser{};
+    static constinit ProcCallInfixParser S_ProcCallInfixParser{};
 
-    static constexpr auto S_InfixParsers =
+    static constinit auto S_InfixParsers =
             frozen::make_unordered_map<TokenType, const InfixParser*>({
                     { TokenType::Swap, &S_AssignBinOpParser },                    // <->
                     { TokenType::Assignment, &S_AssignBinOpParser },              // =

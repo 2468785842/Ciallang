@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "pch.h"
+
 #define SCOPE_GUARD_CONCATENATE_IMPL(s1, s2) s1##s2
 #define SCOPE_GUARD_CONCATENATE(s1, s2) SCOPE_GUARD_CONCATENATE_IMPL(s1, s2)
 // ScopeGuard for C++11

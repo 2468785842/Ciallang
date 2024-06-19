@@ -12,13 +12,15 @@
  *
  */
 
+#include "pch.h"
+
 #include "lexer/Lexer.hpp"
-#include "types/TjsString.hpp"
 #include "common/SourceFile.hpp"
-#include "core/print.hpp"
-#include "gen/CodeGen.hpp"
+#include "gen/BytecodeGen.hpp"
 #include "init/GlogInit.hpp"
 #include "parser/Parser.hpp"
+#include "parser/Parser.hpp"
+#include "vm/Interpreter.hpp"
 
 void testLexer() {
     Ciallang::Common::SourceFile source_file{ R"(.\startup.tjs)" };
@@ -65,24 +67,20 @@ int main(int /* argc */, char* * argv) {
     Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
     auto* globalNode = parser.parse(r);
 
-    Ciallang::Inter::CodeGen codeGen{ sourceFile };
+    Ciallang::Inter::BytecodeGen codeGen{ sourceFile };
     auto chunk = codeGen.parseAst(r, globalNode);
-    for(const auto& message : r.messages()) {
-        if(message.isError()) {
-            fmt::println("{}", message.message());
-            if(!message.details().empty())
-                fmt::println("{}", message.details());
-            fmt::println("");
-        }
-    }
 
-    Ciallang::VM::Interpreter interpreter{ sourceFile, std::move(*chunk.release()) };
+    Ciallang::Bytecode::Interpreter interpreter{};
 
-    interpreter.addNative(Ciallang::Core::S_PrintFunction);
-    interpreter.addNative(Ciallang::Core::S_PrintlnFunction);
-    // interpreter.dump();
+    fmt::println("{}", interpreter.dumpInstruction(*chunk));
+    auto start = std::chrono::high_resolution_clock::now();
+    interpreter.run(chunk.get());
+    fmt::println("{}", interpreter.dumpRegisters());
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = duration_cast<std::chrono::seconds>(end - start);
 
-    interpreter.run(r);
+    fmt::format("Time taken by function: {}s", duration.count());
+
     // testLexer();
     /*Ciallang::Inter::Compiler compiler{
             Ciallang::Inter::CompilerOptions{

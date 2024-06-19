@@ -14,34 +14,18 @@
 
 #pragma once
 
-#include "../lexer/Token.hpp"
+#include "lexer/Token.hpp"
 
 #include "AstNode.hpp"
 
 namespace Ciallang::Syntax {
     class AstBuilder {
-        std::stack<BlockStmtNode*> _scopeStack{};
-        std::forward_list<AstNode*> _nodes{};
+        std::vector<AstNode*> _nodes{};
 
     public:
         AstBuilder() = default;
 
         ~AstBuilder();
-
-        void reset();
-
-        // scope/block stack
-        BlockStmtNode* endScope();
-
-        BlockStmtNode* popScope();
-
-        BlockStmtNode* beginScope();
-
-        void pushScope(BlockStmtNode* node);
-
-        BlockStmtNode* globalNode();
-
-        BlockStmtNode* basicBlockNode();
 
         ExprStmtNode* makeExprStmtNode(const ExprNode* rhs);
 
@@ -58,12 +42,10 @@ namespace Ciallang::Syntax {
 
         ProcCallExprNode* makeProcCallExprNode(const ExprNode* lhs);
 
-        AssignExprNode* makeAssignExprNode(const SymbolExprNode* lhs,
+        AssignExprNode* makeAssignExprNode(const IdentifierExprNode* lhs,
                                            const ExprNode* rhs);
 
-        SymbolExprNode* makeSymbolExprNode(Token&& token);
-
-        VarDeclNode* makeVarDeclNode(Token&& token, const ExprStmtNode* rhs = nullptr);
+        IdentifierExprNode* makeSymbolExprNode(Token&& token);
 
         FunctionDeclNode* makeFunctionDeclNode(Token&& token);
 
@@ -76,6 +58,15 @@ namespace Ciallang::Syntax {
         ReturnStmtNode* makeReturnStmtNode(const ExprNode* node);
 
         template <typename R, typename... Args>
-        R* makeNode(Args&&... args);
+        R* makeNode(Args&&... args) {
+            static_assert(
+                std::is_base_of_v<AstNode, R>,
+                "Error: R must be a derived class of AstNode."
+            );
+
+            R* node = new R{ std::forward<Args>(args)... };
+            _nodes.push_back(node);
+            return node;
+        }
     };
 }

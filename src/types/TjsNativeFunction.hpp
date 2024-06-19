@@ -13,6 +13,9 @@
  */
 #pragma once
 
+#include "pch.h"
+
+#include "TjsValue.hpp"
 #include "TjsObject.hpp"
 
 namespace Ciallang {
@@ -63,12 +66,6 @@ namespace Ciallang {
 
         [[nodiscard]] bool isNative() const noexcept override {
             return true;
-        }
-
-        [[nodiscard]] std::unique_ptr<TjsObject> clone() const noexcept override {
-            return std::make_unique<TjsNativeFunction>(
-                _callback, _arity, _name
-            );
         }
 
         ~TjsNativeFunction() noexcept override = default;

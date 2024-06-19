@@ -13,165 +13,187 @@
  */
 #pragma once
 
+#include "pch.h"
 
-#include "VMChunk.hpp"
-#include "../common/ConstExpr.hpp"
-#include "../common/SourceFile.hpp"
+#include "Chunk.hpp"
+#include "types/TjsFunction.hpp"
 
-#include "../types/TjsValue.hpp"
-#include "../types/TjsFunction.hpp"
+#include "types/TjsValue.hpp"
 
-#include "../types/TjsNativeFunction.hpp"
+#include "vm/Register.hpp"
 
-#define STACK_MAX 2048
-
-namespace Ciallang::VM {
-    class VMChunk;
-
-    enum class InterpretResult {
-        OK,            // 正常结束
-        CONTINUE,      // 继续解释
-        COMPILE_ERROR, // 编译错误
-        RUNTIME_ERROR  // 运行错误
-    };
-
+namespace Ciallang::Bytecode {
+    // 每个 CallFrame 都有自己的一组 registers vector 太影响性能, 改为共享容器加偏移量.
     struct CallFrame {
-        const VMChunk* vmChunk;
-        size_t ip;
-        TjsValue* slots;
-        bool sub;
+        Chunk* chunk;
+        uint32_t registersOffset;
+        std::optional<Register> ret{};
+        size_t pc{};
+
+        explicit CallFrame(
+            Chunk* chunk_,
+            uint32_t registersOffset_,
+            std::optional<Register> ret_
+        ) : chunk(chunk_), registersOffset(registersOffset_), ret(ret_) {
+        }
+
+        CallFrame(CallFrame&& callFrame) noexcept :
+            chunk(callFrame.chunk),
+            ret(callFrame.ret), 
+            registersOffset(callFrame.registersOffset),
+            pc(callFrame.pc) {
+        }
+
+        CallFrame& operator=(CallFrame &&callFrame) noexcept {
+            if(this == &callFrame) return *this;
+
+            chunk = callFrame.chunk;
+            ret = callFrame.ret;
+            registersOffset = callFrame.registersOffset;
+            pc = callFrame.pc;
+
+            return *this;
+        }
+
+        CallFrame(const CallFrame&) = delete;
+        CallFrame& operator=(const CallFrame&) = delete;
     };
 
     class Interpreter {
-        template <Common::Name, intptr_t, Opcode>
-        friend struct MakeInstruction;
-
     public:
-        explicit Interpreter(Common::SourceFile& sourceFile, VMChunk&& chunk);
+        explicit Interpreter() = default;
 
-        InterpretResult run(Common::Result& r);
+        void run(Chunk* mainChunk);
 
-        void error(
-            Common::Result& r,
-            const std::string& message) const {
-            _sourceFile.error(r, message,
-                chunk()->rlc()->find(
-                    chunk()->bytecodes(callFrame().ip)
-                )
-            );
+        void reg(const Register reg, TjsValue value) {
+            auto index = reg.index() 
+                + _currentFrame->registersOffset;
+            allocReigsers(index);
+
+            _registers[index] = std::move(value);
+            ++_logicRegistersSize;
         }
 
-        void ip(const int16_t relativeIdx) noexcept {
-            _vm.frames[_vm.frameCount].ip += relativeIdx;
+        const TjsValue& reg(const Register reg) const {
+            auto index = reg.index()
+                + _currentFrame->registersOffset;
+
+            DCHECK_LT(index, _registers.size());
+
+            return _registers[index];
         }
 
-        [[nodiscard]] size_t ip() const noexcept {
-            return callFrame().ip;
+        const TjsValue& global(const std::string& identifier) const {
+            return _globals.at(identifier);
         }
 
-        [[nodiscard]] const VMChunk* chunk() const {
-            return callFrame().vmChunk;
+        void global(const std::string& identifier, TjsValue&& value) {
+            _globals[identifier] = std::move(value);
         }
 
-        [[nodiscard]] uint8_t readByte();
+        void setZF(const bool zf) { _ZF = zf; }
 
-        [[nodiscard]] const TjsValue& readConstant(size_t index) const;
+        bool getZF() const { return _ZF; }
 
-        [[nodiscard]] const TjsValue& peek(size_t distance) const;
-
-        void pushVoid();
-
-        void push(TjsValue&& value);
-
-        TjsValue popN(size_t n);
-
-        TjsValue pop();
-
-        TjsValue* popArgs(size_t count);
-
-        void putStack(size_t slot, TjsValue&& value) const;
-
-        [[nodiscard]] const TjsValue& getStack(size_t slot) const;
-
-        void addNative(const TjsNativeFunction& nFun);
-
-        void putGlobal(std::string&& key, TjsValue&& value);
-
-        [[nodiscard]] TjsValue* getGlobal(const std::string_view& key) const;
-
-        void printStack();
-
-        void printGlobal();
-
-        ~Interpreter() noexcept {
-            for(auto& val : _vm.globals | std::views::values) {
-                delete val;
-            }
-            delete _main;
+        void setPC(const Label label) {
+            _callStack.back().pc = label.address();
         }
 
-        bool call(const TjsFunction* const fun) {
-            auto slot = _vm.sp - fun->arity();
+        size_t getPC() const {
+            return _currentFrame->pc;
+        }
 
-            _vm.frames[++_vm.frameCount] = {
-                    fun->chunk().get(), 0, slot, false
+        void pushCallFrame(CallFrame&& frame) {
+            _callStack.push_back(std::move(frame));
+            _currentFrame = &_callStack.back();
+        }
+
+        CallFrame popCallFrame() {
+            CallFrame frame = std::move(*_currentFrame);
+            _callStack.pop_back();
+            _currentFrame = &_callStack.back();
+            _logicRegistersSize = frame.registersOffset;
+            return std::move(frame);
+        }
+
+        const std::vector<Op::Instruction*>& instructions() noexcept {
+            return _currentFrame->chunk->instructions();
+        }
+
+        const Chunk* current() const noexcept {
+            return _currentFrame->chunk;
+        }
+
+        CallFrame createCallFrame(Chunk* chunk, std::optional<Register> ret = {}) {
+            return CallFrame {
+                chunk, _logicRegistersSize, ret
             };
+        }
 
-            // default parameter;
-            for(size_t i = 0; i < fun->arity(); i++) {
-                if(auto chunk = fun->parameters()->at(i).get()) {
-                    _vm.frames[++_vm.frameCount] = {
-                            chunk, 0, slot + i, true
-                    };
+        std::string dumpRegisters() const {
+            std::stringstream ss{};
+            for(size_t i = 0; i < _logicRegistersSize; i++) {
+                ss << fmt::format("(%{}): {}\n", i, _registers[i]);
+            }
+            return ss.str();
+        }
+
+        std::string dumpInstruction(const Chunk& chunk) const {
+            std::stringstream ss{};
+            size_t pc{};
+            std::vector<TjsFunction*> functions{};
+            while(pc < chunk.instructions().size()) {
+                auto instruction = chunk.instructions()[pc];
+                ss << fmt::format(
+                    "{: <6}: {}\n", Label{ pc },
+                    instruction->dump(*this, false)
+                );
+
+                if(const auto loadIns = dynamic_cast<Op::Load*>(instruction);
+                    loadIns
+                    && loadIns->value().isObject()
+                ) {
+                    if(auto fun = dynamic_cast<TjsFunction*>(loadIns->value().asObject())) {
+                        functions.push_back(fun);
+                    }
                 }
+
+                ++pc;
             }
-
-            return true;
+            for(auto fun : functions) {
+                ss << fmt::format("{:=^30}\n",
+                    fmt::format(" function {} ", fun->name())
+                ) << dumpInstruction(*fun->chunk());
+            }
+            return ss.str();
         }
 
-        void resovleParameter(TjsValue&& val) const {
-            if(_vm.frames[_vm.frameCount].slots->type() == TjsValueType::Void) {
-                *_vm.frames[_vm.frameCount].slots = std::move(val);
+        void allocReigsers(size_t index) {
+            if (index >= _registers.size()) {
+                _registers.resize(index + 11);
+                CHECK_LE(_registers.size(), std::numeric_limits<uint32_t>::max());
             }
         }
-
-        [[nodiscard]] bool isSubCallFrame() const { return callFrame().sub; }
-
-        [[nodiscard]] const CallFrame& callFrame() const {
-            DCHECK_GE(_vm.frameCount, 0) << "call frames underflow";
-            return _vm.frames[_vm.frameCount];
-        }
-
-        void callFrameRet() {
-            _vm.sp = _vm.frames[_vm.frameCount].slots;
-            --_vm.frameCount;
-        }
-
-        [[nodiscard]] bool isCallFrameTop() const { return _vm.frameCount == 0; }
 
     private:
-        TjsFunction* _main;
-        Common::SourceFile& _sourceFile;
+        CallFrame* _currentFrame{ nullptr };
+        std::vector<CallFrame> _callStack{};
+        std::vector<TjsValue> _registers{};
+        uint32_t _logicRegistersSize{};
+        std::unordered_map<std::string, TjsValue> _globals{};
 
-        struct {
-            std::unordered_map<std::string, TjsValue*> globals{};
-
-            CallFrame frames[64];
-            size_t frameCount{ 0 };
-            TjsValue stack[STACK_MAX];
-            TjsValue* sp = stack;
-        } _vm{};
+        bool _ZF{ false };
 
     public:
-        [[nodiscard]] std::string disassembleLine() const {
-            auto& [line, column] =
-                    chunk()->rlc()->find(ip()).start();
+        void applyArgument(CallFrame& frame,
+                           const Register reg,
+                           TjsValue value) {
 
-            return !chunk()->rlc()->firstAppear(ip())
-                   ? fmt::format("{: <14}", fmt::format("@{}:{}", line + 1, column + 1))
-                   : fmt::format("{: <14}", "~");
+            auto index = reg.index() + frame.registersOffset;
+            allocReigsers(index);
+
+            _registers[index] = std::move(value);
+            ++_logicRegistersSize;
         }
-
-        void dump();
     };
 }

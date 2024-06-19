@@ -13,7 +13,7 @@
  */
 #include "Rlc.hpp"
 
-namespace Ciallang::VM {
+namespace Ciallang::Bytecode {
     // 字节码索引是否是这行的第一个
     [[nodiscard]] bool Rlc::firstAppear(const size_t bytecodeIndex) const {
         return std::ranges::any_of(

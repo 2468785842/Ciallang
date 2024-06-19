@@ -14,13 +14,15 @@
 
 #pragma once
 
+#include "pch.h"
+
 #include "SourceLocation.hpp"
 #include "ResultMessage.hpp"
 
 namespace Ciallang::Common {
     using namespace std;
 
-    class Result {
+    class [[nodiscard]] Result {
     public:
         Result() = default;
 
