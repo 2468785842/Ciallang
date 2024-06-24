@@ -16,7 +16,7 @@
 #include "pch.h"
 
 namespace Ciallang::Init {
-    inline void MyPrefixFormatter(std::ostream& s, const google::LogMessage& m, void* /*data*/) {
+    static void MyPrefixFormatter(std::ostream& s, const google::LogMessage& m, void* /*data*/) {
         using namespace std;
         s << fmt::format("{} {:02d}{:02d}{:02d} {:02d}:{:02d}:{:02d}",
                     GetLogSeverityName(m.severity()),
@@ -27,8 +27,9 @@ namespace Ciallang::Init {
     }
 
     // 初始化glog的函数
-    inline void InitializeGlog(char** argv) {
+    static void InitializeGlog(const int argc, char** argv) {
         using namespace std::chrono_literals;
+        if(argc == 0) return;
 
         auto logDir = std::filesystem::path(*argv)
                       .parent_path() / "log";

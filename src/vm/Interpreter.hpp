@@ -32,15 +32,15 @@ namespace Ciallang::Bytecode {
 
         explicit CallFrame(
             Chunk* chunk_,
-            uint32_t registersOffset_,
-            std::optional<Register> ret_
+            const uint32_t registersOffset_,
+            const std::optional<Register> ret_
         ) : chunk(chunk_), registersOffset(registersOffset_), ret(ret_) {
         }
 
         CallFrame(CallFrame&& callFrame) noexcept :
             chunk(callFrame.chunk),
-            ret(callFrame.ret), 
             registersOffset(callFrame.registersOffset),
+            ret(callFrame.ret),
             pc(callFrame.pc) {
         }
 
@@ -116,7 +116,7 @@ namespace Ciallang::Bytecode {
             return std::move(frame);
         }
 
-        const std::vector<Op::Instruction*>& instructions() noexcept {
+        const std::vector<Op::Instruction*>& instructions() const noexcept {
             return _currentFrame->chunk->instructions();
         }
 
@@ -124,7 +124,7 @@ namespace Ciallang::Bytecode {
             return _currentFrame->chunk;
         }
 
-        CallFrame createCallFrame(Chunk* chunk, std::optional<Register> ret = {}) {
+        CallFrame createCallFrame(Chunk* chunk, const std::optional<Register> ret = {}) const {
             return CallFrame {
                 chunk, _logicRegistersSize, ret
             };
@@ -168,7 +168,7 @@ namespace Ciallang::Bytecode {
             return ss.str();
         }
 
-        void allocReigsers(size_t index) {
+        void allocReigsers(const size_t index) {
             if (index >= _registers.size()) {
                 _registers.resize(index + 11);
                 CHECK_LE(_registers.size(), std::numeric_limits<uint32_t>::max());
@@ -185,7 +185,7 @@ namespace Ciallang::Bytecode {
         bool _ZF{ false };
 
     public:
-        void applyArgument(CallFrame& frame,
+        void applyArgument(const CallFrame& frame,
                            const Register reg,
                            TjsValue value) {
 

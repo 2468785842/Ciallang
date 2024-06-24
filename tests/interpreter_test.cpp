@@ -14,24 +14,14 @@
 
 #include <gtest/gtest.h>
 
-#include "vm/Interpreter.hpp"
+#include "../src/vm/Interpreter.hpp"
 
-#include "init/GlogInit.hpp"
-#include "parser/Parser.hpp"
-#include "ast/AstFormatter.hpp"
-#include "gen/BytecodeGen.hpp"
-#include "common/SourceFile.hpp"
+#include "../src/parser/Parser.hpp"
+#include "../src/ast/AstFormatter.hpp"
+#include "../src/gen/BytecodeGen.hpp"
+#include "../src/common/SourceFile.hpp"
 
-int main(int argc, char** argv) {
-    // Initialize Google's logging library.
-    Ciallang::Init::InitializeGlog(argv);
-    // Initialize GoogleTest.
-    testing::InitGoogleTest(&argc, argv);
-
-    return RUN_ALL_TESTS();
-}
-
-TEST(Interpreter, Execute) {
+TEST(InterpreterTest, TestExecute) {
     Ciallang::Common::Result r{};
 
     Ciallang::Common::SourceFile sourceFile{ R"(.\startup.tjs)" };

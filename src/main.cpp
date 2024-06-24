@@ -55,8 +55,8 @@ void testLexer() {
     }
 }
 
-int main(int /* argc */, char* * argv) {
-    Ciallang::Init::InitializeGlog(argv);
+int main(int argc, char* * argv) {
+    Ciallang::Init::InitializeGlog(argc, argv);
 
     Ciallang::Common::Result r{};
 
@@ -79,7 +79,7 @@ int main(int /* argc */, char* * argv) {
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = duration_cast<std::chrono::seconds>(end - start);
 
-    fmt::format("Time taken by function: {}s", duration.count());
+    fmt::println("Time taken by function: {}s", duration.count());
 
     // testLexer();
     /*Ciallang::Inter::Compiler compiler{
