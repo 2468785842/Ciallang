@@ -13,6 +13,8 @@
  */
 #include "Generational.hpp"
 
+#include "common/TableFormatter.hpp"
+
 namespace Ciallang::GC {
     Generational::Generational(
         const size_t size
@@ -25,7 +27,13 @@ namespace Ciallang::GC {
         _eden = _heap;
         _from = _eden + _edenSize;
         _to = _from + _survivorSize;
-        _majorGC = new MarkSweep{ size - newSize, _heap + newSize };
+
+        _majorGC = new MarkSweep{
+                MarkSweep::initFreeList(
+                    MarkSweep::resolveHeapSize(size - newSize),
+                    _heap + newSize
+                )
+        };
     }
 
     Generational::~Generational() {
@@ -43,32 +51,35 @@ namespace Ciallang::GC {
     }
 
     void Generational::printState() const {
-        const auto& [used, capacity] = _majorGC->memoryInfo();
-        static constexpr size_t TABLE_SIZE = 60;
-        static constexpr size_t TABLE_COL_SIZE = TABLE_SIZE >> 2;
+        static constexpr auto TABLE_SIZE = 60;
+        static constexpr auto COL_COUNT = 5;
 
-        fmt::print(
-            "+{0:-^{3}}+\n"
-            "|{2: ^{3}}|\n"
-            "+{0:-^{1}}+{0:-^{7}}+{0:-^{8}}+\n"
-            "|{4: ^{1}}|{5: ^{7}}|{0: ^{8}}|\n"
-            "+{0:-^{1}}+{0:-^{14}}+{0:-^{14}}+{0:-^{8}}+{6: ^{8}}+\n"
-            "|{9: ^{1}}|{10: ^{14}}|{11: ^{14}}|{12: ^{8}}|{13: ^{8}}|\n"
-            "+{0:-^{1}}+{0:-^{14}}+{0:-^{14}}+{0:-^{8}}+{0:-^{8}}+\n"
-            "|{15: ^{1}}|{16: ^{14}}|{17: ^{14}}|{18: ^{8}}|{19: ^{8}}|\n"
-            "|{20: ^{1}}|{21: ^{14}}|{22: ^{14}}|{23: ^{8}}|{24: ^{8}}|\n"
-            "|{25: ^{1}}|{26: ^{14}}|{27: ^{14}}|{28: ^{8}}|{29: ^{8}}|\n"
-            "|{30: ^{1}}|{31: ^{14}.2F}|{32: ^{14}.2F}|{33: ^{8}}|{34: ^{8}.2F}|\n"
-            "+{0:-^{3}}+\n",
-            "", 15, "Heap Usage", TABLE_SIZE + 15,                                                               // 0 ~ 3
-            "Generation", "New", "Old", TABLE_COL_SIZE * 3 - 2, TABLE_COL_SIZE,                                 // 4 ~ 8
-            "Space", "Eden", "From", "To", "", TABLE_COL_SIZE - 2,                                              // 9 ~ 14
-            "Capacity", _edenSize, _survivorSize, _survivorSize, capacity,                                  // 15 ~ 19
-            "Used", _nextFreeOffset, _nextForwardingOffset, 0, used,                                        // 20 ~ 24
-            "Free", _edenSize - _nextFreeOffset, _survivorSize - _nextForwardingOffset, 0, capacity - used, // 25 ~ 29
-            "Used(%)", static_cast<double>(_nextFreeOffset) / _edenSize * 100,
-            static_cast<double>(_nextForwardingOffset) / _survivorSize * 100, 0,
-            static_cast<double>(used) / capacity * 100 // 29 ~ 33
-        );
+        int oldSpaceCapacity = _heapSize - _edenSize - (_survivorSize << 1);
+        int oldSpaceUsed = _majorGC->freeHeap() - _majorGC->heap();
+        int oldSpaceFree = oldSpaceCapacity - oldSpaceUsed;
+
+        int edenFree = _edenSize - _nextFreeOffset;
+        int survivorFree = _survivorSize - _nextForwardingOffset;
+
+        const std::any table[][COL_COUNT] = {
+                { "Heap Usage", "Heap Usage", "Heap Usage", "Heap Usage", "Heap Usage" },
+                {},
+                { "Generation", "New", "New", "New", "Old" },
+                {},
+                { "Space", "Eden", "From", "To", "Old" },
+                {},
+                { "Capacity", _edenSize, _survivorSize, _survivorSize, oldSpaceCapacity },
+                { "Used", _nextFreeOffset, _nextForwardingOffset, 0, oldSpaceUsed },
+                { "Free", edenFree, survivorFree, 0, oldSpaceFree },
+                { "Used(%)",
+                  static_cast<double>(_nextFreeOffset) / _edenSize * 100,
+                  static_cast<double>(_nextForwardingOffset) / _survivorSize * 100,
+                  0.00,
+                  static_cast<double>(oldSpaceUsed) / oldSpaceCapacity * 100
+                }
+        };
+        static Common::TableFormatter formatter{ TABLE_SIZE, COL_COUNT };
+        formatter.parse(table);
+        formatter.println();
     }
 }

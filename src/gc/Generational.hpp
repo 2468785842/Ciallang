@@ -62,9 +62,9 @@ namespace Ciallang::GC {
                 auto fields = (*it)->getFields();
                 if(fields.has_value()) {
                     for(auto& field : fields.value()) {
-                        if(field < _majorGC->heap()) {
+                        if(reinterpret_cast<uintptr_t>(field) < _majorGC->heap()) {
                             copy(field);
-                            hasNewObj = field < _majorGC->heap();
+                            hasNewObj = reinterpret_cast<uintptr_t>(field) < _majorGC->heap();
                         }
                     }
                 }
@@ -113,12 +113,19 @@ namespace Ciallang::GC {
                 return;
             }
 
-            obj->ageIncrement();
             auto* forwarding = obj->copyTo(_to + _nextForwardingOffset);
             forwarding->forwarded(false);
             forwarding->remembered(false);
-
+            forwarding->ageIncrement();
             obj->forwarded(true);
+
+            for(auto& ptr : _rememberedSet) {
+                if(ptr == obj) {
+                    ptr = forwarding;
+                    break;
+                }
+            }
+
             obj = forwarding;
 
             _nextForwardingOffset += obj->size();
@@ -133,7 +140,7 @@ namespace Ciallang::GC {
         void promotion(GCObject*& obj) {
             _majorGC->reallocate(obj);
 
-            obj->forwarded(true);
+            // obj->forwarded(true);
 
             auto fields = obj->getFields();
             if(!fields.has_value()) return;
@@ -194,7 +201,7 @@ namespace Ciallang::GC {
         template <typename T>
             requires std::is_base_of_v<GCObject, T>
         void writeBarrier(GCObject* obj, T** fieldRef, T* newObj) {
-            if(obj >= _majorGC->heap()
+            if(reinterpret_cast<uintptr_t>(obj) >= _majorGC->heap()
                && reinterpret_cast<uintptr_t>(newObj)
                <= reinterpret_cast<uintptr_t>(_eden + _edenSize + _survivorSize)
                && !obj->remembered()) {

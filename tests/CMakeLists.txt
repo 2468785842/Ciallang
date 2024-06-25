@@ -47,6 +47,14 @@ add_executable(
         ${gc_SOURCE_FILES}
 )
 
+add_executable(
+        table_formatter_test
+        table_formatter_test.cpp
+        gtest_cfg.cpp
+        ${CMAKE_SOURCE_DIR}/src/init/GlogInit.hpp
+        ${CMAKE_SOURCE_DIR}/src/common/TableFormatter.hpp
+)
+
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
 include(cmake/depend.cmake)
@@ -73,9 +81,18 @@ target_link_libraries(
         fmt utf8proc frozen gflags glog gtest
 )
 
+target_link_libraries(
+        table_formatter_test
+        PRIVATE
+        GTest::gtest_main
+        fmt utf8proc frozen gflags glog gtest
+)
+
 target_precompile_headers(interpreter_test PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
 target_precompile_headers(gc_test PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
+target_precompile_headers(table_formatter_test PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
 
 include(GoogleTest)
 gtest_discover_tests(interpreter_test)
 gtest_discover_tests(gc_test)
+gtest_discover_tests(table_formatter_test)

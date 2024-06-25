@@ -35,9 +35,7 @@ namespace Ciallang::GC {
         bool marked() const noexcept { return _marked; }
         void marked(const bool marked) noexcept { _marked = marked; }
 
-        virtual std::optional<std::vector<GCObject*>> getFields() const {
-            return {};
-        };
+        virtual std::optional<std::vector<GCObject*>> getFields() const = 0;
 
         // uint8_t is memory area,
         // warn!! caller considers whether enough memory

@@ -24,12 +24,14 @@ public:
 
     ~Dept() override = default;
 
-    size_t size() const noexcept override {
+    constexpr size_t size() const noexcept override {
         return sizeof(Dept);
     }
 
+    std::optional<std::vector<GCObject*>> getFields() const override { return {}; }
+
     GCObject* copyTo(uint8_t* to) override {
-        return new(to) Dept{ std::move(*this) };
+        return new(to) Dept{ *this };
     }
 };
 
@@ -40,27 +42,28 @@ public:
     Dept* dept{ nullptr };
 
     std::optional<std::vector<GCObject*>> getFields() const override {
+
+        if(!dept) return {};
+
         auto fields = std::vector<GCObject*>{};
-        if(dept) {
-            fields.push_back(dept);
-            auto childrenFields = dept->getFields();
-            if(childrenFields.has_value()) {
-                fields.insert(
-                    fields.end(),
-                    childrenFields.value().begin(),
-                    childrenFields.value().end()
-                );
-            }
+        auto childrenFields = dept->getFields();
+        if(childrenFields.has_value()) {
+            fields.insert(
+                fields.end(),
+                childrenFields.value().begin(),
+                childrenFields.value().end()
+            );
         }
-        return std::move(fields);
+        fields.push_back(dept);
+        return fields;
     }
 
-    size_t size() const noexcept override {
+    constexpr size_t size() const noexcept override {
         return sizeof(Emp);
     }
 
     GCObject* copyTo(uint8_t* to) override {
-        return new(to) Emp{ std::move(*this) };
+        return new(to) Emp{ *this };
     }
 
     ~Emp() override = default;

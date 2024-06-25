@@ -18,40 +18,32 @@
 namespace Ciallang::GC {
     static constexpr size_t NODE_SIZE = 128; // Byte
 
-    class Cell {
-    public:
-        void next(Cell* cell) noexcept { _next = cell; }
-        Cell* next() const noexcept { return _next; }
-
-        void data(GCObject* data) noexcept { _data = data; }
-        GCObject* data() const noexcept { return _data; }
-
-    private:
-        Cell* _next{ nullptr };
-        GCObject* _data{ nullptr };
+    struct Cell {
+        Cell* next{ nullptr };
+        GCObject* data{ nullptr };
     };
 
 
     class MarkSweep {
     public:
-        explicit MarkSweep(
-            const size_t size,
-            void* heap
-        ) : _head(initFreeList(resolveHeapSize(size))), _heap(heap) {
+        explicit MarkSweep(Cell* heap) :
+            _head(heap) {
             _nextFree = _head;
         }
 
-        ~MarkSweep() {
+        /*~MarkSweep() {
             for(Cell* cursor = _head; cursor;) {
                 Cell* nextCell = cursor->next();
                 free(cursor);
                 cursor = nextCell;
             }
-        }
+        }*/
 
         void collect() {
             for(auto& obj : _roots) {
-                if(obj && obj > _heap) mark(obj);
+                if(obj && reinterpret_cast<uintptr_t>(obj)
+                   > reinterpret_cast<uintptr_t>(_head))
+                    mark(obj);
             }
             sweep();
         }
@@ -59,7 +51,7 @@ namespace Ciallang::GC {
         template <typename T, typename... Args>
             requires std::is_base_of_v<GCObject, T>
         T* allocate(Args&&... args) {
-            if(!_nextFree || !_nextFree->data()) {
+            if(!_nextFree || !_nextFree->data) {
                 findIdleNode();
             }
             Cell* cell = _nextFree;
@@ -68,15 +60,15 @@ namespace Ciallang::GC {
             newObj->marked(false);
             newObj->size(sizeof(T));
 
-            cell->data(newObj);
-            _nextFree = _nextFree->next();
+            cell->data = newObj;
+            _nextFree = _nextFree->next;
             return newObj;
         }
 
         template <typename T>
             requires std::is_base_of_v<GCObject, T>
         void reallocate(T*& obj) {
-            if(!_nextFree || _nextFree->data()) {
+            if(!_nextFree || _nextFree->data) {
                 findIdleNode();
             }
             Cell* cell = _nextFree;
@@ -90,17 +82,17 @@ namespace Ciallang::GC {
             newObj->forwarded(false);
             newObj->marked(false);
 
-            cell->data(newObj);
+            cell->data = newObj;
 
-            _nextFree = _nextFree->next();
+            _nextFree = _nextFree->next;
             obj = newObj;
         }
 
         Cell* findIdleNode() {
             auto find = [&] {
                 _nextFree = _head;
-                while(_nextFree && _nextFree->data()) {
-                    _nextFree = _nextFree->next();
+                while(_nextFree && _nextFree->data) {
+                    _nextFree = _nextFree->next;
                 }
             };
 
@@ -118,10 +110,10 @@ namespace Ciallang::GC {
 
 
         void sweep() {
-            for(Cell* cursor = _head; cursor; cursor = cursor->next()) {
-                if(!cursor->data()) continue;
+            for(Cell* cursor = _head; cursor; cursor = cursor->next) {
+                if(!cursor->data) continue;
 
-                GCObject* obj = cursor->data();
+                GCObject* obj = cursor->data;
 
                 if(obj->marked()) obj->marked(false);
                 else {
@@ -131,8 +123,8 @@ namespace Ciallang::GC {
 
                     // fill memory with zero
                     // obj->~GCObject();
-                    memset((void*) obj, 0, obj->size());
-                    cell->data(nullptr);
+                    memset((void*)obj, 0, obj->size());
+                    cell->data = nullptr;
 
                     _nextFree = cell;
                 }
@@ -146,31 +138,14 @@ namespace Ciallang::GC {
             auto fields = obj->getFields();
             if(!fields.has_value()) return;
             for(auto& field : fields.value()) {
-                if(field >= _heap) mark(field);
+                if(reinterpret_cast<uintptr_t>(field)
+                   >= reinterpret_cast<uintptr_t>(_head))
+                    mark(field);
             }
         }
 
-        const void* heap() const { return _heap; }
-
-        // B
-        std::pair<uint32_t, uint32_t> memoryInfo() const {
-            uint32_t used{ 0 };
-            uint32_t total{ 0 };
-            for(Cell* cursor = _head; cursor; cursor = cursor->next()) {
-                if(cursor->data()) {
-                    used += NODE_SIZE;
-                }
-                total += NODE_SIZE;
-            }
-
-            return { used, total };
-        }
-
-    private:
-        std::vector<GCObject*> _roots{ nullptr };
-        Cell* _nextFree{ nullptr };
-        Cell* _head{ nullptr };
-        void* _heap{ nullptr };
+        uintptr_t heap() const { return reinterpret_cast<uintptr_t>(_head); }
+        uintptr_t freeHeap() const { return reinterpret_cast<uintptr_t>(_nextFree); }
 
         static constexpr size_t resolveHeapSize(const size_t size) {
             if(size < NODE_SIZE) {
@@ -179,16 +154,20 @@ namespace Ciallang::GC {
             return size / NODE_SIZE * NODE_SIZE;
         }
 
-        static Cell* initFreeList(const int freeListSize) {
+        static Cell* initFreeList(const size_t freeListSize, uint8_t* heap) {
             Cell* head{ nullptr };
-            for(int i = 0; i < freeListSize; ++i) {
-                Cell* cell = static_cast<Cell*>(malloc(NODE_SIZE));
-                cell->next(head);
-                cell->data(nullptr);
-                head = cell;
+            for(int i = 0; i < freeListSize; i += NODE_SIZE) {
+                head = new(heap + i) Cell{};
+                head->next = head;
+                head->data = nullptr;
             }
 
             return head;
         }
+
+    private:
+        std::vector<GCObject*> _roots{ nullptr };
+        Cell* _nextFree{ nullptr };
+        Cell* _head{ nullptr };
     };
 } // Ciallang

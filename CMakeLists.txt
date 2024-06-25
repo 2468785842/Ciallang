@@ -20,6 +20,7 @@ set(SOURCE_FILES
         src/common/SourceFile.cpp
         src/common/Colorizer.cpp
         src/common/UTF8.cpp
+        src/common/TableFormatter.hpp
 
         src/parser/Parser.cpp
 
