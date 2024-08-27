@@ -32,8 +32,6 @@ namespace Ciallang::GC {
      */
     class Generational {
     public:
-        using Roots = std::vector<GCObject*>;
-
         explicit Generational(size_t size);
 
         ~Generational();
@@ -43,127 +41,21 @@ namespace Ciallang::GC {
             _majorGC->collect();
         }
 
-        void minorGC() {
-            _nextForwardingOffset = 0;
-
-            for(auto& roots : _rootsSet) {
-                for(auto& root : *roots) {
-                    if(reinterpret_cast<uintptr_t>(root)
-                       <= reinterpret_cast<uintptr_t>(_eden + _edenSize + _survivorSize)) {
-                        copy(root);
-                    }
-                }
-            }
-
-            auto it = _rememberedSet.begin();
-            while(it != _rememberedSet.end()) {
-                bool hasNewObj = false;
-
-                auto fields = (*it)->getFields();
-                if(fields.has_value()) {
-                    for(auto& field : fields.value()) {
-                        if(reinterpret_cast<uintptr_t>(field) < _majorGC->heap()) {
-                            copy(field);
-                            hasNewObj = reinterpret_cast<uintptr_t>(field) < _majorGC->heap();
-                        }
-                    }
-                }
-
-                if(hasNewObj) {
-                    (*it)->remembered(false);
-
-                    if(it != _rememberedSet.end() - 1) {
-                        swap(*it, _rememberedSet.back());
-                    }
-
-                    _rememberedSet.pop_back();
-                } else {
-                    ++it;
-                }
-            }
-
-            _nextFreeOffset = 0;
-
-            // for(size_t i = 0; i < _edenSize;) {
-            //     auto* obj = reinterpret_cast<GCObject*>(_eden + i);
-            //     obj.~GCObject();
-            //     i += obj->size();
-            // }
-            //
-            // for(size_t i = 0; i < _survivorSize;) {
-            //     auto* obj = reinterpret_cast<GCObject*>(_from + i);
-            //     obj.~GCObject();
-            //     i += obj->size();
-            // }
-
-            memset(_eden, 0, _edenSize);
-            memset(_from, 0, _survivorSize);
-
-            swap(_from, _to);
-        }
+        void minorGC();
 
         // copy object from new area to from area
-        void copy(GCObject*& obj) {
-            if(!obj || obj->forwarded()) return;
+        void copy(GCObject*& obj);
 
-            if(obj->age() >= MAX_AGE
-               // `to area` is full
-               || _nextForwardingOffset + obj->size() > _survivorSize) {
-                promotion(obj);
-                return;
-            }
-
-            auto* forwarding = obj->copyTo(_to + _nextForwardingOffset);
-            forwarding->forwarded(false);
-            forwarding->remembered(false);
-            forwarding->ageIncrement();
-            obj->forwarded(true);
-
-            for(auto& ptr : _rememberedSet) {
-                if(ptr == obj) {
-                    ptr = forwarding;
-                    break;
-                }
-            }
-
-            obj = forwarding;
-
-            _nextForwardingOffset += obj->size();
-
-            auto fields = obj->getFields();
-            if(!fields.has_value()) return;
-            for(auto& field : fields.value()) {
-                copy(field);
-            }
-        }
-
-        void promotion(GCObject*& obj) {
-            _majorGC->reallocate(obj);
-
-            // obj->forwarded(true);
-
-            auto fields = obj->getFields();
-            if(!fields.has_value()) return;
-            for(auto& field : fields.value()) {
-                if(reinterpret_cast<uintptr_t>(field)
-                   <= reinterpret_cast<uintptr_t>(_majorGC->heap())) {
-                    obj->remembered(true);
-                    _rememberedSet.push_back(obj);
-                    break;
-                }
-            }
-        }
+        void promotion(GCObject*& obj);
 
         template <typename T, typename... Args>
-            requires std::is_base_of_v<GCObject, T>
+            requires is_gc_object_v<T>
         T* allocateNewSpace(Args... args) {
             //检查是否可以分配
             if(_nextFreeOffset + sizeof(T) > _edenSize) {
-                printf("[New] Allocation Failed. execute gc...\n");
                 minorGC();
                 if(_nextFreeOffset + sizeof(T) > _edenSize) {
-                    printf("[New] Allocation Failed! OutOfMemory...\n");
-                    abort();
+                    LOG(FATAL) << "[New] Allocation Failed! OutOfMemory...";
                 }
             }
 
@@ -182,26 +74,27 @@ namespace Ciallang::GC {
         }
 
         template <typename T, typename... Args>
-            requires std::is_base_of_v<GCObject, T>
+            requires is_gc_object_v<T>
         T* allocateOldSpace(Args... args) {
             return _majorGC->allocate<T>(std::forward<Args>(args)...);
         }
 
         template <typename T, typename... Args>
+            requires is_gc_object_v<T>
         T* allocatePermSpace(Args... args) {
             return _permHeap.push_back(new T{ std::forward<T>(args)... });
         }
 
         template <typename T>
-            requires std::is_base_of_v<GCObject, T>
+            requires is_gc_object_v<T>
         void updatePtr(GCObject* obj, T** fieldRef, T* newObj) {
             writeBarrier(obj, fieldRef, newObj);
         }
 
         template <typename T>
-            requires std::is_base_of_v<GCObject, T>
+            requires is_gc_object_v<T>
         void writeBarrier(GCObject* obj, T** fieldRef, T* newObj) {
-            if(reinterpret_cast<uintptr_t>(obj) >= _majorGC->heap()
+            if(reinterpret_cast<uintptr_t>(obj) >= _majorGC->start()
                && reinterpret_cast<uintptr_t>(newObj)
                <= reinterpret_cast<uintptr_t>(_eden + _edenSize + _survivorSize)
                && !obj->remembered()) {
@@ -212,6 +105,7 @@ namespace Ciallang::GC {
 
         void printState() const;
 
+
         Roots& allocateRoots() {
             auto* roots = new Roots{};
             _rootsSet.push_back(roots);
@@ -220,9 +114,10 @@ namespace Ciallang::GC {
 
     private:
         std::vector<Roots*> _rootsSet{};
+
         std::vector<GCObject*> _rememberedSet{};
 
-        std::vector<GCObject*> _permHeap{ 100 };
+        std::vector<GCObject*> _permHeap{ 2000 };
 
         uint8_t* _heap;
         uint8_t* _eden;

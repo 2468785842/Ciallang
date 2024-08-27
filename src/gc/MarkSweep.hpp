@@ -23,33 +23,14 @@ namespace Ciallang::GC {
         GCObject* data{ nullptr };
     };
 
-
     class MarkSweep {
     public:
-        explicit MarkSweep(Cell* heap) :
-            _head(heap) {
-            _nextFree = _head;
-        }
+        explicit MarkSweep(Cell* heap, Cell* tail, std::vector<Roots*>& rootsSet);
 
-        /*~MarkSweep() {
-            for(Cell* cursor = _head; cursor;) {
-                Cell* nextCell = cursor->next();
-                free(cursor);
-                cursor = nextCell;
-            }
-        }*/
-
-        void collect() {
-            for(auto& obj : _roots) {
-                if(obj && reinterpret_cast<uintptr_t>(obj)
-                   > reinterpret_cast<uintptr_t>(_head))
-                    mark(obj);
-            }
-            sweep();
-        }
+        void collect();
 
         template <typename T, typename... Args>
-            requires std::is_base_of_v<GCObject, T>
+            requires is_gc_object_v<T>
         T* allocate(Args&&... args) {
             if(!_nextFree || !_nextFree->data) {
                 findIdleNode();
@@ -62,11 +43,12 @@ namespace Ciallang::GC {
 
             cell->data = newObj;
             _nextFree = _nextFree->next;
+
             return newObj;
         }
 
         template <typename T>
-            requires std::is_base_of_v<GCObject, T>
+            requires is_gc_object_v<T>
         void reallocate(T*& obj) {
             if(!_nextFree || _nextFree->data) {
                 findIdleNode();
@@ -88,64 +70,24 @@ namespace Ciallang::GC {
             obj = newObj;
         }
 
-        Cell* findIdleNode() {
-            auto find = [&] {
-                _nextFree = _head;
-                while(_nextFree && _nextFree->data) {
-                    _nextFree = _nextFree->next;
-                }
-            };
+        Cell* findIdleNode();
 
-            find();
-            if(!_nextFree) collect();
-            find();
+        void sweep();
 
-            if(!_nextFree) {
-                std::cerr << "Allcation Failed! OutOfMemory..." << std::endl;
-                abort();
-            }
+        void mark(GCObject* obj);
 
-            return _nextFree;
+        uintptr_t start() const {
+            return reinterpret_cast<uintptr_t>(_head);
         }
 
-
-        void sweep() {
-            for(Cell* cursor = _head; cursor; cursor = cursor->next) {
-                if(!cursor->data) continue;
-
-                GCObject* obj = cursor->data;
-
-                if(obj->marked()) obj->marked(false);
-                else {
-                    Cell* cell = reinterpret_cast<Cell*>(obj - 1);
-
-                    std::cout << "collection: " << obj->size() << 'B' << std::endl;
-
-                    // fill memory with zero
-                    // obj->~GCObject();
-                    memset((void*)obj, 0, obj->size());
-                    cell->data = nullptr;
-
-                    _nextFree = cell;
-                }
-            }
+        uintptr_t free() const {
+            if(!_nextFree) return start();
+            return reinterpret_cast<uintptr_t>(_nextFree);
         }
 
-        void mark(GCObject* obj) {
-            if(!obj || obj->marked()) return;
-            obj->marked(true);
-
-            auto fields = obj->getFields();
-            if(!fields.has_value()) return;
-            for(auto& field : fields.value()) {
-                if(reinterpret_cast<uintptr_t>(field)
-                   >= reinterpret_cast<uintptr_t>(_head))
-                    mark(field);
-            }
+        uintptr_t end() const {
+            return reinterpret_cast<uintptr_t>(_tail);
         }
-
-        uintptr_t heap() const { return reinterpret_cast<uintptr_t>(_head); }
-        uintptr_t freeHeap() const { return reinterpret_cast<uintptr_t>(_nextFree); }
 
         static constexpr size_t resolveHeapSize(const size_t size) {
             if(size < NODE_SIZE) {
@@ -155,19 +97,24 @@ namespace Ciallang::GC {
         }
 
         static Cell* initFreeList(const size_t freeListSize, uint8_t* heap) {
-            Cell* head{ nullptr };
-            for(int i = 0; i < freeListSize; i += NODE_SIZE) {
-                head = new(heap + i) Cell{};
-                head->next = head;
-                head->data = nullptr;
+            Cell* tail = new(heap) Cell{};
+            for(size_t i = 1; i < freeListSize; i += NODE_SIZE) {
+                tail->next = new(heap + i) Cell{};
+                tail->data = nullptr;
+
+                tail = tail->next;
+
+                tail->next = nullptr;
+                tail->data = nullptr;
             }
 
-            return head;
+            return tail;
         }
 
     private:
-        std::vector<GCObject*> _roots{ nullptr };
+        std::vector<Roots*>& _rootsSet;
         Cell* _nextFree{ nullptr };
         Cell* _head{ nullptr };
+        Cell* _tail{ nullptr };
     };
 } // Ciallang

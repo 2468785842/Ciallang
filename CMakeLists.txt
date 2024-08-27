@@ -57,6 +57,8 @@ set(SOURCE_FILES
         src/gc/MarkSweep.cpp
         src/gc/Generational.cpp
         src/gc/GC.hpp
+
+        src/collections/ConservativeVector.hpp
 )
 add_executable(${PROJECT_NAME}
         src/main.cpp

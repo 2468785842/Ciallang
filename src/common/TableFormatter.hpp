@@ -182,7 +182,6 @@ namespace Ciallang::Common {
         }
 
         bool isEqual(const std::any& a, const std::any& b) const {
-
             if(a.type() != b.type())
                 return false;
 
@@ -206,8 +205,7 @@ namespace Ciallang::Common {
             if(value.type() == typeid(size_t))
                 return fmt::format("{}", std::any_cast<size_t>(value));
 
-            LOG(FATAL) << "unsupport";
-            return "";
+            throw std::runtime_error("Unsupported type");
         }
     };
 }

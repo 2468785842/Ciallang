@@ -37,8 +37,6 @@ namespace Ciallang::GC {
 
         virtual std::optional<std::vector<GCObject*>> getFields() const = 0;
 
-        // uint8_t is memory area,
-        // warn!! caller considers whether enough memory
         virtual GCObject* copyTo(uint8_t*) = 0;
 
         virtual size_t size() const noexcept = 0;
@@ -54,4 +52,10 @@ namespace Ciallang::GC {
 
         bool _marked{};
     };
+
+    using Roots = std::vector<GCObject*>;
+
+
+    template <typename T>
+    static constexpr bool is_gc_object_v = std::is_base_of_v<GCObject, T>;
 }

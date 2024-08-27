@@ -16,6 +16,7 @@
 #include "pch.h"
 
 #include "Chunk.hpp"
+#include "collections/ConservativeVector.hpp"
 #include "types/TjsFunction.hpp"
 
 #include "types/TjsValue.hpp"
@@ -104,13 +105,13 @@ namespace Ciallang::Bytecode {
         }
 
         void pushCallFrame(CallFrame&& frame) {
-            _callStack.push_back(std::move(frame));
+            _callStack.pushBack(std::move(frame));
             _currentFrame = &_callStack.back();
         }
 
         CallFrame popCallFrame() {
             CallFrame frame = std::move(*_currentFrame);
-            _callStack.pop_back();
+            _callStack.popBack();
             _currentFrame = &_callStack.back();
             _logicRegistersSize = frame.registersOffset;
             return std::move(frame);
@@ -170,15 +171,15 @@ namespace Ciallang::Bytecode {
 
         void allocReigsers(const size_t index) {
             if (index >= _registers.size()) {
-                _registers.resize(index + 11);
-                CHECK_LE(_registers.size(), std::numeric_limits<uint32_t>::max());
+                _registers.resize(index + 1);
+                // CHECK_LE(_registers.size(), std::numeric_limits<uint32_t>::max());
             }
         }
 
     private:
         CallFrame* _currentFrame{ nullptr };
-        std::vector<CallFrame> _callStack{};
-        std::vector<TjsValue> _registers{};
+        Collections::ConservativeVector<CallFrame> _callStack{};
+        Collections::ConservativeVector<TjsValue> _registers{};
         uint32_t _logicRegistersSize{};
         std::unordered_map<std::string, TjsValue> _globals{};
 
