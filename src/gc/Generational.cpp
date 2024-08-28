@@ -126,11 +126,9 @@ namespace Ciallang::GC {
 
         _nextForwardingOffset += obj->size();
 
-        auto fields = obj->getFields();
-        if(!fields.has_value()) return;
-        for(auto& field : fields.value()) {
+        handleFields(obj, [&](GCObject*& field) {
             copy(field);
-        }
+        });
     }
 
     void Generational::promotion(GCObject*& obj) {
@@ -138,15 +136,12 @@ namespace Ciallang::GC {
 
         obj->forwarded(true);
 
-        auto fields = obj->getFields();
-        if(!fields.has_value()) return;
-        for(auto& field : fields.value()) {
+        handleFields(obj, [&](GCObject*& field) {
             if(reinterpret_cast<uintptr_t>(field) < _majorGC->start()) {
                 obj->remembered(true);
                 _rememberedSet.push_back(obj);
-                break;
             }
-        }
+        });
     }
 
     void Generational::printState() const {

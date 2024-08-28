@@ -50,14 +50,17 @@ namespace Ciallang::GC {
         template <typename T>
             requires is_gc_object_v<T>
         void reallocate(T*& obj) {
-            if(!_nextFree || _nextFree->data) {
-                findIdleNode();
-            }
-            Cell* cell = _nextFree;
-
             if(obj->size() > NODE_SIZE) {
                 LOG(FATAL) << "object too large";
             }
+
+            if(!_nextFree || _nextFree->data) {
+                findIdleNode();
+            }
+
+            Cell* cell = _nextFree;
+
+            _nextFree = _nextFree->next;
 
             auto* newObj = obj->copyTo(reinterpret_cast<uint8_t*>(cell + 1));
 
@@ -66,7 +69,6 @@ namespace Ciallang::GC {
 
             cell->data = newObj;
 
-            _nextFree = _nextFree->next;
             obj = newObj;
         }
 
@@ -98,16 +100,15 @@ namespace Ciallang::GC {
 
         static Cell* initFreeList(const size_t freeListSize, uint8_t* heap) {
             Cell* tail = new(heap) Cell{};
-            for(size_t i = 1; i < freeListSize; i += NODE_SIZE) {
+
+            for(size_t i = NODE_SIZE; i < freeListSize; i += NODE_SIZE) {
                 tail->next = new(heap + i) Cell{};
                 tail->data = nullptr;
 
                 tail = tail->next;
-
-                tail->next = nullptr;
-                tail->data = nullptr;
             }
-
+            tail->next = nullptr;
+            tail->data = nullptr;
             return tail;
         }
 

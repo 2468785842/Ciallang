@@ -60,8 +60,8 @@ namespace Ciallang {
     }
 
     TjsValue::TjsValue(TjsValue&& value) noexcept :
-        _type(value._type),
-        _value(value._value) {
+        _value(value._value),
+        _type(value._type) {
         value._value = {};
     }
 

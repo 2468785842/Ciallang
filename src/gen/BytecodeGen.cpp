@@ -121,7 +121,7 @@ namespace Ciallang::Inter {
             _chunk->emit<Bytecode::Op::Call>(dst, memberReg.value(), std::move(arguments));
             return dst;
         }
-        DCHECK(true) << "not impl";
+        DCHECK(true) << "no impl";
         return {};
     }
 
@@ -298,7 +298,7 @@ namespace Ciallang::Inter {
 
         if(variable.has_value()) {
             if(!variable.value()->init) {
-                error(_r, "variable not initialization", node->location);
+                error(_r, "variable no initialization", node->location);
                 return {};
             }
             return variable.value()->reg;

@@ -144,5 +144,14 @@ namespace Ciallang::GC {
             from = to;
             to = temp;
         }
+
+        static void handleFields(const GCObject* obj, const std::function<void(GCObject*&)>& func) {
+            auto fields = obj->getFields();
+            if(fields.has_value()) {
+                for(auto& field : fields.value()) {
+                    func(field);
+                }
+            }
+        }
     };
 }

@@ -94,6 +94,7 @@ TEST(GCTest, TestPromotion) {
     auto& roots = gc.allocateRoots();
     roots.push_back(gc.allocateNewSpace<Emp>());
 
+    gc.printState();
     for(int i = 0; i < 31; ++i) {
         gc.allocateNewSpace<Emp>();
     }
