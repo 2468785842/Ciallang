@@ -21,6 +21,7 @@
 #include "parser/Parser.hpp"
 #include "parser/Parser.hpp"
 #include "vm/Interpreter.hpp"
+#include "core/print.hpp"
 
 void testLexer() {
     Ciallang::Common::SourceFile source_file{ R"(.\startup.tjs)" };
@@ -55,12 +56,13 @@ void testLexer() {
     }
 }
 
-int main(int argc, char* * argv) {
+int main(int argc, char** argv) {
     Ciallang::Init::InitializeGlog(argc, argv);
 
+    LOG_IF(FATAL, argc > 2) << "Usage: Ciallang <file-name>";
     Ciallang::Common::Result r{};
 
-    Ciallang::Common::SourceFile sourceFile{ R"(.\startup.tjs)" };
+    Ciallang::Common::SourceFile sourceFile{ argv[1] };
     sourceFile.load(r);
 
     Ciallang::Syntax::AstBuilder astBuilder{};
@@ -71,6 +73,7 @@ int main(int argc, char* * argv) {
     auto chunk = codeGen.parseAst(r, globalNode);
 
     Ciallang::Bytecode::Interpreter interpreter{};
+    interpreter.global("println", Ciallang::TjsValue{ Ciallang::Core::S_PrintlnFunction});
 
     fmt::println("{}", interpreter.dumpInstruction(*chunk));
     auto start = std::chrono::high_resolution_clock::now();

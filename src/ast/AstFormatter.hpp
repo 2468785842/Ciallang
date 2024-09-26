@@ -44,7 +44,7 @@ namespace Ciallang {
                 } else if constexpr(std::is_same_v<char, T>) {
                     fmt::print(" ({})", value);
                 } else {
-                    static_assert(false, "not support");
+                    static_assert(!std::is_same_v<T, T>, "not support");
                 }
             }
             fmt::println("{}", "");

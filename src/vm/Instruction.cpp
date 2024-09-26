@@ -16,6 +16,7 @@
 
 #include "Interpreter.hpp"
 #include "types/TjsFunction.hpp"
+#include "types/TjsNativeFunction.hpp"
 
 namespace Ciallang::Bytecode::Op {
     void Load::execute(Interpreter& interpreter) const {
@@ -279,7 +280,8 @@ namespace Ciallang::Bytecode::Op {
             auto callFrame = interpreter.createCallFrame(fun->chunk(), _dst);
 
             for(uint32_t i = 0; i < _arguments.size(); i++) {
-                auto& value = interpreter.reg(_arguments[i]);
+                // copy
+                auto value = interpreter.reg(_arguments[i]);
 
                 if(value.isVoid()) continue;
 
@@ -287,7 +289,11 @@ namespace Ciallang::Bytecode::Op {
             }
 
             interpreter.pushCallFrame(std::move(callFrame));
+            return;
         }
+        
+        dynamic_cast<TjsNativeFunction*>(object.asObject())
+                    ->callProc(&interpreter.reg(_arguments.front()));
     }
 
     std::string Call::dump(const Interpreter&, bool) const {

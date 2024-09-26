@@ -19,14 +19,14 @@
 
 namespace Ciallang::Core {
     static const auto S_PrintFunction = TjsNativeFunction{
-            [](TjsValue* values) {
+            [](const TjsValue* values) {
                 fmt::print("{}", *values);
             },
             1, "print"
     };
 
     static const auto S_PrintlnFunction = TjsNativeFunction{
-            [](TjsValue* values) {
+            [](const TjsValue* values) {
                 fmt::println("{}", *values);
             },
             1, "println"

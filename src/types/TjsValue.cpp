@@ -50,7 +50,7 @@ namespace Ciallang {
                 _value._object = value._value._object;
                 break;
             case TjsValueType::String:
-                _value._string = new std::string(*value._value._string);
+                _value._string = new std::string(value._value._string->c_str());
                 break;
             case TjsValueType::Octet:
                 _value._octet = new TjsOctet(*value._value._octet);
@@ -68,21 +68,10 @@ namespace Ciallang {
     TjsValue& TjsValue::operator=(TjsValue&& value) noexcept {
         if(this == &value) return *this;
 
-        switch(_type) {
-        case TjsValueType::Object:
-            // TODO: GC.
-            break;
-        case TjsValueType::String:
-            delete _value._string;
-            break;
-        case TjsValueType::Octet:
-            delete _value._octet;
-            break;
-        default: ;
-        }
-
         _value = value._value;
         _type = value._type;
+        value._value = {};
+        value._type = TjsValueType::Void;
         return *this;
     }
 
