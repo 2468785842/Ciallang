@@ -22,8 +22,8 @@
       "hidden": true,
       "cacheVariables": {
         "CMAKE_MAKE_PROGRAM": "/usr/bin/ninja",
-        "CMAKE_C_COMPILER": "/usr/bin/gcc",
-        "CMAKE_CXX_COMPILER": "/usr/bin/g++"
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
       },
       "condition": {
         "type": "equals",

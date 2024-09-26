@@ -90,3 +90,13 @@ set(BUILD_TESTING ON)
 if (${BUILD_TESTING})
     add_subdirectory(tests)
 endif ()
+
+# just for vscode clangd plugin with linux
+if (PROJECT_IS_TOP_LEVEL AND UNIX)
+    # Create symlink to compile_commands.json for IDE to pick it up
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
+            ${CMAKE_BINARY_DIR}/compile_commands.json
+            ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json
+    )
+endif()
