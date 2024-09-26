@@ -57,9 +57,13 @@ void testLexer() {
 }
 
 int main(int argc, char** argv) {
+    if(argc < 2) {
+        fmt::println("Usage: Ciallang <script-file>");
+        return 0;
+    }
+
     Ciallang::Init::InitializeGlog(argc, argv);
 
-    LOG_IF(FATAL, argc > 2) << "Usage: Ciallang <file-name>";
     Ciallang::Common::Result r{};
 
     Ciallang::Common::SourceFile sourceFile{ argv[1] };
