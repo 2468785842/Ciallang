@@ -20,23 +20,12 @@ namespace Ciallang::Common {
 
     class Colorizer {
     public:
-        static std::string colorize(
-            const std::string&,
-            fmt::color);
+        static std::string colorize(const std::string &, fmt::color);
 
-        static std::string colorize(
-            const std::string&,
-            fmt::color,
-            fmt::color);
+        static std::string colorize(const std::string &, fmt::color, fmt::color);
 
-        static std::string colorizeRange(
-            const std::string&,
-            size_t, size_t,
-            fmt::color);
+        static std::string colorizeRange(const std::string &, size_t, size_t, fmt::color);
 
-        static std::string colorizeRange(
-            const std::string&,
-            size_t, size_t,
-            fmt::color, fmt::color);
+        static std::string colorizeRange(const std::string &, size_t, size_t, fmt::color, fmt::color);
     };
-}
+} // namespace Ciallang::Common

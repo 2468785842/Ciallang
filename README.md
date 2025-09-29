@@ -31,15 +31,22 @@ Ciallang 是一个用 C++20 编写的轻量级脚本语言解释器，专门用�
    ```sh
    git clone https://github.com/2468785842/Ciallang.git
    ```
+2. 安装vcpkg设置VCPKG_ROOT变量
 
-2. 使用 CMake 编译：
+3. 使用 CMake 编译：
+   - Windows
+      ```sh
+      cmake --preset="Windows Debug"
+      cmake --build --preset="Windows Debug"
+      ```
+   - Linux
+      ```sh
+      cmake --preset="Linux Debug"
+      cmake --build --preset="Linux Debug"
+      ```
+4. 运行解释器：
    ```sh
-   TODO
-   ```
-
-3. 运行解释器：
-   ```sh
-   ./Ciallang <script-file>
+   ./cll <script-file>
    ```
 
 ---
@@ -67,8 +74,13 @@ CompileFlags:
 
 ### 贡献
 
-欢迎任何形式的贡献！如果你对这个项目感兴趣，请提交 PR 或者报告问题。
-
+- 欢迎任何形式的贡献！如果你对这个项目感兴趣，请提交 PR 或者报告问题。
+- clang-format格式化:
+    ```powershell
+        Get-ChildItem -Path ./src, ./tests -Recurse -File |  
+        Where-Object { $_.Name -match '\.(cpp|cc|h|hpp|inc)$' } | 
+        ForEach-Object { clang-format -i --verbose $_.FullName }
+    ```
 ---
 
 **许可证**  

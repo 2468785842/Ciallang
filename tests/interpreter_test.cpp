@@ -16,11 +16,12 @@
 
 #include "vm/Interpreter.hpp"
 
-#include "parser/Parser.hpp"
 #include "ast/AstFormatter.hpp"
-#include "gen/BytecodeGen.hpp"
 #include "common/SourceFile.hpp"
+#include "gen/BytecodeGen.hpp"
+#include "parser/Parser.hpp"
 #include "test_config.h"
+#include "standard/print.hpp"
 
 TEST_CASE("Interpreter Test Execute") {
     Ciallang::Common::Result r{};
@@ -30,7 +31,7 @@ TEST_CASE("Interpreter Test Execute") {
 
     Ciallang::Syntax::AstBuilder astBuilder{};
     Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
-    auto* globalNode = parser.parse(r);
+    auto *globalNode = parser.parse(r);
     Ciallang::AstFormatter formatter{};
     formatter.formatAst(globalNode);
 
@@ -54,16 +55,18 @@ TEST_CASE("Script execution benchmark") {
                 if(n < 2) return n;
                 return fib(n - 2) + fib(n - 1);
             }
-            fib(15);
+            println(fib(15));
         )");
-
         Ciallang::Syntax::AstBuilder astBuilder{};
         Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
-        auto* globalNode = parser.parse(r);
+        auto *globalNode = parser.parse(r);
 
         Ciallang::Inter::BytecodeGen codeGen{ sourceFile };
         auto chunk = codeGen.parseAst(r, globalNode);
+
         Ciallang::Bytecode::Interpreter interpreter{};
+        interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
+
         interpreter.run(chunk.get());
     };
 }

@@ -18,20 +18,16 @@
 namespace Ciallang::Bytecode {
     class [[nodiscard]] Label {
     public:
-        explicit Label(const size_t address): _address(address) {
-        }
+        explicit Label(const size_t address) : _address(address) {}
 
         size_t address() const { return _address; }
 
     private:
         const size_t _address;
 
-        friend std::ostream& operator<<(std::ostream& os, const Label& label) {
-            return os << '@' << label._address;
-        }
+        friend std::ostream &operator<<(std::ostream &os, const Label &label) { return os << '@' << label._address; }
     };
-}
+} // namespace Ciallang::Bytecode
 
 template <>
-struct fmt::formatter<Ciallang::Bytecode::Label> : ostream_formatter {
-};
+struct fmt::formatter<Ciallang::Bytecode::Label> : ostream_formatter {};

@@ -14,112 +14,106 @@
 
 #include "Lexer.hpp"
 
-#include "types/TjsOctet.hpp"
-#include "types/TjsValue.hpp"
 #include "common/Defer.hpp"
 #include "common/UTF8.hpp"
 #include "logging/Logger.hpp"
+#include "types/TjsOctet.hpp"
+#include "types/TjsValue.hpp"
 
 #include "IEEETypes.hpp"
 
 using namespace Ciallang::Syntax;
 
 std::multimap<int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
-        // block comment, line comment
-        { '/', bind_front(&Lexer::lineComment) },
-        { '/', bind_front(&Lexer::blockComment) },
-        { '/', bind_front(&Lexer::slash) },
-        { '\\', bind_front(&Lexer::backslash) },
+    // block comment, line comment
+    { '/', bind_front(&Lexer::lineComment) },
+    { '/', bind_front(&Lexer::blockComment) },
+    { '/', bind_front(&Lexer::slash) },
+    { '\\', bind_front(&Lexer::backslash) },
 
-        { '=', bind_front(&Lexer::equalSign) },
-        { '!', bind_front(&Lexer::exclamationSign) },
-        { '&', bind_front(&Lexer::ampersandSign) },
-        { '|', bind_front(&Lexer::vertLineSign) },
+    { '=', bind_front(&Lexer::equalSign) },
+    { '!', bind_front(&Lexer::exclamationSign) },
+    { '&', bind_front(&Lexer::ampersandSign) },
+    { '|', bind_front(&Lexer::vertLineSign) },
 
-        { '.', bind_front(&Lexer::numberConstVal) },
-        { '.', bind_front(&Lexer::dotSign) },
+    { '.', bind_front(&Lexer::numberConstVal) },
+    { '.', bind_front(&Lexer::dotSign) },
 
-        { '-', bind_front(&Lexer::minus) },
+    { '-', bind_front(&Lexer::minus) },
 
-        { '+', bind_front(&Lexer::plus) },
+    { '+', bind_front(&Lexer::plus) },
 
-        { '*', bind_front(&Lexer::mul) },
+    { '*', bind_front(&Lexer::mul) },
 
-        // "> operator more..."
-        { '>', bind_front(&Lexer::gtSign) },
+    // "> operator more..."
+    { '>', bind_front(&Lexer::gtSign) },
 
-        // "<%" octet literal
-        { '<', bind_front(&Lexer::octetLiteral) },
+    // "<%" octet literal
+    { '<', bind_front(&Lexer::octetLiteral) },
 
-        // "< operator more..."
-        { '<', bind_front(&Lexer::ltSign) },
-        { '%', bind_front(&Lexer::percent) },
-        { '^', bind_front(&Lexer::chevron) },
-        { '[', bind_front(&Lexer::singletonSign) },
-        { ']', bind_front(&Lexer::singletonSign) },
-        { '(', bind_front(&Lexer::singletonSign) },
-        { ')', bind_front(&Lexer::singletonSign) },
-        { '~', bind_front(&Lexer::singletonSign) },
-        { '?', bind_front(&Lexer::singletonSign) },
-        { ':', bind_front(&Lexer::singletonSign) },
-        { ',', bind_front(&Lexer::singletonSign) },
-        { '{', bind_front(&Lexer::singletonSign) },
-        { '}', bind_front(&Lexer::singletonSign) },
-        { '#', bind_front(&Lexer::singletonSign) },
-        { '$', bind_front(&Lexer::singletonSign) },
+    // "< operator more..."
+    { '<', bind_front(&Lexer::ltSign) },
+    { '%', bind_front(&Lexer::percent) },
+    { '^', bind_front(&Lexer::chevron) },
+    { '[', bind_front(&Lexer::singletonSign) },
+    { ']', bind_front(&Lexer::singletonSign) },
+    { '(', bind_front(&Lexer::singletonSign) },
+    { ')', bind_front(&Lexer::singletonSign) },
+    { '~', bind_front(&Lexer::singletonSign) },
+    { '?', bind_front(&Lexer::singletonSign) },
+    { ':', bind_front(&Lexer::singletonSign) },
+    { ',', bind_front(&Lexer::singletonSign) },
+    { '{', bind_front(&Lexer::singletonSign) },
+    { '}', bind_front(&Lexer::singletonSign) },
+    { '#', bind_front(&Lexer::singletonSign) },
+    { '$', bind_front(&Lexer::singletonSign) },
 
-        // line terminator
-        { ';', bind_front(&Lexer::lineTerminator) },
-        { '\'', bind_front(&Lexer::stringConstVal) },
-        { '"', bind_front(&Lexer::stringConstVal) },
-        { '@', bind_front(&Lexer::templateStringConstVal) },
+    // line terminator
+    { ';', bind_front(&Lexer::lineTerminator) },
+    { '\'', bind_front(&Lexer::stringConstVal) },
+    { '"', bind_front(&Lexer::stringConstVal) },
+    { '@', bind_front(&Lexer::templateStringConstVal) },
 };
 
-[[maybe_unused]] void* Lexer::S_LoadCases = [] {
+[[maybe_unused]] void *Lexer::S_LoadCases = [] {
     // number literal
     string numberMarks = ".0123456789";
-    for(auto& mark : numberMarks)
+    for(auto &mark : numberMarks)
         S_Cases.emplace(mark, bind_front(&Lexer::numberConstVal));
 
     return nullptr;
 }();
 
-std::unordered_map<std::string, const Token&> Lexer::S_Keywords{
-        { "true", S_True },
-        { "false", S_False },
-        { "Infinity", S_Infinity },
-        { "NaN", S_NaN },
+std::unordered_map<std::string, const Token &> Lexer::S_Keywords{ { "true", S_True },
+                                                                  { "false", S_False },
+                                                                  { "Infinity", S_Infinity },
+                                                                  { "NaN", S_NaN },
 
-        { "function", S_Function },
-        { "return", S_Return },
+                                                                  { "function", S_Function },
+                                                                  { "return", S_Return },
 
-        { "var", S_Var },
-        { "const", S_Const },
+                                                                  { "var", S_Var },
+                                                                  { "const", S_Const },
 
-        { "if", S_If },
-        { "else", S_Else },
+                                                                  { "if", S_If },
+                                                                  { "else", S_Else },
 
-        { "int", S_Int },
-        { "real", S_Real },
-        { "string", S_String },
+                                                                  { "int", S_Int },
+                                                                  { "real", S_Real },
+                                                                  { "string", S_String },
 
-        { "new", S_New },
+                                                                  { "new", S_New },
 
-        { "do", S_Do },
-        { "while", S_While },
-        { "for", S_For },
-        { "break", S_Break },
-        { "continue", S_Continue }
-};
+                                                                  { "do", S_Do },
+                                                                  { "while", S_While },
+                                                                  { "for", S_For },
+                                                                  { "break", S_Break },
+                                                                  { "continue", S_Continue } };
 
-Lexer::Lexer(SourceFile& sourceFile) : _sourceFile(sourceFile) {
-}
+Lexer::Lexer(SourceFile &sourceFile) : _sourceFile(sourceFile) {}
 
-bool Lexer::boringMatch(
-    Token*& token,
-    const OperatorTokenSet& signMap
-) {
-    for(const auto& [sign, _token] : signMap) {
+bool Lexer::boringMatch(Token *&token, const OperatorTokenSet &signMap) {
+    for(const auto &[sign, _token] : signMap) {
         if(match(sign)) {
             token = makeToken(_token);
             return true;
@@ -128,9 +122,7 @@ bool Lexer::boringMatch(
     return false;
 }
 
-bool Lexer::hasNext() const {
-    return _hasNext;
-}
+bool Lexer::hasNext() const { return _hasNext; }
 
 /**
  * 回溯一个字符
@@ -158,13 +150,11 @@ void Lexer::rewindOneChar() const {
 }
 
 pair<uint32_t, uint32_t> Lexer::getCurrentRowCol() const {
-    return std::make_pair(
-        _sourceFile.columnByIndex(_sourceFile.pos()),
-        _sourceFile.lineByIndex(_sourceFile.pos())->line
-    );
+    return std::make_pair(_sourceFile.columnByIndex(_sourceFile.pos()),
+                          _sourceFile.lineByIndex(_sourceFile.pos())->line);
 }
 
-void Lexer::setTokenLocation(Token*& token) const {
+void Lexer::setTokenLocation(Token *&token) const {
     const auto [column, line] = getCurrentRowCol();
 
     token->location.end(line, column);
@@ -178,14 +168,13 @@ void Lexer::setTokenLocation(Token*& token) const {
  * @return 是否匹配成功? succeed -> true
  *                     failed  -> false
  */
-bool Lexer::next(Token*& token) {
+bool Lexer::next(Token *&token) {
     // 向前看一个字符
     const auto rune = read();
 
     DEFER {
         _sourceFile.popMark();
-        _hasNext = rune != runeEof
-                   && token->type() != TokenType::Invalid;
+        _hasNext = rune != runeEof && token->type() != TokenType::Invalid;
     };
 
     if(rune == runeInvalid) {
@@ -197,11 +186,9 @@ bool Lexer::next(Token*& token) {
     if(rune == runeEof) {
         token = makeToken(S_EndOfFile);
 
-        const auto column = _sourceFile.columnByIndex(
-            _sourceFile.length());
+        const auto column = _sourceFile.columnByIndex(_sourceFile.length());
 
-        const auto line = _sourceFile.lineByIndex(
-            _sourceFile.length())->line;
+        const auto line = _sourceFile.lineByIndex(_sourceFile.length())->line;
 
         token->location.end(line, column);
         token->location.start(line, column);
@@ -232,29 +219,23 @@ bool Lexer::next(Token*& token) {
             return true;
         }
 
-        //no match restore mark, match the next
+        // no match restore mark, match the next
         _sourceFile.restoreTopMark();
     }
 
     // identifier
     if(isRuneLetter(rune)) {
-        const auto [
-            startColumn,
-            startLine
-        ] = getCurrentRowCol();
+        const auto [startColumn, startLine] = getCurrentRowCol();
 
         if(identifier(token)) {
-            const auto [
-                endColumn,
-                endLine
-            ] = getCurrentRowCol();
+            const auto [endColumn, endLine] = getCurrentRowCol();
 
             token->location.start(startLine, startColumn);
             token->location.end(endLine, endColumn);
             return true;
         }
 
-        //no match restore mark, match the next
+        // no match restore mark, match the next
         _sourceFile.restoreTopMark();
     }
 
@@ -271,7 +252,7 @@ bool Lexer::next(Token*& token) {
  */
 void Lexer::skipComment() {
     // 性能不好, 如果不是注释会回退,导致两次扫描完全没必要
-    Token* token{ nullptr };
+    Token *token{ nullptr };
 
     while(true) {
         _sourceFile.pushMark();
@@ -279,8 +260,7 @@ void Lexer::skipComment() {
 
         CLL_ASSERT(token != nullptr, "token is null");
 
-        auto isComment = token->type() == TokenType::LineComment
-                         || token->type() == TokenType::BlockComment;
+        auto isComment = token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment;
 
         _tokens.pop_back();
 
@@ -295,21 +275,20 @@ void Lexer::skipComment() {
     }
 }
 
-bool Lexer::tackOverToken(Token& token) {
+bool Lexer::tackOverToken(Token &token) {
     CLL_ASSERT(!_tokens.empty(), "tokens vec is empty");
 
     token = *_tokens.front();
 
-    if(token.type() == TokenType::EndOfFile) return false;
+    if(token.type() == TokenType::EndOfFile)
+        return false;
 
     delete _tokens.front();
     _tokens.erase(_tokens.begin());
     return true;
 }
 
-const Result& Lexer::result() const {
-    return _result;
-}
+const Result &Lexer::result() const { return _result; }
 
 /**
  * 从流中读取一个字符
@@ -338,22 +317,21 @@ int32_t Lexer::read(const bool skipWhitespace) {
  * @return 是否匹配成功? succeed -> true
  *                     failed  -> false
  */
-bool Lexer::match(const string& literal) {
+bool Lexer::match(const string &literal) {
     _sourceFile.pushMark();
     DEFER { _sourceFile.popMark(); };
 
     // 实际可以少循环一次, 因为 ch 一定和 literal[0] 匹配
-    return ranges::all_of(literal,
-        [&](const auto targetCh) {
-            if(targetCh != read(false)) {
-                _sourceFile.restoreTopMark();
-                return false;
-            }
-            return true;
-        });
+    return ranges::all_of(literal, [&](const auto targetCh) {
+        if(targetCh != read(false)) {
+            _sourceFile.restoreTopMark();
+            return false;
+        }
+        return true;
+    });
 }
 
-bool Lexer::lineComment(Token*& token) {
+bool Lexer::lineComment(Token *&token) {
     if(auto ch = read(); ch == '/') {
         ch = read(false);
         if(ch == '/') {
@@ -374,7 +352,7 @@ bool Lexer::lineComment(Token*& token) {
  * @param token 返回的token
  * @return 是否成功
  */
-bool Lexer::blockComment(Token*& token) {
+bool Lexer::blockComment(Token *&token) {
     if(match("/*")) {
         auto block_count = 1;
         token = makeToken(S_BlockComment);
@@ -417,7 +395,7 @@ bool Lexer::blockComment(Token*& token) {
     return false;
 }
 
-bool Lexer::numberConstVal(Token*& token) {
+bool Lexer::numberConstVal(Token *&token) {
     std::stringstream stream{ std::string{} };
     auto ch = read();
     const std::string valid = ".0123456789Ee";
@@ -491,7 +469,7 @@ bool Lexer::numberConstVal(Token*& token) {
 
     rewindOneChar();
 
-    const auto fixValue = [&](const TjsReal& val) {
+    const auto fixValue = [&](const TjsReal &val) {
         TjsReal ret = val;
         if(shifting > 0)
             ret *= pow(10, shifting);
@@ -519,13 +497,11 @@ bool Lexer::numberConstVal(Token*& token) {
 }
 
 // regex expr : 0x\\d*\.?\\d+[pP]\\d*
-bool Lexer::parseNonDecimalNumber(Token*& token, stringstream& ss,
-                                  int8_t (*validDigits)(char),
-                                  const int8_t base) {
+bool Lexer::parseNonDecimalNumber(Token *&token, stringstream &ss, int8_t (*validDigits)(char), const int8_t base) {
     bool isReal = false;
     extractNumber(validDigits, "Pp", ss, isReal);
 
-    const auto& str = ss.str();
+    const auto &str = ss.str();
     if(str.empty())
         return false;
 
@@ -536,13 +512,12 @@ bool Lexer::parseNonDecimalNumber(Token*& token, stringstream& ss,
     return parseNonDecimalInteger(token, str, validDigits, base);
 }
 
-void Lexer::parseNonDecimalReal(
-    Token*& token, const string& decimalStr,
-    int8_t (*validDigits)(char), const int8_t baseBits) {
+void Lexer::parseNonDecimalReal(Token *&token, const string &decimalStr, int8_t (*validDigits)(char),
+                                const int8_t baseBits) {
     // parse non-decimal(hex decimal, octal or binary) floating-point number.
     // this routine heavily depends on IEEE double floating-point number expression.
-    uint64_t main = 0ull;  // significand
-    int32_t exp = 0;       // 2^n exponential
+    uint64_t main = 0ull; // significand
+    int32_t exp = 0; // 2^n exponential
     int32_t numSignIf = 0; // significand bit count (including leading left-most '1') in "main"
     bool pointPassed = false;
 
@@ -642,18 +617,13 @@ void Lexer::parseNonDecimalReal(
     TjsReal temp = 0.0;
 
     // compose IEEE double
-    *reinterpret_cast<TjsInteger*>(&temp) =
-            IEEE_D_MAKE_SIGN(0)
-            | IEEE_D_MAKE_EXP(exp)
-            | IEEE_D_MAKE_SIGNIFICAND(main);
+    *reinterpret_cast<TjsInteger *>(&temp) = IEEE_D_MAKE_SIGN(0) | IEEE_D_MAKE_EXP(exp) | IEEE_D_MAKE_SIGNIFICAND(main);
 
     token = makeToken(TokenType::ConstVal, tjsReal(temp));
 }
 
-bool Lexer::parseNonDecimalInteger(
-    Token*& token, const string& decimalStr,
-    int8_t (*validDigits)(char), const int8_t baseBits
-) {
+bool Lexer::parseNonDecimalInteger(Token *&token, const string &decimalStr, int8_t (*validDigits)(char),
+                                   const int8_t baseBits) {
     int64_t v = 0;
     for(const auto decimal : decimalStr) {
         v <<= baseBits;
@@ -664,9 +634,7 @@ bool Lexer::parseNonDecimalInteger(
 }
 
 // 如果是 . | p | P 那么isReal = true
-void Lexer::extractNumber(int8_t (*validDigits)(char),
-                          const string& expMark,
-                          stringstream& ss, bool& isReal) {
+void Lexer::extractNumber(int8_t (*validDigits)(char), const string &expMark, stringstream &ss, bool &isReal) {
     // 小数点
     bool pointFound = false;
     // 指数
@@ -709,7 +677,7 @@ void Lexer::extractNumber(int8_t (*validDigits)(char),
     isReal = pointFound || expFound;
 }
 
-bool Lexer::identifier(Token*& token) {
+bool Lexer::identifier(Token *&token) {
     const auto name = readIdentifier();
 
     if(name.empty())
@@ -748,144 +716,139 @@ std::string Lexer::readIdentifier() {
     }
 }
 
-bool Lexer::lineTerminator(Token*& token) {
+bool Lexer::lineTerminator(Token *&token) {
     const auto r = read() == ';';
     if(r)
         token = makeToken(S_SemiColon);
     return r;
 }
 
-bool Lexer::equalSign(Token*& token) {
+bool Lexer::equalSign(Token *&token) {
     static const OperatorTokenSet signArr{
-            { DiscEqualLiteral, S_DiscEqual },
-            { EqualLiteral, S_Equal },
-            { CommaLiteral, S_Comma }, // comma like perl
-            { AssignmentLiteral, S_Assignment },
+        { DiscEqualLiteral, S_DiscEqual },
+        { EqualLiteral, S_Equal },
+        { CommaLiteral, S_Comma }, // comma like perl
+        { AssignmentLiteral, S_Assignment },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::plus(Token*& token) {
+bool Lexer::plus(Token *&token) {
     static const OperatorTokenSet signArr{
-            { IncrementLiteral, S_Increment },
-            { PlusEqualLiteral, S_PlusEqual },
-            { PlusLiteral, S_Plus },
+        { IncrementLiteral, S_Increment },
+        { PlusEqualLiteral, S_PlusEqual },
+        { PlusLiteral, S_Plus },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::minus(Token*& token) {
+bool Lexer::minus(Token *&token) {
     static const OperatorTokenSet signArr{
-            { DecrementLiteral, S_Decrement },
-            { MinusEqualLiteral, S_MinusEqual },
-            { MinusLiteral, S_Minus },
+        { DecrementLiteral, S_Decrement },
+        { MinusEqualLiteral, S_MinusEqual },
+        { MinusLiteral, S_Minus },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::mul(Token*& token) {
+bool Lexer::mul(Token *&token) {
     static const OperatorTokenSet signArr{
-            { AsteriskEqualLiteral, S_AsteriskEqual },
-            { AsteriskLiteral, S_Asterisk },
+        { AsteriskEqualLiteral, S_AsteriskEqual },
+        { AsteriskLiteral, S_Asterisk },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::gtSign(Token*& token) {
-    static const OperatorTokenSet signArr{
-            { RBitShiftEqualLiteral, S_RBitShiftEqual },
-            { RBitShiftLiteral, S_RBitShift },
-            { RArithShiftEqualLiteral, S_RArithShiftEqual },
-            { RArithShiftLiteral, S_RArithShift },
-            { GtOrEqualLiteral, S_GtOrEqual },
-            { GtLiteral, S_Gt }
-    };
+bool Lexer::gtSign(Token *&token) {
+    static const OperatorTokenSet signArr{ { RBitShiftEqualLiteral, S_RBitShiftEqual },
+                                           { RBitShiftLiteral, S_RBitShift },
+                                           { RArithShiftEqualLiteral, S_RArithShiftEqual },
+                                           { RArithShiftLiteral, S_RArithShift },
+                                           { GtOrEqualLiteral, S_GtOrEqual },
+                                           { GtLiteral, S_Gt } };
     return boringMatch(token, signArr);
 }
 
 
-bool Lexer::ltSign(Token*& token) {
+bool Lexer::ltSign(Token *&token) {
     static const OperatorTokenSet signArr{
-            { LArithShiftEqualLiteral, S_LArithShiftEqual },
-            { SwapLiteral, S_Swap },
-            { LtOrEqualLiteral, S_LtOrEqual },
-            { LArithShiftEqualLiteral, S_LArithShift },
-            { LtLiteral, S_Lt },
+        { LArithShiftEqualLiteral, S_LArithShiftEqual }, { SwapLiteral, S_Swap }, { LtOrEqualLiteral, S_LtOrEqual },
+        { LArithShiftEqualLiteral, S_LArithShift },      { LtLiteral, S_Lt },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::exclamationSign(Token*& token) {
+bool Lexer::exclamationSign(Token *&token) {
     static const OperatorTokenSet signArr{
-            { DiscNotEqualLiteral, S_DiscNotEqual },
-            { NotEqualLiteral, S_NotEqual },
-            { ExclamationLiteral, S_Exclamation },
+        { DiscNotEqualLiteral, S_DiscNotEqual },
+        { NotEqualLiteral, S_NotEqual },
+        { ExclamationLiteral, S_Exclamation },
     };
     return boringMatch(token, signArr);
 }
 
 
-bool Lexer::ampersandSign(Token*& token) {
+bool Lexer::ampersandSign(Token *&token) {
     static const OperatorTokenSet signArr{
-            { LogicalAndEqualLiteral, S_LogicalAndEqual },
-            { LogicalAndLiteral, S_LogicalAnd },
-            { AmpersandEqualLiteral, S_AmpersandEqual },
-            { AmpersandLiteral, S_Ampersand },
+        { LogicalAndEqualLiteral, S_LogicalAndEqual },
+        { LogicalAndLiteral, S_LogicalAnd },
+        { AmpersandEqualLiteral, S_AmpersandEqual },
+        { AmpersandLiteral, S_Ampersand },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::vertLineSign(Token*& token) {
+bool Lexer::vertLineSign(Token *&token) {
     static const OperatorTokenSet signArr{
-            { LogicalOrEqualLiteral, S_LogicalOrEqual },
-            { LogicalOrLiteral, S_LogicalOr },
-            { VertLineEqualLiteral, S_VertLineEqual },
-            { VertLineLiteral, S_VertLine },
+        { LogicalOrEqualLiteral, S_LogicalOrEqual },
+        { LogicalOrLiteral, S_LogicalOr },
+        { VertLineEqualLiteral, S_VertLineEqual },
+        { VertLineLiteral, S_VertLine },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::dotSign(Token*& token) {
+bool Lexer::dotSign(Token *&token) {
     static const OperatorTokenSet signArr{
-            { OmitLiteral, S_Omit },
-            { DotLiteral, S_Dot },
+        { OmitLiteral, S_Omit },
+        { DotLiteral, S_Dot },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::slash(Token*& token) {
+bool Lexer::slash(Token *&token) {
     static const OperatorTokenSet signArr{
-            { SlashEqualLiteral, S_SlashEqual },
-            { SlashLiteral, S_Slash },
+        { SlashEqualLiteral, S_SlashEqual },
+        { SlashLiteral, S_Slash },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::backslash(Token*& token) {
+bool Lexer::backslash(Token *&token) {
     static const OperatorTokenSet signArr{
-            { BackslashEqualLiteral, S_BackslashEqual },
-            { BackslashLiteral, S_Backslash },
+        { BackslashEqualLiteral, S_BackslashEqual },
+        { BackslashLiteral, S_Backslash },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::percent(Token*& token) {
+bool Lexer::percent(Token *&token) {
     static const OperatorTokenSet signArr{
-            { PercentEqualLiteral, S_PercentEqual },
-            { PercentLiteral, S_Percent },
+        { PercentEqualLiteral, S_PercentEqual },
+        { PercentLiteral, S_Percent },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::chevron(Token*& token) {
+bool Lexer::chevron(Token *&token) {
     static const OperatorTokenSet signArr{
-            { ChevronEqualLiteral, S_ChevronEqual },
-            { ChevronLiteral, S_Chevron },
+        { ChevronEqualLiteral, S_ChevronEqual },
+        { ChevronLiteral, S_Chevron },
     };
     return boringMatch(token, signArr);
 }
 
-bool Lexer::singletonSign(Token*& token) {
+bool Lexer::singletonSign(Token *&token) {
     auto r = true;
     switch(const auto ch = read(); ch) {
         case '[':
@@ -931,7 +894,7 @@ bool Lexer::singletonSign(Token*& token) {
     return r;
 }
 
-bool Lexer::stringConstVal(Token*& token) {
+bool Lexer::stringConstVal(Token *&token) {
     const int32_t delimiter = read(false);
     if(delimiter != '"' && delimiter != '\'') {
         rewindOneChar();
@@ -944,7 +907,7 @@ bool Lexer::stringConstVal(Token*& token) {
  * 需要多次匹配
  * such as @"this can be embeddable like &variable;"
  */
-bool Lexer::templateStringConstVal(Token*& token) {
+bool Lexer::templateStringConstVal(Token *&token) {
     _sourceFile.pushMark();
 
     DEFER { _sourceFile.popMark(); };
@@ -1009,9 +972,7 @@ bool Lexer::templateStringConstVal(Token*& token) {
         }
 
         // & 和 ${
-        if(strPsState == StringParseState::Dollar
-           || strPsState == StringParseState::Ampersand
-        ) {
+        if(strPsState == StringParseState::Dollar || strPsState == StringParseState::Ampersand) {
             const auto result = next(token);
             // ${}替换符号结束
             if(strPsState == StringParseState::Dollar)
@@ -1074,11 +1035,8 @@ bool Lexer::templateStringConstVal(Token*& token) {
     return false;
 }
 
-StringParseState Lexer::internalStringParser(
-    Token*& token, const char delimiter,
-    bool* templateOver,
-    const bool templateMode
-) {
+StringParseState Lexer::internalStringParser(Token *&token, const char delimiter, bool *templateOver,
+                                             const bool templateMode) {
     stringstream str{ string{} };
     auto strPsState = StringParseState::None;
     if(templateOver)
@@ -1104,9 +1062,7 @@ StringParseState Lexer::internalStringParser(
 
                 int32_t code = 0, count = 0;
                 auto hex = getHexNum(static_cast<char>(ch));
-                while(hex != -1
-                      && count < sizeof(int32_t) * 2
-                ) {
+                while(hex != -1 && count < sizeof(int32_t) * 2) {
                     // code * 16
                     code <<= 4;
                     code += hex;
@@ -1163,13 +1119,16 @@ StringParseState Lexer::internalStringParser(
             if(ch == runeEof) {
                 rewindOneChar();
                 strPsState = StringParseState::Delimiter;
-                if(templateOver) *templateOver = true;
+                if(templateOver)
+                    *templateOver = true;
                 break;
             }
             // sequence of 'A' 'B' will be combined as 'AB'
-            if(ch == delimiter) continue;
+            if(ch == delimiter)
+                continue;
             strPsState = StringParseState::Delimiter;
-            if(templateOver) *templateOver = true;
+            if(templateOver)
+                *templateOver = true;
 
             rewindOneChar();
             break;
@@ -1217,11 +1176,9 @@ StringParseState Lexer::internalStringParser(
 /**
  * 十六进制,字符序列
  */
-bool Lexer::octetLiteral(Token*& token) {
+bool Lexer::octetLiteral(Token *&token) {
     _sourceFile.pushMark();
-    DEFER {
-        _sourceFile.popMark();
-    };
+    DEFER { _sourceFile.popMark(); };
     stringstream stream{ string{} };
     vector<uint8_t> buf{};
     // parse a octet literal;

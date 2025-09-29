@@ -15,58 +15,27 @@
 
 #include "pch.h"
 
-#include "TjsValue.hpp"
 #include "TjsObject.hpp"
+#include "TjsValue.hpp"
 
 namespace Ciallang {
+
     class TjsNativeFunction final : public TjsObject {
-        using Callback = std::function<TjsValue(const TjsValue*)>;
-        using CallbackVoid = std::function<void(const TjsValue*)>;
+        using Callback = std::function<TjsValue(const TjsValue *)>;
+        using CallbackVoid = std::function<void(const TjsValue *)>;
 
     public:
         TjsNativeFunction() = delete;
 
-        explicit TjsNativeFunction(
-            const Callback& callback,
-            const size_t arity,
-            std::string&& name
-        ): _callback(callback), _arity(arity), _name(std::move(name)) {
-        }
+        explicit TjsNativeFunction(const Callback &callback, size_t arity, std::string name);
 
-        explicit TjsNativeFunction(
-            const Callback& callback,
-            const size_t arity,
-            const std::string& name
-        ): _callback(callback), _arity(arity), _name(name) {
-        }
+        explicit TjsNativeFunction(const CallbackVoid &callback, size_t arity, std::string name);
 
-        explicit TjsNativeFunction(
-            const CallbackVoid& callback,
-            const size_t arity,
-            const std::string& name
-        ): _callback([=](const auto* values) {
-               // just warp
-               callback(values);
-               return TjsValue{};
-           }),
-           _arity(arity), _name(name) {
-        }
+        TjsValue callProc(const TjsValue *values) const { return _callback(values); }
 
-        TjsValue callProc(const TjsValue* values) const {
-            return _callback(values);
-        }
+        [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
 
-        [[nodiscard]] std::string_view name() const noexcept override {
-            return _name;
-        }
-
-        [[nodiscard]] size_t arity() const noexcept override {
-            return _arity;
-        }
-
-        [[nodiscard]] bool isNative() const noexcept override {
-            return true;
-        }
+        [[nodiscard]] size_t arity() const noexcept override { return _arity; }
 
         ~TjsNativeFunction() noexcept override = default;
 
@@ -75,4 +44,4 @@ namespace Ciallang {
         const size_t _arity;
         const std::string _name;
     };
-}
+} // namespace Ciallang

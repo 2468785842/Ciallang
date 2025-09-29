@@ -12,23 +12,3 @@
  *
  */
 #pragma once
-
-#include "pch.h"
-
-#include "types/TjsNativeFunction.hpp"
-
-namespace Ciallang::Core {
-    static const auto S_PrintFunction = TjsNativeFunction{
-            [](const TjsValue* values) {
-                fmt::print("{}", *values);
-            },
-            1, "print"
-    };
-
-    static const auto S_PrintlnFunction = TjsNativeFunction{
-            [](const TjsValue* values) {
-                fmt::println("{}", *values);
-            },
-            1, "println"
-    };
-}

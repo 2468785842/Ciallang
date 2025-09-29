@@ -49,11 +49,8 @@ namespace Ciallang::Common {
     };
 
     static inline const Utf8AcceptRangeType S_Utf8AcceptRanges[] = {
-        { .low = 0x80, .high = 0xbf },
-        { .low = 0xa0, .high = 0xbf },
-        { .low = 0x80, .high = 0x9f },
-        { .low = 0x90, .high = 0xbf },
-        { .low = 0x80, .high = 0x8f },
+        { .low = 0x80, .high = 0xbf }, { .low = 0xa0, .high = 0xbf }, { .low = 0x80, .high = 0x9f },
+        { .low = 0x90, .high = 0xbf }, { .low = 0x80, .high = 0x8f },
     };
 
     struct CodePointType {
@@ -75,7 +72,7 @@ namespace Ciallang::Common {
 
     EncodedRuneType utf8Encode(int32_t r);
 
-    int64_t utf8Strlen(const string& str);
+    int64_t utf8Strlen(const string &str);
 
-    CodePointType utf8Decode(const char* str, size_t length);
-};
+    CodePointType utf8Decode(const char *str, size_t length);
+}; // namespace Ciallang::Common

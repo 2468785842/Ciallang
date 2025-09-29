@@ -18,36 +18,36 @@
 #include <iostream>
 #include <string>
 
-#include <cstdint>
 #include <cassert>
+#include <cstdint>
 
-#include <stdexcept>
 #include <exception>
+#include <stdexcept>
 
 #include <filesystem>
 #include <fstream>
 #include <utility>
 
+#include <any>
+#include <map>
+#include <optional>
+#include <ranges>
 #include <set>
 #include <stack>
-#include <vector>
-#include <map>
 #include <unordered_map>
-#include <ranges>
-#include <optional>
-#include <any>
+#include <vector>
 
-#include <functional>
 #include <compare>
+#include <functional>
 
 #include <spdlog/spdlog.h>
 
-#include <frozen/unordered_map.h>
 #include <frozen/string.h>
+#include <frozen/unordered_map.h>
 
+#include <fmt/args.h>
+#include <fmt/color.h>
+#include <fmt/core.h>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
-#include <fmt/color.h>
 #include <fmt/printf.h>
-#include <fmt/core.h>
-#include <fmt/args.h>

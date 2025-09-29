@@ -26,31 +26,32 @@ namespace Ciallang::Common {
 
     bool isRuneLetter(const int32_t r) {
         if(r < 0x80) {
-            if(r == '_') return true;
+            if(r == '_')
+                return true;
             return isalpha(r) != 0;
         }
         switch(utf8proc_category(r)) {
-        case UTF8PROC_CATEGORY_LU:
-        case UTF8PROC_CATEGORY_LL:
-        case UTF8PROC_CATEGORY_LT:
-        case UTF8PROC_CATEGORY_LM:
-        case UTF8PROC_CATEGORY_LO:
-            return true;
-        default:
-            break;
+            case UTF8PROC_CATEGORY_LU:
+            case UTF8PROC_CATEGORY_LL:
+            case UTF8PROC_CATEGORY_LT:
+            case UTF8PROC_CATEGORY_LM:
+            case UTF8PROC_CATEGORY_LO:
+                return true;
+            default:
+                break;
         }
         return false;
     }
 
     bool isRuneWhitespace(const int32_t r) {
         switch(r) {
-        case ' ':
-        case '\t':
-        case '\n':
-        case '\r':
-            return true;
-        default:
-            return false;
+            case ' ':
+            case '\t':
+            case '\n':
+            case '\r':
+                return true;
+            default:
+                return false;
         }
     }
 
@@ -98,7 +99,7 @@ namespace Ciallang::Common {
         return e;
     }
 
-    int64_t utf8Strlen(const std::string& str) {
+    int64_t utf8Strlen(const std::string &str) {
         int64_t len = 0;
         auto p = str.data();
         for(; *p; len++) {
@@ -121,7 +122,7 @@ namespace Ciallang::Common {
         return len;
     }
 
-    CodePointType utf8Decode(const char* str, const size_t length) {
+    CodePointType utf8Decode(const char *str, const size_t length) {
         CodePointType cp{};
         if(length == 0)
             return cp;
@@ -152,8 +153,7 @@ namespace Ciallang::Common {
             return cp;
 
         if(sz == 2) {
-            cp.value = (static_cast<int32_t>(s0) & 0x1f) << 6
-                | (static_cast<int32_t>(b1) & 0x3f);
+            cp.value = (static_cast<int32_t>(s0) & 0x1f) << 6 | (static_cast<int32_t>(b1) & 0x3f);
             cp.width = 2;
             return cp;
         }
@@ -163,9 +163,8 @@ namespace Ciallang::Common {
             return cp;
 
         if(sz == 3) {
-            cp.value = (static_cast<int32_t>(s0) & 0x1f) << 12
-                | (static_cast<int32_t>(b1) & 0x3f) << 6
-                | (static_cast<int32_t>(b2) & 0x3f);
+            cp.value = (static_cast<int32_t>(s0) & 0x1f) << 12 | (static_cast<int32_t>(b1) & 0x3f) << 6 |
+                (static_cast<int32_t>(b2) & 0x3f);
             cp.width = 3;
             return cp;
         }
@@ -174,12 +173,10 @@ namespace Ciallang::Common {
         if(!(b3 >= 0x80 && b3 <= 0xbf))
             return cp;
 
-        cp.value = (static_cast<int32_t>(s0) & 0x07) << 18
-            | (static_cast<int32_t>(b1) & 0x3f) << 12
-            | (static_cast<int32_t>(b2) & 0x3f) << 6
-            | (static_cast<int32_t>(b3) & 0x3f);
+        cp.value = (static_cast<int32_t>(s0) & 0x07) << 18 | (static_cast<int32_t>(b1) & 0x3f) << 12 |
+            (static_cast<int32_t>(b2) & 0x3f) << 6 | (static_cast<int32_t>(b3) & 0x3f);
         cp.width = 4;
 
         return cp;
     }
-}
+} // namespace Ciallang::Common

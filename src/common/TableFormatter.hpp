@@ -18,9 +18,7 @@
 namespace Ciallang::Common {
     class TableFormatter {
         template <uint8_t L1>
-        uint8_t mergeX(const std::any (&table)[L1],
-                       const uint8_t curX
-        ) {
+        uint8_t mergeX(const std::any (&table)[L1], const uint8_t curX) {
             uint8_t size{ 1 };
             for(uint8_t i = curX + 1; i < L1; ++i) {
                 if(!isEqual(table[curX], table[i])) {
@@ -32,10 +30,7 @@ namespace Ciallang::Common {
         }
 
         template <uint8_t L1, uint8_t L2>
-        std::any mergeY(const std::any (&table)[L1][L2],
-                        const uint8_t curX,
-                        const uint8_t curY
-        ) {
+        std::any mergeY(const std::any (&table)[L1][L2], const uint8_t curX, const uint8_t curY) {
             if(curY == L1 - 1 || curX == 0) {
                 return table[curY][curX];
             }
@@ -51,7 +46,8 @@ namespace Ciallang::Common {
             }
 
             for(uint8_t i = curY; i > 0; --i) {
-                if(isRowEmpty(table[i - 1])) continue;
+                if(isRowEmpty(table[i - 1]))
+                    continue;
 
                 if(isEqual(upCmp, table[i - 1][curX])) {
                     ++absIndex;
@@ -60,7 +56,8 @@ namespace Ciallang::Common {
             }
 
             for(uint8_t i = curY + 1; i < L1; ++i) {
-                if(isRowEmpty(table[i])) continue;
+                if(isRowEmpty(table[i]))
+                    continue;
 
                 if(isEqual(downCmp, table[i][curX])) {
                     ++continuousSize;
@@ -122,9 +119,8 @@ namespace Ciallang::Common {
         }
 
     public:
-        TableFormatter(const size_t tableSize, const uint8_t columnCount)
-            : _tableSize(tableSize), _columnCount(columnCount) {
-        }
+        TableFormatter(const size_t tableSize, const uint8_t columnCount) :
+            _tableSize(tableSize), _columnCount(columnCount) {}
 
         template <uint8_t L1, uint8_t L2>
         void parse(const std::any (&table)[L1][L2]) {
@@ -149,7 +145,7 @@ namespace Ciallang::Common {
 
         std::string format() const {
             std::ostringstream ss;
-            for(const auto& line : _buffer | std::views::reverse) {
+            for(const auto &line : _buffer | std::views::reverse) {
                 ss << line;
             }
             return ss.str();
@@ -167,33 +163,25 @@ namespace Ciallang::Common {
         uint8_t _columnCount;
         std::vector<std::string> _buffer{};
 
-        static bool isRowEmpty(const std::any* row) {
-            return !row->has_value();
-        }
+        static bool isRowEmpty(const std::any *row) { return !row->has_value(); }
 
-        size_t cellSize() const {
-            return _tableSize / _columnCount;
-        }
+        size_t cellSize() const { return _tableSize / _columnCount; }
 
-        size_t tableSize() const {
-            return _tableSize + (_columnCount - 1);
-        }
+        size_t tableSize() const { return _tableSize + (_columnCount - 1); }
 
-        bool isEqual(const std::any& a, const std::any& b) const {
+        bool isEqual(const std::any &a, const std::any &b) const {
             if(a.type() != b.type())
                 return false;
 
-            if(a.type() == typeid(std::string)
-               || a.type() == typeid(const char*)
-            )
+            if(a.type() == typeid(std::string) || a.type() == typeid(const char *))
                 return anyToString(a) == anyToString(b);
 
             return false;
         }
 
-        std::string anyToString(const std::any& value) const {
-            if(value.type() == typeid(const char*))
-                return std::any_cast<const char*>(value);
+        std::string anyToString(const std::any &value) const {
+            if(value.type() == typeid(const char *))
+                return std::any_cast<const char *>(value);
             if(value.type() == typeid(std::string))
                 return std::any_cast<std::string>(value);
             if(value.type() == typeid(double))
@@ -206,4 +194,4 @@ namespace Ciallang::Common {
             throw std::runtime_error("Unsupported type");
         }
     };
-}
+} // namespace Ciallang::Common

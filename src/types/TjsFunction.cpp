@@ -1,4 +1,4 @@
-// Copyright (c) 2024/5/21 下午8:44
+// Copyright (c) 2025/9/29 16:04
 //
 // /\  _` \   __          /\_ \  /\_ \
 // \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -10,6 +10,17 @@
 //                                                            \_/__/
 //
 
-#include "TjsObject.hpp"
+//
+// Created by LiDon on 2025/9/29.
+//
 
-namespace Ciallang {}
+#include "TjsFunction.hpp"
+
+namespace Ciallang {
+
+    TjsFunction::TjsFunction(Bytecode::Chunk *chunk, const std::string &name) :
+        TjsFunction(chunk, std::move(name), 0) {}
+
+    TjsFunction::TjsFunction(Bytecode::Chunk *chunk, const std::string &name, const size_t arity) :
+        TjsObject(false), _chunk(chunk), _name(name), _arity(arity) {}
+} // namespace Ciallang

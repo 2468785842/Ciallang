@@ -13,14 +13,13 @@
  */
 #pragma once
 
-#include "pch.h"
 #include "common/SourceLocation.hpp"
+#include "pch.h"
 
 namespace Ciallang::Bytecode {
     class Rlc {
     public:
-        explicit Rlc(std::filesystem::path path) : _path(std::move(path)) {
-        }
+        explicit Rlc(std::filesystem::path path) : _path(std::move(path)) {}
 
         void addBytecodeLine(size_t bytecodeIndex, Common::SourceLocation sourceLine) {
             if(contains(sourceLine)) {
@@ -44,4 +43,4 @@ namespace Ciallang::Bytecode {
         std::vector<std::pair<size_t, Common::SourceLocation>> _bytecodeMapLine;
         std::filesystem::path _path;
     };
-}
+} // namespace Ciallang::Bytecode

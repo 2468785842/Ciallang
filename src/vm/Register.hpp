@@ -18,20 +18,16 @@
 namespace Ciallang::Bytecode {
     class [[nodiscard]] Register {
     public:
-        explicit Register(const std::uint32_t index) : _index(index) {
-        }
+        explicit Register(const std::uint32_t index) : _index(index) {}
 
-        std::uint32_t index() const noexcept { return _index; }
+        [[nodiscard]] std::uint32_t index() const noexcept { return _index; }
 
     private:
         std::uint32_t _index;
 
-        friend std::ostream& operator<<(std::ostream& os, const Register& reg) {
-            return os << '%' << reg._index;
-        }
+        friend std::ostream &operator<<(std::ostream &os, const Register &reg) { return os << '%' << reg._index; }
     };
-}
+} // namespace Ciallang::Bytecode
 
 template <>
-struct fmt::formatter<Ciallang::Bytecode::Register> : ostream_formatter {
-};
+struct fmt::formatter<Ciallang::Bytecode::Register> : ostream_formatter {};

@@ -22,40 +22,21 @@ namespace Ciallang::Common {
 
     class ResultMessage {
     public:
-        enum Types {
-            info, error, warning, data
-        };
+        enum Types { info, error, warning, data };
 
-        explicit ResultMessage(
-                std::string message,
-                const SourceLocation loc = {},
-                std::string details = "",
-                const Types type = info
-        ) : _type(type),
-            _message(std::move(message)),
-            _details(std::move(details)),
-            _location(loc) {
-        }
+        explicit ResultMessage(std::string message, const SourceLocation loc = {}, std::string details = "",
+                               const Types type = info) :
+            _type(type), _message(std::move(message)), _details(std::move(details)), _location(loc) {}
 
-        [[nodiscard]] constexpr Types type() const noexcept {
-            return _type;
-        }
+        [[nodiscard]] constexpr Types type() const noexcept { return _type; }
 
-        [[nodiscard]] constexpr bool isError() const noexcept {
-            return _type == error;
-        }
+        [[nodiscard]] constexpr bool isError() const noexcept { return _type == error; }
 
-        [[nodiscard]] constexpr const std::string &details() const noexcept {
-            return _details;
-        }
+        [[nodiscard]] constexpr const std::string &details() const noexcept { return _details; }
 
-        [[nodiscard]] constexpr const std::string &message() const noexcept {
-            return _message;
-        }
+        [[nodiscard]] constexpr const std::string &message() const noexcept { return _message; }
 
-        [[nodiscard]] constexpr const SourceLocation &location() const noexcept {
-            return _location;
-        }
+        [[nodiscard]] constexpr const SourceLocation &location() const noexcept { return _location; }
 
     private:
         Types _type;
@@ -65,4 +46,4 @@ namespace Ciallang::Common {
     };
 
     using ResultMessageList = std::vector<ResultMessage>;
-}
+} // namespace Ciallang::Common

@@ -24,17 +24,19 @@ namespace Ciallang::Bytecode {
 
         template <typename T, typename... Args>
             requires std::is_base_of_v<Op::Instruction, T>
-        T* emit(Args&&... args) {
-            T* ins = new T{ std::forward<Args>(args)... };
+        T *emit(Args &&...args) {
+            T *ins = new T{ std::forward<Args>(args)... };
             _instructions.push_back(ins);
             return ins;
         }
 
-        auto& instructions() const {
-            return _instructions;
-        }
+        [[nodiscard]] auto &instructions() const { return _instructions; }
+
+        void setRegisterCount(const std::uint32_t count) { _registerCount = count; }
+        std::uint32_t getRegisterCount() const { return _registerCount; }
 
     private:
-        std::vector<Op::Instruction*> _instructions{};
+        std::vector<Op::Instruction *> _instructions{};
+        std::uint32_t _registerCount{ 0 };
     };
-}
+} // namespace Ciallang::Bytecode

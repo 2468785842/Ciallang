@@ -15,25 +15,22 @@
 
 #include "pch.h"
 
-#include "lexer/Token.hpp"
 #include "AstNode.hpp"
 #include "DeclNode.hpp"
 #include "ExprNode.hpp"
 #include "StmtNode.hpp"
+#include "lexer/Token.hpp"
 #include "logging/Logger.hpp"
 
 namespace Ciallang {
     class AstFormatter final : public Syntax::AstNode::Visitor {
     public:
-        explicit AstFormatter(const size_t initialIndent = 2) : leftPadding(initialIndent) {
-        }
+        explicit AstFormatter(const size_t initialIndent = 2) : leftPadding(initialIndent) {}
 
-        void formatAst(const Syntax::AstNode* node) {
-            node->accept(this);
-        }
+        void formatAst(const Syntax::AstNode *node) { node->accept(this); }
 
         template <typename T = Syntax::AstNode>
-        void printNode(const std::string& type, const T* value = nullptr) {
+        void printNode(const std::string &type, const T *value = nullptr) {
             fmt::print("{0: <{2}}{1}", "", type, leftPadding);
             if(value) {
                 if constexpr(std::is_base_of_v<Syntax::AstNode, T>) {
@@ -51,11 +48,9 @@ namespace Ciallang {
             fmt::println("{}", "");
         }
 
-        void visit(const Syntax::StmtDeclNode* node) override {
-            node->statement->accept(this);
-        }
+        void visit(const Syntax::StmtDeclNode *node) override { node->statement->accept(this); }
 
-        void visit(const Syntax::VarDeclNode* node) override {
+        void visit(const Syntax::VarDeclNode *node) override {
             printNode("DeclareVar");
             increaseIndent();
 
@@ -68,14 +63,14 @@ namespace Ciallang {
             decreaseIndent();
         }
 
-        void visit(const Syntax::FunctionDeclNode* node) override {
+        void visit(const Syntax::FunctionDeclNode *node) override {
             printNode("FunctionDecl");
             increaseIndent();
 
             printNode("(Parameters)");
 
             increaseIndent();
-            for(auto& [token,exprNode] : node->parameters) {
+            for(auto &[token, exprNode] : node->parameters) {
                 CLL_ASSERT(token.value()->isString(), "FunctionDeclNode val is not string");
                 printNode(*token.value()->asString(), exprNode);
             }
@@ -89,16 +84,14 @@ namespace Ciallang {
             decreaseIndent();
         }
 
-        void visit(const Syntax::ValueExprNode* node) override {
-            printNode("Value", node->token->value());
-        }
+        void visit(const Syntax::ValueExprNode *node) override { printNode("Value", node->token->value()); }
 
-        void visit(const Syntax::IdentifierExprNode* node) override {
+        void visit(const Syntax::IdentifierExprNode *node) override {
             CLL_ASSERT(node->token->value()->isString(), "IdentifierExprNode val is not string");
             printNode("Identifier", node->token->value());
         }
 
-        void visit(const Syntax::BinaryExprNode* node) override {
+        void visit(const Syntax::BinaryExprNode *node) override {
             printNode("BinaryExpression");
             increaseIndent();
 
@@ -109,7 +102,7 @@ namespace Ciallang {
             decreaseIndent();
         }
 
-        void visit(const Syntax::UnaryExprNode* node) override {
+        void visit(const Syntax::UnaryExprNode *node) override {
             printNode("UnaryExpression");
             increaseIndent();
 
@@ -119,7 +112,7 @@ namespace Ciallang {
             decreaseIndent();
         }
 
-        void visit(const Syntax::ProcCallExprNode* node) override {
+        void visit(const Syntax::ProcCallExprNode *node) override {
             printNode("ProcCall");
             increaseIndent();
 
@@ -134,7 +127,7 @@ namespace Ciallang {
             decreaseIndent();
         }
 
-        void visit(const Syntax::AssignExprNode* node) override {
+        void visit(const Syntax::AssignExprNode *node) override {
             printNode("AssignmentExpression");
             increaseIndent();
 
@@ -145,14 +138,14 @@ namespace Ciallang {
             decreaseIndent();
         }
 
-        void visit(const Syntax::BlockStmtNode* node) override {
+        void visit(const Syntax::BlockStmtNode *node) override {
             printNode("BlockStatement");
             increaseIndent();
 
             printNode("(Children)");
 
             increaseIndent();
-            for(const auto* child : node->childrens) {
+            for(const auto *child : node->childrens) {
                 child->accept(this);
             }
             decreaseIndent();
@@ -160,11 +153,9 @@ namespace Ciallang {
             decreaseIndent();
         }
 
-        void visit(const Syntax::ExprStmtNode* node) override {
-            node->expression->accept(this);
-        }
+        void visit(const Syntax::ExprStmtNode *node) override { node->expression->accept(this); }
 
-        void visit(const Syntax::IfStmtNode* node) override {
+        void visit(const Syntax::IfStmtNode *node) override {
             printNode("IfStatement");
             increaseIndent();
 
@@ -190,7 +181,7 @@ namespace Ciallang {
             decreaseIndent();
         }
 
-        void visit(const Syntax::WhileStmtNode* node) override {
+        void visit(const Syntax::WhileStmtNode *node) override {
             printNode("WhileStatement");
             increaseIndent();
 
@@ -207,15 +198,11 @@ namespace Ciallang {
             decreaseIndent();
         }
 
-        void visit(const Syntax::BreakStmtNode* node) override {
-            printNode("BreakStatement");
-        }
+        void visit(const Syntax::BreakStmtNode *node) override { printNode("BreakStatement"); }
 
-        void visit(const Syntax::ContinueStmtNode* node) override {
-            printNode("ContinueStatement");
-        }
+        void visit(const Syntax::ContinueStmtNode *node) override { printNode("ContinueStatement"); }
 
-        void visit(const Syntax::ReturnStmtNode* node) override {
+        void visit(const Syntax::ReturnStmtNode *node) override {
             printNode("ReturnStatement");
             increaseIndent();
             node->expr->accept(this);
@@ -229,4 +216,4 @@ namespace Ciallang {
     private:
         size_t leftPadding{ 0 };
     };
-}
+} // namespace Ciallang

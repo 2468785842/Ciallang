@@ -20,11 +20,10 @@ namespace Ciallang {
         std::vector<uint8_t> _buf;
 
     public:
-        explicit TjsOctet(std::vector<uint8_t> buf) : _buf(std::move(buf)) {
-        }
+        explicit TjsOctet(std::vector<uint8_t> buf) : _buf(std::move(buf)) {}
 
-        static TjsValue tjsOctet(const std::vector<uint8_t>&);
+        static TjsValue tjsOctet(const std::vector<uint8_t> &);
     };
 
 
-}
+} // namespace Ciallang

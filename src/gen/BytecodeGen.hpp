@@ -15,11 +15,11 @@
 #include "pch.h"
 
 #include "ast/Ast.hpp"
-#include "vm/Chunk.hpp"
-#include "vm/Register.hpp"
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
+#include "vm/Chunk.hpp"
 #include "vm/Label.hpp"
+#include "vm/Register.hpp"
 
 namespace Ciallang::Inter {
     struct LocalVariable {
@@ -31,64 +31,52 @@ namespace Ciallang::Inter {
 
     class BytecodeGen {
     public:
-        explicit BytecodeGen(
-            Common::SourceFile& sourceFile
-        ) : _sourceFile(sourceFile) {
-        }
+        explicit BytecodeGen(Common::SourceFile &sourceFile) : _sourceFile(sourceFile) {}
 
-        std::unique_ptr<Bytecode::Chunk> parseAst(const Common::Result& r,
-                                                  const Syntax::AstNode* node);
+        std::unique_ptr<Bytecode::Chunk> parseAst(Common::Result &r, const Syntax::AstNode *node);
 
-        void error(Common::Result& r,
-                   const std::string& message,
-                   const Common::SourceLocation& location) const {
+        void error(Common::Result &r, const std::string &message, const Common::SourceLocation &location) const {
             _sourceFile.error(r, message, location);
         }
 
-        void addVariable(LocalVariable&& variable) {
-            _variables.push_back(std::move(variable));
-        }
+        void addVariable(LocalVariable &&variable) { _variables.push_back(std::move(variable)); }
 
-        ~BytecodeGen() noexcept {
-            delete _chunk;
-        }
+        std::optional<Bytecode::Register> generate(const Syntax::ValueExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::ValueExprNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::IdentifierExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::IdentifierExprNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::BinaryExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::BinaryExprNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::UnaryExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::UnaryExprNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::ProcCallExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::ProcCallExprNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::AssignExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::AssignExprNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::BlockStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::BlockStmtNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::ExprStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::ExprStmtNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::IfStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::IfStmtNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::VarDeclNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::VarDeclNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::FunctionDeclNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::FunctionDeclNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::StmtDeclNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::StmtDeclNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::WhileStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::WhileStmtNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::BreakStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::BreakStmtNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::ContinueStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::ContinueStmtNode*);
-
-        std::optional<Bytecode::Register> generate(const Syntax::ReturnStmtNode*);
+        std::optional<Bytecode::Register> generate(const Syntax::ReturnStmtNode *);
 
     private:
-        Bytecode::Chunk* _chunk{ nullptr };
+        std::unique_ptr<Bytecode::Chunk> _chunk = std::make_unique<Bytecode::Chunk>();
 
-        Common::SourceFile& _sourceFile;
+        Common::SourceFile &_sourceFile;
         Common::Result _r{};
 
         size_t _scopeDepth{ 0 };
@@ -106,35 +94,34 @@ namespace Ciallang::Inter {
                 _freeRegisters.pop_back();
                 return reg;
             }
-
-            return Bytecode::Register{ _nextIndex++ };
+            const Bytecode::Register reg{ _nextIndex++ };
+            _chunk->setRegisterCount(std::max(_chunk->getRegisterCount(), _nextIndex));
+            return reg;
         }
 
         void freeRegister(const Bytecode::Register reg) {
             _freeRegisters.push_back(reg);
         }
 
-        Bytecode::Label makeLabel() const {
-            return Bytecode::Label{ _chunk->instructions().size() };
-        }
+        Bytecode::Label makeLabel() const { return Bytecode::Label{ _chunk->instructions().size() }; }
 
         void beginScope() { _scopeDepth++; }
 
         void endScope() {
-            auto new_end = std::ranges::remove_if(
-                _variables, [&](const LocalVariable& variable) {
-                    if(variable.scopeDepth == _scopeDepth) {
-                        freeRegister(variable.reg);
-                        return true;
-                    }
-                    return false;
-                }).begin();
+            const auto new_end =
+                std::ranges::remove_if(_variables, [&](const LocalVariable &variable) {
+                   if(variable.scopeDepth == _scopeDepth) {
+                       freeRegister(variable.reg);
+                       return true;
+                   }
+                   return false;
+               }).begin();
 
             _variables.erase(new_end, _variables.end());
             _scopeDepth--;
         }
 
-        Bytecode::Register getEmpty(Bytecode::Chunk& chunk) {
+        Bytecode::Register getEmpty(Bytecode::Chunk &chunk) {
             if(!_empty.has_value()) {
                 _empty = allocateRegister();
                 chunk.emit<Bytecode::Op::Load>(_empty.value(), TjsValue{});
@@ -142,6 +129,6 @@ namespace Ciallang::Inter {
             return _empty.value();
         }
 
-        std::optional<LocalVariable*> resolveLocalVariable(const std::string& identifier);
+        std::optional<LocalVariable *> resolveLocalVariable(const std::string &identifier);
     };
-}
+} // namespace Ciallang::Inter

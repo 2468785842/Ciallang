@@ -13,7 +13,7 @@
 #pragma once
 
 namespace Ciallang {
-#if defined (LLONG_MAX)
+#if defined(LLONG_MAX)
     using TjsInteger = long long;
     using TjsReal = double;
 #else
@@ -36,4 +36,4 @@ namespace Ciallang {
 
     class TjsValue;
 
-}
+} // namespace Ciallang

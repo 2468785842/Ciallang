@@ -16,21 +16,13 @@
 
 using namespace Ciallang::Common;
 
-const LocationType& SourceLocation::end() const {
-    return _end;
-}
+const LocationType &SourceLocation::end() const { return _end; }
 
-const LocationType& SourceLocation::start() const {
-    return _start;
-}
+const LocationType &SourceLocation::start() const { return _start; }
 
-void SourceLocation::end(const LocationType& value) {
-    _end = value;
-}
+void SourceLocation::end(const LocationType &value) { _end = value; }
 
-void SourceLocation::start(const LocationType& value) {
-    _start = value;
-}
+void SourceLocation::start(const LocationType &value) { _start = value; }
 
 void SourceLocation::end(const uint32_t line, const uint32_t column) {
     _end.line = line;

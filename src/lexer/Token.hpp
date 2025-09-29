@@ -165,250 +165,171 @@ namespace Ciallang::Syntax {
         String
     };
 
-    static constexpr char
-            CommaLiteral[] = ",",
-            AssignmentLiteral[] = "=",
-            AmpersandEqualLiteral[] = "&=",
-            VertLineEqualLiteral[] = "|=",
-            ChevronEqualLiteral[] = "^=",
-            MinusEqualLiteral[] = "-=",
-            PlusEqualLiteral[] = "+=",
-            PercentEqualLiteral[] = "%=",
-            SlashEqualLiteral[] = "/=",
-            BackslashEqualLiteral[] = "\\=",
-            AsteriskEqualLiteral[] = "*=",
-            LogicalOrEqualLiteral[] = "||=",
-            LogicalAndEqualLiteral[] = "&&=",
-            RBitShiftEqualLiteral[] = ">>>=",
-            LArithShiftEqualLiteral[] = "<<=",
-            RArithShiftEqualLiteral[] = ">>=",
-            QuestionLiteral[] = "?",
-            LogicalOrLiteral[] = "||",
-            LogicalAndLiteral[] = "&&",
-            VertLineLiteral[] = "|",
-            ChevronLiteral[] = "^",
-            AmpersandLiteral[] = "&",
-            NotEqualLiteral[] = "!=",
-            EqualLiteral[] = "==",
-            DiscNotEqualLiteral[] = "!==",
-            DiscEqualLiteral[] = "===",
-            SwapLiteral[] = "<->",
-            LtLiteral[] = "<",
-            GtLiteral[] = ">",
-            LtOrEqualLiteral[] = "<=",
-            GtOrEqualLiteral[] = ">=",
-            RArithShiftLiteral[] = ">>",
-            LArithShiftLiteral[] = "<<",
-            RBitShiftLiteral[] = ">>>",
-            PercentLiteral[] = "%",
-            SlashLiteral[] = "/",
-            BackslashLiteral[] = "\\",
-            AsteriskLiteral[] = "*",
-            ExclamationLiteral[] = "!",
-            TildeLiteral[] = "~",
-            DecrementLiteral[] = "--",
-            IncrementLiteral[] = "++",
-            PlusLiteral[] = "+",
-            MinusLiteral[] = "-",
-            SharpLiteral[] = "#",
-            DollarLiteral[] = "$",
-            LParenthesisLiteral[] = "(",
-            DotLiteral[] = ".",
-            LBracketLiteral[] = "[",
-            RBracketLiteral[] = "]",
-            RParenthesisLiteral[] = ")",
-            ColonLiteral[] = ":",
-            SemiColonLiteral[] = ";",
-            LeftCurlyBraceLiteral[] = "{",
-            RightCurlyBraceLiteral[] = "}",
-            NewLiteral[] = "new",
-            DeleteLiteral[] = "delete",
-            TypeofLiteral[] = "typeof",
-            IsvalidLiteral[] = "isvalid",
-            InvalidateLiteral[] = "invalidate",
-            InstanceofLiteral[] = "instanceof",
-            ThisLiteral[] = "this",
-            SuperLiteral[] = "super",
-            GlobalLiteral[] = "global",
-            ClassLiteral[] = "class",
-            VoidLiteral[] = "void",
-            SynchronizedLiteral[] = "synchronized",
-            WithLiteral[] = "with",
-            VarLiteral[] = "var",
-            ConstLiteral[] = "const",
-            EnumLiteral[] = "enum",
-            GotoLiteral[] = "goto",
-            ThrowLiteral[] = "throw",
-            TryLiteral[] = "try",
-            SetterLiteral[] = "setter",
-            GetterLiteral[] = "getter",
-            CatchLiteral[] = "catch",
-            OmitLiteral[] = "...",
-            ContinueLiteral[] = "continue",
-            FunctionLiteral[] = "function",
-            DebuggerLiteral[] = "debugger",
-            DefaultLiteral[] = "default",
-            CaseLiteral[] = "case",
-            ExtendsLiteral[] = "extends",
-            FinallyLiteral[] = "finally",
-            PropertyLiteral[] = "property",
-            PrivateLiteral[] = "private",
-            PublicLiteral[] = "public",
-            ProtectedLiteral[] = "protected",
-            StaticLiteral[] = "static",
-            ReturnLiteral[] = "return",
-            BreakLiteral[] = "break",
-            ExportLiteral[] = "export",
-            ImportLiteral[] = "import",
-            SwitchLiteral[] = "switch",
-            InLiteral[] = "in",
-            IncontextofLiteral[] = "incontextof",
-            ForLiteral[] = "for",
-            WhileLiteral[] = "while",
-            DoLiteral[] = "do",
-            IfLiteral[] = "if",
-            ElseLiteral[] = "else",
-            InvalidLiteral[] = "invalid",
-            LineCommentLiteral[] = "line_comment",
-            BlockCommentLiteral[] = "block_comment",
-            IdentifierLiteral[] = "identifier",
-            ConstValLiteral[] = "const_val",
-            IntLiteral[] = "int",
-            RealLiteral[] = "real",
-            StringLiteral[] = "string",
-            EndOfFileLiteral[] = "end_of_file",
-            Unknown[] = "unknown";
+    static constexpr char CommaLiteral[] = ",", AssignmentLiteral[] = "=",
+                          AmpersandEqualLiteral[] = "&=", VertLineEqualLiteral[] = "|=", ChevronEqualLiteral[] = "^=",
+                          MinusEqualLiteral[] = "-=", PlusEqualLiteral[] = "+=", PercentEqualLiteral[] = "%=",
+                          SlashEqualLiteral[] = "/=", BackslashEqualLiteral[] = "\\=", AsteriskEqualLiteral[] = "*=",
+                          LogicalOrEqualLiteral[] = "||=", LogicalAndEqualLiteral[] = "&&=",
+                          RBitShiftEqualLiteral[] = ">>>=", LArithShiftEqualLiteral[] = "<<=",
+                          RArithShiftEqualLiteral[] = ">>=", QuestionLiteral[] = "?", LogicalOrLiteral[] = "||",
+                          LogicalAndLiteral[] = "&&", VertLineLiteral[] = "|", ChevronLiteral[] = "^",
+                          AmpersandLiteral[] = "&", NotEqualLiteral[] = "!=", EqualLiteral[] = "==",
+                          DiscNotEqualLiteral[] = "!==", DiscEqualLiteral[] = "===", SwapLiteral[] = "<->",
+                          LtLiteral[] = "<", GtLiteral[] = ">",
+                          LtOrEqualLiteral[] = "<=", GtOrEqualLiteral[] = ">=", RArithShiftLiteral[] = ">>",
+                          LArithShiftLiteral[] = "<<", RBitShiftLiteral[] = ">>>", PercentLiteral[] = "%",
+                          SlashLiteral[] = "/", BackslashLiteral[] = "\\", AsteriskLiteral[] = "*",
+                          ExclamationLiteral[] = "!", TildeLiteral[] = "~", DecrementLiteral[] = "--",
+                          IncrementLiteral[] = "++", PlusLiteral[] = "+", MinusLiteral[] = "-", SharpLiteral[] = "#",
+                          DollarLiteral[] = "$", LParenthesisLiteral[] = "(", DotLiteral[] = ".",
+                          LBracketLiteral[] = "[", RBracketLiteral[] = "]", RParenthesisLiteral[] = ")",
+                          ColonLiteral[] = ":", SemiColonLiteral[] = ";", LeftCurlyBraceLiteral[] = "{",
+                          RightCurlyBraceLiteral[] = "}", NewLiteral[] = "new", DeleteLiteral[] = "delete",
+                          TypeofLiteral[] = "typeof", IsvalidLiteral[] = "isvalid", InvalidateLiteral[] = "invalidate",
+                          InstanceofLiteral[] = "instanceof", ThisLiteral[] = "this", SuperLiteral[] = "super",
+                          GlobalLiteral[] = "global", ClassLiteral[] = "class", VoidLiteral[] = "void",
+                          SynchronizedLiteral[] = "synchronized", WithLiteral[] = "with", VarLiteral[] = "var",
+                          ConstLiteral[] = "const", EnumLiteral[] = "enum", GotoLiteral[] = "goto",
+                          ThrowLiteral[] = "throw", TryLiteral[] = "try", SetterLiteral[] = "setter",
+                          GetterLiteral[] = "getter", CatchLiteral[] = "catch", OmitLiteral[] = "...",
+                          ContinueLiteral[] = "continue", FunctionLiteral[] = "function",
+                          DebuggerLiteral[] = "debugger", DefaultLiteral[] = "default", CaseLiteral[] = "case",
+                          ExtendsLiteral[] = "extends", FinallyLiteral[] = "finally", PropertyLiteral[] = "property",
+                          PrivateLiteral[] = "private", PublicLiteral[] = "public", ProtectedLiteral[] = "protected",
+                          StaticLiteral[] = "static", ReturnLiteral[] = "return", BreakLiteral[] = "break",
+                          ExportLiteral[] = "export", ImportLiteral[] = "import", SwitchLiteral[] = "switch",
+                          InLiteral[] = "in", IncontextofLiteral[] = "incontextof", ForLiteral[] = "for",
+                          WhileLiteral[] = "while", DoLiteral[] = "do", IfLiteral[] = "if", ElseLiteral[] = "else",
+                          InvalidLiteral[] = "invalid", LineCommentLiteral[] = "line_comment",
+                          BlockCommentLiteral[] = "block_comment", IdentifierLiteral[] = "identifier",
+                          ConstValLiteral[] = "const_val", IntLiteral[] = "int", RealLiteral[] = "real",
+                          StringLiteral[] = "string", EndOfFileLiteral[] = "end_of_file", Unknown[] = "unknown";
 
 
     static constexpr auto S_TypeToName =
-            frozen::make_unordered_map<TokenType, const char*>({
-                    { TokenType::Comma, CommaLiteral },
-                    { TokenType::Assignment, AssignmentLiteral },
-                    { TokenType::AmpersandEqual, AmpersandEqualLiteral },
-                    { TokenType::VertLineEqual, VertLineEqualLiteral },
-                    { TokenType::ChevronEqual, ChevronEqualLiteral },
-                    { TokenType::MinusEqual, MinusEqualLiteral },
-                    { TokenType::PlusEqual, PlusEqualLiteral },
-                    { TokenType::PercentEqual, PercentEqualLiteral },
-                    { TokenType::SlashEqual, SlashEqualLiteral },
-                    { TokenType::BackslashEqual, BackslashEqualLiteral },
-                    { TokenType::AsteriskEqual, AsteriskEqualLiteral },
-                    { TokenType::LogicalOrEqual, LogicalOrEqualLiteral },
-                    { TokenType::LogicalAndEqual, LogicalAndEqualLiteral },
-                    { TokenType::RBitShiftEqual, RBitShiftEqualLiteral },
-                    { TokenType::LArithShiftEqual, LArithShiftEqualLiteral },
-                    { TokenType::RArithShiftEqual, RArithShiftEqualLiteral },
-                    { TokenType::Question, QuestionLiteral },
-                    { TokenType::LogicalOr, LogicalOrLiteral },
-                    { TokenType::LogicalAnd, LogicalAndLiteral },
-                    { TokenType::VertLine, VertLineLiteral },
-                    { TokenType::Chevron, ChevronLiteral },
-                    { TokenType::Ampersand, AmpersandLiteral },
-                    { TokenType::NotEqual, NotEqualLiteral },
-                    { TokenType::Equal, EqualLiteral },
-                    { TokenType::DiscNotEqual, DiscNotEqualLiteral },
-                    { TokenType::DiscEqual, DiscEqualLiteral },
-                    { TokenType::Swap, SwapLiteral },
-                    { TokenType::Lt, LtLiteral },
-                    { TokenType::Gt, GtLiteral },
-                    { TokenType::LtOrEqual, LtOrEqualLiteral },
-                    { TokenType::GtOrEqual, GtOrEqualLiteral },
-                    { TokenType::RArithShift, RArithShiftLiteral },
-                    { TokenType::LArithShift, LArithShiftLiteral },
-                    { TokenType::RBitShift, RBitShiftLiteral },
-                    { TokenType::Percent, PercentLiteral },
-                    { TokenType::Slash, SlashLiteral },
-                    { TokenType::Backslash, BackslashLiteral },
-                    { TokenType::Asterisk, AsteriskLiteral },
-                    { TokenType::Exclamation, ExclamationLiteral },
-                    { TokenType::Tilde, TildeLiteral },
-                    { TokenType::Decrement, DecrementLiteral },
-                    { TokenType::Increment, IncrementLiteral },
-                    { TokenType::Plus, PlusLiteral },
-                    { TokenType::Minus, MinusLiteral },
-                    { TokenType::Sharp, SharpLiteral },
-                    { TokenType::Dollar, DollarLiteral },
-                    { TokenType::LParenthesis, LParenthesisLiteral },
-                    { TokenType::Dot, DotLiteral },
-                    { TokenType::LBracket, LBracketLiteral },
-                    { TokenType::RBracket, RBracketLiteral },
-                    { TokenType::RParenthesis, RParenthesisLiteral },
-                    { TokenType::Colon, ColonLiteral },
-                    { TokenType::SemiColon, SemiColonLiteral },
-                    { TokenType::LeftCurlyBrace, LeftCurlyBraceLiteral },
-                    { TokenType::RightCurlyBrace, RightCurlyBraceLiteral },
-                    { TokenType::New, NewLiteral },
-                    { TokenType::Delete, DeleteLiteral },
-                    { TokenType::Typeof, TypeofLiteral },
-                    { TokenType::Isvalid, IsvalidLiteral },
-                    { TokenType::Invalidate, InvalidateLiteral },
-                    { TokenType::Instanceof, InstanceofLiteral },
-                    { TokenType::This, ThisLiteral },
-                    { TokenType::Super, SuperLiteral },
-                    { TokenType::Global, GlobalLiteral },
-                    { TokenType::Class, ClassLiteral },
-                    { TokenType::Void, VoidLiteral },
-                    { TokenType::Synchronized, SynchronizedLiteral },
-                    { TokenType::With, WithLiteral },
-                    { TokenType::Var, VarLiteral },
-                    { TokenType::Const, ConstLiteral },
-                    { TokenType::Enum, EnumLiteral },
-                    { TokenType::Goto, GotoLiteral },
-                    { TokenType::Throw, ThrowLiteral },
-                    { TokenType::Try, TryLiteral },
-                    { TokenType::Setter, SetterLiteral },
-                    { TokenType::Getter, GetterLiteral },
-                    { TokenType::Catch, CatchLiteral },
-                    { TokenType::Omit, OmitLiteral },
-                    { TokenType::Continue, ContinueLiteral },
-                    { TokenType::Function, FunctionLiteral },
-                    { TokenType::Debugger, DebuggerLiteral },
-                    { TokenType::Default, DefaultLiteral },
-                    { TokenType::Case, CaseLiteral },
-                    { TokenType::Extends, ExtendsLiteral },
-                    { TokenType::Finally, FinallyLiteral },
-                    { TokenType::Property, PropertyLiteral },
-                    { TokenType::Private, PrivateLiteral },
-                    { TokenType::Public, PublicLiteral },
-                    { TokenType::Protected, ProtectedLiteral },
-                    { TokenType::Static, StaticLiteral },
-                    { TokenType::Return, ReturnLiteral },
-                    { TokenType::Break, BreakLiteral },
-                    { TokenType::Export, ExportLiteral },
-                    { TokenType::Import, ImportLiteral },
-                    { TokenType::Switch, SwitchLiteral },
-                    { TokenType::In, InLiteral },
-                    { TokenType::Incontextof, IncontextofLiteral },
-                    { TokenType::For, ForLiteral },
-                    { TokenType::While, WhileLiteral },
-                    { TokenType::Do, DoLiteral },
-                    { TokenType::If, IfLiteral },
-                    { TokenType::Else, ElseLiteral },
-                    { TokenType::Invalid, InvalidLiteral },
-                    { TokenType::LineComment, LineCommentLiteral },
-                    { TokenType::BlockComment, BlockCommentLiteral },
-                    { TokenType::Identifier, IdentifierLiteral },
-                    { TokenType::ConstVal, ConstValLiteral },
-                    { TokenType::Int, IntLiteral },
-                    { TokenType::Real, RealLiteral },
-                    { TokenType::String, StringLiteral },
-                    { TokenType::EndOfFile, EndOfFileLiteral }
-            });
+        frozen::make_unordered_map<TokenType, const char *>({ { TokenType::Comma, CommaLiteral },
+                                                              { TokenType::Assignment, AssignmentLiteral },
+                                                              { TokenType::AmpersandEqual, AmpersandEqualLiteral },
+                                                              { TokenType::VertLineEqual, VertLineEqualLiteral },
+                                                              { TokenType::ChevronEqual, ChevronEqualLiteral },
+                                                              { TokenType::MinusEqual, MinusEqualLiteral },
+                                                              { TokenType::PlusEqual, PlusEqualLiteral },
+                                                              { TokenType::PercentEqual, PercentEqualLiteral },
+                                                              { TokenType::SlashEqual, SlashEqualLiteral },
+                                                              { TokenType::BackslashEqual, BackslashEqualLiteral },
+                                                              { TokenType::AsteriskEqual, AsteriskEqualLiteral },
+                                                              { TokenType::LogicalOrEqual, LogicalOrEqualLiteral },
+                                                              { TokenType::LogicalAndEqual, LogicalAndEqualLiteral },
+                                                              { TokenType::RBitShiftEqual, RBitShiftEqualLiteral },
+                                                              { TokenType::LArithShiftEqual, LArithShiftEqualLiteral },
+                                                              { TokenType::RArithShiftEqual, RArithShiftEqualLiteral },
+                                                              { TokenType::Question, QuestionLiteral },
+                                                              { TokenType::LogicalOr, LogicalOrLiteral },
+                                                              { TokenType::LogicalAnd, LogicalAndLiteral },
+                                                              { TokenType::VertLine, VertLineLiteral },
+                                                              { TokenType::Chevron, ChevronLiteral },
+                                                              { TokenType::Ampersand, AmpersandLiteral },
+                                                              { TokenType::NotEqual, NotEqualLiteral },
+                                                              { TokenType::Equal, EqualLiteral },
+                                                              { TokenType::DiscNotEqual, DiscNotEqualLiteral },
+                                                              { TokenType::DiscEqual, DiscEqualLiteral },
+                                                              { TokenType::Swap, SwapLiteral },
+                                                              { TokenType::Lt, LtLiteral },
+                                                              { TokenType::Gt, GtLiteral },
+                                                              { TokenType::LtOrEqual, LtOrEqualLiteral },
+                                                              { TokenType::GtOrEqual, GtOrEqualLiteral },
+                                                              { TokenType::RArithShift, RArithShiftLiteral },
+                                                              { TokenType::LArithShift, LArithShiftLiteral },
+                                                              { TokenType::RBitShift, RBitShiftLiteral },
+                                                              { TokenType::Percent, PercentLiteral },
+                                                              { TokenType::Slash, SlashLiteral },
+                                                              { TokenType::Backslash, BackslashLiteral },
+                                                              { TokenType::Asterisk, AsteriskLiteral },
+                                                              { TokenType::Exclamation, ExclamationLiteral },
+                                                              { TokenType::Tilde, TildeLiteral },
+                                                              { TokenType::Decrement, DecrementLiteral },
+                                                              { TokenType::Increment, IncrementLiteral },
+                                                              { TokenType::Plus, PlusLiteral },
+                                                              { TokenType::Minus, MinusLiteral },
+                                                              { TokenType::Sharp, SharpLiteral },
+                                                              { TokenType::Dollar, DollarLiteral },
+                                                              { TokenType::LParenthesis, LParenthesisLiteral },
+                                                              { TokenType::Dot, DotLiteral },
+                                                              { TokenType::LBracket, LBracketLiteral },
+                                                              { TokenType::RBracket, RBracketLiteral },
+                                                              { TokenType::RParenthesis, RParenthesisLiteral },
+                                                              { TokenType::Colon, ColonLiteral },
+                                                              { TokenType::SemiColon, SemiColonLiteral },
+                                                              { TokenType::LeftCurlyBrace, LeftCurlyBraceLiteral },
+                                                              { TokenType::RightCurlyBrace, RightCurlyBraceLiteral },
+                                                              { TokenType::New, NewLiteral },
+                                                              { TokenType::Delete, DeleteLiteral },
+                                                              { TokenType::Typeof, TypeofLiteral },
+                                                              { TokenType::Isvalid, IsvalidLiteral },
+                                                              { TokenType::Invalidate, InvalidateLiteral },
+                                                              { TokenType::Instanceof, InstanceofLiteral },
+                                                              { TokenType::This, ThisLiteral },
+                                                              { TokenType::Super, SuperLiteral },
+                                                              { TokenType::Global, GlobalLiteral },
+                                                              { TokenType::Class, ClassLiteral },
+                                                              { TokenType::Void, VoidLiteral },
+                                                              { TokenType::Synchronized, SynchronizedLiteral },
+                                                              { TokenType::With, WithLiteral },
+                                                              { TokenType::Var, VarLiteral },
+                                                              { TokenType::Const, ConstLiteral },
+                                                              { TokenType::Enum, EnumLiteral },
+                                                              { TokenType::Goto, GotoLiteral },
+                                                              { TokenType::Throw, ThrowLiteral },
+                                                              { TokenType::Try, TryLiteral },
+                                                              { TokenType::Setter, SetterLiteral },
+                                                              { TokenType::Getter, GetterLiteral },
+                                                              { TokenType::Catch, CatchLiteral },
+                                                              { TokenType::Omit, OmitLiteral },
+                                                              { TokenType::Continue, ContinueLiteral },
+                                                              { TokenType::Function, FunctionLiteral },
+                                                              { TokenType::Debugger, DebuggerLiteral },
+                                                              { TokenType::Default, DefaultLiteral },
+                                                              { TokenType::Case, CaseLiteral },
+                                                              { TokenType::Extends, ExtendsLiteral },
+                                                              { TokenType::Finally, FinallyLiteral },
+                                                              { TokenType::Property, PropertyLiteral },
+                                                              { TokenType::Private, PrivateLiteral },
+                                                              { TokenType::Public, PublicLiteral },
+                                                              { TokenType::Protected, ProtectedLiteral },
+                                                              { TokenType::Static, StaticLiteral },
+                                                              { TokenType::Return, ReturnLiteral },
+                                                              { TokenType::Break, BreakLiteral },
+                                                              { TokenType::Export, ExportLiteral },
+                                                              { TokenType::Import, ImportLiteral },
+                                                              { TokenType::Switch, SwitchLiteral },
+                                                              { TokenType::In, InLiteral },
+                                                              { TokenType::Incontextof, IncontextofLiteral },
+                                                              { TokenType::For, ForLiteral },
+                                                              { TokenType::While, WhileLiteral },
+                                                              { TokenType::Do, DoLiteral },
+                                                              { TokenType::If, IfLiteral },
+                                                              { TokenType::Else, ElseLiteral },
+                                                              { TokenType::Invalid, InvalidLiteral },
+                                                              { TokenType::LineComment, LineCommentLiteral },
+                                                              { TokenType::BlockComment, BlockCommentLiteral },
+                                                              { TokenType::Identifier, IdentifierLiteral },
+                                                              { TokenType::ConstVal, ConstValLiteral },
+                                                              { TokenType::Int, IntLiteral },
+                                                              { TokenType::Real, RealLiteral },
+                                                              { TokenType::String, StringLiteral },
+                                                              { TokenType::EndOfFile, EndOfFileLiteral } });
 
     struct Token {
-        SourceLocation location{};
+        Common::SourceLocation location{};
 
         explicit Token() = default;
 
-        constexpr explicit Token(const TokenType type) :
-            _type(type) {
-        }
+        constexpr explicit Token(const TokenType type) : _type(type) {}
 
-        explicit Token(const TokenType type, TjsValue&& value) :
-            _type(type), _value(new TjsValue{ std::move(value) }) {
-        }
+        explicit Token(const TokenType type, TjsValue &&value) :
+            _type(type), _value(new TjsValue{ std::move(value) }) {}
 
-        Token(Token&& token) noexcept {
+        Token(Token &&token) noexcept {
             _type = token._type;
             _value = token._value;
             location = token.location;
@@ -416,7 +337,7 @@ namespace Ciallang::Syntax {
             token._value = nullptr;
         }
 
-        Token(const Token& token) noexcept {
+        Token(const Token &token) noexcept {
             _type = token._type;
 
             if(token._value)
@@ -425,8 +346,9 @@ namespace Ciallang::Syntax {
             location = token.location;
         }
 
-        Token& operator=(Token&& token) noexcept {
-            if(this == &token) return *this;
+        Token &operator=(Token &&token) noexcept {
+            if(this == &token)
+                return *this;
             _type = token._type;
 
             delete _value;
@@ -437,7 +359,7 @@ namespace Ciallang::Syntax {
             return *this;
         }
 
-        Token& operator=(const Token& token) noexcept {
+        Token &operator=(const Token &token) noexcept {
             if(this != &token) {
                 _type = token._type;
 
@@ -450,17 +372,13 @@ namespace Ciallang::Syntax {
             return *this;
         }
 
-        bool operator==(const Token& token) const {
-            return _type == token.type() && *_value == *token.value();
-        }
+        bool operator==(const Token &token) const { return _type == token.type() && *_value == *token.value(); }
 
         [[nodiscard]] constexpr TokenType type() const noexcept { return _type; }
 
-        [[nodiscard]] constexpr TjsValue* value() const noexcept {
-            return _value;
-        }
+        [[nodiscard]] constexpr TjsValue *value() const noexcept { return _value; }
 
-        [[nodiscard]] constexpr const char* name() const noexcept {
+        [[nodiscard]] constexpr const char *name() const noexcept {
             const auto it = S_TypeToName.find(_type);
             if(it != S_TypeToName.end()) {
                 return it->second;
@@ -472,7 +390,7 @@ namespace Ciallang::Syntax {
 
     private:
         TokenType _type{ TokenType::Void };
-        TjsValue* _value{ nullptr };
+        TjsValue *_value{ nullptr };
     };
 
     /**
@@ -480,140 +398,95 @@ namespace Ciallang::Syntax {
      */
     // use token->type() != TokenType::EndOfFile
     // not token != &S_EndOfFile, because location maybe change
-    static const constinit Token
-            S_Invalid{ TokenType::Invalid },
-            S_EndOfFile{ TokenType::EndOfFile },
-            S_LineComment{ TokenType::LineComment },
-            S_BlockComment{ TokenType::BlockComment },
-            S_Var{ TokenType::Var },
-            S_Const{ TokenType::Const },
+    static const constinit Token S_Invalid{ TokenType::Invalid }, S_EndOfFile{ TokenType::EndOfFile },
+        S_LineComment{ TokenType::LineComment }, S_BlockComment{ TokenType::BlockComment }, S_Var{ TokenType::Var },
+        S_Const{ TokenType::Const },
 
-            S_SemiColon{ TokenType::SemiColon },
-            S_LeftCurlyBrace{ TokenType::LeftCurlyBrace },
-            S_RightCurlyBrace{ TokenType::RightCurlyBrace },
+        S_SemiColon{ TokenType::SemiColon }, S_LeftCurlyBrace{ TokenType::LeftCurlyBrace },
+        S_RightCurlyBrace{ TokenType::RightCurlyBrace },
 
-            S_RBitShiftEqual{ TokenType::RBitShiftEqual },
-            S_RBitShift{ TokenType::RBitShift },
-            S_RArithShiftEqual{ TokenType::RArithShiftEqual },
-            S_RArithShift{ TokenType::RArithShift },
-            S_GtOrEqual{ TokenType::GtOrEqual },
-            S_Gt{ TokenType::Gt },
+        S_RBitShiftEqual{ TokenType::RBitShiftEqual }, S_RBitShift{ TokenType::RBitShift },
+        S_RArithShiftEqual{ TokenType::RArithShiftEqual }, S_RArithShift{ TokenType::RArithShift },
+        S_GtOrEqual{ TokenType::GtOrEqual }, S_Gt{ TokenType::Gt },
 
-            S_LArithShiftEqual{ TokenType::LArithShiftEqual },
-            S_Swap{ TokenType::Swap },
-            S_LtOrEqual{ TokenType::LtOrEqual },
-            S_LArithShift{ TokenType::LArithShift },
-            S_Lt{ TokenType::Lt },
+        S_LArithShiftEqual{ TokenType::LArithShiftEqual }, S_Swap{ TokenType::Swap },
+        S_LtOrEqual{ TokenType::LtOrEqual }, S_LArithShift{ TokenType::LArithShift }, S_Lt{ TokenType::Lt },
 
-            S_Assignment{ TokenType::Assignment },
-            S_Equal{ TokenType::Equal },
-            S_DiscEqual{ TokenType::DiscEqual },
+        S_Assignment{ TokenType::Assignment }, S_Equal{ TokenType::Equal }, S_DiscEqual{ TokenType::DiscEqual },
 
-            S_DiscNotEqual{ TokenType::DiscNotEqual },
-            S_NotEqual{ TokenType::NotEqual },
-            S_Exclamation{ TokenType::Exclamation },
+        S_DiscNotEqual{ TokenType::DiscNotEqual }, S_NotEqual{ TokenType::NotEqual },
+        S_Exclamation{ TokenType::Exclamation },
 
-            S_LogicalAndEqual{ TokenType::LogicalAndEqual },
-            S_LogicalAnd{ TokenType::LogicalAnd },
-            S_AmpersandEqual{ TokenType::AmpersandEqual },
-            S_Ampersand{ TokenType::Ampersand },
+        S_LogicalAndEqual{ TokenType::LogicalAndEqual }, S_LogicalAnd{ TokenType::LogicalAnd },
+        S_AmpersandEqual{ TokenType::AmpersandEqual }, S_Ampersand{ TokenType::Ampersand },
 
-            S_LogicalOrEqual{ TokenType::LogicalOrEqual },
-            S_LogicalOr{ TokenType::LogicalOr },
-            S_VertLineEqual{ TokenType::VertLineEqual },
-            S_VertLine{ TokenType::VertLine },
+        S_LogicalOrEqual{ TokenType::LogicalOrEqual }, S_LogicalOr{ TokenType::LogicalOr },
+        S_VertLineEqual{ TokenType::VertLineEqual }, S_VertLine{ TokenType::VertLine },
 
-            S_Omit{ TokenType::Omit },
-            S_Dot{ TokenType::Dot },
+        S_Omit{ TokenType::Omit }, S_Dot{ TokenType::Dot },
 
-            S_Increment{ TokenType::Increment },
-            S_PlusEqual{ TokenType::PlusEqual },
-            S_Plus{ TokenType::Plus },
+        S_Increment{ TokenType::Increment }, S_PlusEqual{ TokenType::PlusEqual }, S_Plus{ TokenType::Plus },
 
-            S_Decrement{ TokenType::Decrement },
-            S_MinusEqual{ TokenType::MinusEqual },
-            S_Minus{ TokenType::Minus },
+        S_Decrement{ TokenType::Decrement }, S_MinusEqual{ TokenType::MinusEqual }, S_Minus{ TokenType::Minus },
 
-            S_AsteriskEqual{ TokenType::AsteriskEqual },
-            S_Asterisk{ TokenType::Asterisk },
+        S_AsteriskEqual{ TokenType::AsteriskEqual }, S_Asterisk{ TokenType::Asterisk },
 
-            S_SlashEqual{ TokenType::SlashEqual },
-            S_Slash{ TokenType::Slash },
-            S_BackslashEqual{ TokenType::BackslashEqual },
-            S_Backslash{ TokenType::Backslash },
+        S_SlashEqual{ TokenType::SlashEqual }, S_Slash{ TokenType::Slash },
+        S_BackslashEqual{ TokenType::BackslashEqual }, S_Backslash{ TokenType::Backslash },
 
-            S_PercentEqual{ TokenType::PercentEqual },
-            S_Percent{ TokenType::Percent },
-            S_ChevronEqual{ TokenType::ChevronEqual },
-            S_Chevron{ TokenType::Chevron },
-            S_LBracket{ TokenType::LBracket },
-            S_RBracket{ TokenType::RBracket },
-            S_LParenthesis{ TokenType::LParenthesis },
-            S_RParenthesis{ TokenType::RParenthesis },
-            S_Tilde{ TokenType::Tilde },
-            S_Question{ TokenType::Question },
-            S_Colon{ TokenType::Colon },
-            S_Comma{ TokenType::Comma },
-            S_Sharp{ TokenType::Sharp },
-            S_Dollar{ TokenType::Dollar },
+        S_PercentEqual{ TokenType::PercentEqual }, S_Percent{ TokenType::Percent },
+        S_ChevronEqual{ TokenType::ChevronEqual }, S_Chevron{ TokenType::Chevron }, S_LBracket{ TokenType::LBracket },
+        S_RBracket{ TokenType::RBracket }, S_LParenthesis{ TokenType::LParenthesis },
+        S_RParenthesis{ TokenType::RParenthesis }, S_Tilde{ TokenType::Tilde }, S_Question{ TokenType::Question },
+        S_Colon{ TokenType::Colon }, S_Comma{ TokenType::Comma }, S_Sharp{ TokenType::Sharp },
+        S_Dollar{ TokenType::Dollar },
 
-            S_If{ TokenType::If },
-            S_Else{ TokenType::Else },
+        S_If{ TokenType::If }, S_Else{ TokenType::Else },
 
-            S_New{ TokenType::New },
-            S_Function{ TokenType::Function },
-            S_Return{ TokenType::Return },
+        S_New{ TokenType::New }, S_Function{ TokenType::Function }, S_Return{ TokenType::Return },
 
-            S_Int{ TokenType::Int },
-            S_Real{ TokenType::Real },
-            S_String{ TokenType::String },
+        S_Int{ TokenType::Int }, S_Real{ TokenType::Real }, S_String{ TokenType::String },
 
-            S_Do{ TokenType::Do },
-            S_While{ TokenType::While },
-            S_For{ TokenType::For },
-            S_Break{ TokenType::Break },
-            S_Continue{ TokenType::Continue };
+        S_Do{ TokenType::Do }, S_While{ TokenType::While }, S_For{ TokenType::For }, S_Break{ TokenType::Break },
+        S_Continue{ TokenType::Continue };
 
-    static const inline Token
-            S_True{ TokenType::ConstVal, tjsInteger(1) },
-            S_False{ TokenType::ConstVal, tjsInteger(0) },
+    static const inline Token S_True{ TokenType::ConstVal, tjsInteger(1) },
+        S_False{ TokenType::ConstVal, tjsInteger(0) },
 
-            S_Infinity{ TokenType::ConstVal, tjsReal(IEEE_D_N_INF) },
+        S_Infinity{ TokenType::ConstVal, tjsReal(IEEE_D_N_INF) },
 
-            S_NaN{ TokenType::ConstVal, tjsReal(IEEE_D_N_NaN) };
+        S_NaN{ TokenType::ConstVal, tjsReal(IEEE_D_N_NaN) };
 
     enum class StringParseState {
         None,
         Delimiter, //' "
         Ampersand, //&
-        Dollar     //${}
+        Dollar //${}
     };
 
-    static constexpr inline auto S_AssignToNonAssign =
-            frozen::make_unordered_map<TokenType, const Token&>({
-                    { TokenType::PlusEqual, S_Plus },               // +=
-                    { TokenType::MinusEqual, S_Minus },             // -=
-                    { TokenType::SlashEqual, S_Slash },             // /=
-                    { TokenType::PercentEqual, S_Percent },         // %=
-                    { TokenType::AsteriskEqual, S_Asterisk },       // *=
-                    { TokenType::VertLineEqual, S_VertLine },       // |=
-                    { TokenType::AmpersandEqual, S_Ampersand },     // &=
-                    { TokenType::ChevronEqual, S_Chevron },         // ^=
-                    { TokenType::BackslashEqual, S_Backslash },     // \=
-                    { TokenType::LogicalOrEqual, S_LogicalOr },     // ||=
-                    { TokenType::LogicalAnd, S_LogicalAnd },        // &&=
-                    { TokenType::RBitShiftEqual, S_RBitShift },     // >>>=
-                    { TokenType::LArithShiftEqual, S_LArithShift }, // <<=
-                    { TokenType::RArithShiftEqual, S_RArithShift }  // >>=
-            });
-    using AssignToNonAssignMap = decltype (S_AssignToNonAssign);
+    static constexpr inline auto S_AssignToNonAssign = frozen::make_unordered_map<TokenType, const Token &>({
+        { TokenType::PlusEqual, S_Plus }, // +=
+        { TokenType::MinusEqual, S_Minus }, // -=
+        { TokenType::SlashEqual, S_Slash }, // /=
+        { TokenType::PercentEqual, S_Percent }, // %=
+        { TokenType::AsteriskEqual, S_Asterisk }, // *=
+        { TokenType::VertLineEqual, S_VertLine }, // |=
+        { TokenType::AmpersandEqual, S_Ampersand }, // &=
+        { TokenType::ChevronEqual, S_Chevron }, // ^=
+        { TokenType::BackslashEqual, S_Backslash }, // \=
+        { TokenType::LogicalOrEqual, S_LogicalOr }, // ||=
+        { TokenType::LogicalAnd, S_LogicalAnd }, // &&=
+        { TokenType::RBitShiftEqual, S_RBitShift }, // >>>=
+        { TokenType::LArithShiftEqual, S_LArithShift }, // <<=
+        { TokenType::RArithShiftEqual, S_RArithShift } // >>=
+    });
+    using AssignToNonAssignMap = decltype(S_AssignToNonAssign);
 
-    static bool contains(const AssignToNonAssignMap& map,
-                         const TokenType tokenType) noexcept {
+    static bool contains(const AssignToNonAssignMap &map, const TokenType tokenType) noexcept {
         return map.find(tokenType) != map.end();
     }
 
-    static Token stripAssign(Token&& token) noexcept {
+    static Token stripAssign(Token &&token) noexcept {
         const auto it = S_AssignToNonAssign.find(token.type());
         if(it != S_AssignToNonAssign.end()) {
             return it->second;

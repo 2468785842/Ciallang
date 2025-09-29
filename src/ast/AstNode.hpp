@@ -13,6 +13,7 @@
 #pragma once
 
 #include "common/SourceLocation.hpp"
+#include "lexer/Token.hpp"
 #include "vm/Chunk.hpp"
 #include "vm/Register.hpp"
 
@@ -61,16 +62,14 @@ namespace Ciallang::Syntax {
 
     class StmtDeclNode;
 
-    using DeclNodeList = std::vector<DeclNode*>;
+    using DeclNodeList = std::vector<DeclNode *>;
 
     class AstNode {
     protected:
-        explicit AstNode(std::string&& name) : _name(std::move(name)) {
-        }
+        explicit AstNode(const char *name) : _name(name) {}
 
-        explicit AstNode(
-            Token& token, std::string&& name
-        ) : token(std::make_unique<Token>(std::move(token))), _name(std::move(name)) {
+        explicit AstNode(Token &token, const char *name) :
+            token(std::make_unique<Token>(std::move(token))), _name(name) {
             location = this->token->location;
         }
 
@@ -83,13 +82,11 @@ namespace Ciallang::Syntax {
 
         SourceLocation location{};
 
-        virtual void accept(Visitor*) const = 0;
+        virtual void accept(Visitor *) const = 0;
 
-        virtual std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen*) const = 0;
+        virtual std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *) const = 0;
 
-        [[nodiscard]] std::string_view name() const noexcept {
-            return _name;
-        };
+        [[nodiscard]] std::string_view name() const noexcept { return _name; };
 
         virtual ~AstNode() = default;
 
@@ -100,36 +97,36 @@ namespace Ciallang::Syntax {
     struct AstNode::Visitor {
         virtual ~Visitor() = default;
 
-        virtual void visit(const StmtDeclNode*) = 0;
+        virtual void visit(const StmtDeclNode *) = 0;
 
-        virtual void visit(const VarDeclNode*) = 0;
+        virtual void visit(const VarDeclNode *) = 0;
 
-        virtual void visit(const FunctionDeclNode*) = 0;
+        virtual void visit(const FunctionDeclNode *) = 0;
 
-        virtual void visit(const ValueExprNode*) = 0;
+        virtual void visit(const ValueExprNode *) = 0;
 
-        virtual void visit(const IdentifierExprNode*) = 0;
+        virtual void visit(const IdentifierExprNode *) = 0;
 
-        virtual void visit(const BinaryExprNode*) = 0;
+        virtual void visit(const BinaryExprNode *) = 0;
 
-        virtual void visit(const UnaryExprNode*) = 0;
+        virtual void visit(const UnaryExprNode *) = 0;
 
-        virtual void visit(const ProcCallExprNode*) = 0;
+        virtual void visit(const ProcCallExprNode *) = 0;
 
-        virtual void visit(const AssignExprNode*) = 0;
+        virtual void visit(const AssignExprNode *) = 0;
 
-        virtual void visit(const BlockStmtNode*) = 0;
+        virtual void visit(const BlockStmtNode *) = 0;
 
-        virtual void visit(const ExprStmtNode*) = 0;
+        virtual void visit(const ExprStmtNode *) = 0;
 
-        virtual void visit(const IfStmtNode*) = 0;
+        virtual void visit(const IfStmtNode *) = 0;
 
-        virtual void visit(const WhileStmtNode*) = 0;
+        virtual void visit(const WhileStmtNode *) = 0;
 
-        virtual void visit(const BreakStmtNode*) = 0;
+        virtual void visit(const BreakStmtNode *) = 0;
 
-        virtual void visit(const ContinueStmtNode*) = 0;
+        virtual void visit(const ContinueStmtNode *) = 0;
 
-        virtual void visit(const ReturnStmtNode*) = 0;
+        virtual void visit(const ReturnStmtNode *) = 0;
     };
-}
+} // namespace Ciallang::Syntax

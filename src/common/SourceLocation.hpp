@@ -22,9 +22,7 @@ namespace Ciallang::Common {
         uint32_t line = 0;
         uint32_t column = 0;
 
-        bool operator==(const LocationType& type) const {
-            return line == type.line && column == type.column;
-        }
+        bool operator==(const LocationType &type) const { return line == type.line && column == type.column; }
     };
 
     class SourceLocation {
@@ -32,20 +30,20 @@ namespace Ciallang::Common {
         LocationType _start;
 
     public:
-        [[nodiscard]] const LocationType& end() const;
+        [[nodiscard]] const LocationType &end() const;
 
-        [[nodiscard]] const LocationType& start() const;
+        [[nodiscard]] const LocationType &start() const;
 
-        void end(const LocationType& value);
+        void end(const LocationType &value);
 
-        void start(const LocationType& value);
+        void start(const LocationType &value);
 
         void end(uint32_t line, uint32_t column);
 
         void start(uint32_t line, uint32_t column);
 
-        bool operator==(const SourceLocation& sourceLocation) const {
+        bool operator==(const SourceLocation &sourceLocation) const {
             return _start == sourceLocation._start && _end == sourceLocation._end;
         }
     };
-}
+} // namespace Ciallang::Common

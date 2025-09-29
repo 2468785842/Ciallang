@@ -27,7 +27,7 @@ TEST_CASE("test lexer") {
     source_file.load(r);
     Ciallang::Syntax::Lexer lexer{ source_file };
     while(lexer.hasNext()) {
-        Ciallang::Syntax::Token* token = nullptr;
+        Ciallang::Syntax::Token *token = nullptr;
         lexer.next(token);
 
         std::cout << token->name() << "\t";
@@ -47,10 +47,9 @@ TEST_CASE("test lexer") {
         std::cout << std::endl;
     }
     if(r.isFailed()) {
-        for(const auto& item : r.messages()) {
+        for(const auto &item : r.messages()) {
             std::cerr << item.details() << std::endl;
             std::cerr << item.message() << std::endl;
         }
     }
-
 }

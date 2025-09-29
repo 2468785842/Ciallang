@@ -19,32 +19,32 @@
 
 namespace Ciallang::Bytecode {
 
-    void Interpreter::run(Chunk* mainChunk) {
+    void Interpreter::run(const Chunk *mainChunk) {
         pushCallFrame(createCallFrame(mainChunk));
 
         for(;;) {
             // cache hit
             size_t &pc = _currentFrame->pc;
-            const auto& instList = instructions();
+            const auto &instList = instructions();
 
-            if(pc >= instList.size()) break;
+            if(pc >= instList.size())
+                break;
 
-            if(_callStack.empty()) break;
+            if(_callStack.empty())
+                break;
 
-             auto *instruction = instList[pc];
-            // fmt::println("{: <6}: {}", Label{ getPC() }, instruction->dump(*this, true));
-             ++pc;
+            const auto *instruction = instList[pc];
+            ++pc;
             instruction->execute(*this);
         }
     }
 
-    const TjsValue& Interpreter::reg(const Register reg) const {
-        auto index = reg.index()
-            + _currentFrame->registersOffset;
+    const TjsValue &Interpreter::reg(const Register reg) const {
+        const auto index = reg.index() + _currentFrame->registersOffset;
 
         CLL_ASSERT(index < _registers.size(), "index > _registers.size");
 
         return _registers[index];
     }
 
-}
+} // namespace Ciallang::Bytecode

@@ -14,24 +14,30 @@
 // Created by LiDon on 2025/9/29.
 //
 #pragma once
-#include <memory>
-#include <string>
 #include <cstdarg>
 #include <functional>
+#include <memory>
+#include <string>
 
-#define CLL_LOG_TRACE(fmt, ...) ::Ciallang::LogFmt(::Ciallang::Level::kTrace, fmt, ##__VA_ARGS__)
-#define CLL_LOG_DEBUG(fmt, ...) ::Ciallang::LogFmt(::Ciallang::Level::kDebug, fmt, ##__VA_ARGS__)
-#define CLL_LOG_INFO(fmt, ...)  ::Ciallang::LogFmt(::Ciallang::Level::kInfo,  fmt, ##__VA_ARGS__)
-#define CLL_LOG_WARN(fmt, ...)  ::Ciallang::LogFmt(::Ciallang::Level::kWarn,  fmt, ##__VA_ARGS__)
-#define CLL_LOG_ERROR(fmt, ...) ::Ciallang::LogFmt(::Ciallang::Level::kError, fmt, ##__VA_ARGS__)
-#define CLL_LOG_FATAL(fmt, ...) ::Ciallang::LogFmt(::Ciallang::Level::kFatal, fmt, ##__VA_ARGS__)
+#if _DEBUG
+#define CLL_LOG_TRACE(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kTrace, fmt, ##__VA_ARGS__)
+#define CLL_LOG_DEBUG(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kDebug, fmt, ##__VA_ARGS__)
+#else
+#define CLL_LOG_TRACE(fmt, ...)
+#define CLL_LOG_DEBUG(fmt, ...)
+#endif
 
-#define CLL_ASSERT(cond, fmt, ...) \
-do { \
-    if (!(cond)) { \
-        ::Ciallang::AssertFail(#cond, __FILE__, __LINE__, fmt, ##__VA_ARGS__); \
-    } \
-} while (false)
+#define CLL_LOG_INFO(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kInfo, fmt, ##__VA_ARGS__)
+#define CLL_LOG_WARN(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kWarn, fmt, ##__VA_ARGS__)
+#define CLL_LOG_ERROR(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kError, fmt, ##__VA_ARGS__)
+#define CLL_LOG_FATAL(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kFatal, fmt, ##__VA_ARGS__)
+
+#define CLL_ASSERT(cond, fmt, ...)                                                                                     \
+    do {                                                                                                               \
+        if(!(cond)) {                                                                                                  \
+            ::Ciallang::assertFail(#cond, __FILE__, __LINE__, fmt, ##__VA_ARGS__);                                     \
+        }                                                                                                              \
+    } while(false)
 
 namespace Ciallang {
 
@@ -48,26 +54,26 @@ namespace Ciallang {
     public:
         virtual ~Logger() = default;
 
-        virtual void Init(const std::string& name, Level min_level) = 0;
+        virtual void init(const std::string &name, Level min_level) = 0;
 
         // 设置最小输出级别
-        virtual void SetLevel(Level level) = 0;
-        [[nodiscard]] virtual Level GetLevel() const = 0;
+        virtual void setLevel(Level level) = 0;
+        [[nodiscard]] virtual Level getLevel() const = 0;
 
-        virtual void Log(Level level, const char* fmt, va_list ap) = 0;
+        virtual void log(Level level, const char *fmt, va_list ap) = 0;
 
-        virtual void LogStr(Level level, const std::string& msg) = 0;
+        virtual void logStr(Level level, const std::string &msg) = 0;
     };
 
-    using LoggerFactory = std::function<std::unique_ptr<Logger>(const std::string& name)>;
+    using LoggerFactory = std::function<std::unique_ptr<Logger>(const std::string &name)>;
 
-    void RegisterLoggerBackend(const std::string& backend_name, LoggerFactory factory);
+    void registerLoggerBackend(const std::string &backend_name, LoggerFactory factory);
 
-    std::unique_ptr<Logger> CreateLogger(const std::string& backend_name, const std::string& logger_name);
+    std::unique_ptr<Logger> createLogger(const std::string &backend_name, const std::string &logger_name);
 
-    void SetGlobalLogger(std::unique_ptr<Logger> logger);
-    Logger* GetGlobalLogger(); // 不拥有
+    void setGlobalLogger(std::unique_ptr<Logger> logger);
+    Logger *getGlobalLogger();
 
-    void LogFmt(Level level, const char* fmt, ...);
-    void AssertFail(const char* expr, const char* file, int line, const char* fmt, ...);
-}
+    void logFmt(Level level, const char *fmt, ...);
+    void assertFail(const char *expr, const char *file, int line, const char *fmt, ...);
+} // namespace Ciallang

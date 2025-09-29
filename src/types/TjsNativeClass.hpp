@@ -1,4 +1,4 @@
-// Copyright (c) 2024/5/21 下午8:44
+// Copyright (c) 2025/9/29 15:42
 //
 // /\  _` \   __          /\_ \  /\_ \
 // \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -10,6 +10,7 @@
 //                                                            \_/__/
 //
 
-#include "TjsObject.hpp"
-
-namespace Ciallang {}
+//
+// Created by LiDon on 2025/9/29.
+//
+#pragma once

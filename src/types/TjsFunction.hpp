@@ -21,53 +21,25 @@
 namespace Ciallang {
     class TjsFunction final : public TjsObject {
     public:
-        using VMChunkPtr = std::shared_ptr<Bytecode::Chunk>;
-
         TjsFunction() = delete;
 
-        explicit TjsFunction(
-            Bytecode::Chunk&& chunk,
-            const std::string& name
-        ): _chunk(std::make_shared<Bytecode::Chunk>(std::move(chunk))), _name(name) {
-        }
+        explicit TjsFunction(Bytecode::Chunk *chunk, const std::string &name);
 
-        explicit TjsFunction(
-            Bytecode::Chunk&& chunk,
-            const std::string& name,
-            const size_t arity
-        ): _chunk(std::make_shared<Bytecode::Chunk>(std::move(chunk))),
-           _name(name), _arity(arity) {
-        }
+        explicit TjsFunction(Bytecode::Chunk *chunk, const std::string &name, size_t arity);
 
-        // clone
-        explicit TjsFunction(
-            VMChunkPtr& chunk,
-            std::string& name,
-            const size_t arity
-        ): _chunk(chunk), _name(name), _arity(arity) {
-        }
+        [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
 
-        [[nodiscard]] std::string_view name() const noexcept override {
-            return _name;
-        }
+        [[nodiscard]] const Bytecode::Chunk *chunk() const { return _chunk.get(); }
 
-        [[nodiscard]] Bytecode::Chunk* chunk() const {
-            return _chunk.get();
-        }
+        [[nodiscard]] size_t arity() const noexcept override { return _arity; }
 
-        [[nodiscard]] size_t arity() const noexcept override {
-            return _arity;
-        }
-
-        [[nodiscard]] bool isNative() const noexcept override {
-            return false;
-        }
+        [[nodiscard]] bool isNative() const noexcept override { return false; }
 
         ~TjsFunction() noexcept override = default;
 
     private:
-        const VMChunkPtr _chunk{ nullptr };
-        const std::string _name{};
-        const size_t _arity{};
+        const std::unique_ptr<Bytecode::Chunk> _chunk;
+        const std::string _name;
+        const size_t _arity;
     };
-}
+} // namespace Ciallang

@@ -22,9 +22,7 @@ namespace Ciallang::Common {
     using SourceFileRangeType = std::pair<size_t, size_t>;
 
     struct SourceFileRangeCompareType {
-        bool operator()(
-                const SourceFileRangeType &lhs,
-                const SourceFileRangeType &rhs) const {
+        bool operator()(const SourceFileRangeType &lhs, const SourceFileRangeType &rhs) const {
             return lhs.second < rhs.first;
         }
     };
@@ -40,15 +38,11 @@ namespace Ciallang::Common {
     public:
         SourceFile() = default;
 
-        explicit SourceFile(std::filesystem::path path) : _path(std::move(path)) {
-        }
+        explicit SourceFile(std::filesystem::path path) : _path(std::move(path)) {}
 
         ~SourceFile() = default;
 
-        void error(
-                Result &r,
-                const std::string &message,
-                const SourceLocation &location) const;
+        void error(Result &r, const std::string &message, const SourceLocation &location) const;
 
         [[nodiscard]] bool eof() const;
 
@@ -98,9 +92,6 @@ namespace Ciallang::Common {
         std::vector<uint8_t> _buffer;
         std::stack<size_t> _markStack{};
         std::map<size_t, SourceFileLineType *> _linesByNumber{};
-        std::map<
-                SourceFileRangeType,
-                SourceFileLineType,
-                SourceFileRangeCompareType> _linesByIndexRange{};
+        std::map<SourceFileRangeType, SourceFileLineType, SourceFileRangeCompareType> _linesByIndexRange{};
     };
-}
+} // namespace Ciallang::Common

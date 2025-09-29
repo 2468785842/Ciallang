@@ -26,125 +26,97 @@ namespace Ciallang::Syntax {
     public:
         DeclNodeList childrens;
 
-        explicit BlockStmtNode() : StmtNode("block_statement") {
-        }
+        explicit BlockStmtNode() : StmtNode("block_statement") {}
 
-        void accept(Visitor* visitor) const override {
-            visitor->visit(this);
-        }
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
             return gen->generate(this);
         }
     };
 
     class ExprStmtNode final : public StmtNode {
     public:
-        const ExprNode* expression;
+        const ExprNode *expression;
 
         ExprStmtNode() = delete;
 
-        explicit ExprStmtNode(const ExprNode* expr):
-            StmtNode("expression_statement"),
-            expression(expr) {
-        }
+        explicit ExprStmtNode(const ExprNode *expr) : StmtNode("expression_statement"), expression(expr) {}
 
-        void accept(Visitor* visitor) const override {
-            visitor->visit(this);
-        }
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
             return gen->generate(this);
         }
     };
 
     class IfStmtNode final : public StmtNode {
     public:
-        const ExprNode* test;
-        const BlockStmtNode* body;
-        BlockStmtNode* elseBody{ nullptr };
+        const ExprNode *test;
+        const BlockStmtNode *body;
+        BlockStmtNode *elseBody{ nullptr };
 
         IfStmtNode() = delete;
 
-        explicit IfStmtNode(
-            const ExprNode* test,
-            const BlockStmtNode* body
-        ) : StmtNode("if_statement"), test(test), body(body) {
-        }
+        explicit IfStmtNode(const ExprNode *test, const BlockStmtNode *body) :
+            StmtNode("if_statement"), test(test), body(body) {}
 
-        void accept(Visitor* visitor) const override {
-            visitor->visit(this);
-        }
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
             return gen->generate(this);
         }
     };
 
     class WhileStmtNode final : public StmtNode {
     public:
-        const ExprNode* test;
-        const BlockStmtNode* body;
+        const ExprNode *test;
+        const BlockStmtNode *body;
 
         WhileStmtNode() = delete;
 
-        explicit WhileStmtNode(
-            const ExprNode* test,
-            const BlockStmtNode* body
-        ): StmtNode("while_statement"), test(test), body(body) {
-        }
+        explicit WhileStmtNode(const ExprNode *test, const BlockStmtNode *body) :
+            StmtNode("while_statement"), test(test), body(body) {}
 
-        void accept(Visitor* visitor) const override {
-            visitor->visit(this);
-        }
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
             return gen->generate(this);
         }
     };
 
     class BreakStmtNode final : public StmtNode {
     public:
-        BreakStmtNode() : StmtNode("break_statement") {
-        }
+        BreakStmtNode() : StmtNode("break_statement") {}
 
-        void accept(Visitor* visitor) const override {
-            visitor->visit(this);
-        }
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
             return gen->generate(this);
         }
     };
 
     class ContinueStmtNode final : public StmtNode {
     public:
-        ContinueStmtNode() : StmtNode("continue_statement") {
-        }
+        ContinueStmtNode() : StmtNode("continue_statement") {}
 
-        void accept(Visitor* visitor) const override {
-            visitor->visit(this);
-        }
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
             return gen->generate(this);
         }
     };
 
     class ReturnStmtNode final : public StmtNode {
     public:
-        const ExprNode* expr;
+        const ExprNode *expr;
 
-        explicit ReturnStmtNode(const ExprNode* expr) :
-            StmtNode("return_statement"), expr(expr) {
-        }
+        explicit ReturnStmtNode(const ExprNode *expr) : StmtNode("return_statement"), expr(expr) {}
 
-        void accept(Visitor* visitor) const override {
-            visitor->visit(this);
-        }
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen* gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
             return gen->generate(this);
         }
     };
-}
+} // namespace Ciallang::Syntax

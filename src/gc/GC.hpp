@@ -13,73 +13,60 @@
  */
 #pragma once
 
+#include <unordered_set>
 #include "pch.h"
 
-namespace Ciallang::GC {
-    /**
-     * GC doesn't call destructor method.
-     * All fields must be managed for gc.
-     * Don't memory manage itself
-     */
+namespace Ciallang {
+
     class GCObject {
     public:
-        bool remembered() const noexcept { return _remembered; }
-        void remembered(const bool remembered) noexcept { _remembered = remembered; }
-
-        size_t age() const noexcept { return _age; }
-        void age(const size_t age) noexcept { _age = age; }
-        void ageIncrement() noexcept { _age++; }
-
-        bool forwarded() const noexcept { return _forwarded; }
-        void forwarded(const bool forwarded) noexcept { _forwarded = forwarded; }
-
-        bool marked() const noexcept { return _marked; }
-        void marked(const bool marked) noexcept { _marked = marked; }
-
-        virtual std::vector<GCObject*> getFields() const = 0;
-
-        /**
-         * It is called when the gc needs to move an object,
-         * Each gc call will pass in a size() of memory
-         *
-         * Warning!!
-         * Don't call methods yourself
-         *
-         * This is basically a fixed way of writing:
-         *
-         * return new(to) Emp{ *this };
-         *
-         */
-        virtual GCObject* copyTo(uint8_t*) = 0;
-
-        /**
-         * The Object size
-         *
-         * Usually writing with:
-         *
-         * return sizeof(Emp);
-         */
-        virtual size_t size() const noexcept = 0;
-
-        /**
-         * take care memory leak
-         * Maybe never call desturctor method
-         */
+        GCObject() : _refCount(0), _inGCList(false) {}
         virtual ~GCObject() = default;
 
+        void incRef();
+
+        void decRef();
+
+        [[nodiscard]] size_t getRefCount() const { return _refCount; }
+
+        void addChild(GCObject *pChild);
+
     private:
-        bool _remembered{};
+        uint32_t _refCount;
+        bool _inGCList;
+        std::vector<GCObject *> _children;
 
-        size_t _age{};
-
-        bool _forwarded{};
-
-        bool _marked{};
+        friend class GC;
     };
 
-    using Roots = std::vector<GCObject*>;
+    class GC {
+    public:
+        static inline size_t G_Threshold = 5000;
+        static GC &instance() {
+            static GC gc;
+            return gc;
+        }
 
+        /**
+         * track gc obj
+         * @param o gc obj
+         */
+        void track(GCObject *o);
 
+        /**
+         * Dealing with circular references
+         */
+        void collect();
+
+    private:
+        std::vector<GCObject *> _candidates;
+
+        // 递归销毁
+        static void destroyCycle(GCObject *root, std::unordered_set<GCObject *> &visited);
+    };
+
+    // 类型 trait
     template <typename T>
     static constexpr bool is_gc_object_v = std::is_base_of_v<GCObject, T>;
-}
+
+} // namespace Ciallang

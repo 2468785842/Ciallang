@@ -23,23 +23,21 @@ namespace Ciallang::Collections {
     template <typename T>
     class ConservativeVector {
     public:
-        ConservativeVector()
-            : _size(0), _capacity(1), _data(static_cast<T*>(operator new[](sizeof(T) * _capacity))) {
-        }
+        ConservativeVector() : _size(0), _capacity(1), _data(static_cast<T *>(operator new[](sizeof(T) * _capacity))) {}
 
         ~ConservativeVector() {
             clear();
             operator delete[](_data);
         }
 
-        void pushBack(const T& value) {
+        void pushBack(const T &value) {
             if(_size >= _capacity) {
                 reserve(_capacity * 2); // 按倍数增加容量
             }
             new(&_data[_size++]) T(value); // 使用 placement new 创建对象
         }
 
-        void pushBack(T&& value) {
+        void pushBack(T &&value) {
             if(_size >= _capacity) {
                 reserve(_capacity * 2);
             }
@@ -58,22 +56,18 @@ namespace Ciallang::Collections {
             }
         }
 
-        size_t size() const {
-            return _size;
-        }
+        size_t size() const { return _size; }
 
-        size_t capacity() const {
-            return _capacity;
-        }
+        size_t capacity() const { return _capacity; }
 
-        T& operator[](size_t index) {
+        T &operator[](size_t index) {
             if(index >= _size) {
                 throw std::out_of_range("Index out of bounds");
             }
             return _data[index];
         }
 
-        const T& operator[](size_t index) const {
+        const T &operator[](size_t index) const {
             if(index >= _size) {
                 throw std::out_of_range("Index out of bounds");
             }
@@ -81,7 +75,7 @@ namespace Ciallang::Collections {
         }
 
         // 调整大小
-        void resize(const size_t new_size, const T& default_value = T()) {
+        void resize(const size_t new_size, const T &default_value = T()) {
             if(new_size > _capacity) {
                 reserve(new_size); // 扩展容量以容纳新元素
             }
@@ -111,40 +105,38 @@ namespace Ciallang::Collections {
             _size = 0;
         }
 
-        T& back() {
+        T &back() {
             if(_size == 0) {
                 throw std::out_of_range("Vector is empty");
             }
             return _data[_size - 1];
         }
 
-        const T& back() const {
+        const T &back() const {
             if(_size == 0) {
                 throw std::out_of_range("Vector is empty");
             }
             return _data[_size - 1];
         }
 
-        size_t empty() const {
-            return _size == 0;
-        }
+        size_t empty() const { return _size == 0; }
 
     private:
         size_t _size;
         size_t _capacity;
-        T* _data;
+        T *_data;
 
         void reserve(size_t new_capacity) {
             if(new_capacity < _size) {
                 new_capacity = _size;
             }
 
-            T* new_data = static_cast<T*>(operator new[](sizeof(T) * new_capacity));
+            T *new_data = static_cast<T *>(operator new[](sizeof(T) * new_capacity));
 
             // 将数据从旧内存移动到新内存
             for(size_t i = 0; i < _size; ++i) {
                 new(&new_data[i]) T(std::move(_data[i])); // 使用 placement new 移动对象
-                _data[i].~T();                            // 销毁旧对象
+                _data[i].~T(); // 销毁旧对象
             }
 
             operator delete[](_data);
@@ -152,4 +144,4 @@ namespace Ciallang::Collections {
             _capacity = new_capacity;
         }
     };
-}
+} // namespace Ciallang::Collections

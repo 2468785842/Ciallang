@@ -43,15 +43,13 @@ static constexpr uint64_t IEEE_D_SIGNIFICAND_MSB_MASK = 0x0008000000000000ull;
 
 #define IEEE_D_GET_SIGN(x) (0 != (x & IEEE_D_SIGN_MASK))
 
-#define IEEE_D_GET_EXP(x) ((std::int32_t)(( \
-        (x & IEEE_D_EXP_MASK) >> IEEE_D_SIGNIFICAND_BITS \
-        ) - IEEE_D_EXP_BIAS))
+#define IEEE_D_GET_EXP(x) ((std::int32_t)(((x & IEEE_D_EXP_MASK) >> IEEE_D_SIGNIFICAND_BITS) - IEEE_D_EXP_BIAS))
 
 #define IEEE_D_GET_SIGNIFICAND(x) (x & IEEE_D_SIGNIFICAND_MASK)
 
 /* component composition */
-#define IEEE_D_MAKE_SIGN(x)  ((x) ? 0x8000000000000000ull : 0ull)
-#define IEEE_D_MAKE_EXP(x)   ((std::uint64_t)(x + IEEE_D_EXP_BIAS) << 52)
+#define IEEE_D_MAKE_SIGN(x) ((x) ? 0x8000000000000000ull : 0ull)
+#define IEEE_D_MAKE_EXP(x) ((std::uint64_t)(x + IEEE_D_EXP_BIAS) << 52)
 #define IEEE_D_MAKE_SIGNIFICAND(x) ((std::uint64_t)(x))
 
 /* special expression */
@@ -64,10 +62,9 @@ static constexpr uint64_t IEEE_D_P_INF = IEEE_D_EXP_MASK;
 static constexpr uint64_t IEEE_D_N_INF = IEEE_D_SIGN_MASK | IEEE_D_P_INF;
 
 /* special expression check */
-#define IEEE_D_IS_NaN(x) ((IEEE_D_EXP_MASK & (x)) == IEEE_D_EXP_MASK) && \
-			(((x) & IEEE_D_SIGNIFICAND_MSB_MASK) || \
-			(!((x) & IEEE_D_SIGNIFICAND_MSB_MASK) && \
-			((x) & (IEEE_D_SIGNIFICAND_MASK ^ IEEE_D_SIGNIFICAND_MSB_MASK))))
+#define IEEE_D_IS_NaN(x)                                                                                               \
+    ((IEEE_D_EXP_MASK & (x)) == IEEE_D_EXP_MASK) &&                                                                    \
+        (((x) & IEEE_D_SIGNIFICAND_MSB_MASK) ||                                                                        \
+         (!((x) & IEEE_D_SIGNIFICAND_MSB_MASK) && ((x) & (IEEE_D_SIGNIFICAND_MASK ^ IEEE_D_SIGNIFICAND_MSB_MASK))))
 
-#define IEEE_D_IS_INF(x) (((IEEE_D_EXP_MASK & (x)) == IEEE_D_EXP_MASK) && \
-			(!((x) & IEEE_D_SIGNIFICAND_MASK)))
+#define IEEE_D_IS_INF(x) (((IEEE_D_EXP_MASK & (x)) == IEEE_D_EXP_MASK) && (!((x) & IEEE_D_SIGNIFICAND_MASK)))

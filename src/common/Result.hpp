@@ -16,8 +16,8 @@
 
 #include "pch.h"
 
-#include "SourceLocation.hpp"
 #include "ResultMessage.hpp"
+#include "SourceLocation.hpp"
 
 #include "logging/Logger.hpp"
 
@@ -32,53 +32,28 @@ namespace Ciallang::Common {
 
         constexpr void succeed() noexcept { _success = true; }
 
-        void info(
-            const string& message,
-            const SourceLocation& loc = {},
-            const string& details = {}) {
+        void info(const string &message, const SourceLocation &loc = {}, const string &details = {}) {
             CLL_LOG_INFO(message.c_str());
-            _messages.emplace_back(
-                message,
-                loc,
-                details,
-                ResultMessage::Types::info);
+            _messages.emplace_back(message, loc, details, ResultMessage::Types::info);
         }
 
-        void error(
-            const string& message,
-            const SourceLocation& loc = {},
-            const string& details = {}) {
+        void error(const string &message, const SourceLocation &loc = {}, const string &details = {}) {
             CLL_LOG_ERROR(message.c_str());
-            _messages.emplace_back(
-                message,
-                loc,
-                details,
-                ResultMessage::Types::error);
+            _messages.emplace_back(message, loc, details, ResultMessage::Types::error);
             fail();
         }
 
-        void warning(
-            const std::string& message,
-            const SourceLocation& loc = {},
-            const std::string& details = {}) {
+        void warning(const std::string &message, const SourceLocation &loc = {}, const std::string &details = {}) {
             CLL_LOG_WARN(message.c_str());
-            _messages.emplace_back(
-                message,
-                loc,
-                details,
-                ResultMessage::Types::warning);
+            _messages.emplace_back(message, loc, details, ResultMessage::Types::warning);
         }
 
-        [[nodiscard]] constexpr bool isFailed() const noexcept {
-            return !_success;
-        }
+        [[nodiscard]] constexpr bool isFailed() const noexcept { return !_success; }
 
-        [[nodiscard]] constexpr const ResultMessageList& messages() const noexcept {
-            return _messages;
-        }
+        [[nodiscard]] constexpr const ResultMessageList &messages() const noexcept { return _messages; }
 
     private:
         bool _success = true;
         ResultMessageList _messages{};
     };
-}
+} // namespace Ciallang::Common

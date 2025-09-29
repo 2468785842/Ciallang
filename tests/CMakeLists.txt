@@ -15,6 +15,7 @@ set(TEST_FILES_PATH ${CMAKE_CURRENT_SOURCE_DIR}/test_files)
 configure_file(test_config.h.in test_config.h)
 
 set(SOURCES
+        gc_test.cpp
         lexer_test.cpp
         interpreter_test.cpp
         table_formatter_test.cpp

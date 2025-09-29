@@ -28,18 +28,16 @@
 // |    Used(%)    |    11.70    |    93.62    |       0       |     0.00      |
 // +---------------------------------------------------------------------------+
 
-static const std::any table[][5] = {
-        { "Heap Usage", "Heap Usage", "Heap Usage", "Heap Usage", "Heap Usage" },
-        {},
-        { "Generation", "New", "New", "New", "Old" },
-        {},
-        { "Space", "Eden", "From", "To", "Old" },
-        {},
-        { "Capacity", 752, 94, 94, 3760 },
-        { "Used", 88, 88, 0, 0 },
-        { "Free", 664, 6, 0, 3760 },
-        { "Used(%)", 11.70, 93.62, 0.00, 0.00 }
-};
+static const std::any table[][5] = { { "Heap Usage", "Heap Usage", "Heap Usage", "Heap Usage", "Heap Usage" },
+                                     {},
+                                     { "Generation", "New", "New", "New", "Old" },
+                                     {},
+                                     { "Space", "Eden", "From", "To", "Old" },
+                                     {},
+                                     { "Capacity", 752, 94, 94, 3760 },
+                                     { "Used", 88, 88, 0, 0 },
+                                     { "Free", 664, 6, 0, 3760 },
+                                     { "Used(%)", 11.70, 93.62, 0.00, 0.00 } };
 
 TEST_CASE("TableFormatterTest Print") {
     static constexpr size_t TABLE_SIZE = 60;

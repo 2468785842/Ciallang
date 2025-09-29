@@ -59,18 +59,16 @@ set(SOURCE_FILES
         src/vm/Register.hpp
         src/vm/Label.hpp
 
-        src/types/TjsNativeFunction.hpp
-        src/types/TjsFunction.hpp
+        src/types/TjsNativeFunction.cpp
+        src/types/TjsFunction.cpp
         src/types/TjsOctet.cpp
         src/types/TjsObject.cpp
         src/types/TjsValue.cpp
         src/types/TjsTypes.hpp
 
-        src/core/print.hpp
+        src/standard/debug.cpp
 
-        src/gc/MarkSweep.cpp
-        src/gc/Generational.cpp
-        src/gc/GC.hpp
+        src/gc/GC.cpp
 
         src/collections/ConservativeVector.hpp
 

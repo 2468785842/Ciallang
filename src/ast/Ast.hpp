@@ -20,53 +20,48 @@
 
 namespace Ciallang::Syntax {
     class AstBuilder {
-        std::vector<AstNode*> _nodes{};
+        std::vector<AstNode *> _nodes{};
 
     public:
         AstBuilder() = default;
 
         ~AstBuilder();
 
-        ExprStmtNode* makeExprStmtNode(const ExprNode* rhs);
+        ExprStmtNode *makeExprStmtNode(const ExprNode *rhs);
 
-        IfStmtNode* makeIfStmtNode(const ExprNode* test, const BlockStmtNode* body);
+        IfStmtNode *makeIfStmtNode(const ExprNode *test, const BlockStmtNode *body);
 
-        WhileStmtNode* makeWhileStmtNode(const ExprNode* test, const BlockStmtNode* body);
+        WhileStmtNode *makeWhileStmtNode(const ExprNode *test, const BlockStmtNode *body);
 
-        ValueExprNode* makeValueExprNode(Token&& op);
+        ValueExprNode *makeValueExprNode(Token &&op);
 
-        BinaryExprNode* makeBinaryExprNode(Token&& op, const ExprNode* lhs,
-                                           const ExprNode* rhs);
+        BinaryExprNode *makeBinaryExprNode(Token &&op, const ExprNode *lhs, const ExprNode *rhs);
 
-        UnaryExprNode* makeUnaryExprNode(Token&& op, const ExprNode* rhs);
+        UnaryExprNode *makeUnaryExprNode(Token &&op, const ExprNode *rhs);
 
-        ProcCallExprNode* makeProcCallExprNode(const ExprNode* lhs);
+        ProcCallExprNode *makeProcCallExprNode(const ExprNode *lhs);
 
-        AssignExprNode* makeAssignExprNode(const IdentifierExprNode* lhs,
-                                           const ExprNode* rhs);
+        AssignExprNode *makeAssignExprNode(const IdentifierExprNode *lhs, const ExprNode *rhs);
 
-        IdentifierExprNode* makeSymbolExprNode(Token&& token);
+        IdentifierExprNode *makeSymbolExprNode(Token &&token);
 
-        FunctionDeclNode* makeFunctionDeclNode(Token&& token);
+        FunctionDeclNode *makeFunctionDeclNode(Token &&token);
 
-        StmtDeclNode* makeStmtDeclNode(const StmtNode* stmtNode);
+        StmtDeclNode *makeStmtDeclNode(const StmtNode *stmtNode);
 
-        BreakStmtNode* makeBreakStmtNode();
+        BreakStmtNode *makeBreakStmtNode();
 
-        ContinueStmtNode* makeContinueStmtNode();
+        ContinueStmtNode *makeContinueStmtNode();
 
-        ReturnStmtNode* makeReturnStmtNode(const ExprNode* node);
+        ReturnStmtNode *makeReturnStmtNode(const ExprNode *node);
 
         template <typename R, typename... Args>
-        R* makeNode(Args&&... args) {
-            static_assert(
-                std::is_base_of_v<AstNode, R>,
-                "Error: R must be a derived class of AstNode."
-            );
+        R *makeNode(Args &&...args) {
+            static_assert(std::is_base_of_v<AstNode, R>, "Error: R must be a derived class of AstNode.");
 
-            R* node = new R{ std::forward<Args>(args)... };
+            R *node = new R{ std::forward<Args>(args)... };
             _nodes.push_back(node);
             return node;
         }
     };
-}
+} // namespace Ciallang::Syntax

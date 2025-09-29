@@ -12,32 +12,22 @@
 
 #include "TjsValue.hpp"
 
-#include "TjsOctet.hpp"
 #include "TjsObject.hpp"
+#include "TjsOctet.hpp"
 #include "logging/Logger.hpp"
 
 namespace Ciallang {
-    TjsValue::TjsValue(const TjsInteger& value) :
-        _value{ ._integer = value },
-        _type(TjsValueType::Integer) {
-    }
+    TjsValue::TjsValue(const TjsInteger &value) : _value{ ._integer = value }, _type(TjsValueType::Integer) {}
 
-    TjsValue::TjsValue(const TjsReal& value) :
-        _value{ ._real = value },
-        _type(TjsValueType::Real) {
-    }
+    TjsValue::TjsValue(const TjsReal &value) : _value{ ._real = value }, _type(TjsValueType::Real) {}
 
-    TjsValue::TjsValue(const std::string& value) :
-        _type(TjsValueType::String) {
+    TjsValue::TjsValue(const std::string &value) : _type(TjsValueType::String) {
         _value._string = new std::string{ value };
     }
 
-    TjsValue::TjsValue(const TjsOctet& value) :
-        _type(TjsValueType::Octet) {
-        _value._octet = new TjsOctet{ value };
-    }
+    TjsValue::TjsValue(const TjsOctet &value) : _type(TjsValueType::Octet) { _value._octet = new TjsOctet{ value }; }
 
-    TjsValue::TjsValue(const TjsValue& value) noexcept {
+    TjsValue::TjsValue(const TjsValue &value) noexcept {
         _type = value._type;
         switch(_type) {
             case TjsValueType::Integer:
@@ -55,18 +45,15 @@ namespace Ciallang {
             case TjsValueType::Octet:
                 _value._octet = new TjsOctet(*value._value._octet);
                 break;
-            default: ;
+            default:;
         }
     }
 
-    TjsValue::TjsValue(TjsValue&& value) noexcept :
-        _value(value._value),
-        _type(value._type) {
-        value._value = {};
-    }
+    TjsValue::TjsValue(TjsValue &&value) noexcept : _value(value._value), _type(value._type) { value._value = {}; }
 
-    TjsValue& TjsValue::operator=(TjsValue&& value) noexcept {
-        if(this == &value) return *this;
+    TjsValue &TjsValue::operator=(TjsValue &&value) noexcept {
+        if(this == &value)
+            return *this;
 
         _value = value._value;
         _type = value._type;
@@ -77,14 +64,16 @@ namespace Ciallang {
 
     TjsValue::~TjsValue() noexcept {
         switch(_type) {
-            case TjsValueType::Object:                 
-               // TODO: add GC 
+            case TjsValueType::Object:
+                // TODO: add GC
                 break;
-            case TjsValueType::String: delete _value._string;
+            case TjsValueType::String:
+                delete _value._string;
                 break;
-            case TjsValueType::Octet: delete _value._octet;
+            case TjsValueType::Octet:
+                delete _value._octet;
                 break;
-            default: ;
+            default:;
         }
     }
 
@@ -98,17 +87,17 @@ namespace Ciallang {
         return _value._real;
     }
 
-    std::string* TjsValue::asString() const {
+    std::string *TjsValue::asString() const {
         CLL_ASSERT(_type == TjsValueType::String, "not string type is %s", name());
         return _value._string;
     }
 
-    TjsOctet* TjsValue::asOctet() const {
+    TjsOctet *TjsValue::asOctet() const {
         CLL_ASSERT(_type == TjsValueType::Octet, "not octet type is %s", name());
         return _value._octet;
     }
 
-    TjsObject* TjsValue::asObject() const {
+    TjsObject *TjsValue::asObject() const {
         CLL_ASSERT(_type == TjsValueType::Object, "not object type is %s", name());
         return _value._object;
     }
@@ -139,7 +128,7 @@ namespace Ciallang {
         }
     }
 
-    TjsValue TjsValue::operator+(const TjsValue& tjsValue) const {
+    TjsValue TjsValue::operator+(const TjsValue &tjsValue) const {
         switch(tjsValue.type()) {
             case TjsValueType::Integer:
                 return TjsValue{ this->asInteger() + tjsValue.asInteger() };
@@ -150,7 +139,7 @@ namespace Ciallang {
         }
     }
 
-    TjsValue TjsValue::operator-(const TjsValue& tjsValue) const {
+    TjsValue TjsValue::operator-(const TjsValue &tjsValue) const {
         switch(tjsValue.type()) {
             case TjsValueType::Integer:
                 return TjsValue{ this->asInteger() - tjsValue.asInteger() };
@@ -161,7 +150,7 @@ namespace Ciallang {
         }
     }
 
-    TjsValue TjsValue::operator*(const TjsValue& tjsValue) const {
+    TjsValue TjsValue::operator*(const TjsValue &tjsValue) const {
         switch(tjsValue.type()) {
             case TjsValueType::Integer:
                 return TjsValue{ this->asInteger() * tjsValue.asInteger() };
@@ -172,7 +161,7 @@ namespace Ciallang {
         }
     }
 
-    TjsValue TjsValue::operator/(const TjsValue& tjsValue) const {
+    TjsValue TjsValue::operator/(const TjsValue &tjsValue) const {
         switch(tjsValue.type()) {
             case TjsValueType::Integer:
                 return TjsValue{ this->asInteger() / tjsValue.asInteger() };
@@ -194,8 +183,9 @@ namespace Ciallang {
         }
     }
 
-    bool TjsValue::operator==(const TjsValue& tjsValue) const {
-        if(type() != tjsValue.type()) return false;
+    bool TjsValue::operator==(const TjsValue &tjsValue) const {
+        if(type() != tjsValue.type())
+            return false;
         switch(type()) {
             case TjsValueType::Integer:
                 return asInteger() == tjsValue.asInteger();
@@ -206,26 +196,24 @@ namespace Ciallang {
             case TjsValueType::Object:
                 return asObject() == tjsValue.asObject();
             case TjsValueType::Octet:
-            default: ;
+            default:;
         }
 
         CLL_LOG_FATAL("not impl `==` operator in TjsValue");
         std::abort();
     }
 
-    std::partial_ordering TjsValue::operator<=>(const TjsValue& tjsValue) const {
-        if(_type == TjsValueType::Integer
-           && tjsValue._type == TjsValueType::Integer) {
+    std::partial_ordering TjsValue::operator<=>(const TjsValue &tjsValue) const {
+        if(_type == TjsValueType::Integer && tjsValue._type == TjsValueType::Integer) {
             return asInteger() <=> tjsValue.asInteger();
         }
-        if(_type != TjsValueType::String
-           || tjsValue._type != TjsValueType::String) {
+        if(_type != TjsValueType::String || tjsValue._type != TjsValueType::String) {
             return asReal() <=> tjsValue.asReal();
         }
         return asString() <=> tjsValue.asString();
     }
 
-    std::ostream& operator<<(std::ostream& os, const TjsValue& d) {
+    std::ostream &operator<<(std::ostream &os, const TjsValue &d) {
         switch(d.type()) {
             case TjsValueType::Integer:
                 return os << d.asInteger();
@@ -242,4 +230,4 @@ namespace Ciallang {
         }
         return os << "unknown";
     }
-}
+} // namespace Ciallang
