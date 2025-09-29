@@ -1,6 +1,9 @@
+var num = 15;
 function fib(n) {
-    if(n < 2) return n;
-    return fib(n - 2) + fib(n - 1);
+    var one = 1;
+    var two = 2;
+    if(n < two) return n;
+    return fib(n - two) + fib(n - one);
 }
 
-fib(35);
+fib(num);
