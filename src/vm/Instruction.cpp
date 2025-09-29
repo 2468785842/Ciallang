@@ -17,6 +17,7 @@
 #include "Interpreter.hpp"
 #include "types/TjsFunction.hpp"
 #include "types/TjsNativeFunction.hpp"
+#include "logging/Logger.hpp"
 
 namespace Ciallang::Bytecode::Op {
     void Load::execute(Interpreter& interpreter) const {
@@ -220,7 +221,7 @@ namespace Ciallang::Bytecode::Op {
 
     void AbsEQ::execute(Interpreter&) const {
         // TODO:
-        CHECK(false);
+        assert(false);
     }
 
     std::string AbsEQ::dump(const Interpreter&, bool) const {
@@ -228,24 +229,24 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void Jmp::execute(Interpreter& interpreter) const {
-        CHECK(_label.has_value());
+        CLL_ASSERT(_label.has_value(), "label is empty");
         interpreter.setPC(_label.value());
     }
 
     std::string Jmp::dump(const Interpreter& interpreter, bool info) const {
-        CHECK(_label.has_value());
+        CLL_ASSERT(_label.has_value(), "label is empty");
         return fmt::format("{: <10} {: <4}", "jmp", _label.value());
     }
 
     void JmpE::execute(Interpreter& interpreter) const {
         if(interpreter.getZF()) {
-            CHECK(_label.has_value());
+            CLL_ASSERT(_label.has_value(), "label is empty");
             interpreter.setPC(_label.value());
         }
     }
 
     std::string JmpE::dump(const Interpreter& interpreter, const bool info) const {
-        CHECK(_label.has_value());
+        CLL_ASSERT(_label.has_value(), "label is empty");
         auto insDump = fmt::format("{: <10} {: <4}", "jmpe", _label.value());
 
         if(!info) return insDump;
@@ -255,13 +256,13 @@ namespace Ciallang::Bytecode::Op {
 
     void JmpNE::execute(Interpreter& interpreter) const {
         if(!interpreter.getZF()) {
-            CHECK(_label.has_value());
+            CLL_ASSERT(_label.has_value(), "label is empty");
             interpreter.setPC(_label.value());
         }
     }
 
     std::string JmpNE::dump(const Interpreter& interpreter, const bool info) const {
-        CHECK(_label.has_value());
+        CLL_ASSERT(_label.has_value(), "label is empty");
         auto insDump = fmt::format("{: <10} {: <4}", "jmpne", _label.value());
 
         if(!info) return insDump;
@@ -271,12 +272,12 @@ namespace Ciallang::Bytecode::Op {
 
     void Call::execute(Interpreter& interpreter) const {
         const auto& object = interpreter.reg(_memberReg);
-        CHECK(object.isObject());
+        CLL_ASSERT(object.isObject(), "memberReg is not object");
 
         if(!object.asObject()->isNative()) {
             const auto fun = dynamic_cast<TjsFunction*>(object.asObject());
 
-            CHECK_NOTNULL(fun);
+            CLL_ASSERT(fun != nullptr, "fun is null");
             auto callFrame = interpreter.createCallFrame(fun->chunk(), _dst);
 
             for(uint32_t i = 0; i < _arguments.size(); i++) {
@@ -311,7 +312,7 @@ namespace Ciallang::Bytecode::Op {
         // copy
         auto value = interpreter.reg(_retReg.value());
         auto frame = interpreter.popCallFrame();
-        CHECK(frame.ret.has_value());
+        CLL_ASSERT(frame.ret.has_value(), "frame.ret val is empty");
         interpreter.reg(frame.ret.value(), std::move(value));
     }
 

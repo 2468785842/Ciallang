@@ -12,19 +12,20 @@
  *
  */
 
-#include <gtest/gtest.h>
+#include <catch.hpp>
 
-#include "../src/vm/Interpreter.hpp"
+#include "vm/Interpreter.hpp"
 
-#include "../src/parser/Parser.hpp"
-#include "../src/ast/AstFormatter.hpp"
-#include "../src/gen/BytecodeGen.hpp"
-#include "../src/common/SourceFile.hpp"
+#include "parser/Parser.hpp"
+#include "ast/AstFormatter.hpp"
+#include "gen/BytecodeGen.hpp"
+#include "common/SourceFile.hpp"
+#include "test_config.h"
 
-TEST(InterpreterTest, TestExecute) {
+TEST_CASE("Interpreter Test Execute") {
     Ciallang::Common::Result r{};
 
-    Ciallang::Common::SourceFile sourceFile{ R"(.\startup.tjs)" };
+    Ciallang::Common::SourceFile sourceFile{ TEST_FILES_PATH R"(/startup.tjs)" };
     sourceFile.load(r);
 
     Ciallang::Syntax::AstBuilder astBuilder{};
@@ -41,4 +42,28 @@ TEST(InterpreterTest, TestExecute) {
     fmt::println("{}", interpreter.dumpInstruction(*chunk));
     interpreter.run(chunk.get());
     fmt::println("{}", interpreter.dumpRegisters());
+}
+
+TEST_CASE("Script execution benchmark") {
+    BENCHMARK("fib 15") {
+        Ciallang::Common::Result r{};
+
+        Ciallang::Common::SourceFile sourceFile{};
+        sourceFile.load(r, R"(
+            function fib(n) {
+                if(n < 2) return n;
+                return fib(n - 2) + fib(n - 1);
+            }
+            fib(15);
+        )");
+
+        Ciallang::Syntax::AstBuilder astBuilder{};
+        Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
+        auto* globalNode = parser.parse(r);
+
+        Ciallang::Inter::BytecodeGen codeGen{ sourceFile };
+        auto chunk = codeGen.parseAst(r, globalNode);
+        Ciallang::Bytecode::Interpreter interpreter{};
+        interpreter.run(chunk.get());
+    };
 }

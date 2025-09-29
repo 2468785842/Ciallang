@@ -11,9 +11,9 @@
  *                                                            \_/__/
  *
  */
-#include <gtest/gtest.h>
+#include <catch.hpp>
 
-#include "../src/common/TableFormatter.hpp"
+#include "common/TableFormatter.hpp"
 
 // +---------------------------------------------------------------------------+
 // |                                Heap Usage                                 |
@@ -41,7 +41,7 @@ static const std::any table[][5] = {
         { "Used(%)", 11.70, 93.62, 0.00, 0.00 }
 };
 
-TEST(TableFormatterTest, Println) {
+TEST_CASE("TableFormatterTest Print") {
     static constexpr size_t TABLE_SIZE = 60;
     Ciallang::Common::TableFormatter formatter{ TABLE_SIZE, 5 };
     formatter.parse(table);

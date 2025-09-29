@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "ciallang",
+  "version-string": "1.0.0",
+  "dependencies": [
+    {
+      "name": "argparse",
+      "platform": "linux | windows | osx"
+    },
+    {
+      "name": "catch2",
+      "default-features": false,
+      "platform": "linux | windows | osx"
+    },
+    "fmt",
+    "utf8proc",
+    "frozen",
+    "spdlog"
+  ]
+}

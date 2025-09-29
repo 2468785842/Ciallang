@@ -16,6 +16,9 @@
 #include <type_traits>
 #include <utility>
 
+/**
+ * GPT生成的code,有缺陷...需要修改
+ */
 namespace Ciallang::Collections {
     template <typename T>
     class ConservativeVector {

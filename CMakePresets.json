@@ -10,13 +10,12 @@
       "name": "default",
       "hidden": true,
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": true
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       }
     },
     {
-      "name": "Linux",
-      "displayName": "Linux",
-      "description": "Linux Compile",
+      "name": "Linux Config",
       "inherits": "default",
       "generator": "Ninja",
       "hidden": true,
@@ -33,7 +32,7 @@
     },
     {
       "name": "Linux Debug",
-      "inherits": "Linux",
+      "inherits": "Linux Config",
       "binaryDir": "${sourceDir}/build/Linux/Debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
@@ -41,16 +40,14 @@
     },
     {
       "name": "Linux Release",
-      "inherits": "Linux",
+      "inherits": "Linux Config",
       "binaryDir": "${sourceDir}/build/Linux/Release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
-      "name": "Windows",
-      "displayName": "Windows",
-      "description": "Windows Compile",
+      "name": "Windows Config",
       "generator": "Ninja",
       "inherits": "default",
       "hidden": true,
@@ -67,7 +64,7 @@
     },
     {
       "name": "Windows Debug",
-      "inherits": "Windows",
+      "inherits": "Windows Config",
       "binaryDir": "${sourceDir}/build/Windows/Debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
@@ -75,7 +72,7 @@
     },
     {
       "name": "Windows Release",
-      "inherits": "Windows",
+      "inherits": "Windows Config",
       "binaryDir": "${sourceDir}/build/Windows/Release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"

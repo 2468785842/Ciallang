@@ -17,6 +17,7 @@
 #include "ast/ExprNode.hpp"
 #include "ast/StmtNode.hpp"
 #include "ast/DeclNode.hpp"
+#include "logging/Logger.hpp"
 
 namespace Ciallang::Syntax {
     using namespace Common;
@@ -110,7 +111,7 @@ namespace Ciallang::Syntax {
                 _lexer.tackOverToken(*token);
             }
 
-            CHECK(token != nullptr);
+            CLL_ASSERT(token != nullptr, "token is null");
         }
         return !tokens().empty();
     }

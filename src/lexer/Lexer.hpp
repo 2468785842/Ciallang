@@ -74,17 +74,7 @@ namespace Ciallang::Syntax {
 
         void skipComment();
 
-        bool tackOverToken(Token& token) {
-            CHECK(!_tokens.empty());
-
-            token = *_tokens.front();
-
-            if(token.type() == TokenType::EndOfFile) return false;
-
-            delete _tokens.front();
-            _tokens.erase(_tokens.begin());
-            return true;
-        }
+        bool tackOverToken(Token& token);
 
         [[nodiscard]] bool hasNext() const;
 

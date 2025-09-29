@@ -2,97 +2,39 @@ cmake_minimum_required(VERSION 3.25)
 
 enable_testing()
 
-project(Ciallang CXX)
+project(CiallangTests CXX)
 
-set(CMAKE_BUILD_TYPE "Debug")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(Catch2 3 REQUIRED)
 
-macro(get_source_file directory)
-    file(GLOB ${directory}_SOURCE_FILES "${CMAKE_SOURCE_DIR}/src/${directory}/*.[ch]pp")
-endmacro()
+include(CTest)
+include(Catch)
 
-get_source_file(ast)
-get_source_file(gc)
-get_source_file(common)
-get_source_file(gen)
-get_source_file(lexer)
-get_source_file(parser)
-get_source_file(types)
-get_source_file(vm)
+set(TEST_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
-add_executable(
-        interpreter_test
+set(TEST_FILES_PATH ${CMAKE_CURRENT_SOURCE_DIR}/test_files)
+configure_file(test_config.h.in test_config.h)
 
+set(SOURCES
+        lexer_test.cpp
         interpreter_test.cpp
-
-        gtest_cfg.cpp
-        ${CMAKE_SOURCE_DIR}/src/init/GlogInit.hpp
-
-        ${ast_SOURCE_FILES}
-        ${common_SOURCE_FILES}
-        ${gen_SOURCE_FILES}
-        ${lexer_SOURCE_FILES}
-        ${parser_SOURCE_FILES}
-        ${types_SOURCE_FILES}
-        ${vm_SOURCE_FILES}
-)
-
-add_executable(
-        gc_test
-        gc_test.cpp
-        gtest_cfg.cpp
-        ${CMAKE_SOURCE_DIR}/src/init/GlogInit.hpp
-        ${gc_SOURCE_FILES}
-)
-
-add_executable(
-        table_formatter_test
         table_formatter_test.cpp
-        gtest_cfg.cpp
-        ${CMAKE_SOURCE_DIR}/src/init/GlogInit.hpp
-        ${CMAKE_SOURCE_DIR}/src/common/TableFormatter.hpp
 )
 
-include_directories(${CMAKE_SOURCE_DIR}/src)
+string(REPLACE ".cpp" "" BASENAMES_SOURCES "${SOURCES}")
+set(TARGETS ${BASENAMES_SOURCES})
 
-include(cmake/depend.cmake)
-find_package(gtest REQUIRED)
+foreach(name ${TARGETS})
+    add_executable(${name} ${name}.cpp main.cpp)
+endforeach()
 
-include(../cmake/depend.cmake)
-find_package(fmt REQUIRED)
-find_package(utf8proc REQUIRED)
-find_package(frozen REQUIRED)
-find_package(gflags REQUIRED)
-find_package(glog REQUIRED)
+set(ALL_TARGETS ${TARGETS})
 
-target_link_libraries(
-        interpreter_test
+foreach(name ${ALL_TARGETS})
+    target_link_libraries(${name}
         PRIVATE
-        GTest::gtest_main
-        fmt utf8proc frozen gflags glog gtest
-)
-
-target_link_libraries(
-        gc_test
-        PRIVATE
-        GTest::gtest_main
-        fmt utf8proc frozen gflags glog gtest
-)
-
-target_link_libraries(
-        table_formatter_test
-        PRIVATE
-        GTest::gtest_main
-        fmt utf8proc frozen gflags glog gtest
-)
-
-target_precompile_headers(interpreter_test PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
-target_precompile_headers(gc_test PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
-target_precompile_headers(table_formatter_test PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
-
-include(GoogleTest)
-gtest_discover_tests(interpreter_test)
-gtest_discover_tests(gc_test)
-gtest_discover_tests(table_formatter_test)
+            Catch2::Catch2
+            Ciallang
+    )
+    target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+    catch_discover_tests(${name})
+endforeach()

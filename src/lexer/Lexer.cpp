@@ -18,6 +18,7 @@
 #include "types/TjsValue.hpp"
 #include "common/Defer.hpp"
 #include "common/UTF8.hpp"
+#include "logging/Logger.hpp"
 
 #include "IEEETypes.hpp"
 
@@ -257,7 +258,7 @@ bool Lexer::next(Token*& token) {
         _sourceFile.restoreTopMark();
     }
 
-    LOG(FATAL) << "unknown char: " << static_cast<char>(rune);
+    CLL_LOG_FATAL("unknown char: %c", static_cast<char>(rune));
 
     token = makeToken(S_Invalid);
     setTokenLocation(token);
@@ -276,7 +277,7 @@ void Lexer::skipComment() {
         _sourceFile.pushMark();
         next(token);
 
-        CHECK(token != nullptr);
+        CLL_ASSERT(token != nullptr, "token is null");
 
         auto isComment = token->type() == TokenType::LineComment
                          || token->type() == TokenType::BlockComment;
@@ -294,6 +295,17 @@ void Lexer::skipComment() {
     }
 }
 
+bool Lexer::tackOverToken(Token& token) {
+    CLL_ASSERT(!_tokens.empty(), "tokens vec is empty");
+
+    token = *_tokens.front();
+
+    if(token.type() == TokenType::EndOfFile) return false;
+
+    delete _tokens.front();
+    _tokens.erase(_tokens.begin());
+    return true;
+}
 
 const Result& Lexer::result() const {
     return _result;

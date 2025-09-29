@@ -45,10 +45,6 @@ namespace Ciallang::Common {
 
         ~SourceFile() = default;
 
-        bool load(
-                Result &r,
-                const std::string &buffer);
-
         void error(
                 Result &r,
                 const std::string &message,
@@ -73,6 +69,8 @@ namespace Ciallang::Common {
         void restoreTopMark();
 
         bool load(Result &r);
+
+        bool load(Result &r, const std::string &buffer);
 
         int32_t next(Result &r);
 

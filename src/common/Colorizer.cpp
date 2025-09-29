@@ -69,7 +69,7 @@ namespace Ciallang::Common {
     // Returns true iff terminal supports using colors in output.
     static bool TerminalSupportsColor() {
         bool term_supports_color = false;
-#ifdef GLOG_OS_WINDOWS
+#ifdef _WIN32
         // on Windows TERM variable is usually not set, but the console does
         // support colors.
         term_supports_color = true;

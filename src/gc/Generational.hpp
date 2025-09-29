@@ -55,7 +55,7 @@ namespace Ciallang::GC {
             if(_nextFreeOffset + sizeof(T) > _edenSize) {
                 minorGC();
                 if(_nextFreeOffset + sizeof(T) > _edenSize) {
-                    LOG(FATAL) << "[New] Allocation Failed! OutOfMemory...";
+                    // LOG(FATAL) << "[New] Allocation Failed! OutOfMemory...";
                 }
             }
 
@@ -137,21 +137,5 @@ namespace Ciallang::GC {
         size_t _survivorSize{};
 
         MarkSweep* _majorGC;
-
-        template <typename T>
-        static void swap(T*& from, T*& to) {
-            T* temp = from;
-            from = to;
-            to = temp;
-        }
-
-        static void handleFields(const GCObject* obj, const std::function<void(GCObject*&)>& func) {
-            auto fields = obj->getFields();
-            if(fields.has_value()) {
-                for(auto& field : fields.value()) {
-                    func(field);
-                }
-            }
-        }
     };
 }

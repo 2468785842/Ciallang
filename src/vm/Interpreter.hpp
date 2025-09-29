@@ -69,20 +69,13 @@ namespace Ciallang::Bytecode {
         void reg(const Register reg, TjsValue value) {
             auto index = reg.index() 
                 + _currentFrame->registersOffset;
-            allocReigsers(index);
+            allocRegisters(index);
 
             _registers[index] = std::move(value);
             ++_logicRegistersSize;
         }
 
-        const TjsValue& reg(const Register reg) const {
-            auto index = reg.index()
-                + _currentFrame->registersOffset;
-
-            DCHECK_LT(index, _registers.size());
-
-            return _registers[index];
-        }
+        const TjsValue& reg(Register reg) const;
 
         const TjsValue& global(const std::string& identifier) const {
             return _globals.at(identifier);
@@ -169,8 +162,9 @@ namespace Ciallang::Bytecode {
             return ss.str();
         }
 
-        void allocReigsers(const size_t index) {
+        void allocRegisters(const size_t index) {
             if (index >= _registers.size()) {
+                // maybe increase or decrease
                 _registers.resize(index + 1);
                 // CHECK_LE(_registers.size(), std::numeric_limits<uint32_t>::max());
             }
@@ -178,6 +172,7 @@ namespace Ciallang::Bytecode {
 
     private:
         CallFrame* _currentFrame{ nullptr };
+        // 考虑使用map?
         Collections::ConservativeVector<CallFrame> _callStack{};
         Collections::ConservativeVector<TjsValue> _registers{};
         uint32_t _logicRegistersSize{};
@@ -191,7 +186,7 @@ namespace Ciallang::Bytecode {
                            TjsValue value) {
 
             auto index = reg.index() + frame.registersOffset;
-            allocReigsers(index);
+            allocRegisters(index);
 
             _registers[index] = std::move(value);
             ++_logicRegistersSize;

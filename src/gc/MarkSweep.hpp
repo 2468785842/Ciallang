@@ -51,7 +51,7 @@ namespace Ciallang::GC {
             requires is_gc_object_v<T>
         void reallocate(T*& obj) {
             if(obj->size() > NODE_SIZE) {
-                LOG(FATAL) << "object too large";
+                // LOG(FATAL) << "object too large";
             }
 
             if(!_nextFree || _nextFree->data) {

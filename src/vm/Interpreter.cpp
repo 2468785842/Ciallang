@@ -15,6 +15,7 @@
 
 #include "Chunk.hpp"
 #include "Instruction.hpp"
+#include "logging/Logger.hpp"
 
 namespace Ciallang::Bytecode {
 
@@ -24,19 +25,26 @@ namespace Ciallang::Bytecode {
         for(;;) {
             // cache hit
             size_t &pc = _currentFrame->pc;
-            const auto& insts = instructions();
+            const auto& instList = instructions();
 
-            if(pc >= insts.size()) break;
+            if(pc >= instList.size()) break;
 
             if(_callStack.empty()) break;
 
-             auto *instruction = insts[pc];
+             auto *instruction = instList[pc];
             // fmt::println("{: <6}: {}", Label{ getPC() }, instruction->dump(*this, true));
              ++pc;
             instruction->execute(*this);
         }
+    }
 
-        fmt::println("interpret over...");
+    const TjsValue& Interpreter::reg(const Register reg) const {
+        auto index = reg.index()
+            + _currentFrame->registersOffset;
+
+        CLL_ASSERT(index < _registers.size(), "index > _registers.size");
+
+        return _registers[index];
     }
 
 }

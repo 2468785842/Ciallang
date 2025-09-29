@@ -17,8 +17,9 @@
 
 namespace Ciallang::GC {
     /**
-     * GC will not call destructor method.
-     * all fields must manage for gc. don't memory manage for self
+     * GC doesn't call destructor method.
+     * All fields must be managed for gc.
+     * Don't memory manage itself
      */
     class GCObject {
     public:
@@ -35,12 +36,35 @@ namespace Ciallang::GC {
         bool marked() const noexcept { return _marked; }
         void marked(const bool marked) noexcept { _marked = marked; }
 
-        virtual std::optional<std::vector<GCObject*>> getFields() const = 0;
+        virtual std::vector<GCObject*> getFields() const = 0;
 
+        /**
+         * It is called when the gc needs to move an object,
+         * Each gc call will pass in a size() of memory
+         *
+         * Warning!!
+         * Don't call methods yourself
+         *
+         * This is basically a fixed way of writing:
+         *
+         * return new(to) Emp{ *this };
+         *
+         */
         virtual GCObject* copyTo(uint8_t*) = 0;
 
+        /**
+         * The Object size
+         *
+         * Usually writing with:
+         *
+         * return sizeof(Emp);
+         */
         virtual size_t size() const noexcept = 0;
 
+        /**
+         * take care memory leak
+         * Maybe never call desturctor method
+         */
         virtual ~GCObject() = default;
 
     private:

@@ -20,6 +20,7 @@
 #include "DeclNode.hpp"
 #include "ExprNode.hpp"
 #include "StmtNode.hpp"
+#include "logging/Logger.hpp"
 
 namespace Ciallang {
     class AstFormatter final : public Syntax::AstNode::Visitor {
@@ -58,7 +59,7 @@ namespace Ciallang {
             printNode("DeclareVar");
             increaseIndent();
 
-            CHECK(node->token->value()->isString());
+            CLL_ASSERT(node->token->value()->isString(), "VarDeclNode val is not string");
             printNode("Variable", node->token->value());
 
             printNode("=");
@@ -75,7 +76,7 @@ namespace Ciallang {
 
             increaseIndent();
             for(auto& [token,exprNode] : node->parameters) {
-                CHECK(token.value()->isString());
+                CLL_ASSERT(token.value()->isString(), "FunctionDeclNode val is not string");
                 printNode(*token.value()->asString(), exprNode);
             }
             decreaseIndent();
@@ -93,7 +94,7 @@ namespace Ciallang {
         }
 
         void visit(const Syntax::IdentifierExprNode* node) override {
-            CHECK(node->token->value()->isString());
+            CLL_ASSERT(node->token->value()->isString(), "IdentifierExprNode val is not string");
             printNode("Identifier", node->token->value());
         }
 
@@ -125,7 +126,7 @@ namespace Ciallang {
             printNode("(Arguments)");
 
             increaseIndent();
-            for(auto argument : node->arguments) {
+            for(const auto argument : node->arguments) {
                 argument->accept(this);
             }
             decreaseIndent();
@@ -151,7 +152,7 @@ namespace Ciallang {
             printNode("(Children)");
 
             increaseIndent();
-            for(auto* child : node->childrens) {
+            for(const auto* child : node->childrens) {
                 child->accept(this);
             }
             decreaseIndent();

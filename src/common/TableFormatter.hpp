@@ -85,9 +85,8 @@ namespace Ciallang::Common {
                 throw std::invalid_argument("bad arguments");
             }
             for(uint8_t i = 0; i < L2;) {
-                uint8_t size = mergeX(table[y - 1], i);
-                auto temp = mergeY(table, i, y);
-                if(temp.has_value()) {
+                const uint8_t size = mergeX(table[y - 1], i);
+                if(auto temp = mergeY(table, i, y); temp.has_value()) {
                     ss << fmt::format("+{: ^{}}", anyToString(temp), cellSize() * size + size - 1);
                 } else {
                     ss << fmt::format("+{:-^{}}", "", cellSize() * size + size - 1);
@@ -105,9 +104,8 @@ namespace Ciallang::Common {
             std::stringstream ss{};
             char closeChar = '+';
             for(uint8_t i = 0; i < L2; ++i) {
-                uint8_t size = mergeX(table[y], i);
-                auto temp = mergeY(table, i, y);
-                if(temp.has_value()) {
+                const uint8_t size = mergeX(table[y], i);
+                if(auto temp = mergeY(table, i, y); temp.has_value()) {
                     ss << fmt::format("|{: ^{}}", anyToString(temp), cellSize() * size + size - 1);
                     closeChar = '|';
                 } else {

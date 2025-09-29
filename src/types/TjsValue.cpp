@@ -14,7 +14,7 @@
 
 #include "TjsOctet.hpp"
 #include "TjsObject.hpp"
-
+#include "logging/Logger.hpp"
 
 namespace Ciallang {
     TjsValue::TjsValue(const TjsInteger& value) :
@@ -50,7 +50,7 @@ namespace Ciallang {
                 _value._object = value._value._object;
                 break;
             case TjsValueType::String:
-                _value._string = new std::string(value._value._string->c_str());
+                _value._string = new std::string(*value._value._string);
                 break;
             case TjsValueType::Octet:
                 _value._octet = new TjsOctet(*value._value._octet);
@@ -89,32 +89,27 @@ namespace Ciallang {
     }
 
     TjsInteger TjsValue::asInteger() const {
-        CHECK(this->_type == TjsValueType::Integer)
-        << "is not integer " << "is " << name();
+        CLL_ASSERT(_type == TjsValueType::Integer, "not integer type is %s", name());
         return _value._integer;
     }
 
     TjsReal TjsValue::asReal() const {
-        CHECK(this->_type == TjsValueType::Real)
-        << "is not real " << "is " << name();
+        CLL_ASSERT(_type == TjsValueType::Real, "not real type is %s", name());
         return _value._real;
     }
 
     std::string* TjsValue::asString() const {
-        CHECK(this->_type == TjsValueType::String)
-        << "is not string " << "is " << name();
+        CLL_ASSERT(_type == TjsValueType::String, "not string type is %s", name());
         return _value._string;
     }
 
     TjsOctet* TjsValue::asOctet() const {
-        CHECK(this->_type == TjsValueType::Octet)
-        << "is not octet " << "is " << name();
+        CLL_ASSERT(_type == TjsValueType::Octet, "not octet type is %s", name());
         return _value._octet;
     }
 
     TjsObject* TjsValue::asObject() const {
-        CHECK(_type == TjsValueType::Object)
-        << "is not object " << "is " << name();
+        CLL_ASSERT(_type == TjsValueType::Object, "not object type is %s", name());
         return _value._object;
     }
 
@@ -125,7 +120,7 @@ namespace Ciallang {
         return _type != TjsValueType::Void;
     }
 
-    std::string TjsValue::name() const {
+    const char *TjsValue::name() const {
         switch(_type) {
             case TjsValueType::Integer:
                 return "integer";
@@ -139,8 +134,9 @@ namespace Ciallang {
                 return "string";
             case TjsValueType::Octet:
                 return "octet";
+            default:
+                return "unknown";
         }
-        return "unknown";
     }
 
     TjsValue TjsValue::operator+(const TjsValue& tjsValue) const {
@@ -213,7 +209,7 @@ namespace Ciallang {
             default: ;
         }
 
-        LOG(FATAL) << "no impl == funcition in TjsValue";
+        CLL_LOG_FATAL("not impl `==` operator in TjsValue");
         std::abort();
     }
 

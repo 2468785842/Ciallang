@@ -51,7 +51,7 @@ namespace Ciallang::GC {
     }
 
     void Generational::minorGC() {
-        LOG_EVERY_T(INFO, 5) << "MinorGC(CopyingGC) Running";
+        // LOG_EVERY_T(INFO, 5) << "MinorGC(CopyingGC) Running";
 
         _nextForwardingOffset = 0;
 
@@ -64,30 +64,25 @@ namespace Ciallang::GC {
             }
         }
 
-        auto it = _rememberedSet.begin();
-        while(it != _rememberedSet.end()) {
+        for(size_t i = 0; i < _rememberedSet.size();) {
             bool hasNewObj = false;
 
-            auto fields = (*it)->getFields();
-            if(fields.has_value()) {
-                for(auto& field : fields.value()) {
-                    if(reinterpret_cast<uintptr_t>(field) < _majorGC->start()) {
-                        copy(field);
-                        hasNewObj = reinterpret_cast<uintptr_t>(field) < _majorGC->start();
-                    }
+            auto fields = _rememberedSet[i]->getFields();
+            for(auto& field : fields) {
+                if(reinterpret_cast<uintptr_t>(field) < _majorGC->start()) {
+                    copy(field);
+                    hasNewObj = reinterpret_cast<uintptr_t>(field) < _majorGC->start();
                 }
             }
 
             if(hasNewObj) {
-                (*it)->remembered(false);
+                _rememberedSet[i]->remembered(false);
 
-                if(it != _rememberedSet.end() - 1) {
-                    swap(*it, _rememberedSet.back());
-                }
+                std::swap(_rememberedSet[i], _rememberedSet.back());
 
                 _rememberedSet.pop_back();
             } else {
-                ++it;
+                ++i;
             }
         }
 
@@ -96,7 +91,7 @@ namespace Ciallang::GC {
         memset(_eden, 0, _edenSize);
         memset(_from, 0, _survivorSize);
 
-        swap(_from, _to);
+        std::swap(_from, _to);
     }
 
     void Generational::copy(GCObject*& obj) {
@@ -126,9 +121,9 @@ namespace Ciallang::GC {
 
         _nextForwardingOffset += obj->size();
 
-        handleFields(obj, [&](GCObject*& field) {
+        for(auto& field : obj->getFields()) {
             copy(field);
-        });
+        }
     }
 
     void Generational::promotion(GCObject*& obj) {
@@ -136,12 +131,12 @@ namespace Ciallang::GC {
 
         obj->forwarded(true);
 
-        handleFields(obj, [&](GCObject*& field) {
+        for(auto& field : obj->getFields()) {
             if(reinterpret_cast<uintptr_t>(field) < _majorGC->start()) {
                 obj->remembered(true);
                 _rememberedSet.push_back(obj);
             }
-        });
+        }
     }
 
     void Generational::printState() const {

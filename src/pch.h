@@ -40,7 +40,7 @@
 #include <functional>
 #include <compare>
 
-#include <glog/logging.h>
+#include <spdlog/spdlog.h>
 
 #include <frozen/unordered_map.h>
 #include <frozen/string.h>

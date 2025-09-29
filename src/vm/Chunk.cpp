@@ -17,7 +17,7 @@
 
 namespace Ciallang::Bytecode {
     Chunk::~Chunk() noexcept {
-        for(auto& instruction : _instructions) {
+        for(const auto& instruction : _instructions) {
             delete instruction;
         }
     }

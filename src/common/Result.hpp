@@ -19,6 +19,8 @@
 #include "SourceLocation.hpp"
 #include "ResultMessage.hpp"
 
+#include "logging/Logger.hpp"
+
 namespace Ciallang::Common {
     using namespace std;
 
@@ -34,7 +36,7 @@ namespace Ciallang::Common {
             const string& message,
             const SourceLocation& loc = {},
             const string& details = {}) {
-            DLOG(INFO) << message;
+            CLL_LOG_INFO(message.c_str());
             _messages.emplace_back(
                 message,
                 loc,
@@ -46,7 +48,7 @@ namespace Ciallang::Common {
             const string& message,
             const SourceLocation& loc = {},
             const string& details = {}) {
-            DLOG(ERROR) << message;
+            CLL_LOG_ERROR(message.c_str());
             _messages.emplace_back(
                 message,
                 loc,
@@ -59,7 +61,7 @@ namespace Ciallang::Common {
             const std::string& message,
             const SourceLocation& loc = {},
             const std::string& details = {}) {
-            DLOG(WARNING) << message;
+            CLL_LOG_WARN(message.c_str());
             _messages.emplace_back(
                 message,
                 loc,

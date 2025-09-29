@@ -88,7 +88,7 @@ namespace Ciallang {
 
         [[nodiscard]] bool asBool() const;
 
-        [[nodiscard]] std::string name() const;
+        [[nodiscard]] const char *name() const;
 
         TjsValue operator+(const TjsValue& tjsValue) const;
 

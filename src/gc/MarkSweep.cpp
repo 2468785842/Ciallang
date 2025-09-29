@@ -24,7 +24,7 @@ namespace Ciallang::GC {
     }
 
     void MarkSweep::collect() {
-        LOG_EVERY_T(INFO, 5) << "MarkSweepGC Running";
+        // LOG_EVERY_T(INFO, 5) << "MarkSweepGC Running";
         for(auto& roots : _rootsSet) {
             for(auto& obj : *roots) {
                 if(obj && reinterpret_cast<uintptr_t>(obj) >= start())
@@ -47,7 +47,7 @@ namespace Ciallang::GC {
         find();
 
         if(!_nextFree) {
-            LOG(FATAL) << "Allcation Failed! OutOfMemory...";
+            // LOG(FATAL) << "Allcation Failed! OutOfMemory...";
         }
 
         return _nextFree;
@@ -64,7 +64,7 @@ namespace Ciallang::GC {
             else {
                 Cell* cell = reinterpret_cast<Cell*>(obj - 1);
 
-                LOG(INFO) << fmt::format("collection: {}B", obj->size());
+                // LOG(INFO) << fmt::format("collection: {}B", obj->size());
 
                 // fill memory with zero
                 memset((void*)obj, 0, obj->size());
@@ -80,8 +80,7 @@ namespace Ciallang::GC {
         obj->marked(true);
 
         auto fields = obj->getFields();
-        if(!fields.has_value()) return;
-        for(auto& field : fields.value()) {
+        for(auto& field : fields) {
             if(reinterpret_cast<uintptr_t>(field) >= start())
                 mark(field);
         }

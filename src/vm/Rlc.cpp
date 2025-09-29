@@ -12,6 +12,7 @@
  *
  */
 #include "Rlc.hpp"
+#include "logging/Logger.hpp"
 
 namespace Ciallang::Bytecode {
     // 字节码索引是否是这行的第一个
@@ -25,7 +26,7 @@ namespace Ciallang::Bytecode {
 
     [[nodiscard]] Common::SourceLocation Rlc::find(const size_t bytecodeIndex) const {
         if(_bytecodeMapLine.empty()) {
-            LOG(FATAL) << "rlc is empty";
+            CLL_LOG_FATAL("rlc is empty");
         }
 
         Common::SourceLocation preSIndex{};
@@ -36,7 +37,7 @@ namespace Ciallang::Bytecode {
             if(bytecodeIndex < bcIndex) return preSIndex;
         }
 
-        LOG(WARNING) << "chunk bytecode map to source line, not found";
+        CLL_LOG_WARN("chunk bytecode map to source line, not found");
         return preSIndex;
     }
 

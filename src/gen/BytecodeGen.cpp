@@ -18,6 +18,7 @@
 #include "types/TjsFunction.hpp"
 
 #include "vm/Instruction.hpp"
+#include "logging/Logger.hpp"
 
 namespace Ciallang::Inter {
     std::unique_ptr<Bytecode::Chunk> BytecodeGen::parseAst(
@@ -53,8 +54,8 @@ namespace Ciallang::Inter {
 
         if(_r.isFailed()) return {};
 
-        CHECK(reg1.has_value());
-        CHECK(reg2.has_value());
+        CLL_ASSERT(reg1.has_value(), "reg1 is empty");
+        CLL_ASSERT(reg2.has_value(), "reg2 is empty");
 
         switch(node->token->type()) {
             case Equal:
@@ -88,7 +89,7 @@ namespace Ciallang::Inter {
                 _chunk->emit<Bytecode::Op::Div>(reg1.value(), reg2.value(), dst);
                 break;
             default:
-                DCHECK(false) << "unknow binary operator";
+                CLL_LOG_ERROR("unknow binary operator");
                 return {};
         }
 
@@ -114,14 +115,14 @@ namespace Ciallang::Inter {
                     auto reg = exprNode->generateBytecode(this);
                     if(_r.isFailed()) return {};
 
-                    CHECK(reg.has_value());
+                    CLL_ASSERT(reg.has_value(), "reg is empty");
                     arguments.push_back(reg.value());
                 }
             }
             _chunk->emit<Bytecode::Op::Call>(dst, memberReg.value(), std::move(arguments));
             return dst;
         }
-        DCHECK(true) << "no impl";
+        CLL_LOG_ERROR("not impl");
         return {};
     }
 
@@ -130,15 +131,15 @@ namespace Ciallang::Inter {
         // TODO: member access
         auto identifier = node->lhs->token->value();
 
-        DCHECK(identifier->isString());
+        CLL_ASSERT(identifier->isString(), "identifier is not string");
 
         auto variable = resolveLocalVariable(*identifier->asString());
 
         if(variable.has_value()) {
             auto dst = node->lhs->generateBytecode(this);
             auto src = node->rhs->generateBytecode(this);
-            DCHECK(dst.has_value());
-            DCHECK(src.has_value());
+            CLL_ASSERT(dst.has_value(), "dst is not have val");
+            CLL_ASSERT(src.has_value(), "src is not have val");
             _chunk->emit<Bytecode::Op::Mov>(src.value(), dst.value());
             variable.value()->init = true;
             if(_r.isFailed()) return {};
@@ -148,7 +149,7 @@ namespace Ciallang::Inter {
 
         // global maybe
         auto src = node->rhs->generateBytecode(this);
-        DCHECK(src.has_value());
+        CLL_ASSERT(src.has_value(), "global src is not have val");
 
         _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->asString()), src.value());
 
@@ -159,7 +160,7 @@ namespace Ciallang::Inter {
     std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::VarDeclNode* node) {
         auto identifier = node->token->value();
 
-        DCHECK(identifier->isString());
+        CLL_ASSERT(identifier->isString(), "identifier is not string");
 
         // global
         if(_scopeDepth == 1) {
@@ -190,7 +191,7 @@ namespace Ciallang::Inter {
 
             if(!_r.isFailed()) return {};
 
-            DCHECK(src.has_value());
+            CLL_ASSERT(src.has_value(), "src is not have val");
 
             _chunk->emit<Bytecode::Op::Mov>(src.value(), variable.value()->reg);
             return {};
@@ -203,7 +204,7 @@ namespace Ciallang::Inter {
             auto src = node->rhs->generateBytecode(this);
 
             if(_r.isFailed()) return {};
-            CHECK(src.has_value());
+            CLL_ASSERT(src.has_value(), "src is not have val");
 
             _chunk->emit<Bytecode::Op::Mov>(src.value(), dst.value());
         } else {
@@ -225,11 +226,11 @@ namespace Ciallang::Inter {
             auto varName = token.value();
             std::optional<Bytecode::Register> paramReg{};
 
-            CHECK(varName->isString());
+            CLL_ASSERT(varName->isString(), "varName is not string");
 
             if(exprNode) {
                 auto defaultParameter = exprNode->generateBytecode(&gen);
-                CHECK(defaultParameter.has_value());
+                CLL_ASSERT(defaultParameter.has_value(), "defaultParameter is not have val");
                 paramReg = defaultParameter.value();
             } else {
                 paramReg = gen.allocateRegister();
@@ -253,7 +254,7 @@ namespace Ciallang::Inter {
 
         auto identifier = node->token->value();
 
-        CHECK(identifier->isString());
+        CLL_ASSERT(identifier->isString(), "identifier is not string");
 
         if(_scopeDepth == 1) {
             _chunk->emit<Bytecode::Op::Load>(funReg, TjsValue{ TjsFunction{
@@ -292,7 +293,7 @@ namespace Ciallang::Inter {
     std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::IdentifierExprNode* node) {
         auto identifier = node->token->value();
 
-        DCHECK(identifier->isString());
+        CLL_ASSERT(identifier->isString(), "identifier is not string");
 
         auto variable = resolveLocalVariable(*identifier->asString());
 
@@ -330,7 +331,7 @@ namespace Ciallang::Inter {
         auto testReg = node->test->generateBytecode(this);
         if(_r.isFailed()) return {};
 
-        DCHECK(testReg.has_value());
+        CLL_ASSERT(testReg.has_value(), "testReg is not have val");
 
         _chunk->emit<Bytecode::Op::Test>(testReg.value());
 
@@ -357,7 +358,7 @@ namespace Ciallang::Inter {
         auto testReg = node->test->generateBytecode(this);
         if(_r.isFailed()) return {};
 
-        DCHECK(testReg.has_value());
+        CLL_ASSERT(testReg.has_value(), "testReg is not have val");
 
         _chunk->emit<Bytecode::Op::Test>(testReg.value());
         auto jmpNE = _chunk->emit<Bytecode::Op::JmpNE>();
