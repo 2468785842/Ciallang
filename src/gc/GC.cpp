@@ -49,62 +49,54 @@ namespace Ciallang {
     }
 
     void GC::collect() {
-        std::unordered_map<GCObject *, size_t> rc;
+        std::unordered_set<GCObject*> visited;
 
-        for(const auto &o : _candidates)
-            rc[o] = o->_refCount;
-
-        for(const auto &o : _candidates) {
-            for(const auto &child : o->_children) {
-                if(rc.contains(child))
-                    --rc[child];
+        for (auto obj : _candidates) {
+            if (obj && !visited.contains(obj)) {
+                destroyCycle(obj, visited);
             }
         }
-
-        // 3. rc==0 的是垃圾循环
-        std::vector<GCObject *> garbage{ rc.size() };
-        for(auto &[obj, cnt] : rc) {
-            if(cnt == 0)
-                garbage.push_back(obj);
-        }
-
-        std::unordered_set<GCObject *> visited{ garbage.size() };
-        for(const auto &g : garbage)
-            destroyCycle(g, visited);
-
-        for(const auto &o : _candidates)
-            o->_inGCList = false;
 
         _candidates.clear();
     }
 
-    void GC::destroyCycle(GCObject *root, std::unordered_set<GCObject *> &visited) {
-        if(!root)
-            return;
+    void GC::destroyCycle(GCObject* root, std::unordered_set<GCObject*>& visited) {
+        if (!root) return;
 
-        std::stack<GCObject *> stk;
+        std::stack<GCObject*> stk;
         stk.push(root);
 
-        while(!stk.empty()) {
-            GCObject *obj = stk.top();
+        // Step 1: 遍历整个循环，把循环内所有对象放入 visited
+        while (!stk.empty()) {
+            auto obj = stk.top();
             stk.pop();
 
-            if(!obj || visited.contains(obj))
-                continue;
+            if (!obj || visited.contains(obj)) continue;
             visited.insert(obj);
 
-            for(auto child : obj->_children) {
-                if(child && !visited.contains(child)) {
+            // push children
+            for (auto child : obj->_children) {
+                if (child && !visited.contains(child)) {
                     stk.push(child);
                 }
             }
+        }
 
-            // 清理 children 引用计数
-            for(const auto &child : obj->_children) {
-                if(child)
-                    child->decRef();
-            }
+        // Step 2: 销毁循环内对象
+        for (const auto &obj : visited) {
+            if (!obj) continue;
+
+            // 拷贝 children 避免 delete 后访问
+            auto children = obj->_children;
             obj->_children.clear();
+
+            // 不调用 decRef，不依赖 refCount
+            for (const auto &child : children) {
+                if (child) {
+                    // 可选：减去循环内部引用计数，但不要触发 delete
+                    if (visited.contains(child)) child->_refCount--;
+                }
+            }
 
             CLL_LOG_DEBUG("Destroying object 0x%llx", obj);
             delete obj;

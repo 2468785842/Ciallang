@@ -35,11 +35,8 @@ TEST_CASE("test garbage collect") {
 
     // A -> B, B -> A
     a->addChild(b);
-    a->incRef();
 
     b->addChild(a);
-    b->incRef();
-
     GC::instance().track(a);
     GC::instance().track(b);
 
