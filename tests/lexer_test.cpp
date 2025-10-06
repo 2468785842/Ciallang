@@ -34,11 +34,11 @@ TEST_CASE("test lexer") {
         if(token->value() != nullptr) {
             if(token->value()->type() != Ciallang::TjsValueType::Octet) {
                 if(token->value()->type() == Ciallang::TjsValueType::Integer) {
-                    std::cout << std::dec << token->value()->asInteger();
+                    std::cout << std::dec << token->value()->toInteger();
                 } else if(token->value()->type() == Ciallang::TjsValueType::Real) {
-                    std::cout << std::dec << token->value()->asReal();
+                    std::cout << std::dec << token->value()->toReal();
                 } else if(token->value()->type() == Ciallang::TjsValueType::String)
-                    std::cout << "\"" << token->value()->asString() << "\"";
+                    std::cout << "\"" << token->value()->toString() << "\"";
             }
         }
         if(token->type() == Ciallang::Syntax::TokenType::Invalid) {

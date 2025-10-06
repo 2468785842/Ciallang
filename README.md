@@ -75,12 +75,18 @@ CompileFlags:
 ### 贡献
 
 - 欢迎任何形式的贡献！如果你对这个项目感兴趣，请提交 PR 或者报告问题。
-- clang-format格式化:
-    ```powershell
-        Get-ChildItem -Path ./src, ./tests -Recurse -File |  
-        Where-Object { $_.Name -match '\.(cpp|cc|h|hpp|inc)$' } | 
-        ForEach-Object { clang-format -i --verbose $_.FullName }
-    ```
+  - clang-format格式化:
+    - windows
+        ```powershell
+            Get-ChildItem -Path ./src, ./tests -Recurse -File |  
+            Where-Object { $_.Name -match '\.(cpp|cc|h|hpp|inc)$' } | 
+            ForEach-Object { clang-format -i --verbose $_.FullName }
+        ```
+    - macos
+        ```bash
+            find ./src ./tests \( -name "*.cpp" -o -name "*.cc" -o -name "*.h" -o -name "*.hpp" -o -name "*.inc" \) \
+            -type f -print0 | xargs -0 clang-format -i --verbose
+        ```
 ---
 
 **许可证**  

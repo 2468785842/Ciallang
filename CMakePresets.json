@@ -20,7 +20,6 @@
       "generator": "Ninja",
       "hidden": true,
       "cacheVariables": {
-        "CMAKE_MAKE_PROGRAM": "/usr/bin/ninja",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++"
       },
@@ -47,12 +46,42 @@
       }
     },
     {
+      "name": "MacOS Config",
+      "inherits": "default",
+      "generator": "Ninja",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "MacOS Debug",
+      "inherits": "MacOS Config",
+      "binaryDir": "${sourceDir}/build/MacOS/Debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "MacOS Release",
+      "inherits": "MacOS Config",
+      "binaryDir": "${sourceDir}/build/MacOS/Release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
       "name": "Windows Config",
       "generator": "Ninja",
       "inherits": "default",
       "hidden": true,
       "cacheVariables": {
-        "CMAKE_MAKE_PROGRAM": "ninja",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++"
       },

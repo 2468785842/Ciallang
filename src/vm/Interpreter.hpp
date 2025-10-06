@@ -67,6 +67,7 @@ namespace Ciallang::Bytecode {
             ++_logicRegistersSize;
         }
 
+        [[nodiscard]] TjsValue reg(Register reg);
         [[nodiscard]] const TjsValue &reg(Register reg) const;
 
         [[nodiscard]] const TjsValue &global(const std::string &identifier) const { return _globals.at(identifier); }
@@ -127,7 +128,7 @@ namespace Ciallang::Bytecode {
                 ss << fmt::format("{: <6}: {}\n", Label{ pc }, instruction->dump(*this, false));
 
                 if(const auto loadIns = dynamic_cast<Op::Load *>(instruction); loadIns && loadIns->value().isObject()) {
-                    if(auto fun = dynamic_cast<TjsFunction *>(loadIns->value().asObject())) {
+                    if(auto fun = dynamic_cast<TjsFunction *>(loadIns->value().toObject())) {
                         functions.push_back(fun);
                     }
                 }

@@ -72,7 +72,7 @@ namespace Ciallang {
             increaseIndent();
             for(auto &[token, exprNode] : node->parameters) {
                 CLL_ASSERT(token.value()->isString(), "FunctionDeclNode val is not string");
-                printNode(*token.value()->asString(), exprNode);
+                printNode(*token.value()->toString(), exprNode);
             }
             decreaseIndent();
 

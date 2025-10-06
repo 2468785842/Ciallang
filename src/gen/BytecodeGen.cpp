@@ -25,7 +25,9 @@ namespace Ciallang::Inter {
     std::unique_ptr<Bytecode::Chunk> BytecodeGen::parseAst(Common::Result &r, const Syntax::AstNode *node) {
         _r = r;
         node->generateBytecode(this);
-        if(_r.isFailed()) { return nullptr; }
+        if(_r.isFailed()) {
+            return nullptr;
+        }
         auto chunk = std::move(_chunk);
         _chunk = std::make_unique<Bytecode::Chunk>();
         return chunk;
@@ -139,7 +141,7 @@ namespace Ciallang::Inter {
 
         CLL_ASSERT(identifier->isString(), "identifier is not string");
 
-        auto variable = resolveLocalVariable(*identifier->asString());
+        auto variable = resolveLocalVariable(*identifier->toString());
 
         if(variable.has_value()) {
             auto src = node->rhs->generateBytecode(this);
@@ -161,7 +163,7 @@ namespace Ciallang::Inter {
         auto src = node->rhs->generateBytecode(this);
         CLL_ASSERT(src.has_value(), "global src is not have val");
 
-        _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->asString()), src.value());
+        _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->toString()), src.value());
 
         if(_r.isFailed())
             return {};
@@ -177,7 +179,7 @@ namespace Ciallang::Inter {
         if(_scopeDepth == 1) {
             // can't init
             if(!node->rhs) {
-                _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->asString()), getEmpty(*_chunk));
+                _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->toString()), getEmpty(*_chunk));
                 return {};
             }
 
@@ -186,11 +188,11 @@ namespace Ciallang::Inter {
             if(_r.isFailed())
                 return {};
 
-            _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->asString()), src.value());
+            _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->toString()), src.value());
             return {};
         }
 
-        auto variable = resolveLocalVariable(*identifier->asString());
+        auto variable = resolveLocalVariable(*identifier->toString());
 
         // already have this variable, in same scope
         if(variable.has_value()) {
@@ -225,7 +227,7 @@ namespace Ciallang::Inter {
             dst = getEmpty(*_chunk);
         }
 
-        _variables.emplace_back(std::move(*identifier->asString()), dst.value(), _scopeDepth, !!node->rhs);
+        _variables.emplace_back(std::move(*identifier->toString()), dst.value(), _scopeDepth, !!node->rhs);
 
         return {};
     }
@@ -247,7 +249,7 @@ namespace Ciallang::Inter {
                 paramReg = gen.allocateRegister();
             }
 
-            gen.addVariable(LocalVariable{ *varName->asString(), paramReg.value(), 1, true });
+            gen.addVariable(LocalVariable{ *varName->toString(), paramReg.value(), 1, true });
         }
 
         auto funReg = allocateRegister();
@@ -262,20 +264,17 @@ namespace Ciallang::Inter {
 
         CLL_ASSERT(identifier->isString(), "identifier is not string");
 
-        _chunk->emit<Bytecode::Op::Load>(funReg,
-            TjsValue{
-                new TjsFunction{
-                    funChunk.release(), *identifier->asString(), node->parameters.size() }
-            }
-        );
+        _chunk->emit<Bytecode::Op::Load>(
+            funReg,
+            TjsValue{ new TjsFunction{ funChunk.release(), *identifier->toString(), node->parameters.size() } });
 
         if(_scopeDepth == 1) {
             freeRegister(funReg);
-            _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->asString()), funReg);
+            _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->toString()), funReg);
             return {};
         }
 
-        _variables.push_back(LocalVariable{ *identifier->asString(), funReg, _scopeDepth, true });
+        _variables.push_back(LocalVariable{ *identifier->toString(), funReg, _scopeDepth, true });
 
         return {};
     }
@@ -286,7 +285,7 @@ namespace Ciallang::Inter {
 
         CLL_ASSERT(identifier->isString(), "identifier is not string");
 
-        auto variable = resolveLocalVariable(*identifier->asString());
+        auto variable = resolveLocalVariable(*identifier->toString());
 
         if(variable.has_value()) {
             if(!variable.value()->init) {
@@ -297,7 +296,7 @@ namespace Ciallang::Inter {
         }
 
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::GGlobal>(std::move(*identifier->asString()), dst);
+        _chunk->emit<Bytecode::Op::GGlobal>(std::move(*identifier->toString()), dst);
         if(_r.isFailed())
             return {};
 
@@ -385,7 +384,7 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<LocalVariable *> BytecodeGen::resolveLocalVariable(const std::string &identifier) {
+    std::optional<LocalVariable *> BytecodeGen::resolveLocalVariable(const TjsString &identifier) {
         for(auto &variable : _variables) {
             if(variable.identifier == identifier && variable.scopeDepth <= _scopeDepth) {
                 return &variable;

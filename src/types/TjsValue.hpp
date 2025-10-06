@@ -27,7 +27,7 @@ namespace Ciallang {
 
         explicit TjsValue(const TjsReal &value);
 
-        explicit TjsValue(const std::string &);
+        explicit TjsValue(const TjsString &value);
 
         explicit TjsValue(const TjsOctet &);
 
@@ -51,15 +51,15 @@ namespace Ciallang {
 
         constexpr void type(const TjsValueType type) noexcept { _type = type; }
 
-        [[nodiscard]] TjsInteger asInteger() const;
+        [[nodiscard]] TjsInteger toInteger() const;
 
-        [[nodiscard]] TjsReal asReal() const;
+        [[nodiscard]] TjsReal toReal() const;
 
-        [[nodiscard]] std::string *asString() const;
+        [[nodiscard]] TjsString *toString() const;
 
-        [[nodiscard]] TjsOctet *asOctet() const;
+        [[nodiscard]] TjsOctet *toOctet() const;
 
-        [[nodiscard]] TjsObject *asObject() const;
+        [[nodiscard]] TjsObject *toObject() const;
 
         [[nodiscard]] bool isVoid() const { return _type == TjsValueType::Void; }
 
@@ -73,7 +73,7 @@ namespace Ciallang {
 
         [[nodiscard]] bool isObject() const { return _type == TjsValueType::Object; }
 
-        [[nodiscard]] bool asBool() const;
+        [[nodiscard]] bool toBool() const;
 
         [[nodiscard]] const char *name() const;
 
@@ -95,7 +95,7 @@ namespace Ciallang {
         union {
             TjsInteger _integer;
             TjsReal _real;
-            std::string *_string;
+            TjsString *_string;
             TjsOctet *_octet;
             TjsObject *_object;
         } _value{};

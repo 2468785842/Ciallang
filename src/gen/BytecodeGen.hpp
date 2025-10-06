@@ -17,6 +17,7 @@
 #include "ast/Ast.hpp"
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
+#include "types/TjsString.hpp"
 #include "vm/Chunk.hpp"
 #include "vm/Label.hpp"
 #include "vm/Register.hpp"
@@ -99,23 +100,20 @@ namespace Ciallang::Inter {
             return reg;
         }
 
-        void freeRegister(const Bytecode::Register reg) {
-            _freeRegisters.push_back(reg);
-        }
+        void freeRegister(const Bytecode::Register reg) { _freeRegisters.push_back(reg); }
 
         Bytecode::Label makeLabel() const { return Bytecode::Label{ _chunk->instructions().size() }; }
 
         void beginScope() { _scopeDepth++; }
 
         void endScope() {
-            const auto new_end =
-                std::ranges::remove_if(_variables, [&](const LocalVariable &variable) {
-                   if(variable.scopeDepth == _scopeDepth) {
-                       freeRegister(variable.reg);
-                       return true;
-                   }
-                   return false;
-               }).begin();
+            const auto new_end = std::ranges::remove_if(_variables, [&](const LocalVariable &variable) {
+                                     if(variable.scopeDepth == _scopeDepth) {
+                                         freeRegister(variable.reg);
+                                         return true;
+                                     }
+                                     return false;
+                                 }).begin();
 
             _variables.erase(new_end, _variables.end());
             _scopeDepth--;
@@ -129,6 +127,6 @@ namespace Ciallang::Inter {
             return _empty.value();
         }
 
-        std::optional<LocalVariable *> resolveLocalVariable(const std::string &identifier);
+        std::optional<LocalVariable *> resolveLocalVariable(const TjsString &identifier);
     };
 } // namespace Ciallang::Inter

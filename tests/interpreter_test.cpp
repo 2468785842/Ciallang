@@ -20,8 +20,26 @@
 #include "common/SourceFile.hpp"
 #include "gen/BytecodeGen.hpp"
 #include "parser/Parser.hpp"
+#include "standard/Print.hpp"
 #include "test_config.h"
-#include "standard/print.hpp"
+
+TEST_CASE("Print \"Hello World!\"") {
+    Ciallang::Common::Result r{};
+
+    Ciallang::Common::SourceFile sourceFile{};
+    sourceFile.load(r, "println(\"Hello World!\");");
+    Ciallang::Syntax::AstBuilder astBuilder{};
+    Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
+    auto *globalNode = parser.parse(r);
+
+    Ciallang::Inter::BytecodeGen codeGen{ sourceFile };
+    auto chunk = codeGen.parseAst(r, globalNode);
+
+    Ciallang::Bytecode::Interpreter interpreter{};
+    interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
+
+    interpreter.run(chunk.get());
+}
 
 TEST_CASE("Interpreter Test Execute") {
     Ciallang::Common::Result r{};
@@ -55,7 +73,7 @@ TEST_CASE("Script execution benchmark") {
                 if(n < 2) return n;
                 return fib(n - 2) + fib(n - 1);
             }
-            println(fib(15));
+            fib(15);
         )");
         Ciallang::Syntax::AstBuilder astBuilder{};
         Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
@@ -65,7 +83,6 @@ TEST_CASE("Script execution benchmark") {
         auto chunk = codeGen.parseAst(r, globalNode);
 
         Ciallang::Bytecode::Interpreter interpreter{};
-        interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
 
         interpreter.run(chunk.get());
     };

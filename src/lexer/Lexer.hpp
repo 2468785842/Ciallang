@@ -21,27 +21,26 @@
 #include "common/SourceFile.hpp"
 
 namespace Ciallang::Syntax {
-    using namespace std;
 
-    static int8_t getHexNum(const char c) noexcept {
+    static std::int8_t getHexNum(const char c) noexcept {
         if(c >= 'a' && c <= 'f')
-            return static_cast<int8_t>(c - 'a' + 10);
+            return static_cast<std::int8_t>(c - 'a' + 10);
         if(c >= 'A' && c <= 'F')
-            return static_cast<int8_t>(c - 'A' + 10);
+            return static_cast<std::int8_t>(c - 'A' + 10);
         if(c >= '0' && c <= '9')
-            return static_cast<int8_t>(c - '0');
+            return static_cast<std::int8_t>(c - '0');
         return -1;
     }
 
-    static int8_t getOctNum(const char c) noexcept {
+    static std::int8_t getOctNum(const char c) noexcept {
         if(c >= '0' && c <= '7')
-            return static_cast<int8_t>(c - '0');
+            return static_cast<std::int8_t>(c - '0');
         return -1;
     }
 
-    static int8_t getBinNum(const char c) noexcept {
+    static std::int8_t getBinNum(const char c) noexcept {
         if(c == '0' || c == '1')
-            return static_cast<int8_t>(c - '0');
+            return static_cast<std::int8_t>(c - '0');
         return -1;
     }
 
@@ -171,13 +170,13 @@ namespace Ciallang::Syntax {
 
         bool templateStringConstVal(Token *&);
 
-        bool parseNonDecimalNumber(Token *&, stringstream &, int8_t (*)(char), int8_t);
+        bool parseNonDecimalNumber(Token *&, stringstream &, std::int8_t (*)(char), std::int8_t);
 
-        bool parseNonDecimalInteger(Token *&, const string &, int8_t (*)(char), int8_t);
+        bool parseNonDecimalInteger(Token *&, const string &, std::int8_t (*)(char), std::int8_t);
 
-        void parseNonDecimalReal(Token *&, const string &, int8_t (*)(char), int8_t);
+        void parseNonDecimalReal(Token *&, const string &, std::int8_t (*)(char), std::int8_t);
 
-        void extractNumber(int8_t (*)(char), const string &expMark, stringstream &, bool &);
+        void extractNumber(std::int8_t (*)(char), const string &expMark, stringstream &, bool &);
 
         bool identifier(Token *&);
 

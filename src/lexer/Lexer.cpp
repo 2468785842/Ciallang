@@ -21,10 +21,11 @@
 #include "types/TjsValue.hpp"
 
 #include "IEEETypes.hpp"
+#include "types/TjsString.hpp"
 
 using namespace Ciallang::Syntax;
 
-std::multimap<int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
+std::multimap<std::int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
     // block comment, line comment
     { '/', bind_front(&Lexer::lineComment) },
     { '/', bind_front(&Lexer::blockComment) },
@@ -690,7 +691,7 @@ bool Lexer::identifier(Token *&token) {
         return true;
     }
 
-    token = makeToken(TokenType::Identifier, TjsValue{ std::move(name) });
+    token = makeToken(TokenType::Identifier, TjsValue{ TjsString{ name } });
     return true;
 }
 
@@ -1168,7 +1169,7 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
         str << runeType.data;
     }
 
-    token = makeToken(TokenType::ConstVal, TjsValue{ std::move(str.str()) });
+    token = makeToken(TokenType::ConstVal, TjsValue{ TjsString{ str.str() } });
 
     return strPsState;
 }
@@ -1181,7 +1182,7 @@ bool Lexer::octetLiteral(Token *&token) {
     DEFER { _sourceFile.popMark(); };
     stringstream stream{ string{} };
     vector<uint8_t> buf{};
-    // parse a octet literal;
+    // parse an octet literal;
     // syntax is:
     // <% xx xx xx xx xx xx ... %>
     // where xx is hexadecimal 8bit(octet) binary representation.

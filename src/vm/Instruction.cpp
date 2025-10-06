@@ -108,7 +108,7 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void Test::execute(Interpreter &interpreter) const {
-        if(interpreter.reg(_reg).asBool()) {
+        if(interpreter.reg(_reg).toBool()) {
             interpreter.setZF(true);
         }
     }
@@ -116,8 +116,8 @@ namespace Ciallang::Bytecode::Op {
     std::string Test::dump(const Interpreter &, bool) const { return fmt::format("{: <10} {: <4}", "test", _reg); }
 
     void EQ::execute(Interpreter &interpreter) const {
-        auto &value1 = interpreter.reg(_reg1);
-        auto &value2 = interpreter.reg(_reg2);
+        const auto value1 = interpreter.reg(_reg1);
+        const auto value2 = interpreter.reg(_reg2);
         const bool result = value1 == value2;
         interpreter.reg(_dst, TjsValue{ static_cast<TjsInteger>(result) });
         interpreter.setZF(result);
@@ -128,8 +128,8 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void NEQ::execute(Interpreter &interpreter) const {
-        auto &value1 = interpreter.reg(_reg1);
-        auto &value2 = interpreter.reg(_reg2);
+        const auto value1 = interpreter.reg(_reg1);
+        const auto value2 = interpreter.reg(_reg2);
         const bool result = value1 != value2;
         interpreter.reg(_dst, TjsValue{ static_cast<TjsInteger>(result) });
         interpreter.setZF(result);
@@ -140,8 +140,8 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void LT::execute(Interpreter &interpreter) const {
-        auto &value1 = interpreter.reg(_reg1);
-        auto &value2 = interpreter.reg(_reg2);
+        const auto value1 = interpreter.reg(_reg1);
+        const auto value2 = interpreter.reg(_reg2);
         const bool result = value1 < value2;
         interpreter.reg(_dst, TjsValue{ static_cast<TjsInteger>(result) });
         interpreter.setZF(result);
@@ -158,8 +158,8 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void LE::execute(Interpreter &interpreter) const {
-        auto &value1 = interpreter.reg(_reg1);
-        auto &value2 = interpreter.reg(_reg2);
+        const auto value1 = interpreter.reg(_reg1);
+        const auto value2 = interpreter.reg(_reg2);
         const bool result = value1 <= value2;
         interpreter.reg(_dst, TjsValue{ static_cast<TjsInteger>(result) });
         interpreter.setZF(result);
@@ -170,8 +170,8 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void GT::execute(Interpreter &interpreter) const {
-        auto &value1 = interpreter.reg(_reg1);
-        auto &value2 = interpreter.reg(_reg2);
+        const auto value1 = interpreter.reg(_reg1);
+        const auto value2 = interpreter.reg(_reg2);
         const bool result = value1 > value2;
         interpreter.reg(_dst, TjsValue{ static_cast<TjsInteger>(result) });
         interpreter.setZF(result);
@@ -182,8 +182,8 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void GE::execute(Interpreter &interpreter) const {
-        auto &value1 = interpreter.reg(_reg1);
-        auto &value2 = interpreter.reg(_reg2);
+        const auto value1 = interpreter.reg(_reg1);
+        const auto value2 = interpreter.reg(_reg2);
         const bool result = value1 >= value2;
         interpreter.reg(_dst, TjsValue{ static_cast<TjsInteger>(result) });
         interpreter.setZF(result);
@@ -250,19 +250,16 @@ namespace Ciallang::Bytecode::Op {
         const auto &object = interpreter.reg(_memberReg);
         CLL_ASSERT(object.isObject(), "memberReg is not object");
 
-        if(!object.asObject()->isNative()) {
-            const auto fun = dynamic_cast<TjsFunction *>(object.asObject());
+        if(!object.toObject()->isNative()) {
+            const auto fun = dynamic_cast<TjsFunction *>(object.toObject());
             if(!fun) {
                 throw std::runtime_error{ "unsupported function type(not function type)" };
             }
             auto callFrame = interpreter.createCallFrame(fun->chunk(), _dst);
 
-            for(uint32_t i = 0; i < _arguments.size(); i++) {
+            for(std::uint32_t i = 0; i < _arguments.size(); i++) {
                 // copy
-                auto value = interpreter.reg(_arguments[i]);
-
-                if(value.isVoid())
-                    continue;
+                const auto value = interpreter.reg(_arguments[i]);
 
                 interpreter.applyArgument(callFrame, Register{ i }, value);
             }
@@ -270,7 +267,12 @@ namespace Ciallang::Bytecode::Op {
             interpreter.pushCallFrame(std::move(callFrame));
             return;
         }
-        auto value = dynamic_cast<TjsNativeFunction *>(object.asObject())->callProc(&interpreter.reg(_arguments.front()));
+
+        const auto values = std::make_unique<TjsValue[]>(_arguments.size());
+        for(std::uint32_t i = 0; i < _arguments.size(); i++) {
+            values[i] = interpreter.reg(_arguments[i]);
+        }
+        auto value = dynamic_cast<TjsNativeFunction *>(object.toObject())->callProc(values.get());
         interpreter.reg(_dst, std::move(value));
     }
 

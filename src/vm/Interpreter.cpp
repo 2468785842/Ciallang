@@ -39,7 +39,7 @@ namespace Ciallang::Bytecode {
         }
     }
 
-    const TjsValue &Interpreter::reg(const Register reg) const {
+    TjsValue Interpreter::reg(const Register reg) {
         const auto index = reg.index() + _currentFrame->registersOffset;
 
         CLL_ASSERT(index < _registers.size(), "index > _registers.size");
@@ -47,4 +47,11 @@ namespace Ciallang::Bytecode {
         return _registers[index];
     }
 
+    const TjsValue &Interpreter::reg(const Register reg) const {
+        const auto index = reg.index() + _currentFrame->registersOffset;
+
+        CLL_ASSERT(index < _registers.size(), "index > _registers.size");
+
+        return _registers[index];
+    }
 } // namespace Ciallang::Bytecode

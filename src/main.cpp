@@ -17,7 +17,7 @@
 #include "common/SourceFile.hpp"
 #include "gen/BytecodeGen.hpp"
 #include "parser/Parser.hpp"
-#include "standard/print.hpp"
+#include "standard/Print.hpp"
 #include "vm/Interpreter.hpp"
 
 int main(int argc, char **argv) {

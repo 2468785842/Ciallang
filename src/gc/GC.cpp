@@ -49,10 +49,10 @@ namespace Ciallang {
     }
 
     void GC::collect() {
-        std::unordered_set<GCObject*> visited;
+        std::unordered_set<GCObject *> visited;
 
-        for (auto obj : _candidates) {
-            if (obj && !visited.contains(obj)) {
+        for(auto obj : _candidates) {
+            if(obj && !visited.contains(obj)) {
                 destroyCycle(obj, visited);
             }
         }
@@ -60,41 +60,45 @@ namespace Ciallang {
         _candidates.clear();
     }
 
-    void GC::destroyCycle(GCObject* root, std::unordered_set<GCObject*>& visited) {
-        if (!root) return;
+    void GC::destroyCycle(GCObject *root, std::unordered_set<GCObject *> &visited) {
+        if(!root)
+            return;
 
-        std::stack<GCObject*> stk;
+        std::stack<GCObject *> stk;
         stk.push(root);
 
         // Step 1: 遍历整个循环，把循环内所有对象放入 visited
-        while (!stk.empty()) {
+        while(!stk.empty()) {
             auto obj = stk.top();
             stk.pop();
 
-            if (!obj || visited.contains(obj)) continue;
+            if(!obj || visited.contains(obj))
+                continue;
             visited.insert(obj);
 
             // push children
-            for (auto child : obj->_children) {
-                if (child && !visited.contains(child)) {
+            for(auto child : obj->_children) {
+                if(child && !visited.contains(child)) {
                     stk.push(child);
                 }
             }
         }
 
         // Step 2: 销毁循环内对象
-        for (const auto &obj : visited) {
-            if (!obj) continue;
+        for(const auto &obj : visited) {
+            if(!obj)
+                continue;
 
             // 拷贝 children 避免 delete 后访问
             auto children = obj->_children;
             obj->_children.clear();
 
             // 不调用 decRef，不依赖 refCount
-            for (const auto &child : children) {
-                if (child) {
+            for(const auto &child : children) {
+                if(child) {
                     // 可选：减去循环内部引用计数，但不要触发 delete
-                    if (visited.contains(child)) child->_refCount--;
+                    if(visited.contains(child))
+                        child->_refCount--;
                 }
             }
 

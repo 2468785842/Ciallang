@@ -59,11 +59,11 @@ set(SOURCE_FILES
         src/vm/Register.hpp
         src/vm/Label.hpp
 
-        src/types/TjsNativeFunction.cpp
         src/types/TjsFunction.cpp
         src/types/TjsOctet.cpp
         src/types/TjsObject.cpp
         src/types/TjsValue.cpp
+        src/types/TjsString.cpp
         src/types/TjsTypes.hpp
 
         src/standard/debug.cpp
