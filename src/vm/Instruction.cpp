@@ -81,11 +81,12 @@ namespace Ciallang::Bytecode::Op {
 
     void DGlobal::execute(Interpreter &interpreter) const {
         const auto &value = interpreter.reg(_src);
-        interpreter.global(_identifier, TjsValue{ value });
+        interpreter.global(_symbolIndex, TjsValue{ value });
     }
 
     std::string DGlobal::dump(const Interpreter &interpreter, const bool info) const {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "dglobal", _src, "\"" + _identifier + "\"");
+        const auto &symbol = fmt::format("\"{}\"", interpreter.getSymbol(_symbolIndex));
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "dglobal", _src, symbol);
 
         if(!info)
             return insDump;
@@ -94,17 +95,18 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void GGlobal::execute(Interpreter &interpreter) const {
-        auto &value = interpreter.global(_identifier);
+        auto &value = interpreter.global(_symbolIndex);
         interpreter.reg(_dst, value);
     }
 
     std::string GGlobal::dump(const Interpreter &interpreter, const bool info) const {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gglobal", "\"" + _identifier + "\"", _dst);
+        const auto &symbol = fmt::format("\"{}\"", interpreter.getSymbol(_symbolIndex));
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gglobal", symbol, _dst);
 
         if(!info)
             return insDump;
 
-        return fmt::format("{: <30} ; {} = {}", insDump, "\"" + _identifier + "\"", interpreter.global(_identifier));
+        return fmt::format("{: <30} ; {} = {}", insDump, symbol, interpreter.global(_symbolIndex));
     }
 
     void Test::execute(Interpreter &interpreter) const {
@@ -255,13 +257,11 @@ namespace Ciallang::Bytecode::Op {
             if(!fun) {
                 throw std::runtime_error{ "unsupported function type(not function type)" };
             }
-            auto callFrame = interpreter.createCallFrame(fun->chunk(), _dst);
+            CallFrame callFrame = interpreter.createCallFrame(fun->chunk(), _dst);
 
             for(std::uint32_t i = 0; i < _arguments.size(); i++) {
                 // copy
-                const auto value = interpreter.reg(_arguments[i]);
-
-                interpreter.applyArgument(callFrame, Register{ i }, value);
+                callFrame.getReg(i) = interpreter.reg(_arguments[i]);
             }
 
             interpreter.pushCallFrame(std::move(callFrame));

@@ -48,7 +48,7 @@ set(SOURCE_FILES
         src/ast/DeclNode.hpp
         src/ast/AstFormatter.hpp
 
-        src/gen/BytecodeGen.cpp
+        src/gen/BytecodeGenerator.cpp
 
 
         # ############################################
@@ -66,11 +66,9 @@ set(SOURCE_FILES
         src/types/TjsString.cpp
         src/types/TjsTypes.hpp
 
-        src/standard/debug.cpp
+        src/standard/Debug.cpp
 
         src/gc/GC.cpp
-
-        src/collections/ConservativeVector.hpp
 
         src/logging/Logger.cpp
 )

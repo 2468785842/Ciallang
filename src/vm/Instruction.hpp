@@ -124,8 +124,7 @@ namespace Ciallang::Bytecode::Op {
 
     class DGlobal final : public Instruction {
     public:
-        explicit DGlobal(std::string &&identifier, const Register src) :
-            _src(src), _identifier(std::move(identifier)) {}
+        explicit DGlobal(const size_t symbolIndex, const Register src) : _src(src), _symbolIndex(symbolIndex) {}
 
         void execute(Interpreter &) const override;
 
@@ -133,20 +132,20 @@ namespace Ciallang::Bytecode::Op {
 
     private:
         const Register _src;
-        const std::string _identifier;
+        const size_t _symbolIndex;
     };
 
     class GGlobal final : public Instruction {
     public:
-        explicit GGlobal(std::string &&identifier, const Register dst) : _identifier(identifier), _dst(dst) {}
+        explicit GGlobal(const size_t symbolIndex, const Register dst) : _dst(dst), _symbolIndex(symbolIndex) {}
 
         void execute(Interpreter &) const override;
 
         [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
 
     private:
-        const std::string _identifier;
         const Register _dst;
+        const size_t _symbolIndex;
     };
 
     class Test final : public Instruction {

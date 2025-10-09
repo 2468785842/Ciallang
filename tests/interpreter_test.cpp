@@ -18,7 +18,7 @@
 
 #include "ast/AstFormatter.hpp"
 #include "common/SourceFile.hpp"
-#include "gen/BytecodeGen.hpp"
+#include "gen/BytecodeGenerator.hpp"
 #include "parser/Parser.hpp"
 #include "standard/Print.hpp"
 #include "test_config.h"
@@ -32,10 +32,12 @@ TEST_CASE("Print \"Hello World!\"") {
     Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
     auto *globalNode = parser.parse(r);
 
-    Ciallang::Inter::BytecodeGen codeGen{ sourceFile };
+    Ciallang::Inter::SymbolTable globalTable{};
+    Ciallang::Inter::BytecodeGenerator codeGen{ sourceFile, globalTable };
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Ciallang::Bytecode::Interpreter interpreter{};
+    Ciallang::Bytecode::Interpreter interpreter{ globalTable };
+
     interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
 
     interpreter.run(chunk.get());
@@ -53,10 +55,11 @@ TEST_CASE("Interpreter Test Execute") {
     Ciallang::AstFormatter formatter{};
     formatter.formatAst(globalNode);
 
-    Ciallang::Inter::BytecodeGen codeGen{ sourceFile };
+    Ciallang::Inter::SymbolTable globalTable{};
+    Ciallang::Inter::BytecodeGenerator codeGen{ sourceFile, globalTable };
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Ciallang::Bytecode::Interpreter interpreter{};
+    Ciallang::Bytecode::Interpreter interpreter{ globalTable };
 
     fmt::println("{}", interpreter.dumpInstruction(*chunk));
     interpreter.run(chunk.get());
@@ -79,10 +82,11 @@ TEST_CASE("Script execution benchmark") {
         Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
         auto *globalNode = parser.parse(r);
 
-        Ciallang::Inter::BytecodeGen codeGen{ sourceFile };
+        Ciallang::Inter::SymbolTable globalTable{};
+        Ciallang::Inter::BytecodeGenerator codeGen{ sourceFile, globalTable };
         auto chunk = codeGen.parseAst(r, globalNode);
 
-        Ciallang::Bytecode::Interpreter interpreter{};
+        Ciallang::Bytecode::Interpreter interpreter{ globalTable };
 
         interpreter.run(chunk.get());
     };

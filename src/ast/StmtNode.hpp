@@ -14,7 +14,7 @@
 
 #include "AstNode.hpp"
 
-#include "gen/BytecodeGen.hpp"
+#include "gen/BytecodeGenerator.hpp"
 
 namespace Ciallang::Syntax {
     class StmtNode : public AstNode {
@@ -30,7 +30,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *gen) const override {
             return gen->generate(this);
         }
     };
@@ -45,7 +45,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *gen) const override {
             return gen->generate(this);
         }
     };
@@ -63,7 +63,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *gen) const override {
             return gen->generate(this);
         }
     };
@@ -80,7 +80,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *gen) const override {
             return gen->generate(this);
         }
     };
@@ -91,7 +91,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *gen) const override {
             return gen->generate(this);
         }
     };
@@ -102,7 +102,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *gen) const override {
             return gen->generate(this);
         }
     };
@@ -115,7 +115,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *gen) const override {
             return gen->generate(this);
         }
     };

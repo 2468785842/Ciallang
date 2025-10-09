@@ -10,7 +10,7 @@
 //                                                            \_/__/
 //
 
-#include "BytecodeGen.hpp"
+#include "BytecodeGenerator.hpp"
 
 #include "ast/DeclNode.hpp"
 #include "ast/ExprNode.hpp"
@@ -22,7 +22,7 @@
 
 namespace Ciallang::Inter {
 
-    std::unique_ptr<Bytecode::Chunk> BytecodeGen::parseAst(Common::Result &r, const Syntax::AstNode *node) {
+    std::unique_ptr<Bytecode::Chunk> BytecodeGenerator::parseAst(const Common::Result &r, const Syntax::AstNode *node) {
         _r = r;
         node->generateBytecode(this);
         if(_r.isFailed()) {
@@ -33,11 +33,11 @@ namespace Ciallang::Inter {
         return chunk;
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::ExprStmtNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::ExprStmtNode *node) {
         return node->expression->generateBytecode(this);
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::ValueExprNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::ValueExprNode *node) {
         auto dst = allocateRegister();
         _chunk->emit<Bytecode::Op::Load>(dst, std::move(*node->token->value()));
 
@@ -46,7 +46,7 @@ namespace Ciallang::Inter {
         return dst;
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::BinaryExprNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::BinaryExprNode *node) {
         using enum Syntax::TokenType;
         auto reg1 = node->lhs->generateBytecode(this);
         auto reg2 = node->rhs->generateBytecode(this);
@@ -100,9 +100,9 @@ namespace Ciallang::Inter {
         return dst;
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::UnaryExprNode *node) { return {}; }
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::UnaryExprNode *node) { return {}; }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::ProcCallExprNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::ProcCallExprNode *node) {
         auto *member = node->memberAccess;
         auto dst = allocateRegister();
 
@@ -135,7 +135,7 @@ namespace Ciallang::Inter {
     }
 
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::AssignExprNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::AssignExprNode *node) {
         // TODO: member access
         const auto identifier = node->lhs->token->value();
 
@@ -163,14 +163,14 @@ namespace Ciallang::Inter {
         auto src = node->rhs->generateBytecode(this);
         CLL_ASSERT(src.has_value(), "global src is not have val");
 
-        _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->toString()), src.value());
+        _chunk->emit<Bytecode::Op::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), src.value());
 
         if(_r.isFailed())
             return {};
         return src;
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::VarDeclNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::VarDeclNode *node) {
         const auto identifier = node->token->value();
 
         CLL_ASSERT(identifier->isString(), "identifier is not string");
@@ -179,7 +179,8 @@ namespace Ciallang::Inter {
         if(_scopeDepth == 1) {
             // can't init
             if(!node->rhs) {
-                _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->toString()), getEmpty(*_chunk));
+                _chunk->emit<Bytecode::Op::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()),
+                                                    getEmpty(*_chunk));
                 return {};
             }
 
@@ -188,7 +189,7 @@ namespace Ciallang::Inter {
             if(_r.isFailed())
                 return {};
 
-            _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->toString()), src.value());
+            _chunk->emit<Bytecode::Op::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), src.value());
             return {};
         }
 
@@ -232,8 +233,8 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::FunctionDeclNode *node) {
-        auto gen = BytecodeGen{ _sourceFile };
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::FunctionDeclNode *node) {
+        auto gen = BytecodeGenerator{ _sourceFile, _symbolTable };
 
         for(auto &[token, exprNode] : node->parameters) {
             const auto varName = token.value();
@@ -270,7 +271,7 @@ namespace Ciallang::Inter {
 
         if(_scopeDepth == 1) {
             freeRegister(funReg);
-            _chunk->emit<Bytecode::Op::DGlobal>(std::move(*identifier->toString()), funReg);
+            _chunk->emit<Bytecode::Op::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), funReg);
             return {};
         }
 
@@ -280,7 +281,7 @@ namespace Ciallang::Inter {
     }
 
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::IdentifierExprNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::IdentifierExprNode *node) {
         const auto identifier = node->token->value();
 
         CLL_ASSERT(identifier->isString(), "identifier is not string");
@@ -296,18 +297,18 @@ namespace Ciallang::Inter {
         }
 
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::GGlobal>(std::move(*identifier->toString()), dst);
+        _chunk->emit<Bytecode::Op::GGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), dst);
         if(_r.isFailed())
             return {};
 
         return dst;
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::StmtDeclNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::StmtDeclNode *node) {
         return node->statement->generateBytecode(this);
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::BlockStmtNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::BlockStmtNode *node) {
         beginScope();
         for(const auto children : node->childrens) {
             children->generateBytecode(this);
@@ -319,7 +320,7 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::IfStmtNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::IfStmtNode *node) {
         auto testReg = node->test->generateBytecode(this);
         if(_r.isFailed())
             return {};
@@ -348,7 +349,7 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::WhileStmtNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::WhileStmtNode *node) {
         const auto loopLabel = makeLabel();
         auto testReg = node->test->generateBytecode(this);
         if(_r.isFailed())
@@ -369,11 +370,11 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::BreakStmtNode *node) { return {}; }
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::BreakStmtNode *node) { return {}; }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::ContinueStmtNode *node) { return {}; }
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::ContinueStmtNode *node) { return {}; }
 
-    std::optional<Bytecode::Register> BytecodeGen::generate(const Syntax::ReturnStmtNode *node) {
+    std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::ReturnStmtNode *node) {
         if(node->expr) {
             auto reg = node->expr->generateBytecode(this);
             CLL_ASSERT(reg.has_value(), "reg is not have val");
@@ -384,7 +385,7 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<LocalVariable *> BytecodeGen::resolveLocalVariable(const TjsString &identifier) {
+    std::optional<LocalVariable *> BytecodeGenerator::resolveLocalVariable(const TjsString &identifier) {
         for(auto &variable : _variables) {
             if(variable.identifier == identifier && variable.scopeDepth <= _scopeDepth) {
                 return &variable;

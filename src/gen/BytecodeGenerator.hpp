@@ -30,11 +30,48 @@ namespace Ciallang::Inter {
         bool init;
     };
 
-    class BytecodeGen {
+    class SymbolTable {
     public:
-        explicit BytecodeGen(Common::SourceFile &sourceFile) : _sourceFile(sourceFile) {}
+        [[nodiscard]] std::optional<size_t> getSymbolIndex(const std::string &identifier) const {
+            const auto symbol = _table.find(identifier);
+            if(symbol == _table.end()) {
+                return {};
+            }
+            return symbol->second;
+        }
 
-        std::unique_ptr<Bytecode::Chunk> parseAst(Common::Result &r, const Syntax::AstNode *node);
+        size_t addSymbol(const std::string &identifier) {
+            _table[identifier] = _symbolNextIndex++;
+            return _symbolNextIndex - 1;
+        }
+
+        size_t getOrAddSymbol(const std::string &identifier) {
+            if(const auto s = getSymbolIndex(identifier)) {
+                return *s;
+            }
+            return addSymbol(identifier);
+        }
+
+        [[nodiscard]] const char *getSymbol(const size_t index) const {
+            for(const auto &[k, v] : _table) {
+                if(v == index) {
+                    return k.c_str();
+                }
+            }
+            return "";
+        }
+
+    private:
+        std::unordered_map<std::string, size_t> _table{};
+        std::uint32_t _symbolNextIndex{ 0 };
+    };
+
+    class BytecodeGenerator {
+    public:
+        explicit BytecodeGenerator(Common::SourceFile &sourceFile, SymbolTable &symbolTable) :
+            _sourceFile(sourceFile), _symbolTable(symbolTable) {}
+
+        std::unique_ptr<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node);
 
         void error(Common::Result &r, const std::string &message, const Common::SourceLocation &location) const {
             _sourceFile.error(r, message, location);
@@ -84,10 +121,12 @@ namespace Ciallang::Inter {
 
         std::vector<LocalVariable> _variables{};
 
-        std::vector<Bytecode::Register> _freeRegisters{};
-        std::uint32_t _nextIndex{ 0 };
-
         std::optional<Bytecode::Register> _empty{};
+
+        std::vector<Bytecode::Register> _freeRegisters{};
+        std::uint32_t _regNextIndex{ 0 };
+
+        SymbolTable &_symbolTable;
 
         Bytecode::Register allocateRegister() {
             if(!_freeRegisters.empty()) {
@@ -95,8 +134,8 @@ namespace Ciallang::Inter {
                 _freeRegisters.pop_back();
                 return reg;
             }
-            const Bytecode::Register reg{ _nextIndex++ };
-            _chunk->setRegisterCount(std::max(_chunk->getRegisterCount(), _nextIndex));
+            const Bytecode::Register reg{ _regNextIndex++ };
+            _chunk->setRegisterCount(std::max(_chunk->getRegisterCount(), _regNextIndex));
             return reg;
         }
 

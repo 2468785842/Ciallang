@@ -18,6 +18,7 @@
 namespace Ciallang::Bytecode {
     class [[nodiscard]] Register {
     public:
+        explicit Register() : _index(0) {}
         explicit Register(const std::uint32_t index) : _index(index) {}
 
         [[nodiscard]] std::uint32_t index() const noexcept { return _index; }

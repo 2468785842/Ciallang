@@ -16,7 +16,8 @@
 #include "pch.h"
 
 #include "Chunk.hpp"
-#include "collections/ConservativeVector.hpp"
+#include "gen/BytecodeGenerator.hpp"
+#include "logging/Logger.hpp"
 #include "types/TjsFunction.hpp"
 
 #include "types/TjsValue.hpp"
@@ -24,18 +25,95 @@
 #include "vm/Register.hpp"
 
 namespace Ciallang::Bytecode {
-    // 每个 CallFrame 都有自己的一组 registers vector 太影响性能, 改为共享容器加偏移量.
+
+    class FastRegisterPool {
+    public:
+        explicit FastRegisterPool(const size_t initialCap = 1 << 16) {
+            storage.reserve(initialCap);
+            storage.resize(0);
+            sp = 0;
+        }
+
+        // 预分配整个栈容量（避免重分配）
+        void reserve(const size_t total) {
+            if(total > storage.capacity()) {
+                storage.reserve(total);
+            }
+        }
+
+        // 分配一个连续的寄存器块，返回指针基址（TjsValue*）
+        // 使用方式：TjsValue* base = stack.allocFrame(n); base[i] ...
+        TjsValue *allocFrame(const size_t n) {
+            const size_t base = sp;
+            ensureCapacity(sp + n);
+            sp += n;
+            // 返回内部数组的裸指针：极快的访问
+            return storage.data() + base;
+        }
+
+        // 释放最近分配的帧（必须和 allocFrame 按栈顺序配对）
+        void freeFrame(const size_t n) {
+            assert(sp >= n);
+            sp -= n;
+        }
+
+        // peek base pointer to stack top - useful for debugging
+        TjsValue *topPtr() noexcept { return storage.data() + sp; }
+
+        [[nodiscard]] size_t used() const noexcept { return sp; }
+        [[nodiscard]] size_t capacity() const noexcept { return storage.capacity(); }
+
+    private:
+        std::vector<TjsValue> storage;
+        size_t sp; // stack pointer (next free slot index)
+
+        void ensureCapacity(const size_t need) {
+            if(need <= storage.size()) {
+                // 已有构造对象覆盖（最常见）
+                return;
+            }
+
+            if(need <= storage.capacity()) {
+                // 有容量但 size() 小：只增加 size（构造需要的对象）
+                storage.resize(need);
+                return;
+            }
+
+            // 容量不够：按指数增长（2x），避免频繁扩容
+            size_t curCap = storage.capacity();
+            if(curCap == 0)
+                curCap = 1;
+            size_t newCap = curCap;
+            // 倍增直到满足 need（防止溢出）
+            while(newCap < need) {
+                newCap = newCap >= size_t{ 1 } << 62 ? need : newCap * 2;
+                if(newCap < curCap) {
+                    newCap = need;
+                    break;
+                } // 防溢出保底
+            }
+
+            // 一次性 reserve 到 newCap，然后 resize 到 need（构造对象）
+            storage.reserve(newCap);
+            storage.resize(need);
+        }
+    };
+
     struct CallFrame {
-        const Chunk *chunk;
-        uint32_t registersOffset;
+        const Chunk *chunk{ nullptr };
+        TjsValue *regs{ nullptr };
         std::optional<Register> ret{};
         size_t pc{};
 
-        explicit CallFrame(const Chunk *chunk_, const uint32_t registersOffset_, const std::optional<Register> ret_) :
-            chunk(chunk_), registersOffset(registersOffset_), ret(ret_) {}
+        explicit CallFrame() = default;
+
+        explicit CallFrame(const Chunk *chunk_, const std::optional<Register> ret_, FastRegisterPool &pool) :
+            chunk(chunk_), regs(pool.allocFrame(chunk_->getRegisterCount())), ret(ret_), _pool(&pool) {}
 
         CallFrame(CallFrame &&callFrame) noexcept :
-            chunk(callFrame.chunk), registersOffset(callFrame.registersOffset), ret(callFrame.ret), pc(callFrame.pc) {}
+            chunk(callFrame.chunk), regs(callFrame.regs), ret(callFrame.ret), pc(callFrame.pc), _pool(callFrame._pool) {
+            callFrame._pool = nullptr;
+        }
 
         CallFrame &operator=(CallFrame &&callFrame) noexcept {
             if(this == &callFrame)
@@ -43,36 +121,73 @@ namespace Ciallang::Bytecode {
 
             chunk = callFrame.chunk;
             ret = callFrame.ret;
-            registersOffset = callFrame.registersOffset;
+            regs = callFrame.regs;
             pc = callFrame.pc;
+            _pool = callFrame._pool;
+
+            callFrame._pool = nullptr;
 
             return *this;
         }
 
         CallFrame(const CallFrame &) = delete;
         CallFrame &operator=(const CallFrame &) = delete;
+
+        ~CallFrame() {
+            if(_pool) {
+                _pool->freeFrame(chunk->getRegisterCount());
+            }
+        }
+
+        [[nodiscard]] TjsValue &getReg(const size_t index) {
+            if(!_pool) {
+                throw std::runtime_error("call frame not initialized");
+            }
+            return regs[index];
+        }
+
+        [[nodiscard]] const TjsValue &getReg(const size_t index) const {
+            if(!_pool) {
+                throw std::runtime_error("call frame not initialized");
+            }
+            return regs[index];
+        }
+
+    private:
+        FastRegisterPool *_pool{ nullptr };
     };
 
     class Interpreter {
     public:
-        explicit Interpreter() = default;
+        CallFrame createCallFrame(const Chunk *chunk, const std::optional<Register> &ret = {}) {
+            return CallFrame{ chunk, ret, _regPool };
+        }
+
+        explicit Interpreter(Inter::SymbolTable &symbolTable) : _symbolTable(symbolTable) {}
 
         void run(const Chunk *mainChunk);
 
-        void reg(const Register reg, TjsValue value) {
-            const auto index = reg.index() + _currentFrame->registersOffset;
-            allocRegisters(index);
-
-            _registers[index] = std::move(value);
-            ++_logicRegistersSize;
-        }
+        void reg(Register reg, TjsValue value) const;
 
         [[nodiscard]] TjsValue reg(Register reg);
         [[nodiscard]] const TjsValue &reg(Register reg) const;
 
-        [[nodiscard]] const TjsValue &global(const std::string &identifier) const { return _globals.at(identifier); }
+        [[nodiscard]] const TjsValue &global(const size_t symbolIndex) const { return _globals[symbolIndex]; }
 
-        void global(const std::string &identifier, TjsValue &&value) { _globals[identifier] = std::move(value); }
+        void global(const size_t symbolIndex, TjsValue &&value) {
+            if(_globals.size() < symbolIndex + 1) {
+                _globals.resize(symbolIndex * 2 + 1);
+            }
+            _globals[symbolIndex] = std::move(value);
+        }
+
+        void global(const std::string &identifier, TjsValue &&value) {
+            const auto index = _symbolTable.getSymbolIndex(identifier);
+            if(!index) {
+                return;
+            }
+            global(*index, std::move(value));
+        }
 
         template <typename T>
             requires std::is_base_of_v<TjsObject, T>
@@ -84,21 +199,22 @@ namespace Ciallang::Bytecode {
 
         [[nodiscard]] bool getZF() const { return _zf; }
 
-        void setPC(const Label label) { _callStack.back().pc = label.address(); }
+        void setPC(const Label label) { _callStack[_stackTop - 1].pc = label.address(); }
 
         [[nodiscard]] size_t getPC() const { return _currentFrame->pc; }
 
         void pushCallFrame(CallFrame &&frame) {
-            _callStack.pushBack(std::move(frame));
-            _currentFrame = &_callStack.back();
+            if(_stackTop >= MAX_CALL_DEPTH)
+                throw std::runtime_error("Call stack overflow");
+            _callStack[_stackTop++] = std::move(frame);
+            _currentFrame = &_callStack[_stackTop - 1];
         }
 
         CallFrame popCallFrame() {
-            CallFrame frame = std::move(*_currentFrame);
-            _callStack.popBack();
-            _currentFrame = &_callStack.back();
-            _logicRegistersSize = frame.registersOffset;
-            return std::move(frame);
+            if(_stackTop == 0)
+                throw std::runtime_error("Call stack underflow");
+            _currentFrame = _stackTop > 0 ? &_callStack[--_stackTop - 1] : nullptr;
+            return std::move(_callStack[_stackTop]);
         }
 
         [[nodiscard]] const std::vector<Op::Instruction *> &instructions() const noexcept {
@@ -107,14 +223,13 @@ namespace Ciallang::Bytecode {
 
         [[nodiscard]] const Chunk *current() const noexcept { return _currentFrame->chunk; }
 
-        CallFrame createCallFrame(const Chunk *chunk, const std::optional<Register> ret = {}) const {
-            return CallFrame{ chunk, _logicRegistersSize, ret };
-        }
-
         [[nodiscard]] std::string dumpRegisters() const {
             std::stringstream ss{};
-            for(size_t i = 0; i < _logicRegistersSize; i++) {
-                ss << fmt::format("(%{}): {}\n", i, _registers[i]);
+            for(size_t i = 0; i < _stackTop; i++) {
+                const auto &call = _callStack[i];
+                for(size_t j = 0; j < call.chunk->getRegisterCount(); j++) {
+                    ss << fmt::format("(%{}): {}\n", j, call.getReg(j));
+                }
             }
             return ss.str();
         }
@@ -142,32 +257,17 @@ namespace Ciallang::Bytecode {
             return ss.str();
         }
 
-        void allocRegisters(const size_t index) {
-            if(index >= _registers.size()) {
-                // maybe increase or decrease
-                _registers.resize(index + 1);
-                // CHECK_LE(_registers.size(), std::numeric_limits<uint32_t>::max());
-            }
-        }
+        [[nodiscard]] const char *getSymbol(const size_t index) const { return _symbolTable.getSymbol(index); }
 
     private:
+        Inter::SymbolTable &_symbolTable;
         CallFrame *_currentFrame{ nullptr };
-        // 考虑使用map?
-        Collections::ConservativeVector<CallFrame> _callStack{};
-        Collections::ConservativeVector<TjsValue> _registers{};
-        uint32_t _logicRegistersSize{};
-        std::unordered_map<std::string, TjsValue> _globals{};
-
+        // 栈的最大深度为1024
+        static constexpr auto MAX_CALL_DEPTH = 1024;
+        FastRegisterPool _regPool{};
+        CallFrame _callStack[MAX_CALL_DEPTH];
+        size_t _stackTop{ 0 };
+        std::vector<TjsValue> _globals{};
         bool _zf{ false };
-
-    public:
-        void applyArgument(const CallFrame &frame, const Register reg, TjsValue value) {
-
-            const auto index = reg.index() + frame.registersOffset;
-            allocRegisters(index);
-
-            _registers[index] = std::move(value);
-            ++_logicRegistersSize;
-        }
     };
 } // namespace Ciallang::Bytecode

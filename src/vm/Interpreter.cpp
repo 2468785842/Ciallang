@@ -30,7 +30,7 @@ namespace Ciallang::Bytecode {
             if(pc >= instList.size())
                 break;
 
-            if(_callStack.empty())
+            if(_stackTop == 0)
                 break;
 
             const auto *instruction = instList[pc];
@@ -39,19 +39,19 @@ namespace Ciallang::Bytecode {
         }
     }
 
+    void Interpreter::reg(const Register reg, TjsValue value) const {
+        _currentFrame->getReg(reg.index()) = std::move(value);
+    }
+
     TjsValue Interpreter::reg(const Register reg) {
-        const auto index = reg.index() + _currentFrame->registersOffset;
-
-        CLL_ASSERT(index < _registers.size(), "index > _registers.size");
-
-        return _registers[index];
+        const auto index = reg.index();
+        CLL_ASSERT(index < _currentFrame->chunk->getRegisterCount(), "index > registers count");
+        return _currentFrame->getReg(index);
     }
 
     const TjsValue &Interpreter::reg(const Register reg) const {
-        const auto index = reg.index() + _currentFrame->registersOffset;
-
-        CLL_ASSERT(index < _registers.size(), "index > _registers.size");
-
-        return _registers[index];
+        const auto index = reg.index();
+        CLL_ASSERT(index < _currentFrame->chunk->getRegisterCount(), "index > registers count");
+        return _currentFrame->getReg(index);
     }
 } // namespace Ciallang::Bytecode

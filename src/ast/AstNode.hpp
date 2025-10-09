@@ -18,7 +18,7 @@
 #include "vm/Register.hpp"
 
 namespace Ciallang::Inter {
-    class BytecodeGen;
+    class BytecodeGenerator;
 }
 
 namespace Ciallang::Syntax {
@@ -84,7 +84,7 @@ namespace Ciallang::Syntax {
 
         virtual void accept(Visitor *) const = 0;
 
-        virtual std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGen *) const = 0;
+        virtual std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *) const = 0;
 
         [[nodiscard]] std::string_view name() const noexcept { return _name; };
 

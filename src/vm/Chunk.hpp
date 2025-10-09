@@ -30,10 +30,10 @@ namespace Ciallang::Bytecode {
             return ins;
         }
 
-        [[nodiscard]] auto &instructions() const { return _instructions; }
+        [[nodiscard]] auto &instructions() const noexcept { return _instructions; }
 
-        void setRegisterCount(const std::uint32_t count) { _registerCount = count; }
-        std::uint32_t getRegisterCount() const { return _registerCount; }
+        void setRegisterCount(const std::uint32_t count) noexcept { _registerCount = count; }
+        [[nodiscard]] std::uint32_t getRegisterCount() const noexcept { return _registerCount; }
 
     private:
         std::vector<Op::Instruction *> _instructions{};

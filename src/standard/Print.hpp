@@ -20,9 +20,7 @@
 #include "types/TjsNativeFunction.hpp"
 
 namespace Ciallang::Standard {
-    static TjsNativeFunction S_PrintFunction =
-        TjsNativeFunction::create("print", [](TjsValue val) { fmt::print("{}", val); });
+    static TjsNativeFunction S_PrintFunction{ "print", [](TjsValue val) { fmt::print("{}", val); } };
 
-    static TjsNativeFunction S_PrintlnFunction =
-        TjsNativeFunction::create("println", [](TjsValue val) { fmt::println("{}", val); });
+    static TjsNativeFunction S_PrintlnFunction{ "println", [](TjsValue val) { fmt::println("{}", val); } };
 } // namespace Ciallang::Standard

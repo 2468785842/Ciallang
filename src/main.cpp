@@ -15,7 +15,7 @@
 #include "pch.h"
 
 #include "common/SourceFile.hpp"
-#include "gen/BytecodeGen.hpp"
+#include "gen/BytecodeGenerator.hpp"
 #include "parser/Parser.hpp"
 #include "standard/Print.hpp"
 #include "vm/Interpreter.hpp"
@@ -35,22 +35,25 @@ int main(int argc, char **argv) {
     Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
     auto *globalNode = parser.parse(r);
 
-    Ciallang::Inter::BytecodeGen codeGen{ sourceFile };
+    Ciallang::Inter::SymbolTable globalTable;
+    Ciallang::Inter::BytecodeGenerator codeGen{ sourceFile, globalTable };
 
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Ciallang::Bytecode::Interpreter interpreter{};
+    Ciallang::Bytecode::Interpreter interpreter{ globalTable };
     interpreter.global(&Ciallang::Standard::S_PrintFunction);
     interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
 
     fmt::println("{}", interpreter.dumpInstruction(*chunk));
+
     auto start = std::chrono::high_resolution_clock::now();
     interpreter.run(chunk.get());
-    fmt::println("{}", interpreter.dumpRegisters());
     auto end = std::chrono::high_resolution_clock::now();
-    auto duration = duration_cast<std::chrono::microseconds>(end - start);
+    auto duration = duration_cast<std::chrono::nanoseconds>(end - start);
 
-    fmt::println("Time taken by function: {}ms", duration.count());
+    fmt::println("{}", interpreter.dumpRegisters());
+
+    fmt::println("Time taken by function: {}ns", duration.count());
 
     return 0;
 }
