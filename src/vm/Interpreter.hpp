@@ -161,7 +161,9 @@ namespace Ciallang::Bytecode {
 
         void run(const Chunk *mainChunk);
 
-        void reg(Register reg, TjsValue value) const;
+        void reg(const Register &reg, const TjsValue& value) const;
+
+        void reg(const Register &reg, TjsValue&& value) const;
 
         [[nodiscard]] TjsValue reg(Register reg);
         [[nodiscard]] const TjsValue &reg(Register reg) const;
@@ -193,7 +195,7 @@ namespace Ciallang::Bytecode {
 
         [[nodiscard]] bool getZF() const { return _zf; }
 
-        void setPC(const Label label) { _callStack[_stackTop - 1].pc = label.address(); }
+        void setPC(const Label &label) { _callStack[_stackTop - 1].pc = label.address(); }
 
         [[nodiscard]] size_t getPC() const { return _currentFrame->pc; }
 

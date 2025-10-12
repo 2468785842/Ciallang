@@ -18,47 +18,6 @@
 
 namespace Ciallang {
     class TjsValue {
-        struct Helper {
-            union {
-                TjsInteger integer;
-                TjsReal real;
-                TjsString *string;
-                TjsOctet *octet;
-                TjsObject *object;
-            } value{};
-
-            TjsValueType type{ TjsValueType::Void };
-            explicit Helper() = default;
-
-            explicit Helper(const TjsInteger value) : type(TjsValueType::Integer) { this->value.integer = value; }
-
-            explicit Helper(const TjsReal value) : type(TjsValueType::Real) { this->value.real = value; }
-
-            explicit Helper(TjsString *value) : type(TjsValueType::String) { this->value.string = value; }
-
-            explicit Helper(TjsOctet *value) : type(TjsValueType::Octet) { this->value.octet = value; }
-
-            explicit Helper(TjsObject *value) : type(TjsValueType::Object) { this->value.object = value; }
-
-            Helper(const Helper &other) = delete;
-
-            Helper(Helper &&other) noexcept {
-                type = other.type;
-                value = other.value;
-                other.type = TjsValueType::Void;
-            }
-
-            Helper &operator=(const Helper &other) = delete;
-
-            Helper &operator=(Helper &&other) noexcept {
-                if (this == &other) return *this;
-                this->~Helper();
-                new (this) Helper(std::move(other));
-                return *this;
-            }
-
-            ~Helper();
-        };
 
     public:
         TjsValue() = default;
@@ -73,17 +32,19 @@ namespace Ciallang {
 
         explicit TjsValue(TjsObject *value);
 
-        TjsValue(const TjsValue &value) noexcept;
+        TjsValue(const TjsValue &v) noexcept;
 
-        TjsValue(TjsValue &&) = default;
+        ~TjsValue();
+
+        TjsValue(TjsValue &&) noexcept;
 
         TjsValue &operator=(const TjsValue &value) = delete;
 
-        TjsValue &operator=(TjsValue &&value) = default;
+        TjsValue &operator=(TjsValue &&rhs) noexcept;
 
-        [[nodiscard]] TjsValueType type() const noexcept { return _helper.type; }
+        [[nodiscard]] TjsValueType type() const noexcept { return _type; }
 
-        void type(const TjsValueType type) noexcept { _helper.type = type; }
+        void type(const TjsValueType type) noexcept { _type = type; }
 
         [[nodiscard]] TjsInteger toInteger() const;
 
@@ -123,10 +84,18 @@ namespace Ciallang {
 
         bool operator==(const TjsValue &tjsValue) const;
 
-        std::partial_ordering operator<=>(const TjsValue &tjsValue) const;
+        std::partial_ordering operator<=>(const TjsValue &rhs) const;
 
     private:
-        Helper _helper{};
+        union {
+            TjsInteger _integer;
+            TjsReal _real;
+            TjsString *_string;
+            TjsOctet *_octet;
+            TjsObject *_object;
+        } _value{};
+
+        TjsValueType _type{ TjsValueType::Void };
 
         friend std::ostream &operator<<(std::ostream &os, const TjsValue &d);
     };

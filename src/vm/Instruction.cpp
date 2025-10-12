@@ -27,7 +27,7 @@ namespace Ciallang::Bytecode::Op {
         return fmt::format("{: <10} {: <4} {: <4}", "load", reg(itt), value(itt));
     }
 
-    void Add::execute(const Instruction &itt, Interpreter &ipt) {
+    void Add::execute(const Instruction &itt, const Interpreter &ipt) {
         ipt.reg(dst(itt), ipt.reg(reg1(itt)) + ipt.reg(reg2(itt)));
     }
 
@@ -42,7 +42,8 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void Sub::execute(const Instruction &itt, const Interpreter &ipt) {
-        ipt.reg(dst(itt), ipt.reg(reg1(itt)) - ipt.reg(reg2(itt)));
+        const auto &kIpt = static_cast<const Interpreter &>(ipt);
+        ipt.reg(dst(itt), kIpt.reg(reg1(itt)) - kIpt.reg(reg2(itt)));
     }
 
     std::string Sub::dump(const Instruction &itt, const Interpreter &ipt, const bool info) {
@@ -95,8 +96,8 @@ namespace Ciallang::Bytecode::Op {
         return fmt::format("{: <30} ; {} = {}", insDump, src(itt), interpreter.reg(src(itt)));
     }
 
-    void GGlobal::execute(const Instruction &itt, Interpreter &interpreter) {
-        auto &value = interpreter.global(symbolIndex(itt));
+    void GGlobal::execute(const Instruction &itt, const Interpreter &interpreter) {
+        const auto &value = interpreter.global(symbolIndex(itt));
         interpreter.reg(dst(itt), value);
     }
 
@@ -110,9 +111,9 @@ namespace Ciallang::Bytecode::Op {
         return fmt::format("{: <30} ; {} = {}", insDump, symbol, interpreter.global(symbolIndex(itt)));
     }
 
-    void Test::execute(const Instruction &itt, Interpreter &interpreter) {
-        if(interpreter.reg(reg(itt)).toBool()) {
-            interpreter.setZF(true);
+    void Test::execute(const Instruction &itt, Interpreter &ipt) {
+        if(static_cast<const Interpreter&>(ipt).reg(reg(itt)).toBool()) {
+            ipt.setZF(true);
         }
     }
 
@@ -259,7 +260,7 @@ namespace Ciallang::Bytecode::Op {
             const auto args = arguments(itt);
             for(std::uint32_t i = 0; i < args->size(); i++) {
                 // copy
-                callFrame.getReg(i) = std::move(interpreter.reg((*args)[i]));
+                callFrame.getReg(i) = interpreter.reg((*args)[i]);
             }
 
             interpreter.pushCallFrame(std::move(callFrame));
@@ -271,6 +272,7 @@ namespace Ciallang::Bytecode::Op {
         for(std::uint32_t i = 0; i < args->size(); i++) {
             values[i] = interpreter.reg((*args)[i]);
         }
+
         auto value = dynamic_cast<TjsNativeFunction *>(object.toObject())->callProc(values.get());
         interpreter.reg(dst(itt), std::move(value));
     }
@@ -285,11 +287,10 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void Ret::execute(const Instruction &itt, Interpreter &interpreter) {
-        // copy
-        auto value = interpreter.reg(retReg(itt));
-        const auto frame = interpreter.popCallFrame();
+        const auto &value = static_cast<const Interpreter&>(interpreter).reg(retReg(itt));
+        const auto &frame = interpreter.popCallFrame();
         CLL_ASSERT(frame.ret.has_value(), "frame.ret val is empty");
-        interpreter.reg(frame.ret.value(), std::move(value));
+        interpreter.reg(frame.ret.value(), value);
     }
 
     std::string Ret::dump(const Instruction &itt, const Interpreter &, bool) {

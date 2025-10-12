@@ -50,7 +50,7 @@ namespace Ciallang::Bytecode::Op {
     O(Ret)
 
 #define OPCODE_ENUM_CLASS(OP) OP,
-    enum class OpCode : std::uint8_t {
+    enum class OpCode : std::uint32_t {
         OPCODE_ENUMS(OPCODE_ENUM_CLASS)
         COUNT
     };
@@ -204,9 +204,9 @@ namespace Ciallang::Bytecode::Op {
     };
 
     namespace Load {
-        static Register reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static TjsValue value(const Instruction &itt) { return itt.getOperand2<TjsValue>(); }
+        static const TjsValue &value(const Instruction &itt) { return itt.getOperand2<TjsValue>(); }
 
         static void execute(const Instruction &, const Interpreter &);
 
@@ -214,23 +214,23 @@ namespace Ciallang::Bytecode::Op {
     } // namespace Load
 
     namespace Add {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, const Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
     } // namespace Add
 
     namespace Sub {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, const Interpreter &);
 
@@ -238,11 +238,11 @@ namespace Ciallang::Bytecode::Op {
     } // namespace Sub
 
     namespace Mul {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -250,11 +250,11 @@ namespace Ciallang::Bytecode::Op {
     } // namespace Mul
 
     namespace Div {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -262,9 +262,9 @@ namespace Ciallang::Bytecode::Op {
     } // namespace Div
 
     namespace Mov {
-        static Register src(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &src(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -274,7 +274,7 @@ namespace Ciallang::Bytecode::Op {
     namespace DGlobal {
         static size_t symbolIndex(const Instruction &itt) { return itt.getOperand1<size_t>(); }
 
-        static Register src(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &src(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -284,15 +284,15 @@ namespace Ciallang::Bytecode::Op {
     namespace GGlobal {
         static size_t symbolIndex(const Instruction &itt) { return itt.getOperand1<size_t>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, const Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
     } // namespace GGlobal
 
     namespace Test {
-        static Register reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -300,11 +300,11 @@ namespace Ciallang::Bytecode::Op {
     } // namespace Test
 
     namespace EQ {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -312,11 +312,11 @@ namespace Ciallang::Bytecode::Op {
     } // namespace EQ
 
     namespace NEQ {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -324,11 +324,11 @@ namespace Ciallang::Bytecode::Op {
     } // namespace NEQ
 
     namespace LT {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -336,11 +336,11 @@ namespace Ciallang::Bytecode::Op {
     } // namespace LT
 
     namespace LE {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -348,11 +348,11 @@ namespace Ciallang::Bytecode::Op {
     } // namespace LE
 
     namespace GT {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -360,11 +360,11 @@ namespace Ciallang::Bytecode::Op {
     } // namespace GT
 
     namespace GE {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -372,11 +372,11 @@ namespace Ciallang::Bytecode::Op {
     } // namespace GE
 
     namespace AbsEQ {
-        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
@@ -385,7 +385,7 @@ namespace Ciallang::Bytecode::Op {
 
     namespace Jmp {
 
-        static Label label(const Instruction &itt) { return itt.getOperand1<Label>(); }
+        static const Label &label(const Instruction &itt) { return itt.getOperand1<Label>(); }
 
         static void setTarget(Instruction &itt, Label label) { itt.setOperand1(label); }
 
@@ -396,7 +396,7 @@ namespace Ciallang::Bytecode::Op {
 
     namespace JmpE {
 
-        static Label label(const Instruction &itt) { return itt.getOperand1<Label>(); }
+        static const Label &label(const Instruction &itt) { return itt.getOperand1<Label>(); }
 
         static void setTarget(Instruction &itt, Label label) { itt.setOperand1(label); }
         static void execute(const Instruction &, Interpreter &);
@@ -406,7 +406,7 @@ namespace Ciallang::Bytecode::Op {
 
     namespace JmpNE {
 
-        static Label label(const Instruction &itt) { return itt.getOperand1<Label>(); }
+        static const Label &label(const Instruction &itt) { return itt.getOperand1<Label>(); }
 
         static void setTarget(Instruction &itt, Label label) { itt.setOperand1(label); }
 
@@ -416,9 +416,9 @@ namespace Ciallang::Bytecode::Op {
     } // namespace JmpNE
 
     namespace Call {
-        static Register dst(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &dst(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static Register memberReg(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const Register &memberReg(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
         static std::vector<Register> *arguments(const Instruction &itt) {
             return itt.getOperand3<std::vector<Register> *>();
@@ -430,7 +430,7 @@ namespace Ciallang::Bytecode::Op {
     } // namespace Call
 
     namespace Ret {
-        static Register retReg(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        static const Register &retReg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 

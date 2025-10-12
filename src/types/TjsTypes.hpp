@@ -21,7 +21,7 @@ namespace Ciallang {
     using TjsReal = float;
 #endif
 
-    enum class TjsValueType {
+    enum class TjsValueType : std::uint8_t {
         Void, // empty
         Object,
         String,
