@@ -31,6 +31,21 @@ namespace Ciallang {
 
     TjsValue::TjsValue(TjsObject *value) : _value{ ._object = value }, _type(TjsValueType::Object) {}
 
+    TjsValue::~TjsValue() {
+        switch(_type) {
+            case TjsValueType::Object:
+                // TODO: add GC
+                break;
+            case TjsValueType::String:
+                delete _value._string;
+                break;
+            case TjsValueType::Octet:
+                delete _value._octet;
+                break;
+            default:;
+        }
+    }
+
     TjsValue::TjsValue(const TjsValue &v) noexcept {
         _type = v._type;
 
@@ -45,21 +60,6 @@ namespace Ciallang {
                 break;
             default:
                 _value = v._value;
-        }
-    }
-
-    TjsValue::~TjsValue() {
-        switch(_type) {
-            case TjsValueType::Object:
-                // TODO: add GC
-                break;
-            case TjsValueType::String:
-                delete _value._string;
-                break;
-            case TjsValueType::Octet:
-                delete _value._octet;
-                break;
-            default:;
         }
     }
 

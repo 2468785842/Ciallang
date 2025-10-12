@@ -32,10 +32,9 @@ namespace Ciallang {
 
         explicit TjsValue(TjsObject *value);
 
-        TjsValue(const TjsValue &v) noexcept;
-
         ~TjsValue();
 
+        TjsValue(const TjsValue &v) noexcept;
         TjsValue(TjsValue &&) noexcept;
 
         TjsValue &operator=(const TjsValue &value) = delete;

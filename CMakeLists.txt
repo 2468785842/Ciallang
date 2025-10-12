@@ -53,7 +53,6 @@ set(SOURCE_FILES
 
         # ############################################
         src/vm/Interpreter.cpp
-        src/vm/Chunk.cpp
         src/vm/Rlc.cpp
         src/vm/Instruction.cpp
         src/vm/Register.hpp

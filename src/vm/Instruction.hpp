@@ -20,12 +20,6 @@
 
 #include "types/TjsValue.hpp"
 
-namespace Ciallang::Bytecode {
-    class Interpreter;
-}
-
-namespace Ciallang::Bytecode::Op {
-
 #define OPCODE_ENUMS(O)                                                                                                \
     O(Load)                                                                                                            \
     O(Add)                                                                                                             \
@@ -49,8 +43,14 @@ namespace Ciallang::Bytecode::Op {
     O(Call)                                                                                                            \
     O(Ret)
 
+namespace Ciallang::Bytecode {
+    class Interpreter;
+}
+
+namespace Ciallang::Bytecode::Op {
+
 #define OPCODE_ENUM_CLASS(OP) OP,
-    enum class OpCode : std::uint32_t { OPCODE_ENUMS(OPCODE_ENUM_CLASS) COUNT };
+    enum struct OpCode : std::uint32_t { OPCODE_ENUMS(OPCODE_ENUM_CLASS) COUNT };
 #undef OPCODE_ENUM_CLASS
 
     class Instruction;
@@ -58,14 +58,14 @@ namespace Ciallang::Bytecode::Op {
     using ExecuteCallback = void (*)(const Instruction &, Interpreter &);
     using DumpCallback = std::string (*)(const Instruction &, const Interpreter &, bool);
 
-    using RegisterVec = std::vector<Register> *;
+    using RegisterVec = std::vector<Register>;
 
     struct Operand {
         enum class Type { None, Value, Register, RegisterVec, Label, SymbolIndex };
         union {
             TjsValue *value;
             Register reg;
-            RegisterVec regs;
+            RegisterVec *regs;
             Label label;
             size_t symbolIndex;
         } operand{};
@@ -78,7 +78,7 @@ namespace Ciallang::Bytecode::Op {
 
         explicit Operand(const Register &value) : type(Type::Register) { this->operand.reg = value; }
 
-        explicit Operand(RegisterVec value) : type(Type::RegisterVec) { this->operand.regs = value; }
+        explicit Operand(RegisterVec *value) : type(Type::RegisterVec) { this->operand.regs = value; }
 
         explicit Operand(const Label &value) : type(Type::Label) { this->operand.label = value; }
 
@@ -86,21 +86,15 @@ namespace Ciallang::Bytecode::Op {
 
         Operand(const Operand &other) = delete;
 
-        Operand(Operand &&other) noexcept {
-            type = other.type;
-            operand = other.operand;
-            other.type = Type::None;
-        }
+        Operand(Operand &&other) noexcept : operand(other.operand), type(other.type) { other.type = Type::None; }
 
         Operand &operator=(const Operand &other) = delete;
 
         Operand &operator=(Operand &&other) noexcept {
-            if(this == &other)
-                return *this;
-            this->~Operand();
-            this->operand = other.operand;
-            this->type = other.type;
-            other.type = Type::None;
+            if(this != &other) {
+                this->~Operand();
+                new(this) Operand(std::move(other));
+            }
             return *this;
         }
 
@@ -118,11 +112,6 @@ namespace Ciallang::Bytecode::Op {
     public:
         const OpCode opcode;
 
-        struct Handler {
-            ExecuteCallback exec;
-            DumpCallback dump;
-        };
-
         explicit Instruction(const OpCode opcode) : opcode(opcode) {}
         explicit Instruction(const OpCode opcode, Operand &&operand) : opcode(opcode), _operand1(std::move(operand)) {}
         explicit Instruction(const OpCode opcode, Operand &&operand1, Operand &&operand2) :
@@ -130,6 +119,22 @@ namespace Ciallang::Bytecode::Op {
         explicit Instruction(const OpCode opcode, Operand &&operand1, Operand &&operand2, Operand &&operand3) :
             opcode(opcode), _operand1(std::move(operand1)), _operand2(std::move(operand2)),
             _operand3(std::move(operand3)) {}
+
+
+        Instruction(const Instruction &other) = delete;
+
+        Instruction(Instruction &&other) noexcept : opcode(other.opcode) {
+            if(other._operand1)
+                _operand1 = std::move(*other._operand1);
+            if(other._operand2)
+                _operand2 = std::move(*other._operand2);
+            if(other._operand3)
+                _operand3 = std::move(*other._operand3);
+        }
+
+        Instruction &operator=(const Operand &other) = delete;
+
+        Instruction &operator=(Instruction &&other) = delete;
 
         template <typename T>
         void setOperand1(T &&v) {
@@ -178,7 +183,7 @@ namespace Ciallang::Bytecode::Op {
                 return operand->operand.reg;
             } else if constexpr(std::is_same_v<T, RegisterVec>) {
                 CLL_ASSERT(operand->type == Operand::Type::RegisterVec, "operand type is not RegisterVec");
-                return operand->operand.regs;
+                return *operand->operand.regs;
             } else if constexpr(std::is_same_v<T, Label>) {
                 CLL_ASSERT(operand->type == Operand::Type::Label, "operand type is not Label");
                 return operand->operand.label;
@@ -188,12 +193,13 @@ namespace Ciallang::Bytecode::Op {
             } else if constexpr(std::is_same_v<T, size_t>) {
                 CLL_ASSERT(operand->type == Operand::Type::SymbolIndex, "operand type is not symbolIndex");
                 return operand->operand.symbolIndex;
+            } else {
+                return nullptr;
             }
-            static_assert(std::is_same_v<T, T>, "type unsupported");
         }
     };
 
-    namespace Load {
+    struct Load {
         static const Register &reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const TjsValue &value(const Instruction &itt) { return itt.getOperand2<TjsValue>(); }
@@ -201,9 +207,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, const Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace Load
+    }; // struct Load
 
-    namespace Add {
+    struct Add {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -213,9 +219,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, const Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace Add
+    }; // struct Add
 
-    namespace Sub {
+    struct Sub {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -225,9 +231,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, const Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace Sub
+    }; // struct Sub
 
-    namespace Mul {
+    struct Mul {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -237,9 +243,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace Mul
+    }; // struct Mul
 
-    namespace Div {
+    struct Div {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -249,9 +255,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace Div
+    }; // struct Div
 
-    namespace Mov {
+    struct Mov {
         static const Register &src(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -259,9 +265,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace Mov
+    }; // struct Mov
 
-    namespace DGlobal {
+    struct DGlobal {
         static size_t symbolIndex(const Instruction &itt) { return itt.getOperand1<size_t>(); }
 
         static const Register &src(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -269,9 +275,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace DGlobal
+    }; // struct DGlobal
 
-    namespace GGlobal {
+    struct GGlobal {
         static size_t symbolIndex(const Instruction &itt) { return itt.getOperand1<size_t>(); }
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -279,17 +285,17 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, const Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace GGlobal
+    }; // struct GGlobal
 
-    namespace Test {
+    struct Test {
         static const Register &reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace Test
+    }; // struct Test
 
-    namespace EQ {
+    struct EQ {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -299,9 +305,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace EQ
+    }; // struct EQ
 
-    namespace NEQ {
+    struct NEQ {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -311,9 +317,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace NEQ
+    }; // struct NEQ
 
-    namespace LT {
+    struct LT {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -323,9 +329,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace LT
+    }; // struct LT
 
-    namespace LE {
+    struct LE {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -335,9 +341,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace LE
+    }; // struct LE
 
-    namespace GT {
+    struct GT {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -347,9 +353,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace GT
+    }; // struct GT
 
-    namespace GE {
+    struct GE {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -359,9 +365,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace GE
+    }; // struct GE
 
-    namespace AbsEQ {
+    struct AbsEQ {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -371,9 +377,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace AbsEQ
+    }; // struct AbsEQ
 
-    namespace Jmp {
+    struct Jmp {
 
         static const Label &label(const Instruction &itt) { return itt.getOperand1<Label>(); }
 
@@ -382,9 +388,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace Jmp
+    }; // struct Jmp
 
-    namespace JmpE {
+    struct JmpE {
 
         static const Label &label(const Instruction &itt) { return itt.getOperand1<Label>(); }
 
@@ -392,9 +398,9 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace JmpE
+    }; // struct JmpE
 
-    namespace JmpNE {
+    struct JmpNE {
 
         static const Label &label(const Instruction &itt) { return itt.getOperand1<Label>(); }
 
@@ -403,28 +409,26 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace JmpNE
+    }; // struct JmpNE
 
-    namespace Call {
+    struct Call {
         static const Register &dst(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &memberReg(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static std::vector<Register> *arguments(const Instruction &itt) {
-            return itt.getOperand3<std::vector<Register> *>();
-        }
+        static const std::vector<Register> &arguments(const Instruction &itt) { return itt.getOperand3<RegisterVec>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace Call
+    }; // struct Call
 
-    namespace Ret {
+    struct Ret {
         static const Register &retReg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static void execute(const Instruction &, Interpreter &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
-    } // namespace Ret
+    }; // struct Ret
 
-} // namespace Ciallang::Bytecode::Op
+}; // namespace Ciallang::Bytecode::Op

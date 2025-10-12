@@ -258,7 +258,7 @@ namespace Ciallang::Inter {
         auto funChunk = gen.parseAst(_r, node->body);
 
         // the last instruction is not ret, patch one ret
-        if(funChunk->instructions().back()->opcode != Bytecode::Op::OpCode::Ret) {
+        if(funChunk->instructions().back().opcode != Bytecode::Op::OpCode::Ret) {
             funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.getEmpty(*funChunk));
         }
 
@@ -330,19 +330,19 @@ namespace Ciallang::Inter {
 
         _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
 
-        auto *jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
+        const size_t jmpNEIndex = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
         node->body->generateBytecode(this);
-        Bytecode::Op::Instruction *jmp{ nullptr };
+        size_t jmpIndex = 0;
 
         if(node->elseBody) {
-            jmp = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
+            jmpIndex = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
         }
 
-        Bytecode::Op::JmpNE::setTarget(*jmpNE, makeLabel());
+        Bytecode::Op::JmpNE::setTarget(_chunk->getItt(jmpNEIndex), makeLabel());
 
         if(node->elseBody) {
             node->elseBody->generateBytecode(this);
-            Bytecode::Op::Jmp::setTarget(*jmp, makeLabel());
+            Bytecode::Op::Jmp::setTarget(_chunk->getItt(jmpIndex), makeLabel());
         }
 
         freeRegister(testReg.value());
@@ -359,13 +359,13 @@ namespace Ciallang::Inter {
         CLL_ASSERT(testReg.has_value(), "testReg is not have val");
 
         _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
-        const auto jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
+        size_t jmpNEIndex = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
 
         node->body->generateBytecode(this);
-        Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), loopLabel);
+        Bytecode::Op::Jmp::setTarget(_chunk->getItt(_chunk->emit<Bytecode::Op::OpCode::Jmp>()), loopLabel);
 
-        Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), makeLabel());
-        Bytecode::Op::JmpNE::setTarget(*jmpNE, makeLabel());
+        Bytecode::Op::Jmp::setTarget(_chunk->getItt(_chunk->emit<Bytecode::Op::OpCode::Jmp>()), makeLabel());
+        Bytecode::Op::JmpNE::setTarget(_chunk->getItt(jmpNEIndex), makeLabel());
 
         freeRegister(testReg.value());
 

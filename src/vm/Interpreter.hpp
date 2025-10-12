@@ -54,13 +54,12 @@ namespace Ciallang::Bytecode {
         struct Block {
             TjsValue *data;
 
-            explicit Block(const size_t blockSize) :
-                data(new TjsValue[blockSize]) {}
+            explicit Block(const size_t blockSize) : data(new TjsValue[blockSize]) {}
 
-            Block(const Block&) = delete;
-            Block& operator=(const Block&) = delete;
-            Block(Block&& rhs) noexcept : data(rhs.data) { rhs.data = nullptr; }
-            Block& operator=(Block&& rhs) noexcept {
+            Block(const Block &) = delete;
+            Block &operator=(const Block &) = delete;
+            Block(Block &&rhs) noexcept : data(rhs.data) { rhs.data = nullptr; }
+            Block &operator=(Block &&rhs) noexcept {
                 if(this != &rhs) {
                     this->~Block();
                     new(this) Block(std::move(rhs));
@@ -76,8 +75,8 @@ namespace Ciallang::Bytecode {
         size_t _sp; // 全局栈指针（相对于首块）
 
         TjsValue *ptrAt(const size_t globalIndex) const {
-            const size_t blockIndex = globalIndex / _blockSize;    // 第几个块
-            const size_t offset = globalIndex % _blockSize;        // 块内偏移
+            const size_t blockIndex = globalIndex / _blockSize; // 第几个块
+            const size_t offset = globalIndex % _blockSize; // 块内偏移
 
             assert(blockIndex < _blocks.size());
             return _blocks[blockIndex].data + offset;
@@ -219,7 +218,7 @@ namespace Ciallang::Bytecode {
             return std::move(_callStack[_stackTop]);
         }
 
-        [[nodiscard]] const std::vector<Op::Instruction *> &instructions() const noexcept {
+        [[nodiscard]] const std::vector<Op::Instruction> &instructions() const noexcept {
             return _currentFrame->chunk->instructions();
         }
 
@@ -241,13 +240,13 @@ namespace Ciallang::Bytecode {
             size_t pc{};
             std::vector<TjsFunction *> functions{};
             while(pc < chunk.instructions().size()) {
-                const auto instruction = chunk.instructions()[pc];
+                const auto &instruction = chunk.instructions()[pc];
 
                 ss << fmt::format("{: <6}: {}\n", Label{ pc },
-                                  Op::Instruction::dump(instruction->opcode, *instruction, *this, false));
+                                  Op::Instruction::dump(instruction.opcode, instruction, *this, false));
 
-                if(instruction->opcode == Op::OpCode::Load) {
-                    if(auto value = Op::Load::value(*instruction); value.isObject()) {
+                if(instruction.opcode == Op::OpCode::Load) {
+                    if(auto value = Op::Load::value(instruction); value.isObject()) {
                         if(auto fun = dynamic_cast<TjsFunction *>(value.toObject())) {
                             functions.push_back(fun);
                         }

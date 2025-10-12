@@ -21,7 +21,37 @@ namespace Ciallang::Bytecode {
 
     void Interpreter::run(const Chunk *mainChunk) {
         pushCallFrame(createCallFrame(mainChunk));
+// #define CLL_COMPUTED_GOTO
+#ifdef CLL_COMPUTED_GOTO
+        // 标签数组
+        static void *labels[] = {
+#define HANDLE_OPCODE(OP) &&label_##OP,
+            OPCODE_ENUMS(HANDLE_OPCODE)
+#undef HANDLE_OPCODE
+        };
 
+        goto label_Dispatch;
+
+    label_Dispatch: {
+        const auto &instList = instructions();
+        const Op::Instruction &instruction = instList[_currentFrame->pc];
+        if(_currentFrame->pc >= instList.size() || _stackTop == 0)
+            return;
+
+        goto *labels[static_cast<size_t>(instruction.opcode)];
+    }
+
+#define HANDLE_OPCODE(OP)                                                                                              \
+    label_##OP : {                                                                                                     \
+        const Op::Instruction &instruction = instructions()[_currentFrame->pc];                                        \
+        ++_currentFrame->pc;                                                                                           \
+        Op::OP::execute(instruction, *this);                                                                           \
+        goto label_Dispatch;                                                                                           \
+    }
+
+        OPCODE_ENUMS(HANDLE_OPCODE)
+#undef HANDLE_OPCODE
+#else
         for(;;) {
             // cache hit
             size_t &pc = _currentFrame->pc;
@@ -33,10 +63,11 @@ namespace Ciallang::Bytecode {
             if(_stackTop == 0)
                 break;
 
-            const auto *instruction = instList[pc];
+            const auto &instruction = instList[pc];
             ++pc;
-            Op::Instruction::execute(instruction->opcode, *instruction, *this);
+            Op::Instruction::execute(instruction.opcode, instruction, *this);
         }
+#endif
     }
 
     void Interpreter::reg(const Register &reg, const TjsValue &value) const {
