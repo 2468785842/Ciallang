@@ -35,23 +35,19 @@ namespace Ciallang::Bytecode {
 
             const auto *instruction = instList[pc];
             ++pc;
-            Op::Instruction::execute(instruction->getOpcode(), *instruction, *this);
+            Op::Instruction::execute(instruction->opcode, *instruction, *this);
         }
     }
 
-    void Interpreter::reg(const Register &reg, const TjsValue& value) const {
-        _currentFrame->getReg(reg.index()) = TjsValue{value};
+    void Interpreter::reg(const Register &reg, const TjsValue &value) const {
+        _currentFrame->getReg(reg.index()) = TjsValue{ value };
     }
 
-    void Interpreter::reg(const Register &reg, TjsValue&& value) const {
+    void Interpreter::reg(const Register &reg, TjsValue &&value) const {
         _currentFrame->getReg(reg.index()) = std::move(value);
     }
 
-    TjsValue Interpreter::reg(const Register reg) {
-        return _currentFrame->getReg(reg.index());
-    }
+    TjsValue Interpreter::reg(const Register reg) { return _currentFrame->getReg(reg.index()); }
 
-    const TjsValue &Interpreter::reg(const Register reg) const {
-        return _currentFrame->getReg(reg.index());
-    }
+    const TjsValue &Interpreter::reg(const Register reg) const { return _currentFrame->getReg(reg.index()); }
 } // namespace Ciallang::Bytecode

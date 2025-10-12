@@ -29,7 +29,7 @@ namespace Ciallang {
 
     TjsValue::TjsValue(const TjsOctet &value) : _type(TjsValueType::Octet) { _value._octet = new TjsOctet{ value }; }
 
-    TjsValue::TjsValue(TjsObject *value) : _value{._object = value}, _type(TjsValueType::Object) {}
+    TjsValue::TjsValue(TjsObject *value) : _value{ ._object = value }, _type(TjsValueType::Object) {}
 
     TjsValue::TjsValue(const TjsValue &v) noexcept {
         _type = v._type;
@@ -63,12 +63,15 @@ namespace Ciallang {
         }
     }
 
-    TjsValue::TjsValue(TjsValue &&rhs) noexcept : _value(rhs._value), _type(rhs._type) { rhs._type = TjsValueType::Void; }
+    TjsValue::TjsValue(TjsValue &&rhs) noexcept : _value(rhs._value), _type(rhs._type) {
+        rhs._type = TjsValueType::Void;
+    }
 
     TjsValue &TjsValue::operator=(TjsValue &&rhs) noexcept {
-        if(this == &rhs) return *this;
-        this->~TjsValue();
-        new (this) TjsValue(std::move(rhs));
+        if(this != &rhs) {
+            this->~TjsValue();
+            new(this) TjsValue(std::move(rhs));
+        }
         return *this;
     }
 

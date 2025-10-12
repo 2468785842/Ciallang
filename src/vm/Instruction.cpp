@@ -112,7 +112,7 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void Test::execute(const Instruction &itt, Interpreter &ipt) {
-        if(static_cast<const Interpreter&>(ipt).reg(reg(itt)).toBool()) {
+        if(static_cast<const Interpreter &>(ipt).reg(reg(itt)).toBool()) {
             ipt.setZF(true);
         }
     }
@@ -287,7 +287,7 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void Ret::execute(const Instruction &itt, Interpreter &interpreter) {
-        const auto &value = static_cast<const Interpreter&>(interpreter).reg(retReg(itt));
+        const auto &value = static_cast<const Interpreter &>(interpreter).reg(retReg(itt));
         const auto &frame = interpreter.popCallFrame();
         CLL_ASSERT(frame.ret.has_value(), "frame.ret val is empty");
         interpreter.reg(frame.ret.value(), value);
@@ -297,8 +297,11 @@ namespace Ciallang::Bytecode::Op {
         return fmt::format("{: <10} {}", "ret", retReg(itt));
     }
 
-    void Instruction::execute(const OpCode opcode, const Instruction &itt, Interpreter & ipt) {
-#define HANDLE_OPCODE(OP) case OpCode::OP: OP::execute(itt, ipt); break;
+    void Instruction::execute(const OpCode opcode, const Instruction &itt, Interpreter &ipt) {
+#define HANDLE_OPCODE(OP)                                                                                              \
+    case OpCode::OP:                                                                                                   \
+        OP::execute(itt, ipt);                                                                                         \
+        break;
         switch(opcode) {
             OPCODE_ENUMS(HANDLE_OPCODE)
             default:;
@@ -306,8 +309,11 @@ namespace Ciallang::Bytecode::Op {
     }
 
 
-    std::string Instruction::dump(const OpCode opcode, const Instruction & itt, const Interpreter & ipt, const bool info) {
-#define DUMP_OPCODE(OP) case OpCode::OP: return OP::dump(itt, ipt, info);
+    std::string Instruction::dump(const OpCode opcode, const Instruction &itt, const Interpreter &ipt,
+                                  const bool info) {
+#define DUMP_OPCODE(OP)                                                                                                \
+    case OpCode::OP:                                                                                                   \
+        return OP::dump(itt, ipt, info);
         switch(opcode) {
             OPCODE_ENUMS(DUMP_OPCODE)
             default:;

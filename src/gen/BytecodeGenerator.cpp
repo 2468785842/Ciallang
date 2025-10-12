@@ -180,7 +180,7 @@ namespace Ciallang::Inter {
             // can't init
             if(!node->rhs) {
                 _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()),
-                                                             getEmpty(*_chunk));
+                                                            getEmpty(*_chunk));
                 return {};
             }
 
@@ -190,7 +190,7 @@ namespace Ciallang::Inter {
                 return {};
 
             _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()),
-                                                         src.value());
+                                                        src.value());
             return {};
         }
 
@@ -258,7 +258,7 @@ namespace Ciallang::Inter {
         auto funChunk = gen.parseAst(_r, node->body);
 
         // the last instruction is not ret, patch one ret
-        if(funChunk->instructions().back()->getOpcode() != Bytecode::Op::OpCode::Ret) {
+        if(funChunk->instructions().back()->opcode != Bytecode::Op::OpCode::Ret) {
             funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.getEmpty(*funChunk));
         }
 
