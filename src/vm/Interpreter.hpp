@@ -53,14 +53,13 @@ namespace Ciallang::Bytecode {
     private:
         struct Block {
             TjsValue *data;
-            size_t capacity;
 
             explicit Block(const size_t blockSize) :
-                data(new TjsValue[blockSize]), capacity(blockSize) {}
+                data(new TjsValue[blockSize]) {}
 
             Block(const Block&) = delete;
             Block& operator=(const Block&) = delete;
-            Block(Block&& rhs) noexcept : data(rhs.data), capacity(rhs.capacity) { rhs.data = nullptr; rhs.capacity = 0; }
+            Block(Block&& rhs) noexcept : data(rhs.data) { rhs.data = nullptr; }
             Block& operator=(Block&& rhs) noexcept {
                 if(this != &rhs) {
                     this->~Block();
@@ -77,39 +76,35 @@ namespace Ciallang::Bytecode {
         size_t _sp; // 全局栈指针（相对于首块）
 
         TjsValue *ptrAt(const size_t globalIndex) const {
-            size_t idx = globalIndex;
-            for(const auto &[data, capacity] : _blocks) {
-                if(idx < capacity)
-                    return data + idx;
-                idx -= capacity;
-            }
-            assert(false && "ptrAt out of range");
+            const size_t blockIndex = globalIndex / _blockSize;    // 第几个块
+            const size_t offset = globalIndex % _blockSize;        // 块内偏移
+
+            assert(blockIndex < _blocks.size());
+            return _blocks[blockIndex].data + offset;
         }
+
 
         void allocateBlock() { _blocks.emplace_back(_blockSize); }
 
         void ensureCapacity(const size_t need) {
-            size_t total = 0;
-            for(auto &[data, capacity] : _blocks)
-                total += capacity;
+            size_t totalCapacity = _blocks.size() * _blockSize;
 
-            while(need > total) {
+            while(need > totalCapacity) {
                 allocateBlock();
-                total += _blockSize;
+                totalCapacity += _blockSize;
             }
         }
 
         void maybeShrink() {
             const size_t totalUsed = _sp;
-            size_t totalCapacity = 0;
-            for(const auto &b : _blocks) totalCapacity += b.capacity;
+            size_t totalCapacity = (_blocks.size() - 1) * _blockSize;
 
             // 至少保留 minBlocks 个块
             constexpr size_t minBlocks = 2;
 
-            while(_blocks.size() > minBlocks && totalUsed <= totalCapacity - _blocks.back().capacity) {
-                totalCapacity -= _blocks.back().capacity;
+            while(_blocks.size() > minBlocks && totalUsed <= totalCapacity - _blockSize) {
                 _blocks.pop_back();
+                totalCapacity -= _blockSize;
             }
         }
     };
