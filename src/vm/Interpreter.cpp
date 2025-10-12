@@ -35,7 +35,10 @@ namespace Ciallang::Bytecode {
 
             const auto *instruction = instList[pc];
             ++pc;
-            instruction->execute(*this);
+            Op::Instruction::execute(instruction->getOpcode(), *instruction, *this);
+
+            // const auto &[exec, dump] = Op::Instruction::handlers[static_cast<size_t>(instruction->getOpcode())];
+            // exec(*instruction, *this);
         }
     }
 
@@ -44,14 +47,10 @@ namespace Ciallang::Bytecode {
     }
 
     TjsValue Interpreter::reg(const Register reg) {
-        const auto index = reg.index();
-        CLL_ASSERT(index < _currentFrame->chunk->getRegisterCount(), "index > registers count");
-        return _currentFrame->getReg(index);
+        return _currentFrame->getReg(reg.index());
     }
 
     const TjsValue &Interpreter::reg(const Register reg) const {
-        const auto index = reg.index();
-        CLL_ASSERT(index < _currentFrame->chunk->getRegisterCount(), "index > registers count");
-        return _currentFrame->getReg(index);
+        return _currentFrame->getReg(reg.index());
     }
 } // namespace Ciallang::Bytecode

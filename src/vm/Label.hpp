@@ -20,10 +20,10 @@ namespace Ciallang::Bytecode {
     public:
         explicit Label(const size_t address) : _address(address) {}
 
-        size_t address() const { return _address; }
+        [[nodiscard]] size_t address() const { return _address; }
 
     private:
-        const size_t _address;
+        size_t _address;
 
         friend std::ostream &operator<<(std::ostream &os, const Label &label) { return os << '@' << label._address; }
     };

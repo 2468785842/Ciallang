@@ -22,10 +22,9 @@ namespace Ciallang::Bytecode {
     public:
         ~Chunk() noexcept;
 
-        template <typename T, typename... Args>
-            requires std::is_base_of_v<Op::Instruction, T>
-        T *emit(Args &&...args) {
-            T *ins = new T{ std::forward<Args>(args)... };
+        template <Op::OpCode OP, typename... Args>
+        auto *emit(Args &&...args) {
+            auto *ins = new Op::Instruction{ OP, Op::Operand(std::forward<Args>(args))... };
             _instructions.push_back(ins);
             return ins;
         }

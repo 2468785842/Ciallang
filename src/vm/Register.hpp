@@ -19,12 +19,12 @@ namespace Ciallang::Bytecode {
     class [[nodiscard]] Register {
     public:
         explicit Register() : _index(0) {}
-        explicit Register(const std::uint32_t index) : _index(index) {}
+        explicit Register(const size_t index) : _index(index) {}
 
-        [[nodiscard]] std::uint32_t index() const noexcept { return _index; }
+        [[nodiscard]] size_t index() const noexcept { return _index; }
 
     private:
-        std::uint32_t _index;
+        size_t _index;
 
         friend std::ostream &operator<<(std::ostream &os, const Register &reg) { return os << '%' << reg._index; }
     };

@@ -39,7 +39,7 @@ namespace Ciallang::Inter {
 
     std::optional<Bytecode::Register> BytecodeGenerator::generate(const Syntax::ValueExprNode *node) {
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::Load>(dst, std::move(*node->token->value()));
+        _chunk->emit<Bytecode::Op::OpCode::Load>(dst, std::move(*node->token->value()));
 
         if(_r.isFailed())
             return {};
@@ -61,34 +61,34 @@ namespace Ciallang::Inter {
 
         switch(node->token->type()) {
             case Equal:
-                _chunk->emit<Bytecode::Op::EQ>(reg1.value(), reg2.value(), dst);
+                _chunk->emit<Bytecode::Op::OpCode::EQ>(reg1.value(), reg2.value(), dst);
                 break;
             case NotEqual:
-                _chunk->emit<Bytecode::Op::NEQ>(reg1.value(), reg2.value(), dst);
+                _chunk->emit<Bytecode::Op::OpCode::NEQ>(reg1.value(), reg2.value(), dst);
                 break;
             case Gt:
-                _chunk->emit<Bytecode::Op::GT>(reg1.value(), reg2.value(), dst);
+                _chunk->emit<Bytecode::Op::OpCode::GT>(reg1.value(), reg2.value(), dst);
                 break;
             case GtOrEqual:
-                _chunk->emit<Bytecode::Op::GE>(reg1.value(), reg2.value(), dst);
+                _chunk->emit<Bytecode::Op::OpCode::GE>(reg1.value(), reg2.value(), dst);
                 break;
             case Lt:
-                _chunk->emit<Bytecode::Op::LT>(reg1.value(), reg2.value(), dst);
+                _chunk->emit<Bytecode::Op::OpCode::LT>(reg1.value(), reg2.value(), dst);
                 break;
             case LtOrEqual:
-                _chunk->emit<Bytecode::Op::LE>(reg1.value(), reg2.value(), dst);
+                _chunk->emit<Bytecode::Op::OpCode::LE>(reg1.value(), reg2.value(), dst);
                 break;
             case Plus:
-                _chunk->emit<Bytecode::Op::Add>(reg1.value(), reg2.value(), dst);
+                _chunk->emit<Bytecode::Op::OpCode::Add>(reg1.value(), reg2.value(), dst);
                 break;
             case Minus:
-                _chunk->emit<Bytecode::Op::Sub>(reg1.value(), reg2.value(), dst);
+                _chunk->emit<Bytecode::Op::OpCode::Sub>(reg1.value(), reg2.value(), dst);
                 break;
             case Asterisk:
-                _chunk->emit<Bytecode::Op::Mul>(reg1.value(), reg2.value(), dst);
+                _chunk->emit<Bytecode::Op::OpCode::Mul>(reg1.value(), reg2.value(), dst);
                 break;
             case Slash:
-                _chunk->emit<Bytecode::Op::Div>(reg1.value(), reg2.value(), dst);
+                _chunk->emit<Bytecode::Op::OpCode::Div>(reg1.value(), reg2.value(), dst);
                 break;
             default:
                 CLL_LOG_ERROR("unknow binary operator");
@@ -107,14 +107,14 @@ namespace Ciallang::Inter {
         auto dst = allocateRegister();
 
         if(dynamic_cast<const Syntax::IdentifierExprNode *>(member)) {
-            std::vector<Bytecode::Register> arguments{};
+            auto arguments = std::make_unique<std::vector<Bytecode::Register>>();
             auto memberReg = node->memberAccess->generateBytecode(this);
 
             CLL_ASSERT(memberReg.has_value(), "memberReg is empty");
 
             for(const auto *exprNode : node->arguments) {
                 if(!exprNode) {
-                    arguments.push_back(getEmpty(*_chunk));
+                    arguments->push_back(getEmpty(*_chunk));
                 } else {
                     auto reg = exprNode->generateBytecode(this);
                     if(_r.isFailed())
@@ -122,12 +122,12 @@ namespace Ciallang::Inter {
 
                     CLL_ASSERT(reg.has_value(), "reg is empty");
                     freeRegister(reg.value());
-                    arguments.push_back(reg.value());
+                    arguments->push_back(reg.value());
                 }
             }
 
             freeRegister(memberReg.value());
-            _chunk->emit<Bytecode::Op::Call>(dst, memberReg.value(), std::move(arguments));
+            _chunk->emit<Bytecode::Op::OpCode::Call>(dst, memberReg.value(), arguments.release());
             return dst;
         }
         CLL_LOG_ERROR("not impl");
@@ -151,7 +151,7 @@ namespace Ciallang::Inter {
             CLL_ASSERT(dst.has_value(), "dst is not have val");
 
             freeRegister(src.value());
-            _chunk->emit<Bytecode::Op::Mov>(src.value(), dst.value());
+            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), dst.value());
             variable.value()->init = true;
             if(_r.isFailed())
                 return {};
@@ -163,7 +163,7 @@ namespace Ciallang::Inter {
         auto src = node->rhs->generateBytecode(this);
         CLL_ASSERT(src.has_value(), "global src is not have val");
 
-        _chunk->emit<Bytecode::Op::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), src.value());
+        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), src.value());
 
         if(_r.isFailed())
             return {};
@@ -179,8 +179,8 @@ namespace Ciallang::Inter {
         if(_scopeDepth == 1) {
             // can't init
             if(!node->rhs) {
-                _chunk->emit<Bytecode::Op::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()),
-                                                    getEmpty(*_chunk));
+                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()),
+                                                             getEmpty(*_chunk));
                 return {};
             }
 
@@ -189,7 +189,8 @@ namespace Ciallang::Inter {
             if(_r.isFailed())
                 return {};
 
-            _chunk->emit<Bytecode::Op::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), src.value());
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()),
+                                                         src.value());
             return {};
         }
 
@@ -208,7 +209,7 @@ namespace Ciallang::Inter {
 
             CLL_ASSERT(src.has_value(), "src is not have val");
 
-            _chunk->emit<Bytecode::Op::Mov>(src.value(), variable.value()->reg);
+            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), variable.value()->reg);
             return {};
         }
 
@@ -223,7 +224,7 @@ namespace Ciallang::Inter {
                 return {};
             CLL_ASSERT(src.has_value(), "src is not have val");
 
-            _chunk->emit<Bytecode::Op::Mov>(src.value(), dst.value());
+            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), dst.value());
         } else {
             dst = getEmpty(*_chunk);
         }
@@ -257,21 +258,21 @@ namespace Ciallang::Inter {
         auto funChunk = gen.parseAst(_r, node->body);
 
         // the last instruction is not ret, patch one ret
-        if(!dynamic_cast<Bytecode::Op::Ret *>(funChunk->instructions().back())) {
-            funChunk->emit<Bytecode::Op::Ret>(gen.getEmpty(*funChunk));
+        if(funChunk->instructions().back()->getOpcode() != Bytecode::Op::OpCode::Ret) {
+            funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.getEmpty(*funChunk));
         }
 
         const auto identifier = node->token->value();
 
         CLL_ASSERT(identifier->isString(), "identifier is not string");
 
-        _chunk->emit<Bytecode::Op::Load>(
+        _chunk->emit<Bytecode::Op::OpCode::Load>(
             funReg,
             TjsValue{ new TjsFunction{ funChunk.release(), *identifier->toString(), node->parameters.size() } });
 
         if(_scopeDepth == 1) {
             freeRegister(funReg);
-            _chunk->emit<Bytecode::Op::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), funReg);
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), funReg);
             return {};
         }
 
@@ -297,7 +298,7 @@ namespace Ciallang::Inter {
         }
 
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::GGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), dst);
+        _chunk->emit<Bytecode::Op::OpCode::GGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), dst);
         if(_r.isFailed())
             return {};
 
@@ -327,21 +328,21 @@ namespace Ciallang::Inter {
 
         CLL_ASSERT(testReg.has_value(), "testReg is not have val");
 
-        _chunk->emit<Bytecode::Op::Test>(testReg.value());
+        _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
 
-        auto *jmpNE = _chunk->emit<Bytecode::Op::JmpNE>();
+        auto *jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
         node->body->generateBytecode(this);
-        Bytecode::Op::Jmp *jmp{ nullptr };
+        Bytecode::Op::Instruction *jmp{ nullptr };
 
         if(node->elseBody) {
-            jmp = _chunk->emit<Bytecode::Op::Jmp>();
+            jmp = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
         }
 
-        jmpNE->setTarget(makeLabel());
+        Bytecode::Op::JmpNE::setTarget(*jmpNE, makeLabel());
 
         if(node->elseBody) {
             node->elseBody->generateBytecode(this);
-            jmp->setTarget(makeLabel());
+            Bytecode::Op::Jmp::setTarget(*jmp, makeLabel());
         }
 
         freeRegister(testReg.value());
@@ -357,13 +358,14 @@ namespace Ciallang::Inter {
 
         CLL_ASSERT(testReg.has_value(), "testReg is not have val");
 
-        _chunk->emit<Bytecode::Op::Test>(testReg.value());
-        const auto jmpNE = _chunk->emit<Bytecode::Op::JmpNE>();
+        _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
+        const auto jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
 
         node->body->generateBytecode(this);
-        _chunk->emit<Bytecode::Op::Jmp>()->setTarget(loopLabel);
+        Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), loopLabel);
 
-        jmpNE->setTarget(makeLabel());
+        Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), makeLabel());
+        Bytecode::Op::JmpNE::setTarget(*jmpNE, makeLabel());
 
         freeRegister(testReg.value());
 
@@ -378,10 +380,10 @@ namespace Ciallang::Inter {
         if(node->expr) {
             auto reg = node->expr->generateBytecode(this);
             CLL_ASSERT(reg.has_value(), "reg is not have val");
-            _chunk->emit<Bytecode::Op::Ret>(reg.value());
+            _chunk->emit<Bytecode::Op::OpCode::Ret>(reg.value());
             return {};
         }
-        _chunk->emit<Bytecode::Op::Ret>(getEmpty(*_chunk));
+        _chunk->emit<Bytecode::Op::OpCode::Ret>(getEmpty(*_chunk));
         return {};
     }
 

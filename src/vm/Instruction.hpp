@@ -15,6 +15,7 @@
 
 #include "Label.hpp"
 #include "Register.hpp"
+#include "logging/Logger.hpp"
 #include "pch.h"
 
 #include "types/TjsValue.hpp"
@@ -24,314 +25,416 @@ namespace Ciallang::Bytecode {
 }
 
 namespace Ciallang::Bytecode::Op {
+
+#define OPCODE_ENUMS(O) \
+    O(Load) \
+    O(Add) \
+    O(Sub) \
+    O(Mul) \
+    O(Div) \
+    O(Mov) \
+    O(DGlobal) \
+    O(GGlobal) \
+    O(Test) \
+    O(EQ) \
+    O(NEQ) \
+    O(LT) \
+    O(LE) \
+    O(GT) \
+    O(GE) \
+    O(AbsEQ) \
+    O(Jmp) \
+    O(JmpE) \
+    O(JmpNE) \
+    O(Call) \
+    O(Ret)
+
+#define OPCODE_ENUM_CLASS(OP) OP,
+    enum class OpCode : std::uint8_t {
+        OPCODE_ENUMS(OPCODE_ENUM_CLASS)
+        COUNT
+    };
+#undef OPCODE_ENUM_CLASS
+
+    class Instruction;
+
+    using ExecuteCallback = void (*)(const Instruction &, Interpreter &);
+    using DumpCallback = std::string (*)(const Instruction &, const Interpreter &, bool);
+
+    using RegisterVec = std::vector<Register> *;
+
+    struct Operand {
+        enum class Type {
+            None,
+            Value,
+            Register,
+            RegisterVec,
+            Label,
+            SymbolIndex
+        };
+        union {
+            TjsValue *value;
+            Register reg;
+            RegisterVec regs;
+            Label label;
+            size_t symbolIndex;
+        } operand{};
+
+        Type type{ Type::None };
+
+        explicit Operand(TjsValue &&value) : type(Type::Value) {
+            this->operand.value = new TjsValue{std::move(value)};
+        }
+
+        explicit Operand(const Register &value) : type(Type::Register) { this->operand.reg = value; }
+
+        explicit Operand(RegisterVec value) : type(Type::RegisterVec) { this->operand.regs = value; }
+
+        explicit Operand(const Label &value) : type(Type::Label) { this->operand.label = value; }
+
+        explicit Operand(const size_t value) : type(Type::SymbolIndex) { this->operand.symbolIndex = value; }
+
+        Operand(const Operand &other) = delete;
+
+        Operand(Operand &&other) noexcept {
+            type = other.type;
+            operand = other.operand;
+            other.type = Type::None;
+        }
+
+        Operand &operator=(const Operand &other) = delete;
+
+        Operand &operator=(Operand &&other) noexcept {
+            if (this == &other) return *this;
+            this->~Operand();
+            this->operand = other.operand;
+            this->type = other.type;
+            other.type = Type::None;
+            return *this;
+        }
+
+        ~Operand() {
+            if(type == Type::Value) {
+                delete operand.value;
+            }
+            if(type == Type::RegisterVec) {
+                delete operand.regs;
+            }
+        }
+    };
+
     class Instruction {
     public:
-        virtual void execute(Interpreter &) const = 0;
 
-        [[nodiscard]] virtual std::string dump(const Interpreter &, bool) const = 0;
+        struct Handler {
+            ExecuteCallback exec;
+            DumpCallback dump;
+        };
 
-        virtual ~Instruction() = default;
-    };
+        explicit Instruction(const OpCode opcode) : _opcode(opcode) {}
+        explicit Instruction(const OpCode opcode, Operand &&operand) : _opcode(opcode), _operand1(std::move(operand)) {}
+        explicit Instruction(const OpCode opcode, Operand &&operand1, Operand &&operand2) :
+            _opcode(opcode), _operand1(std::move(operand1)), _operand2(std::move(operand2)) {}
+        explicit Instruction(const OpCode opcode, Operand &&operand1, Operand &&operand2, Operand &&operand3) :
+            _opcode(opcode), _operand1(std::move(operand1)), _operand2(std::move(operand2)), _operand3(std::move(operand3)) {}
 
-    class Load final : public Instruction {
-    public:
-        explicit Load(const Register reg, TjsValue &&value) : _reg(reg), _value(std::move(value)) {}
+        [[nodiscard]] OpCode getOpcode() const { return _opcode; }
 
-        void execute(Interpreter &) const override;
+        template <typename T>
+        void setOperand1(T &&v) {
+            _operand1 = Operand{std::forward<T>(v)};
+        }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        template <typename T>
+        void setOperand2(T &&v) {
+            _operand2 = Operand{std::forward<T>(v)};
+        }
 
-        [[nodiscard]] const TjsValue &value() const { return _value; }
+        template <typename T>
+        void setOperand3(T &&v) {
+            _operand3 = Operand{std::forward<T>(v)};
+        }
 
-    private:
-        const Register _reg;
-        const TjsValue _value;
-    };
+        template<typename T>
+        [[nodiscard]] const T &getOperand1() const {
+            return getOperand<T>(_operand1);
+        }
 
-    class Add final : public Instruction {
-    public:
-        explicit Add(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
+        template<typename T>
+        [[nodiscard]] const T &getOperand2() const {
+            return getOperand<T>(_operand2);
+        }
 
-        void execute(Interpreter &) const override;
+        template<typename T>
+        [[nodiscard]] const T &getOperand3() const {
+            return getOperand<T>(_operand3);
+        }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
 
-    private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
-    };
+        static void execute(OpCode opcode, const Instruction &itt, Interpreter & ipt);
 
-    class Sub final : public Instruction {
-    public:
-        explicit Sub(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
-
-        void execute(Interpreter &) const override;
-
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
-
-    private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
-    };
-
-    class Mul final : public Instruction {
-    public:
-        explicit Mul(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
-
-        void execute(Interpreter &) const override;
-
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static std::string dump(OpCode opcode, const Instruction & itt, const Interpreter & ipt, bool info);
 
     private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
+        const OpCode _opcode;
+        std::optional<Operand> _operand1;
+        std::optional<Operand> _operand2;
+        std::optional<Operand> _operand3;
+
+        template<typename T>
+        [[nodiscard]] const T &getOperand(const std::optional<Operand> &operand) const {
+            if constexpr (std::is_same_v<T, Register>) {
+                CLL_ASSERT(operand->type == Operand::Type::Register, "operand type is not Register");
+                return operand->operand.reg;
+            }else if constexpr (std::is_same_v<T, RegisterVec>) {
+                CLL_ASSERT(operand->type == Operand::Type::RegisterVec, "operand type is not RegisterVec");
+                return operand->operand.regs;
+            }else if constexpr (std::is_same_v<T, Label>) {
+                CLL_ASSERT(operand->type == Operand::Type::Label, "operand type is not Label");
+                return operand->operand.label;
+            }else if constexpr (std::is_same_v<T, TjsValue>) {
+                CLL_ASSERT(operand->type == Operand::Type::Value, "operand type is not Value");
+                return *operand->operand.value;
+            }else if constexpr (std::is_same_v<T, size_t>) {
+                CLL_ASSERT(operand->type == Operand::Type::SymbolIndex, "operand type is not symbolIndex");
+                return operand->operand.symbolIndex;
+            }
+            static_assert(std::is_same_v<T, T>, "type unsupported");
+        }
     };
 
-    class Div final : public Instruction {
-    public:
-        explicit Div(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
+    namespace Load {
+        static Register reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static TjsValue value(const Instruction &itt) { return itt.getOperand2<TjsValue>(); }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static void execute(const Instruction &, const Interpreter &);
 
-    private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
-    };
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace Load
 
+    namespace Add {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-    class Mov final : public Instruction {
-    public:
-        explicit Mov(const Register src, const Register dst) : _src(src), _dst(dst) {}
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static void execute(const Instruction &, Interpreter &);
 
-    private:
-        const Register _src;
-        const Register _dst;
-    };
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace Add
 
-    class DGlobal final : public Instruction {
-    public:
-        explicit DGlobal(const size_t symbolIndex, const Register src) : _src(src), _symbolIndex(symbolIndex) {}
+    namespace Sub {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-    private:
-        const Register _src;
-        const size_t _symbolIndex;
-    };
+        static void execute(const Instruction &, const Interpreter &);
 
-    class GGlobal final : public Instruction {
-    public:
-        explicit GGlobal(const size_t symbolIndex, const Register dst) : _dst(dst), _symbolIndex(symbolIndex) {}
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace Sub
 
-        void execute(Interpreter &) const override;
+    namespace Mul {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-    private:
-        const Register _dst;
-        const size_t _symbolIndex;
-    };
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-    class Test final : public Instruction {
-    public:
-        explicit Test(const Register reg) : _reg(reg) {}
+        static void execute(const Instruction &, Interpreter &);
 
-        void execute(Interpreter &) const override;
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace Mul
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+    namespace Div {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-    private:
-        const Register _reg;
-    };
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-    class EQ final : public Instruction {
-    public:
-        explicit EQ(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static void execute(const Instruction &, Interpreter &);
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace Div
 
-    private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
-    };
+    namespace Mov {
+        static Register src(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-    class NEQ final : public Instruction {
-    public:
-        explicit NEQ(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
+        static Register dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static void execute(const Instruction &, Interpreter &);
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace Mov
 
-    private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
-    };
+    namespace DGlobal {
+        static size_t symbolIndex(const Instruction &itt) { return itt.getOperand1<size_t>(); }
 
-    class LT final : public Instruction {
-    public:
-        explicit LT(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
+        static Register src(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static void execute(const Instruction &, Interpreter &);
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace DGlobal
 
-    private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
-    };
+    namespace GGlobal {
+        static size_t symbolIndex(const Instruction &itt) { return itt.getOperand1<size_t>(); }
 
-    class LE final : public Instruction {
-    public:
-        explicit LE(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
+        static Register dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static void execute(const Instruction &, Interpreter &);
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace GGlobal
 
-    private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
-    };
+    namespace Test {
+        static Register reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-    class GT final : public Instruction {
-    public:
-        explicit GT(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
+        static void execute(const Instruction &, Interpreter &);
 
-        void execute(Interpreter &) const override;
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace Test
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+    namespace EQ {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-    private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
-    };
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-    class GE final : public Instruction {
-    public:
-        explicit GE(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static void execute(const Instruction &, Interpreter &);
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace EQ
 
-    private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
-    };
+    namespace NEQ {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-    // ===
-    class AbsEQ final : public Instruction {
-    public:
-        explicit AbsEQ(const Register reg1, const Register reg2, const Register dst) :
-            _reg1(reg1), _reg2(reg2), _dst(dst) {}
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static void execute(const Instruction &, Interpreter &);
 
-    private:
-        const Register _reg1;
-        const Register _reg2;
-        const Register _dst;
-    };
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace NEQ
 
-    class Jmp final : public Instruction {
-    public:
-        explicit Jmp() = default;
+    namespace LT {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        void setTarget(Label label) { _label.emplace(label); }
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static void execute(const Instruction &, Interpreter &);
 
-    private:
-        std::optional<Label> _label;
-    };
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace LT
 
-    class JmpE final : public Instruction {
-    public:
-        explicit JmpE() = default;
+    namespace LE {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        void setTarget(Label label) { _label.emplace(label); }
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static void execute(const Instruction &, Interpreter &);
 
-    private:
-        std::optional<Label> _label;
-    };
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace LE
 
-    class JmpNE final : public Instruction {
-    public:
-        explicit JmpNE() = default;
+    namespace GT {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        void setTarget(Label label) { _label.emplace(label); }
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static void execute(const Instruction &, Interpreter &);
 
-    private:
-        std::optional<Label> _label;
-    };
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace GT
 
-    class Call final : public Instruction {
-    public:
-        explicit Call(const Register dst, const Register memberReg, std::vector<Register> &&arguments) :
-            _dst(dst), _memberReg(memberReg), _arguments(arguments) {}
+    namespace GE {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        void execute(Interpreter &) const override;
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-    private:
-        const Register _dst;
-        const Register _memberReg;
-        const std::vector<Register> _arguments;
-    };
+        static void execute(const Instruction &, Interpreter &);
 
-    class Ret final : public Instruction {
-    public:
-        explicit Ret(const Register retReg) : _retReg(retReg) {}
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace GE
 
-        void execute(Interpreter &) const override;
+    namespace AbsEQ {
+        static Register reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        [[nodiscard]] std::string dump(const Interpreter &, bool) const override;
+        static Register reg2(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-    private:
-        std::optional<Register> _retReg{};
-    };
+        static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+
+        static void execute(const Instruction &, Interpreter &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace AbsEQ
+
+    namespace Jmp {
+
+        static Label label(const Instruction &itt) { return itt.getOperand1<Label>(); }
+
+        static void setTarget(Instruction &itt, Label label) { itt.setOperand1(label); }
+
+        static void execute(const Instruction &, Interpreter &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace Jmp
+
+    namespace JmpE {
+
+        static Label label(const Instruction &itt) { return itt.getOperand1<Label>(); }
+
+        static void setTarget(Instruction &itt, Label label) { itt.setOperand1(label); }
+        static void execute(const Instruction &, Interpreter &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace JmpE
+
+    namespace JmpNE {
+
+        static Label label(const Instruction &itt) { return itt.getOperand1<Label>(); }
+
+        static void setTarget(Instruction &itt, Label label) { itt.setOperand1(label); }
+
+        static void execute(const Instruction &, Interpreter &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace JmpNE
+
+    namespace Call {
+        static Register dst(const Instruction &itt) { return itt.getOperand1<Register>(); }
+
+        static Register memberReg(const Instruction &itt) { return itt.getOperand2<Register>(); }
+
+        static std::vector<Register> *arguments(const Instruction &itt) {
+            return itt.getOperand3<std::vector<Register> *>();
+        }
+
+        static void execute(const Instruction &, Interpreter &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace Call
+
+    namespace Ret {
+        static Register retReg(const Instruction &itt) { return itt.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, Interpreter &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+    } // namespace Ret
+
 } // namespace Ciallang::Bytecode::Op

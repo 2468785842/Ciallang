@@ -29,58 +29,58 @@ namespace Ciallang::Bytecode {
     class FastRegisterPool {
     public:
         explicit FastRegisterPool(const size_t initialCap = 1 << 16) {
-            storage.reserve(initialCap);
-            storage.resize(0);
-            sp = 0;
+            _storage.reserve(initialCap);
+            _storage.resize(0);
+            _sp = 0;
         }
 
         // 预分配整个栈容量（避免重分配）
         void reserve(const size_t total) {
-            if(total > storage.capacity()) {
-                storage.reserve(total);
+            if(total > _storage.capacity()) {
+                _storage.reserve(total);
             }
         }
 
         // 分配一个连续的寄存器块，返回指针基址（TjsValue*）
         // 使用方式：TjsValue* base = stack.allocFrame(n); base[i] ...
         TjsValue *allocFrame(const size_t n) {
-            const size_t base = sp;
-            ensureCapacity(sp + n);
-            sp += n;
+            const size_t base = _sp;
+            ensureCapacity(_sp + n);
+            _sp += n;
             // 返回内部数组的裸指针：极快的访问
-            return storage.data() + base;
+            return _storage.data() + base;
         }
 
         // 释放最近分配的帧（必须和 allocFrame 按栈顺序配对）
         void freeFrame(const size_t n) {
-            assert(sp >= n);
-            sp -= n;
+            assert(_sp >= n);
+            _sp -= n;
         }
 
         // peek base pointer to stack top - useful for debugging
-        TjsValue *topPtr() noexcept { return storage.data() + sp; }
+        TjsValue *topPtr() noexcept { return _storage.data() + _sp; }
 
-        [[nodiscard]] size_t used() const noexcept { return sp; }
-        [[nodiscard]] size_t capacity() const noexcept { return storage.capacity(); }
+        [[nodiscard]] size_t used() const noexcept { return _sp; }
+        [[nodiscard]] size_t capacity() const noexcept { return _storage.capacity(); }
 
     private:
-        std::vector<TjsValue> storage;
-        size_t sp; // stack pointer (next free slot index)
+        std::vector<TjsValue> _storage;
+        size_t _sp; // stack pointer (next free slot index)
 
         void ensureCapacity(const size_t need) {
-            if(need <= storage.size()) {
+            if(need <= _storage.size()) {
                 // 已有构造对象覆盖（最常见）
                 return;
             }
 
-            if(need <= storage.capacity()) {
+            if(need <= _storage.capacity()) {
                 // 有容量但 size() 小：只增加 size（构造需要的对象）
-                storage.resize(need);
+                _storage.resize(need);
                 return;
             }
 
             // 容量不够：按指数增长（2x），避免频繁扩容
-            size_t curCap = storage.capacity();
+            size_t curCap = _storage.capacity();
             if(curCap == 0)
                 curCap = 1;
             size_t newCap = curCap;
@@ -94,8 +94,8 @@ namespace Ciallang::Bytecode {
             }
 
             // 一次性 reserve 到 newCap，然后 resize 到 need（构造对象）
-            storage.reserve(newCap);
-            storage.resize(need);
+            _storage.reserve(newCap);
+            _storage.resize(need);
         }
     };
 
@@ -140,16 +140,10 @@ namespace Ciallang::Bytecode {
         }
 
         [[nodiscard]] TjsValue &getReg(const size_t index) {
-            if(!_pool) {
-                throw std::runtime_error("call frame not initialized");
-            }
             return regs[index];
         }
 
         [[nodiscard]] const TjsValue &getReg(const size_t index) const {
-            if(!_pool) {
-                throw std::runtime_error("call frame not initialized");
-            }
             return regs[index];
         }
 
@@ -240,11 +234,14 @@ namespace Ciallang::Bytecode {
             std::vector<TjsFunction *> functions{};
             while(pc < chunk.instructions().size()) {
                 const auto instruction = chunk.instructions()[pc];
-                ss << fmt::format("{: <6}: {}\n", Label{ pc }, instruction->dump(*this, false));
 
-                if(const auto loadIns = dynamic_cast<Op::Load *>(instruction); loadIns && loadIns->value().isObject()) {
-                    if(auto fun = dynamic_cast<TjsFunction *>(loadIns->value().toObject())) {
-                        functions.push_back(fun);
+                ss << fmt::format("{: <6}: {}\n", Label{ pc }, Op::Instruction::dump(instruction->getOpcode(), *instruction, *this, false));
+
+                if(instruction->getOpcode() == Op::OpCode::Load) {
+                    if(auto value = Op::Load::value(*instruction); value.isObject()) {
+                        if(auto fun = dynamic_cast<TjsFunction *>(value.toObject())) {
+                            functions.push_back(fun);
+                        }
                     }
                 }
 

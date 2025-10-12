@@ -32,12 +32,16 @@
 #define CLL_LOG_ERROR(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kError, fmt, ##__VA_ARGS__)
 #define CLL_LOG_FATAL(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kFatal, fmt, ##__VA_ARGS__)
 
+#if _DEBUG
+#define CLL_ASSERT(cond, fmt, ...)
+#else
 #define CLL_ASSERT(cond, fmt, ...)                                                                                     \
     do {                                                                                                               \
         if(!(cond)) {                                                                                                  \
             ::Ciallang::assertFail(#cond, __FILE__, __LINE__, fmt, ##__VA_ARGS__);                                     \
         }                                                                                                              \
     } while(false)
+#endif
 
 namespace Ciallang {
 
