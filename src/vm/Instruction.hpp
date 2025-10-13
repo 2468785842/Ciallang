@@ -50,7 +50,7 @@ namespace Ciallang::Bytecode {
 namespace Ciallang::Bytecode::Op {
 
 #define OPCODE_ENUM_CLASS(OP) OP,
-    enum struct OpCode : std::uint32_t { OPCODE_ENUMS(OPCODE_ENUM_CLASS) COUNT };
+    enum class OpCode : std::uint32_t { OPCODE_ENUMS(OPCODE_ENUM_CLASS) COUNT };
 #undef OPCODE_ENUM_CLASS
 
     class Instruction;

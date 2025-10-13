@@ -31,11 +31,11 @@ namespace Ciallang::Bytecode {
         explicit FastRegisterPool(const size_t blockSize = 1 << 12) : _blockSize(blockSize), _sp(0) { allocateBlock(); }
 
         // 分配连续的寄存器帧
-        TjsValue *allocFrame(const size_t n) {
+        size_t allocFrame(const size_t n) {
             ensureCapacity(_sp + n);
-            TjsValue *ptr = ptrAt(_sp);
+            const size_t baseSP = _sp;
             _sp += n;
-            return ptr;
+            return baseSP;
         }
 
         // 释放最近分配的帧
@@ -45,10 +45,15 @@ namespace Ciallang::Bytecode {
             maybeShrink();
         }
 
-        // 返回栈顶指针
-        TjsValue *topPtr() const noexcept { return ptrAt(_sp); }
+        [[nodiscard]] TjsValue *ptrAt(const size_t globalIndex) const {
+            const size_t blockIndex = globalIndex / _blockSize; // 第几个块
+            const size_t offset = globalIndex % _blockSize; // 块内偏移
 
-        size_t used() const noexcept { return _sp; }
+            assert(blockIndex < _blocks.size());
+            return _blocks[blockIndex].data + offset;
+        }
+
+        [[nodiscard]] size_t used() const noexcept { return _sp; }
 
     private:
         struct Block {
@@ -73,15 +78,6 @@ namespace Ciallang::Bytecode {
         std::vector<Block> _blocks;
         size_t _blockSize;
         size_t _sp; // 全局栈指针（相对于首块）
-
-        TjsValue *ptrAt(const size_t globalIndex) const {
-            const size_t blockIndex = globalIndex / _blockSize; // 第几个块
-            const size_t offset = globalIndex % _blockSize; // 块内偏移
-
-            assert(blockIndex < _blocks.size());
-            return _blocks[blockIndex].data + offset;
-        }
-
 
         void allocateBlock() { _blocks.emplace_back(_blockSize); }
 
@@ -110,17 +106,17 @@ namespace Ciallang::Bytecode {
 
     struct CallFrame {
         const Chunk *chunk{ nullptr };
-        TjsValue *regs{ nullptr };
+        size_t baseRegSP{ 0 };
         std::optional<Register> ret{};
         size_t pc{};
 
         explicit CallFrame() = default;
 
         explicit CallFrame(const Chunk *chunk_, const std::optional<Register> ret_, FastRegisterPool &pool) :
-            chunk(chunk_), regs(pool.allocFrame(chunk_->getRegisterCount())), ret(ret_), _pool(&pool) {}
+            chunk(chunk_), baseRegSP(pool.allocFrame(chunk_->getRegisterCount())), ret(ret_), _pool(&pool) {}
 
         CallFrame(CallFrame &&callFrame) noexcept :
-            chunk(callFrame.chunk), regs(callFrame.regs), ret(callFrame.ret), pc(callFrame.pc), _pool(callFrame._pool) {
+            chunk(callFrame.chunk), baseRegSP(callFrame.baseRegSP), ret(callFrame.ret), pc(callFrame.pc), _pool(callFrame._pool) {
             callFrame._pool = nullptr;
         }
 
@@ -130,13 +126,21 @@ namespace Ciallang::Bytecode {
 
             chunk = callFrame.chunk;
             ret = callFrame.ret;
-            regs = callFrame.regs;
+            baseRegSP = callFrame.baseRegSP;
             pc = callFrame.pc;
             _pool = callFrame._pool;
 
             callFrame._pool = nullptr;
 
             return *this;
+        }
+
+        void reset(const Chunk *chunk_, const std::optional<Register> ret_, FastRegisterPool &pool) {
+            _pool = &pool;
+            chunk = chunk_;
+            ret = ret_;
+            baseRegSP = _pool->allocFrame(chunk_->getRegisterCount());
+            pc = 0;
         }
 
         CallFrame(const CallFrame &) = delete;
@@ -148,9 +152,9 @@ namespace Ciallang::Bytecode {
             }
         }
 
-        [[nodiscard]] TjsValue &getReg(const size_t index) { return regs[index]; }
+        [[nodiscard]] TjsValue &getReg(const size_t index) { return *_pool->ptrAt(baseRegSP + index); }
 
-        [[nodiscard]] const TjsValue &getReg(const size_t index) const { return regs[index]; }
+        [[nodiscard]] const TjsValue &getReg(const size_t index) const { return *_pool->ptrAt(baseRegSP + index); }
 
     private:
         FastRegisterPool *_pool{ nullptr };
@@ -222,7 +226,7 @@ namespace Ciallang::Bytecode {
             return _currentFrame->chunk->instructions();
         }
 
-        [[nodiscard]] const Chunk *current() const noexcept { return _currentFrame->chunk; }
+        [[nodiscard]] const CallFrame *current() const noexcept { return _currentFrame; }
 
         [[nodiscard]] std::string dumpRegisters() const {
             std::stringstream ss{};
