@@ -48,8 +48,6 @@ namespace Ciallang::Bytecode {
         [[nodiscard]] TjsValue *ptrAt(const size_t globalIndex) const {
             const size_t blockIndex = globalIndex / _blockSize; // 第几个块
             const size_t offset = globalIndex % _blockSize; // 块内偏移
-
-            assert(blockIndex < _blocks.size());
             return _blocks[blockIndex].data + offset;
         }
 
@@ -116,7 +114,8 @@ namespace Ciallang::Bytecode {
             chunk(chunk_), baseRegSP(pool.allocFrame(chunk_->getRegisterCount())), ret(ret_), _pool(&pool) {}
 
         CallFrame(CallFrame &&callFrame) noexcept :
-            chunk(callFrame.chunk), baseRegSP(callFrame.baseRegSP), ret(callFrame.ret), pc(callFrame.pc), _pool(callFrame._pool) {
+            chunk(callFrame.chunk), baseRegSP(callFrame.baseRegSP), ret(callFrame.ret), pc(callFrame.pc),
+            _pool(callFrame._pool) {
             callFrame._pool = nullptr;
         }
 
@@ -133,14 +132,6 @@ namespace Ciallang::Bytecode {
             callFrame._pool = nullptr;
 
             return *this;
-        }
-
-        void reset(const Chunk *chunk_, const std::optional<Register> ret_, FastRegisterPool &pool) {
-            _pool = &pool;
-            chunk = chunk_;
-            ret = ret_;
-            baseRegSP = _pool->allocFrame(chunk_->getRegisterCount());
-            pc = 0;
         }
 
         CallFrame(const CallFrame &) = delete;
@@ -160,13 +151,13 @@ namespace Ciallang::Bytecode {
         FastRegisterPool *_pool{ nullptr };
     };
 
-    class Interpreter {
+    class VMState {
     public:
         CallFrame createCallFrame(const Chunk *chunk, const std::optional<Register> &ret = {}) {
             return CallFrame{ chunk, ret, _regPool };
         }
 
-        explicit Interpreter(Inter::SymbolTable &symbolTable) : _symbolTable(symbolTable) {}
+        explicit VMState(Inter::SymbolTable &symbolTable) : _symbolTable(symbolTable) {}
 
         void run(const Chunk *mainChunk);
 

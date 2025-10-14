@@ -14,7 +14,7 @@
 
 #include <catch.hpp>
 
-#include "vm/Interpreter.hpp"
+#include "vm/VMState.hpp"
 
 #include "ast/AstFormatter.hpp"
 #include "common/SourceFile.hpp"
@@ -36,7 +36,7 @@ TEST_CASE("Print \"Hello World!\"") {
     Ciallang::Inter::BytecodeGenerator codeGen{ sourceFile, globalTable };
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Ciallang::Bytecode::Interpreter interpreter{ globalTable };
+    Ciallang::Bytecode::VMState interpreter{ globalTable };
 
     interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
 
@@ -59,7 +59,7 @@ TEST_CASE("Interpreter Test Execute") {
     Ciallang::Inter::BytecodeGenerator codeGen{ sourceFile, globalTable };
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Ciallang::Bytecode::Interpreter interpreter{ globalTable };
+    Ciallang::Bytecode::VMState interpreter{ globalTable };
 
     fmt::println("{}", interpreter.dumpInstruction(*chunk));
     interpreter.run(chunk.get());
@@ -86,7 +86,7 @@ TEST_CASE("Script execution benchmark") {
         Ciallang::Inter::BytecodeGenerator codeGen{ sourceFile, globalTable };
         auto chunk = codeGen.parseAst(r, globalNode);
 
-        Ciallang::Bytecode::Interpreter interpreter{ globalTable };
+        Ciallang::Bytecode::VMState interpreter{ globalTable };
 
         interpreter.run(chunk.get());
     };

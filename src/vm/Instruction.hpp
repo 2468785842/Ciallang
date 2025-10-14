@@ -44,19 +44,22 @@
     O(Ret)
 
 namespace Ciallang::Bytecode {
-    class Interpreter;
+    class VMState;
 }
 
 namespace Ciallang::Bytecode::Op {
 
+    enum class OpCode : std::uint32_t {
 #define OPCODE_ENUM_CLASS(OP) OP,
-    enum class OpCode : std::uint32_t { OPCODE_ENUMS(OPCODE_ENUM_CLASS) COUNT };
+        OPCODE_ENUMS(OPCODE_ENUM_CLASS)
 #undef OPCODE_ENUM_CLASS
+            COUNT
+    };
 
     class Instruction;
 
-    using ExecuteCallback = void (*)(const Instruction &, Interpreter &);
-    using DumpCallback = std::string (*)(const Instruction &, const Interpreter &, bool);
+    using ExecuteCallback = void (*)(const Instruction &, VMState &);
+    using DumpCallback = std::string (*)(const Instruction &, const VMState &, bool);
 
     using RegisterVec = std::vector<Register>;
 
@@ -167,9 +170,9 @@ namespace Ciallang::Bytecode::Op {
         }
 
 
-        static void execute(OpCode opcode, const Instruction &itt, Interpreter &ipt);
+        static void execute(OpCode opcode, const Instruction &itt, VMState &ipt);
 
-        static std::string dump(OpCode opcode, const Instruction &itt, const Interpreter &ipt, bool info);
+        static std::string dump(OpCode opcode, const Instruction &itt, const VMState &ipt, bool info);
 
     private:
         std::optional<Operand> _operand1;
@@ -204,9 +207,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const TjsValue &value(const Instruction &itt) { return itt.getOperand2<TjsValue>(); }
 
-        static void execute(const Instruction &, const Interpreter &);
+        static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Load
 
     struct Add {
@@ -216,9 +219,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, const Interpreter &);
+        static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Add
 
     struct Sub {
@@ -228,9 +231,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, const Interpreter &);
+        static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Sub
 
     struct Mul {
@@ -240,9 +243,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Mul
 
     struct Div {
@@ -252,9 +255,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Div
 
     struct Mov {
@@ -262,9 +265,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Mov
 
     struct DGlobal {
@@ -272,9 +275,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &src(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct DGlobal
 
     struct GGlobal {
@@ -282,17 +285,17 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, const Interpreter &);
+        static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct GGlobal
 
     struct Test {
         static const Register &reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Test
 
     struct EQ {
@@ -302,9 +305,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct EQ
 
     struct NEQ {
@@ -314,9 +317,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct NEQ
 
     struct LT {
@@ -326,9 +329,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct LT
 
     struct LE {
@@ -338,9 +341,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct LE
 
     struct GT {
@@ -350,9 +353,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct GT
 
     struct GE {
@@ -362,9 +365,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct GE
 
     struct AbsEQ {
@@ -374,9 +377,9 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct AbsEQ
 
     struct Jmp {
@@ -385,9 +388,9 @@ namespace Ciallang::Bytecode::Op {
 
         static void setTarget(Instruction &itt, Label label) { itt.setOperand1(label); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Jmp
 
     struct JmpE {
@@ -395,9 +398,9 @@ namespace Ciallang::Bytecode::Op {
         static const Label &label(const Instruction &itt) { return itt.getOperand1<Label>(); }
 
         static void setTarget(Instruction &itt, Label label) { itt.setOperand1(label); }
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct JmpE
 
     struct JmpNE {
@@ -406,9 +409,9 @@ namespace Ciallang::Bytecode::Op {
 
         static void setTarget(Instruction &itt, Label label) { itt.setOperand1(label); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct JmpNE
 
     struct Call {
@@ -418,17 +421,17 @@ namespace Ciallang::Bytecode::Op {
 
         static const std::vector<Register> &arguments(const Instruction &itt) { return itt.getOperand3<RegisterVec>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Call
 
     struct Ret {
         static const Register &retReg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static void execute(const Instruction &, Interpreter &);
+        static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const Interpreter &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Ret
 
 }; // namespace Ciallang::Bytecode::Op

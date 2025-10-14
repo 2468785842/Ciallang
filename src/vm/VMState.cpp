@@ -11,7 +11,7 @@
  *                                                            \_/__/
  *
  */
-#include "Interpreter.hpp"
+#include "VMState.hpp"
 
 #include "Chunk.hpp"
 #include "Instruction.hpp"
@@ -19,7 +19,7 @@
 
 namespace Ciallang::Bytecode {
 
-    void Interpreter::run(const Chunk *mainChunk) {
+    void VMState::run(const Chunk *mainChunk) {
         pushCallFrame(createCallFrame(mainChunk));
 // #define CLL_COMPUTED_GOTO
 #ifdef CLL_COMPUTED_GOTO
@@ -70,15 +70,15 @@ namespace Ciallang::Bytecode {
 #endif
     }
 
-    void Interpreter::reg(const Register &reg, const TjsValue &value) const {
+    void VMState::reg(const Register &reg, const TjsValue &value) const {
         _currentFrame->getReg(reg.index()) = TjsValue{ value };
     }
 
-    void Interpreter::reg(const Register &reg, TjsValue &&value) const {
+    void VMState::reg(const Register &reg, TjsValue &&value) const {
         _currentFrame->getReg(reg.index()) = std::move(value);
     }
 
-    TjsValue Interpreter::reg(const Register reg) { return _currentFrame->getReg(reg.index()); }
+    TjsValue VMState::reg(const Register reg) { return _currentFrame->getReg(reg.index()); }
 
-    const TjsValue &Interpreter::reg(const Register reg) const { return _currentFrame->getReg(reg.index()); }
+    const TjsValue &VMState::reg(const Register reg) const { return _currentFrame->getReg(reg.index()); }
 } // namespace Ciallang::Bytecode

@@ -18,7 +18,7 @@
 #include "gen/BytecodeGenerator.hpp"
 #include "parser/Parser.hpp"
 #include "standard/Print.hpp"
-#include "vm/Interpreter.hpp"
+#include "vm/VMState.hpp"
 
 int main(int argc, char **argv) {
     if(argc < 2) {
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Ciallang::Bytecode::Interpreter interpreter{ globalTable };
+    Ciallang::Bytecode::VMState interpreter{ globalTable };
     interpreter.global(&Ciallang::Standard::S_PrintFunction);
     interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
 
