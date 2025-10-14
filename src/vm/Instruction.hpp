@@ -16,7 +16,6 @@
 #include "Label.hpp"
 #include "Register.hpp"
 #include "logging/Logger.hpp"
-#include "pch.h"
 
 #include "types/TjsValue.hpp"
 

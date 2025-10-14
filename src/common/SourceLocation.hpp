@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "pch.h"
-
 namespace Ciallang::Common {
 
     struct LocationType {

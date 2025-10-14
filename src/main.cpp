@@ -12,8 +12,6 @@
  *
  */
 
-#include "pch.h"
-
 #include "common/SourceFile.hpp"
 #include "gen/BytecodeGenerator.hpp"
 #include "parser/Parser.hpp"

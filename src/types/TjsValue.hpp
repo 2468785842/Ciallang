@@ -12,8 +12,6 @@
 
 #pragma once
 
-#include "pch.h"
-
 #include "TjsTypes.hpp"
 
 namespace Ciallang {

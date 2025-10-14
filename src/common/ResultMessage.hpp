@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "pch.h"
-
 #include "SourceLocation.hpp"
 
 namespace Ciallang::Common {

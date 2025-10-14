@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "pch.h"
-
 #include "ResultMessage.hpp"
 #include "SourceLocation.hpp"
 

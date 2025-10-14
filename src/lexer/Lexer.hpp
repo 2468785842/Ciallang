@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "pch.h"
-
 #include "Token.hpp"
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"

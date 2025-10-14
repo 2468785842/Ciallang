@@ -13,8 +13,6 @@
  */
 #pragma once
 
-#include "pch.h"
-
 #include <tuple>
 
 #include "TjsObject.hpp"

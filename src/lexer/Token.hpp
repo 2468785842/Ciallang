@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "pch.h"
-
 #include "IEEETypes.hpp"
 #include "common/SourceLocation.hpp"
 #include "types/TjsValue.hpp"

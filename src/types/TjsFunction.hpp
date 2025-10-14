@@ -13,8 +13,6 @@
  */
 #pragma once
 
-#include "pch.h"
-
 #include "TjsObject.hpp"
 #include "vm/Chunk.hpp"
 

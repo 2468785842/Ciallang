@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "pch.h"
-
 #include "ast/Ast.hpp"
 #include "common/SourceFile.hpp"
 #include "lexer/Lexer.hpp"

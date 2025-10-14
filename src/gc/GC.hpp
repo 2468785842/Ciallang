@@ -14,7 +14,6 @@
 #pragma once
 
 #include <unordered_set>
-#include "pch.h"
 
 namespace Ciallang {
 

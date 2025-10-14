@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "pch.h"
-
 #include "Result.hpp"
 
 namespace Ciallang::Common {

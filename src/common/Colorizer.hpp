@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "pch.h"
+
 
 namespace Ciallang::Common {
     // N.B. this is not thread safe

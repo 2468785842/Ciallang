@@ -13,8 +13,6 @@
  */
 #pragma once
 
-#include "pch.h"
-
 namespace Ciallang::Bytecode {
     class [[nodiscard]] Register {
     public:

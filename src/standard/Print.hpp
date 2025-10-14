@@ -15,8 +15,6 @@
 //
 #pragma once
 
-#include "pch.h"
-
 #include "types/TjsNativeFunction.hpp"
 
 namespace Ciallang::Standard {

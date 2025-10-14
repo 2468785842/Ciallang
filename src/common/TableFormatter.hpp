@@ -13,8 +13,6 @@
  */
 #pragma once
 
-#include "pch.h"
-
 namespace Ciallang::Common {
     class TableFormatter {
         template <uint8_t L1>

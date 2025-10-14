@@ -13,8 +13,6 @@
  */
 #pragma once
 
-#include "pch.h"
-
 #include "Chunk.hpp"
 #include "gen/BytecodeGenerator.hpp"
 #include "logging/Logger.hpp"

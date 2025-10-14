@@ -14,7 +14,6 @@
 #pragma once
 
 #include "common/SourceLocation.hpp"
-#include "pch.h"
 
 namespace Ciallang::Bytecode {
     class Rlc {
