@@ -13,6 +13,10 @@
  */
 #pragma once
 
+#include <any>
+#include <fmt/format.h>
+#include <ranges>
+
 namespace Ciallang::Common {
     class TableFormatter {
         template <uint8_t L1>

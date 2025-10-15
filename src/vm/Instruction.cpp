@@ -11,108 +11,137 @@
  *                                                            \_/__/
  *
  */
-
 #include "Instruction.hpp"
+#include <fmt/format.h>
 
 #include "VMState.hpp"
 #include "logging/Logger.hpp"
 #include "types/TjsFunction.hpp"
 #include "types/TjsNativeFunction.hpp"
+#include "vm/Register.hpp"
 
 namespace Ciallang::Bytecode::Op {
 
-    void Load::execute(const Instruction &itt, const VMState &ipt) { ipt.reg(reg(itt), value(itt)); }
+    void Load::execute(const Instruction &itt, const VMState &vmState) { vmState.reg(reg(itt), value(itt)); }
 
     std::string Load::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {: <4} {: <4}", "load", reg(itt), value(itt));
     }
 
-    void Add::execute(const Instruction &itt, const VMState &ipt) {
-        ipt.reg(dst(itt), ipt.reg(reg1(itt)) + ipt.reg(reg2(itt)));
+    void PushReg::execute(const Instruction &itt, VMState &vmState) { vmState.push(src(itt)); }
+
+    std::string PushReg::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        auto insDump = fmt::format("{: <10} {: <4}", "pushreg", src(itt));
+
+        if(!info)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}", insDump, src(itt), vmState.reg(src(itt)));
     }
 
-    std::string Add::dump(const Instruction &itt, const VMState &ipt, const bool info) {
+    void PopN::execute(const Instruction &itt, VMState &vmState) { vmState.pop(count(itt)); }
+
+    std::string PopN::dump(const Instruction &itt, const VMState &, bool) {
+        return fmt::format("{: <10} {: <4}", "popn", count(itt));
+    }
+
+    void CP::execute(const Instruction &itt, const VMState &vmState) { vmState.reg(dst(itt), vmState.reg(src(itt))); }
+
+    std::string CP::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "cp", dst(itt), src(itt));
+
+        if(!info)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}", insDump, src(itt), vmState.reg(src(itt)));
+    }
+
+    void Add::execute(const Instruction &itt, const VMState &vmState) {
+        vmState.reg(dst(itt), vmState.reg(reg1(itt)) + vmState.reg(reg2(itt)));
+    }
+
+    std::string Add::dump(const Instruction &itt, const VMState &vmState, const bool info) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "add", reg1(itt), reg2(itt), dst(itt));
 
         if(!info)
             return insDump;
 
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, reg1(itt), ipt.reg(reg1(itt)), reg2(itt),
-                           ipt.reg(reg2(itt)));
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, reg1(itt), vmState.reg(reg1(itt)), reg2(itt),
+                           vmState.reg(reg2(itt)));
     }
 
-    void Sub::execute(const Instruction &itt, const VMState &ipt) {
-        ipt.reg(dst(itt), ipt.reg(reg1(itt)) - ipt.reg(reg2(itt)));
+    void Sub::execute(const Instruction &itt, const VMState &vmState) {
+        vmState.reg(dst(itt), vmState.reg(reg1(itt)) - vmState.reg(reg2(itt)));
     }
 
-    std::string Sub::dump(const Instruction &itt, const VMState &ipt, const bool info) {
+    std::string Sub::dump(const Instruction &itt, const VMState &vmState, const bool info) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "sub", reg1(itt), reg2(itt), dst(itt));
 
         if(!info)
             return insDump;
 
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, reg1, ipt.reg(reg1(itt)), reg2(itt),
-                           ipt.reg(reg2(itt)));
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, reg1, vmState.reg(reg1(itt)), reg2(itt),
+                           vmState.reg(reg2(itt)));
     }
 
-    void Mul::execute(const Instruction &itt, const VMState &ipt) {
-        ipt.reg(dst(itt), ipt.reg(reg1(itt)) * ipt.reg(reg2(itt)));
+    void Mul::execute(const Instruction &itt, const VMState &vmState) {
+        vmState.reg(dst(itt), vmState.reg(reg1(itt)) * vmState.reg(reg2(itt)));
     }
 
     std::string Mul::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {: <4} {: <4} {: <4}", "mul", reg1(itt), reg2(itt), dst(itt));
     }
 
-    void Div::execute(const Instruction &itt, VMState &ipt) {
-        ipt.reg(dst(itt), ipt.reg(reg1(itt)) / ipt.reg(reg2(itt)));
+    void Div::execute(const Instruction &itt, VMState &vmState) {
+        vmState.reg(dst(itt), vmState.reg(reg1(itt)) / vmState.reg(reg2(itt)));
     }
 
     std::string Div::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {: <4} {: <4} {: <4}", "div", reg1(itt), reg2(itt), dst(itt));
     }
 
-    void Mov::execute(const Instruction &itt, const VMState &ipt) {
-        const TjsValue &srcVal = ipt.reg(src(itt));
-        ipt.reg(dst(itt), srcVal);
+    void Mov::execute(const Instruction &itt, const VMState &vmState) {
+        const TjsValue &srcVal = vmState.reg(src(itt));
+        vmState.reg(dst(itt), srcVal);
     }
 
     std::string Mov::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {: <4} {: <4}", "mov", src(itt), dst(itt));
     }
 
-    void DGlobal::execute(const Instruction &itt, VMState &ipt) {
-        const auto &value = ipt.reg(src(itt));
-        ipt.global(symbolIndex(itt), TjsValue{ value });
+    void DGlobal::execute(const Instruction &itt, VMState &vmState) {
+        const auto &value = vmState.reg(src(itt));
+        vmState.global(symbolIndex(itt), TjsValue{ value });
     }
 
-    std::string DGlobal::dump(const Instruction &itt, const VMState &ipt, const bool info) {
-        const auto &symbol = fmt::format("\"{}\"", ipt.getSymbol(symbolIndex(itt)));
+    std::string DGlobal::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        const auto &symbol = fmt::format("\"{}\"", vmState.getSymbol(symbolIndex(itt)));
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "dglobal", src(itt), symbol);
 
         if(!info)
             return insDump;
 
-        return fmt::format("{: <30} ; {} = {}", insDump, src(itt), ipt.reg(src(itt)));
+        return fmt::format("{: <30} ; {} = {}", insDump, src(itt), vmState.reg(src(itt)));
     }
 
-    void GGlobal::execute(const Instruction &itt, const VMState &ipt) {
-        const auto &value = ipt.global(symbolIndex(itt));
-        ipt.reg(dst(itt), value);
+    void GGlobal::execute(const Instruction &itt, const VMState &vmState) {
+        const auto &value = vmState.global(symbolIndex(itt));
+        vmState.reg(dst(itt), value);
     }
 
-    std::string GGlobal::dump(const Instruction &itt, const VMState &ipt, const bool info) {
-        const auto &symbol = fmt::format("\"{}\"", ipt.getSymbol(symbolIndex(itt)));
+    std::string GGlobal::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        const auto &symbol = fmt::format("\"{}\"", vmState.getSymbol(symbolIndex(itt)));
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gglobal", symbol, dst(itt));
 
         if(!info)
             return insDump;
 
-        return fmt::format("{: <30} ; {} = {}", insDump, symbol, ipt.global(symbolIndex(itt)));
+        return fmt::format("{: <30} ; {} = {}", insDump, symbol, vmState.global(symbolIndex(itt)));
     }
 
-    void Test::execute(const Instruction &itt, VMState &ipt) {
-        if(static_cast<const VMState &>(ipt).reg(reg(itt)).toBool()) {
-            ipt.setZF(true);
+    void Test::execute(const Instruction &itt, VMState &vmState) {
+        if(static_cast<const VMState &>(vmState).reg(reg(itt)).toBool()) {
+            vmState.setZF(true);
         }
     }
 
@@ -120,79 +149,79 @@ namespace Ciallang::Bytecode::Op {
         return fmt::format("{: <10} {: <4}", "test", reg(itt));
     }
 
-    void EQ::execute(const Instruction &itt, VMState &ipt) {
-        const auto value1 = ipt.reg(reg1(itt));
-        const auto value2 = ipt.reg(reg2(itt));
+    void EQ::execute(const Instruction &itt, VMState &vmState) {
+        const auto value1 = vmState.reg(reg1(itt));
+        const auto value2 = vmState.reg(reg2(itt));
         const bool result = value1 == value2;
-        ipt.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
-        ipt.setZF(result);
+        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.setZF(result);
     }
 
     std::string EQ::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {: <4} {: <4} {: <4}", "eq", reg1(itt), reg2(itt), dst(itt));
     }
 
-    void NEQ::execute(const Instruction &itt, VMState &ipt) {
-        const auto value1 = ipt.reg(reg1(itt));
-        const auto value2 = ipt.reg(reg2(itt));
+    void NEQ::execute(const Instruction &itt, VMState &vmState) {
+        const auto value1 = vmState.reg(reg1(itt));
+        const auto value2 = vmState.reg(reg2(itt));
         const bool result = value1 != value2;
-        ipt.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
-        ipt.setZF(result);
+        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.setZF(result);
     }
 
     std::string NEQ::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {: <4}, {: <4}, {: <4}", "neq", reg1(itt), reg2(itt), dst(itt));
     }
 
-    void LT::execute(const Instruction &itt, VMState &ipt) {
-        const auto &kIpt = static_cast<const VMState &>(ipt);
+    void LT::execute(const Instruction &itt, VMState &vmState) {
+        const auto &kIpt = static_cast<const VMState &>(vmState);
         const auto &value1 = kIpt.reg(reg1(itt));
         const auto &value2 = kIpt.reg(reg2(itt));
         const bool result = value1 < value2;
-        ipt.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
-        ipt.setZF(result);
+        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.setZF(result);
     }
 
-    std::string LT::dump(const Instruction &itt, const VMState &ipt, const bool info) {
+    std::string LT::dump(const Instruction &itt, const VMState &vmState, const bool info) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "lt", reg1(itt), reg2(itt), dst(itt));
 
         if(!info)
             return insDump;
 
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, reg1(itt), ipt.reg(reg1(itt)), reg2(itt),
-                           ipt.reg(reg2(itt)));
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, reg1(itt), vmState.reg(reg1(itt)), reg2(itt),
+                           vmState.reg(reg2(itt)));
     }
 
-    void LE::execute(const Instruction &itt, VMState &ipt) {
-        const auto value1 = ipt.reg(reg1(itt));
-        const auto value2 = ipt.reg(reg2(itt));
+    void LE::execute(const Instruction &itt, VMState &vmState) {
+        const auto value1 = vmState.reg(reg1(itt));
+        const auto value2 = vmState.reg(reg2(itt));
         const bool result = value1 <= value2;
-        ipt.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
-        ipt.setZF(result);
+        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.setZF(result);
     }
 
     std::string LE::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {: <4} {: <4} {: <4}", "le", reg1(itt), reg2(itt), dst(itt));
     }
 
-    void GT::execute(const Instruction &itt, VMState &ipt) {
-        const auto value1 = ipt.reg(reg1(itt));
-        const auto value2 = ipt.reg(reg2(itt));
+    void GT::execute(const Instruction &itt, VMState &vmState) {
+        const auto value1 = vmState.reg(reg1(itt));
+        const auto value2 = vmState.reg(reg2(itt));
         const bool result = value1 > value2;
-        ipt.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
-        ipt.setZF(result);
+        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.setZF(result);
     }
 
     std::string GT::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {: <4} {: <4} {: <4}", "ge", reg1(itt), reg2(itt), dst(itt));
     }
 
-    void GE::execute(const Instruction &itt, VMState &ipt) {
-        const auto value1 = ipt.reg(reg1(itt));
-        const auto value2 = ipt.reg(reg2(itt));
+    void GE::execute(const Instruction &itt, VMState &vmState) {
+        const auto value1 = vmState.reg(reg1(itt));
+        const auto value2 = vmState.reg(reg2(itt));
         const bool result = value1 >= value2;
-        ipt.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
-        ipt.setZF(result);
+        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.setZF(result);
     }
 
     std::string GE::dump(const Instruction &itt, const VMState &, bool) {
@@ -208,110 +237,101 @@ namespace Ciallang::Bytecode::Op {
         return fmt::format("{: <10} {: <4} {: <4} {: <4}", "abseq", reg1(itt), reg2(itt), dst(itt));
     }
 
-    void Jmp::execute(const Instruction &itt, VMState &ipt) { ipt.setPC(label(itt)); }
+    void Jmp::execute(const Instruction &itt, VMState &vmState) { vmState.setPC(label(itt)); }
 
     std::string Jmp::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {: <4}", "jmp", label(itt));
     }
 
-    void JmpE::execute(const Instruction &itt, VMState &ipt) {
-        if(ipt.getZF()) {
-            ipt.setPC(label(itt));
+    void JmpE::execute(const Instruction &itt, VMState &vmState) {
+        if(vmState.getZF()) {
+            vmState.setPC(label(itt));
         }
     }
 
-    std::string JmpE::dump(const Instruction &itt, const VMState &ipt, const bool info) {
+    std::string JmpE::dump(const Instruction &itt, const VMState &vmState, const bool info) {
         auto insDump = fmt::format("{: <10} {: <4}", "jmpe", label(itt));
 
         if(!info)
             return insDump;
 
-        return fmt::format("{: <30} ; ZF = {}", insDump, ipt.getZF());
+        return fmt::format("{: <30} ; ZF = {}", insDump, vmState.getZF());
     }
 
-    void JmpNE::execute(const Instruction &itt, VMState &ipt) {
-        if(!ipt.getZF()) {
-            ipt.setPC(label(itt));
+    void JmpNE::execute(const Instruction &itt, VMState &vmState) {
+        if(!vmState.getZF()) {
+            vmState.setPC(label(itt));
         }
     }
 
-    std::string JmpNE::dump(const Instruction &itt, const VMState &ipt, const bool info) {
+    std::string JmpNE::dump(const Instruction &itt, const VMState &vmState, const bool info) {
         auto insDump = fmt::format("{: <10} {: <4}", "jmpne", label(itt));
 
         if(!info)
             return insDump;
 
-        return fmt::format("{: <30} ; ZF = {}", insDump, ipt.getZF());
+        return fmt::format("{: <30} ; ZF = {}", insDump, vmState.getZF());
     }
 
-    void Call::execute(const Instruction &itt, VMState &ipt) {
+    void Call::execute(const Instruction &itt, VMState &vmState) {
         // call const ref is Faster
-        const auto &object = static_cast<const VMState &>(ipt).reg(memberReg(itt));
+        const auto &object = static_cast<const VMState &>(vmState).reg(memberReg(itt));
         CLL_ASSERT(object.isObject(), "memberReg is not object");
 
         if(!object.toObject()->isNative()) {
             const auto fun = dynamic_cast<TjsFunction *>(object.toObject());
-            if(!fun) {
-                throw std::runtime_error{ "not function a type" };
-            }
-            CallFrame callFrame = ipt.createCallFrame(fun->chunk(), dst(itt));
-
-            const auto &args = arguments(itt);
-            for(std::uint32_t i = 0; i < args.size(); i++) {
-                // copy
-                callFrame.getReg(i) = ipt.reg(args[i]);
-            }
-
-            ipt.pushCallFrame(std::move(callFrame));
+            CLL_ASSERT(fun, "not a function");
+            vmState.allocCallFrame(fun->chunk(), dst(itt));
+            // Faster move Reg window ptr, WARING: reverse args
+            vmState.current()->baseRegSP -= argCount(itt);
             return;
         }
 
-        const auto args = arguments(itt);
-        const auto values = std::make_unique<TjsValue[]>(args.size());
-        for(std::uint32_t i = 0; i < args.size(); i++) {
-            values[i] = ipt.reg(args[i]);
+        const size_t count = argCount(itt);
+        const auto values = std::make_unique<TjsValue[]>(count);
+        const CallFrame *curCallFrame = vmState.current();
+        const size_t base = vmState.getRegPoolTop() - count;
+        // Faster operation
+        for(std::uint32_t i = 0; i < count; i++) {
+            new(&values[i]) TjsValue{ curCallFrame->getReg(base - i) };
         }
 
         auto value = dynamic_cast<TjsNativeFunction *>(object.toObject())->callProc(values.get());
-        ipt.reg(dst(itt), std::move(value));
+        vmState.reg(dst(itt), std::move(value));
     }
 
     std::string Call::dump(const Instruction &itt, const VMState &, bool) {
-        std::stringstream ss{};
-        ss << fmt::format("{: <10} {: <4} {: <4}", "call", memberReg(itt), dst(itt));
-        for(const auto &argument : arguments(itt)) {
-            ss << fmt::format("{: <4}", argument);
-        }
-        return ss.str();
+        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "call", memberReg(itt), dst(itt), argCount(itt));
     }
 
-    void Ret::execute(const Instruction &itt, VMState &ipt) {
-        auto value = ipt.reg(retReg(itt));
-        const auto &frame = ipt.popCallFrame();
-        CLL_ASSERT(frame.ret, "frame.ret val is empty");
-        ipt.reg(*frame.ret, std::move(value));
+    void Ret::execute(const Instruction &itt, VMState &vmState) {
+        auto value = vmState.reg(retReg(itt));
+        const auto frame = vmState.current();
+        CLL_ASSERT(frame->ret, "frame.ret val is empty");
+        vmState.prev()->getReg(frame->ret->index()) = std::move(value);
+        vmState.freeCallFrame();
     }
 
     std::string Ret::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {}", "ret", retReg(itt));
     }
 
-    void Instruction::execute(const OpCode opcode, const Instruction &itt, VMState &ipt) {
+    void Instruction::execute(const Instruction &itt, VMState &vmState) {
 #define HANDLE_OPCODE(OP)                                                                                              \
     case OpCode::OP:                                                                                                   \
-        OP::execute(itt, ipt);                                                                                         \
+        OP::execute(itt, vmState);                                                                                     \
         break;
-        switch(opcode) {
+        switch(itt.opcode) {
             OPCODE_ENUMS(HANDLE_OPCODE)
             default:;
         }
     }
 
-    std::string Instruction::dump(const OpCode opcode, const Instruction &itt, const VMState &ipt, const bool info) {
+    std::string Instruction::dump(const Instruction &itt, const VMState &vmState, const bool info) {
 #define DUMP_OPCODE(OP)                                                                                                \
     case OpCode::OP:                                                                                                   \
-        return OP::dump(itt, ipt, info);
-        switch(opcode) {
+        return OP::dump(itt, vmState, info);
+        switch(itt.opcode) {
             OPCODE_ENUMS(DUMP_OPCODE)
             default:;
         }

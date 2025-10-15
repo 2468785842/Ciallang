@@ -14,7 +14,9 @@
 // Created by LiDon on 2025/9/29.
 //
 #pragma once
-#include <cstdarg>
+
+#include "pch.h"
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -39,6 +41,7 @@
     do {                                                                                                               \
         if(!(cond)) {                                                                                                  \
             ::Ciallang::assertFail(#cond, __FILE__, __LINE__, fmt, ##__VA_ARGS__);                                     \
+            std::abort();                                                                                              \
         }                                                                                                              \
     } while(false)
 #endif

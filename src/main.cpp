@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
     auto chunk = codeGen.parseAst(r, globalNode);
 
     Ciallang::Bytecode::VMState interpreter{ globalTable };
-    interpreter.global(&Ciallang::Standard::S_PrintFunction);
+    // interpreter.global(&Ciallang::Standard::S_PrintFunction);
     interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
 
     fmt::println("{}", interpreter.dumpInstruction(*chunk));

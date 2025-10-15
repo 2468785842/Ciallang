@@ -13,6 +13,7 @@
  */
 
 #pragma once
+#include <frozen/unordered_map.h>
 
 #include "IEEETypes.hpp"
 #include "common/SourceLocation.hpp"

@@ -133,7 +133,7 @@ namespace Ciallang::Inter {
                 return reg;
             }
             const Bytecode::Register reg{ _regNextIndex++ };
-            _chunk->setRegisterCount(std::max(_chunk->getRegisterCount(), _regNextIndex));
+            _chunk->setRegisterCount(std::max(_chunk->getRegCount(), _regNextIndex));
             return reg;
         }
 

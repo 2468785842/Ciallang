@@ -13,6 +13,9 @@
  */
 #pragma once
 
+#include <filesystem>
+
+
 #include "common/SourceLocation.hpp"
 
 namespace Ciallang::Bytecode {

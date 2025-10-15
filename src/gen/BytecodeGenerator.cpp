@@ -12,6 +12,8 @@
 
 #include "BytecodeGenerator.hpp"
 
+#include <complex>
+
 #include "ast/DeclNode.hpp"
 #include "ast/ExprNode.hpp"
 #include "ast/StmtNode.hpp"
@@ -107,27 +109,24 @@ namespace Ciallang::Inter {
         auto dst = allocateRegister();
 
         if(dynamic_cast<const Syntax::IdentifierExprNode *>(member)) {
-            auto arguments = std::make_unique<std::vector<Bytecode::Register>>();
+            std::vector<Bytecode::Register> arguments{};
             auto memberReg = node->memberAccess->generateBytecode(this);
 
-            CLL_ASSERT(memberReg.has_value(), "memberReg is empty");
-
-            for(const auto *exprNode : node->arguments) {
+            CLL_ASSERT(memberReg, "memberReg is empty");
+            for(size_t i = node->arguments.size(); i > 0; i--) {
+                const auto *exprNode = node->arguments[i - 1];
                 if(!exprNode) {
-                    arguments->push_back(getEmpty(*_chunk));
+                    _chunk->emit<Bytecode::Op::OpCode::PushReg>(getEmpty(*_chunk));
                 } else {
                     auto reg = exprNode->generateBytecode(this);
                     if(_r.isFailed())
                         return {};
-
-                    CLL_ASSERT(reg.has_value(), "reg is empty");
-                    freeRegister(reg.value());
-                    arguments->push_back(reg.value());
+                    CLL_ASSERT(reg, "reg is empty");
+                    _chunk->emit<Bytecode::Op::OpCode::PushReg>(*reg);
                 }
             }
-
-            freeRegister(memberReg.value());
-            _chunk->emit<Bytecode::Op::OpCode::Call>(dst, memberReg.value(), arguments.release());
+            freeRegister(*memberReg);
+            _chunk->emit<Bytecode::Op::OpCode::Call>(dst, *memberReg, node->arguments.size());
             return dst;
         }
         CLL_LOG_ERROR("not impl");

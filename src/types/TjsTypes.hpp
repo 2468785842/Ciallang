@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace Ciallang {
 #if defined(LLONG_MAX)
     using TjsInteger = long long;

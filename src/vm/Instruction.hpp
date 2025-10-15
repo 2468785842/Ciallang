@@ -13,6 +13,8 @@
  */
 #pragma once
 
+#include <optional>
+
 #include "Label.hpp"
 #include "Register.hpp"
 #include "logging/Logger.hpp"
@@ -21,6 +23,9 @@
 
 #define OPCODE_ENUMS(O)                                                                                                \
     O(Load)                                                                                                            \
+    O(PushReg)                                                                                                         \
+    O(PopN)                                                                                                            \
+    O(CP)                                                                                                              \
     O(Add)                                                                                                             \
     O(Sub)                                                                                                             \
     O(Mul)                                                                                                             \
@@ -60,16 +65,13 @@ namespace Ciallang::Bytecode::Op {
     using ExecuteCallback = void (*)(const Instruction &, VMState &);
     using DumpCallback = std::string (*)(const Instruction &, const VMState &, bool);
 
-    using RegisterVec = std::vector<Register>;
-
     struct Operand {
         enum class Type { None, Value, Register, RegisterVec, Label, SymbolIndex };
         union {
             TjsValue *value;
             Register reg;
-            RegisterVec *regs;
             Label label;
-            size_t symbolIndex;
+            size_t i;
         } operand{};
 
         Type type{ Type::None };
@@ -80,11 +82,9 @@ namespace Ciallang::Bytecode::Op {
 
         explicit Operand(const Register &value) : type(Type::Register) { this->operand.reg = value; }
 
-        explicit Operand(RegisterVec *value) : type(Type::RegisterVec) { this->operand.regs = value; }
-
         explicit Operand(const Label &value) : type(Type::Label) { this->operand.label = value; }
 
-        explicit Operand(const size_t value) : type(Type::SymbolIndex) { this->operand.symbolIndex = value; }
+        explicit Operand(const size_t value) : type(Type::SymbolIndex) { this->operand.i = value; }
 
         Operand(const Operand &other) = delete;
 
@@ -104,9 +104,6 @@ namespace Ciallang::Bytecode::Op {
             if(type == Type::Value) {
                 delete operand.value;
             }
-            if(type == Type::RegisterVec) {
-                delete operand.regs;
-            }
         }
     };
 
@@ -121,7 +118,6 @@ namespace Ciallang::Bytecode::Op {
         explicit Instruction(const OpCode opcode, Operand &&operand1, Operand &&operand2, Operand &&operand3) :
             opcode(opcode), _operand1(std::move(operand1)), _operand2(std::move(operand2)),
             _operand3(std::move(operand3)) {}
-
 
         Instruction(const Instruction &other) = delete;
 
@@ -169,9 +165,9 @@ namespace Ciallang::Bytecode::Op {
         }
 
 
-        static void execute(OpCode opcode, const Instruction &itt, VMState &ipt);
+        static void execute(const Instruction &itt, VMState &vmState);
 
-        static std::string dump(OpCode opcode, const Instruction &itt, const VMState &ipt, bool info);
+        static std::string dump(const Instruction &itt, const VMState &vmState, bool info);
 
     private:
         std::optional<Operand> _operand1;
@@ -183,9 +179,6 @@ namespace Ciallang::Bytecode::Op {
             if constexpr(std::is_same_v<T, Register>) {
                 CLL_ASSERT(operand->type == Operand::Type::Register, "operand type is not Register");
                 return operand->operand.reg;
-            } else if constexpr(std::is_same_v<T, RegisterVec>) {
-                CLL_ASSERT(operand->type == Operand::Type::RegisterVec, "operand type is not RegisterVec");
-                return *operand->operand.regs;
             } else if constexpr(std::is_same_v<T, Label>) {
                 CLL_ASSERT(operand->type == Operand::Type::Label, "operand type is not Label");
                 return operand->operand.label;
@@ -194,7 +187,7 @@ namespace Ciallang::Bytecode::Op {
                 return *operand->operand.value;
             } else if constexpr(std::is_same_v<T, size_t>) {
                 CLL_ASSERT(operand->type == Operand::Type::SymbolIndex, "operand type is not symbolIndex");
-                return operand->operand.symbolIndex;
+                return operand->operand.i;
             } else {
                 return nullptr;
             }
@@ -210,6 +203,32 @@ namespace Ciallang::Bytecode::Op {
 
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Load
+
+    struct PushReg {
+        static const Register &src(const Instruction &itt) { return itt.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+    }; // struct PushReg
+
+    struct PopN {
+        static const size_t &count(const Instruction &itt) { return itt.getOperand1<size_t>(); }
+
+        static void execute(const Instruction &, VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+    }; // struct PushReg
+
+    struct CP {
+        static const Register &dst(const Instruction &itt) { return itt.getOperand1<Register>(); }
+
+        static const Register &src(const Instruction &itt) { return itt.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+    }; // struct CP
 
     struct Add {
         static const Register &reg1(const Instruction &itt) { return itt.getOperand1<Register>(); }
@@ -418,7 +437,7 @@ namespace Ciallang::Bytecode::Op {
 
         static const Register &memberReg(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
-        static const std::vector<Register> &arguments(const Instruction &itt) { return itt.getOperand3<RegisterVec>(); }
+        static const size_t &argCount(const Instruction &itt) { return itt.getOperand3<size_t>(); }
 
         static void execute(const Instruction &, VMState &);
 

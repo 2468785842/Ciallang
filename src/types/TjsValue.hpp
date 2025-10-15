@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include <fmt/ostream.h>
+
 #include "TjsTypes.hpp"
 
 namespace Ciallang {

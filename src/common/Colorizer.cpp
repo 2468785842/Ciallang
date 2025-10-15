@@ -14,6 +14,8 @@
 
 #include "Colorizer.hpp"
 
+#include <sstream>
+
 namespace Ciallang::Common {
     static bool TerminalSupportsColor();
 

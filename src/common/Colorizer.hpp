@@ -12,7 +12,8 @@
 
 #pragma once
 
-
+#include <fmt/color.h>
+#include <string>
 
 namespace Ciallang::Common {
     // N.B. this is not thread safe

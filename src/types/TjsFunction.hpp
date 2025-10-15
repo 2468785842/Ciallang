@@ -23,7 +23,7 @@ namespace Ciallang {
 
         explicit TjsFunction(Bytecode::Chunk *chunk, const std::string &name);
 
-        explicit TjsFunction(Bytecode::Chunk *chunk, const std::string &name, size_t arity);
+        explicit TjsFunction(Bytecode::Chunk *chunk, std::string name, size_t arity);
 
         [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
 

@@ -13,6 +13,8 @@
  */
 #pragma once
 
+#include <fmt/ostream.h>
+
 namespace Ciallang::Bytecode {
     class [[nodiscard]] Label {
     public:

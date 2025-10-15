@@ -13,6 +13,8 @@
  */
 #pragma once
 
+#include <fmt/format.h>
+
 #include "Chunk.hpp"
 #include "gen/BytecodeGenerator.hpp"
 #include "logging/Logger.hpp"
@@ -24,6 +26,7 @@
 
 namespace Ciallang::Bytecode {
 
+    // FIFO Model
     class FastRegisterPool {
     public:
         explicit FastRegisterPool(const size_t blockSize = 1 << 12) : _blockSize(blockSize), _sp(0) { allocateBlock(); }
@@ -109,7 +112,7 @@ namespace Ciallang::Bytecode {
         explicit CallFrame() = default;
 
         explicit CallFrame(const Chunk *chunk_, const std::optional<Register> ret_, FastRegisterPool &pool) :
-            chunk(chunk_), baseRegSP(pool.allocFrame(chunk_->getRegisterCount())), ret(ret_), _pool(&pool) {}
+            chunk(chunk_), baseRegSP(pool.allocFrame(chunk_->getRegCount())), ret(ret_), _pool(&pool) {}
 
         CallFrame(CallFrame &&callFrame) noexcept :
             chunk(callFrame.chunk), baseRegSP(callFrame.baseRegSP), ret(callFrame.ret), pc(callFrame.pc),
@@ -137,7 +140,7 @@ namespace Ciallang::Bytecode {
 
         ~CallFrame() {
             if(_pool) {
-                _pool->freeFrame(chunk->getRegisterCount());
+                _pool->freeFrame(chunk->getRegCount());
             }
         }
 
@@ -151,10 +154,6 @@ namespace Ciallang::Bytecode {
 
     class VMState {
     public:
-        CallFrame createCallFrame(const Chunk *chunk, const std::optional<Register> &ret = {}) {
-            return CallFrame{ chunk, ret, _regPool };
-        }
-
         explicit VMState(Inter::SymbolTable &symbolTable) : _symbolTable(symbolTable) {}
 
         void run(const Chunk *mainChunk);
@@ -197,31 +196,34 @@ namespace Ciallang::Bytecode {
 
         [[nodiscard]] size_t getPC() const { return _currentFrame->pc; }
 
-        void pushCallFrame(CallFrame &&frame) {
+        void allocCallFrame(const Chunk *chunk, const std::optional<Register> &ret = {}) {
             if(_stackTop >= MAX_CALL_DEPTH)
                 throw std::runtime_error("Call stack overflow");
-            _callStack[_stackTop++] = std::move(frame);
-            _currentFrame = &_callStack[_stackTop - 1];
+            _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ chunk, ret, _regPool };
         }
 
-        CallFrame popCallFrame() {
+        void freeCallFrame() {
             if(_stackTop == 0)
                 throw std::runtime_error("Call stack underflow");
             _currentFrame = _stackTop > 0 ? &_callStack[--_stackTop - 1] : nullptr;
-            return std::move(_callStack[_stackTop]);
+            _callStack[_stackTop].~CallFrame();
         }
 
         [[nodiscard]] const std::vector<Op::Instruction> &instructions() const noexcept {
             return _currentFrame->chunk->instructions();
         }
 
+        [[nodiscard]] CallFrame *current() noexcept { return _currentFrame; }
         [[nodiscard]] const CallFrame *current() const noexcept { return _currentFrame; }
+
+        [[nodiscard]] CallFrame *prev() noexcept { return &_callStack[_stackTop - 2]; }
+        [[nodiscard]] const CallFrame *prev() const noexcept { return &_callStack[_stackTop - 2]; }
 
         [[nodiscard]] std::string dumpRegisters() const {
             std::stringstream ss{};
             for(size_t i = 0; i < _stackTop; i++) {
                 const auto &call = _callStack[i];
-                for(size_t j = 0; j < call.chunk->getRegisterCount(); j++) {
+                for(size_t j = 0; j < call.chunk->getRegCount(); j++) {
                     ss << fmt::format("(%{}): {}\n", j, call.getReg(j));
                 }
             }
@@ -235,8 +237,7 @@ namespace Ciallang::Bytecode {
             while(pc < chunk.instructions().size()) {
                 const auto &instruction = chunk.instructions()[pc];
 
-                ss << fmt::format("{: <6}: {}\n", Label{ pc },
-                                  Op::Instruction::dump(instruction.opcode, instruction, *this, false));
+                ss << fmt::format("{: <6}: {}\n", Label{ pc }, Op::Instruction::dump(instruction, *this, false));
 
                 if(instruction.opcode == Op::OpCode::Load) {
                     if(auto value = Op::Load::value(instruction); value.isObject()) {
@@ -256,6 +257,11 @@ namespace Ciallang::Bytecode {
         }
 
         [[nodiscard]] const char *getSymbol(const size_t index) const { return _symbolTable.getSymbol(index); }
+
+        void push(const Register &r) { *_regPool.ptrAt(_regPool.allocFrame(1)) = reg(r); }
+
+        void pop(const size_t count) { _regPool.freeFrame(count); }
+        [[nodiscard]] size_t getRegPoolTop() const { return _regPool.used(); }
 
     private:
         Inter::SymbolTable &_symbolTable;

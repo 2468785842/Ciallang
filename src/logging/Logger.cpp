@@ -125,7 +125,5 @@ namespace Ciallang {
         va_end(ap);
 
         CLL_LOG_FATAL("Assertion failed: (%s), file %s, line %d: %s", expr, file, line, msg.c_str());
-
-        std::abort();
     }
 } // namespace Ciallang

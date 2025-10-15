@@ -20,7 +20,7 @@
 namespace Ciallang::Bytecode {
 
     void VMState::run(const Chunk *mainChunk) {
-        pushCallFrame(createCallFrame(mainChunk));
+        allocCallFrame(mainChunk);
 // #define CLL_COMPUTED_GOTO
 #ifdef CLL_COMPUTED_GOTO
         // 标签数组
@@ -35,9 +35,10 @@ namespace Ciallang::Bytecode {
     label_Dispatch: {
         const auto &instList = instructions();
         const Op::Instruction &instruction = instList[_currentFrame->pc];
-        if(_currentFrame->pc >= instList.size() || _stackTop == 0)
+        if(_currentFrame->pc >= instList.size() || _stackTop == 0) {
+            freeCallFrame();
             return;
-
+        }
         goto *labels[static_cast<size_t>(instruction.opcode)];
     }
 
@@ -65,8 +66,9 @@ namespace Ciallang::Bytecode {
 
             const auto &instruction = instList[pc];
             ++pc;
-            Op::Instruction::execute(instruction.opcode, instruction, *this);
+            Op::Instruction::execute(instruction, *this);
         }
+        freeCallFrame();
 #endif
     }
 

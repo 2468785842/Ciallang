@@ -16,11 +16,12 @@
 
 #include "TjsFunction.hpp"
 
+#include <utility>
+
 namespace Ciallang {
 
-    TjsFunction::TjsFunction(Bytecode::Chunk *chunk, const std::string &name) :
-        TjsFunction(chunk, std::move(name), 0) {}
+    TjsFunction::TjsFunction(Bytecode::Chunk *chunk, const std::string &name) : TjsFunction(chunk, name, 0) {}
 
-    TjsFunction::TjsFunction(Bytecode::Chunk *chunk, const std::string &name, const size_t arity) :
-        TjsObject(false), _chunk(chunk), _name(name), _arity(arity) {}
+    TjsFunction::TjsFunction(Bytecode::Chunk *chunk, std::string name, const size_t arity) :
+        TjsObject(false), _chunk(chunk), _name(std::move(name)), _arity(arity) {}
 } // namespace Ciallang
