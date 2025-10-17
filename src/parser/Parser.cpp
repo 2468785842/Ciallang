@@ -35,13 +35,18 @@ namespace Ciallang::Syntax {
         return node;
     }
 
+    /**
+     * NOTE: This language allows commas to represent implicit 'void' arguments.
+     * e.g.
+     * a(,) -> a(void, void)
+     * a(,,) -> a(void, void, void)
+     * a(2,) -> a(2, void)
+     * a(,2) -> a(void, 2)
+     */
     static bool parseArguments(Result &r, Parser *parser, ProcCallExprNode *node) {
-        // a(,) -> a(void, void)
-        // a(,,) -> a(void, void, void)
-        // a(2,) -> a(2, void)
-        // a(,2) -> a(void, 2)
+        // Special rule: a leading comma means an implicit 'void' argument.
+        // We don't consume it yet, so the while-loop will handle the first ',' properly.
         if(parser->peek(TokenType::Comma)) {
-            parser->consume();
             node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
         }
 
