@@ -64,9 +64,9 @@ namespace Ciallang::Inter {
         std::uint32_t _symbolNextIndex{ 0 };
     };
 
-    class BytecodeGenerator {
+    class IRGenerator {
     public:
-        explicit BytecodeGenerator(Common::SourceFile &sourceFile, SymbolTable &symbolTable) :
+        explicit IRGenerator(Common::SourceFile &sourceFile, SymbolTable &symbolTable) :
             _sourceFile(sourceFile), _symbolTable(symbolTable) {}
 
         std::unique_ptr<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024/6/10 下午5:55
+ * Copyright (c) 2024/6/8 上午10:23
  *
  * /\  _` \   __          /\_ \  /\_ \
  * \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -18,8 +18,34 @@
 #include "TjsObject.hpp"
 #include "TjsString.hpp"
 #include "TjsValue.hpp"
+#include "vm/Chunk.hpp"
 
 namespace Ciallang {
+
+    class Function final : public TjsObject {
+    public:
+        Function() = delete;
+
+        explicit Function(Bytecode::Chunk *chunk, const std::string &name);
+
+        explicit Function(Bytecode::Chunk *chunk, std::string name, size_t arity);
+
+        [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
+
+        [[nodiscard]] const Bytecode::Chunk *chunk() const { return _chunk.get(); }
+
+        [[nodiscard]] size_t arity() const noexcept override { return _arity; }
+
+        [[nodiscard]] bool isNative() const noexcept override { return false; }
+
+        ~Function() noexcept override = default;
+
+    private:
+        const std::unique_ptr<Bytecode::Chunk> _chunk;
+        const std::string _name;
+        const size_t _arity;
+    };
+
 
     // 函数特性萃取
     namespace detail {
@@ -106,14 +132,14 @@ namespace Ciallang {
 
     } // namespace detail
 
-    class TjsNativeFunction final : public TjsObject {
+    class NativeFunction final : public TjsObject {
         using Callback = std::function<TjsValue(TjsValue *)>;
 
     public:
-        TjsNativeFunction() = delete;
+        NativeFunction() = delete;
 
         template <typename Callable>
-        explicit TjsNativeFunction(const std::string_view name, Callable &&callable) :
+        explicit NativeFunction(const std::string_view name, Callable &&callable) :
             TjsObject{ true }, _callback([callable = std::forward<Callable>(callable)](TjsValue *args) {
                 return detail::invoke_callable(callable, args);
             }),
@@ -125,7 +151,7 @@ namespace Ciallang {
 
         [[nodiscard]] size_t arity() const noexcept override { return _arity; }
 
-        ~TjsNativeFunction() noexcept override = default;
+        ~NativeFunction() noexcept override = default;
 
     private:
         const Callback _callback;

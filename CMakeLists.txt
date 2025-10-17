@@ -48,8 +48,7 @@ set(SOURCE_FILES
         src/ast/DeclNode.hpp
         src/ast/AstFormatter.hpp
 
-        src/gen/BytecodeGenerator.cpp
-
+        src/gen/IRGenerator.cpp
 
         # ############################################
         src/vm/VMState.cpp
@@ -58,7 +57,7 @@ set(SOURCE_FILES
         src/vm/Register.hpp
         src/vm/Label.hpp
 
-        src/types/TjsFunction.cpp
+        src/types/Function.cpp
         src/types/TjsOctet.cpp
         src/types/TjsObject.cpp
         src/types/TjsValue.cpp
@@ -88,7 +87,7 @@ if(${BUILD_EXECUTABLE})
             src/main.cpp
             ${SOURCE_FILES}
     )
-    target_precompile_headers(cll PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
+#    target_precompile_headers(cll PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
     target_link_libraries(
             cll
             PRIVATE

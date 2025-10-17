@@ -15,10 +15,10 @@
 //
 #pragma once
 
-#include "types/TjsNativeFunction.hpp"
+#include "types/Function.hpp"
 
 namespace Ciallang::Standard {
-    static TjsNativeFunction S_PrintFunction{ "print", [](TjsValue val) { fmt::print("{}", val); } };
+    static NativeFunction S_PrintFunction{ "print", [](TjsValue val) { fmt::print("{}", val); } };
 
-    static TjsNativeFunction S_PrintlnFunction{ "println", [](TjsValue val) { fmt::println("{}", val); } };
+    static NativeFunction S_PrintlnFunction{ "println", [](TjsValue val) { fmt::println("{}", val); } };
 } // namespace Ciallang::Standard

@@ -37,15 +37,18 @@ namespace Ciallang::Syntax {
 
     static bool parseArguments(Result &r, Parser *parser, ProcCallExprNode *node) {
         // a(,) -> a(void, void)
+        // a(,,) -> a(void, void, void)
+        // a(2,) -> a(2, void)
+        // a(,2) -> a(void, 2)
+        if(parser->peek(TokenType::Comma)) {
+            parser->consume();
+            node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
+        }
 
         while(!parser->peek(TokenType::RParenthesis)) {
             if(parser->peek(TokenType::Comma)) {
                 parser->consume();
                 node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
-
-                if(parser->peek(TokenType::RParenthesis)) {
-                    node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
-                }
                 continue;
             }
             auto *expr = parser->parseExpression(r);

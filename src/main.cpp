@@ -13,7 +13,7 @@
  */
 
 #include "common/SourceFile.hpp"
-#include "gen/BytecodeGenerator.hpp"
+#include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
 #include "standard/Print.hpp"
 #include "vm/VMState.hpp"
@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
     auto *globalNode = parser.parse(r);
 
     Ciallang::Inter::SymbolTable globalTable;
-    Ciallang::Inter::BytecodeGenerator codeGen{ sourceFile, globalTable };
+    Ciallang::Inter::IRGenerator codeGen{ sourceFile, globalTable };
 
     auto chunk = codeGen.parseAst(r, globalNode);
 

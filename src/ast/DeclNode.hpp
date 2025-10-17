@@ -15,7 +15,7 @@
 
 #include "AstNode.hpp"
 
-#include "gen/BytecodeGenerator.hpp"
+#include "gen/IRGenerator.hpp"
 
 namespace Ciallang::Syntax {
     class DeclNode : public AstNode {
@@ -33,7 +33,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
             return gen->generate(this);
         }
     };
@@ -50,7 +50,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
             return gen->generate(this);
         }
     };
@@ -65,7 +65,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::BytecodeGenerator *gen) const override {
+        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
             return gen->generate(this);
         }
     };

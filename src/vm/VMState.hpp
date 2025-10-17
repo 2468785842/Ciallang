@@ -16,9 +16,9 @@
 #include <fmt/format.h>
 
 #include "Chunk.hpp"
-#include "gen/BytecodeGenerator.hpp"
+#include "gen/IRGenerator.hpp"
 #include "logging/Logger.hpp"
-#include "types/TjsFunction.hpp"
+#include "types/Function.hpp"
 
 #include "types/TjsValue.hpp"
 
@@ -233,7 +233,7 @@ namespace Ciallang::Bytecode {
         [[nodiscard]] std::string dumpInstruction(const Chunk &chunk) const {
             std::stringstream ss{};
             size_t pc{};
-            std::vector<TjsFunction *> functions{};
+            std::vector<Function *> functions{};
             while(pc < chunk.instructions().size()) {
                 const auto &instruction = chunk.instructions()[pc];
 
@@ -241,7 +241,7 @@ namespace Ciallang::Bytecode {
 
                 if(instruction.opcode == Op::OpCode::Load) {
                     if(auto value = Op::Load::value(instruction); value.isObject()) {
-                        if(auto fun = dynamic_cast<TjsFunction *>(value.toObject())) {
+                        if(auto fun = dynamic_cast<Function *>(value.toObject())) {
                             functions.push_back(fun);
                         }
                     }
@@ -258,7 +258,10 @@ namespace Ciallang::Bytecode {
 
         [[nodiscard]] const char *getSymbol(const size_t index) const { return _symbolTable.getSymbol(index); }
 
-        void push(const Register &r) { *_regPool.ptrAt(_regPool.allocFrame(1)) = reg(r); }
+        void pushVoid(const size_t n) { _regPool.allocFrame(n); }
+
+        void push(const TjsValue &v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = TjsValue{ v }; }
+        void push(TjsValue &&v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = std::move(v); }
 
         void pop(const size_t count) { _regPool.freeFrame(count); }
         [[nodiscard]] size_t getRegPoolTop() const { return _regPool.used(); }

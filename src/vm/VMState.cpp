@@ -15,7 +15,6 @@
 
 #include "Chunk.hpp"
 #include "Instruction.hpp"
-#include "logging/Logger.hpp"
 
 namespace Ciallang::Bytecode {
 
@@ -68,7 +67,7 @@ namespace Ciallang::Bytecode {
             ++pc;
             Op::Instruction::execute(instruction, *this);
         }
-        freeCallFrame();
+        // freeCallFrame();
 #endif
     }
 

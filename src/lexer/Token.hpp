@@ -15,6 +15,8 @@
 #pragma once
 #include <frozen/unordered_map.h>
 
+#include <utility>
+
 #include "IEEETypes.hpp"
 #include "common/SourceLocation.hpp"
 #include "types/TjsValue.hpp"
@@ -323,50 +325,31 @@ namespace Ciallang::Syntax {
 
         explicit Token() = default;
 
-        constexpr explicit Token(const TokenType type) : _type(type) {}
+        constexpr explicit Token(const TokenType type) : _type(type), _value(nullptr) {}
 
         explicit Token(const TokenType type, TjsValue &&value) :
             _type(type), _value(new TjsValue{ std::move(value) }) {}
 
         Token(Token &&token) noexcept {
             _type = token._type;
-            _value = token._value;
+            _value = std::move(token._value);
             location = token.location;
-
-            token._value = nullptr;
         }
 
         Token(const Token &token) noexcept {
             _type = token._type;
 
             if(token._value)
-                _value = new TjsValue{ *token._value };
+                _value = std::make_unique<TjsValue>(*token._value);
 
             location = token.location;
         }
 
-        Token &operator=(Token &&token) noexcept {
-            if(this == &token)
-                return *this;
-            _type = token._type;
-
-            delete _value;
-            _value = token._value;
-            location = token.location;
-
-            token._value = nullptr;
-            return *this;
-        }
-
-        Token &operator=(const Token &token) noexcept {
+        template <typename T>
+        Token &operator=(T &&token) noexcept {
             if(this != &token) {
-                _type = token._type;
-
-                delete _value;
-                if(token._value)
-                    _value = new TjsValue{ *token._value };
-
-                location = token.location;
+                this->~Token();
+                new(this) Token{ std::forward<T>(token) };
             }
             return *this;
         }
@@ -375,7 +358,7 @@ namespace Ciallang::Syntax {
 
         [[nodiscard]] constexpr TokenType type() const noexcept { return _type; }
 
-        [[nodiscard]] constexpr TjsValue *value() const noexcept { return _value; }
+        [[nodiscard]] constexpr TjsValue *value() const noexcept { return _value.get(); }
 
         [[nodiscard]] constexpr const char *name() const noexcept {
             const auto it = S_TypeToName.find(_type);
@@ -385,11 +368,9 @@ namespace Ciallang::Syntax {
             return Unknown;
         }
 
-        ~Token() noexcept { delete _value; }
-
     private:
-        TokenType _type{ TokenType::Void };
-        TjsValue *_value{ nullptr };
+        TokenType _type = TokenType::Void;
+        std::unique_ptr<TjsValue> _value = std::make_unique<TjsValue>();
     };
 
     /**

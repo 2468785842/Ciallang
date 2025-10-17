@@ -14,14 +14,14 @@
 // Created by LiDon on 2025/9/29.
 //
 
-#include "TjsFunction.hpp"
+#include "Function.hpp"
 
 #include <utility>
 
 namespace Ciallang {
 
-    TjsFunction::TjsFunction(Bytecode::Chunk *chunk, const std::string &name) : TjsFunction(chunk, name, 0) {}
+    Function::Function(Bytecode::Chunk *chunk, const std::string &name) : Function(chunk, name, 0) {}
 
-    TjsFunction::TjsFunction(Bytecode::Chunk *chunk, std::string name, const size_t arity) :
+    Function::Function(Bytecode::Chunk *chunk, std::string name, const size_t arity) :
         TjsObject(false), _chunk(chunk), _name(std::move(name)), _arity(arity) {}
 } // namespace Ciallang
