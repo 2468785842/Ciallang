@@ -45,7 +45,8 @@ int main(int argc, char **argv) {
     fmt::println("{}", interpreter.dumpInstruction(*chunk));
 
     auto start = std::chrono::high_resolution_clock::now();
-    interpreter.run(chunk.get());
+    interpreter.allocCallFrame(chunk.get());
+    interpreter.run();
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = duration_cast<std::chrono::nanoseconds>(end - start);
 

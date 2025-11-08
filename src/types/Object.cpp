@@ -10,6 +10,6 @@
 //                                                            \_/__/
 //
 
-#include "TjsObject.hpp"
+#include "Object.hpp"
 
 namespace Ciallang {}

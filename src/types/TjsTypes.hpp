@@ -34,7 +34,7 @@ namespace Ciallang {
 
     class TjsString;
     class TjsOctet;
-    class TjsObject;
+    class Object;
 
     class TjsValue;
 

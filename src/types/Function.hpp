@@ -15,14 +15,14 @@
 
 #include <tuple>
 
-#include "TjsObject.hpp"
+#include "Object.hpp"
 #include "TjsString.hpp"
 #include "TjsValue.hpp"
 #include "vm/Chunk.hpp"
 
 namespace Ciallang {
 
-    class Function final : public TjsObject {
+    class Function final : public Object {
     public:
         Function() = delete;
 
@@ -101,7 +101,7 @@ namespace Ciallang {
         }
 
         template <>
-        inline TjsObject *extract_arg<TjsObject *>(TjsValue *args, const size_t index) {
+        inline Object *extract_arg<Object *>(TjsValue *args, const size_t index) {
             return args[index].toObject();
         }
 
@@ -132,7 +132,7 @@ namespace Ciallang {
 
     } // namespace detail
 
-    class NativeFunction final : public TjsObject {
+    class NativeFunction final : public Object {
         using Callback = std::function<TjsValue(TjsValue *)>;
 
     public:
@@ -140,7 +140,7 @@ namespace Ciallang {
 
         template <typename Callable>
         explicit NativeFunction(const std::string_view name, Callable &&callable) :
-            TjsObject{ true }, _callback([callable = std::forward<Callable>(callable)](TjsValue *args) {
+            Object{ true }, _callback([callable = std::forward<Callable>(callable)](TjsValue *args) {
                 return detail::invoke_callable(callable, args);
             }),
             _arity(detail::function_traits<Callable>::arity), _name(name) {}

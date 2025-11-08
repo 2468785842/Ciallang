@@ -16,20 +16,13 @@
 
 namespace Ciallang {
 
-    class TjsObject {
+    class Object {
     public:
-        explicit TjsObject(const bool native) : _native(native) {}
-
-        virtual ~TjsObject() noexcept = default;
+        virtual ~Object() noexcept = default;
 
         [[nodiscard]] virtual const char *name() const noexcept = 0;
 
-        [[nodiscard]] virtual bool isNative() const noexcept { return _native; }
-
         [[nodiscard]] virtual size_t arity() const noexcept = 0;
-
-    private:
-        bool _native;
     };
 
 } // namespace Ciallang

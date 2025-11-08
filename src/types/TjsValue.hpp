@@ -30,7 +30,7 @@ namespace Ciallang {
 
         explicit TjsValue(const TjsOctet &value);
 
-        explicit TjsValue(TjsObject *value);
+        explicit TjsValue(Object *value);
 
         ~TjsValue();
 
@@ -53,7 +53,7 @@ namespace Ciallang {
 
         [[nodiscard]] TjsOctet *toOctet() const;
 
-        [[nodiscard]] TjsObject *toObject() const;
+        [[nodiscard]] Object *toObject() const;
 
         [[nodiscard]] bool isVoid() const { return type() == TjsValueType::Void; }
 
@@ -91,7 +91,7 @@ namespace Ciallang {
             TjsReal _real;
             TjsString *_string;
             TjsOctet *_octet;
-            TjsObject *_object;
+            Object *_object;
         } _value{};
 
         TjsValueType _type{ TjsValueType::Void };

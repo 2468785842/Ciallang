@@ -18,8 +18,7 @@
 
 namespace Ciallang::Bytecode {
 
-    void VMState::run(const Chunk *mainChunk) {
-        allocCallFrame(mainChunk);
+    void VMState::run() {
 // #define CLL_COMPUTED_GOTO
 #ifdef CLL_COMPUTED_GOTO
         // 标签数组

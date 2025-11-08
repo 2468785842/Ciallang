@@ -15,6 +15,7 @@
 //
 
 #include "gc/GC.hpp"
+#include <iostream>
 #include <catch.hpp>
 #include <utility>
 

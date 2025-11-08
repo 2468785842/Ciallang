@@ -12,7 +12,7 @@
 
 #include "TjsValue.hpp"
 
-#include "TjsObject.hpp"
+#include "Object.hpp"
 #include "TjsOctet.hpp"
 #include "TjsString.hpp"
 #include "logging/Logger.hpp"
@@ -29,7 +29,7 @@ namespace Ciallang {
 
     TjsValue::TjsValue(const TjsOctet &value) : _type(TjsValueType::Octet) { _value._octet = new TjsOctet{ value }; }
 
-    TjsValue::TjsValue(TjsObject *value) : _value{ ._object = value }, _type(TjsValueType::Object) {}
+    TjsValue::TjsValue(Object *value) : _value{ ._object = value }, _type(TjsValueType::Object) {}
 
     TjsValue::~TjsValue() {
         switch(_type) {
@@ -95,7 +95,7 @@ namespace Ciallang {
         return _value._octet;
     }
 
-    TjsObject *TjsValue::toObject() const {
+    Object *TjsValue::toObject() const {
         CLL_ASSERT(type() == TjsValueType::Object, "not object type is %s", name());
         return _value._object;
     }

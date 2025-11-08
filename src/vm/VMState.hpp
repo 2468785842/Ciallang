@@ -156,7 +156,7 @@ namespace Ciallang::Bytecode {
     public:
         explicit VMState(Inter::SymbolTable &symbolTable) : _symbolTable(symbolTable) {}
 
-        void run(const Chunk *mainChunk);
+        void run();
 
         void reg(const Register &reg, const TjsValue &value) const;
 
@@ -183,7 +183,7 @@ namespace Ciallang::Bytecode {
         }
 
         template <typename T>
-            requires std::is_base_of_v<TjsObject, T>
+            requires std::is_base_of_v<Object, T>
         void global(T *obj) {
             global(obj->name(), TjsValue{ obj });
         }

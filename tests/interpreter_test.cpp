@@ -40,7 +40,8 @@ TEST_CASE("Print \"Hello World!\"") {
 
     interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
 
-    interpreter.run(chunk.get());
+    interpreter.allocCallFrame(chunk.get());
+    interpreter.run();
 }
 
 TEST_CASE("Interpreter Test Execute") {
@@ -62,7 +63,8 @@ TEST_CASE("Interpreter Test Execute") {
     Ciallang::Bytecode::VMState interpreter{ globalTable };
 
     fmt::println("{}", interpreter.dumpInstruction(*chunk));
-    interpreter.run(chunk.get());
+    interpreter.allocCallFrame(chunk.get());
+    interpreter.run();
     fmt::println("{}", interpreter.dumpRegisters());
 }
 
@@ -88,6 +90,7 @@ TEST_CASE("Script execution benchmark") {
 
         Ciallang::Bytecode::VMState interpreter{ globalTable };
 
-        interpreter.run(chunk.get());
+        interpreter.allocCallFrame(chunk.get());
+        interpreter.run();
     };
 }
