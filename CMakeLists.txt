@@ -59,7 +59,7 @@ set(SOURCE_FILES
 
         src/types/Function.cpp
         src/types/TjsOctet.cpp
-        src/types/TjsObject.cpp
+        src/types/Object.cpp
         src/types/TjsValue.cpp
         src/types/TjsString.cpp
         src/types/TjsTypes.hpp

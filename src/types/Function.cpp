@@ -23,5 +23,5 @@ namespace Ciallang {
     Function::Function(Bytecode::Chunk *chunk, const std::string &name) : Function(chunk, name, 0) {}
 
     Function::Function(Bytecode::Chunk *chunk, std::string name, const size_t arity) :
-        Object(false), _chunk(chunk), _name(std::move(name)), _arity(arity) {}
+        _chunk(chunk), _name(std::move(name)), _arity(arity) {}
 } // namespace Ciallang

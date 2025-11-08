@@ -35,9 +35,7 @@ namespace Ciallang {
         [[nodiscard]] const Bytecode::Chunk *chunk() const { return _chunk.get(); }
 
         [[nodiscard]] size_t arity() const noexcept override { return _arity; }
-
-        [[nodiscard]] bool isNative() const noexcept override { return false; }
-
+        
         ~Function() noexcept override = default;
 
     private:
@@ -140,7 +138,7 @@ namespace Ciallang {
 
         template <typename Callable>
         explicit NativeFunction(const std::string_view name, Callable &&callable) :
-            Object{ true }, _callback([callable = std::forward<Callable>(callable)](TjsValue *args) {
+             _callback([callable = std::forward<Callable>(callable)](TjsValue *args) {
                 return detail::invoke_callable(callable, args);
             }),
             _arity(detail::function_traits<Callable>::arity), _name(name) {}

@@ -18,6 +18,7 @@ namespace Ciallang {
 
     class Object {
     public:
+        Object() = default;
         virtual ~Object() noexcept = default;
 
         [[nodiscard]] virtual const char *name() const noexcept = 0;
