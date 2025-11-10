@@ -7,7 +7,6 @@ option(BUILD_EXECUTABLE "build executable file" ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
 
 if(MSVC)
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/EHsc>" "/MP" "/utf-8")
@@ -40,7 +39,7 @@ set(SOURCE_FILES
 
         src/parser/Parser.cpp
 
-        src/ast/Ast.cpp
+        src/ast/AstBuilder.cpp
 
         src/ast/AstNode.hpp
         src/ast/ExprNode.hpp

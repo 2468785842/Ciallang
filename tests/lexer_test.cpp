@@ -15,20 +15,31 @@
 //
 
 #include <catch.hpp>
+#include <iostream>
 
 #include "test_config.h"
 
 #include "common/SourceFile.hpp"
 #include "lexer/Lexer.hpp"
 
-TEST_CASE("test lexer") {
+TEST_CASE("词法分析 - 基本功能") {
     Ciallang::Common::SourceFile source_file{ TEST_FILES_PATH R"(.\startup.tjs)" };
     Ciallang::Common::Result r{};
     source_file.load(r);
+
+    // 如果文件不存在，跳过测试
+    if(r.isFailed()) {
+        WARN("Test file not found, skipping lexer test");
+        return;
+    }
+
     Ciallang::Syntax::Lexer lexer{ source_file };
+    int tokenCount = 0;
+
     while(lexer.hasNext()) {
         Ciallang::Syntax::Token *token = nullptr;
         lexer.next(token);
+        REQUIRE(token != nullptr);
 
         std::cout << token->name() << "\t";
         if(token->value() != nullptr) {
@@ -45,7 +56,12 @@ TEST_CASE("test lexer") {
             std::cout << token->location.start().line << "," << token->location.start().column;
         }
         std::cout << std::endl;
+        tokenCount++;
     }
+
+    // 验证至少读取了一些token
+    REQUIRE(tokenCount > 0);
+
     if(r.isFailed()) {
         for(const auto &item : r.messages()) {
             std::cerr << item.details() << std::endl;

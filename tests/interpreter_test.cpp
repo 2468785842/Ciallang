@@ -23,7 +23,7 @@
 #include "standard/Print.hpp"
 #include "test_config.h"
 
-TEST_CASE("Print \"Hello World!\"") {
+TEST_CASE("解释器 - Hello World") {
     Ciallang::Common::Result r{};
 
     Ciallang::Common::SourceFile sourceFile{};
@@ -44,7 +44,7 @@ TEST_CASE("Print \"Hello World!\"") {
     interpreter.run();
 }
 
-TEST_CASE("Interpreter Test Execute") {
+TEST_CASE("解释器 - 执行测试") {
     Ciallang::Common::Result r{};
 
     Ciallang::Common::SourceFile sourceFile{ TEST_FILES_PATH R"(/startup.tjs)" };
@@ -61,6 +61,7 @@ TEST_CASE("Interpreter Test Execute") {
     auto chunk = codeGen.parseAst(r, globalNode);
 
     Ciallang::Bytecode::VMState interpreter{ globalTable };
+    interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
 
     fmt::println("{}", interpreter.dumpInstruction(*chunk));
     interpreter.allocCallFrame(chunk.get());
@@ -68,7 +69,7 @@ TEST_CASE("Interpreter Test Execute") {
     fmt::println("{}", interpreter.dumpRegisters());
 }
 
-TEST_CASE("Script execution benchmark") {
+TEST_CASE("解释器 - 脚本执行性能") {
     BENCHMARK("fib 15") {
         Ciallang::Common::Result r{};
 

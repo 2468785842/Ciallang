@@ -16,6 +16,7 @@
 #include <any>
 #include <fmt/format.h>
 #include <ranges>
+#include <sstream>
 
 namespace Ciallang::Common {
     class TableFormatter {

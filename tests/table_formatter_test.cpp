@@ -39,7 +39,7 @@ static const std::any table[][5] = { { "Heap Usage", "Heap Usage", "Heap Usage",
                                      { "Free", 664, 6, 0, 3760 },
                                      { "Used(%)", 11.70, 93.62, 0.00, 0.00 } };
 
-TEST_CASE("TableFormatterTest Print") {
+TEST_CASE("表格格式化 - 打印功能") {
     static constexpr size_t TABLE_SIZE = 60;
     Ciallang::Common::TableFormatter formatter{ TABLE_SIZE, 5 };
     formatter.parse(table);

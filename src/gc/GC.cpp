@@ -14,6 +14,8 @@
 // Created by LiDon on 2025/9/29.
 //
 
+#include <stack>
+
 #include "GC.hpp"
 #include "logging/Logger.hpp"
 
@@ -67,7 +69,9 @@ namespace Ciallang {
         std::stack<GCObject *> stk;
         stk.push(root);
 
-        // Step 1: 遍历整个循环，把循环内所有对象放入 visited
+        std::vector<GCObject *> cycle_objects; // Objects potentially in a cycle
+
+        // Step 1: Find all objects reachable from root within the potential cycle
         while(!stk.empty()) {
             auto obj = stk.top();
             stk.pop();
@@ -75,8 +79,8 @@ namespace Ciallang {
             if(!obj || visited.contains(obj))
                 continue;
             visited.insert(obj);
+            cycle_objects.push_back(obj);
 
-            // push children
             for(auto child : obj->_children) {
                 if(child && !visited.contains(child)) {
                     stk.push(child);
@@ -84,26 +88,36 @@ namespace Ciallang {
             }
         }
 
-        // Step 2: 销毁循环内对象
-        for(const auto &obj : visited) {
+        // Step 2: Perform a "trial deletion" by decrementing reference counts
+        // for all internal references within the identified cycle_objects.
+        // This simulates breaking the cycle.
+        for(auto obj : cycle_objects) {
             if(!obj)
                 continue;
-
-            // 拷贝 children 避免 delete 后访问
-            auto children = obj->_children;
-            obj->_children.clear();
-
-            // 不调用 decRef，不依赖 refCount
-            for(const auto &child : children) {
-                if(child) {
-                    // 可选：减去循环内部引用计数，但不要触发 delete
-                    if(visited.contains(child))
-                        child->_refCount--;
+            for(auto child : obj->_children) {
+                if(child && visited.contains(child)) { // If child is also part of this cycle
+                    child->_refCount--;
                 }
             }
+        }
 
-            CLL_LOG_DEBUG("Destroying object 0x%llx", obj);
-            delete obj;
+        // Step 3: Identify and delete objects that are truly unreferenced (refCount == 0)
+        // after the trial deletion. These objects were only referenced by the cycle.
+        for(auto obj : cycle_objects) {
+            if(obj && obj->_refCount == 0) {
+                CLL_LOG_DEBUG("Destroying object 0x%llx", obj);
+                delete obj;
+            } else if(obj) {
+                // Step 4: For objects that still have refCount > 0, they are externally referenced.
+                // We need to restore their reference counts that were decremented in Step 2.
+                // And also clear their children to prevent dangling pointers.
+                for(auto child : obj->_children) {
+                    if(child && visited.contains(child)) {
+                        child->_refCount++; // Restore ref count
+                    }
+                }
+                obj->_children.clear(); // Clear children to prevent dangling pointers
+            }
         }
     }
 } // namespace Ciallang

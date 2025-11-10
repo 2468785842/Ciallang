@@ -12,6 +12,9 @@
  *
  */
 
+#include <fstream>
+#include <sstream>
+
 #include "SourceFile.hpp"
 
 #include "Colorizer.hpp"
@@ -76,7 +79,7 @@ namespace Ciallang::Common {
     bool SourceFile::empty() const { return _buffer.empty(); }
 
     void SourceFile::buildLines(Result &r) {
-        uint32_t line = 0;
+        uint32_t line = 0; // Start line numbers from 0
         uint32_t columns = 0;
         size_t lineStart = 0;
 

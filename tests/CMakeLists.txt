@@ -19,6 +19,15 @@ set(SOURCES
         lexer_test.cpp
         interpreter_test.cpp
         table_formatter_test.cpp
+        expression_test.cpp
+        function_test.cpp
+        statement_test.cpp
+        parser_comprehensive_test.cpp
+        lexer_comprehensive_test.cpp
+        gc_comprehensive_test.cpp
+        type_system_test.cpp
+        vm_instruction_test.cpp
+        integration_test.cpp
 )
 
 string(REPLACE ".cpp" "" BASENAMES_SOURCES "${SOURCES}")

@@ -23,6 +23,8 @@
 #include "IEEETypes.hpp"
 #include "types/TjsString.hpp"
 
+#include <fmt/format.h>
+
 using namespace Ciallang::Syntax;
 
 std::multimap<std::int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
@@ -78,7 +80,7 @@ std::multimap<std::int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
 
 [[maybe_unused]] void *Lexer::S_LoadCases = [] {
     // number literal
-    string numberMarks = ".0123456789";
+    string numberMarks = "0123456789";
     for(auto &mark : numberMarks)
         S_Cases.emplace(mark, bind_front(&Lexer::numberConstVal));
 
@@ -240,7 +242,7 @@ bool Lexer::next(Token *&token) {
         _sourceFile.restoreTopMark();
     }
 
-    CLL_LOG_FATAL("unknown char: %c", static_cast<char>(rune));
+    _result.error(fmt::format("unknown char: {}", static_cast<char>(rune)));
 
     token = makeToken(S_Invalid);
     setTokenLocation(token);
@@ -401,7 +403,7 @@ bool Lexer::numberConstVal(Token *&token) {
     auto ch = read();
     const std::string valid = ".0123456789Ee";
     int32_t shifting = 0;
-    auto hasDigits = false;
+    auto hasActualDigits = false;
     auto valueType = TjsValueType::Integer;
 
     while(valid.find_first_of(static_cast<char>(ch)) != string::npos) {
@@ -415,7 +417,7 @@ bool Lexer::numberConstVal(Token *&token) {
         }
 
         // 进制检查
-        if(!hasDigits && ch == '0') {
+        if(!hasActualDigits && ch == '0') {
             const auto tCh = read(false);
             if(tCh == 'x' || tCh == 'X')
                 // 十六进制
@@ -427,11 +429,11 @@ bool Lexer::numberConstVal(Token *&token) {
             if(tCh == 'e' || tCh == 'E') {
                 const auto runeType = utf8Encode(ch);
                 stream << runeType.data;
-                hasDigits = true;
+                hasActualDigits = true;
                 ch = tCh;
                 continue;
             }
-            if(string{ "+-.0123456789" }.find_first_of(static_cast<char>(tCh)) != -1)
+            if(isdigit(tCh) && tCh >= '0' && tCh <= '7')
                 // octal, 八进制
                 return parseNonDecimalNumber(token, stream, getOctNum, 3);
 
@@ -461,12 +463,16 @@ bool Lexer::numberConstVal(Token *&token) {
 
         const auto runeType = utf8Encode(ch);
         stream << runeType.data;
-        hasDigits = true;
+        if(isdigit(ch)) {
+            hasActualDigits = true;
+        }
         ch = read(false);
     }
 
-    if(!hasDigits)
+    if(!hasActualDigits) {
+        rewindOneChar();
         return false;
+    }
 
     rewindOneChar();
 

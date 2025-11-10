@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "ast/Ast.hpp"
+#include "ast/AstBuilder.hpp"
 #include "common/SourceFile.hpp"
 #include "lexer/Lexer.hpp"
 
@@ -232,6 +232,12 @@ namespace Ciallang::Syntax {
         ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    struct ParenthesizedPrefixParser final : PrefixParser {
+        ParenthesizedPrefixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     //    struct FunctionPrefixParser final : public PrefixParser {
     //        FunctionPrefixParser() = default;
     //
@@ -242,6 +248,7 @@ namespace Ciallang::Syntax {
     static constinit UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
     static constinit SymbolPrefixParser S_SymbolPrefixParser;
     static constinit UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
+    static constinit ParenthesizedPrefixParser S_ParenthesizedPrefixParser{};
     //    static inline FunctionPrefixParser S_FunctionPrefixParser{};
 
     static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>({
@@ -264,6 +271,7 @@ namespace Ciallang::Syntax {
         { TokenType::Plus, &S_PrefixParser }, //"+"
         { TokenType::Ampersand, &S_PrefixParser }, // "&" substance accessing (ignores property operation)
         { TokenType::Asterisk, &S_PrefixParser }, // "*" force property access
+        { TokenType::LParenthesis, &S_ParenthesizedPrefixParser }, // "(" 括号表达式
         // incontextof_expr "instanceof" unary_expr
         // incontextof_expr "in" unary_expr
         // {TokenType::Int,            &S_TypeCastPrefixParser}, // "int" unary_expr

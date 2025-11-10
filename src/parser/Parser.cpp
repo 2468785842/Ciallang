@@ -44,22 +44,40 @@ namespace Ciallang::Syntax {
      * a(,2) -> a(void, 2)
      */
     static bool parseArguments(Result &r, Parser *parser, ProcCallExprNode *node) {
-        // Special rule: a leading comma means an implicit 'void' argument.
-        // We don't consume it yet, so the while-loop will handle the first ',' properly.
-        if(parser->peek(TokenType::Comma)) {
-            node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
-        }
+        bool expectArgument = true;
 
         while(!parser->peek(TokenType::RParenthesis)) {
-            if(parser->peek(TokenType::Comma)) {
-                parser->consume();
-                node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
-                continue;
+            if(expectArgument) {
+                // 检查当前token是否为逗号
+                if(parser->peek(TokenType::Comma)) {
+                    // 遇到逗号，添加隐式void参数
+                    node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
+
+                    // 期望并消耗逗号
+                    if(!parser->expect(r, &S_Comma))
+                        return false;
+                    // 继续期望参数
+                    expectArgument = true;
+                } else {
+                    // 解析表达式参数
+                    auto *expr = parser->parseExpression(r);
+                    if(!expr)
+                        return false;
+                    node->arguments.push_back(expr);
+                    expectArgument = false;
+                }
+            } else {
+                // 期望逗号
+                if(!parser->expect(r, &S_Comma))
+                    return false;
+                expectArgument = true;
             }
-            auto *expr = parser->parseExpression(r);
-            if(!expr)
-                return false;
-            node->arguments.push_back(expr);
+        }
+
+        // 处理尾随逗号后的隐式void参数
+        // 只有在expectArgument为true时才添加void参数
+        if(expectArgument) {
+            node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
         }
 
         return true;
@@ -636,5 +654,21 @@ namespace Ciallang::Syntax {
 
     ExprNode *SymbolPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
         return parser->astBuilder()->makeSymbolExprNode(std::move(*token));
+    }
+
+    ExprNode *ParenthesizedPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
+        // 解析括号内的表达式
+        auto *expr = parser->parseExpression(r);
+        if(!expr) {
+            parser->error(r, "expected expression inside parentheses", token->location);
+            return nullptr;
+        }
+
+        // 期望右括号
+        if(!parser->expect(r, &S_RParenthesis)) {
+            return nullptr;
+        }
+
+        return expr;
     }
 } // namespace Ciallang::Syntax

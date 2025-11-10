@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "ast/Ast.hpp"
+#include "ast/AstBuilder.hpp"
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
 #include "types/TjsString.hpp"

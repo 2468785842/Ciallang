@@ -164,6 +164,9 @@ namespace Ciallang::Bytecode::Op {
             return getOperand<T>(_operand3);
         }
 
+        [[nodiscard]] size_t operandCount() const {
+            return _operand1.has_value() + _operand2.has_value() + _operand3.has_value();
+        }
 
         static void execute(const Instruction &itt, VMState &vmState);
 
