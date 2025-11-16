@@ -17,7 +17,6 @@
 
 #include "Chunk.hpp"
 #include "gen/IRGenerator.hpp"
-#include "logging/Logger.hpp"
 #include "types/Function.hpp"
 
 #include "types/TjsValue.hpp"
@@ -167,25 +166,19 @@ namespace Ciallang::Bytecode {
 
         [[nodiscard]] const TjsValue &global(const size_t symbolIndex) const { return _globals[symbolIndex]; }
 
-        void global(const size_t symbolIndex, TjsValue &&value) {
+        void global(const size_t symbolIndex, TjsValue value) {
             if(_globals.size() < symbolIndex + 1) {
                 _globals.resize(symbolIndex * 2 + 1);
             }
-            _globals[symbolIndex] = std::move(value);
+            _globals[symbolIndex] = value;
         }
 
-        void global(const std::string &identifier, TjsValue &&value) {
+        void global(const std::string &identifier, TjsValue value) {
             const auto index = _symbolTable.getSymbolIndex(identifier);
             if(!index) {
                 return;
             }
-            global(*index, std::move(value));
-        }
-
-        template <typename T>
-            requires std::is_base_of_v<Object, T>
-        void global(T *obj) {
-            global(obj->name(), TjsValue{ obj });
+            global(*index, value);
         }
 
         void setZF(const bool zf) { _zf = zf; }

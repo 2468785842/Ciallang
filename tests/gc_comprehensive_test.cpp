@@ -5,7 +5,6 @@
  */
 
 #include <catch.hpp>
-#include <memory>
 #include <vector>
 
 #include "gc/GC.hpp"

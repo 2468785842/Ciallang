@@ -16,6 +16,7 @@
 
 #include "VMState.hpp"
 #include "logging/Logger.hpp"
+#include "types/Object.hpp"
 #include "types/Function.hpp"
 #include "vm/Register.hpp"
 
@@ -277,7 +278,7 @@ namespace Ciallang::Bytecode::Op {
         const auto &object = static_cast<const VMState &>(vmState).reg(memberReg(itt));
         CLL_ASSERT(object.isObject(), "memberReg is not object");
 
-        if(const auto fun = dynamic_cast<Function *>(object.toObject())) {
+        if(const auto *fun = dynamic_cast<Function *>(object.toObject())) {
             const auto cnt = static_cast<std::int64_t>(fun->arity() - argCount(itt));
             if(cnt > 0)
                 vmState.pushVoid(cnt);
@@ -286,21 +287,29 @@ namespace Ciallang::Bytecode::Op {
             vmState.current()->baseRegSP -= fun->arity();
             return;
         }
-        const auto fun = dynamic_cast<NativeFunction *>(object.toObject());
-        CLL_ASSERT(fun, "not a function");
 
-        const auto values = std::make_unique<TjsValue[]>(fun->arity());
-        const CallFrame *curCallFrame = vmState.current();
-        const size_t count = argCount(itt);
-        const size_t base = vmState.getRegPoolTop() - count;
-        // Faster operation
-        for(std::uint32_t i = 0; i < count; i++) {
-            new(&values[i]) TjsValue{ curCallFrame->getReg(base - i) };
+        if(const auto *fun = dynamic_cast<NativeFunction *>(object.toObject())) {
+            const auto values = std::make_unique<TjsValue[]>(fun->arity());
+            const CallFrame *curCallFrame = vmState.current();
+            const size_t count = argCount(itt);
+            const size_t base = vmState.getRegPoolTop() - count;
+            // Faster operation
+            for(std::uint32_t i = 0; i < count; i++) {
+                new(&values[i]) TjsValue{ curCallFrame->getReg(base - i) };
+            }
+
+            auto value = fun->callProc(values.get());
+
+            vmState.reg(dst(itt), std::move(value));
+            return;
         }
 
-        auto value = fun->callProc(values.get());
+        if(auto *classObj = dynamic_cast<ClassObject *>(object.toObject())) {
+            vmState.reg(dst(itt), tjsObject<InstanceObject>(classObj));
+            return;
+        }
 
-        vmState.reg(dst(itt), std::move(value));
+        CLL_ASSERT(false, "not a function or class");
     }
 
     std::string Call::dump(const Instruction &itt, const VMState &, bool) {

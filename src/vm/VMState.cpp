@@ -13,7 +13,6 @@
  */
 #include "VMState.hpp"
 
-#include "Chunk.hpp"
 #include "Instruction.hpp"
 
 namespace Ciallang::Bytecode {

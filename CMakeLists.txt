@@ -25,27 +25,15 @@ find_package(spdlog CONFIG REQUIRED)
 
 set(SOURCE_FILES
         src/lexer/Lexer.cpp
-        src/lexer/Token.hpp
-        src/lexer/IEEETypes.hpp
 
         src/common/SourceLocation.cpp
-        src/common/Result.hpp
-        src/common/ResultMessage.hpp
-        src/common/Defer.hpp
         src/common/SourceFile.cpp
         src/common/Colorizer.cpp
         src/common/UTF8.cpp
-        src/common/TableFormatter.hpp
 
         src/parser/Parser.cpp
 
         src/ast/AstBuilder.cpp
-
-        src/ast/AstNode.hpp
-        src/ast/ExprNode.hpp
-        src/ast/StmtNode.hpp
-        src/ast/DeclNode.hpp
-        src/ast/AstFormatter.hpp
 
         src/gen/IRGenerator.cpp
 
@@ -53,15 +41,12 @@ set(SOURCE_FILES
         src/vm/VMState.cpp
         src/vm/Rlc.cpp
         src/vm/Instruction.cpp
-        src/vm/Register.hpp
-        src/vm/Label.hpp
 
         src/types/Function.cpp
         src/types/TjsOctet.cpp
         src/types/Object.cpp
         src/types/TjsValue.cpp
         src/types/TjsString.cpp
-        src/types/TjsTypes.hpp
 
         src/standard/Debug.cpp
 

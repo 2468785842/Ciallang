@@ -38,7 +38,7 @@ TEST_CASE("解释器 - Hello World") {
 
     Ciallang::Bytecode::VMState interpreter{ globalTable };
 
-    interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
+    interpreter.global("println", Ciallang::Standard::S_PrintlnFunction);
 
     interpreter.allocCallFrame(chunk.get());
     interpreter.run();
@@ -61,12 +61,10 @@ TEST_CASE("解释器 - 执行测试") {
     auto chunk = codeGen.parseAst(r, globalNode);
 
     Ciallang::Bytecode::VMState interpreter{ globalTable };
-    interpreter.global(&Ciallang::Standard::S_PrintlnFunction);
+    interpreter.global("println", Ciallang::Standard::S_PrintlnFunction);
 
-    fmt::println("{}", interpreter.dumpInstruction(*chunk));
     interpreter.allocCallFrame(chunk.get());
     interpreter.run();
-    fmt::println("{}", interpreter.dumpRegisters());
 }
 
 TEST_CASE("解释器 - 脚本执行性能") {

@@ -15,6 +15,7 @@
 #include <fmt/ostream.h>
 
 #include "TjsTypes.hpp"
+#include "gc/GC.hpp"
 
 namespace Ciallang {
     class TjsValue {
@@ -37,7 +38,7 @@ namespace Ciallang {
         TjsValue(const TjsValue &v) noexcept;
         TjsValue(TjsValue &&) noexcept;
 
-        TjsValue &operator=(const TjsValue &value) = delete;
+        TjsValue &operator=(const TjsValue &value) noexcept;
 
         TjsValue &operator=(TjsValue &&rhs) noexcept;
 
@@ -102,6 +103,10 @@ namespace Ciallang {
     static TjsValue tjsInteger(const TjsInteger value) { return TjsValue{ value }; }
 
     static TjsValue tjsReal(const TjsReal value) { return TjsValue{ value }; }
+
+    template<class R, class... Args>
+    requires is_gc_object_v<R>
+    static TjsValue tjsObject(Args... args) { return TjsValue{ new R { std::forward<Args>(args)... } }; }
 } // namespace Ciallang
 
 // support fmt::format

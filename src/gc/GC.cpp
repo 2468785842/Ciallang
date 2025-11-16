@@ -39,8 +39,7 @@ namespace Ciallang {
     void GCObject::addChild(GCObject *pChild) {
         CLL_ASSERT(pChild != nullptr, "GC child is null");
         _children.push_back(pChild);
-        if(pChild)
-            pChild->incRef();
+        pChild->incRef();
     }
 
     void GC::track(GCObject *o) {
@@ -91,7 +90,7 @@ namespace Ciallang {
         // Step 2: Perform a "trial deletion" by decrementing reference counts
         // for all internal references within the identified cycle_objects.
         // This simulates breaking the cycle.
-        for(auto obj : cycle_objects) {
+        for(const auto obj : cycle_objects) {
             if(!obj)
                 continue;
             for(auto child : obj->_children) {
@@ -103,7 +102,7 @@ namespace Ciallang {
 
         // Step 3: Identify and delete objects that are truly unreferenced (refCount == 0)
         // after the trial deletion. These objects were only referenced by the cycle.
-        for(auto obj : cycle_objects) {
+        for(const auto obj : cycle_objects) {
             if(obj && obj->_refCount == 0) {
                 CLL_LOG_DEBUG("Destroying object 0x%llx", obj);
                 delete obj;

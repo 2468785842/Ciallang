@@ -15,19 +15,18 @@ set(TEST_FILES_PATH ${CMAKE_CURRENT_SOURCE_DIR}/test_files)
 configure_file(test_config.h.in test_config.h)
 
 set(SOURCES
-        gc_test.cpp
-        lexer_test.cpp
-        interpreter_test.cpp
-        table_formatter_test.cpp
         expression_test.cpp
         function_test.cpp
-        statement_test.cpp
-        parser_comprehensive_test.cpp
-        lexer_comprehensive_test.cpp
+        gc_test.cpp
         gc_comprehensive_test.cpp
+        interpreter_test.cpp
+        integration_test.cpp
+        lexer_comprehensive_test.cpp
+        lexer_test.cpp
+        parser_comprehensive_test.cpp
+        statement_test.cpp
         type_system_test.cpp
         vm_instruction_test.cpp
-        integration_test.cpp
 )
 
 string(REPLACE ".cpp" "" BASENAMES_SOURCES "${SOURCES}")
