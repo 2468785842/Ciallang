@@ -596,7 +596,7 @@ void Lexer::parseNonDecimalReal(Token *&token, const string &decimalStr, int8_t 
         }
     }
 
-    main >>= (64 - 1 - IEEE_D_SIGNIFICAND_BITS);
+    main >>= (64 - 1 - IEEE::SIGNIFICAND_BITS);
 
     if(main == 0) {
         // zero
@@ -604,27 +604,27 @@ void Lexer::parseNonDecimalReal(Token *&token, const string &decimalStr, int8_t 
         return;
     }
 
-    main &= (1ull << IEEE_D_SIGNIFICAND_BITS) - 1ull;
+    main &= (1ull << IEEE::SIGNIFICAND_BITS) - 1ull;
 
-    if(exp < IEEE_D_EXP_MIN) {
+    if(exp < IEEE::EXP_MIN) {
         // informal
         // treat as zero
         token = makeToken(TokenType::ConstVal, tjsReal(0.0));
         return;
     }
 
-    if(exp > IEEE_D_EXP_MAX) {
+    if(exp > IEEE::EXP_MAX) {
         // too large
         // treat as infinity
 
-        token = makeToken(TokenType::ConstVal, tjsReal(static_cast<double>(IEEE_D_P_INF)));
+        token = makeToken(TokenType::ConstVal, tjsReal(static_cast<double>(IEEE::P_INF)));
         return;
     }
 
     TjsReal temp = 0.0;
 
     // compose IEEE double
-    *reinterpret_cast<TjsInteger *>(&temp) = IEEE_D_MAKE_SIGN(0) | IEEE_D_MAKE_EXP(exp) | IEEE_D_MAKE_SIGNIFICAND(main);
+    *reinterpret_cast<TjsInteger *>(&temp) = IEEE::make_sign(false) | IEEE::make_exponent(exp) | IEEE::make_significand(main);
 
     token = makeToken(TokenType::ConstVal, tjsReal(temp));
 }

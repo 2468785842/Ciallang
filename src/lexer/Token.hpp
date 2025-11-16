@@ -430,9 +430,9 @@ namespace Ciallang::Syntax {
     static const inline Token S_True{ TokenType::ConstVal, tjsInteger(1) },
         S_False{ TokenType::ConstVal, tjsInteger(0) },
 
-        S_Infinity{ TokenType::ConstVal, tjsReal(IEEE_D_N_INF) },
+        S_Infinity{ TokenType::ConstVal, tjsReal(IEEE::N_INF) },
 
-        S_NaN{ TokenType::ConstVal, tjsReal(IEEE_D_N_NaN) };
+        S_NaN{ TokenType::ConstVal, tjsReal(IEEE::N_NaN) };
 
     enum class StringParseState {
         None,

@@ -15,6 +15,10 @@
 #include <fmt/ostream.h>
 
 #include "TjsTypes.hpp"
+#include "Object.hpp"
+#include "TjsOctet.hpp"
+#include "TjsString.hpp"
+
 #include "gc/GC.hpp"
 
 namespace Ciallang {

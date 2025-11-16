@@ -12,9 +12,6 @@
 
 #include "TjsValue.hpp"
 
-#include "Object.hpp"
-#include "TjsOctet.hpp"
-#include "TjsString.hpp"
 #include "logging/Logger.hpp"
 
 namespace Ciallang {

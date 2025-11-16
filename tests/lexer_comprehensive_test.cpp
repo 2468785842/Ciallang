@@ -8,8 +8,6 @@
 #include <string>
 #include <vector>
 
-#include "types/TjsString.hpp"
-
 #include "common/SourceFile.hpp"
 #include "lexer/Lexer.hpp"
 

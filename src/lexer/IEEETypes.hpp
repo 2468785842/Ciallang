@@ -14,7 +14,11 @@
 
 #pragma once
 
+#include <bit>
+#include <concepts>
 #include <cstdint>
+#include <type_traits>
+#include <limits>
 
 /*---------------------------------------------------------------------------*/
 /* "TJS2" type definitions                                                   */
@@ -30,43 +34,118 @@
 // +-+-----------+---------------------------+
 // s = sign,  negative if this is 1, otherwise positive.
 
-/* double related constants */
-static constexpr int64_t IEEE_D_EXP_MAX = 1023;
-static constexpr int64_t IEEE_D_EXP_MIN = -1022;
-static constexpr int64_t IEEE_D_SIGNIFICAND_BITS = 52;
+namespace Ciallang::Syntax::IEEE {
 
-static constexpr uint64_t IEEE_D_EXP_BIAS = 1023;
+// Concepts for IEEE floating point operations
+template<typename T>
+concept IEEE754Double = std::same_as<T, double> && (sizeof(T) == 8) && (std::numeric_limits<T>::is_iec559);
 
-/* component extraction */
-static constexpr uint64_t IEEE_D_SIGN_MASK = 0x8000000000000000ull;
-static constexpr uint64_t IEEE_D_EXP_MASK = 0x7ff0000000000000ull;
-static constexpr uint64_t IEEE_D_SIGNIFICAND_MASK = 0x000fffffffffffffull;
-static constexpr uint64_t IEEE_D_SIGNIFICAND_MSB_MASK = 0x0008000000000000ull;
+// double related constants
+static constexpr int64_t EXP_MAX = 1023;
+static constexpr int64_t EXP_MIN = -1022;
+static constexpr int64_t SIGNIFICAND_BITS = 52;
+static constexpr uint64_t EXP_BIAS = 1023;
 
-#define IEEE_D_GET_SIGN(x) (0 != (x & IEEE_D_SIGN_MASK))
+// component extraction bit masks
+static constexpr uint64_t SIGN_MASK = 0x8000000000000000ull;
+static constexpr uint64_t EXP_MASK = 0x7ff0000000000000ull;
+static constexpr uint64_t SIGNIFICAND_MASK = 0x000fffffffffffffull;
+static constexpr uint64_t SIGNIFICAND_MSB_MASK = 0x0008000000000000ull;
 
-#define IEEE_D_GET_EXP(x) ((std::int32_t)(((x & IEEE_D_EXP_MASK) >> IEEE_D_SIGNIFICAND_BITS) - IEEE_D_EXP_BIAS))
+// Type-safe bit manipulation utilities
+template<typename T>
+[[nodiscard]] constexpr std::enable_if_t<std::is_unsigned_v<T>, T> 
+bit_extract(T value, int start, int width) noexcept {
+    return (value >> start) & ((T{1} << width) - 1);
+}
 
-#define IEEE_D_GET_SIGNIFICAND(x) (x & IEEE_D_SIGNIFICAND_MASK)
+template<typename T>
+[[nodiscard]] constexpr std::enable_if_t<std::is_unsigned_v<T>, T> 
+bit_insert(T value, int start, int width, T insert) noexcept {
+    T mask = ((T{1} << width) - 1) << start;
+    return (value & ~mask) | ((insert << start) & mask);
+}
 
-/* component composition */
-#define IEEE_D_MAKE_SIGN(x) ((x) ? 0x8000000000000000ull : 0ull)
-#define IEEE_D_MAKE_EXP(x) ((std::uint64_t)(x + IEEE_D_EXP_BIAS) << 52)
-#define IEEE_D_MAKE_SIGNIFICAND(x) ((std::uint64_t)(x))
+// Component extraction functions (replacing macros)
+[[nodiscard]] constexpr bool get_sign(uint64_t bits) noexcept {
+    return (bits & SIGN_MASK) != 0;
+}
 
-/* special expression */
-/* (quiet) NaN */
-static constexpr uint64_t IEEE_D_P_NaN = IEEE_D_EXP_MASK | IEEE_D_SIGNIFICAND_MSB_MASK;
-static constexpr uint64_t IEEE_D_N_NaN = IEEE_D_SIGN_MASK | IEEE_D_P_NaN;
-/* infinite */
+[[nodiscard]] constexpr int32_t get_exponent(uint64_t bits) noexcept {
+    return static_cast<int32_t>(bit_extract(bits, SIGNIFICAND_BITS, 11) - EXP_BIAS);
+}
 
-static constexpr uint64_t IEEE_D_P_INF = IEEE_D_EXP_MASK;
-static constexpr uint64_t IEEE_D_N_INF = IEEE_D_SIGN_MASK | IEEE_D_P_INF;
+[[nodiscard]] constexpr uint64_t get_significand(uint64_t bits) noexcept {
+    return bits & SIGNIFICAND_MASK;
+}
 
-/* special expression check */
-#define IEEE_D_IS_NaN(x)                                                                                               \
-    ((IEEE_D_EXP_MASK & (x)) == IEEE_D_EXP_MASK) &&                                                                    \
-        (((x) & IEEE_D_SIGNIFICAND_MSB_MASK) ||                                                                        \
-         (!((x) & IEEE_D_SIGNIFICAND_MSB_MASK) && ((x) & (IEEE_D_SIGNIFICAND_MASK ^ IEEE_D_SIGNIFICAND_MSB_MASK))))
+// Component composition functions (replacing macros)
+[[nodiscard]] constexpr uint64_t make_sign(bool negative) noexcept {
+    return negative ? SIGN_MASK : 0ull;
+}
 
-#define IEEE_D_IS_INF(x) (((IEEE_D_EXP_MASK & (x)) == IEEE_D_EXP_MASK) && (!((x) & IEEE_D_SIGNIFICAND_MASK)))
+[[nodiscard]] constexpr uint64_t make_exponent(int32_t exp) noexcept {
+    return static_cast<uint64_t>(exp + EXP_BIAS) << SIGNIFICAND_BITS;
+}
+
+[[nodiscard]] constexpr uint64_t make_significand(uint64_t significand) noexcept {
+    return significand & SIGNIFICAND_MASK;
+}
+
+// Special values
+static constexpr uint64_t P_NaN = EXP_MASK | SIGNIFICAND_MSB_MASK;
+static constexpr uint64_t N_NaN = SIGN_MASK | P_NaN;
+static constexpr uint64_t P_INF = EXP_MASK;
+static constexpr uint64_t N_INF = SIGN_MASK | P_INF;
+
+// Special value check functions (replacing macros)
+[[nodiscard]] constexpr bool check_nan(uint64_t bits) noexcept {
+    const bool exp_all_set = (bits & EXP_MASK) == EXP_MASK;
+    const bool significand_nonzero = (bits & SIGNIFICAND_MASK) != 0;
+    return exp_all_set && significand_nonzero;
+}
+
+[[nodiscard]] constexpr bool check_inf(uint64_t bits) noexcept {
+    const bool exp_all_set = (bits & EXP_MASK) == EXP_MASK;
+    const bool significand_zero = (bits & SIGNIFICAND_MASK) == 0;
+    return exp_all_set && significand_zero;
+}
+
+// Modern C++20 bit cast support for double <-> uint64_t conversion
+template<IEEE754Double T = double>
+[[nodiscard]] constexpr uint64_t double_to_bits(T value) noexcept {
+    return std::bit_cast<uint64_t>(value);
+}
+
+template<IEEE754Double T = double>
+[[nodiscard]] constexpr T bits_to_double(uint64_t bits) noexcept {
+    return std::bit_cast<T>(bits);
+}
+
+// High-level IEEE 754 double precision utilities
+class Double {
+    uint64_t _bits;
+
+public:
+    constexpr explicit Double(uint64_t bits) noexcept : _bits(bits) {}
+    constexpr explicit Double(double value) noexcept : _bits(double_to_bits(value)) {}
+
+    [[nodiscard]] constexpr bool sign() const noexcept { return get_sign(_bits); }
+    [[nodiscard]] constexpr int32_t exponent() const noexcept { return get_exponent(_bits); }
+    [[nodiscard]] constexpr uint64_t significand() const noexcept { return get_significand(_bits); }
+    
+    [[nodiscard]] constexpr bool is_nan() const noexcept { return check_nan(_bits); }
+    [[nodiscard]] constexpr bool is_infinity() const noexcept { return check_inf(_bits); }
+    [[nodiscard]] constexpr bool is_finite() const noexcept { return !is_nan() && !is_infinity(); }
+    
+    [[nodiscard]] constexpr double value() const noexcept { return bits_to_double(_bits); }
+    [[nodiscard]] constexpr uint64_t bits() const noexcept { return _bits; }
+
+    // Static factory methods for special values
+    [[nodiscard]] static constexpr Double positive_infinity() noexcept { return Double(P_INF); }
+    [[nodiscard]] static constexpr Double negative_infinity() noexcept { return Double(N_INF); }
+    [[nodiscard]] static constexpr Double quiet_nan() noexcept { return Double(P_NaN); }
+    [[nodiscard]] static constexpr Double signaling_nan() noexcept { return Double(N_NaN); }
+};
+
+} // namespace Ciallang::Syntax::IEEE
