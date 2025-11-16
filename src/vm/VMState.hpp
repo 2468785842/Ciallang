@@ -157,9 +157,7 @@ namespace Ciallang::Bytecode {
 
         void run();
 
-        void reg(const Register &reg, const TjsValue &value) const;
-
-        void reg(const Register &reg, TjsValue &&value) const;
+        void reg(const Register &reg, TjsValue value) const;
 
         [[nodiscard]] TjsValue reg(Register reg);
         [[nodiscard]] const TjsValue &reg(Register reg) const;
@@ -253,8 +251,7 @@ namespace Ciallang::Bytecode {
 
         void pushVoid(const size_t n) { _regPool.allocFrame(n); }
 
-        void push(const TjsValue &v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = TjsValue{ v }; }
-        void push(TjsValue &&v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = std::move(v); }
+        void push(TjsValue v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = v; }
 
         void pop(const size_t count) { _regPool.freeFrame(count); }
         [[nodiscard]] size_t getRegPoolTop() const { return _regPool.used(); }

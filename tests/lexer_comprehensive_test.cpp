@@ -52,7 +52,7 @@ TEST_CASE("词法分析器 - 标识符识别") {
             REQUIRE(lexer.hasNext());
             lexer.next(token);
             REQUIRE(token != nullptr);
-            REQUIRE(*token->value()->toString() == expected);
+            REQUIRE(*token->value().toString() == expected);
         }
     }
 }
@@ -72,9 +72,8 @@ TEST_CASE("词法分析器 - 字面量识别") {
             REQUIRE(lexer.hasNext());
             lexer.next(token);
             REQUIRE(token != nullptr);
-            REQUIRE(token->value() != nullptr);
-            REQUIRE(token->value()->type() == TjsValueType::Integer);
-            REQUIRE(token->value()->toInteger() == expected);
+            REQUIRE(token->value().type() == TjsValueType::Integer);
+            REQUIRE(token->value().toInteger() == expected);
         }
     }
 
@@ -90,9 +89,8 @@ TEST_CASE("词法分析器 - 字面量识别") {
             lexer.next(token);
             REQUIRE(token != nullptr);
             REQUIRE(token->type() == Syntax::TokenType::ConstVal); // Changed from TokenType::Real
-            REQUIRE(token->value() != nullptr);
-            REQUIRE(token->value()->type() == TjsValueType::Real);
-            REQUIRE(token->value()->toReal() == Catch::Approx(expected));
+            REQUIRE(token->value().type() == TjsValueType::Real);
+            REQUIRE(token->value().toReal() == Catch::Approx(expected));
         }
     }
 
@@ -107,9 +105,8 @@ TEST_CASE("词法分析器 - 字面量识别") {
             REQUIRE(lexer.hasNext());
             lexer.next(token);
             REQUIRE(token != nullptr);
-            REQUIRE(token->value() != nullptr);
-            REQUIRE(token->value()->type() == TjsValueType::String);
-            REQUIRE(*token->value()->toString() == expected);
+            REQUIRE(token->value().type() == TjsValueType::String);
+            REQUIRE(*token->value().toString() == expected);
         }
     }
 }

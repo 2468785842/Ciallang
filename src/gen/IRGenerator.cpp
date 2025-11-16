@@ -12,8 +12,6 @@
 
 #include "IRGenerator.hpp"
 
-#include <complex>
-
 #include "ast/DeclNode.hpp"
 #include "ast/ExprNode.hpp"
 #include "ast/StmtNode.hpp"
@@ -41,7 +39,7 @@ namespace Ciallang::Inter {
 
     std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::ValueExprNode *node) {
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::Load>(dst, std::move(*node->token->value()));
+        _chunk->emit<Bytecode::Op::OpCode::Load>(dst, node->token->value());
 
         if(_r.isFailed())
             return {};
@@ -138,9 +136,9 @@ namespace Ciallang::Inter {
         // TODO: member access
         const auto identifier = node->lhs->token->value();
 
-        CLL_ASSERT(identifier->isString(), "identifier is not string");
+        CLL_ASSERT(identifier.isString(), "identifier is not string");
 
-        auto variable = resolveLocalVariable(*identifier->toString());
+        auto variable = resolveLocalVariable(*identifier.toString());
 
         if(variable.has_value()) {
             auto src = node->rhs->generateBytecode(this);
@@ -162,7 +160,7 @@ namespace Ciallang::Inter {
         auto src = node->rhs->generateBytecode(this);
         CLL_ASSERT(src.has_value(), "global src is not have val");
 
-        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), src.value());
+        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier.toString()), src.value());
 
         if(_r.isFailed())
             return {};
@@ -172,13 +170,13 @@ namespace Ciallang::Inter {
     std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::VarDeclNode *node) {
         const auto identifier = node->token->value();
 
-        CLL_ASSERT(identifier->isString(), "identifier is not string");
+        CLL_ASSERT(identifier.isString(), "identifier is not string");
 
         // global
         if(_scopeDepth == 1) {
             // can't init
             if(!node->rhs) {
-                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()),
+                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier.toString()),
                                                             getEmpty(*_chunk));
                 return {};
             }
@@ -188,12 +186,12 @@ namespace Ciallang::Inter {
             if(_r.isFailed())
                 return {};
 
-            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()),
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier.toString()),
                                                         src.value());
             return {};
         }
 
-        auto variable = resolveLocalVariable(*identifier->toString());
+        auto variable = resolveLocalVariable(*identifier.toString());
 
         // already have this variable, in same scope
         if(variable.has_value()) {
@@ -228,7 +226,7 @@ namespace Ciallang::Inter {
             dst = getEmpty(*_chunk);
         }
 
-        _variables.emplace_back(std::move(*identifier->toString()), dst.value(), _scopeDepth, !!node->rhs);
+        _variables.emplace_back(std::move(*identifier.toString()), dst.value(), _scopeDepth, !!node->rhs);
 
         return {};
     }
@@ -240,7 +238,7 @@ namespace Ciallang::Inter {
             const auto varName = token.value();
             std::optional<Bytecode::Register> paramReg{};
 
-            CLL_ASSERT(varName->isString(), "varName is not string");
+            CLL_ASSERT(varName.isString(), "varName is not string");
 
             if(exprNode) {
                 auto defaultParameter = exprNode->generateBytecode(&gen);
@@ -250,7 +248,7 @@ namespace Ciallang::Inter {
                 paramReg = gen.allocateRegister();
             }
 
-            gen.addVariable(LocalVariable{ *varName->toString(), paramReg.value(), 1, true });
+            gen.addVariable(LocalVariable{ *varName.toString(), paramReg.value(), 1, true });
         }
 
         auto funReg = allocateRegister();
@@ -263,18 +261,18 @@ namespace Ciallang::Inter {
 
         const auto identifier = node->token->value();
 
-        CLL_ASSERT(identifier->isString(), "identifier is not string");
+        CLL_ASSERT(identifier.isString(), "identifier is not string");
 
         _chunk->emit<Bytecode::Op::OpCode::Load>(
-            funReg, TjsValue{ new Function{ funChunk.release(), *identifier->toString(), node->parameters.size() } });
+            funReg, TjsValue{ new Function{ funChunk.release(), *identifier.toString(), node->parameters.size() } });
 
         if(_scopeDepth == 1) {
             freeRegister(funReg);
-            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), funReg);
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier.toString()), funReg);
             return {};
         }
 
-        _variables.push_back(LocalVariable{ *identifier->toString(), funReg, _scopeDepth, true });
+        _variables.push_back(LocalVariable{ *identifier.toString(), funReg, _scopeDepth, true });
 
         return {};
     }
@@ -283,9 +281,9 @@ namespace Ciallang::Inter {
     std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::IdentifierExprNode *node) {
         const auto identifier = node->token->value();
 
-        CLL_ASSERT(identifier->isString(), "identifier is not string");
+        CLL_ASSERT(identifier.isString(), "identifier is not string");
 
-        auto variable = resolveLocalVariable(*identifier->toString());
+        auto variable = resolveLocalVariable(*identifier.toString());
 
         if(variable.has_value()) {
             if(!variable.value()->init) {
@@ -296,7 +294,7 @@ namespace Ciallang::Inter {
         }
 
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::GGlobal>(_symbolTable.getOrAddSymbol(*identifier->toString()), dst);
+        _chunk->emit<Bytecode::Op::OpCode::GGlobal>(_symbolTable.getOrAddSymbol(*identifier.toString()), dst);
         if(_r.isFailed())
             return {};
 

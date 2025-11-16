@@ -42,15 +42,13 @@ TEST_CASE("词法分析 - 基本功能") {
         REQUIRE(token != nullptr);
 
         std::cout << token->name() << "\t";
-        if(token->value() != nullptr) {
-            if(token->value()->type() != Ciallang::TjsValueType::Octet) {
-                if(token->value()->type() == Ciallang::TjsValueType::Integer) {
-                    std::cout << std::dec << token->value()->toInteger();
-                } else if(token->value()->type() == Ciallang::TjsValueType::Real) {
-                    std::cout << std::dec << token->value()->toReal();
-                } else if(token->value()->type() == Ciallang::TjsValueType::String)
-                    std::cout << "\"" << token->value()->toString() << "\"";
-            }
+        if(token->value().type() != Ciallang::TjsValueType::Octet) {
+            if(token->value().type() == Ciallang::TjsValueType::Integer) {
+                std::cout << std::dec << token->value().toInteger();
+            } else if(token->value().type() == Ciallang::TjsValueType::Real) {
+                std::cout << std::dec << token->value().toReal();
+            } else if(token->value().type() == Ciallang::TjsValueType::String)
+                std::cout << "\"" << token->value().toString() << "\"";
         }
         if(token->type() == Ciallang::Syntax::TokenType::Invalid) {
             std::cout << token->location.start().line << "," << token->location.start().column;

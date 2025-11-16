@@ -107,8 +107,8 @@ namespace Ciallang::Syntax {
             return token;
         }
 
-        Token *makeToken(const TokenType type, TjsValue &&value) {
-            auto *token = new Token{ type, std::move(value) };
+        Token *makeToken(const TokenType type, TjsValue value) {
+            auto *token = new Token{ type, value };
             _tokens.push_back(token);
             return token;
         }

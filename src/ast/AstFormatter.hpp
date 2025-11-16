@@ -36,8 +36,6 @@ namespace Ciallang {
                     fmt::print("(");
                     value->accept(this);
                     fmt::print(")");
-                } else if constexpr(std::is_same_v<TjsValue, T>) {
-                    fmt::print(" ({})", *value);
                 } else if constexpr(std::is_same_v<char, T>) {
                     fmt::print(" ({})", value);
                 } else {
@@ -47,13 +45,19 @@ namespace Ciallang {
             fmt::println("{}", "");
         }
 
+        void printNode(const std::string &type, const TjsValue value) {
+            fmt::print("{0: <{2}}{1}", "", type, leftPadding);
+            fmt::print(" ({})", value);
+            fmt::println("{}", "");
+        }
+
         void visit(const Syntax::StmtDeclNode *node) override { node->statement->accept(this); }
 
         void visit(const Syntax::VarDeclNode *node) override {
             printNode("DeclareVar");
             increaseIndent();
 
-            CLL_ASSERT(node->token->value()->isString(), "VarDeclNode val is not string");
+            CLL_ASSERT(node->token->value().isString(), "VarDeclNode val is not string");
             printNode("Variable", node->token->value());
 
             printNode("=");
@@ -70,8 +74,8 @@ namespace Ciallang {
 
             increaseIndent();
             for(auto &[token, exprNode] : node->parameters) {
-                CLL_ASSERT(token.value()->isString(), "FunctionDeclNode val is not string");
-                printNode(*token.value()->toString(), exprNode);
+                CLL_ASSERT(token.value().isString(), "FunctionDeclNode val is not string");
+                printNode(*token.value().toString(), exprNode);
             }
             decreaseIndent();
 
@@ -86,7 +90,7 @@ namespace Ciallang {
         void visit(const Syntax::ValueExprNode *node) override { printNode("Value", node->token->value()); }
 
         void visit(const Syntax::IdentifierExprNode *node) override {
-            CLL_ASSERT(node->token->value()->isString(), "IdentifierExprNode val is not string");
+            CLL_ASSERT(node->token->value().isString(), "IdentifierExprNode val is not string");
             printNode("Identifier", node->token->value());
         }
 

@@ -325,10 +325,10 @@ namespace Ciallang::Syntax {
 
         explicit Token() = default;
 
-        constexpr explicit Token(const TokenType type) : _type(type), _value(nullptr) {}
+        constexpr explicit Token(const TokenType type) : _type(type) {}
 
-        explicit Token(const TokenType type, TjsValue &&value) :
-            _type(type), _value(new TjsValue{ std::move(value) }) {}
+        explicit Token(const TokenType type, TjsValue value) :
+            _type(type), _value(value) {}
 
         Token(Token &&token) noexcept {
             _type = token._type;
@@ -338,10 +338,7 @@ namespace Ciallang::Syntax {
 
         Token(const Token &token) noexcept {
             _type = token._type;
-
-            if(token._value)
-                _value = std::make_unique<TjsValue>(*token._value);
-
+            _value = token._value;
             location = token.location;
         }
 
@@ -354,11 +351,11 @@ namespace Ciallang::Syntax {
             return *this;
         }
 
-        bool operator==(const Token &token) const { return _type == token.type() && *_value == *token.value(); }
+        bool operator==(const Token &token) const { return _type == token.type() && _value == token.value(); }
 
         [[nodiscard]] constexpr TokenType type() const noexcept { return _type; }
 
-        [[nodiscard]] constexpr TjsValue *value() const noexcept { return _value.get(); }
+        [[nodiscard]] TjsValue value() const noexcept { return _value; }
 
         [[nodiscard]] constexpr const char *name() const noexcept {
             const auto it = S_TypeToName.find(_type);
@@ -370,7 +367,7 @@ namespace Ciallang::Syntax {
 
     private:
         TokenType _type = TokenType::Void;
-        std::unique_ptr<TjsValue> _value = std::make_unique<TjsValue>();
+        TjsValue _value{};
     };
 
     /**
