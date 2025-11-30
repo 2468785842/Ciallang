@@ -48,7 +48,7 @@ set(SOURCE_FILES
         src/types/TjsValue.cpp
         src/types/TjsString.cpp
 
-        src/standard/Debug.cpp
+        src/stdlib/Debug.cpp
 
         src/gc/GC.cpp
 

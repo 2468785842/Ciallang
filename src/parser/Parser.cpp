@@ -24,13 +24,13 @@ namespace Ciallang::Syntax {
 
     static ExprNode *createExpressionNode(Result &r, Parser *parser) {
         // expect "("
-        if(!parser->expect(r, &S_LParenthesis))
+        if(!parser->expect(r, TokenType::LParenthesis))
             return nullptr;
 
         const auto node = parser->parseExpression(r);
 
         // expect ")"
-        if(!parser->expect(r, &S_RParenthesis))
+        if(!parser->expect(r, TokenType::RParenthesis))
             return nullptr;
         return node;
     }
@@ -54,7 +54,7 @@ namespace Ciallang::Syntax {
                     node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
 
                     // 期望并消耗逗号
-                    if(!parser->expect(r, &S_Comma))
+                    if(!parser->expect(r, TokenType::Comma))
                         return false;
                     // 继续期望参数
                     expectArgument = true;
@@ -68,7 +68,7 @@ namespace Ciallang::Syntax {
                 }
             } else {
                 // 期望逗号
-                if(!parser->expect(r, &S_Comma))
+                if(!parser->expect(r, TokenType::Comma))
                     return false;
                 expectArgument = true;
             }
@@ -84,7 +84,7 @@ namespace Ciallang::Syntax {
     }
 
     static bool parseParameters(Result &r, Parser *parser, FunctionDeclNode *funNode) {
-        if(!parser->expect(r, &S_LParenthesis))
+        if(!parser->expect(r, TokenType::LParenthesis))
             return false;
 
         if(parser->peek(TokenType::RParenthesis)) {
@@ -120,7 +120,7 @@ namespace Ciallang::Syntax {
                 break;
             }
 
-            if(!parser->expect(r, &S_Comma))
+            if(!parser->expect(r, TokenType::Comma))
                 return false;
         }
 
@@ -171,12 +171,11 @@ namespace Ciallang::Syntax {
         return token.type() != TokenType::EndOfFile;
     }
 
-    bool Parser::expect(Result &r, const Token *token) {
+    bool Parser::expect(Result &r, const TokenType expectedType) {
         if(!lookAhead(0))
             return false;
 
-        std::string expectedName = token->name();
-        const auto expectedType = token->type();
+        std::string expectedName = tokenTypeToStr(expectedType);
         Token tToken{};
 
         if(!_lexer.tackOverToken(tToken)) {
@@ -201,7 +200,7 @@ namespace Ciallang::Syntax {
             return Precedence::lowest;
 
         const auto *token = tokens().front();
-        if(auto infixParser = infixParserFor(token->type()))
+        if(const auto infixParser = infixParserFor(token->type()))
             return infixParser->precedence();
 
         return Precedence::lowest;
@@ -264,7 +263,7 @@ namespace Ciallang::Syntax {
             return declParser->parse(r, this, &token);
         }
 
-        if(auto *stmt = parseStatement(r)) {
+        if(const auto *stmt = parseStatement(r)) {
             return _astBuilder.makeStmtDeclNode(stmt);
         }
 
@@ -332,12 +331,12 @@ namespace Ciallang::Syntax {
 
         // maybe ExpressionStatement
 
-        if(auto *expr = parseExpression(r)) {
+        if(const auto *expr = parseExpression(r)) {
             auto *statementNode = _astBuilder.makeExprStmtNode(expr);
             statementNode->location = expr->location;
 
             // ;
-            if(expect(r, &S_SemiColon))
+            if(expect(r, TokenType::SemiColon))
                 return statementNode;
         }
 
@@ -392,7 +391,7 @@ namespace Ciallang::Syntax {
             return nullptr;
 
         Token identifier;
-        auto line = identifier.location;
+        const auto line = identifier.location;
         parser->current(identifier);
         parser->consume();
 
@@ -403,7 +402,7 @@ namespace Ciallang::Syntax {
             return varDeclNode;
         }
 
-        if(!parser->expect(r, &S_Assignment))
+        if(!parser->expect(r, TokenType::Assignment))
             return nullptr;
 
         auto *rhs = parser->parseExpression(r);
@@ -411,7 +410,7 @@ namespace Ciallang::Syntax {
         if(!rhs)
             return nullptr;
 
-        if(!parser->expect(r, &S_SemiColon)) {
+        if(!parser->expect(r, TokenType::SemiColon)) {
             return nullptr;
         }
 
@@ -537,7 +536,7 @@ namespace Ciallang::Syntax {
             bodyScope->childrens.push_back(parser->astBuilder()->makeStmtDeclNode(body));
         }
 
-        auto whileNode = parser->astBuilder()->makeWhileStmtNode(test, bodyScope);
+        const auto whileNode = parser->astBuilder()->makeWhileStmtNode(test, bodyScope);
 
         whileNode->location.start(token->location.start());
         whileNode->location.end(token->location.end());
@@ -546,14 +545,14 @@ namespace Ciallang::Syntax {
     }
 
     StmtNode *BreakStmtParser::parse(Result &r, Parser *parser, Token *token) const {
-        if(!parser->expect(r, &S_SemiColon))
+        if(!parser->expect(r, TokenType::SemiColon))
             return nullptr;
 
         return parser->astBuilder()->makeBreakStmtNode();
     }
 
     StmtNode *ContinueStmtParser::parse(Result &r, Parser *parser, Token *token) const {
-        if(!parser->expect(r, &S_SemiColon))
+        if(!parser->expect(r, TokenType::SemiColon))
             return nullptr;
 
         return parser->astBuilder()->makeContinueStmtNode();
@@ -561,14 +560,14 @@ namespace Ciallang::Syntax {
 
     StmtNode *ReturnStmtParser::parse(Result &r, Parser *parser, Token *token) const {
         if(!parser->peek(TokenType::SemiColon)) {
-            auto expr = parser->parseExpression(r);
+            const auto expr = parser->parseExpression(r);
 
-            if(!parser->expect(r, &S_SemiColon))
+            if(!parser->expect(r, TokenType::SemiColon))
                 return nullptr;
             return parser->astBuilder()->makeReturnStmtNode(expr);
         }
 
-        if(!parser->expect(r, &S_SemiColon))
+        if(!parser->expect(r, TokenType::SemiColon))
             return nullptr;
 
         return parser->astBuilder()->makeReturnStmtNode(nullptr);
@@ -593,7 +592,8 @@ namespace Ciallang::Syntax {
             return nullptr;
         }
 
-        const auto binOpNode = parser->astBuilder()->makeBinaryExprNode(stripAssign(std::move(*token)), lhs, rhs);
+        const auto binOpNode =
+            parser->astBuilder()->makeBinaryExprNode(Token{ AssignToken::strip(token->type()) }, lhs, rhs);
 
         if(!_withAssignment)
             return binOpNode;
@@ -605,7 +605,7 @@ namespace Ciallang::Syntax {
             return nullptr;
         }
 
-        if(contains(S_AssignToNonAssign, token->type())) {
+        if(AssignToken::support(token->type())) {
             return parser->astBuilder()->makeAssignExprNode(symbolExprNode, binOpNode);
         }
 
@@ -615,13 +615,13 @@ namespace Ciallang::Syntax {
     ExprNode *ProcCallInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
         // check
         if(!dynamic_cast<IdentifierExprNode *>(lhs)) {
-            if(auto binaryExprNode = dynamic_cast<BinaryExprNode *>(lhs);
-               !binaryExprNode || *binaryExprNode->token != S_Dot) {
+            if(const auto binaryExprNode = dynamic_cast<BinaryExprNode *>(lhs);
+               !binaryExprNode || *binaryExprNode->token != TokenType::Dot) {
                 parser->error(r, "proc call expect identifier", token->location);
                 return nullptr;
             }
         }
-        auto procCallExprNode = parser->astBuilder()->makeProcCallExprNode(lhs);
+        const auto procCallExprNode = parser->astBuilder()->makeProcCallExprNode(lhs);
 
         if(!parser->peek(TokenType::RParenthesis)) {
             if(!parseArguments(r, parser, procCallExprNode)) {
@@ -629,7 +629,7 @@ namespace Ciallang::Syntax {
             }
         }
 
-        if(!parser->expect(r, &S_RParenthesis))
+        if(!parser->expect(r, TokenType::RParenthesis))
             return nullptr;
 
         return procCallExprNode;
@@ -665,7 +665,7 @@ namespace Ciallang::Syntax {
         }
 
         // 期望右括号
-        if(!parser->expect(r, &S_RParenthesis)) {
+        if(!parser->expect(r, TokenType::RParenthesis)) {
             return nullptr;
         }
 

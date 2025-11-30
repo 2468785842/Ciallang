@@ -15,7 +15,7 @@
 #include "common/SourceFile.hpp"
 #include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
-#include "standard/Print.hpp"
+#include "stdlib/Print.hpp"
 #include "vm/VMState.hpp"
 
 int main(int argc, char **argv) {
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 
     Ciallang::Bytecode::VMState interpreter{ globalTable };
     // interpreter.global(&Ciallang::Standard::S_PrintFunction);
-    interpreter.global("println", Ciallang::Standard::S_PrintlnFunction);
+    interpreter.global("println", Ciallang::StdLib::S_PrintlnFunction);
 
     fmt::println("{}", interpreter.dumpInstruction(*chunk));
 

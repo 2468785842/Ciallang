@@ -76,9 +76,7 @@ namespace Ciallang::Bytecode::Op {
 
         Type type{ Type::None };
 
-        explicit Operand(TjsValue value) : type(Type::Value) {
-            this->operand.value = new TjsValue{ value };
-        }
+        explicit Operand(TjsValue value) : type(Type::Value) { this->operand.value = new TjsValue{ value }; }
 
         explicit Operand(const Register &value) : type(Type::Register) { this->operand.reg = value; }
 

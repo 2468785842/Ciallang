@@ -109,7 +109,7 @@ namespace Ciallang::Syntax {
 
         StmtNode *parseStatement(Result &);
 
-        bool expect(Result &, const Token *);
+        bool expect(Result &, TokenType);
 
         [[nodiscard]] AstBuilder *astBuilder() const { return &_astBuilder; }
 

@@ -69,9 +69,7 @@ namespace Ciallang::Bytecode {
 #endif
     }
 
-    void VMState::reg(const Register &reg, TjsValue value) const {
-        _currentFrame->getReg(reg.index()) = value;
-    }
+    void VMState::reg(const Register &reg, TjsValue value) const { _currentFrame->getReg(reg.index()) = value; }
 
     TjsValue VMState::reg(const Register reg) { return _currentFrame->getReg(reg.index()); }
 

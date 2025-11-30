@@ -27,7 +27,7 @@ namespace Ciallang {
     TjsValue::TjsValue(const TjsOctet &value) : _type(TjsValueType::Octet) { _value._octet = new TjsOctet{ value }; }
 
     TjsValue::TjsValue(Object *value) : _value{ ._object = value }, _type(TjsValueType::Object) {
-        if (_value._object) {
+        if(_value._object) {
             _value._object->incRef();
         }
     }
@@ -35,7 +35,7 @@ namespace Ciallang {
     TjsValue::~TjsValue() {
         switch(_type) {
             case TjsValueType::Object:
-                if (_value._object) {
+                if(_value._object) {
                     _value._object->decRef();
                 }
                 break;
@@ -63,7 +63,7 @@ namespace Ciallang {
                 break;
             case TjsValueType::Object:
                 _value._object = v._value._object;
-                if (_value._object) {
+                if(_value._object) {
                     _value._object->incRef();
                 }
                 break;
@@ -72,22 +72,10 @@ namespace Ciallang {
         }
     }
 
-    TjsValue& TjsValue::operator=(const TjsValue &value) noexcept {
+    TjsValue &TjsValue::operator=(const TjsValue &value) noexcept {
         if(this != &value) {
             this->~TjsValue();
             new(this) TjsValue(value);
-        }
-        return *this;
-    }
-
-    TjsValue::TjsValue(TjsValue &&rhs) noexcept : _value(rhs._value), _type(rhs._type) {
-        rhs._type = TjsValueType::Void;
-    }
-
-    TjsValue &TjsValue::operator=(TjsValue &&rhs) noexcept {
-        if(this != &rhs) {
-            this->~TjsValue();
-            new(this) TjsValue(std::move(rhs));
         }
         return *this;
     }

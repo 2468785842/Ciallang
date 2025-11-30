@@ -11,7 +11,7 @@
 #include "common/SourceFile.hpp"
 #include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
-#include "standard/Print.hpp"
+#include "stdlib/Print.hpp"
 #include "vm/VMState.hpp"
 
 using namespace Ciallang;
@@ -87,7 +87,7 @@ TEST_CASE("集成测试 - 代码生成和执行") {
         }
 
         Bytecode::VMState interpreter{ globalTable };
-        interpreter.global("println", Ciallang::Standard::S_PrintlnFunction);
+        interpreter.global("println", Ciallang::StdLib::S_PrintlnFunction);
         interpreter.allocCallFrame(chunk.get());
         interpreter.run();
 

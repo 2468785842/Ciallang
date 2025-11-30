@@ -16,8 +16,8 @@
 
 #include "VMState.hpp"
 #include "logging/Logger.hpp"
-#include "types/Object.hpp"
 #include "types/Function.hpp"
+#include "types/Object.hpp"
 #include "vm/Register.hpp"
 
 namespace Ciallang::Bytecode::Op {

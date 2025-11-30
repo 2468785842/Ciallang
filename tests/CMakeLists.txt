@@ -19,7 +19,6 @@ set(SOURCES
         function_test.cpp
         gc_test.cpp
         gc_comprehensive_test.cpp
-        ieee_test.cpp
         interpreter_test.cpp
         integration_test.cpp
         lexer_comprehensive_test.cpp

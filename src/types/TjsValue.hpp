@@ -14,10 +14,10 @@
 
 #include <fmt/ostream.h>
 
-#include "TjsTypes.hpp"
 #include "Object.hpp"
 #include "TjsOctet.hpp"
 #include "TjsString.hpp"
+#include "TjsTypes.hpp"
 
 #include "gc/GC.hpp"
 
@@ -40,11 +40,8 @@ namespace Ciallang {
         ~TjsValue();
 
         TjsValue(const TjsValue &v) noexcept;
-        TjsValue(TjsValue &&) noexcept;
 
         TjsValue &operator=(const TjsValue &value) noexcept;
-
-        TjsValue &operator=(TjsValue &&rhs) noexcept;
 
         [[nodiscard]] TjsValueType type() const noexcept { return _type; }
 
@@ -108,9 +105,11 @@ namespace Ciallang {
 
     static TjsValue tjsReal(const TjsReal value) { return TjsValue{ value }; }
 
-    template<class R, class... Args>
-    requires is_gc_object_v<R>
-    static TjsValue tjsObject(Args... args) { return TjsValue{ new R { std::forward<Args>(args)... } }; }
+    template <class R, class... Args>
+        requires is_gc_object_v<R>
+    static TjsValue tjsObject(Args... args) {
+        return TjsValue{ new R{ std::forward<Args>(args)... } };
+    }
 } // namespace Ciallang
 
 // support fmt::format

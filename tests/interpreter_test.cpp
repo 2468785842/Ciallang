@@ -20,7 +20,7 @@
 #include "common/SourceFile.hpp"
 #include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
-#include "standard/Print.hpp"
+#include "stdlib/Print.hpp"
 #include "test_config.h"
 
 TEST_CASE("解释器 - Hello World") {
@@ -38,7 +38,7 @@ TEST_CASE("解释器 - Hello World") {
 
     Ciallang::Bytecode::VMState interpreter{ globalTable };
 
-    interpreter.global("println", Ciallang::Standard::S_PrintlnFunction);
+    interpreter.global("println", Ciallang::StdLib::S_PrintlnFunction);
 
     interpreter.allocCallFrame(chunk.get());
     interpreter.run();
@@ -61,7 +61,7 @@ TEST_CASE("解释器 - 执行测试") {
     auto chunk = codeGen.parseAst(r, globalNode);
 
     Ciallang::Bytecode::VMState interpreter{ globalTable };
-    interpreter.global("println", Ciallang::Standard::S_PrintlnFunction);
+    interpreter.global("println", Ciallang::StdLib::S_PrintlnFunction);
 
     interpreter.allocCallFrame(chunk.get());
     interpreter.run();

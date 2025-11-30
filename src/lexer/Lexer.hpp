@@ -94,26 +94,19 @@ namespace Ciallang::Syntax {
 
         [[maybe_unused]] static void *S_LoadCases;
 
-        static std::unordered_map<std::string, const Token &> S_Keywords;
-
         std::vector<Token *> _tokens{};
         bool _hasNext = true;
         Result _result{};
         SourceFile &_sourceFile;
 
-        Token *makeToken(Token t) {
-            auto *token = new Token{ std::move(t) };
+        template <typename... Args>
+        Token *makeToken(Args &&...args) {
+            auto *token = new Token{ std::forward<Args>(args)... };
             _tokens.push_back(token);
             return token;
         }
 
-        Token *makeToken(const TokenType type, TjsValue value) {
-            auto *token = new Token{ type, value };
-            _tokens.push_back(token);
-            return token;
-        }
-
-        using OperatorTokenSet = std::vector<std::pair<const char *, const Token &>>;
+        using OperatorTokenSet = std::vector<std::pair<const char *, TokenType>>;
 
         bool boringMatch(Token *&, const OperatorTokenSet &signMap);
 

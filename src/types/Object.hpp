@@ -25,7 +25,6 @@ namespace Ciallang {
         [[nodiscard]] virtual const char *name() const noexcept = 0;
 
         [[nodiscard]] virtual size_t arity() const noexcept = 0;
-
     };
 
     class ClassObject final : public Object {
@@ -35,7 +34,7 @@ namespace Ciallang {
         explicit ClassObject(std::string name, size_t arity = 0) : _name(std::move(name)), _arity(arity) {}
 
         ~ClassObject() noexcept override {
-            if (_base) {
+            if(_base) {
                 _base->decRef();
             }
         }
@@ -44,12 +43,12 @@ namespace Ciallang {
 
         [[nodiscard]] size_t arity() const noexcept override { return _arity; }
 
-        void setBase(ClassObject *base) noexcept { 
-            if (_base) {
+        void setBase(ClassObject *base) noexcept {
+            if(_base) {
                 _base->decRef();
             }
-            _base = base; 
-            if (_base) {
+            _base = base;
+            if(_base) {
                 _base->incRef();
             }
         }
@@ -67,13 +66,13 @@ namespace Ciallang {
         InstanceObject() = delete;
 
         explicit InstanceObject(ClassObject *klass) : _class(klass) {
-            if (_class) {
+            if(_class) {
                 _class->incRef();
             }
         }
 
         ~InstanceObject() noexcept override {
-            if (_class) {
+            if(_class) {
                 _class->decRef();
             }
         }
