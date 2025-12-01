@@ -18,21 +18,24 @@
 namespace Ciallang::Bytecode {
     class Chunk {
     public:
+        ~Chunk() {
+            for (const auto &inst : _instructions) {
+                inst->~Instruction();
+            }
+            _instructions.clear();
+        }
         /**
-         * WARNING: 调用此函数可能会导致内存realloc，getItt的引用会失效
-         *
          * @tparam OP 操作码
          * @tparam Args 指令的值类型
          * @param args 值数组
          * @return 指令在内存的索引
          */
         template <Op::OpCode OP, typename... Args>
-        size_t emit(Args &&...args) {
-            _instructions.emplace_back(OP, Op::Operand(std::forward<Args>(args))...);
-            return _instructions.size() - 1;
+        Op::Instruction *emit(Args &&...args) {
+            auto *inst = new Op::Instruction(OP, Op::Operand(std::forward<Args>(args))...);
+            _instructions.push_back(inst);
+            return inst;
         }
-
-        Op::Instruction &getItt(const size_t index) { return _instructions[index]; }
 
         explicit Chunk() = default;
 
@@ -45,7 +48,7 @@ namespace Ciallang::Bytecode {
         Chunk &operator=(const Chunk &) = delete;
 
     private:
-        std::vector<Op::Instruction> _instructions{};
+        std::vector<Op::Instruction*> _instructions{};
         std::uint32_t _registerCount{ 0 };
     };
 } // namespace Ciallang::Bytecode

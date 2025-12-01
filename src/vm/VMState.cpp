@@ -63,15 +63,15 @@ namespace Ciallang::Bytecode {
 
             const auto &instruction = instList[pc];
             ++pc;
-            Op::Instruction::execute(instruction, *this);
+            Op::Instruction::execute(*instruction, *this);
         }
         // freeCallFrame();
 #endif
     }
 
-    void VMState::reg(const Register &reg, TjsValue value) const { _currentFrame->getReg(reg.index()) = value; }
+    void VMState::reg(const Register &reg, const Value& value) const { _currentFrame->getReg(reg.index()) = value; }
 
-    TjsValue VMState::reg(const Register reg) { return _currentFrame->getReg(reg.index()); }
+    Value VMState::reg(const Register reg) { return _currentFrame->getReg(reg.index()); }
 
-    const TjsValue &VMState::reg(const Register reg) const { return _currentFrame->getReg(reg.index()); }
+    const Value &VMState::reg(const Register reg) const { return _currentFrame->getReg(reg.index()); }
 } // namespace Ciallang::Bytecode

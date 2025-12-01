@@ -19,7 +19,7 @@
 #include <utility>
 
 #include "common/SourceLocation.hpp"
-#include "types/TjsValue.hpp"
+#include "types/Value.hpp"
 
 namespace Ciallang::Syntax {
     using namespace Common;
@@ -163,7 +163,7 @@ namespace Ciallang::Syntax {
 
         constexpr explicit Token(const TokenType type) : _type(type) {}
 
-        explicit Token(const TokenType type, const TjsValue &value) : _type(type), _value(value) {}
+        explicit Token(const TokenType type, const Value &value) : _type(type), _value(value) {}
 
         Token(const Token &token) noexcept {
             _type = token._type;
@@ -177,13 +177,13 @@ namespace Ciallang::Syntax {
 
         [[nodiscard]] constexpr TokenType type() const noexcept { return _type; }
 
-        [[nodiscard]] TjsValue value() const noexcept { return _value; }
+        [[nodiscard]] Value value() const noexcept { return _value; }
 
         [[nodiscard]] constexpr const char *name() const noexcept { return tokenTypeToStr(_type); }
 
     private:
         TokenType _type = TokenType::Void;
-        TjsValue _value{};
+        Value _value{};
     };
 
     enum class StringParseState {

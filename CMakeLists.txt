@@ -43,10 +43,10 @@ set(SOURCE_FILES
         src/vm/Instruction.cpp
 
         src/types/Function.cpp
-        src/types/TjsOctet.cpp
+        src/types/Octet.cpp
         src/types/Object.cpp
-        src/types/TjsValue.cpp
-        src/types/TjsString.cpp
+        src/types/Value.cpp
+        src/types/String.cpp
 
         src/stdlib/Debug.cpp
 

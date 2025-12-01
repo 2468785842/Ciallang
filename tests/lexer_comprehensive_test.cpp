@@ -50,7 +50,7 @@ TEST_CASE("词法分析器 - 标识符识别") {
             REQUIRE(lexer.hasNext());
             lexer.next(token);
             REQUIRE(token != nullptr);
-            REQUIRE(*token->value().toString() == expected);
+            REQUIRE(token->value().toString()->toStdStr() == expected);
         }
     }
 }
@@ -63,14 +63,14 @@ TEST_CASE("词法分析器 - 字面量识别") {
         sourceFile.load(r, "123 456 0 999");
         Syntax::Lexer lexer{ sourceFile };
 
-        std::vector<TjsInteger> expectedValues = { 123, 456, 0, 999 };
+        std::vector<Integer> expectedValues = { 123, 456, 0, 999 };
 
         for(const auto &expected : expectedValues) {
             Syntax::Token *token = nullptr;
             REQUIRE(lexer.hasNext());
             lexer.next(token);
             REQUIRE(token != nullptr);
-            REQUIRE(token->value().type() == TjsValueType::Integer);
+            REQUIRE(token->value().type() == ValueType::Integer);
             REQUIRE(token->value().toInteger() == expected);
         }
     }
@@ -79,7 +79,7 @@ TEST_CASE("词法分析器 - 字面量识别") {
         sourceFile.load(r, "3.14 2.718 0.5");
         Syntax::Lexer lexer{ sourceFile };
 
-        std::vector<TjsReal> expectedValues = { 3.14, 2.718, 0.5 };
+        std::vector<Real> expectedValues = { 3.14, 2.718, 0.5 };
 
         for(const auto &expected : expectedValues) {
             Syntax::Token *token = nullptr;
@@ -87,7 +87,7 @@ TEST_CASE("词法分析器 - 字面量识别") {
             lexer.next(token);
             REQUIRE(token != nullptr);
             REQUIRE(token->type() == Syntax::TokenType::ConstVal); // Changed from TokenType::Real
-            REQUIRE(token->value().type() == TjsValueType::Real);
+            REQUIRE(token->value().type() == ValueType::Real);
             REQUIRE(token->value().toReal() == Catch::Approx(expected));
         }
     }
@@ -103,8 +103,8 @@ TEST_CASE("词法分析器 - 字面量识别") {
             REQUIRE(lexer.hasNext());
             lexer.next(token);
             REQUIRE(token != nullptr);
-            REQUIRE(token->value().type() == TjsValueType::String);
-            REQUIRE(*token->value().toString() == expected);
+            REQUIRE(token->value().type() == ValueType::String);
+            REQUIRE(token->value().toString()->toStdStr() == expected);
         }
     }
 }

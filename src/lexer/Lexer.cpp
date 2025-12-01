@@ -17,11 +17,11 @@
 #include "common/Defer.hpp"
 #include "common/UTF8.hpp"
 #include "logging/Logger.hpp"
-#include "types/TjsOctet.hpp"
-#include "types/TjsValue.hpp"
+#include "types/Octet.hpp"
+#include "types/Value.hpp"
 
 #include "IEEETypes.hpp"
-#include "types/TjsString.hpp"
+#include "types/String.hpp"
 
 #include <fmt/format.h>
 
@@ -379,16 +379,16 @@ bool Lexer::numberConstVal(Token *&token) {
     const std::string valid = ".0123456789Ee";
     int32_t shifting = 0;
     auto hasActualDigits = false;
-    auto valueType = TjsValueType::Integer;
+    auto valueType = ValueType::Integer;
 
     while(valid.find_first_of(static_cast<char>(ch)) != string::npos) {
         if(ch == '.') {
-            if(valueType == TjsValueType::Real) {
+            if(valueType == ValueType::Real) {
                 token = makeToken(TokenType::Invalid);
                 rewindOneChar();
                 return false;
             }
-            valueType = TjsValueType::Real;
+            valueType = ValueType::Real;
         }
 
         // 进制检查
@@ -451,8 +451,8 @@ bool Lexer::numberConstVal(Token *&token) {
 
     rewindOneChar();
 
-    const auto fixValue = [&](const TjsReal &val) {
-        TjsReal ret = val;
+    const auto fixValue = [&](const Real &val) {
+        Real ret = val;
         if(shifting > 0)
             ret *= pow(10, shifting);
         if(shifting < 0)
@@ -461,17 +461,17 @@ bool Lexer::numberConstVal(Token *&token) {
     };
 
     if(!stream.str().empty()) {
-        if(valueType == TjsValueType::Real) {
-            TjsReal val = 0.0;
+        if(valueType == ValueType::Real) {
+            Real val = 0.0;
             stream >> val;
             val = fixValue(val);
-            token = makeToken(TokenType::ConstVal, tjsReal(val));
+            token = makeToken(TokenType::ConstVal, createReal(val));
         }
-        if(valueType == TjsValueType::Integer) {
-            TjsInteger val = 0;
+        if(valueType == ValueType::Integer) {
+            Integer val = 0;
             stream >> val;
-            val = static_cast<TjsInteger>(fixValue(static_cast<TjsReal>(val)));
-            token = makeToken(TokenType::ConstVal, tjsInteger(val));
+            val = static_cast<Integer>(fixValue(static_cast<Real>(val)));
+            token = makeToken(TokenType::ConstVal, createInteger(val));
         }
         return true;
     }
@@ -575,7 +575,7 @@ void Lexer::parseNonDecimalReal(Token *&token, const string &decimalStr, int8_t 
 
     if(main == 0) {
         // zero
-        token = makeToken(TokenType::ConstVal, tjsReal(0.0));
+        token = makeToken(TokenType::ConstVal, createReal(0.0));
         return;
     }
 
@@ -584,7 +584,7 @@ void Lexer::parseNonDecimalReal(Token *&token, const string &decimalStr, int8_t 
     if(exp < IEEE::EXP_MIN) {
         // informal
         // treat as zero
-        token = makeToken(TokenType::ConstVal, tjsReal(0.0));
+        token = makeToken(TokenType::ConstVal, createReal(0.0));
         return;
     }
 
@@ -592,17 +592,17 @@ void Lexer::parseNonDecimalReal(Token *&token, const string &decimalStr, int8_t 
         // too large
         // treat as infinity
 
-        token = makeToken(TokenType::ConstVal, tjsReal(static_cast<double>(IEEE::P_INF)));
+        token = makeToken(TokenType::ConstVal, createReal(static_cast<double>(IEEE::P_INF)));
         return;
     }
 
-    TjsReal temp = 0.0;
+    Real temp = 0.0;
 
     // compose IEEE double
-    *reinterpret_cast<TjsInteger *>(&temp) =
+    *reinterpret_cast<Integer *>(&temp) =
         IEEE::make_sign(false) | IEEE::make_exponent(exp) | IEEE::make_significand(main);
 
-    token = makeToken(TokenType::ConstVal, tjsReal(temp));
+    token = makeToken(TokenType::ConstVal, createReal(temp));
 }
 
 bool Lexer::parseNonDecimalInteger(Token *&token, const string &decimalStr, int8_t (*validDigits)(char),
@@ -612,7 +612,7 @@ bool Lexer::parseNonDecimalInteger(Token *&token, const string &decimalStr, int8
         v <<= baseBits;
         v += validDigits(decimal);
     }
-    token = makeToken(TokenType::ConstVal, tjsInteger(v));
+    token = makeToken(TokenType::ConstVal, createInteger(v));
     return true;
 }
 
@@ -667,10 +667,10 @@ bool Lexer::identifier(Token *&token) {
         return false;
 
     static std::unordered_map<std::string, Token> Keywords{
-        { "true", Token{ TokenType::ConstVal, tjsInteger(1) } },
-        { "false", Token{ TokenType::ConstVal, tjsInteger(0) } },
-        { "Infinity", Token{ TokenType::ConstVal, tjsReal(IEEE::Double::negative_infinity().value()) } },
-        { "NaN", Token{ TokenType::ConstVal, tjsReal(IEEE::Double::signaling_nan().value()) } },
+        { "true", Token{ TokenType::ConstVal, createInteger(1) } },
+        { "false", Token{ TokenType::ConstVal, createInteger(0) } },
+        { "Infinity", Token{ TokenType::ConstVal, createReal(IEEE::Double::negative_infinity().value()) } },
+        { "NaN", Token{ TokenType::ConstVal, createReal(IEEE::Double::signaling_nan().value()) } },
 
         { "function", Token{ TokenType::Function } },
         { "return", Token{ TokenType::Return } },
@@ -701,7 +701,7 @@ bool Lexer::identifier(Token *&token) {
         return true;
     }
 
-    token = makeToken(TokenType::Identifier, TjsValue{ TjsString{ name } });
+    token = makeToken(TokenType::Identifier, createString(name.c_str(), name.size()));
     return true;
 }
 
@@ -1176,7 +1176,7 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
         str << runeType.data;
     }
 
-    token = makeToken(TokenType::ConstVal, TjsValue{ TjsString{ str.str() } });
+    token = makeToken(TokenType::ConstVal, createString(str.str().c_str(), str.str().size()));
 
     return strPsState;
 }
@@ -1203,7 +1203,7 @@ bool Lexer::octetLiteral(Token *&token) {
             if(ch == '%') {
                 ch = read(false);
                 if(ch == '>') {
-                    token = makeToken(TokenType::ConstVal, TjsOctet::tjsOctet(buf));
+                    token = makeToken(TokenType::ConstVal, createOctet(buf.data(), buf.size()));
                     return true;
                 }
                 _sourceFile.restoreTopMark();

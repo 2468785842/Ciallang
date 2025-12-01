@@ -160,7 +160,7 @@ namespace Ciallang::Inter {
         auto src = node->rhs->generateBytecode(this);
         CLL_ASSERT(src.has_value(), "global src is not have val");
 
-        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier.toString()), src.value());
+        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()), src.value());
 
         if(_r.isFailed())
             return {};
@@ -176,7 +176,7 @@ namespace Ciallang::Inter {
         if(_scopeDepth == 1) {
             // can't init
             if(!node->rhs) {
-                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier.toString()),
+                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
                                                             getEmpty(*_chunk));
                 return {};
             }
@@ -186,7 +186,7 @@ namespace Ciallang::Inter {
             if(_r.isFailed())
                 return {};
 
-            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier.toString()),
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
                                                         src.value());
             return {};
         }
@@ -226,7 +226,7 @@ namespace Ciallang::Inter {
             dst = getEmpty(*_chunk);
         }
 
-        _variables.emplace_back(std::move(*identifier.toString()), dst.value(), _scopeDepth, !!node->rhs);
+        _variables.emplace_back(std::move(identifier.toString()->toStdStr()), dst.value(), _scopeDepth, !!node->rhs);
 
         return {};
     }
@@ -248,14 +248,14 @@ namespace Ciallang::Inter {
                 paramReg = gen.allocateRegister();
             }
 
-            gen.addVariable(LocalVariable{ *varName.toString(), paramReg.value(), 1, true });
+            gen.addVariable(LocalVariable{ varName.toString()->toStdStr(), paramReg.value(), 1, true });
         }
 
         auto funReg = allocateRegister();
         auto funChunk = gen.parseAst(_r, node->body);
 
         // the last instruction is not ret, patch one ret
-        if(funChunk->instructions().back().opcode != Bytecode::Op::OpCode::Ret) {
+        if(funChunk->instructions().back()->opcode != Bytecode::Op::OpCode::Ret) {
             funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.getEmpty(*funChunk));
         }
 
@@ -264,15 +264,15 @@ namespace Ciallang::Inter {
         CLL_ASSERT(identifier.isString(), "identifier is not string");
 
         _chunk->emit<Bytecode::Op::OpCode::Load>(
-            funReg, TjsValue{ new Function{ funChunk.release(), *identifier.toString(), node->parameters.size() } });
+            funReg, Value{ new Function{ funChunk.release(), identifier.toString()->toStdStr(), node->parameters.size() } });
 
         if(_scopeDepth == 1) {
             freeRegister(funReg);
-            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(*identifier.toString()), funReg);
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()), funReg);
             return {};
         }
 
-        _variables.push_back(LocalVariable{ *identifier.toString(), funReg, _scopeDepth, true });
+        _variables.push_back(LocalVariable{ identifier.toString()->toStdStr(), funReg, _scopeDepth, true });
 
         return {};
     }
@@ -294,7 +294,7 @@ namespace Ciallang::Inter {
         }
 
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::GGlobal>(_symbolTable.getOrAddSymbol(*identifier.toString()), dst);
+        _chunk->emit<Bytecode::Op::OpCode::GGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()), dst);
         if(_r.isFailed())
             return {};
 
@@ -326,19 +326,19 @@ namespace Ciallang::Inter {
 
         _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
 
-        const size_t jmpNEIndex = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
+        auto *jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
         node->body->generateBytecode(this);
-        size_t jmpIndex = 0;
+        Bytecode::Op::Instruction *jmp = nullptr;
 
         if(node->elseBody) {
-            jmpIndex = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
+            jmp = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
         }
 
-        Bytecode::Op::JmpNE::setTarget(_chunk->getItt(jmpNEIndex), makeLabel());
+        Bytecode::Op::JmpNE::setTarget(*jmpNE, makeLabel());
 
         if(node->elseBody) {
             node->elseBody->generateBytecode(this);
-            Bytecode::Op::Jmp::setTarget(_chunk->getItt(jmpIndex), makeLabel());
+            Bytecode::Op::Jmp::setTarget(*jmp, makeLabel());
         }
 
         freeRegister(testReg.value());
@@ -355,13 +355,13 @@ namespace Ciallang::Inter {
         CLL_ASSERT(testReg.has_value(), "testReg is not have val");
 
         _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
-        size_t jmpNEIndex = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
+        auto *jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
 
         node->body->generateBytecode(this);
-        Bytecode::Op::Jmp::setTarget(_chunk->getItt(_chunk->emit<Bytecode::Op::OpCode::Jmp>()), loopLabel);
+        Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), loopLabel);
 
-        Bytecode::Op::Jmp::setTarget(_chunk->getItt(_chunk->emit<Bytecode::Op::OpCode::Jmp>()), makeLabel());
-        Bytecode::Op::JmpNE::setTarget(_chunk->getItt(jmpNEIndex), makeLabel());
+        Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), makeLabel());
+        Bytecode::Op::JmpNE::setTarget(*jmpNE, makeLabel());
 
         freeRegister(testReg.value());
 
@@ -383,9 +383,9 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<LocalVariable *> IRGenerator::resolveLocalVariable(const TjsString &identifier) {
+    std::optional<LocalVariable *> IRGenerator::resolveLocalVariable(const String &identifier) {
         for(auto &variable : _variables) {
-            if(variable.identifier == identifier && variable.scopeDepth <= _scopeDepth) {
+            if(variable.identifier == identifier.toStdStr() && variable.scopeDepth <= _scopeDepth) {
                 return &variable;
             }
         }

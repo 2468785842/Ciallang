@@ -101,7 +101,7 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void Mov::execute(const Instruction &itt, const VMState &vmState) {
-        const TjsValue &srcVal = vmState.reg(src(itt));
+        const Value &srcVal = vmState.reg(src(itt));
         vmState.reg(dst(itt), srcVal);
     }
 
@@ -111,7 +111,7 @@ namespace Ciallang::Bytecode::Op {
 
     void DGlobal::execute(const Instruction &itt, VMState &vmState) {
         const auto &value = vmState.reg(src(itt));
-        vmState.global(symbolIndex(itt), TjsValue{ value });
+        vmState.global(symbolIndex(itt), Value{ value });
     }
 
     std::string DGlobal::dump(const Instruction &itt, const VMState &vmState, const bool info) {
@@ -153,7 +153,7 @@ namespace Ciallang::Bytecode::Op {
         const auto value1 = vmState.reg(reg1(itt));
         const auto value2 = vmState.reg(reg2(itt));
         const bool result = value1 == value2;
-        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.reg(dst(itt), Value{ static_cast<Integer>(result) });
         vmState.setZF(result);
     }
 
@@ -165,7 +165,7 @@ namespace Ciallang::Bytecode::Op {
         const auto value1 = vmState.reg(reg1(itt));
         const auto value2 = vmState.reg(reg2(itt));
         const bool result = value1 != value2;
-        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.reg(dst(itt), Value{ static_cast<Integer>(result) });
         vmState.setZF(result);
     }
 
@@ -178,7 +178,7 @@ namespace Ciallang::Bytecode::Op {
         const auto &value1 = kIpt.reg(reg1(itt));
         const auto &value2 = kIpt.reg(reg2(itt));
         const bool result = value1 < value2;
-        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.reg(dst(itt), Value{ static_cast<Integer>(result) });
         vmState.setZF(result);
     }
 
@@ -196,7 +196,7 @@ namespace Ciallang::Bytecode::Op {
         const auto value1 = vmState.reg(reg1(itt));
         const auto value2 = vmState.reg(reg2(itt));
         const bool result = value1 <= value2;
-        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.reg(dst(itt), Value{ static_cast<Integer>(result) });
         vmState.setZF(result);
     }
 
@@ -208,7 +208,7 @@ namespace Ciallang::Bytecode::Op {
         const auto value1 = vmState.reg(reg1(itt));
         const auto value2 = vmState.reg(reg2(itt));
         const bool result = value1 > value2;
-        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.reg(dst(itt), Value{ static_cast<Integer>(result) });
         vmState.setZF(result);
     }
 
@@ -220,7 +220,7 @@ namespace Ciallang::Bytecode::Op {
         const auto value1 = vmState.reg(reg1(itt));
         const auto value2 = vmState.reg(reg2(itt));
         const bool result = value1 >= value2;
-        vmState.reg(dst(itt), TjsValue{ static_cast<TjsInteger>(result) });
+        vmState.reg(dst(itt), Value{ static_cast<Integer>(result) });
         vmState.setZF(result);
     }
 
@@ -289,13 +289,13 @@ namespace Ciallang::Bytecode::Op {
         }
 
         if(const auto *fun = dynamic_cast<NativeFunction *>(object.toObject())) {
-            const auto values = std::make_unique<TjsValue[]>(fun->arity());
+            const auto values = std::make_unique<Value[]>(fun->arity());
             const CallFrame *curCallFrame = vmState.current();
             const size_t count = argCount(itt);
             const size_t base = vmState.getRegPoolTop() - count;
             // Faster operation
             for(std::uint32_t i = 0; i < count; i++) {
-                new(&values[i]) TjsValue{ curCallFrame->getReg(base - i) };
+                new(&values[i]) Value{ curCallFrame->getReg(base - i) };
             }
 
             auto value = fun->callProc(values.get());
@@ -305,7 +305,7 @@ namespace Ciallang::Bytecode::Op {
         }
 
         if(auto *classObj = dynamic_cast<ClassObject *>(object.toObject())) {
-            vmState.reg(dst(itt), tjsObject<InstanceObject>(classObj));
+            vmState.reg(dst(itt), createObject<InstanceObject>(classObj));
             return;
         }
 

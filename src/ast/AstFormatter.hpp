@@ -45,7 +45,7 @@ namespace Ciallang {
             fmt::println("{}", "");
         }
 
-        void printNode(const std::string &type, const TjsValue value) {
+        void printNode(const std::string &type, const Value& value) {
             fmt::print("{0: <{2}}{1}", "", type, leftPadding);
             fmt::print(" ({})", value);
             fmt::println("{}", "");
@@ -75,7 +75,7 @@ namespace Ciallang {
             increaseIndent();
             for(auto &[token, exprNode] : node->parameters) {
                 CLL_ASSERT(token.value().isString(), "FunctionDeclNode val is not string");
-                printNode(*token.value().toString(), exprNode);
+                printNode(token.value().toString()->toStdStr(), exprNode);
             }
             decreaseIndent();
 

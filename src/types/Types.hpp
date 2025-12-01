@@ -16,14 +16,14 @@
 
 namespace Ciallang {
 #if defined(LLONG_MAX)
-    using TjsInteger = long long;
-    using TjsReal = double;
+    using Integer = long long;
+    using Real = double;
 #else
-    using TjsInteger = int;
-    using TjsReal = float;
+    using Integer = int;
+    using Real = float;
 #endif
 
-    enum class TjsValueType : std::uint8_t {
+    enum class ValueType : std::uint8_t {
         Void, // empty
         Object,
         String,
@@ -32,10 +32,10 @@ namespace Ciallang {
         Real
     };
 
-    class TjsString;
-    class TjsOctet;
+    class String;
+    class Octet;
     class Object;
 
-    class TjsValue;
+    class Value;
 
 } // namespace Ciallang

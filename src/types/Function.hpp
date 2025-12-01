@@ -16,8 +16,8 @@
 #include <tuple>
 
 #include "Object.hpp"
-#include "TjsString.hpp"
-#include "TjsValue.hpp"
+#include "String.hpp"
+#include "Value.hpp"
 #include "vm/Chunk.hpp"
 
 namespace Ciallang {
@@ -80,11 +80,11 @@ namespace Ciallang {
         struct function_traits : function_traits<decltype(&F::operator())> {};
 
         template <typename T>
-        T extract_arg(TjsValue *args, const size_t index) {
+        T extract_arg(Value *args, const size_t index) {
             // 根据T类型从args[index]中提取实际值
-            if constexpr(std::is_same_v<T, TjsInteger>) {
+            if constexpr(std::is_same_v<T, Integer>) {
                 return args[index].toInteger();
-            } else if constexpr(std::is_same_v<T, TjsReal>) {
+            } else if constexpr(std::is_same_v<T, Real>) {
                 return args[index].toReal();
             } else if constexpr(std::is_same_v<T, bool>) {
                 return args[index].toBool();
@@ -94,33 +94,33 @@ namespace Ciallang {
         }
 
         template <>
-        inline TjsString *extract_arg<TjsString *>(TjsValue *args, const size_t index) {
+        inline String *extract_arg<String *>(Value *args, const size_t index) {
             return args[index].toString();
         }
 
         template <>
-        inline Object *extract_arg<Object *>(TjsValue *args, const size_t index) {
+        inline Object *extract_arg<Object *>(Value *args, const size_t index) {
             return args[index].toObject();
         }
 
         template <>
-        inline TjsOctet *extract_arg<TjsOctet *>(TjsValue *args, const size_t index) {
+        inline Octet *extract_arg<Octet *>(Value *args, const size_t index) {
             return args[index].toOctet();
         }
 
         template <typename Callable, typename Tuple, size_t... I>
-        TjsValue invoke_callable_impl(Callable &&callable, TjsValue *args, std::index_sequence<I...>) {
+        Value invoke_callable_impl(Callable &&callable, Value *args, std::index_sequence<I...>) {
             using Ret = function_traits<std::decay_t<Callable>>::return_type;
             if constexpr(std::is_void_v<Ret>) {
                 callable(detail::extract_arg<std::tuple_element_t<I, Tuple>>(args, I)...);
-                return TjsValue{};
+                return Value{};
             } else {
                 return callable(detail::extract_arg<std::tuple_element_t<I, Tuple>>(args, I)...);
             }
         }
 
         template <typename Callable>
-        TjsValue invoke_callable(Callable &&callable, TjsValue *args) {
+        Value invoke_callable(Callable &&callable, Value *args) {
             using traits = function_traits<std::decay_t<Callable>>;
             using Tuple = traits::args_tuple;
             constexpr size_t N = traits::arity;
@@ -131,19 +131,19 @@ namespace Ciallang {
     } // namespace detail
 
     class NativeFunction final : public Object {
-        using Callback = std::function<TjsValue(TjsValue *)>;
+        using Callback = std::function<Value(Value *)>;
 
     public:
         NativeFunction() = delete;
 
         template <typename Callable>
         explicit NativeFunction(const std::string_view name, Callable &&callable) :
-            _callback([callable = std::forward<Callable>(callable)](TjsValue *args) {
+            _callback([callable = std::forward<Callable>(callable)](Value *args) {
                 return detail::invoke_callable(callable, args);
             }),
             _arity(detail::function_traits<Callable>::arity), _name(name) {}
 
-        TjsValue callProc(TjsValue *values) const { return _callback(values); }
+        Value callProc(Value *values) const { return _callback(values); }
 
         [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
 

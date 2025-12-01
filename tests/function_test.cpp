@@ -34,7 +34,7 @@ TEST_CASE("函数声明 - 简单函数定义") {
         auto *funcDecl = dynamic_cast<Syntax::FunctionDeclNode *>(blockNode->childrens[0]);
         REQUIRE(funcDecl != nullptr);
         REQUIRE(funcDecl->token != nullptr);
-        REQUIRE(*funcDecl->token->value().toString() == "foo");
+        REQUIRE(funcDecl->token->value().toString()->toStdStr() == "foo");
         REQUIRE(funcDecl->parameters.empty());
         REQUIRE(funcDecl->body != nullptr);
         REQUIRE(dynamic_cast<Syntax::BlockStmtNode *>(funcDecl->body) != nullptr);
@@ -54,10 +54,10 @@ TEST_CASE("函数声明 - 简单函数定义") {
         auto *funcDecl = dynamic_cast<Syntax::FunctionDeclNode *>(blockNode->childrens[0]);
         REQUIRE(funcDecl != nullptr);
         REQUIRE(funcDecl->token != nullptr);
-        REQUIRE(*funcDecl->token->value().toString() == "add");
+        REQUIRE(funcDecl->token->value().toString()->toStdStr() == "add");
         REQUIRE(funcDecl->parameters.size() == 2);
-        REQUIRE(*funcDecl->parameters[0].first.value().toString() == "a");
-        REQUIRE(*funcDecl->parameters[1].first.value().toString() == "b");
+        REQUIRE(funcDecl->parameters[0].first.value().toString()->toStdStr() == "a");
+        REQUIRE(funcDecl->parameters[1].first.value().toString()->toStdStr() == "b");
         REQUIRE(funcDecl->body != nullptr);
     }
 
@@ -99,7 +99,7 @@ TEST_CASE("函数声明 - 参数列表") {
         auto *funcDecl = dynamic_cast<Syntax::FunctionDeclNode *>(blockNode->childrens[0]);
         REQUIRE(funcDecl != nullptr);
         REQUIRE(funcDecl->parameters.size() == 1);
-        REQUIRE(*funcDecl->parameters[0].first.value().toString() == "x");
+        REQUIRE(funcDecl->parameters[0].first.value().toString()->toStdStr() == "x");
     }
 
     SECTION("多个参数") {
@@ -116,9 +116,9 @@ TEST_CASE("函数声明 - 参数列表") {
         auto *funcDecl = dynamic_cast<Syntax::FunctionDeclNode *>(blockNode->childrens[0]);
         REQUIRE(funcDecl != nullptr);
         REQUIRE(funcDecl->parameters.size() == 3);
-        REQUIRE(*funcDecl->parameters[0].first.value().toString() == "a");
-        REQUIRE(*funcDecl->parameters[1].first.value().toString() == "b");
-        REQUIRE(*funcDecl->parameters[2].first.value().toString() == "c");
+        REQUIRE(funcDecl->parameters[0].first.value().toString()->toStdStr() == "a");
+        REQUIRE(funcDecl->parameters[1].first.value().toString()->toStdStr() == "b");
+        REQUIRE(funcDecl->parameters[2].first.value().toString()->toStdStr() == "c");
     }
 
     SECTION("复杂参数名") {
@@ -135,9 +135,9 @@ TEST_CASE("函数声明 - 参数列表") {
         auto *funcDecl = dynamic_cast<Syntax::FunctionDeclNode *>(blockNode->childrens[0]);
         REQUIRE(funcDecl != nullptr);
         REQUIRE(funcDecl->parameters.size() == 3);
-        REQUIRE(*funcDecl->parameters[0].first.value().toString() == "param1");
-        REQUIRE(*funcDecl->parameters[1].first.value().toString() == "param_2");
-        REQUIRE(*funcDecl->parameters[2].first.value().toString() == "param3");
+        REQUIRE(funcDecl->parameters[0].first.value().toString()->toStdStr() == "param1");
+        REQUIRE(funcDecl->parameters[1].first.value().toString()->toStdStr() == "param_2");
+        REQUIRE(funcDecl->parameters[2].first.value().toString()->toStdStr() == "param3");
     }
 }
 

@@ -81,7 +81,7 @@ TEST_CASE("表达式 - 字面量表达式") {
         auto *valueExpr = dynamic_cast<const Syntax::ValueExprNode *>(exprStmt->expression);
         REQUIRE(valueExpr != nullptr);
         REQUIRE(valueExpr->token->type() == Syntax::TokenType::ConstVal);
-        REQUIRE(*valueExpr->token->value().toString() == "hello world");
+        REQUIRE(valueExpr->token->value().toString()->toStdStr() == "hello world");
     }
 }
 

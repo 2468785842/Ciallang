@@ -19,7 +19,7 @@
 #include "Register.hpp"
 #include "logging/Logger.hpp"
 
-#include "types/TjsValue.hpp"
+#include "types/Value.hpp"
 
 #define OPCODE_ENUMS(O)                                                                                                \
     O(Load)                                                                                                            \
@@ -68,7 +68,7 @@ namespace Ciallang::Bytecode::Op {
     struct Operand {
         enum class Type { None, Value, Register, RegisterVec, Label, SymbolIndex };
         union {
-            TjsValue *value;
+            Value *value;
             Register reg;
             Label label;
             size_t i;
@@ -76,7 +76,7 @@ namespace Ciallang::Bytecode::Op {
 
         Type type{ Type::None };
 
-        explicit Operand(TjsValue value) : type(Type::Value) { this->operand.value = new TjsValue{ value }; }
+        explicit Operand(Value value) : type(Type::Value) { this->operand.value = new Value{ value }; }
 
         explicit Operand(const Register &value) : type(Type::Register) { this->operand.reg = value; }
 
@@ -183,7 +183,7 @@ namespace Ciallang::Bytecode::Op {
             } else if constexpr(std::is_same_v<T, Label>) {
                 CLL_ASSERT(operand->type == Operand::Type::Label, "operand type is not Label");
                 return operand->operand.label;
-            } else if constexpr(std::is_same_v<T, TjsValue>) {
+            } else if constexpr(std::is_same_v<T, Value>) {
                 CLL_ASSERT(operand->type == Operand::Type::Value, "operand type is not Value");
                 return *operand->operand.value;
             } else if constexpr(std::is_same_v<T, size_t>) {
@@ -198,7 +198,7 @@ namespace Ciallang::Bytecode::Op {
     struct Load {
         static const Register &reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static const TjsValue &value(const Instruction &itt) { return itt.getOperand2<TjsValue>(); }
+        static const Value &value(const Instruction &itt) { return itt.getOperand2<Value>(); }
 
         static void execute(const Instruction &, const VMState &);
 

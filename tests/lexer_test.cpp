@@ -42,12 +42,12 @@ TEST_CASE("词法分析 - 基本功能") {
         REQUIRE(token != nullptr);
 
         std::cout << token->name() << "\t";
-        if(token->value().type() != Ciallang::TjsValueType::Octet) {
-            if(token->value().type() == Ciallang::TjsValueType::Integer) {
+        if(token->value().type() != Ciallang::ValueType::Octet) {
+            if(token->value().type() == Ciallang::ValueType::Integer) {
                 std::cout << std::dec << token->value().toInteger();
-            } else if(token->value().type() == Ciallang::TjsValueType::Real) {
+            } else if(token->value().type() == Ciallang::ValueType::Real) {
                 std::cout << std::dec << token->value().toReal();
-            } else if(token->value().type() == Ciallang::TjsValueType::String)
+            } else if(token->value().type() == Ciallang::ValueType::String)
                 std::cout << "\"" << token->value().toString() << "\"";
         }
         if(token->type() == Ciallang::Syntax::TokenType::Invalid) {

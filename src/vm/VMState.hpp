@@ -19,7 +19,7 @@
 #include "gen/IRGenerator.hpp"
 #include "types/Function.hpp"
 
-#include "types/TjsValue.hpp"
+#include "types/Value.hpp"
 
 #include "vm/Register.hpp"
 
@@ -45,7 +45,7 @@ namespace Ciallang::Bytecode {
             maybeShrink();
         }
 
-        [[nodiscard]] TjsValue *ptrAt(const size_t globalIndex) const {
+        [[nodiscard]] Value *ptrAt(const size_t globalIndex) const {
             const size_t blockIndex = globalIndex / _blockSize; // 第几个块
             const size_t offset = globalIndex % _blockSize; // 块内偏移
             return _blocks[blockIndex].data + offset;
@@ -55,9 +55,9 @@ namespace Ciallang::Bytecode {
 
     private:
         struct Block {
-            TjsValue *data;
+            Value *data;
 
-            explicit Block(const size_t blockSize) : data(new TjsValue[blockSize]) {}
+            explicit Block(const size_t blockSize) : data(new Value[blockSize]) {}
 
             Block(const Block &) = delete;
             Block &operator=(const Block &) = delete;
@@ -143,9 +143,9 @@ namespace Ciallang::Bytecode {
             }
         }
 
-        [[nodiscard]] TjsValue &getReg(const size_t index) { return *_pool->ptrAt(baseRegSP + index); }
+        [[nodiscard]] Value &getReg(const size_t index) { return *_pool->ptrAt(baseRegSP + index); }
 
-        [[nodiscard]] const TjsValue &getReg(const size_t index) const { return *_pool->ptrAt(baseRegSP + index); }
+        [[nodiscard]] const Value &getReg(const size_t index) const { return *_pool->ptrAt(baseRegSP + index); }
 
     private:
         FastRegisterPool *_pool{ nullptr };
@@ -157,21 +157,21 @@ namespace Ciallang::Bytecode {
 
         void run();
 
-        void reg(const Register &reg, TjsValue value) const;
+        void reg(const Register &reg, const Value& value) const;
 
-        [[nodiscard]] TjsValue reg(Register reg);
-        [[nodiscard]] const TjsValue &reg(Register reg) const;
+        [[nodiscard]] Value reg(Register reg);
+        [[nodiscard]] const Value &reg(Register reg) const;
 
-        [[nodiscard]] const TjsValue &global(const size_t symbolIndex) const { return _globals[symbolIndex]; }
+        [[nodiscard]] const Value &global(const size_t symbolIndex) const { return _globals[symbolIndex]; }
 
-        void global(const size_t symbolIndex, TjsValue value) {
+        void global(const size_t symbolIndex, const Value& value) {
             if(_globals.size() < symbolIndex + 1) {
                 _globals.resize(symbolIndex * 2 + 1);
             }
             _globals[symbolIndex] = value;
         }
 
-        void global(const std::string &identifier, TjsValue value) {
+        void global(const std::string &identifier, const Value& value) {
             const auto index = _symbolTable.getSymbolIndex(identifier);
             if(!index) {
                 return;
@@ -200,7 +200,7 @@ namespace Ciallang::Bytecode {
             _callStack[_stackTop].~CallFrame();
         }
 
-        [[nodiscard]] const std::vector<Op::Instruction> &instructions() const noexcept {
+        [[nodiscard]] const std::vector<Op::Instruction*> &instructions() const noexcept {
             return _currentFrame->chunk->instructions();
         }
 
@@ -228,10 +228,10 @@ namespace Ciallang::Bytecode {
             while(pc < chunk.instructions().size()) {
                 const auto &instruction = chunk.instructions()[pc];
 
-                ss << fmt::format("{: <6}: {}\n", Label{ pc }, Op::Instruction::dump(instruction, *this, false));
+                ss << fmt::format("{: <6}: {}\n", Label{ pc }, Op::Instruction::dump(*instruction, *this, false));
 
-                if(instruction.opcode == Op::OpCode::Load) {
-                    if(auto value = Op::Load::value(instruction); value.isObject()) {
+                if(instruction->opcode == Op::OpCode::Load) {
+                    if(auto value = Op::Load::value(*instruction); value.isObject()) {
                         if(auto fun = dynamic_cast<Function *>(value.toObject())) {
                             functions.push_back(fun);
                         }
@@ -251,7 +251,7 @@ namespace Ciallang::Bytecode {
 
         void pushVoid(const size_t n) { _regPool.allocFrame(n); }
 
-        void push(TjsValue v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = v; }
+        void push(const Value& v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = v; }
 
         void pop(const size_t count) { _regPool.freeFrame(count); }
         [[nodiscard]] size_t getRegPoolTop() const { return _regPool.used(); }
@@ -264,7 +264,7 @@ namespace Ciallang::Bytecode {
         FastRegisterPool _regPool{};
         CallFrame _callStack[MAX_CALL_DEPTH];
         size_t _stackTop{ 0 };
-        std::vector<TjsValue> _globals{};
+        std::vector<Value> _globals{};
         bool _zf{ false };
     };
 } // namespace Ciallang::Bytecode

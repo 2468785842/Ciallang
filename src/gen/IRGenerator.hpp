@@ -15,7 +15,7 @@
 #include "ast/AstBuilder.hpp"
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
-#include "types/TjsString.hpp"
+#include "types/String.hpp"
 #include "vm/Chunk.hpp"
 #include "vm/Label.hpp"
 #include "vm/Register.hpp"
@@ -159,11 +159,11 @@ namespace Ciallang::Inter {
         Bytecode::Register getEmpty(Bytecode::Chunk &chunk) {
             if(!_empty.has_value()) {
                 _empty = allocateRegister();
-                chunk.emit<Bytecode::Op::OpCode::Load>(_empty.value(), TjsValue{});
+                chunk.emit<Bytecode::Op::OpCode::Load>(_empty.value(), Value{});
             }
             return _empty.value();
         }
 
-        std::optional<LocalVariable *> resolveLocalVariable(const TjsString &identifier);
+        std::optional<LocalVariable *> resolveLocalVariable(const String &identifier);
     };
 } // namespace Ciallang::Inter
