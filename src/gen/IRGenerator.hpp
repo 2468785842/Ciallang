@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "ast/AstBuilder.hpp"
+#include "ast/AstNode.hpp"
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
 #include "types/String.hpp"
@@ -77,37 +77,39 @@ namespace Ciallang::Inter {
 
         void addVariable(LocalVariable &&variable) { _variables.push_back(std::move(variable)); }
 
-        std::optional<Bytecode::Register> generate(const Syntax::ValueExprNode *);
+        Syntax::OptReg generate(const Syntax::ValueExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::IdentifierExprNode *);
+        Syntax::OptReg generate(const Syntax::IdentifierExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::BinaryExprNode *);
+        Syntax::OptReg generate(const Syntax::BinaryExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::UnaryExprNode *);
+        Syntax::OptReg generate(const Syntax::UnaryExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::ProcCallExprNode *);
+        Syntax::OptReg generate(const Syntax::ProcCallExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::AssignExprNode *);
+        Syntax::OptReg generate(const Syntax::AssignExprNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::BlockStmtNode *);
+        Syntax::OptReg generate(const Syntax::BlockStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::ExprStmtNode *);
+        Syntax::OptReg generate(const Syntax::ExprStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::IfStmtNode *);
+        Syntax::OptReg generate(const Syntax::IfStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::VarDeclNode *);
+        Syntax::OptReg generate(const Syntax::VarDeclNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::FunctionDeclNode *);
+        Syntax::OptReg generate(const Syntax::FunctionDeclNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::StmtDeclNode *);
+        Syntax::OptReg generate(const Syntax::ClassDeclNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::WhileStmtNode *);
+        Syntax::OptReg generate(const Syntax::StmtDeclNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::BreakStmtNode *);
+        Syntax::OptReg generate(const Syntax::WhileStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::ContinueStmtNode *);
+        Syntax::OptReg generate(const Syntax::BreakStmtNode *);
 
-        std::optional<Bytecode::Register> generate(const Syntax::ReturnStmtNode *);
+        Syntax::OptReg generate(const Syntax::ContinueStmtNode *);
+
+        Syntax::OptReg generate(const Syntax::ReturnStmtNode *);
 
     private:
         std::unique_ptr<Bytecode::Chunk> _chunk = std::make_unique<Bytecode::Chunk>();
@@ -119,7 +121,7 @@ namespace Ciallang::Inter {
 
         std::vector<LocalVariable> _variables{};
 
-        std::optional<Bytecode::Register> _empty{};
+        Syntax::OptReg _empty{};
 
         std::vector<Bytecode::Register> _freeRegisters{};
         std::uint32_t _regNextIndex{ 0 };

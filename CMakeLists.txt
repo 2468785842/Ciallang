@@ -33,8 +33,6 @@ set(SOURCE_FILES
 
         src/parser/Parser.cpp
 
-        src/ast/AstBuilder.cpp
-
         src/gen/IRGenerator.cpp
 
         # ############################################

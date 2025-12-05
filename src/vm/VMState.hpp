@@ -157,21 +157,21 @@ namespace Ciallang::Bytecode {
 
         void run();
 
-        void reg(const Register &reg, const Value& value) const;
+        void reg(const Register &reg, const Value &value) const;
 
         [[nodiscard]] Value reg(Register reg);
         [[nodiscard]] const Value &reg(Register reg) const;
 
         [[nodiscard]] const Value &global(const size_t symbolIndex) const { return _globals[symbolIndex]; }
 
-        void global(const size_t symbolIndex, const Value& value) {
+        void global(const size_t symbolIndex, const Value &value) {
             if(_globals.size() < symbolIndex + 1) {
                 _globals.resize(symbolIndex * 2 + 1);
             }
             _globals[symbolIndex] = value;
         }
 
-        void global(const std::string &identifier, const Value& value) {
+        void global(const std::string &identifier, const Value &value) {
             const auto index = _symbolTable.getSymbolIndex(identifier);
             if(!index) {
                 return;
@@ -200,7 +200,7 @@ namespace Ciallang::Bytecode {
             _callStack[_stackTop].~CallFrame();
         }
 
-        [[nodiscard]] const std::vector<Op::Instruction*> &instructions() const noexcept {
+        [[nodiscard]] const std::vector<Op::Instruction *> &instructions() const noexcept {
             return _currentFrame->chunk->instructions();
         }
 
@@ -251,7 +251,7 @@ namespace Ciallang::Bytecode {
 
         void pushVoid(const size_t n) { _regPool.allocFrame(n); }
 
-        void push(const Value& v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = v; }
+        void push(const Value &v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = v; }
 
         void pop(const size_t count) { _regPool.freeFrame(count); }
         [[nodiscard]] size_t getRegPoolTop() const { return _regPool.used(); }

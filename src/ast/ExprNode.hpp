@@ -27,26 +27,22 @@ namespace Ciallang::Syntax {
     public:
         ValueExprNode() = delete;
 
-        explicit ValueExprNode(Token &token) : ExprNode(token, "value") {}
+        explicit ValueExprNode(const Token &token) : ExprNode(token, "value") {}
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
-            return gen->generate(this);
-        }
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
 
     class IdentifierExprNode final : public ExprNode {
     public:
         IdentifierExprNode() = delete;
 
-        explicit IdentifierExprNode(Token &token) : ExprNode(token, "identifier") {}
+        explicit IdentifierExprNode(const Token &token) : ExprNode(token, "identifier") {}
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
-            return gen->generate(this);
-        }
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
 
     class BinaryExprNode final : public ExprNode {
@@ -56,7 +52,15 @@ namespace Ciallang::Syntax {
 
         BinaryExprNode() = delete;
 
-        explicit BinaryExprNode(Token &token, const ExprNode *lhs, const ExprNode *rhs) :
+        /**
+         * 创建一个二目运算节点
+         *
+         * @param token 根节点
+         * @param lhs 左叶子节点
+         * @param rhs 右叶子节点
+         * @return 二目运算符AstNode
+         */
+        explicit BinaryExprNode(const Token &token, const ExprNode *lhs, const ExprNode *rhs) :
             ExprNode(token, "binary_operator"), lhs(lhs), rhs(rhs) {
             location.start(lhs->location.start());
             location.end(rhs->location.end());
@@ -64,9 +68,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
-            return gen->generate(this);
-        }
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
 
     class ProcCallExprNode final : public ExprNode {
@@ -80,9 +82,7 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
-            return gen->generate(this);
-        }
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
 
     class UnaryExprNode final : public ExprNode {
@@ -91,15 +91,13 @@ namespace Ciallang::Syntax {
 
         UnaryExprNode() = delete;
 
-        explicit UnaryExprNode(Token &token, const ExprNode *rhs) : ExprNode(token, "unary_operator"), rhs(rhs) {
+        explicit UnaryExprNode(const Token &token, const ExprNode *rhs) : ExprNode(token, "unary_operator"), rhs(rhs) {
             location.end(rhs->location.end());
         }
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
-            return gen->generate(this);
-        }
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
 
     class AssignExprNode final : public ExprNode {
@@ -117,8 +115,6 @@ namespace Ciallang::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
-            return gen->generate(this);
-        }
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
 } // namespace Ciallang::Syntax

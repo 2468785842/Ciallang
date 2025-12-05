@@ -14,7 +14,6 @@
 
 #include "common/SourceLocation.hpp"
 #include "lexer/Token.hpp"
-#include "vm/Chunk.hpp"
 #include "vm/Register.hpp"
 
 namespace Ciallang::Inter {
@@ -60,16 +59,17 @@ namespace Ciallang::Syntax {
 
     class FunctionDeclNode;
 
+    class ClassDeclNode;
+
     class StmtDeclNode;
 
-    using DeclNodeList = std::vector<DeclNode *>;
+    using OptReg = std::optional<Bytecode::Register>;
 
     class AstNode {
     protected:
         explicit AstNode(const char *name) : _name(name) {}
 
-        explicit AstNode(Token &token, const char *name) :
-            token(std::make_unique<Token>(std::move(token))), _name(name) {
+        explicit AstNode(const Token &token, const char *name) : token(std::make_unique<Token>(token)), _name(name) {
             location = this->token->location;
         }
 
@@ -84,9 +84,9 @@ namespace Ciallang::Syntax {
 
         virtual void accept(Visitor *) const = 0;
 
-        virtual std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *) const = 0;
+        virtual OptReg generateBytecode(Inter::IRGenerator *) const = 0;
 
-        [[nodiscard]] std::string_view name() const noexcept { return _name; };
+        [[nodiscard]] std::string_view name() const noexcept { return _name; }
 
         virtual ~AstNode() = default;
 
@@ -102,6 +102,8 @@ namespace Ciallang::Syntax {
         virtual void visit(const VarDeclNode *) = 0;
 
         virtual void visit(const FunctionDeclNode *) = 0;
+
+        virtual void visit(const ClassDeclNode *) = 0;
 
         virtual void visit(const ValueExprNode *) = 0;
 

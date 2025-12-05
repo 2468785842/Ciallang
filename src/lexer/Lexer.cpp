@@ -673,6 +673,8 @@ bool Lexer::identifier(Token *&token) {
         { "NaN", Token{ TokenType::ConstVal, createReal(IEEE::Double::signaling_nan().value()) } },
 
         { "function", Token{ TokenType::Function } },
+        { "class", Token{ TokenType::Class } },
+        { "extends", Token{ TokenType::Extends } },
         { "return", Token{ TokenType::Return } },
 
         { "var", Token{ TokenType::Var } },

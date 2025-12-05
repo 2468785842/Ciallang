@@ -45,7 +45,7 @@ namespace Ciallang {
             fmt::println("{}", "");
         }
 
-        void printNode(const std::string &type, const Value& value) {
+        void printNode(const std::string &type, const Value &value) {
             fmt::print("{0: <{2}}{1}", "", type, leftPadding);
             fmt::print(" ({})", value);
             fmt::println("{}", "");
@@ -86,12 +86,25 @@ namespace Ciallang {
 
             decreaseIndent();
         }
+        void visit(const Syntax::ClassDeclNode *node) override {
+            printNode("ClassDecl");
+            increaseIndent();
 
-        void visit(const Syntax::ValueExprNode *node) override { printNode("Value", node->token->value()); }
+            printNode("(Parameters)");
 
-        void visit(const Syntax::IdentifierExprNode *node) override {
-            CLL_ASSERT(node->token->value().isString(), "IdentifierExprNode val is not string");
-            printNode("Identifier", node->token->value());
+            increaseIndent();
+            for(auto &declNode : node->body->childrens) {
+                CLL_ASSERT(declNode->token->value().isString(), "ClassDeclNode val is not string");
+                declNode->accept(this);
+            }
+            decreaseIndent();
+
+            printNode("(Body)");
+            increaseIndent();
+            node->body->accept(this);
+            decreaseIndent();
+
+            decreaseIndent();
         }
 
         void visit(const Syntax::BinaryExprNode *node) override {
@@ -212,6 +225,10 @@ namespace Ciallang {
 
             decreaseIndent();
         }
+
+        virtual void visit(const Syntax::IdentifierExprNode *node) override {}
+
+        virtual void visit(const Syntax::ValueExprNode *node) override {}
 
         void increaseIndent() { leftPadding += 2; }
         void decreaseIndent() { leftPadding = std::max(leftPadding - 2, static_cast<size_t>(0)); }

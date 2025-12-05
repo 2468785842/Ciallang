@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "lexer/Token.hpp"
-
 #include "AstNode.hpp"
 
 namespace Ciallang::Syntax {
@@ -25,35 +23,12 @@ namespace Ciallang::Syntax {
     public:
         AstBuilder() = default;
 
-        ~AstBuilder();
-
-        ExprStmtNode *makeExprStmtNode(const ExprNode *rhs);
-
-        IfStmtNode *makeIfStmtNode(const ExprNode *test, const BlockStmtNode *body);
-
-        WhileStmtNode *makeWhileStmtNode(const ExprNode *test, const BlockStmtNode *body);
-
-        ValueExprNode *makeValueExprNode(Token &&op);
-
-        BinaryExprNode *makeBinaryExprNode(Token &&op, const ExprNode *lhs, const ExprNode *rhs);
-
-        UnaryExprNode *makeUnaryExprNode(Token &&op, const ExprNode *rhs);
-
-        ProcCallExprNode *makeProcCallExprNode(const ExprNode *lhs);
-
-        AssignExprNode *makeAssignExprNode(const IdentifierExprNode *lhs, const ExprNode *rhs);
-
-        IdentifierExprNode *makeSymbolExprNode(Token &&token);
-
-        FunctionDeclNode *makeFunctionDeclNode(Token &&token);
-
-        StmtDeclNode *makeStmtDeclNode(const StmtNode *stmtNode);
-
-        BreakStmtNode *makeBreakStmtNode();
-
-        ContinueStmtNode *makeContinueStmtNode();
-
-        ReturnStmtNode *makeReturnStmtNode(const ExprNode *node);
+        ~AstBuilder() {
+            for(const auto &val : _nodes) {
+                delete val;
+            }
+            _nodes.clear();
+        }
 
         template <typename R, typename... Args>
         R *makeNode(Args &&...args) {

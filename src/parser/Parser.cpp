@@ -51,7 +51,7 @@ namespace Ciallang::Syntax {
                 // 检查当前token是否为逗号
                 if(parser->peek(TokenType::Comma)) {
                     // 遇到逗号，添加隐式void参数
-                    node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
+                    node->arguments.push_back(parser->astBuilder()->makeNode<ValueExprNode>(Token{}));
 
                     // 期望并消耗逗号
                     if(!parser->expect(r, TokenType::Comma))
@@ -77,7 +77,7 @@ namespace Ciallang::Syntax {
         // 处理尾随逗号后的隐式void参数
         // 只有在expectArgument为true时才添加void参数
         if(expectArgument) {
-            node->arguments.push_back(parser->astBuilder()->makeValueExprNode(Token{}));
+            node->arguments.push_back(parser->astBuilder()->makeNode<ValueExprNode>(Token{}));
         }
 
         return true;
@@ -264,7 +264,7 @@ namespace Ciallang::Syntax {
         }
 
         if(const auto *stmt = parseStatement(r)) {
-            return _astBuilder.makeStmtDeclNode(stmt);
+            return _astBuilder.makeNode<StmtDeclNode>(stmt);
         }
 
         return nullptr;
@@ -332,7 +332,7 @@ namespace Ciallang::Syntax {
         // maybe ExpressionStatement
 
         if(const auto *expr = parseExpression(r)) {
-            auto *statementNode = _astBuilder.makeExprStmtNode(expr);
+            auto *statementNode = _astBuilder.makeNode<ExprStmtNode>(expr);
             statementNode->location = expr->location;
 
             // ;
@@ -425,7 +425,7 @@ namespace Ciallang::Syntax {
         if(!parser->consume(identifier))
             return nullptr;
 
-        auto *functionDeclNode = parser->astBuilder()->makeFunctionDeclNode(std::move(identifier));
+        auto *functionDeclNode = parser->astBuilder()->makeNode<FunctionDeclNode>(identifier);
 
         // it's ok
         // function a {
@@ -443,6 +443,7 @@ namespace Ciallang::Syntax {
 
         auto *body = dynamic_cast<BlockStmtNode *>(parser->parseStatement(r));
 
+
         if(!body)
             return nullptr;
 
@@ -450,6 +451,49 @@ namespace Ciallang::Syntax {
         functionDeclNode->location = body->location;
 
         return functionDeclNode;
+    }
+
+    DeclNode *ClassDeclParser::parse(Result &r, Parser *parser, Token *token) const {
+        Token identifier{};
+        if(!parser->consume(identifier))
+            return nullptr;
+
+        auto *classDeclNode = parser->astBuilder()->makeNode<ClassDeclNode>(identifier);
+
+        if(!parser->peek(TokenType::LeftCurlyBrace)) {
+            parser->error(r, "class expect {", token->location);
+            return nullptr;
+        }
+
+        parser->consume();
+
+        auto *body = parser->astBuilder()->makeNode<BlockStmtNode>();
+
+        while(!parser->peek(TokenType::RightCurlyBrace) && !parser->peek(TokenType::EndOfFile)) {
+            auto *stmt = parser->parseDeclaration(r);
+            if(!stmt)
+                return nullptr;
+
+            if(!dynamic_cast<FunctionDeclNode *>(stmt) && !dynamic_cast<VarDeclNode *>(stmt)) {
+                parser->error(r, "class expect function or var", stmt->location);
+                return nullptr;
+            }
+
+            body->childrens.push_back(stmt);
+        }
+
+        if(parser->peek(TokenType::RightCurlyBrace)) {
+            parser->consume();
+        } else {
+            parser->error(r, "class expect }", token->location);
+            return nullptr;
+        }
+
+        classDeclNode->body = body;
+        classDeclNode->location.start(token->location.start());
+        classDeclNode->location.end(body->location.end());
+
+        return classDeclNode;
     }
 
 
@@ -489,10 +533,10 @@ namespace Ciallang::Syntax {
 
         if(!bodyScope) {
             bodyScope = parser->astBuilder()->makeNode<BlockStmtNode>();
-            bodyScope->childrens.push_back(parser->astBuilder()->makeStmtDeclNode(body));
+            bodyScope->childrens.push_back(parser->astBuilder()->makeNode<StmtDeclNode>(body));
         }
 
-        auto *ifNode = parser->astBuilder()->makeIfStmtNode(test, bodyScope);
+        auto *ifNode = parser->astBuilder()->makeNode<IfStmtNode>(test, bodyScope);
 
         ifNode->location.start(token->location.start());
         ifNode->location.end(ifNode->body->location.end());
@@ -511,7 +555,7 @@ namespace Ciallang::Syntax {
 
             if(!elseBodyScope) {
                 elseBodyScope = parser->astBuilder()->makeNode<BlockStmtNode>();
-                elseBodyScope->childrens.push_back(parser->astBuilder()->makeStmtDeclNode(elseBody));
+                elseBodyScope->childrens.push_back(parser->astBuilder()->makeNode<StmtDeclNode>(elseBody));
             }
             ifNode->elseBody = elseBodyScope;
 
@@ -533,10 +577,10 @@ namespace Ciallang::Syntax {
         auto *bodyScope = dynamic_cast<BlockStmtNode *>(body);
         if(!bodyScope) {
             bodyScope = parser->astBuilder()->makeNode<BlockStmtNode>();
-            bodyScope->childrens.push_back(parser->astBuilder()->makeStmtDeclNode(body));
+            bodyScope->childrens.push_back(parser->astBuilder()->makeNode<StmtDeclNode>(body));
         }
 
-        const auto whileNode = parser->astBuilder()->makeWhileStmtNode(test, bodyScope);
+        const auto whileNode = parser->astBuilder()->makeNode<WhileStmtNode>(test, bodyScope);
 
         whileNode->location.start(token->location.start());
         whileNode->location.end(token->location.end());
@@ -548,14 +592,14 @@ namespace Ciallang::Syntax {
         if(!parser->expect(r, TokenType::SemiColon))
             return nullptr;
 
-        return parser->astBuilder()->makeBreakStmtNode();
+        return parser->astBuilder()->makeNode<BreakStmtNode>();
     }
 
     StmtNode *ContinueStmtParser::parse(Result &r, Parser *parser, Token *token) const {
         if(!parser->expect(r, TokenType::SemiColon))
             return nullptr;
 
-        return parser->astBuilder()->makeContinueStmtNode();
+        return parser->astBuilder()->makeNode<ContinueStmtNode>();
     }
 
     StmtNode *ReturnStmtParser::parse(Result &r, Parser *parser, Token *token) const {
@@ -564,13 +608,13 @@ namespace Ciallang::Syntax {
 
             if(!parser->expect(r, TokenType::SemiColon))
                 return nullptr;
-            return parser->astBuilder()->makeReturnStmtNode(expr);
+            return parser->astBuilder()->makeNode<ReturnStmtNode>(expr);
         }
 
         if(!parser->expect(r, TokenType::SemiColon))
             return nullptr;
 
-        return parser->astBuilder()->makeReturnStmtNode(nullptr);
+        return parser->astBuilder()->makeNode<ReturnStmtNode>(nullptr);
     }
 
     /**
@@ -593,7 +637,7 @@ namespace Ciallang::Syntax {
         }
 
         const auto binOpNode =
-            parser->astBuilder()->makeBinaryExprNode(Token{ AssignToken::strip(token->type()) }, lhs, rhs);
+            parser->astBuilder()->makeNode<BinaryExprNode>(Token{ AssignToken::strip(token->type()) }, lhs, rhs);
 
         if(!_withAssignment)
             return binOpNode;
@@ -606,10 +650,10 @@ namespace Ciallang::Syntax {
         }
 
         if(AssignToken::support(token->type())) {
-            return parser->astBuilder()->makeAssignExprNode(symbolExprNode, binOpNode);
+            return parser->astBuilder()->makeNode<AssignExprNode>(symbolExprNode, binOpNode);
         }
 
-        return parser->astBuilder()->makeAssignExprNode(symbolExprNode, rhs);
+        return parser->astBuilder()->makeNode<AssignExprNode>(symbolExprNode, rhs);
     }
 
     ExprNode *ProcCallInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
@@ -621,7 +665,7 @@ namespace Ciallang::Syntax {
                 return nullptr;
             }
         }
-        const auto procCallExprNode = parser->astBuilder()->makeProcCallExprNode(lhs);
+        const auto procCallExprNode = parser->astBuilder()->makeNode<ProcCallExprNode>(lhs);
 
         if(!parser->peek(TokenType::RParenthesis)) {
             if(!parseArguments(r, parser, procCallExprNode)) {
@@ -637,7 +681,7 @@ namespace Ciallang::Syntax {
 
 
     ExprNode *ConstValPrefixParser::parse(Result &, Parser *parser, Token *token) const {
-        return parser->astBuilder()->makeValueExprNode(std::move(*token));
+        return parser->astBuilder()->makeNode<ValueExprNode>(*token);
     }
 
     ExprNode *UnaryOperatorPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
@@ -647,13 +691,13 @@ namespace Ciallang::Syntax {
             return nullptr;
         }
 
-        const auto node = parser->astBuilder()->makeUnaryExprNode(std::move(*token), rhs);
+        const auto node = parser->astBuilder()->makeNode<UnaryExprNode>(*token, rhs);
 
         return node;
     }
 
-    ExprNode *SymbolPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
-        return parser->astBuilder()->makeSymbolExprNode(std::move(*token));
+    ExprNode *IdentifierPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
+        return parser->astBuilder()->makeNode<IdentifierExprNode>(*token);
     }
 
     ExprNode *ParenthesizedPrefixParser::parse(Result &r, Parser *parser, Token *token) const {

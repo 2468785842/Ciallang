@@ -91,25 +91,25 @@ namespace Ciallang::Syntax {
 
         bool consume(Token &token);
 
-        bool current(Token &);
+        bool current(Token &token);
 
         bool lookAhead(size_t count);
 
-        bool peek(TokenType);
+        bool peek(TokenType tokenType);
 
         void synchronize();
 
-        AstNode *parse(Result &);
+        AstNode *parse(Result &r);
 
-        void parseScope(Result &, BlockStmtNode *, TokenType = TokenType::EndOfFile);
+        void parseScope(Result &r, BlockStmtNode *node, TokenType tokenType = TokenType::EndOfFile);
 
         DeclNode *parseDeclaration(Result &r);
 
-        ExprNode *parseExpression(Result &, Precedence = Precedence::lowest);
+        ExprNode *parseExpression(Result &r, Precedence pre = Precedence::lowest);
 
-        StmtNode *parseStatement(Result &);
+        StmtNode *parseStatement(Result &r);
 
-        bool expect(Result &, TokenType);
+        bool expect(Result &r, TokenType tokenType);
 
         [[nodiscard]] AstBuilder *astBuilder() const { return &_astBuilder; }
 
@@ -148,11 +148,20 @@ namespace Ciallang::Syntax {
         DeclNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    struct ClassDeclParser final : DeclParser {
+        ClassDeclParser() = default;
+
+        DeclNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     static constinit VarDeclParser S_VarDeclParser{};
     static constinit FunctionDeclParser S_FunctionDeclParser{};
+    static constinit ClassDeclParser S_ClassDeclParser{};
 
-    static constinit auto S_DeclParsers = frozen::make_unordered_map<TokenType, const DeclParser *>(
-        { { TokenType::Var, &S_VarDeclParser }, { TokenType::Function, &S_FunctionDeclParser } });
+    static constinit auto S_DeclParsers =
+        frozen::make_unordered_map<TokenType, const DeclParser *>({ { TokenType::Var, &S_VarDeclParser },
+                                                                    { TokenType::Function, &S_FunctionDeclParser },
+                                                                    { TokenType::Class, &S_ClassDeclParser } });
 
     /**
      * +----------------------------------------------------------------------------+
@@ -226,8 +235,8 @@ namespace Ciallang::Syntax {
         Precedence _precedence;
     };
 
-    struct SymbolPrefixParser final : PrefixParser {
-        SymbolPrefixParser() = default;
+    struct IdentifierPrefixParser final : PrefixParser {
+        IdentifierPrefixParser() = default;
 
         ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
@@ -246,7 +255,7 @@ namespace Ciallang::Syntax {
 
     static constinit ConstValPrefixParser S_ConstValPrefixParser{};
     static constinit UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
-    static constinit SymbolPrefixParser S_SymbolPrefixParser;
+    static constinit IdentifierPrefixParser S_IdentifierPrefixParser;
     static constinit UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
     static constinit ParenthesizedPrefixParser S_ParenthesizedPrefixParser{};
     //    static inline FunctionPrefixParser S_FunctionPrefixParser{};
@@ -255,7 +264,7 @@ namespace Ciallang::Syntax {
         // { TokenType::Const, &S_PrefixParser },
         { TokenType::ConstVal, &S_ConstValPrefixParser },
         { TokenType::Minus, &S_NegatePrefixParser }, // "-"
-        { TokenType::Identifier, &S_SymbolPrefixParser },
+        { TokenType::Identifier, &S_IdentifierPrefixParser },
         { TokenType::Exclamation, &S_PrefixParser }, // "!"
         { TokenType::Tilde, &S_PrefixParser }, // "~"
         { TokenType::Decrement, &S_PrefixParser }, // "--"

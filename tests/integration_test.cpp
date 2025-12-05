@@ -60,6 +60,25 @@ TEST_CASE("集成测试 - 基本脚本解析") {
         REQUIRE(globalNode != nullptr);
         REQUIRE_FALSE(r.isFailed());
     }
+
+    SECTION("类声明解析") {
+        Common::SourceFile sourceFile{};
+        Common::Result r{};
+        sourceFile.load(r, "class MyClass { function A() {} }");
+
+        Syntax::AstBuilder astBuilder{};
+        Syntax::Parser parser{ sourceFile, astBuilder };
+        auto *globalNode = parser.parse(r);
+
+        REQUIRE(globalNode != nullptr);
+        for(const auto &msg : r.messages()) {
+            if(msg.isError()) {
+                FAIL(msg.details());
+                FAIL(msg.message());
+            }
+        }
+        REQUIRE_FALSE(r.isFailed());
+    }
 }
 
 TEST_CASE("集成测试 - 代码生成和执行") {

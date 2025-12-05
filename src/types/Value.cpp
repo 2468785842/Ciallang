@@ -26,7 +26,7 @@ namespace Ciallang {
         }
     }
 
-    Value::Value(Octet *value) : _value{ ._octet = value }, _type(ValueType::Octet) { 
+    Value::Value(Octet *value) : _value{ ._octet = value }, _type(ValueType::Octet) {
         if(_value._octet) {
             _value._octet->incRef();
         }

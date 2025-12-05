@@ -23,21 +23,13 @@ namespace Ciallang {
 
         explicit Octet(const Octet &oct1, const Octet &oct2);
 
-        ~Octet() override {
-            delete[] _buf;
-        }
+        ~Octet() override { delete[] _buf; }
 
-        std::uint32_t getSize() const {
-            return _size;
-        }
+        std::uint32_t getSize() const { return _size; }
 
-        const std::uint8_t *getData() const {
-            return _buf;
-        }
+        const std::uint8_t *getData() const { return _buf; }
 
-        int getPersistSize() const { 
-            return static_cast<int>(sizeof(decltype(_size)) + _size);
-        }
+        int getPersistSize() const { return static_cast<int>(sizeof(decltype(_size)) + _size); }
 
         void persist(std::uint8_t *dst);
 

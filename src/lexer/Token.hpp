@@ -41,10 +41,13 @@ namespace Ciallang::Syntax {
     X(Omit, "...")                                                                                                     \
     X(Continue, "continue")                                                                                            \
     X(Function, "function")                                                                                            \
+    X(Class, "class")                                                                                                  \
+    X(Extends, "extends")                                                                                              \
+    X(This, "this")                                                                                                    \
+    X(Super, "super")                                                                                                  \
     X(Debugger, "debugger")                                                                                            \
     X(Default, "default")                                                                                              \
     X(Case, "case")                                                                                                    \
-    X(Extends, "extends")                                                                                              \
     X(Finally, "finally")                                                                                              \
     X(Property, "property")                                                                                            \
     X(Private, "private")                                                                                              \
@@ -118,11 +121,8 @@ namespace Ciallang::Syntax {
     X(LParenthesis, "(")                                                                                               \
     X(Dot, ".")                                                                                                        \
     X(LBracket, "[")                                                                                                   \
-    X(This, "this")                                                                                                    \
-    X(Super, "super")                                                                                                  \
     X(Global, "global")                                                                                                \
     X(RBracket, "]")                                                                                                   \
-    X(Class, "class")                                                                                                  \
     X(RParenthesis, ")")                                                                                               \
     X(Colon, ":")                                                                                                      \
     X(SemiColon, ";")                                                                                                  \

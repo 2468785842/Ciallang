@@ -33,11 +33,11 @@ namespace Ciallang::Inter {
         return chunk;
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::ExprStmtNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::ExprStmtNode *node) {
         return node->expression->generateBytecode(this);
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::ValueExprNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::ValueExprNode *node) {
         auto dst = allocateRegister();
         _chunk->emit<Bytecode::Op::OpCode::Load>(dst, node->token->value());
 
@@ -46,7 +46,7 @@ namespace Ciallang::Inter {
         return dst;
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::BinaryExprNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::BinaryExprNode *node) {
         using enum Syntax::TokenType;
         auto reg1 = node->lhs->generateBytecode(this);
         auto reg2 = node->rhs->generateBytecode(this);
@@ -100,9 +100,9 @@ namespace Ciallang::Inter {
         return dst;
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::UnaryExprNode *node) { return {}; }
+    Syntax::OptReg IRGenerator::generate(const Syntax::UnaryExprNode *node) { return {}; }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::ProcCallExprNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::ProcCallExprNode *node) {
         auto *member = node->memberAccess;
         auto dst = allocateRegister();
 
@@ -132,7 +132,7 @@ namespace Ciallang::Inter {
     }
 
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::AssignExprNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::AssignExprNode *node) {
         // TODO: member access
         const auto identifier = node->lhs->token->value();
 
@@ -160,14 +160,15 @@ namespace Ciallang::Inter {
         auto src = node->rhs->generateBytecode(this);
         CLL_ASSERT(src.has_value(), "global src is not have val");
 
-        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()), src.value());
+        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
+                                                    src.value());
 
         if(_r.isFailed())
             return {};
         return src;
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::VarDeclNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::VarDeclNode *node) {
         const auto identifier = node->token->value();
 
         CLL_ASSERT(identifier.isString(), "identifier is not string");
@@ -176,8 +177,8 @@ namespace Ciallang::Inter {
         if(_scopeDepth == 1) {
             // can't init
             if(!node->rhs) {
-                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
-                                                            getEmpty(*_chunk));
+                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(
+                    _symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()), getEmpty(*_chunk));
                 return {};
             }
 
@@ -210,7 +211,7 @@ namespace Ciallang::Inter {
             return {};
         }
 
-        std::optional<Bytecode::Register> dst{};
+        Syntax::OptReg dst{};
         // can init
         if(node->rhs) {
             dst = allocateRegister();
@@ -231,12 +232,12 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::FunctionDeclNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::FunctionDeclNode *node) {
         auto gen = IRGenerator{ _sourceFile, _symbolTable };
 
         for(auto &[token, exprNode] : node->parameters) {
             const auto varName = token.value();
-            std::optional<Bytecode::Register> paramReg{};
+            Syntax::OptReg paramReg{};
 
             CLL_ASSERT(varName.isString(), "varName is not string");
 
@@ -264,11 +265,13 @@ namespace Ciallang::Inter {
         CLL_ASSERT(identifier.isString(), "identifier is not string");
 
         _chunk->emit<Bytecode::Op::OpCode::Load>(
-            funReg, Value{ new Function{ funChunk.release(), identifier.toString()->toStdStr(), node->parameters.size() } });
+            funReg,
+            Value{ new Function{ funChunk.release(), identifier.toString()->toStdStr(), node->parameters.size() } });
 
         if(_scopeDepth == 1) {
             freeRegister(funReg);
-            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()), funReg);
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
+                                                        funReg);
             return {};
         }
 
@@ -278,7 +281,9 @@ namespace Ciallang::Inter {
     }
 
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::IdentifierExprNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::ClassDeclNode *) { return {}; }
+
+    Syntax::OptReg IRGenerator::generate(const Syntax::IdentifierExprNode *node) {
         const auto identifier = node->token->value();
 
         CLL_ASSERT(identifier.isString(), "identifier is not string");
@@ -294,18 +299,19 @@ namespace Ciallang::Inter {
         }
 
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::GGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()), dst);
+        _chunk->emit<Bytecode::Op::OpCode::GGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
+                                                    dst);
         if(_r.isFailed())
             return {};
 
         return dst;
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::StmtDeclNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::StmtDeclNode *node) {
         return node->statement->generateBytecode(this);
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::BlockStmtNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::BlockStmtNode *node) {
         beginScope();
         for(const auto children : node->childrens) {
             children->generateBytecode(this);
@@ -317,7 +323,7 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::IfStmtNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::IfStmtNode *node) {
         auto testReg = node->test->generateBytecode(this);
         if(_r.isFailed())
             return {};
@@ -346,7 +352,7 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::WhileStmtNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::WhileStmtNode *node) {
         const auto loopLabel = makeLabel();
         auto testReg = node->test->generateBytecode(this);
         if(_r.isFailed())
@@ -368,11 +374,11 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::BreakStmtNode *node) { return {}; }
+    Syntax::OptReg IRGenerator::generate(const Syntax::BreakStmtNode *node) { return {}; }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::ContinueStmtNode *node) { return {}; }
+    Syntax::OptReg IRGenerator::generate(const Syntax::ContinueStmtNode *node) { return {}; }
 
-    std::optional<Bytecode::Register> IRGenerator::generate(const Syntax::ReturnStmtNode *node) {
+    Syntax::OptReg IRGenerator::generate(const Syntax::ReturnStmtNode *node) {
         if(node->expr) {
             auto reg = node->expr->generateBytecode(this);
             CLL_ASSERT(reg.has_value(), "reg is not have val");

@@ -14,6 +14,7 @@
 #pragma once
 
 #include "AstNode.hpp"
+#include "StmtNode.hpp"
 
 #include "gen/IRGenerator.hpp"
 
@@ -29,13 +30,11 @@ namespace Ciallang::Syntax {
 
         VarDeclNode() = delete;
 
-        explicit VarDeclNode(Token &token, const ExprNode *rhs) : DeclNode(token, "var_declaration"), rhs(rhs) {}
+        explicit VarDeclNode(const Token &token, const ExprNode *rhs) : DeclNode(token, "var_declaration"), rhs(rhs) {}
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
-            return gen->generate(this);
-        }
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
 
     class FunctionDeclNode final : public DeclNode {
@@ -46,13 +45,23 @@ namespace Ciallang::Syntax {
 
         FunctionDeclNode() = delete;
 
-        explicit FunctionDeclNode(Token &token) : DeclNode(token, "function_declaration") {}
+        explicit FunctionDeclNode(const Token &token) : DeclNode(token, "function_declaration") {}
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
-            return gen->generate(this);
-        }
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+    };
+
+    class ClassDeclNode final : public DeclNode {
+    public:
+        BlockStmtNode *body{ nullptr };
+        ClassDeclNode() = delete;
+
+        explicit ClassDeclNode(const Token &token) : DeclNode(token, "class_declaration") {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
 
     class StmtDeclNode final : public DeclNode {
@@ -61,12 +70,12 @@ namespace Ciallang::Syntax {
 
         StmtDeclNode() = delete;
 
-        explicit StmtDeclNode(const StmtNode *stmtNode) : DeclNode("statement_declaration"), statement(stmtNode) {}
+        explicit StmtDeclNode(const StmtNode *stmtNode) : DeclNode("statement_declaration"), statement(stmtNode) {
+            this->location = statement->location;
+        }
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        std::optional<Bytecode::Register> generateBytecode(Inter::IRGenerator *gen) const override {
-            return gen->generate(this);
-        }
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
 } // namespace Ciallang::Syntax

@@ -19,7 +19,7 @@ namespace Ciallang::Bytecode {
     class Chunk {
     public:
         ~Chunk() {
-            for (const auto &inst : _instructions) {
+            for(const auto &inst : _instructions) {
                 inst->~Instruction();
             }
             _instructions.clear();
@@ -48,7 +48,7 @@ namespace Ciallang::Bytecode {
         Chunk &operator=(const Chunk &) = delete;
 
     private:
-        std::vector<Op::Instruction*> _instructions{};
+        std::vector<Op::Instruction *> _instructions{};
         std::uint32_t _registerCount{ 0 };
     };
 } // namespace Ciallang::Bytecode
