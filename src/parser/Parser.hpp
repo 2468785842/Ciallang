@@ -178,6 +178,16 @@ namespace Ciallang::Syntax {
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    struct DoWhileStmtParser final : StmtParser {
+        DoWhileStmtParser() = default;
+        StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
+    struct ForStmtParser final : StmtParser {
+        ForStmtParser() = default;
+        StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     struct WhileStmtParser final : StmtParser {
         WhileStmtParser() = default;
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
@@ -200,6 +210,8 @@ namespace Ciallang::Syntax {
 
     static constinit BlockStmtParser S_BlockStmtParser{};
     static constinit IfStmtParser S_IfStmtParser{};
+    static constinit DoWhileStmtParser S_DoWhileStmtParser{};
+    static constinit ForStmtParser S_ForStmtParser{};
     static constinit WhileStmtParser S_WhileStmtParser{};
     static constinit BreakStmtParser S_BreakStmtParser{};
     static constinit ContinueStmtParser S_ContinueStmtParser{};
@@ -208,6 +220,8 @@ namespace Ciallang::Syntax {
     static constinit auto S_StmtParsers = frozen::make_unordered_map<TokenType, const StmtParser *>({
         { TokenType::LeftCurlyBrace, &S_BlockStmtParser },
         { TokenType::If, &S_IfStmtParser },
+        { TokenType::Do, &S_DoWhileStmtParser },
+        { TokenType::For, &S_ForStmtParser },
         { TokenType::While, &S_WhileStmtParser },
         { TokenType::Break, &S_BreakStmtParser },
         { TokenType::Continue, &S_ContinueStmtParser },

@@ -74,7 +74,7 @@ TEST_CASE("函数声明 - 简单函数定义") {
         REQUIRE(blockNode->childrens.size() == 1);
         auto *funcDecl = dynamic_cast<Syntax::FunctionDeclNode *>(blockNode->childrens[0]);
         REQUIRE(funcDecl != nullptr);
-        auto *body = dynamic_cast<Syntax::BlockStmtNode *>(funcDecl->body);
+        auto *body = funcDecl->body;
         REQUIRE(body != nullptr);
         REQUIRE(body->childrens.empty());
     }
@@ -159,7 +159,7 @@ TEST_CASE("函数声明 - 函数体内容") {
         REQUIRE(blockNode->childrens.size() == 1);
         auto *funcDecl = dynamic_cast<Syntax::FunctionDeclNode *>(blockNode->childrens[0]);
         REQUIRE(funcDecl != nullptr);
-        auto *body = dynamic_cast<Syntax::BlockStmtNode *>(funcDecl->body);
+        auto *body = funcDecl->body;
         REQUIRE(body != nullptr);
         REQUIRE(body->childrens.size() == 3);
     }

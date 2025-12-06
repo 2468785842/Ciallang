@@ -17,6 +17,7 @@ configure_file(test_config.h.in test_config.h)
 set(SOURCES
         expression_test.cpp
         function_test.cpp
+        loop_test.cpp
         gc_test.cpp
         gc_comprehensive_test.cpp
         interpreter_test.cpp

@@ -106,7 +106,7 @@ TEST_CASE("集成测试 - 代码生成和执行") {
         }
 
         Bytecode::VMState interpreter{ globalTable };
-        interpreter.global("println", Ciallang::StdLib::S_PrintlnFunction);
+        interpreter.global("println", StdLib::S_PrintlnFunction);
         interpreter.allocCallFrame(chunk.get());
         interpreter.run();
 

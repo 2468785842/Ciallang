@@ -103,6 +103,10 @@ namespace Ciallang::Inter {
 
         Syntax::OptReg generate(const Syntax::StmtDeclNode *);
 
+        Syntax::OptReg generate(const Syntax::DoWhileStmtNode *);
+
+        Syntax::OptReg generate(const Syntax::ForStmtNode *);
+
         Syntax::OptReg generate(const Syntax::WhileStmtNode *);
 
         Syntax::OptReg generate(const Syntax::BreakStmtNode *);
@@ -126,6 +130,14 @@ namespace Ciallang::Inter {
         std::vector<Bytecode::Register> _freeRegisters{};
         std::uint32_t _regNextIndex{ 0 };
 
+        struct LoopContext {
+            std::optional<Bytecode::Label> continueLabel;
+            std::optional<Bytecode::Label> breakLabel;
+            std::vector<Bytecode::Op::Instruction *> continues;
+            std::vector<Bytecode::Op::Instruction *> breaks;
+        };
+
+        std::vector<LoopContext> _loopStack{};
         SymbolTable &_symbolTable;
 
         Bytecode::Register allocateRegister() {

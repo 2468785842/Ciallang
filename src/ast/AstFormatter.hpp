@@ -197,6 +197,47 @@ namespace Ciallang {
             decreaseIndent();
         }
 
+        void visit(const Syntax::DoWhileStmtNode *node) override {
+            printNode("DoWhileStatement");
+            increaseIndent();
+
+            printNode("(Body)");
+            increaseIndent();
+            node->body->accept(this);
+            decreaseIndent();
+
+            printNode("(Condition)");
+            increaseIndent();
+            node->test->accept(this);
+            decreaseIndent();
+
+            decreaseIndent();
+        }
+
+        void visit(const Syntax::ForStmtNode *node) override {
+            printNode("ForStatement");
+            increaseIndent();
+
+            if(node->init) {
+                printNode("(Init)", node->init);
+            }
+
+            if(node->test) {
+                printNode("(Condition)", node->test);
+            }
+
+            if(node->step) {
+                printNode("(Step)", node->step);
+            }
+
+            printNode("(Body)");
+            increaseIndent();
+            node->body->accept(this);
+            decreaseIndent();
+
+            decreaseIndent();
+        }
+
         void visit(const Syntax::WhileStmtNode *node) override {
             printNode("WhileStatement");
             increaseIndent();
@@ -226,9 +267,9 @@ namespace Ciallang {
             decreaseIndent();
         }
 
-        virtual void visit(const Syntax::IdentifierExprNode *node) override {}
+        void visit(const Syntax::IdentifierExprNode *node) override {}
 
-        virtual void visit(const Syntax::ValueExprNode *node) override {}
+        void visit(const Syntax::ValueExprNode *node) override {}
 
         void increaseIndent() { leftPadding += 2; }
         void decreaseIndent() { leftPadding = std::max(leftPadding - 2, static_cast<size_t>(0)); }

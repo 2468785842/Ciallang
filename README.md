@@ -36,8 +36,8 @@
 * [x] `var` 变量声明与使用
 * [x] `if`
 * [x] `while`
-* [ ] `do while`
-* [ ] `for`
+* [x] `do while`
+* [x] `for`
 * [ ] `switch`
 * [ ] `try-catch`
 * [x] `function` 函数定义与调用

@@ -65,6 +65,40 @@ namespace Ciallang::Syntax {
         OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
 
+
+    class DoWhileStmtNode final : public StmtNode {
+    public:
+        const BlockStmtNode *body;
+        const ExprNode *test;
+
+        DoWhileStmtNode() = delete;
+
+        explicit DoWhileStmtNode(const BlockStmtNode *body, const ExprNode *test) :
+            StmtNode("do_while_statement"), body(body), test(test) {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+    };
+
+    class ForStmtNode final : public StmtNode {
+    public:
+        const DeclNode *init{ nullptr };
+        const ExprNode *test{ nullptr };
+        const ExprNode *step{ nullptr };
+        const BlockStmtNode *body{ nullptr };
+
+        ForStmtNode() = delete;
+
+        explicit ForStmtNode(const DeclNode *init, const ExprNode *test, const ExprNode *step,
+                             const BlockStmtNode *body) :
+            StmtNode("for_statement"), init(init), test(test), step(step), body(body) {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+    };
+
     class WhileStmtNode final : public StmtNode {
     public:
         const ExprNode *test;

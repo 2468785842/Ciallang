@@ -565,6 +565,79 @@ namespace Ciallang::Syntax {
         return ifNode;
     }
 
+    StmtNode *DoWhileStmtParser::parse(Result &r, Parser *parser, Token *token) const {
+        auto *body = parser->parseStatement(r);
+        if(!body)
+            return nullptr;
+
+        auto *bodyScope = dynamic_cast<BlockStmtNode *>(body);
+        if(!bodyScope) {
+            bodyScope = parser->astBuilder()->makeNode<BlockStmtNode>();
+            bodyScope->childrens.push_back(parser->astBuilder()->makeNode<StmtDeclNode>(body));
+        }
+
+        if(!parser->expect(r, TokenType::While))
+            return nullptr;
+        const auto *test = createExpressionNode(r, parser);
+        if(!test)
+            return nullptr;
+        if(!parser->expect(r, TokenType::SemiColon))
+            return nullptr;
+
+        const auto node = parser->astBuilder()->makeNode<DoWhileStmtNode>(bodyScope, test);
+        node->location.start(token->location.start());
+        node->location.end(token->location.end());
+        return node;
+    }
+
+    StmtNode *ForStmtParser::parse(Result &r, Parser *parser, Token *token) const {
+        if(!parser->expect(r, TokenType::LParenthesis))
+            return nullptr;
+
+        DeclNode *initDecl{ nullptr };
+        if(!parser->peek(TokenType::SemiColon)) {
+            auto *expr = parser->parseExpression(r);
+            if(!expr)
+                return nullptr;
+            initDecl = parser->astBuilder()->makeNode<StmtDeclNode>(parser->astBuilder()->makeNode<ExprStmtNode>(expr));
+        }
+        if(!parser->expect(r, TokenType::SemiColon))
+            return nullptr;
+
+        ExprNode *condExpr{ nullptr };
+        if(!parser->peek(TokenType::SemiColon)) {
+            condExpr = parser->parseExpression(r);
+            if(!condExpr)
+                return nullptr;
+        }
+        if(!parser->expect(r, TokenType::SemiColon))
+            return nullptr;
+
+        ExprNode *stepExpr{ nullptr };
+        if(!parser->peek(TokenType::RParenthesis)) {
+            stepExpr = parser->parseExpression(r);
+            if(!stepExpr)
+                return nullptr;
+        }
+        if(!parser->expect(r, TokenType::RParenthesis))
+            return nullptr;
+
+        auto *body = parser->parseStatement(r);
+        if(!body)
+            return nullptr;
+
+        auto *bodyScope = dynamic_cast<BlockStmtNode *>(body);
+        if(!bodyScope) {
+            bodyScope = parser->astBuilder()->makeNode<BlockStmtNode>();
+            bodyScope->childrens.push_back(parser->astBuilder()->makeNode<StmtDeclNode>(body));
+        }
+
+        const auto node = parser->astBuilder()->makeNode<ForStmtNode>(initDecl, condExpr, stepExpr, bodyScope);
+        node->location.start(token->location.start());
+        node->location.end(token->location.end());
+        return node;
+    }
+
     StmtNode *WhileStmtParser::parse(Result &r, Parser *parser, Token *token) const {
         const auto *test = createExpressionNode(r, parser);
         if(!test)

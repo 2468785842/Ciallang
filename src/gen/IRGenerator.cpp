@@ -352,8 +352,90 @@ namespace Ciallang::Inter {
         return {};
     }
 
+    Syntax::OptReg IRGenerator::generate(const Syntax::DoWhileStmtNode *node) {
+        const auto bodyLabel = makeLabel();
+        _loopStack.push_back(LoopContext{});
+
+        node->body->generateBytecode(this);
+
+        const auto testLabel = makeLabel();
+        _loopStack.back().continueLabel = testLabel;
+        for(auto *ct : _loopStack.back().continues) {
+            Bytecode::Op::Jmp::setTarget(*ct, testLabel);
+        }
+
+        auto testReg = node->test->generateBytecode(this);
+        if(_r.isFailed())
+            return {};
+        CLL_ASSERT(testReg.has_value(), "testReg is not have val");
+
+        _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
+        auto *jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
+        Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), bodyLabel);
+
+        const auto exitLabel = makeLabel();
+        Bytecode::Op::JmpNE::setTarget(*jmpNE, exitLabel);
+        for(auto *br : _loopStack.back().breaks) {
+            Bytecode::Op::Jmp::setTarget(*br, exitLabel);
+        }
+
+        freeRegister(testReg.value());
+        _loopStack.pop_back();
+        return {};
+    }
+
+    Syntax::OptReg IRGenerator::generate(const Syntax::ForStmtNode *node) {
+        if(node->init)
+            node->init->generateBytecode(this);
+
+        const auto testLabel = makeLabel();
+        _loopStack.push_back(LoopContext{});
+
+        Bytecode::Op::Instruction *jmpNE{ nullptr };
+        Syntax::OptReg testReg{};
+        if(node->test) {
+            testReg = node->test->generateBytecode(this);
+            if(_r.isFailed())
+                return {};
+            CLL_ASSERT(testReg.has_value(), "testReg is not have val");
+            _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
+            jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
+        }
+
+        node->body->generateBytecode(this);
+
+        const auto stepLabel = makeLabel();
+        _loopStack.back().continueLabel = stepLabel;
+        for(auto *ct : _loopStack.back().continues) {
+            Bytecode::Op::Jmp::setTarget(*ct, stepLabel);
+        }
+
+        if(node->step) {
+            auto stepReg = node->step->generateBytecode(this);
+            if(stepReg)
+                freeRegister(stepReg.value());
+        }
+        Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), testLabel);
+
+        const auto exitLabel = makeLabel();
+        if(jmpNE)
+            Bytecode::Op::JmpNE::setTarget(*jmpNE, exitLabel);
+        for(auto *br : _loopStack.back().breaks) {
+            Bytecode::Op::Jmp::setTarget(*br, exitLabel);
+        }
+
+        if(testReg)
+            freeRegister(testReg.value());
+        _loopStack.pop_back();
+        return {};
+    }
+
     Syntax::OptReg IRGenerator::generate(const Syntax::WhileStmtNode *node) {
+
         const auto loopLabel = makeLabel();
+
+        _loopStack.push_back(LoopContext{ .continueLabel = loopLabel });
+
         auto testReg = node->test->generateBytecode(this);
         if(_r.isFailed())
             return {};
@@ -365,18 +447,39 @@ namespace Ciallang::Inter {
 
         node->body->generateBytecode(this);
         Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), loopLabel);
+        const auto exitLabel = makeLabel();
+        Bytecode::Op::JmpNE::setTarget(*jmpNE, exitLabel);
 
-        Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), makeLabel());
-        Bytecode::Op::JmpNE::setTarget(*jmpNE, makeLabel());
+        for(auto *br : _loopStack.back().breaks) {
+            Bytecode::Op::Jmp::setTarget(*br, exitLabel);
+        }
 
         freeRegister(testReg.value());
 
+        _loopStack.pop_back();
         return {};
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::BreakStmtNode *node) { return {}; }
+    Syntax::OptReg IRGenerator::generate([[maybe_unused]] const Syntax::BreakStmtNode *node) {
+        if(_loopStack.empty())
+            return {};
+        auto *itt = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
+        _loopStack.back().breaks.push_back(itt);
+        return {};
+    }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::ContinueStmtNode *node) { return {}; }
+    Syntax::OptReg IRGenerator::generate([[maybe_unused]] const Syntax::ContinueStmtNode *node) {
+        if(_loopStack.empty())
+            return {};
+        if(_loopStack.back().continueLabel.has_value()) {
+            Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(),
+                                         _loopStack.back().continueLabel.value());
+        } else {
+            auto *itt = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
+            _loopStack.back().continues.push_back(itt);
+        }
+        return {};
+    }
 
     Syntax::OptReg IRGenerator::generate(const Syntax::ReturnStmtNode *node) {
         if(node->expr) {
