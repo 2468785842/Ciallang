@@ -298,9 +298,9 @@ namespace Ciallang::Bytecode::Op {
                 new(&values[i]) Value{ curCallFrame->getReg(base - i) };
             }
 
-            auto value = fun->callProc(values.get());
+            const auto &value = fun->callProc(values.get());
 
-            vmState.reg(dst(itt), std::move(value));
+            vmState.reg(dst(itt), value);
             return;
         }
 
@@ -312,15 +312,64 @@ namespace Ciallang::Bytecode::Op {
         CLL_ASSERT(false, "not a function or class");
     }
 
-    std::string Call::dump(const Instruction &itt, const VMState &, bool) {
-        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "call", memberReg(itt), dst(itt), argCount(itt));
+    std::string Call::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "call", memberReg(itt), dst(itt), argCount(itt));
+
+        if(!info)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}", insDump, memberReg(itt), vmState.reg(memberReg(itt)));
+    }
+
+    void GProp::execute(const Instruction &itt, const VMState &vmState) {
+        const auto &instObj = vmState.reg(obj(itt));
+        CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
+        const auto &name = vmState.reg(memberReg(itt));
+        CLL_ASSERT(name.isString(), "memberReg is not string");
+
+        if(const auto *inst = dynamic_cast<InstanceObject *>(instObj.toObject())) {
+            if(auto *fun = inst->klass()->getMethod(name.toString()->toStdStr())) {
+                vmState.reg(dst(itt), Value{ fun });
+                return;
+            }
+        }
+
+        // maybe is static method
+        if(const auto *klass = dynamic_cast<ClassObject *>(instObj.toObject())) {
+            if(auto *fun = klass->getMethod(name.toString()->toStdStr())) {
+                vmState.reg(dst(itt), Value{ fun });
+                return;
+            }
+        }
+
+        // not found return void
+        vmState.reg(dst(itt), Value{});
+    }
+
+    std::string GProp::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gprop", memberReg(itt), obj(itt), dst(itt));
+        if(!info)
+            return insDump;
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, memberReg(itt), vmState.reg(memberReg(itt)), obj(itt),
+                           vmState.reg(obj(itt)));
+    }
+
+
+    void SProp::execute(const Instruction &itt, VMState &vmState) {
+        // TODO:
+        throw std::runtime_error("not implemented");
+    }
+
+    std::string SProp::dump(const Instruction &itt, const VMState &vmState, bool) {
+        // TODO:
+        throw std::runtime_error("not implemented");
     }
 
     void Ret::execute(const Instruction &itt, VMState &vmState) {
-        auto value = vmState.reg(retReg(itt));
+        const auto &value = vmState.reg(retReg(itt));
         const auto frame = vmState.current();
         CLL_ASSERT(frame->ret, "frame.ret val is empty");
-        vmState.prev()->getReg(frame->ret->index()) = std::move(value);
+        vmState.prev()->getReg(frame->ret->index()) = value;
         vmState.freeCallFrame();
     }
 

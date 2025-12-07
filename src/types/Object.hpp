@@ -12,10 +12,10 @@
 
 #pragma once
 
-#include <cstddef>
 #include "gc/GC.hpp"
 
 namespace Ciallang {
+    class Function;
 
     class Object : public GCObject {
     public:
@@ -55,10 +55,15 @@ namespace Ciallang {
 
         [[nodiscard]] ClassObject *base() const noexcept { return _base; }
 
+        void setMethod(const std::string &name, Function *fun) noexcept;
+
+        [[nodiscard]] Function *getMethod(const std::string &name) const noexcept;
+
     private:
         ClassObject *_base{ nullptr };
         std::string _name;
         size_t _arity{ 0 };
+        std::unordered_map<std::string, Function *> _methods{};
     };
 
     class InstanceObject final : public Object {

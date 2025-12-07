@@ -45,6 +45,8 @@
     O(JmpE)                                                                                                            \
     O(JmpNE)                                                                                                           \
     O(Call)                                                                                                            \
+    O(GProp)                                                                                                           \
+    O(SProp)                                                                                                           \
     O(Ret)
 
 namespace Ciallang::Bytecode {
@@ -76,7 +78,7 @@ namespace Ciallang::Bytecode::Op {
 
         Type type{ Type::None };
 
-        explicit Operand(Value value) : type(Type::Value) { this->operand.value = new Value{ value }; }
+        explicit Operand(const Value &value) : type(Type::Value) { this->operand.value = new Value{ value }; }
 
         explicit Operand(const Register &value) : type(Type::Register) { this->operand.reg = value; }
 
@@ -444,6 +446,30 @@ namespace Ciallang::Bytecode::Op {
 
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Call
+
+    struct GProp {
+        static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
+
+        static const Register &memberReg(const Instruction &itt) { return itt.getOperand2<Register>(); }
+
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+    }; // struct GProp
+
+    struct SProp {
+        // static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
+        //
+        // static size_t symbolIndex(const Instruction &itt) { return itt.getOperand2<size_t>(); }
+        //
+        // static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+
+        static void execute(const Instruction &, VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+    }; // struct SProp
 
     struct Ret {
         static const Register &retReg(const Instruction &itt) { return itt.getOperand1<Register>(); }

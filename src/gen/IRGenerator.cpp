@@ -90,6 +90,9 @@ namespace Ciallang::Inter {
             case Slash:
                 _chunk->emit<Bytecode::Op::OpCode::Div>(reg1.value(), reg2.value(), dst);
                 break;
+            case Dot:
+                _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1.value(), reg2.value(), dst);
+                break;
             default:
                 CLL_LOG_ERROR("unknow binary operator");
                 return {};
@@ -100,35 +103,42 @@ namespace Ciallang::Inter {
         return dst;
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::UnaryExprNode *node) { return {}; }
+    Syntax::OptReg IRGenerator::generate(const Syntax::UnaryExprNode *node) {
+        using enum Syntax::TokenType;
+        switch(node->token->type()) {
+            case New:
+                return node->rhs->generateBytecode(this);
+            default:
+                CLL_LOG_ERROR("unknow unary operator");
+                return {};
+        }
+
+        return {};
+    }
 
     Syntax::OptReg IRGenerator::generate(const Syntax::ProcCallExprNode *node) {
         auto *member = node->memberAccess;
         auto dst = allocateRegister();
 
-        if(dynamic_cast<const Syntax::IdentifierExprNode *>(member)) {
-            std::vector<Bytecode::Register> arguments{};
-            auto memberReg = node->memberAccess->generateBytecode(this);
+        std::vector<Bytecode::Register> arguments{};
+        auto memberReg = member->generateBytecode(this);
 
-            CLL_ASSERT(memberReg, "memberReg is empty");
-            for(size_t i = node->arguments.size(); i > 0; i--) {
-                const auto *exprNode = node->arguments[i - 1];
-                if(!exprNode) {
-                    _chunk->emit<Bytecode::Op::OpCode::PushReg>(getEmpty(*_chunk));
-                } else {
-                    auto reg = exprNode->generateBytecode(this);
-                    if(_r.isFailed())
-                        return {};
-                    CLL_ASSERT(reg, "reg is empty");
-                    _chunk->emit<Bytecode::Op::OpCode::PushReg>(*reg);
-                }
+        CLL_ASSERT(memberReg, "memberReg is empty");
+        for(size_t i = node->arguments.size(); i > 0; i--) {
+            const auto *exprNode = node->arguments[i - 1];
+            if(!exprNode) {
+                _chunk->emit<Bytecode::Op::OpCode::PushReg>(loadVoidReg(*_chunk));
+            } else {
+                auto reg = exprNode->generateBytecode(this);
+                if(_r.isFailed())
+                    return {};
+                CLL_ASSERT(reg, "reg is empty");
+                _chunk->emit<Bytecode::Op::OpCode::PushReg>(*reg);
             }
-            freeRegister(*memberReg);
-            _chunk->emit<Bytecode::Op::OpCode::Call>(dst, *memberReg, node->arguments.size());
-            return dst;
         }
-        CLL_LOG_ERROR("not impl");
-        return {};
+        freeRegister(*memberReg);
+        _chunk->emit<Bytecode::Op::OpCode::Call>(dst, *memberReg, node->arguments.size());
+        return dst;
     }
 
 
@@ -178,7 +188,7 @@ namespace Ciallang::Inter {
             // can't init
             if(!node->rhs) {
                 _chunk->emit<Bytecode::Op::OpCode::DGlobal>(
-                    _symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()), getEmpty(*_chunk));
+                    _symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()), loadVoidReg(*_chunk));
                 return {};
             }
 
@@ -224,7 +234,7 @@ namespace Ciallang::Inter {
 
             _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), dst.value());
         } else {
-            dst = getEmpty(*_chunk);
+            dst = loadVoidReg(*_chunk);
         }
 
         _variables.emplace_back(std::move(identifier.toString()->toStdStr()), dst.value(), _scopeDepth, !!node->rhs);
@@ -257,7 +267,7 @@ namespace Ciallang::Inter {
 
         // the last instruction is not ret, patch one ret
         if(funChunk->instructions().back()->opcode != Bytecode::Op::OpCode::Ret) {
-            funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.getEmpty(*funChunk));
+            funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
         }
 
         const auto identifier = node->token->value();
@@ -281,7 +291,19 @@ namespace Ciallang::Inter {
     }
 
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::ClassDeclNode *) { return {}; }
+    Syntax::OptReg IRGenerator::generate(const Syntax::ClassDeclNode *node) {
+        const auto identifier = node->token->value();
+        CLL_ASSERT(identifier.isString(), "class identifier is not string");
+
+        auto reg = allocateRegister();
+        _chunk->emit<Bytecode::Op::OpCode::Load>(reg, createObject<ClassObject>(identifier.toString()->toStdStr()));
+
+        // class is always global in current design
+        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
+                                                    reg);
+        freeRegister(reg);
+        return {};
+    }
 
     Syntax::OptReg IRGenerator::generate(const Syntax::IdentifierExprNode *node) {
         const auto identifier = node->token->value();
@@ -488,7 +510,7 @@ namespace Ciallang::Inter {
             _chunk->emit<Bytecode::Op::OpCode::Ret>(reg.value());
             return {};
         }
-        _chunk->emit<Bytecode::Op::OpCode::Ret>(getEmpty(*_chunk));
+        _chunk->emit<Bytecode::Op::OpCode::Ret>(loadVoidReg(*_chunk));
         return {};
     }
 

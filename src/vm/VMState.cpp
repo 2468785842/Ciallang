@@ -63,6 +63,7 @@ namespace Ciallang::Bytecode {
 
             const auto &instruction = instList[pc];
             ++pc;
+            fmt::println("{}\n", Op::Instruction::dump(*instruction, *this, true));
             Op::Instruction::execute(*instruction, *this);
         }
         // freeCallFrame();

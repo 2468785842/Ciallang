@@ -18,6 +18,8 @@ set(SOURCES
         expression_test.cpp
         function_test.cpp
         loop_test.cpp
+        ieee_test.cpp
+        oop_test.cpp
         gc_test.cpp
         gc_comprehensive_test.cpp
         interpreter_test.cpp

@@ -111,14 +111,16 @@ namespace Ciallang {
         return Value{ new R{ std::forward<Args>(args)... } };
     }
 
-    static Value createOctet(std::uint8_t *value, std::uint32_t size) { return Value{ new Octet{ value, size } }; }
+    static Value createOctet(const std::uint8_t *value, const std::uint32_t size) {
+        return Value{ new Octet{ value, size } };
+    }
 
     template <size_t N>
     static Value createString(const char (&arr)[N]) {
         return Value{ new String{ arr, N } };
     }
 
-    static Value createString(const char *str, std::uint32_t size) { return Value{ new String{ str, size } }; }
+    static Value createString(const char *str, const std::uint32_t size) { return Value{ new String{ str, size } }; }
 
 } // namespace Ciallang
 

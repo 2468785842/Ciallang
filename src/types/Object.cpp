@@ -12,4 +12,21 @@
 
 #include "Object.hpp"
 
-namespace Ciallang {}
+#include "Function.hpp"
+
+namespace Ciallang {
+
+    void ClassObject::setMethod(const std::string &name, Function *fun) noexcept {
+        auto it = _methods.find(name);
+        if(it != _methods.end() && it->second)
+            it->second->decRef();
+        _methods[name] = fun;
+        if(fun)
+            fun->incRef();
+    }
+
+    Function *ClassObject::getMethod(const std::string &name) const noexcept {
+        auto it = _methods.find(name);
+        return it != _methods.end() ? it->second : nullptr;
+    }
+} // namespace Ciallang

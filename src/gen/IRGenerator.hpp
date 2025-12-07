@@ -170,7 +170,7 @@ namespace Ciallang::Inter {
             _scopeDepth--;
         }
 
-        Bytecode::Register getEmpty(Bytecode::Chunk &chunk) {
+        Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk) {
             if(!_empty.has_value()) {
                 _empty = allocateRegister();
                 chunk.emit<Bytecode::Op::OpCode::Load>(_empty.value(), Value{});
