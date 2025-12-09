@@ -106,8 +106,8 @@ namespace Ciallang::Syntax {
             ExprNode *expr = nullptr;
             if(parser->peek(TokenType::Assignment)) {
                 parser->consume();
-                Token assgnmentToken{};
-                parser->current(assgnmentToken);
+                Token assignmentToken{};
+                parser->current(assignmentToken);
                 expr = parser->parseExpression(r);
                 if(!expr)
                     return false;
@@ -142,11 +142,11 @@ namespace Ciallang::Syntax {
         return !tokens().empty();
     }
 
-    bool Parser::peek(const TokenType type) {
+    bool Parser::peek(const TokenType tokenType) {
         if(!lookAhead(0))
             return false;
         const auto &token = tokens().front();
-        return token->type() == type;
+        return token->type() == tokenType;
     }
 
     bool Parser::consume() {
@@ -171,11 +171,11 @@ namespace Ciallang::Syntax {
         return token.type() != TokenType::EndOfFile;
     }
 
-    bool Parser::expect(Result &r, const TokenType expectedType) {
+    bool Parser::expect(Result &r, const TokenType tokenType) {
         if(!lookAhead(0))
             return false;
 
-        std::string expectedName = tokenTypeToStr(expectedType);
+        std::string expectedName = tokenTypeToStr(tokenType);
         Token tToken{};
 
         if(!_lexer.tackOverToken(tToken)) {
@@ -183,7 +183,7 @@ namespace Ciallang::Syntax {
             return false;
         }
 
-        if(tToken.type() != expectedType) {
+        if(tToken.type() != tokenType) {
             error(r, fmt::format("expected token '{}' but found '{}'.", expectedName, tToken.name()), tToken.location);
             return false;
         }
@@ -195,14 +195,12 @@ namespace Ciallang::Syntax {
      * 获取下一个Token优先级
      * @return Token优先级
      */
-    Precedence Parser::currentInfixPrecedence() {
-        if(!lookAhead(0))
-            return Precedence::lowest;
-
-        const auto *token = tokens().front();
-        if(const auto infixParser = infixParserFor(token->type()))
-            return infixParser->precedence();
-
+    Precedence Parser::nextInfixPrecedence() {
+        if(lookAhead(0)) {
+            const auto *token = tokens().front();
+            if(const auto infixParser = infixParserFor(token->type()))
+                return infixParser->precedence();
+        }
         return Precedence::lowest;
     }
 
@@ -270,7 +268,7 @@ namespace Ciallang::Syntax {
         return nullptr;
     }
 
-    ExprNode *Parser::parseExpression(Result &r, const Precedence precedence) {
+    ExprNode *Parser::parseExpression(Result &r, const Precedence pre) {
         Token token{};
         if(!consume(token))
             return nullptr;
@@ -290,7 +288,7 @@ namespace Ciallang::Syntax {
         }
 
         // 中缀
-        while(precedence < currentInfixPrecedence()) {
+        while(pre < nextInfixPrecedence()) {
             if(!consume(token))
                 break;
 

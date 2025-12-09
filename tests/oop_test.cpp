@@ -62,15 +62,6 @@ TEST_CASE("OOP - 类方法定义与调用") {
         )");
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
-        AstFormatter{}.formatAst(globalNode);
-
-        for(const auto &msg : r.messages()) {
-            if(msg.isError()) {
-                INFO(msg.details());
-                INFO(msg.message());
-            }
-        }
-
         REQUIRE_FALSE(r.isFailed());
         Inter::SymbolTable globalTable{};
         Inter::IRGenerator codeGen{ sourceFile, globalTable };
@@ -80,27 +71,7 @@ TEST_CASE("OOP - 类方法定义与调用") {
         vm.allocCallFrame(chunk.get());
         vm.run();
         const auto idx = globalTable.getSymbolIndex("res");
-        REQUIRE(idx.has_value());
+        REQUIRE(idx);
         REQUIRE(vm.global(*idx).toInteger() == 3);
     }
-
-    // SECTION("类方法调用") {
-    //     sourceFile.load(r, R"(
-    //         class B { function mul(x, y) { return x * y; } }
-    //         var res2 = B.mul(2, 3);
-    //     )");
-    //     auto *globalNode = parser.parse(r);
-    //     REQUIRE(globalNode != nullptr);
-    //     REQUIRE_FALSE(r.isFailed());
-    //     Inter::SymbolTable globalTable{};
-    //     Inter::IRGenerator codeGen{ sourceFile, globalTable };
-    //     auto chunk = codeGen.parseAst(r, globalNode);
-    //     REQUIRE(chunk != nullptr);
-    //     Bytecode::VMState vm{ globalTable };
-    //     vm.allocCallFrame(chunk.get());
-    //     vm.run();
-    //     const auto idx = globalTable.getSymbolIndex("res2");
-    //     REQUIRE(idx.has_value());
-    //     REQUIRE(vm.global(*idx).toInteger() == 6);
-    // }
 }

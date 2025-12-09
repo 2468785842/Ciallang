@@ -19,6 +19,7 @@
 
 #include "logging/Logger.hpp"
 #include "vm/Instruction.hpp"
+#include "vm/VMState.hpp"
 
 namespace Ciallang::Inter {
 
@@ -48,6 +49,31 @@ namespace Ciallang::Inter {
 
     Syntax::OptReg IRGenerator::generate(const Syntax::BinaryExprNode *node) {
         using enum Syntax::TokenType;
+
+        if(node->token->type() == Dot) {
+            auto reg1 = node->lhs->generateBytecode(this);
+            Syntax::OptReg dst;
+
+            if(_r.isFailed())
+                return {};
+            CLL_ASSERT(reg1, "reg1 is empty");
+
+            if(auto *identifier = dynamic_cast<const Syntax::IdentifierExprNode *>(node->rhs); identifier) {
+                dst = allocateRegister();
+                _chunk->emit<Bytecode::Op::OpCode::GPropD>(
+                    reg1.value(), _symbolTable.getOrAddSymbol(identifier->token->value().toString()->toStdStr()),
+                    dst.value());
+            } else {
+                auto reg2 = node->rhs->generateBytecode(this);
+
+                if(_r.isFailed())
+                    return {};
+                CLL_ASSERT(reg2, "reg2 is empty");
+                _chunk->emit<Bytecode::Op::OpCode::GPropID>(reg1.value(), reg2.value(), dst.value());
+            }
+            return dst;
+        }
+
         auto reg1 = node->lhs->generateBytecode(this);
         auto reg2 = node->rhs->generateBytecode(this);
 
@@ -89,9 +115,6 @@ namespace Ciallang::Inter {
                 break;
             case Slash:
                 _chunk->emit<Bytecode::Op::OpCode::Div>(reg1.value(), reg2.value(), dst);
-                break;
-            case Dot:
-                _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1.value(), reg2.value(), dst);
                 break;
             default:
                 CLL_LOG_ERROR("unknow binary operator");
@@ -138,6 +161,9 @@ namespace Ciallang::Inter {
         }
         freeRegister(*memberReg);
         _chunk->emit<Bytecode::Op::OpCode::Call>(dst, *memberReg, node->arguments.size());
+        if(!node->arguments.empty()) {
+            _chunk->emit<Bytecode::Op::OpCode::PopN>(node->arguments.size());
+        }
         return dst;
     }
 
@@ -276,7 +302,7 @@ namespace Ciallang::Inter {
 
         _chunk->emit<Bytecode::Op::OpCode::Load>(
             funReg,
-            Value{ new Function{ funChunk.release(), identifier.toString()->toStdStr(), node->parameters.size() } });
+            createObject<Function>(funChunk.release(), identifier.toString()->toStdStr(), node->parameters.size()));
 
         if(_scopeDepth == 1) {
             freeRegister(funReg);
@@ -301,6 +327,40 @@ namespace Ciallang::Inter {
         // class is always global in current design
         _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
                                                     reg);
+        for(auto &declNode : node->body->childrens) {
+            if(auto *funcDeclNode = dynamic_cast<Syntax::FunctionDeclNode *>(declNode)) {
+
+                auto gen = IRGenerator{ _sourceFile, _symbolTable };
+
+                for(auto &[token, exprNode] : funcDeclNode->parameters) {
+                    const auto varName = token.value();
+                    Syntax::OptReg paramReg{};
+
+                    CLL_ASSERT(varName.isString(), "varName is not string");
+
+                    if(exprNode) {
+                        auto defaultParameter = exprNode->generateBytecode(&gen);
+                        CLL_ASSERT(defaultParameter.has_value(), "defaultParameter is not have val");
+                        paramReg = defaultParameter.value();
+                    } else {
+                        paramReg = gen.allocateRegister();
+                    }
+
+                    gen.addVariable(LocalVariable{ varName.toString()->toStdStr(), paramReg.value(), 1, true });
+                }
+
+                auto funChunk = gen.parseAst(_r, funcDeclNode->body);
+
+                // the last instruction is not ret, patch one ret
+                if(funChunk->instructions().back()->opcode != Bytecode::Op::OpCode::Ret) {
+                    funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
+                }
+                auto funName = funcDeclNode->token->value().toString()->toStdStr();
+                _chunk->emit<Bytecode::Op::OpCode::SPropD>(
+                    reg, _symbolTable.getOrAddSymbol(funName),
+                    createObject<Function>(funChunk.release(), funName, funcDeclNode->parameters.size()));
+            }
+        }
         freeRegister(reg);
         return {};
     }

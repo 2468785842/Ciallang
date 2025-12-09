@@ -198,6 +198,7 @@ namespace Ciallang::Bytecode {
                 throw std::runtime_error("Call stack underflow");
             _currentFrame = _stackTop > 0 ? &_callStack[--_stackTop - 1] : nullptr;
             _callStack[_stackTop].~CallFrame();
+            new(&_callStack[_stackTop]) CallFrame{};
         }
 
         [[nodiscard]] const std::vector<Op::Instruction *> &instructions() const noexcept {
@@ -240,10 +241,12 @@ namespace Ciallang::Bytecode {
 
                 ++pc;
             }
-            for(const auto fun : functions) {
+
+            for(const auto &fun : functions) {
                 ss << fmt::format("{:=^30}\n", fmt::format(" function {} ", fun->name()))
                    << dumpInstruction(*fun->chunk());
             }
+
             return ss.str();
         }
 

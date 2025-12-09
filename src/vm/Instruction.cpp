@@ -321,46 +321,100 @@ namespace Ciallang::Bytecode::Op {
         return fmt::format("{: <30} ; {} = {}", insDump, memberReg(itt), vmState.reg(memberReg(itt)));
     }
 
-    void GProp::execute(const Instruction &itt, const VMState &vmState) {
+    void GPropD::execute(const Instruction &itt, const VMState &vmState) {
         const auto &instObj = vmState.reg(obj(itt));
         CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
-        const auto &name = vmState.reg(memberReg(itt));
-        CLL_ASSERT(name.isString(), "memberReg is not string");
+        const auto &name = vmState.getSymbol(symbolIndex(itt));
 
         if(const auto *inst = dynamic_cast<InstanceObject *>(instObj.toObject())) {
-            if(auto *fun = inst->klass()->getMethod(name.toString()->toStdStr())) {
-                vmState.reg(dst(itt), Value{ fun });
-                return;
-            }
+            vmState.reg(dst(itt), inst->klass()->getMethod(name));
+            return;
         }
 
         // maybe is static method
-        if(const auto *klass = dynamic_cast<ClassObject *>(instObj.toObject())) {
-            if(auto *fun = klass->getMethod(name.toString()->toStdStr())) {
-                vmState.reg(dst(itt), Value{ fun });
-                return;
-            }
-        }
+        // if(const auto *klass = dynamic_cast<ClassObject *>(instObj.toObject())) {
+        //     if(auto *fun = klass->getMethod(name)) {
+        //         vmState.reg(dst(itt), Value{ fun });
+        //         return;
+        //     }
+        // }
 
         // not found return void
         vmState.reg(dst(itt), Value{});
     }
 
-    std::string GProp::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gprop", memberReg(itt), obj(itt), dst(itt));
+    std::string GPropD::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gpropd", obj(itt), symbolIndex(itt), dst(itt));
         if(!info)
             return insDump;
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, memberReg(itt), vmState.reg(memberReg(itt)), obj(itt),
-                           vmState.reg(obj(itt)));
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, obj(itt), vmState.reg(obj(itt)), symbolIndex(itt),
+                           vmState.getSymbol(symbolIndex(itt)));
+    }
+
+    void GPropID::execute(const Instruction &itt, const VMState &vmState) {
+        // TODO:
+        // const auto &instObj = vmState.reg(obj(itt));
+        // CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
+        // const auto &name = vmState.reg(memberReg(itt));
+        // CLL_ASSERT(name.isString(), "memberReg is not string");
+        //
+        // if(const auto *inst = dynamic_cast<InstanceObject *>(instObj.toObject())) {
+        //     if(auto *fun = inst->klass()->getMethod(name.toString()->toStdStr())) {
+        //         vmState.reg(dst(itt), Value{ fun });
+        //         return;
+        //     }
+        // }
+        //
+        // // maybe is static method
+        // if(const auto *klass = dynamic_cast<ClassObject *>(instObj.toObject())) {
+        //     if(auto *fun = klass->getMethod(name.toString()->toStdStr())) {
+        //         vmState.reg(dst(itt), Value{ fun });
+        //         return;
+        //     }
+        // }
+        //
+        // // not found return void
+        // vmState.reg(dst(itt), Value{});
+        throw std::runtime_error("not implemented");
+    }
+
+    std::string GPropID::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        // TODO:
+        // auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gpropid", obj(itt), memberReg(itt), dst(itt));
+        // if(!info)
+        //     return insDump;
+        // return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, obj(itt), vmState.reg(obj(itt)), memberReg(itt),
+        //                    vmState.reg(memberReg(itt)));
+        throw std::runtime_error("not implemented");
     }
 
 
-    void SProp::execute(const Instruction &itt, VMState &vmState) {
+    void SPropD::execute(const Instruction &itt, VMState &vmState) {
+
+        const auto &instObj = vmState.reg(obj(itt));
+        CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
+        const auto &name = vmState.getSymbol(symbolIndex(itt));
+
+        if(auto *inst = dynamic_cast<ClassObject *>(instObj.toObject())) {
+            inst->setMethod(name, value(itt));
+        }
+    }
+
+    std::string SPropD::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "spropd", obj(itt), symbolIndex(itt), value(itt));
+        if(!info)
+            return insDump;
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, obj(itt), vmState.reg(obj(itt)), symbolIndex(itt),
+                           vmState.getSymbol(symbolIndex(itt)));
+    }
+
+
+    void SPropID::execute(const Instruction &itt, VMState &vmState) {
         // TODO:
         throw std::runtime_error("not implemented");
     }
 
-    std::string SProp::dump(const Instruction &itt, const VMState &vmState, bool) {
+    std::string SPropID::dump(const Instruction &itt, const VMState &vmState, bool) {
         // TODO:
         throw std::runtime_error("not implemented");
     }

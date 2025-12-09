@@ -45,8 +45,10 @@
     O(JmpE)                                                                                                            \
     O(JmpNE)                                                                                                           \
     O(Call)                                                                                                            \
-    O(GProp)                                                                                                           \
-    O(SProp)                                                                                                           \
+    O(GPropD)                                                                                                          \
+    O(GPropID)                                                                                                         \
+    O(SPropD)                                                                                                          \
+    O(SPropID)                                                                                                         \
     O(Ret)
 
 namespace Ciallang::Bytecode {
@@ -447,7 +449,19 @@ namespace Ciallang::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Call
 
-    struct GProp {
+    struct GPropD {
+        static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
+
+        static size_t symbolIndex(const Instruction &itt) { return itt.getOperand2<size_t>(); }
+
+        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+    }; // struct GPropD
+
+    struct GPropID {
         static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
         static const Register &memberReg(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -457,19 +471,31 @@ namespace Ciallang::Bytecode::Op {
         static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
-    }; // struct GProp
+    }; // struct GPropID
 
-    struct SProp {
-        // static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
-        //
-        // static size_t symbolIndex(const Instruction &itt) { return itt.getOperand2<size_t>(); }
-        //
-        // static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
+    struct SPropD {
+        static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
+
+        static size_t symbolIndex(const Instruction &itt) { return itt.getOperand2<size_t>(); }
+
+        static const Value &value(const Instruction &itt) { return itt.getOperand3<Value>(); }
 
         static void execute(const Instruction &, VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
-    }; // struct SProp
+    }; // struct SPropD
+
+    struct SPropID {
+        static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
+
+        static const Register &memberReg(const Instruction &itt) { return itt.getOperand2<Register>(); }
+
+        static const Value &value(const Instruction &itt) { return itt.getOperand3<Value>(); }
+
+        static void execute(const Instruction &, VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+    }; // struct SPropID
 
     struct Ret {
         static const Register &retReg(const Instruction &itt) { return itt.getOperand1<Register>(); }

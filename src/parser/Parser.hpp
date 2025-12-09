@@ -26,8 +26,8 @@ namespace Ciallang::Syntax {
     enum class Precedence : uint8_t {
         lowest = 0,
         comma, // ,
-        assignment, // 一系列赋值语句
         conditional_ternary, // cond ? expr : expr
+        assignment, // 一系列赋值语句
         // key_value,
         logical_or, // ||
         logical_and, // &&
@@ -44,7 +44,6 @@ namespace Ciallang::Syntax {
         cast, //
         type,
         variable,
-        call
     };
 
     class DeclParser {
@@ -101,7 +100,7 @@ namespace Ciallang::Syntax {
 
         AstNode *parse(Result &r);
 
-        void parseScope(Result &r, BlockStmtNode *node, TokenType tokenType = TokenType::EndOfFile);
+        void parseScope(Result &r, BlockStmtNode *blockStmtNode, TokenType terminatorToken = TokenType::EndOfFile);
 
         DeclNode *parseDeclaration(Result &r);
 
@@ -118,7 +117,7 @@ namespace Ciallang::Syntax {
         AstBuilder &_astBuilder;
         SourceFile &_sourceFile;
 
-        Precedence currentInfixPrecedence();
+        Precedence nextInfixPrecedence();
 
         static const DeclParser *declParserFor(TokenType type);
 
@@ -330,7 +329,7 @@ namespace Ciallang::Syntax {
 
         ExprNode *parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const override;
 
-        [[nodiscard]] Precedence precedence() const override { return Precedence::call; }
+        [[nodiscard]] Precedence precedence() const override { return Precedence::postfix; }
     };
 
     static constinit BinaryOperatorInfixParser S_SumSubBinOpInfixParser{ Precedence::sum_sub, false },

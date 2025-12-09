@@ -16,6 +16,7 @@
 
 namespace Ciallang {
     class Function;
+    class Value;
 
     class Object : public GCObject {
     public:
@@ -31,39 +32,29 @@ namespace Ciallang {
     public:
         ClassObject() = delete;
 
-        explicit ClassObject(std::string name, size_t arity = 0) : _name(std::move(name)), _arity(arity) {}
+        explicit ClassObject(std::string name, const size_t arity = 0) : _name(std::move(name)), _arity(arity) {}
 
-        ~ClassObject() noexcept override {
-            if(_base) {
-                _base->decRef();
-            }
-        }
+        ~ClassObject() noexcept override;
 
         [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
 
         [[nodiscard]] size_t arity() const noexcept override { return _arity; }
 
-        void setBase(ClassObject *base) noexcept {
-            if(_base) {
-                _base->decRef();
-            }
-            _base = base;
-            if(_base) {
-                _base->incRef();
-            }
-        }
+        void setBase(ClassObject *base) noexcept;
 
         [[nodiscard]] ClassObject *base() const noexcept { return _base; }
 
-        void setMethod(const std::string &name, Function *fun) noexcept;
+        void setMethod(const std::string &name, const Value &fun) noexcept;
 
-        [[nodiscard]] Function *getMethod(const std::string &name) const noexcept;
+        [[nodiscard]] Value getMethod(const std::string &name) const noexcept;
+
+        [[nodiscard]] std::vector<Value> getAllMethods() const noexcept;
 
     private:
         ClassObject *_base{ nullptr };
         std::string _name;
         size_t _arity{ 0 };
-        std::unordered_map<std::string, Function *> _methods{};
+        std::unordered_map<std::string, Value *> _methods{};
     };
 
     class InstanceObject final : public Object {

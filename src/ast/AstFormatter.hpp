@@ -160,17 +160,6 @@ namespace Ciallang {
             printNode("ClassDecl");
             child(
                 [&] {
-                    // Parameters / Members
-                    printNode("(Parameters)");
-                    child(
-                        [&] {
-                            for(size_t i = 0; i < node->body->childrens.size(); ++i) {
-                                const bool hasSibling = i + 1 < node->body->childrens.size();
-                                child(node->body->childrens[i], hasSibling);
-                            }
-                        },
-                        true);
-
                     // Body
                     printNode("(Body)");
                     child(node->body, false);

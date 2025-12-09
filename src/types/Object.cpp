@@ -11,22 +11,47 @@
 //
 
 #include "Object.hpp"
+#include "Value.hpp"
+
+#include <ranges>
 
 #include "Function.hpp"
 
 namespace Ciallang {
+    ClassObject::~ClassObject() noexcept {
+        if(_base) {
+            _base->decRef();
+        }
 
-    void ClassObject::setMethod(const std::string &name, Function *fun) noexcept {
-        auto it = _methods.find(name);
-        if(it != _methods.end() && it->second)
-            it->second->decRef();
-        _methods[name] = fun;
-        if(fun)
-            fun->incRef();
+        for(const auto &v : _methods | std::views::values) {
+            delete v;
+        }
     }
 
-    Function *ClassObject::getMethod(const std::string &name) const noexcept {
-        auto it = _methods.find(name);
-        return it != _methods.end() ? it->second : nullptr;
+    void ClassObject::setBase(ClassObject *base) noexcept {
+        if(_base) {
+            _base->decRef();
+        }
+        _base = base;
+        if(_base) {
+            _base->incRef();
+        }
+    }
+
+    void ClassObject::setMethod(const std::string &name, const Value &fun) noexcept {
+        _methods[name] = new Value{ fun };
+    }
+
+    Value ClassObject::getMethod(const std::string &name) const noexcept {
+        const auto it = _methods.find(name);
+        return it != _methods.end() ? *it->second : Value{};
+    }
+
+    [[nodiscard]] std::vector<Value> ClassObject::getAllMethods() const noexcept {
+        std::vector<Value> result;
+        for(auto &method : _methods | std::views::values) {
+            result.push_back(*method);
+        }
+        return result;
     }
 } // namespace Ciallang
