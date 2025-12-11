@@ -55,26 +55,26 @@ TEST_CASE("OOP - 类方法定义与调用") {
     Syntax::AstBuilder astBuilder{};
     Syntax::Parser parser{ sourceFile, astBuilder };
 
-    // SECTION("实例方法调用") {
-    //     sourceFile.load(r, R"(
-    //         class A { function add(x, y) { return x + y; } }
-    //         var o = new A();
-    //         var res = o.add(1, 2);
-    //     )");
-    //     auto *globalNode = parser.parse(r);
-    //     REQUIRE(globalNode != nullptr);
-    //     REQUIRE_FALSE(r.isFailed());
-    //     Inter::SymbolTable globalTable{};
-    //     Inter::IRGenerator codeGen{ sourceFile, globalTable };
-    //     auto chunk = codeGen.parseAst(r, globalNode);
-    //     REQUIRE(chunk != nullptr);
-    //     Bytecode::VMState vm{ globalTable };
-    //     vm.allocCallFrame(chunk.get());
-    //     vm.run();
-    //     const auto idx = globalTable.getSymbolIndex("res");
-    //     REQUIRE(idx);
-    //     REQUIRE(vm.global(*idx).toInteger() == 3);
-    // }
+    SECTION("实例方法调用") {
+        sourceFile.load(r, R"(
+            class A { function add(x, y) { return x + y; } }
+            var o = new A();
+            var res = o.add(1, 2);
+        )");
+        auto *globalNode = parser.parse(r);
+        REQUIRE(globalNode != nullptr);
+        REQUIRE_FALSE(r.isFailed());
+        Inter::SymbolTable globalTable{};
+        Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        auto chunk = codeGen.parseAst(r, globalNode);
+        REQUIRE(chunk != nullptr);
+        Bytecode::VMState vm{ globalTable };
+        vm.allocCallFrame(chunk.get());
+        vm.run();
+        const auto idx = globalTable.getSymbolIndex("res");
+        REQUIRE(idx);
+        REQUIRE(vm.global(*idx).toInteger() == 3);
+    }
 
     SECTION("实例成员访问") {
         sourceFile.load(r, R"(
