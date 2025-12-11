@@ -15,6 +15,7 @@
 #include "ast/DeclNode.hpp"
 #include "ast/ExprNode.hpp"
 #include "ast/StmtNode.hpp"
+#include "types/Class.hpp"
 #include "types/Function.hpp"
 
 #include "logging/Logger.hpp"
@@ -52,24 +53,22 @@ namespace Ciallang::Inter {
 
         if(node->token->type() == Dot) {
             auto reg1 = node->lhs->generateBytecode(this);
-            Syntax::OptReg dst;
 
             if(_r.isFailed())
                 return {};
             CLL_ASSERT(reg1, "reg1 is empty");
+            Bytecode::Register dst = allocateRegister();
 
             if(auto *identifier = dynamic_cast<const Syntax::IdentifierExprNode *>(node->rhs); identifier) {
-                dst = allocateRegister();
-                _chunk->emit<Bytecode::Op::OpCode::GPropD>(
-                    reg1.value(), _symbolTable.getOrAddSymbol(identifier->token->value().toString()->toStdStr()),
-                    dst.value());
+                _chunk->emit<Bytecode::Op::OpCode::GProp>(
+                    reg1.value(), _symbolTable.getOrAddSymbol(identifier->token->value().toString()->toStdStr()), dst);
             } else {
                 auto reg2 = node->rhs->generateBytecode(this);
 
                 if(_r.isFailed())
                     return {};
                 CLL_ASSERT(reg2, "reg2 is empty");
-                _chunk->emit<Bytecode::Op::OpCode::GPropID>(reg1.value(), reg2.value(), dst.value());
+                _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1.value(), reg2.value(), dst);
             }
             return dst;
         }
@@ -263,38 +262,14 @@ namespace Ciallang::Inter {
             dst = loadVoidReg(*_chunk);
         }
 
-        _variables.emplace_back(std::move(identifier.toString()->toStdStr()), dst.value(), _scopeDepth, !!node->rhs);
+        _variables.emplace_back(identifier.toString()->toStdStr(), dst.value(), _scopeDepth, !!node->rhs);
 
         return {};
     }
 
     Syntax::OptReg IRGenerator::generate(const Syntax::FunctionDeclNode *node) {
-        auto gen = IRGenerator{ _sourceFile, _symbolTable };
-
-        for(auto &[token, exprNode] : node->parameters) {
-            const auto varName = token.value();
-            Syntax::OptReg paramReg{};
-
-            CLL_ASSERT(varName.isString(), "varName is not string");
-
-            if(exprNode) {
-                auto defaultParameter = exprNode->generateBytecode(&gen);
-                CLL_ASSERT(defaultParameter.has_value(), "defaultParameter is not have val");
-                paramReg = defaultParameter.value();
-            } else {
-                paramReg = gen.allocateRegister();
-            }
-
-            gen.addVariable(LocalVariable{ varName.toString()->toStdStr(), paramReg.value(), 1, true });
-        }
-
         auto funReg = allocateRegister();
-        auto funChunk = gen.parseAst(_r, node->body);
-
-        // the last instruction is not ret, patch one ret
-        if(funChunk->instructions().back()->opcode != Bytecode::Op::OpCode::Ret) {
-            funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
-        }
+        auto funChunk = generateChunk(node);
 
         const auto identifier = node->token->value();
 
@@ -321,47 +296,40 @@ namespace Ciallang::Inter {
         const auto identifier = node->token->value();
         CLL_ASSERT(identifier.isString(), "class identifier is not string");
 
-        auto reg = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::Load>(reg, createObject<ClassObject>(identifier.toString()->toStdStr()));
+        auto thisObjReg = allocateRegister();
+        Value classObjVal = createObject<ClassObject>(identifier.toString()->toStdStr());
+        _chunk->emit<Bytecode::Op::OpCode::Load>(thisObjReg, classObjVal);
 
         // class is always global in current design
         _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
-                                                    reg);
-        for(auto &declNode : node->body->childrens) {
-            if(auto *funcDeclNode = dynamic_cast<Syntax::FunctionDeclNode *>(declNode)) {
+                                                    thisObjReg);
+        auto *classObject = dynamic_cast<ClassObject *>(classObjVal.toObject());
+        for(const auto &declNode : node->body->childrens) {
 
-                auto gen = IRGenerator{ _sourceFile, _symbolTable };
-
-                for(auto &[token, exprNode] : funcDeclNode->parameters) {
-                    const auto varName = token.value();
-                    Syntax::OptReg paramReg{};
-
-                    CLL_ASSERT(varName.isString(), "varName is not string");
-
-                    if(exprNode) {
-                        auto defaultParameter = exprNode->generateBytecode(&gen);
-                        CLL_ASSERT(defaultParameter.has_value(), "defaultParameter is not have val");
-                        paramReg = defaultParameter.value();
-                    } else {
-                        paramReg = gen.allocateRegister();
-                    }
-
-                    gen.addVariable(LocalVariable{ varName.toString()->toStdStr(), paramReg.value(), 1, true });
-                }
-
-                auto funChunk = gen.parseAst(_r, funcDeclNode->body);
-
-                // the last instruction is not ret, patch one ret
-                if(funChunk->instructions().back()->opcode != Bytecode::Op::OpCode::Ret) {
-                    funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
-                }
+            if(const auto *funcDeclNode = dynamic_cast<Syntax::FunctionDeclNode *>(declNode)) {
+                auto funChunk = generateChunk(funcDeclNode);
                 auto funName = funcDeclNode->token->value().toString()->toStdStr();
-                _chunk->emit<Bytecode::Op::OpCode::SPropD>(
-                    reg, _symbolTable.getOrAddSymbol(funName),
-                    createObject<Function>(funChunk.release(), funName, funcDeclNode->parameters.size()));
+                classObject->setMethod(
+                    funName, createObject<Function>(funChunk.release(), funName, funcDeclNode->parameters.size()));
+            } else if(const auto *varDeclNode = dynamic_cast<Syntax::VarDeclNode *>(declNode)) {
+                const auto varName = varDeclNode->token->value();
+
+                CLL_ASSERT(varName.isString(), "identifier is not string");
+
+                Syntax::OptReg src;
+
+                // can init
+                if(varDeclNode->rhs) {
+                    src = varDeclNode->rhs->generateBytecode(this);
+                    // freeRegister(src.value());
+                    if(_r.isFailed())
+                        return {};
+                }
+
+                classObject->setFieldDef(varName.toString()->toStdStr(), FieldMeta{ src });
             }
         }
-        freeRegister(reg);
+        freeRegister(thisObjReg);
         return {};
     }
 
@@ -582,4 +550,36 @@ namespace Ciallang::Inter {
         }
         return {};
     }
+
+    std::unique_ptr<Bytecode::Chunk> IRGenerator::generateChunk(const Syntax::FunctionDeclNode *node) const {
+
+        auto gen = IRGenerator{ _sourceFile, _symbolTable };
+
+        for(auto &[token, exprNode] : node->parameters) {
+            const auto varName = token.value();
+            Syntax::OptReg paramReg{};
+
+            CLL_ASSERT(varName.isString(), "varName is not string");
+
+            if(exprNode) {
+                auto defaultParameter = exprNode->generateBytecode(&gen);
+                CLL_ASSERT(defaultParameter.has_value(), "defaultParameter is not have val");
+                paramReg = defaultParameter.value();
+            } else {
+                paramReg = gen.allocateRegister();
+            }
+
+            gen.addVariable(LocalVariable{ varName.toString()->toStdStr(), paramReg.value(), 1, true });
+        }
+
+        auto funChunk = gen.parseAst(_r, node->body);
+
+        // the last instruction is not ret, patch one ret
+        if(funChunk->instructions().back()->opcode != Bytecode::Op::OpCode::Ret) {
+            funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
+        }
+
+        return funChunk;
+    }
+
 } // namespace Ciallang::Inter

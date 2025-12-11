@@ -40,9 +40,9 @@ set(SOURCE_FILES
         src/vm/Rlc.cpp
         src/vm/Instruction.cpp
 
+        src/types/Class.cpp
         src/types/Function.cpp
         src/types/Octet.cpp
-        src/types/Object.cpp
         src/types/Value.cpp
         src/types/String.cpp
 

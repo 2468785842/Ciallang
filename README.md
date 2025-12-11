@@ -42,7 +42,7 @@
 * [ ] `try-catch`
 * [x] `function` 函数定义与调用
 * [ ] `property`
-* [x] `class`: 当前仅实现了方法定义(属性和继承未实现)
+* [x] `class` 继承未实现
 * [ ] `with`
 
 #### 数据类型

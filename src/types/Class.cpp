@@ -10,21 +10,14 @@
 //                                                            \_/__/
 //
 
-#include "Object.hpp"
-#include "Value.hpp"
+#include "Class.hpp"
 
 #include <ranges>
-
-#include "Function.hpp"
 
 namespace Ciallang {
     ClassObject::~ClassObject() noexcept {
         if(_base) {
             _base->decRef();
-        }
-
-        for(const auto &v : _methods | std::views::values) {
-            delete v;
         }
     }
 
@@ -38,20 +31,36 @@ namespace Ciallang {
         }
     }
 
-    void ClassObject::setMethod(const std::string &name, const Value &fun) noexcept {
-        _methods[name] = new Value{ fun };
-    }
+    void ClassObject::setMethod(const std::string &name, const Value &method) noexcept { _methods[name] = method; }
 
     Value ClassObject::getMethod(const std::string &name) const noexcept {
         const auto it = _methods.find(name);
-        return it != _methods.end() ? *it->second : Value{};
+        return it != _methods.end() ? it->second : Value{};
     }
 
-    [[nodiscard]] std::vector<Value> ClassObject::getAllMethods() const noexcept {
+    [[nodiscard]] std::vector<Value> ClassObject::getAllMethod() const noexcept {
         std::vector<Value> result;
         for(auto &method : _methods | std::views::values) {
-            result.push_back(*method);
+            result.push_back(method);
         }
         return result;
     }
+
+    void ClassObject::setFieldDef(const std::string &name, const FieldMeta &fieldMeta) noexcept {
+        _fieldDefs[name] = fieldMeta;
+    }
+
+    [[nodiscard]] FieldMeta ClassObject::getFieldDef(const std::string &name) const noexcept {
+        const auto it = _fieldDefs.find(name);
+        return it != _fieldDefs.end() ? it->second : FieldMeta{};
+    }
+
+    void InstanceObject::setField(const std::string &name, const Value &field) noexcept { _fields[name] = field; }
+
+    [[nodiscard]] Value InstanceObject::getField(const std::string &name) const noexcept {
+        if(const auto it = _fields.find(name); it != _fields.end())
+            return it->second;
+        return _class->getMethod(name);
+    }
+
 } // namespace Ciallang

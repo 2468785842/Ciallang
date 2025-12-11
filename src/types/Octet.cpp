@@ -34,7 +34,7 @@ namespace Ciallang {
     }
 
     void Octet::persist(std::uint8_t *dst) {
-        *(decltype(_size) *)dst = _size;
+        *reinterpret_cast<decltype(_size) *>(dst) = _size;
         if(_buf) {
             std::memcpy(dst + sizeof(decltype(_size)), _buf, _size);
         }

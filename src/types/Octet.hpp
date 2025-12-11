@@ -15,7 +15,7 @@
 #include "gc/GC.hpp"
 
 namespace Ciallang {
-    class Octet : public GCObject {
+    class Octet final : public GCObject {
     public:
         explicit Octet(const std::uint8_t *src, std::uint32_t size);
 
@@ -25,11 +25,11 @@ namespace Ciallang {
 
         ~Octet() override { delete[] _buf; }
 
-        std::uint32_t getSize() const { return _size; }
+        [[nodiscard]] std::uint32_t getSize() const { return _size; }
 
-        const std::uint8_t *getData() const { return _buf; }
+        [[nodiscard]] const std::uint8_t *getData() const { return _buf; }
 
-        int getPersistSize() const { return static_cast<int>(sizeof(decltype(_size)) + _size); }
+        [[nodiscard]] int getPersistSize() const { return static_cast<int>(sizeof(decltype(_size)) + _size); }
 
         void persist(std::uint8_t *dst);
 

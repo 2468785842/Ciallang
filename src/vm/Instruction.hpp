@@ -45,10 +45,8 @@
     O(JmpE)                                                                                                            \
     O(JmpNE)                                                                                                           \
     O(Call)                                                                                                            \
-    O(GPropD)                                                                                                          \
-    O(GPropID)                                                                                                         \
-    O(SPropD)                                                                                                          \
-    O(SPropID)                                                                                                         \
+    O(GProp)                                                                                                           \
+    O(SProp)                                                                                                           \
     O(Ret)
 
 namespace Ciallang::Bytecode {
@@ -166,8 +164,15 @@ namespace Ciallang::Bytecode::Op {
             return getOperand<T>(_operand3);
         }
 
+        [[nodiscard]] const Operand::Type &getOperand1Type() const { return _operand1->type; }
+
+        [[nodiscard]] const Operand::Type &getOperand2Type() const { return _operand2->type; }
+
+        [[nodiscard]] const Operand::Type &getOperand3Type() const { return _operand3->type; }
+
         [[nodiscard]] size_t operandCount() const {
-            return _operand1.has_value() + _operand2.has_value() + _operand3.has_value();
+            return static_cast<int>(_operand1.has_value()) + static_cast<int>(_operand2.has_value()) +
+                static_cast<int>(_operand3.has_value());
         }
 
         static void execute(const Instruction &itt, VMState &vmState);
@@ -449,53 +454,29 @@ namespace Ciallang::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct Call
 
-    struct GPropD {
+    struct GProp {
         static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static size_t symbolIndex(const Instruction &itt) { return itt.getOperand2<size_t>(); }
+        static const char *name(const Instruction &itt, const VMState &vmState);
 
         static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
-    }; // struct GPropD
+    }; // struct GProp
 
-    struct GPropID {
+    struct SProp {
         static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static const Register &memberReg(const Instruction &itt) { return itt.getOperand2<Register>(); }
+        static const char *name(const Instruction &itt, const VMState &vmState);
 
-        static const Register &dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
-    }; // struct GPropID
-
-    struct SPropD {
-        static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
-
-        static size_t symbolIndex(const Instruction &itt) { return itt.getOperand2<size_t>(); }
-
-        static const Value &value(const Instruction &itt) { return itt.getOperand3<Value>(); }
+        static const Value &value(const Instruction &itt, const VMState &vmState);
 
         static void execute(const Instruction &, VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
-    }; // struct SPropD
-
-    struct SPropID {
-        static const Register &obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
-
-        static const Register &memberReg(const Instruction &itt) { return itt.getOperand2<Register>(); }
-
-        static const Value &value(const Instruction &itt) { return itt.getOperand3<Value>(); }
-
-        static void execute(const Instruction &, VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
-    }; // struct SPropID
+    }; // struct SProp
 
     struct Ret {
         static const Register &retReg(const Instruction &itt) { return itt.getOperand1<Register>(); }

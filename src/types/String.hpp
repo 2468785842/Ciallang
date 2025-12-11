@@ -14,11 +14,11 @@ namespace Ciallang {
     public:
         explicit String(const char *str, std::uint32_t len);
 
-        const char *getData() const { return _longStr ? _longStr : _shortStr; }
+        [[nodiscard]] const char *getData() const { return _longStr ? _longStr : _shortStr; }
 
-        std::string toStdStr() const { return std::string(getData(), _len); }
+        [[nodiscard]] std::string toStdStr() const { return std::string{ getData(), static_cast<size_t>(_len) }; }
 
-        bool operator==(const String &str) { return toStdStr() == str.toStdStr(); }
+        bool operator==(const String &str) const { return toStdStr() == str.toStdStr(); }
 
         friend std::ostream &operator<<(std::ostream &os, const String &d) { return os << d.toStdStr(); }
 

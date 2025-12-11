@@ -16,6 +16,7 @@
 
 #include "VMState.hpp"
 #include "logging/Logger.hpp"
+#include "types/Class.hpp"
 #include "types/Function.hpp"
 #include "types/Object.hpp"
 #include "vm/Register.hpp"
@@ -305,7 +306,12 @@ namespace Ciallang::Bytecode::Op {
         }
 
         if(auto *classObj = dynamic_cast<ClassObject *>(object.toObject())) {
-            vmState.reg(dst(itt), createObject<InstanceObject>(classObj));
+            const Value &instanceObjVal = createObject<InstanceObject>(classObj);
+            auto *instanceObj = dynamic_cast<InstanceObject *>(instanceObjVal.toObject());
+            for(auto &[k, v] : classObj->getFieldDefs()) {
+                instanceObj->setField(k, v.defValReg ? vmState.reg(v.defValReg.value()) : Value{});
+            }
+            vmState.reg(dst(itt), instanceObjVal);
             return;
         }
 
@@ -321,13 +327,13 @@ namespace Ciallang::Bytecode::Op {
         return fmt::format("{: <30} ; {} = {}", insDump, memberReg(itt), vmState.reg(memberReg(itt)));
     }
 
-    void GPropD::execute(const Instruction &itt, const VMState &vmState) {
+    void GProp::execute(const Instruction &itt, const VMState &vmState) {
         const auto &instObj = vmState.reg(obj(itt));
         CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
-        const auto &name = vmState.getSymbol(symbolIndex(itt));
 
         if(const auto *inst = dynamic_cast<InstanceObject *>(instObj.toObject())) {
-            vmState.reg(dst(itt), inst->klass()->getMethod(name));
+            auto tmp = inst->getField(name(itt, vmState));
+            vmState.reg(dst(itt), tmp);
             return;
         }
 
@@ -343,78 +349,51 @@ namespace Ciallang::Bytecode::Op {
         vmState.reg(dst(itt), Value{});
     }
 
-    std::string GPropD::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gpropd", obj(itt), symbolIndex(itt), dst(itt));
-        if(!info)
-            return insDump;
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, obj(itt), vmState.reg(obj(itt)), symbolIndex(itt),
-                           vmState.getSymbol(symbolIndex(itt)));
+
+    const char *GProp::name(const Instruction &itt, const VMState &vmState) {
+        if(itt.getOperand2Type() == Operand::Type::SymbolIndex)
+            return vmState.getSymbol(itt.getOperand2<size_t>());
+        if(itt.getOperand2Type() == Operand::Type::Register)
+            return vmState.reg(itt.getOperand2<Register>()).toString()->getData();
+        CLL_ASSERT(false, "unknown inst gprop operand2 type");
     }
 
-    void GPropID::execute(const Instruction &itt, const VMState &vmState) {
+    std::string GProp::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gpropd", obj(itt), name(itt, vmState), dst(itt));
+        if(!info)
+            return insDump;
+        return fmt::format("{: <30} ; {} = {}", insDump, obj(itt), vmState.reg(obj(itt)));
+    }
+
+
+    const char *SProp::name(const Instruction &itt, const VMState &vmState) {
+        if(itt.getOperand2Type() == Operand::Type::SymbolIndex)
+            return vmState.getSymbol(itt.getOperand2<size_t>());
+        if(itt.getOperand2Type() == Operand::Type::Register)
+            return vmState.reg(itt.getOperand2<Register>()).toString()->getData();
+        CLL_ASSERT(false, "unknown inst sprop operand2 type");
+    }
+
+    const Value &SProp::value(const Instruction &itt, const VMState &vmState) {
+        if(itt.getOperand3Type() == Operand::Type::Value)
+            return itt.getOperand3<Value>();
+        if(itt.getOperand3Type() == Operand::Type::Register)
+            return vmState.reg(itt.getOperand3<Register>());
+        CLL_ASSERT(false, "unknown inst sprop operand3 type");
+    }
+
+    void SProp::execute(const Instruction &itt, VMState &vmState) {
         // TODO:
         // const auto &instObj = vmState.reg(obj(itt));
         // CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
-        // const auto &name = vmState.reg(memberReg(itt));
-        // CLL_ASSERT(name.isString(), "memberReg is not string");
         //
-        // if(const auto *inst = dynamic_cast<InstanceObject *>(instObj.toObject())) {
-        //     if(auto *fun = inst->klass()->getMethod(name.toString()->toStdStr())) {
-        //         vmState.reg(dst(itt), Value{ fun });
-        //         return;
-        //     }
+        // if(auto *inst = dynamic_cast<ClassObject *>(instObj.toObject())) {
+        //     inst->set(name(itt, vmState), value(itt, vmState));
         // }
-        //
-        // // maybe is static method
-        // if(const auto *klass = dynamic_cast<ClassObject *>(instObj.toObject())) {
-        //     if(auto *fun = klass->getMethod(name.toString()->toStdStr())) {
-        //         vmState.reg(dst(itt), Value{ fun });
-        //         return;
-        //     }
-        // }
-        //
-        // // not found return void
-        // vmState.reg(dst(itt), Value{});
         throw std::runtime_error("not implemented");
     }
 
-    std::string GPropID::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        // TODO:
-        // auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gpropid", obj(itt), memberReg(itt), dst(itt));
-        // if(!info)
-        //     return insDump;
-        // return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, obj(itt), vmState.reg(obj(itt)), memberReg(itt),
-        //                    vmState.reg(memberReg(itt)));
-        throw std::runtime_error("not implemented");
-    }
-
-
-    void SPropD::execute(const Instruction &itt, VMState &vmState) {
-
-        const auto &instObj = vmState.reg(obj(itt));
-        CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
-        const auto &name = vmState.getSymbol(symbolIndex(itt));
-
-        if(auto *inst = dynamic_cast<ClassObject *>(instObj.toObject())) {
-            inst->setMethod(name, value(itt));
-        }
-    }
-
-    std::string SPropD::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "spropd", obj(itt), symbolIndex(itt), value(itt));
-        if(!info)
-            return insDump;
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, obj(itt), vmState.reg(obj(itt)), symbolIndex(itt),
-                           vmState.getSymbol(symbolIndex(itt)));
-    }
-
-
-    void SPropID::execute(const Instruction &itt, VMState &vmState) {
-        // TODO:
-        throw std::runtime_error("not implemented");
-    }
-
-    std::string SPropID::dump(const Instruction &itt, const VMState &vmState, bool) {
+    std::string SProp::dump(const Instruction &itt, const VMState &vmState, const bool info) {
         // TODO:
         throw std::runtime_error("not implemented");
     }

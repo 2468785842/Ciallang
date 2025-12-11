@@ -179,5 +179,7 @@ namespace Ciallang::Inter {
         }
 
         std::optional<LocalVariable *> resolveLocalVariable(const String &identifier);
+
+        std::unique_ptr<Bytecode::Chunk> generateChunk(const Syntax::FunctionDeclNode *node) const;
     };
 } // namespace Ciallang::Inter
