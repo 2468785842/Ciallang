@@ -23,7 +23,7 @@
 #include "lexer/Lexer.hpp"
 
 TEST_CASE("词法分析 - 基本功能") {
-    Ciallang::Common::SourceFile source_file{ TEST_FILES_PATH R"(.\startup.tjs)" };
+    Ciallang::Common::SourceFile source_file{ TEST_FILES_PATH "/startup.tjs" };
     Ciallang::Common::Result r{};
     source_file.load(r);
 

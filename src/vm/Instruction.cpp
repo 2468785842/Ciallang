@@ -374,7 +374,7 @@ namespace Ciallang::Bytecode::Op {
         CLL_ASSERT(false, "unknown inst sprop operand2 type");
     }
 
-    const Value &SProp::value(const Instruction &itt, const VMState &vmState) {
+    Value SProp::value(const Instruction &itt, const VMState &vmState) {
         if(itt.getOperand3Type() == Operand::Type::Value)
             return itt.getOperand3<Value>();
         if(itt.getOperand3Type() == Operand::Type::Register)

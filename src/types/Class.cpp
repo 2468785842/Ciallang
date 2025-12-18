@@ -31,28 +31,37 @@ namespace Ciallang {
         }
     }
 
-    void ClassObject::setMethod(const std::string &name, const Value &method) noexcept { _methods[name] = method; }
+    void ClassObject::setStaticField(const std::string &name, const Value &field) noexcept {
+        _staticFields[name] = field;
+    }
+
+    [[nodiscard]] Value ClassObject::getStaticField(const std::string &name) const noexcept {
+        const auto it = _staticFields.find(name);
+        return it != _staticFields.end() ? it->second : Value{};
+    }
+
+    void ClassObject::setMethod(const std::string &name, const Value &method) noexcept { _methodsDef[name] = method; }
 
     Value ClassObject::getMethod(const std::string &name) const noexcept {
-        const auto it = _methods.find(name);
-        return it != _methods.end() ? it->second : Value{};
+        const auto it = _methodsDef.find(name);
+        return it != _methodsDef.end() ? it->second : Value{};
     }
 
     [[nodiscard]] std::vector<Value> ClassObject::getAllMethod() const noexcept {
         std::vector<Value> result;
-        for(auto &method : _methods | std::views::values) {
+        for(auto &method : _methodsDef | std::views::values) {
             result.push_back(method);
         }
         return result;
     }
 
     void ClassObject::setFieldDef(const std::string &name, const FieldMeta &fieldMeta) noexcept {
-        _fieldDefs[name] = fieldMeta;
+        _fieldsDef[name] = fieldMeta;
     }
 
     [[nodiscard]] FieldMeta ClassObject::getFieldDef(const std::string &name) const noexcept {
-        const auto it = _fieldDefs.find(name);
-        return it != _fieldDefs.end() ? it->second : FieldMeta{};
+        const auto it = _fieldsDef.find(name);
+        return it != _fieldsDef.end() ? it->second : FieldMeta{};
     }
 
     void InstanceObject::setField(const std::string &name, const Value &field) noexcept { _fields[name] = field; }

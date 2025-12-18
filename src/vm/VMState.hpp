@@ -17,6 +17,7 @@
 
 #include "Chunk.hpp"
 #include "gen/IRGenerator.hpp"
+#include "types/Class.hpp"
 #include "types/Function.hpp"
 
 #include "types/Value.hpp"
@@ -103,8 +104,8 @@ namespace Ciallang::Bytecode {
     };
 
     struct CallFrame {
-        const Chunk *chunk{ nullptr };
-        size_t baseRegSP{ 0 };
+        const Chunk *chunk{};
+        size_t baseRegSP{};
         std::optional<Register> ret{};
         size_t pc{};
 
@@ -120,16 +121,9 @@ namespace Ciallang::Bytecode {
         }
 
         CallFrame &operator=(CallFrame &&callFrame) noexcept {
-            if(this == &callFrame)
-                return *this;
-
-            chunk = callFrame.chunk;
-            ret = callFrame.ret;
-            baseRegSP = callFrame.baseRegSP;
-            pc = callFrame.pc;
-            _pool = callFrame._pool;
-
-            callFrame._pool = nullptr;
+            if(this != &callFrame) {
+                new(this) CallFrame(std::move(callFrame));
+            }
 
             return *this;
         }
@@ -159,25 +153,19 @@ namespace Ciallang::Bytecode {
 
         void reg(const Register &reg, const Value &value) const;
 
-        [[nodiscard]] Value reg(Register reg);
-        [[nodiscard]] const Value &reg(Register reg) const;
+        [[nodiscard]] Value reg(Register reg) const;
 
-        [[nodiscard]] const Value &global(const size_t symbolIndex) const { return _globals[symbolIndex]; }
+        [[nodiscard]] Value global(const size_t symbolIndex) const {
+            return _globalObject.getStaticField(getSymbol(symbolIndex));
+        }
 
         void global(const size_t symbolIndex, const Value &value) {
-            if(_globals.size() < symbolIndex + 1) {
-                _globals.resize(symbolIndex * 2 + 1);
-            }
-            _globals[symbolIndex] = value;
+            _globalObject.setStaticField(getSymbol(symbolIndex), value);
         }
 
-        void global(const std::string &identifier, const Value &value) {
-            const auto index = _symbolTable.getSymbolIndex(identifier);
-            if(!index) {
-                return;
-            }
-            global(*index, value);
-        }
+        [[nodiscard]] Value global(const std::string &name) const { return _globalObject.getStaticField(name); }
+
+        void global(const std::string &name, const Value &value) { _globalObject.setStaticField(name, value); }
 
         void setZF(const bool zf) { _zf = zf; }
 
@@ -202,7 +190,7 @@ namespace Ciallang::Bytecode {
         }
 
         [[nodiscard]] const std::vector<Op::Instruction *> &instructions() const noexcept {
-            return _currentFrame->chunk->instructions();
+            return _currentFrame->chunk->getInstVec();
         }
 
         [[nodiscard]] CallFrame *current() noexcept { return _currentFrame; }
@@ -226,8 +214,8 @@ namespace Ciallang::Bytecode {
             std::stringstream ss{};
             size_t pc{};
             std::vector<Function *> functions{};
-            while(pc < chunk.instructions().size()) {
-                const auto &instruction = chunk.instructions()[pc];
+            while(pc < chunk.getInstVec().size()) {
+                const auto &instruction = chunk.getInstVec()[pc];
 
                 ss << fmt::format("{: <6}: {}\n", Label{ pc }, Op::Instruction::dump(*instruction, *this, false));
 
@@ -267,7 +255,7 @@ namespace Ciallang::Bytecode {
         FastRegisterPool _regPool{};
         CallFrame _callStack[MAX_CALL_DEPTH];
         size_t _stackTop{ 0 };
-        std::vector<Value> _globals{};
+        ClassObject _globalObject{ "global" };
         bool _zf{ false };
     };
 } // namespace Ciallang::Bytecode

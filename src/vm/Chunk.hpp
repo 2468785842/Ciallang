@@ -13,6 +13,7 @@
  */
 #pragma once
 
+#include "ConstIndex.hpp"
 #include "Instruction.hpp"
 
 namespace Ciallang::Bytecode {
@@ -39,10 +40,15 @@ namespace Ciallang::Bytecode {
 
         explicit Chunk() = default;
 
-        [[nodiscard]] auto &instructions() const noexcept { return _instructions; }
+        [[nodiscard]] auto &getInstVec() const noexcept { return _instructions; }
 
         void setRegisterCount(const std::uint32_t count) noexcept { _registerCount = count; }
         [[nodiscard]] std::uint32_t getRegCount() const noexcept { return _registerCount; }
+
+        ConstIndex addConstant(const Value &value) {
+            _constants.push_back(value);
+            return ConstIndex{ _constants.size() - 1 };
+        }
 
         Chunk(const Chunk &) = delete;
         Chunk &operator=(const Chunk &) = delete;
@@ -50,5 +56,6 @@ namespace Ciallang::Bytecode {
     private:
         std::vector<Op::Instruction *> _instructions{};
         std::uint32_t _registerCount{ 0 };
+        std::vector<Value> _constants{};
     };
 } // namespace Ciallang::Bytecode

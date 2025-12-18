@@ -22,6 +22,7 @@
 #include "types/Value.hpp"
 
 #define OPCODE_ENUMS(O)                                                                                                \
+    O(NOP)                                                                                                             \
     O(Load)                                                                                                            \
     O(PushReg)                                                                                                         \
     O(PopN)                                                                                                            \
@@ -199,10 +200,20 @@ namespace Ciallang::Bytecode::Op {
                 CLL_ASSERT(operand->type == Operand::Type::SymbolIndex, "operand type is not symbolIndex");
                 return operand->operand.i;
             } else {
+                static_assert(std::is_same_v<T, int> && "operand type is not support");
                 return nullptr;
             }
         }
     };
+
+    struct NOP {
+        static void execute(const Instruction &, const VMState &) {}
+
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool) {
+            return fmt::format("{: <10}", "load");
+        }
+    }; // struct Load
+
 
     struct Load {
         static const Register &reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
@@ -471,7 +482,7 @@ namespace Ciallang::Bytecode::Op {
 
         static const char *name(const Instruction &itt, const VMState &vmState);
 
-        static const Value &value(const Instruction &itt, const VMState &vmState);
+        static Value value(const Instruction &itt, const VMState &vmState);
 
         static void execute(const Instruction &, VMState &);
 

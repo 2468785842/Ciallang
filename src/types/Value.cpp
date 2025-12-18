@@ -241,7 +241,7 @@ namespace Ciallang {
             case ValueType::Real:
                 return os << d.toReal();
             case ValueType::String:
-                return os << *d.toString();
+                return os << "\"" << *d.toString() << "\"";
             case ValueType::Octet:
                 throw std::logic_error("not support");
             case ValueType::Object:

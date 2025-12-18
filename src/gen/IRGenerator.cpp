@@ -575,7 +575,7 @@ namespace Ciallang::Inter {
         auto funChunk = gen.parseAst(_r, node->body);
 
         // the last instruction is not ret, patch one ret
-        if(funChunk->instructions().back()->opcode != Bytecode::Op::OpCode::Ret) {
+        if(funChunk->getInstVec().back()->opcode != Bytecode::Op::OpCode::Ret) {
             funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
         }
 

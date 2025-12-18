@@ -38,6 +38,10 @@ namespace Ciallang {
 
         [[nodiscard]] ClassObject *base() const noexcept { return _base; }
 
+        void setStaticField(const std::string &name, const Value &field) noexcept;
+
+        [[nodiscard]] Value getStaticField(const std::string &name) const noexcept;
+
         void setMethod(const std::string &name, const Value &method) noexcept;
 
         [[nodiscard]] Value getMethod(const std::string &name) const noexcept;
@@ -49,16 +53,15 @@ namespace Ciallang {
         [[nodiscard]] FieldMeta getFieldDef(const std::string &name) const noexcept;
 
         [[nodiscard]] const std::unordered_map<std::string, FieldMeta> &getFieldDefs() const noexcept {
-            return _fieldDefs;
+            return _fieldsDef;
         }
 
     private:
         ClassObject *_base{ nullptr };
         std::string _name;
         size_t _arity{ 0 };
-        std::unordered_map<std::string, Value> _methods{};
-        std::unordered_map<std::string, Value> _staticMethods{};
-        std::unordered_map<std::string, FieldMeta> _fieldDefs{};
+        std::unordered_map<std::string, Value> _methodsDef{};
+        std::unordered_map<std::string, FieldMeta> _fieldsDef{};
         std::unordered_map<std::string, Value> _staticFields{};
     };
 

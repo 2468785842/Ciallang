@@ -153,7 +153,7 @@ namespace Ciallang::Inter {
 
         void freeRegister(const Bytecode::Register reg) { _freeRegisters.push_back(reg); }
 
-        Bytecode::Label makeLabel() const { return Bytecode::Label{ _chunk->instructions().size() }; }
+        Bytecode::Label makeLabel() const { return Bytecode::Label{ _chunk->getInstVec().size() }; }
 
         void beginScope() { _scopeDepth++; }
 

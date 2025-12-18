@@ -55,7 +55,7 @@ TEST_CASE("循环 - while字节码结构") {
     auto chunk = codeGen.parseAst(r, globalNode);
     REQUIRE(chunk != nullptr);
 
-    const auto &instructions = chunk->instructions();
+    const auto &instructions = chunk->getInstVec();
     bool hasTest = false;
     bool hasJmpNE = false;
     bool hasJmp = false;
@@ -89,9 +89,7 @@ TEST_CASE("循环 - do while与for执行") {
         Bytecode::VMState vm{ globalTable };
         vm.allocCallFrame(chunk.get());
         vm.run();
-        const auto idx = globalTable.getSymbolIndex("j");
-        REQUIRE(idx.has_value());
-        REQUIRE(vm.global(*idx).toInteger() == 5);
+        REQUIRE(vm.global("j").toInteger() == 5);
     }
 
     SECTION("for执行") {
@@ -104,9 +102,7 @@ TEST_CASE("循环 - do while与for执行") {
         Bytecode::VMState vm{ globalTable };
         vm.allocCallFrame(chunk.get());
         vm.run();
-        const auto idx = globalTable.getSymbolIndex("k");
-        REQUIRE(idx.has_value());
-        REQUIRE(vm.global(*idx).toInteger() == 3);
+        REQUIRE(vm.global("k").toInteger() == 3);
     }
 }
 
