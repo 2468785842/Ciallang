@@ -14,6 +14,8 @@
 
 #include <ranges>
 
+#include "vm/VMState.hpp"
+
 namespace Ciallang {
     ClassObject::~ClassObject() noexcept {
         if(_base) {
@@ -67,9 +69,38 @@ namespace Ciallang {
     void InstanceObject::setField(const std::string &name, const Value &field) noexcept { _fields[name] = field; }
 
     [[nodiscard]] Value InstanceObject::getField(const std::string &name) const noexcept {
-        if(const auto it = _fields.find(name); it != _fields.end())
-            return it->second;
-        return _class->getMethod(name);
+        const auto it = _fields.find(name);
+        return it != _fields.end() ? it->second : Value{};
+    }
+
+    void InstanceObject::setMethod(const std::string &name, const Value &method) noexcept { _methods[name] = method; }
+
+    [[nodiscard]] Value InstanceObject::getMethod(const std::string &name) const noexcept {
+        const auto it = _methods.find(name);
+        return it != _methods.end() ? it->second : Value{};
+    }
+
+    void ClassFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
+        getFunction()->call(vmState, ret, argCount);
+        vmState.current()->thisValue = _thisValue;
+    }
+
+    void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
+        const Value &instanceObjVal = createObject<InstanceObject>(this);
+        auto *instanceObj = dynamic_cast<InstanceObject *>(instanceObjVal.toObject());
+
+        for(auto &[k, v] : getFieldDefs()) {
+            instanceObj->setField(k, v.defValReg ? vmState.reg(v.defValReg.value()) : Value{});
+        }
+
+        for(auto &v : getAllMethod()) {
+            instanceObj->setField(v.toObject()->name(), createObject<ClassFunction>(instanceObjVal, v));
+        }
+        vmState.reg(ret, instanceObjVal);
+    }
+
+    void InstanceObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
+        throw std::runtime_error("Not implemented InstanceObject call");
     }
 
 } // namespace Ciallang

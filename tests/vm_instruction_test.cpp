@@ -5,7 +5,6 @@
  */
 
 #include <catch.hpp>
-#include <memory>
 
 #include "types/Types.hpp"
 #include "types/Value.hpp"
@@ -86,7 +85,7 @@ TEST_CASE("虚拟机指令 - 基本操作码") {
 TEST_CASE("虚拟机指令 - 操作数类型") {
     SECTION("Value 操作数") {
         Ciallang::Value value{ static_cast<Ciallang::Integer>(42) };
-        Ciallang::Bytecode::Op::Operand operand{ std::move(value) };
+        Ciallang::Bytecode::Op::Operand operand{ value };
         REQUIRE(operand.type == Ciallang::Bytecode::Op::Operand::Type::Value);
         REQUIRE(operand.operand.value != nullptr);
         REQUIRE(operand.operand.value->toInteger() == 42);
@@ -118,7 +117,7 @@ TEST_CASE("虚拟机指令 - 带操作数的指令") {
     SECTION("带 Value 操作数的指令") {
         Ciallang::Value value{ static_cast<Ciallang::Integer>(100) };
         Ciallang::Bytecode::Op::Instruction instr{ Ciallang::Bytecode::Op::OpCode::Load,
-                                                   Ciallang::Bytecode::Op::Operand{ std::move(value) } };
+                                                   Ciallang::Bytecode::Op::Operand{ value } };
         REQUIRE(instr.opcode == Ciallang::Bytecode::Op::OpCode::Load);
         REQUIRE(instr.operandCount() == 1);
         REQUIRE(instr.getOperand1<Ciallang::Value>().toInteger() == 100);

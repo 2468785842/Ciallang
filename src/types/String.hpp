@@ -27,6 +27,8 @@ namespace Ciallang {
         char _shortStr[G_ShortStrLen + 1];
         int _len;
     };
+
+    inline String operator""_str(const char *str, const std::size_t len) { return String(str, len); }
 } // namespace Ciallang
 
 // support fmt::format

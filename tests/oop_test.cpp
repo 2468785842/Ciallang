@@ -39,10 +39,7 @@ TEST_CASE("OOP - 类声明与实例化") {
     vm.allocCallFrame(chunk.get());
     vm.run();
 
-    const auto idx = globalTable.getSymbolIndex("o");
-    REQUIRE(idx.has_value());
-
-    const auto &val = vm.global(*idx);
+    const auto &val = vm.global("o");
     REQUIRE(val.isObject());
     auto *inst = dynamic_cast<InstanceObject *>(val.toObject());
     REQUIRE(inst != nullptr);
@@ -71,9 +68,7 @@ TEST_CASE("OOP - 类方法定义与调用") {
         Bytecode::VMState vm{ globalTable };
         vm.allocCallFrame(chunk.get());
         vm.run();
-        const auto idx = globalTable.getSymbolIndex("res");
-        REQUIRE(idx);
-        REQUIRE(vm.global(*idx).toInteger() == 3);
+        REQUIRE(vm.global("res").toInteger() == 3);
     }
 
     SECTION("实例成员访问") {
@@ -92,8 +87,89 @@ TEST_CASE("OOP - 类方法定义与调用") {
         Bytecode::VMState vm{ globalTable };
         vm.allocCallFrame(chunk.get());
         vm.run();
-        const auto idx = globalTable.getSymbolIndex("res");
-        REQUIRE(idx);
-        REQUIRE(vm.global(*idx).toInteger() == 1);
+        REQUIRE(vm.global("res").toInteger() == 1);
+    }
+}
+
+
+TEST_CASE("OOP - 类访问变量") {
+    Common::Result r{};
+    Common::SourceFile sourceFile{};
+    Syntax::AstBuilder astBuilder{};
+    Syntax::Parser parser{ sourceFile, astBuilder };
+
+    SECTION("实例成员初始化变量访问") {
+
+        sourceFile.load(r, R"(
+            var a = 1;
+            class A {
+                var b = a;
+            }
+            var o = new A().b;
+        )");
+
+        auto *globalNode = parser.parse(r);
+        REQUIRE(globalNode != nullptr);
+        REQUIRE_FALSE(r.isFailed());
+
+        Inter::SymbolTable globalTable{};
+        Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        auto chunk = codeGen.parseAst(r, globalNode);
+        REQUIRE(chunk != nullptr);
+
+        Bytecode::VMState vm{ globalTable };
+        vm.allocCallFrame(chunk.get());
+        vm.run();
+        REQUIRE(vm.global("o").toInteger() == 1);
+    }
+
+    SECTION("实例成员方法初始化变量访问") {
+
+        sourceFile.load(r, R"(
+            var a = 1;
+            class A {
+                function b() { return a; }
+            }
+            var o = new A().b();
+        )");
+
+        auto *globalNode = parser.parse(r);
+        REQUIRE(globalNode != nullptr);
+        REQUIRE_FALSE(r.isFailed());
+
+        Inter::SymbolTable globalTable{};
+        Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        auto chunk = codeGen.parseAst(r, globalNode);
+        REQUIRE(chunk != nullptr);
+
+        Bytecode::VMState vm{ globalTable };
+        vm.allocCallFrame(chunk.get());
+        vm.run();
+        REQUIRE(vm.global("o").toInteger() == 1);
+    }
+
+    SECTION("实例成员函数访问成员变量") {
+
+        sourceFile.load(r, R"(
+            class A {
+                var a = 1;
+                function b() { return a; }
+            }
+            var o = new A().b();
+        )");
+
+        auto *globalNode = parser.parse(r);
+        REQUIRE(globalNode != nullptr);
+        REQUIRE_FALSE(r.isFailed());
+
+        Inter::SymbolTable globalTable{};
+        Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        auto chunk = codeGen.parseAst(r, globalNode);
+        REQUIRE(chunk != nullptr);
+
+        Bytecode::VMState vm{ globalTable };
+        vm.allocCallFrame(chunk.get());
+        vm.run();
+        REQUIRE(vm.global("o").toInteger() == 1);
     }
 }

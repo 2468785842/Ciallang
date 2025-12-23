@@ -14,6 +14,11 @@
 
 #include "gc/GC.hpp"
 
+namespace Ciallang::Bytecode {
+    class VMState;
+    class Register;
+} // namespace Ciallang::Bytecode
+
 namespace Ciallang {
     class Object : public GCObject {
     public:
@@ -22,7 +27,7 @@ namespace Ciallang {
 
         [[nodiscard]] virtual const char *name() const noexcept = 0;
 
-        [[nodiscard]] virtual size_t arity() const noexcept = 0;
+        virtual void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) = 0;
     };
 
 } // namespace Ciallang

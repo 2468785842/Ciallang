@@ -48,6 +48,7 @@
     O(Call)                                                                                                            \
     O(GProp)                                                                                                           \
     O(SProp)                                                                                                           \
+    O(GDynamic)                                                                                                        \
     O(Ret)
 
 namespace Ciallang::Bytecode {
@@ -488,6 +489,16 @@ namespace Ciallang::Bytecode::Op {
 
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct SProp
+
+    struct GDynamic {
+        static size_t symbolIndex(const Instruction &itt) { return itt.getOperand1<size_t>(); }
+
+        static const Register &dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+    }; // struct GDynamic
 
     struct Ret {
         static const Register &retReg(const Instruction &itt) { return itt.getOperand1<Register>(); }

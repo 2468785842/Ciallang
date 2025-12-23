@@ -20,40 +20,22 @@ namespace Ciallang {
 
     Value::Value(const Real value) : _value{ ._real = value }, _type(ValueType::Real) {}
 
-    Value::Value(String *value) : _value{ ._string = value }, _type(ValueType::String) {
-        if(_value._string) {
-            _value._string->incRef();
-        }
-    }
+    Value::Value(String *value) : _value{ ._string = value }, _type(ValueType::String) { _value._string->incRef(); }
 
-    Value::Value(Octet *value) : _value{ ._octet = value }, _type(ValueType::Octet) {
-        if(_value._octet) {
-            _value._octet->incRef();
-        }
-    }
+    Value::Value(Octet *value) : _value{ ._octet = value }, _type(ValueType::Octet) { _value._octet->incRef(); }
 
-    Value::Value(Object *value) : _value{ ._object = value }, _type(ValueType::Object) {
-        if(_value._object) {
-            _value._object->incRef();
-        }
-    }
+    Value::Value(Object *value) : _value{ ._object = value }, _type(ValueType::Object) { _value._object->incRef(); }
 
     Value::~Value() {
         switch(_type) {
             case ValueType::Object:
-                if(_value._object) {
-                    _value._object->decRef();
-                }
+                _value._object->decRef();
                 break;
             case ValueType::String:
-                if(_value._string) {
-                    _value._string->decRef();
-                }
+                _value._string->decRef();
                 break;
             case ValueType::Octet:
-                if(_value._octet) {
-                    _value._octet->decRef();
-                }
+                _value._octet->decRef();
                 break;
             default:;
         }
@@ -65,21 +47,15 @@ namespace Ciallang {
         switch(v._type) {
             case ValueType::String:
                 _value._string = v._value._string;
-                if(_value._string) {
-                    _value._string->incRef();
-                }
+                _value._string->incRef();
                 break;
             case ValueType::Octet:
                 _value._octet = v._value._octet;
-                if(_value._octet) {
-                    _value._octet->incRef();
-                }
+                _value._octet->incRef();
                 break;
             case ValueType::Object:
                 _value._object = v._value._object;
-                if(_value._object) {
-                    _value._object->incRef();
-                }
+                _value._object->incRef();
                 break;
             default:
                 _value = v._value;

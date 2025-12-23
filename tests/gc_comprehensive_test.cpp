@@ -5,6 +5,7 @@
  */
 
 #include <catch.hpp>
+#include <utility>
 #include <vector>
 
 #include "gc/GC.hpp"
@@ -16,7 +17,7 @@ public:
     std::string name;
     static int s_instanceCount;
 
-    TestNode(const std::string &n) : name(n), next(nullptr) { s_instanceCount++; }
+    explicit TestNode(std::string n) : next(nullptr), name(std::move(n)) { s_instanceCount++; }
     ~TestNode() override { s_instanceCount--; }
 
     // 适配GC的子节点添加方法

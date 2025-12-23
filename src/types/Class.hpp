@@ -18,6 +18,20 @@
 
 namespace Ciallang {
 
+    class ClassFunction final : public Object {
+    public:
+        ClassFunction(const Value &thisValue, const Value &function) : _thisValue(thisValue), _function(function) {}
+        [[nodiscard]] const char *name() const noexcept override { return getFunction()->name(); }
+
+        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
+
+        [[nodiscard]] Function *getFunction() const noexcept { return dynamic_cast<Function *>(_function.toObject()); }
+
+    private:
+        Value _thisValue;
+        Value _function;
+    };
+
     struct FieldMeta {
         std::optional<Bytecode::Register> defValReg{};
     };
@@ -32,7 +46,7 @@ namespace Ciallang {
 
         [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
 
-        [[nodiscard]] size_t arity() const noexcept override { return _arity; }
+        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
         void setBase(ClassObject *base) noexcept;
 
@@ -83,7 +97,7 @@ namespace Ciallang {
 
         [[nodiscard]] const char *name() const noexcept override { return _class ? _class->name() : "unknown"; }
 
-        [[nodiscard]] size_t arity() const noexcept override { return 0; }
+        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
         [[nodiscard]] ClassObject *klass() const noexcept { return _class; }
 
@@ -91,8 +105,13 @@ namespace Ciallang {
 
         [[nodiscard]] Value getField(const std::string &name) const noexcept;
 
+        void setMethod(const std::string &name, const Value &method) noexcept;
+
+        [[nodiscard]] Value getMethod(const std::string &name) const noexcept;
+
     private:
         ClassObject *_class{ nullptr };
         std::unordered_map<std::string, Value> _fields{};
+        std::unordered_map<std::string, Value> _methods{};
     };
 } // namespace Ciallang

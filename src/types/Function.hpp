@@ -32,9 +32,9 @@ namespace Ciallang {
 
         [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
 
-        [[nodiscard]] const Bytecode::Chunk *chunk() const { return _chunk.get(); }
+        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
-        [[nodiscard]] size_t arity() const noexcept override { return _arity; }
+        [[nodiscard]] const Bytecode::Chunk *chunk() const { return _chunk.get(); }
 
         ~Function() noexcept override = default;
 
@@ -147,7 +147,7 @@ namespace Ciallang {
 
         [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
 
-        [[nodiscard]] size_t arity() const noexcept override { return _arity; }
+        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
         ~NativeFunction() noexcept override = default;
 

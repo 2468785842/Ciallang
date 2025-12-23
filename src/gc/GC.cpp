@@ -30,10 +30,7 @@ namespace Ciallang {
             return;
         }
         // 非零：可能是循环引用，需要 GC 检测
-        if(!_inGCList) {
-            _inGCList = true;
-            GC::instance().track(this);
-        }
+        GC::instance().track(this);
     }
 
     void GCObject::addChild(GCObject *pChild) {
@@ -43,9 +40,12 @@ namespace Ciallang {
     }
 
     void GC::track(GCObject *o) {
-        _candidates.push_back(o);
-        if(_candidates.size() >= G_Threshold) {
-            collect();
+        if(!o->_inGCList) {
+            o->_inGCList = true;
+            _candidates.push_back(o);
+            if(_candidates.size() >= G_Threshold) {
+                collect();
+            }
         }
     }
 

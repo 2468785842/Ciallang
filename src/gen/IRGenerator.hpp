@@ -21,12 +21,6 @@
 #include "vm/Register.hpp"
 
 namespace Ciallang::Inter {
-    struct LocalVariable {
-        std::string identifier;
-        Bytecode::Register reg;
-        size_t scopeDepth;
-        bool init;
-    };
 
     class SymbolTable {
     public:
@@ -65,17 +59,12 @@ namespace Ciallang::Inter {
     };
 
     class IRGenerator {
+
     public:
         explicit IRGenerator(Common::SourceFile &sourceFile, SymbolTable &symbolTable) :
             _sourceFile(sourceFile), _symbolTable(symbolTable) {}
 
         std::unique_ptr<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node);
-
-        void error(Common::Result &r, const std::string &message, const Common::SourceLocation &location) const {
-            _sourceFile.error(r, message, location);
-        }
-
-        void addVariable(LocalVariable &&variable) { _variables.push_back(std::move(variable)); }
 
         Syntax::OptReg generate(const Syntax::ValueExprNode *);
 
@@ -121,10 +110,6 @@ namespace Ciallang::Inter {
         Common::SourceFile &_sourceFile;
         Common::Result _r{};
 
-        size_t _scopeDepth{ 0 };
-
-        std::vector<LocalVariable> _variables{};
-
         Syntax::OptReg _empty{};
 
         std::vector<Bytecode::Register> _freeRegisters{};
@@ -138,6 +123,23 @@ namespace Ciallang::Inter {
         };
 
         std::vector<LoopContext> _loopStack{};
+
+        struct LocalVariable {
+            Bytecode::Register reg{};
+            bool init{};
+        };
+
+        struct Variable {
+            std::string identifier;
+            std::optional<LocalVariable> localVar;
+        };
+
+        struct ScopeContext {
+            std::vector<Variable> variables{};
+        };
+
+        std::vector<ScopeContext> _scopeChain{};
+
         SymbolTable &_symbolTable;
 
         Bytecode::Register allocateRegister() {
@@ -155,20 +157,19 @@ namespace Ciallang::Inter {
 
         Bytecode::Label makeLabel() const { return Bytecode::Label{ _chunk->getInstVec().size() }; }
 
-        void beginScope() { _scopeDepth++; }
+        void beginScope() { _scopeChain.emplace_back(); }
 
         void endScope() {
-            const auto new_end = std::ranges::remove_if(_variables, [&](const LocalVariable &variable) {
-                                     if(variable.scopeDepth == _scopeDepth) {
-                                         freeRegister(variable.reg);
-                                         return true;
-                                     }
-                                     return false;
-                                 }).begin();
-
-            _variables.erase(new_end, _variables.end());
-            _scopeDepth--;
+            const auto &scope = _scopeChain.back();
+            for(const auto &var : scope.variables) {
+                if(var.localVar.has_value()) {
+                    freeRegister(var.localVar->reg);
+                }
+            }
+            _scopeChain.pop_back();
         }
+
+        void addVariable(Variable &&variable) { _scopeChain.back().variables.emplace_back(std::move(variable)); }
 
         Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk) {
             if(!_empty.has_value()) {
@@ -178,8 +179,12 @@ namespace Ciallang::Inter {
             return _empty.value();
         }
 
-        std::optional<LocalVariable *> resolveLocalVariable(const String &identifier);
+        std::optional<Variable *> resolveLocalVariable(const String &identifier);
 
         std::unique_ptr<Bytecode::Chunk> generateChunk(const Syntax::FunctionDeclNode *node) const;
+
+        void error(Common::Result &r, const std::string &message, const Common::SourceLocation &location) const {
+            _sourceFile.error(r, message, location);
+        }
     };
 } // namespace Ciallang::Inter

@@ -141,7 +141,7 @@ namespace Ciallang::Bytecode::Op {
     }
 
     void Test::execute(const Instruction &itt, VMState &vmState) {
-        if(static_cast<const VMState &>(vmState).reg(reg(itt)).toBool()) {
+        if(vmState.reg(reg(itt)).toBool()) {
             vmState.setZF(true);
         }
     }
@@ -276,46 +276,9 @@ namespace Ciallang::Bytecode::Op {
 
     void Call::execute(const Instruction &itt, VMState &vmState) {
         // call const ref is Faster
-        const auto &object = static_cast<const VMState &>(vmState).reg(memberReg(itt));
+        const auto &object = vmState.reg(memberReg(itt));
         CLL_ASSERT(object.isObject(), "memberReg is not object");
-
-        if(const auto *fun = dynamic_cast<Function *>(object.toObject())) {
-            const auto cnt = static_cast<std::int64_t>(fun->arity() - argCount(itt));
-            if(cnt > 0)
-                vmState.pushVoid(cnt);
-            vmState.allocCallFrame(fun->chunk(), dst(itt));
-            // Faster move Reg window ptr, WARING: reverse args
-            vmState.current()->baseRegSP -= fun->arity();
-            return;
-        }
-
-        if(const auto *fun = dynamic_cast<NativeFunction *>(object.toObject())) {
-            const auto values = std::make_unique<Value[]>(fun->arity());
-            const CallFrame *curCallFrame = vmState.current();
-            const size_t count = argCount(itt);
-            const size_t base = vmState.getRegPoolTop() - count;
-            // Faster operation
-            for(std::uint32_t i = 0; i < count; i++) {
-                new(&values[i]) Value{ curCallFrame->getReg(base - i) };
-            }
-
-            const auto &value = fun->callProc(values.get());
-
-            vmState.reg(dst(itt), value);
-            return;
-        }
-
-        if(auto *classObj = dynamic_cast<ClassObject *>(object.toObject())) {
-            const Value &instanceObjVal = createObject<InstanceObject>(classObj);
-            auto *instanceObj = dynamic_cast<InstanceObject *>(instanceObjVal.toObject());
-            for(auto &[k, v] : classObj->getFieldDefs()) {
-                instanceObj->setField(k, v.defValReg ? vmState.reg(v.defValReg.value()) : Value{});
-            }
-            vmState.reg(dst(itt), instanceObjVal);
-            return;
-        }
-
-        CLL_ASSERT(false, "not a function or class");
+        object.toObject()->call(vmState, dst(itt), argCount(itt));
     }
 
     std::string Call::dump(const Instruction &itt, const VMState &vmState, const bool info) {
@@ -396,6 +359,42 @@ namespace Ciallang::Bytecode::Op {
     std::string SProp::dump(const Instruction &itt, const VMState &vmState, const bool info) {
         // TODO:
         throw std::runtime_error("not implemented");
+    }
+
+    void GDynamic::execute(const Instruction &itt, const VMState &vmState) {
+        const auto &callFrame = vmState.current();
+        Value v{};
+        if(callFrame->thisValue.isObject()) {
+            if(const auto *instanceObject = dynamic_cast<InstanceObject *>(callFrame->thisValue.toObject())) {
+                v = instanceObject->getField(vmState.getSymbol(symbolIndex(itt)));
+            }
+        }
+
+        if(v.isVoid()) {
+            v = vmState.global(symbolIndex(itt));
+        }
+
+        vmState.reg(dst(itt), v);
+    }
+
+    std::string GDynamic::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+        const auto &symbol = fmt::format("\"{}\"", vmState.getSymbol(symbolIndex(itt)));
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gdynamic", symbol, dst(itt));
+
+        if(!info)
+            return insDump;
+        Value v{};
+        if(const auto &callFrame = vmState.current(); callFrame->thisValue.isObject()) {
+            if(const auto *instanceObject = dynamic_cast<InstanceObject *>(callFrame->thisValue.toObject())) {
+                v = instanceObject->getField(vmState.getSymbol(symbolIndex(itt)));
+            }
+        }
+
+        if(v.isVoid()) {
+            v = vmState.global(symbolIndex(itt));
+        }
+
+        return fmt::format("{: <30} ; {} = {}", insDump, symbol, v);
     }
 
     void Ret::execute(const Instruction &itt, VMState &vmState) {

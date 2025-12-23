@@ -12,6 +12,8 @@
 
 #include "IRGenerator.hpp"
 
+#include <ranges>
+
 #include "ast/DeclNode.hpp"
 #include "ast/ExprNode.hpp"
 #include "ast/StmtNode.hpp"
@@ -175,7 +177,7 @@ namespace Ciallang::Inter {
 
         auto variable = resolveLocalVariable(*identifier.toString());
 
-        if(variable.has_value()) {
+        if(variable.has_value() && variable.value()->localVar.has_value()) {
             auto src = node->rhs->generateBytecode(this);
             CLL_ASSERT(src.has_value(), "src is not have val");
 
@@ -184,7 +186,7 @@ namespace Ciallang::Inter {
 
             freeRegister(src.value());
             _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), dst.value());
-            variable.value()->init = true;
+            variable.value()->localVar->init = true;
             if(_r.isFailed())
                 return {};
 
@@ -209,7 +211,7 @@ namespace Ciallang::Inter {
         CLL_ASSERT(identifier.isString(), "identifier is not string");
 
         // global
-        if(_scopeDepth == 1) {
+        if(_scopeChain.size() == 1) {
             // can't init
             if(!node->rhs) {
                 _chunk->emit<Bytecode::Op::OpCode::DGlobal>(
@@ -230,7 +232,7 @@ namespace Ciallang::Inter {
         auto variable = resolveLocalVariable(*identifier.toString());
 
         // already have this variable, in same scope
-        if(variable.has_value()) {
+        if(variable.has_value() && variable.value()->localVar.has_value()) {
             if(!node->rhs)
                 return {};
 
@@ -242,7 +244,7 @@ namespace Ciallang::Inter {
 
             CLL_ASSERT(src.has_value(), "src is not have val");
 
-            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), variable.value()->reg);
+            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), variable.value()->localVar->reg);
             return {};
         }
 
@@ -262,7 +264,8 @@ namespace Ciallang::Inter {
             dst = loadVoidReg(*_chunk);
         }
 
-        _variables.emplace_back(identifier.toString()->toStdStr(), dst.value(), _scopeDepth, !!node->rhs);
+        addVariable(
+            Variable{ identifier.toString()->toStdStr(), std::make_optional<LocalVariable>(dst.value(), !!node->rhs) });
 
         return {};
     }
@@ -279,14 +282,14 @@ namespace Ciallang::Inter {
             funReg,
             createObject<Function>(funChunk.release(), identifier.toString()->toStdStr(), node->parameters.size()));
 
-        if(_scopeDepth == 1) {
+        if(_scopeChain.size() == 1) {
             freeRegister(funReg);
             _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
                                                         funReg);
             return {};
         }
 
-        _variables.push_back(LocalVariable{ identifier.toString()->toStdStr(), funReg, _scopeDepth, true });
+        addVariable(Variable{ identifier.toString()->toStdStr(), std::make_optional<LocalVariable>(funReg, true) });
 
         return {};
     }
@@ -304,7 +307,10 @@ namespace Ciallang::Inter {
         _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
                                                     thisObjReg);
         auto *classObject = dynamic_cast<ClassObject *>(classObjVal.toObject());
+
+        beginScope();
         for(const auto &declNode : node->body->childrens) {
+            addVariable(Variable{ identifier.toString()->toStdStr() });
 
             if(const auto *funcDeclNode = dynamic_cast<Syntax::FunctionDeclNode *>(declNode)) {
                 auto funChunk = generateChunk(funcDeclNode);
@@ -329,6 +335,8 @@ namespace Ciallang::Inter {
                 classObject->setFieldDef(varName.toString()->toStdStr(), FieldMeta{ src });
             }
         }
+
+        endScope();
         freeRegister(thisObjReg);
         return {};
     }
@@ -341,16 +349,20 @@ namespace Ciallang::Inter {
         auto variable = resolveLocalVariable(*identifier.toString());
 
         if(variable.has_value()) {
-            if(!variable.value()->init) {
-                error(_r, "variable no initialization", node->location);
-                return {};
+            if(variable.value()->localVar) {
+                if(!variable.value()->localVar->init) {
+                    error(_r, "variable no initialization", node->location);
+                    return {};
+                }
+                return variable.value()->localVar->reg;
             }
-            return variable.value()->reg;
+            throw std::bad_cast{};
         }
 
+        // dynamic get
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::GGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
-                                                    dst);
+        _chunk->emit<Bytecode::Op::OpCode::GDynamic>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
+                                                     dst);
         if(_r.isFailed())
             return {};
 
@@ -542,10 +554,12 @@ namespace Ciallang::Inter {
         return {};
     }
 
-    std::optional<LocalVariable *> IRGenerator::resolveLocalVariable(const String &identifier) {
-        for(auto &variable : _variables) {
-            if(variable.identifier == identifier.toStdStr() && variable.scopeDepth <= _scopeDepth) {
-                return &variable;
+    std::optional<IRGenerator::Variable *> IRGenerator::resolveLocalVariable(const String &identifier) {
+        for(auto &it : std::ranges::reverse_view(_scopeChain)) {
+            for(auto &var : it.variables) {
+                if(var.identifier == identifier.toStdStr()) {
+                    return &var;
+                }
             }
         }
         return {};
@@ -554,10 +568,14 @@ namespace Ciallang::Inter {
     std::unique_ptr<Bytecode::Chunk> IRGenerator::generateChunk(const Syntax::FunctionDeclNode *node) const {
 
         auto gen = IRGenerator{ _sourceFile, _symbolTable };
+        gen._scopeChain = _scopeChain; // 复制作用域结构
+
+        gen.beginScope();
+
+        Syntax::OptReg paramReg{};
 
         for(auto &[token, exprNode] : node->parameters) {
             const auto varName = token.value();
-            Syntax::OptReg paramReg{};
 
             CLL_ASSERT(varName.isString(), "varName is not string");
 
@@ -569,10 +587,12 @@ namespace Ciallang::Inter {
                 paramReg = gen.allocateRegister();
             }
 
-            gen.addVariable(LocalVariable{ varName.toString()->toStdStr(), paramReg.value(), 1, true });
+            gen.addVariable(
+                Variable{ varName.toString()->toStdStr(), std::make_optional<LocalVariable>(paramReg.value(), true) });
         }
 
         auto funChunk = gen.parseAst(_r, node->body);
+        gen.endScope();
 
         // the last instruction is not ret, patch one ret
         if(funChunk->getInstVec().back()->opcode != Bytecode::Op::OpCode::Ret) {

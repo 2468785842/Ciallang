@@ -18,6 +18,8 @@
 namespace Ciallang {
 
     class GCObject {
+        friend class GC;
+
     public:
         GCObject() : _refCount(0), _inGCList(false) {}
         virtual ~GCObject() = default;
@@ -56,6 +58,8 @@ namespace Ciallang {
          * Dealing with circular references
          */
         void collect();
+
+        [[nodiscard]] size_t getObjCount() const { return _candidates.size(); }
 
     private:
         std::vector<GCObject *> _candidates;
