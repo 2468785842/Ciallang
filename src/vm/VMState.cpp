@@ -15,7 +15,7 @@
 
 #include "Instruction.hpp"
 
-namespace Ciallang::Bytecode {
+namespace Cial::Bytecode {
 
     void VMState::run() {
 // #define CLL_COMPUTED_GOTO
@@ -73,4 +73,5 @@ namespace Ciallang::Bytecode {
     void VMState::reg(const Register &reg, const Value &value) const { _currentFrame->getReg(reg.index()) = value; }
 
     Value VMState::reg(const Register reg) const { return _currentFrame->getReg(reg.index()); }
-} // namespace Ciallang::Bytecode
+
+} // namespace Cial::Bytecode

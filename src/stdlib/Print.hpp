@@ -17,8 +17,9 @@
 
 #include "types/Function.hpp"
 
-namespace Ciallang::StdLib {
-    static auto S_PrintFunction = createObject<NativeFunction>("print", [](Value val) { fmt::print("{}", val); });
+namespace Cial::StdLib {
+    static auto S_PrintFunction = Object::create<NativeFunction>("print", [](Value val) { fmt::print("{}", val); });
 
-    static auto S_PrintlnFunction = createObject<NativeFunction>("println", [](Value val) { fmt::println("{}", val); });
-} // namespace Ciallang::StdLib
+    static auto S_PrintlnFunction =
+        Object::create<NativeFunction>("println", [](Value val) { fmt::println("{}", val); });
+} // namespace Cial::StdLib

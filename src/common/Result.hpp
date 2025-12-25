@@ -19,7 +19,7 @@
 
 #include "logging/Logger.hpp"
 
-namespace Ciallang::Common {
+namespace Cial::Common {
     using namespace std;
 
     class [[nodiscard]] Result {
@@ -54,4 +54,4 @@ namespace Ciallang::Common {
         bool _success = true;
         ResultMessageList _messages{};
     };
-} // namespace Ciallang::Common
+} // namespace Cial::Common

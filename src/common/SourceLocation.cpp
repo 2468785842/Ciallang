@@ -14,7 +14,7 @@
 
 #include "SourceLocation.hpp"
 
-using namespace Ciallang::Common;
+using namespace Cial::Common;
 
 const LocationType &SourceLocation::end() const { return _end; }
 

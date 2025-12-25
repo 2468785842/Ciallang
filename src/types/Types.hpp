@@ -13,8 +13,10 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
+#include <vector>
 
-namespace Ciallang {
+namespace Cial {
 #if defined(LLONG_MAX)
     using Integer = long long;
     using Real = double;
@@ -38,4 +40,9 @@ namespace Ciallang {
 
     class Value;
 
-} // namespace Ciallang
+    template <typename T>
+    using Vec = std::vector<T>;
+
+    template <typename T>
+    using Opt = std::optional<T>;
+} // namespace Cial

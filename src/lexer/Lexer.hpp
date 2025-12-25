@@ -18,7 +18,7 @@
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
 
-namespace Ciallang::Syntax {
+namespace Cial::Syntax {
 
     static std::int8_t getHexNum(const char c) noexcept {
         if(c >= 'a' && c <= 'f')
@@ -182,4 +182,4 @@ namespace Ciallang::Syntax {
         StringParseState internalStringParser(Token *&token, char delimiter, bool *templateOver = nullptr,
                                               bool templateMode = false);
     };
-} // namespace Ciallang::Syntax
+} // namespace Cial::Syntax

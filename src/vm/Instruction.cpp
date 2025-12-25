@@ -21,9 +21,11 @@
 #include "types/Object.hpp"
 #include "vm/Register.hpp"
 
-namespace Ciallang::Bytecode::Op {
+namespace Cial::Bytecode::Op {
 
-    void Load::execute(const Instruction &itt, const VMState &vmState) { vmState.reg(reg(itt), value(itt)); }
+    void Load::execute(const Instruction &itt, const VMState &vmState) {
+        vmState.reg(reg(itt), vmState.current()->chunk->getConstant(value(itt)));
+    }
 
     std::string Load::dump(const Instruction &itt, const VMState &, bool) {
         return fmt::format("{: <10} {: <4} {: <4}", "load", reg(itt), value(itt));
@@ -93,7 +95,7 @@ namespace Ciallang::Bytecode::Op {
         return fmt::format("{: <10} {: <4} {: <4} {: <4}", "mul", reg1(itt), reg2(itt), dst(itt));
     }
 
-    void Div::execute(const Instruction &itt, VMState &vmState) {
+    void Div::execute(const Instruction &itt, const VMState &vmState) {
         vmState.reg(dst(itt), vmState.reg(reg1(itt)) / vmState.reg(reg2(itt)));
     }
 
@@ -110,7 +112,7 @@ namespace Ciallang::Bytecode::Op {
         return fmt::format("{: <10} {: <4} {: <4}", "mov", src(itt), dst(itt));
     }
 
-    void DGlobal::execute(const Instruction &itt, VMState &vmState) {
+    void DGlobal::execute(const Instruction &itt, const VMState &vmState) {
         const auto &value = vmState.reg(src(itt));
         vmState.global(symbolIndex(itt), Value{ value });
     }
@@ -295,7 +297,7 @@ namespace Ciallang::Bytecode::Op {
         CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
 
         if(const auto *inst = dynamic_cast<InstanceObject *>(instObj.toObject())) {
-            auto tmp = inst->getField(name(itt, vmState));
+            const auto tmp = inst->getField(name(itt, vmState));
             vmState.reg(dst(itt), tmp);
             return;
         }
@@ -314,8 +316,8 @@ namespace Ciallang::Bytecode::Op {
 
 
     const char *GProp::name(const Instruction &itt, const VMState &vmState) {
-        if(itt.getOperand2Type() == Operand::Type::SymbolIndex)
-            return vmState.getSymbol(itt.getOperand2<size_t>());
+        if(itt.getOperand2Type() == Operand::Type::ConstIndex)
+            return vmState.current()->chunk->getConstant(itt.getOperand2<ConstIndex>()).toString()->getData();
         if(itt.getOperand2Type() == Operand::Type::Register)
             return vmState.reg(itt.getOperand2<Register>()).toString()->getData();
         CLL_ASSERT(false, "unknown inst gprop operand2 type");
@@ -330,16 +332,16 @@ namespace Ciallang::Bytecode::Op {
 
 
     const char *SProp::name(const Instruction &itt, const VMState &vmState) {
-        if(itt.getOperand2Type() == Operand::Type::SymbolIndex)
-            return vmState.getSymbol(itt.getOperand2<size_t>());
+        if(itt.getOperand2Type() == Operand::Type::ConstIndex)
+            return vmState.current()->chunk->getConstant(itt.getOperand2<ConstIndex>()).toString()->getData();
         if(itt.getOperand2Type() == Operand::Type::Register)
             return vmState.reg(itt.getOperand2<Register>()).toString()->getData();
         CLL_ASSERT(false, "unknown inst sprop operand2 type");
     }
 
     Value SProp::value(const Instruction &itt, const VMState &vmState) {
-        if(itt.getOperand3Type() == Operand::Type::Value)
-            return itt.getOperand3<Value>();
+        if(itt.getOperand3Type() == Operand::Type::ConstIndex)
+            return vmState.current()->chunk->getConstant(itt.getOperand3<ConstIndex>());
         if(itt.getOperand3Type() == Operand::Type::Register)
             return vmState.reg(itt.getOperand3<Register>());
         CLL_ASSERT(false, "unknown inst sprop operand3 type");
@@ -432,4 +434,4 @@ namespace Ciallang::Bytecode::Op {
     }
 
 
-} // namespace Ciallang::Bytecode::Op
+} // namespace Cial::Bytecode::Op

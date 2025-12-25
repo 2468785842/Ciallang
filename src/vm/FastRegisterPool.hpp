@@ -17,7 +17,7 @@
 
 #include "types/Value.hpp"
 
-namespace Ciallang::Bytecode {
+namespace Cial::Bytecode {
 
     // FIFO Model
     class FastRegisterPool {
@@ -95,4 +95,4 @@ namespace Ciallang::Bytecode {
             }
         }
     };
-} // namespace Ciallang::Bytecode
+} // namespace Cial::Bytecode

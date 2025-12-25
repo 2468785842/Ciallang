@@ -14,7 +14,7 @@
 #include "stdlib/Print.hpp"
 #include "vm/VMState.hpp"
 
-using namespace Ciallang;
+using namespace Cial;
 
 TEST_CASE("集成测试 - 基本脚本解析") {
     SECTION("简单表达式解析") {
@@ -105,10 +105,12 @@ TEST_CASE("集成测试 - 代码生成和执行") {
             return;
         }
 
-        Bytecode::VMState interpreter{ globalTable };
-        interpreter.global("println", StdLib::S_PrintlnFunction);
-        interpreter.allocCallFrame(chunk.get());
-        interpreter.run();
+        Runtime rt;
+        Bytecode::VMState vm{ globalTable, rt };
+
+        vm.global("println", StdLib::S_PrintlnFunction);
+        vm.allocCallFrame(chunk.get());
+        vm.run();
 
         REQUIRE(true); // 如果执行到这里说明没有崩溃
     }

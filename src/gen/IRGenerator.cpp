@@ -24,7 +24,7 @@
 #include "vm/Instruction.hpp"
 #include "vm/VMState.hpp"
 
-namespace Ciallang::Inter {
+namespace Cial::Inter {
 
     std::unique_ptr<Bytecode::Chunk> IRGenerator::parseAst(const Common::Result &r, const Syntax::AstNode *node) {
         _r = r;
@@ -43,7 +43,7 @@ namespace Ciallang::Inter {
 
     Syntax::OptReg IRGenerator::generate(const Syntax::ValueExprNode *node) {
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::Load>(dst, node->token->value());
+        _chunk->emit<Bytecode::Op::OpCode::Load>(dst, _chunk->addConstant(node->token->value()));
 
         if(_r.isFailed())
             return {};
@@ -62,8 +62,8 @@ namespace Ciallang::Inter {
             Bytecode::Register dst = allocateRegister();
 
             if(auto *identifier = dynamic_cast<const Syntax::IdentifierExprNode *>(node->rhs); identifier) {
-                _chunk->emit<Bytecode::Op::OpCode::GProp>(
-                    reg1.value(), _symbolTable.getOrAddSymbol(identifier->token->value().toString()->toStdStr()), dst);
+                _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1.value(), _chunk->addConstant(identifier->token->value()),
+                                                          dst);
             } else {
                 auto reg2 = node->rhs->generateBytecode(this);
 
@@ -280,7 +280,8 @@ namespace Ciallang::Inter {
 
         _chunk->emit<Bytecode::Op::OpCode::Load>(
             funReg,
-            createObject<Function>(funChunk.release(), identifier.toString()->toStdStr(), node->parameters.size()));
+            _chunk->addConstant(Object::create<Function>(funChunk.release(), identifier.toString()->toStdStr(),
+                                                         node->parameters.size())));
 
         if(_scopeChain.size() == 1) {
             freeRegister(funReg);
@@ -300,8 +301,8 @@ namespace Ciallang::Inter {
         CLL_ASSERT(identifier.isString(), "class identifier is not string");
 
         auto thisObjReg = allocateRegister();
-        Value classObjVal = createObject<ClassObject>(identifier.toString()->toStdStr());
-        _chunk->emit<Bytecode::Op::OpCode::Load>(thisObjReg, classObjVal);
+        const Value classObjVal = Object::create<ClassObject>(identifier.toString()->toStdStr());
+        _chunk->emit<Bytecode::Op::OpCode::Load>(thisObjReg, _chunk->addConstant(classObjVal));
 
         // class is always global in current design
         _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
@@ -316,7 +317,7 @@ namespace Ciallang::Inter {
                 auto funChunk = generateChunk(funcDeclNode);
                 auto funName = funcDeclNode->token->value().toString()->toStdStr();
                 classObject->setMethod(
-                    funName, createObject<Function>(funChunk.release(), funName, funcDeclNode->parameters.size()));
+                    funName, Object::create<Function>(funChunk.release(), funName, funcDeclNode->parameters.size()));
             } else if(const auto *varDeclNode = dynamic_cast<Syntax::VarDeclNode *>(declNode)) {
                 const auto varName = varDeclNode->token->value();
 
@@ -602,4 +603,4 @@ namespace Ciallang::Inter {
         return funChunk;
     }
 
-} // namespace Ciallang::Inter
+} // namespace Cial::Inter

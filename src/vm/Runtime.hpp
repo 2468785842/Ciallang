@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024/6/14 下午4:49
+ * Copyright (c) 2025/12/24 上午8:08
  *
  * /\  _` \   __          /\_ \  /\_ \
  * \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -12,22 +12,15 @@
  *
  */
 #pragma once
+#include <string>
+#include <unordered_map>
 
-#include <fmt/ostream.h>
+#include "types/Value.hpp"
 
-namespace Cial::Bytecode {
-    class [[nodiscard]] Label {
+namespace Cial {
+
+    class Runtime {
     public:
-        explicit Label(const size_t address) : _address(address) {}
-
-        [[nodiscard]] size_t address() const noexcept { return _address; }
-
-    private:
-        size_t _address;
-
-        friend std::ostream &operator<<(std::ostream &os, const Label &label) { return os << '@' << label._address; }
+        std::unordered_map<std::string, Value> gObj{};
     };
-} // namespace Cial::Bytecode
-
-template <>
-struct fmt::formatter<Cial::Bytecode::Label> : ostream_formatter {};
+} // namespace Cial

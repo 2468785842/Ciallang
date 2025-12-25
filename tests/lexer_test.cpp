@@ -23,8 +23,8 @@
 #include "lexer/Lexer.hpp"
 
 TEST_CASE("词法分析 - 基本功能") {
-    Ciallang::Common::SourceFile source_file{ TEST_FILES_PATH "/startup.tjs" };
-    Ciallang::Common::Result r{};
+    Cial::Common::SourceFile source_file{ TEST_FILES_PATH "/startup.tjs" };
+    Cial::Common::Result r{};
     source_file.load(r);
 
     // 如果文件不存在，跳过测试
@@ -33,24 +33,24 @@ TEST_CASE("词法分析 - 基本功能") {
         return;
     }
 
-    Ciallang::Syntax::Lexer lexer{ source_file };
+    Cial::Syntax::Lexer lexer{ source_file };
     int tokenCount = 0;
 
     while(lexer.hasNext()) {
-        Ciallang::Syntax::Token *token = nullptr;
+        Cial::Syntax::Token *token = nullptr;
         lexer.next(token);
         REQUIRE(token != nullptr);
 
         std::cout << token->name() << "\t";
-        if(token->value().type() != Ciallang::ValueType::Octet) {
-            if(token->value().type() == Ciallang::ValueType::Integer) {
+        if(token->value().type() != Cial::ValueType::Octet) {
+            if(token->value().type() == Cial::ValueType::Integer) {
                 std::cout << std::dec << token->value().toInteger();
-            } else if(token->value().type() == Ciallang::ValueType::Real) {
+            } else if(token->value().type() == Cial::ValueType::Real) {
                 std::cout << std::dec << token->value().toReal();
-            } else if(token->value().type() == Ciallang::ValueType::String)
+            } else if(token->value().type() == Cial::ValueType::String)
                 std::cout << "\"" << token->value().toString() << "\"";
         }
-        if(token->type() == Ciallang::Syntax::TokenType::Invalid) {
+        if(token->type() == Cial::Syntax::TokenType::Invalid) {
             std::cout << token->location.start().line << "," << token->location.start().column;
         }
         std::cout << std::endl;

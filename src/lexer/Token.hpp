@@ -21,7 +21,7 @@
 #include "common/SourceLocation.hpp"
 #include "types/Value.hpp"
 
-namespace Ciallang::Syntax {
+namespace Cial::Syntax {
     using namespace Common;
 #define TOKEN_SYMBOL_PAIR_ENUM(X)                                                                                      \
     X(Invalid, "invalid")                                                                                              \
@@ -226,4 +226,4 @@ namespace Ciallang::Syntax {
             { TokenType::RArithShiftEqual, TokenType::RArithShift } // >>=
         });
     };
-} // namespace Ciallang::Syntax
+} // namespace Cial::Syntax

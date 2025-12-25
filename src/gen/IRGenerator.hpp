@@ -20,7 +20,7 @@
 #include "vm/Label.hpp"
 #include "vm/Register.hpp"
 
-namespace Ciallang::Inter {
+namespace Cial::Inter {
 
     class SymbolTable {
     public:
@@ -125,8 +125,8 @@ namespace Ciallang::Inter {
         std::vector<LoopContext> _loopStack{};
 
         struct LocalVariable {
-            Bytecode::Register reg{};
-            bool init{};
+            Bytecode::Register reg;
+            bool init;
         };
 
         struct Variable {
@@ -174,7 +174,7 @@ namespace Ciallang::Inter {
         Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk) {
             if(!_empty.has_value()) {
                 _empty = allocateRegister();
-                chunk.emit<Bytecode::Op::OpCode::Load>(_empty.value(), Value{});
+                chunk.emit<Bytecode::Op::OpCode::Load>(_empty.value(), _chunk->addConstant(Value{}));
             }
             return _empty.value();
         }
@@ -187,4 +187,4 @@ namespace Ciallang::Inter {
             _sourceFile.error(r, message, location);
         }
     };
-} // namespace Ciallang::Inter
+} // namespace Cial::Inter

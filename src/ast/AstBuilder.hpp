@@ -16,7 +16,7 @@
 
 #include "AstNode.hpp"
 
-namespace Ciallang::Syntax {
+namespace Cial::Syntax {
     class AstBuilder {
         std::vector<AstNode *> _nodes{};
 
@@ -39,4 +39,4 @@ namespace Ciallang::Syntax {
             return node;
         }
     };
-} // namespace Ciallang::Syntax
+} // namespace Cial::Syntax

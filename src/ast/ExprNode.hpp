@@ -17,7 +17,7 @@
 #include "gen/IRGenerator.hpp"
 #include "lexer/Token.hpp"
 
-namespace Ciallang::Syntax {
+namespace Cial::Syntax {
     class ExprNode : public AstNode {
     protected:
         using AstNode::AstNode;
@@ -117,4 +117,4 @@ namespace Ciallang::Syntax {
 
         OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
     };
-} // namespace Ciallang::Syntax
+} // namespace Cial::Syntax

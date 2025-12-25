@@ -18,7 +18,7 @@
 
 #include "common/SourceLocation.hpp"
 
-namespace Ciallang::Bytecode {
+namespace Cial::Bytecode {
     class Rlc {
     public:
         explicit Rlc(std::filesystem::path path) : _path(std::move(path)) {}
@@ -45,4 +45,4 @@ namespace Ciallang::Bytecode {
         std::vector<std::pair<size_t, Common::SourceLocation>> _bytecodeMapLine;
         std::filesystem::path _path;
     };
-} // namespace Ciallang::Bytecode
+} // namespace Cial::Bytecode

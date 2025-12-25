@@ -20,7 +20,7 @@
 #include "Value.hpp"
 #include "vm/Chunk.hpp"
 
-namespace Ciallang {
+namespace Cial {
 
     class Function final : public Object {
     public:
@@ -35,6 +35,14 @@ namespace Ciallang {
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
         [[nodiscard]] const Bytecode::Chunk *chunk() const { return _chunk.get(); }
+
+        Opt<Vec<GCObject *>> getRefs() override {
+            Vec<GCObject *> refs{};
+            for(auto &v : _chunk->getConstants()) {
+                refs.push_back(toGCObject(v));
+            }
+            return refs;
+        }
 
         ~Function() noexcept override = default;
 
@@ -149,6 +157,8 @@ namespace Ciallang {
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
+        Opt<Vec<GCObject *>> getRefs() override { return {}; }
+
         ~NativeFunction() noexcept override = default;
 
     private:
@@ -157,4 +167,4 @@ namespace Ciallang {
         const std::string _name;
     };
 
-} // namespace Ciallang
+} // namespace Cial

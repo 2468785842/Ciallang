@@ -15,7 +15,7 @@
 #include <fmt/color.h>
 #include <string>
 
-namespace Ciallang::Common {
+namespace Cial::Common {
     // N.B. this is not thread safe
     extern bool G_ColorEnabled;
 
@@ -29,4 +29,4 @@ namespace Ciallang::Common {
 
         static std::string colorizeRange(const std::string &, size_t, size_t, fmt::color, fmt::color);
     };
-} // namespace Ciallang::Common
+} // namespace Cial::Common

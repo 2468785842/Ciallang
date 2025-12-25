@@ -18,7 +18,7 @@
 
 #include "vm/VMState.hpp"
 
-namespace Ciallang {
+namespace Cial {
 
     Function::Function(Bytecode::Chunk *chunk, const std::string &name) : Function(chunk, name, 0) {}
 
@@ -48,4 +48,4 @@ namespace Ciallang {
 
         vmState.reg(ret, value);
     }
-} // namespace Ciallang
+} // namespace Cial

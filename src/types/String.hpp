@@ -7,8 +7,8 @@
 
 #include "gc/GC.hpp"
 
-namespace Ciallang {
-    class String : public GCObject {
+namespace Cial {
+    class String final : public GCObject {
         static constexpr int G_ShortStrLen = 21;
 
     public:
@@ -20,17 +20,26 @@ namespace Ciallang {
 
         bool operator==(const String &str) const { return toStdStr() == str.toStdStr(); }
 
+        Opt<Vec<GCObject *>> getRefs() override { return {}; }
+
         friend std::ostream &operator<<(std::ostream &os, const String &d) { return os << d.toStdStr(); }
+
+        template <size_t N>
+        static Value create(const char (&arr)[N]) {
+            return Value{ new String(arr, N) };
+        }
+
+        static Value create(const char *str, std::uint32_t size);
 
     private:
         char *_longStr;
-        char _shortStr[G_ShortStrLen + 1];
+        char _shortStr[G_ShortStrLen + 1]{};
         int _len;
     };
 
     inline String operator""_str(const char *str, const std::size_t len) { return String(str, len); }
-} // namespace Ciallang
+} // namespace Cial
 
 // support fmt::format
 template <>
-struct fmt::formatter<Ciallang::String> : ostream_formatter {};
+struct fmt::formatter<Cial::String> : ostream_formatter {};

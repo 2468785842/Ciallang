@@ -24,54 +24,55 @@
 #include "test_config.h"
 
 TEST_CASE("解释器 - Hello World") {
-    Ciallang::Common::Result r{};
+    Cial::Common::Result r{};
 
-    Ciallang::Common::SourceFile sourceFile{};
+    Cial::Common::SourceFile sourceFile{};
     sourceFile.load(r, "println(\"Hello World!\");");
-    Ciallang::Syntax::AstBuilder astBuilder{};
-    Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
+    Cial::Syntax::AstBuilder astBuilder{};
+    Cial::Syntax::Parser parser{ sourceFile, astBuilder };
     auto *globalNode = parser.parse(r);
 
-    Ciallang::Inter::SymbolTable globalTable{};
-    Ciallang::Inter::IRGenerator codeGen{ sourceFile, globalTable };
+    Cial::Inter::SymbolTable globalTable{};
+    Cial::Inter::IRGenerator codeGen{ sourceFile, globalTable };
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Ciallang::Bytecode::VMState interpreter{ globalTable };
+    Cial::Runtime rt;
+    Cial::Bytecode::VMState vm{ globalTable, rt };
 
-    interpreter.global("println", Ciallang::StdLib::S_PrintlnFunction);
+    vm.global("println", Cial::StdLib::S_PrintlnFunction);
 
-    interpreter.allocCallFrame(chunk.get());
-    interpreter.run();
+    vm.allocCallFrame(chunk.get());
+    vm.run();
 }
 
 TEST_CASE("解释器 - 执行测试") {
-    Ciallang::Common::Result r{};
+    Cial::Common::Result r{};
 
-    Ciallang::Common::SourceFile sourceFile{ TEST_FILES_PATH R"(/startup.tjs)" };
+    Cial::Common::SourceFile sourceFile{ TEST_FILES_PATH R"(/startup.tjs)" };
     sourceFile.load(r);
 
-    Ciallang::Syntax::AstBuilder astBuilder{};
-    Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
+    Cial::Syntax::AstBuilder astBuilder{};
+    Cial::Syntax::Parser parser{ sourceFile, astBuilder };
     auto *globalNode = parser.parse(r);
-    Ciallang::AstFormatter formatter{};
-    formatter.formatAst(globalNode);
 
-    Ciallang::Inter::SymbolTable globalTable{};
-    Ciallang::Inter::IRGenerator codeGen{ sourceFile, globalTable };
+    Cial::Inter::SymbolTable globalTable{};
+    Cial::Inter::IRGenerator codeGen{ sourceFile, globalTable };
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Ciallang::Bytecode::VMState interpreter{ globalTable };
-    interpreter.global("println", Ciallang::StdLib::S_PrintlnFunction);
+    Cial::Runtime rt;
+    Cial::Bytecode::VMState vm{ globalTable, rt };
 
-    interpreter.allocCallFrame(chunk.get());
-    interpreter.run();
+    vm.global("println", Cial::StdLib::S_PrintlnFunction);
+
+    vm.allocCallFrame(chunk.get());
+    vm.run();
 }
 
 TEST_CASE("解释器 - 脚本执行性能") {
     BENCHMARK("fib 15") {
-        Ciallang::Common::Result r{};
+        Cial::Common::Result r{};
 
-        Ciallang::Common::SourceFile sourceFile{};
+        Cial::Common::SourceFile sourceFile{};
         sourceFile.load(r, R"(
             function fib(n) {
                 if(n < 2) return n;
@@ -79,17 +80,18 @@ TEST_CASE("解释器 - 脚本执行性能") {
             }
             fib(15);
         )");
-        Ciallang::Syntax::AstBuilder astBuilder{};
-        Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
+        Cial::Syntax::AstBuilder astBuilder{};
+        Cial::Syntax::Parser parser{ sourceFile, astBuilder };
         auto *globalNode = parser.parse(r);
 
-        Ciallang::Inter::SymbolTable globalTable{};
-        Ciallang::Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        Cial::Inter::SymbolTable globalTable{};
+        Cial::Inter::IRGenerator codeGen{ sourceFile, globalTable };
         auto chunk = codeGen.parseAst(r, globalNode);
 
-        Ciallang::Bytecode::VMState interpreter{ globalTable };
+        Cial::Runtime rt;
+        Cial::Bytecode::VMState vm{ globalTable, rt };
 
-        interpreter.allocCallFrame(chunk.get());
-        interpreter.run();
+        vm.allocCallFrame(chunk.get());
+        vm.run();
     };
 }

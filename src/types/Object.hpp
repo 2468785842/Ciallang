@@ -14,12 +14,12 @@
 
 #include "gc/GC.hpp"
 
-namespace Ciallang::Bytecode {
+namespace Cial::Bytecode {
     class VMState;
     class Register;
-} // namespace Ciallang::Bytecode
+} // namespace Cial::Bytecode
 
-namespace Ciallang {
+namespace Cial {
     class Object : public GCObject {
     public:
         Object() = default;
@@ -28,6 +28,12 @@ namespace Ciallang {
         [[nodiscard]] virtual const char *name() const noexcept = 0;
 
         virtual void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) = 0;
+
+        template <class R, class... Args>
+            requires is_gc_object_v<R>
+        static Value create(Args... args) {
+            return Value{ new R(std::forward<Args>(args)...) };
+        }
     };
 
-} // namespace Ciallang
+} // namespace Cial

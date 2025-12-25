@@ -10,8 +10,9 @@
 
 #include "common/SourceFile.hpp"
 #include "lexer/Lexer.hpp"
+#include "types/String.hpp"
 
-using namespace Ciallang;
+using namespace Cial;
 
 TEST_CASE("词法分析器 - 关键字识别") {
     Common::SourceFile sourceFile{};

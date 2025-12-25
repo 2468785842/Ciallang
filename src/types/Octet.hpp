@@ -12,9 +12,10 @@
 
 #pragma once
 
+#include "Types.hpp"
 #include "gc/GC.hpp"
 
-namespace Ciallang {
+namespace Cial {
     class Octet final : public GCObject {
     public:
         explicit Octet(const std::uint8_t *src, std::uint32_t size);
@@ -33,10 +34,14 @@ namespace Ciallang {
 
         void persist(std::uint8_t *dst);
 
+        Opt<Vec<GCObject *>> getRefs() override { return {}; }
+
+        static Value create(const std::uint8_t *value, std::uint32_t size);
+
     private:
         std::uint8_t *_buf;
         std::uint32_t _size;
     };
 
 
-} // namespace Ciallang
+} // namespace Cial

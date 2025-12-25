@@ -18,7 +18,7 @@
 #include "common/SourceFile.hpp"
 #include "lexer/Lexer.hpp"
 
-namespace Ciallang::Syntax {
+namespace Cial::Syntax {
     using namespace Common;
 
     class Parser;
@@ -388,4 +388,4 @@ namespace Ciallang::Syntax {
           //            {TokenType::Question,         &S_ConditionalTernaryBinOpParser}, // cond ? expr : expr
           { TokenType::Dot, &S_MemberAccessBinOpParser },
           { TokenType::LParenthesis, &S_ProcCallInfixParser } });
-} // namespace Ciallang::Syntax
+} // namespace Cial::Syntax

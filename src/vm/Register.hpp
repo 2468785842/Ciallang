@@ -15,10 +15,9 @@
 
 #include <fmt/ostream.h>
 
-namespace Ciallang::Bytecode {
+namespace Cial::Bytecode {
     class [[nodiscard]] Register {
     public:
-        explicit Register() : _index(0) {}
         explicit Register(const size_t index) : _index(index) {}
 
         [[nodiscard]] size_t index() const noexcept { return _index; }
@@ -28,7 +27,7 @@ namespace Ciallang::Bytecode {
 
         friend std::ostream &operator<<(std::ostream &os, const Register &reg) { return os << '%' << reg._index; }
     };
-} // namespace Ciallang::Bytecode
+} // namespace Cial::Bytecode
 
 template <>
-struct fmt::formatter<Ciallang::Bytecode::Register> : ostream_formatter {};
+struct fmt::formatter<Cial::Bytecode::Register> : ostream_formatter {};

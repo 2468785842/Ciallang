@@ -14,7 +14,7 @@
 #include "Rlc.hpp"
 #include "logging/Logger.hpp"
 
-namespace Ciallang::Bytecode {
+namespace Cial::Bytecode {
     // 字节码索引是否是这行的第一个
     [[nodiscard]] bool Rlc::firstAppear(const size_t bytecodeIndex) const {
         return std::ranges::any_of(_bytecodeMapLine.begin(), _bytecodeMapLine.end(),
@@ -52,4 +52,4 @@ namespace Ciallang::Bytecode {
 
         return _bytecodeMapLine.at(0).second == sourceLine;
     }
-} // namespace Ciallang::Bytecode
+} // namespace Cial::Bytecode

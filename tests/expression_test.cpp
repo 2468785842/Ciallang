@@ -14,7 +14,7 @@
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"
 
-using namespace Ciallang;
+using namespace Cial;
 
 TEST_CASE("表达式 - 字面量表达式") {
     Common::SourceFile sourceFile{};

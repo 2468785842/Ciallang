@@ -13,7 +13,7 @@
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"
 
-using namespace Ciallang;
+using namespace Cial;
 
 TEST_CASE("函数声明 - 简单函数定义") {
     Common::SourceFile sourceFile{};

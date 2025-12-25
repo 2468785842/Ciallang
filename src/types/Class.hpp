@@ -13,10 +13,14 @@
  */
 #pragma once
 
+#include <ranges>
+
 #include "Function.hpp"
 #include "Value.hpp"
+#include "vm/VMState.hpp"
 
-namespace Ciallang {
+namespace Cial {
+    class Function;
 
     class ClassFunction final : public Object {
     public:
@@ -26,6 +30,12 @@ namespace Ciallang {
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
         [[nodiscard]] Function *getFunction() const noexcept { return dynamic_cast<Function *>(_function.toObject()); }
+
+        Opt<Vec<GCObject *>> getRefs() override {
+            auto refs = _function.toObject()->getRefs();
+            refs->push_back(toGCObject(_thisValue));
+            return refs;
+        }
 
     private:
         Value _thisValue;
@@ -60,7 +70,7 @@ namespace Ciallang {
 
         [[nodiscard]] Value getMethod(const std::string &name) const noexcept;
 
-        [[nodiscard]] std::vector<Value> getAllMethod() const noexcept;
+        [[nodiscard]] std::vector<Value> getMethods() const noexcept;
 
         void setFieldDef(const std::string &name, const FieldMeta &fieldMeta) noexcept;
 
@@ -68,6 +78,26 @@ namespace Ciallang {
 
         [[nodiscard]] const std::unordered_map<std::string, FieldMeta> &getFieldDefs() const noexcept {
             return _fieldsDef;
+        }
+
+        Opt<Vec<GCObject *>> getRefs() override {
+            Vec<GCObject *> refs{};
+
+            if(_base) {
+                if(const auto baseOptRefs = _base->getRefs()) {
+                    refs = *baseOptRefs;
+                }
+            }
+
+            for(auto &v : std::views::values(_methodsDef)) {
+                refs.push_back(toGCObject(v));
+            }
+
+            for(auto &v : std::views::values(_staticFields)) {
+                refs.push_back(toGCObject(v));
+            }
+
+            return refs;
         }
 
     private:
@@ -109,9 +139,30 @@ namespace Ciallang {
 
         [[nodiscard]] Value getMethod(const std::string &name) const noexcept;
 
+
+        Opt<Vec<GCObject *>> getRefs() override {
+            Vec<GCObject *> refs{};
+
+            if(_class) {
+                if(const auto classOptRefs = _class->getRefs()) {
+                    refs = *classOptRefs;
+                }
+            }
+
+            for(auto &v : std::views::values(_fields)) {
+                refs.push_back(toGCObject(v));
+            }
+
+            for(auto &v : std::views::values(_fields)) {
+                refs.push_back(toGCObject(v));
+            }
+
+            return refs;
+        }
+
     private:
         ClassObject *_class{ nullptr };
         std::unordered_map<std::string, Value> _fields{};
         std::unordered_map<std::string, Value> _methods{};
     };
-} // namespace Ciallang
+} // namespace Cial

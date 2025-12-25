@@ -24,23 +24,23 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    Ciallang::Common::Result r{};
+    Cial::Common::Result r{};
 
-    Ciallang::Common::SourceFile sourceFile{ argv[1] };
+    Cial::Common::SourceFile sourceFile{ argv[1] };
     sourceFile.load(r);
 
-    Ciallang::Syntax::AstBuilder astBuilder{};
-    Ciallang::Syntax::Parser parser{ sourceFile, astBuilder };
+    Cial::Syntax::AstBuilder astBuilder{};
+    Cial::Syntax::Parser parser{ sourceFile, astBuilder };
     auto *globalNode = parser.parse(r);
 
-    Ciallang::Inter::SymbolTable globalTable;
-    Ciallang::Inter::IRGenerator codeGen{ sourceFile, globalTable };
+    Cial::Inter::SymbolTable globalTable;
+    Cial::Inter::IRGenerator codeGen{ sourceFile, globalTable };
 
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Ciallang::Bytecode::VMState interpreter{ globalTable };
+    Cial::Bytecode::VMState interpreter{ globalTable };
     // interpreter.global(&Ciallang::Standard::S_PrintFunction);
-    interpreter.global("println", Ciallang::StdLib::S_PrintlnFunction);
+    interpreter.global("println", Cial::StdLib::S_PrintlnFunction);
 
     fmt::println("{}", interpreter.dumpInstruction(*chunk));
 

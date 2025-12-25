@@ -13,7 +13,7 @@
 #include "vm/Instruction.hpp"
 #include "vm/VMState.hpp"
 
-using namespace Ciallang;
+using namespace Cial;
 
 TEST_CASE("循环 - while语法解析") {
     Common::SourceFile sourceFile{};
@@ -86,7 +86,8 @@ TEST_CASE("循环 - do while与for执行") {
         Inter::SymbolTable globalTable{};
         Inter::IRGenerator codeGen{ sourceFile, globalTable };
         auto chunk = codeGen.parseAst(r, globalNode);
-        Bytecode::VMState vm{ globalTable };
+        Runtime rt;
+        Bytecode::VMState vm{ globalTable, rt };
         vm.allocCallFrame(chunk.get());
         vm.run();
         REQUIRE(vm.global("j").toInteger() == 5);
@@ -99,7 +100,9 @@ TEST_CASE("循环 - do while与for执行") {
         Inter::SymbolTable globalTable{};
         Inter::IRGenerator codeGen{ sourceFile, globalTable };
         auto chunk = codeGen.parseAst(r, globalNode);
-        Bytecode::VMState vm{ globalTable };
+
+        Runtime rt;
+        Bytecode::VMState vm{ globalTable, rt };
         vm.allocCallFrame(chunk.get());
         vm.run();
         REQUIRE(vm.global("k").toInteger() == 3);
@@ -123,7 +126,9 @@ TEST_CASE("循环 - while执行结果") {
     auto chunk = codeGen.parseAst(r, globalNode);
     REQUIRE(chunk != nullptr);
 
-    Bytecode::VMState vm{ globalTable };
+
+    Runtime rt;
+    Bytecode::VMState vm{ globalTable, rt };
     vm.allocCallFrame(chunk.get());
     vm.run();
 

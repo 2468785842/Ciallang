@@ -15,10 +15,9 @@
 
 #include <fmt/ostream.h>
 
-namespace Ciallang::Bytecode {
+namespace Cial::Bytecode {
     class [[nodiscard]] ConstIndex {
     public:
-        explicit ConstIndex() : _index(0) {}
         explicit ConstIndex(const size_t index) : _index(index) {}
 
         [[nodiscard]] size_t index() const noexcept { return _index; }
@@ -28,7 +27,7 @@ namespace Ciallang::Bytecode {
 
         friend std::ostream &operator<<(std::ostream &os, const ConstIndex &reg) { return os << '*' << reg._index; }
     };
-} // namespace Ciallang::Bytecode
+} // namespace Cial::Bytecode
 
 template <>
-struct fmt::formatter<Ciallang::Bytecode::ConstIndex> : ostream_formatter {};
+struct fmt::formatter<Cial::Bytecode::ConstIndex> : ostream_formatter {};

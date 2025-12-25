@@ -16,11 +16,11 @@
 #include "lexer/Token.hpp"
 #include "vm/Register.hpp"
 
-namespace Ciallang::Inter {
+namespace Cial::Inter {
     class IRGenerator;
 }
 
-namespace Ciallang::Syntax {
+namespace Cial::Syntax {
     class AstNode;
 
     class DeclNode;
@@ -139,4 +139,4 @@ namespace Ciallang::Syntax {
 
         virtual void visit(const ReturnStmtNode *) = 0;
     };
-} // namespace Ciallang::Syntax
+} // namespace Cial::Syntax

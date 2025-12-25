@@ -4,9 +4,9 @@
 
 #include "String.hpp"
 
-namespace Ciallang {
+namespace Cial {
 
-    String::String(const char *str, std::uint32_t len) : _len(len) {
+    String::String(const char *str, const std::uint32_t len) : _len(len) {
         char *buf = _shortStr;
         if(len > G_ShortStrLen) {
             _longStr = new char[len + 1];
@@ -16,4 +16,6 @@ namespace Ciallang {
         std::memcpy(buf, str, len);
     }
 
-} // namespace Ciallang
+    Value String::create(const char *str, const std::uint32_t size) { return Value{ new String(str, size) }; }
+
+} // namespace Cial

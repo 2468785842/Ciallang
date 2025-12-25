@@ -16,7 +16,7 @@
 #include "ConstIndex.hpp"
 #include "Instruction.hpp"
 
-namespace Ciallang::Bytecode {
+namespace Cial::Bytecode {
     class Chunk {
     public:
         ~Chunk() {
@@ -46,16 +46,28 @@ namespace Ciallang::Bytecode {
         [[nodiscard]] std::uint32_t getRegCount() const noexcept { return _registerCount; }
 
         ConstIndex addConstant(const Value &value) {
+            for(size_t i = 0; i < _constants.size(); ++i) {
+                if(_constants[i] == value) {
+                    return ConstIndex{ i };
+                }
+            }
             _constants.push_back(value);
             return ConstIndex{ _constants.size() - 1 };
         }
+
+        [[nodiscard]] const Value &getConstant(const ConstIndex index) const {
+            CLL_ASSERT(index.index() < _constants.size(), "constant index out of range");
+            return _constants[index.index()];
+        }
+
+        Vec<Value> getConstants() noexcept { return _constants; }
 
         Chunk(const Chunk &) = delete;
         Chunk &operator=(const Chunk &) = delete;
 
     private:
-        std::vector<Op::Instruction *> _instructions{};
+        Vec<Op::Instruction *> _instructions{};
         std::uint32_t _registerCount{ 0 };
-        std::vector<Value> _constants{};
+        Vec<Value> _constants{};
     };
-} // namespace Ciallang::Bytecode
+} // namespace Cial::Bytecode

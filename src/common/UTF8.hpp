@@ -17,7 +17,7 @@
 #include <cstdint>
 #include <string>
 
-namespace Ciallang::Common {
+namespace Cial::Common {
     using namespace std;
 
     static constexpr int32_t runeInvalid = 0xfffd;
@@ -76,4 +76,4 @@ namespace Ciallang::Common {
     int64_t utf8Strlen(const string &str);
 
     CodePointType utf8Decode(const char *str, size_t length);
-}; // namespace Ciallang::Common
+}; // namespace Cial::Common

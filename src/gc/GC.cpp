@@ -14,109 +14,88 @@
 // Created by LiDon on 2025/9/29.
 //
 
-#include <stack>
-
 #include "GC.hpp"
+
+#include "types/Object.hpp"
+#include "types/Octet.hpp"
+#include "types/String.hpp"
+
 #include "logging/Logger.hpp"
 
-namespace Ciallang {
+namespace Cial {
 
-    // GCObject 实现
     void GCObject::incRef() { ++_refCount; }
 
     void GCObject::decRef() {
-        if(--_refCount == 0) {
-            delete this;
+        // MarkSweep may free this portion of memory
+        if(_refCount == 0)
             return;
-        }
-        // 非零：可能是循环引用，需要 GC 检测
-        GC::instance().track(this);
+        // MarkSweep owners. We are only calling the destructor. We aren't freeing the memory!
+        if(--_refCount == 0)
+            this->~GCObject();
     }
 
-    void GCObject::addChild(GCObject *pChild) {
-        CLL_ASSERT(pChild != nullptr, "GC child is null");
-        _children.push_back(pChild);
-        pChild->incRef();
-    }
-
-    void GC::track(GCObject *o) {
-        if(!o->_inGCList) {
-            o->_inGCList = true;
-            _candidates.push_back(o);
-            if(_candidates.size() >= G_Threshold) {
-                collect();
+    GCObject *MarkSweep::findIdleNode() {
+        auto find = [&] {
+            _nextFree = _head;
+            while(_nextFree && _nextFree->_refCount > 0) {
+                _nextFree = _nextFree->_next;
             }
+        };
+
+        find();
+        if(!_nextFree)
+            collect();
+        find();
+
+        if(!_nextFree) {
+            auto [used, total] = memoryInfo();
+            CLL_LOG_FATAL("Allocation Failed! OutOfMemory(used/total): %d/%d", used, total);
         }
+
+        return _nextFree;
     }
 
-    void GC::collect() {
-        std::unordered_set<GCObject *> visited;
-
-        for(auto obj : _candidates) {
-            if(obj && !visited.contains(obj)) {
-                destroyCycle(obj, visited);
-            }
-        }
-
-        _candidates.clear();
-    }
-
-    void GC::destroyCycle(GCObject *root, std::unordered_set<GCObject *> &visited) {
-        if(!root)
-            return;
-
-        std::stack<GCObject *> stk;
-        stk.push(root);
-
-        std::vector<GCObject *> cycle_objects; // Objects potentially in a cycle
-
-        // Step 1: Find all objects reachable from root within the potential cycle
-        while(!stk.empty()) {
-            auto obj = stk.top();
-            stk.pop();
-
-            if(!obj || visited.contains(obj))
+    void MarkSweep::sweep() {
+        for(GCObject *cursor = _head; cursor; cursor = cursor->_next) {
+            if(cursor->_refCount == 0)
                 continue;
-            visited.insert(obj);
-            cycle_objects.push_back(obj);
 
-            for(auto child : obj->_children) {
-                if(child && !visited.contains(child)) {
-                    stk.push(child);
-                }
-            }
-        }
+            if(cursor->_marked)
+                cursor->_marked = false;
+            else {
+                cursor->_refCount = 0;
+                cursor->_marked = false;
+                cursor->~GCObject();
+                // fill memory with zero
+                // memset(reinterpret_cast<void*>(cursor + 1), 0, NODE_SIZE - sizeof(GCObject));
 
-        // Step 2: Perform a "trial deletion" by decrementing reference counts
-        // for all internal references within the identified cycle_objects.
-        // This simulates breaking the cycle.
-        for(const auto obj : cycle_objects) {
-            if(!obj)
-                continue;
-            for(auto child : obj->_children) {
-                if(child && visited.contains(child)) { // If child is also part of this cycle
-                    child->_refCount--;
-                }
-            }
-        }
-
-        // Step 3: Identify and delete objects that are truly unreferenced (refCount == 0)
-        // after the trial deletion. These objects were only referenced by the cycle.
-        for(const auto obj : cycle_objects) {
-            if(obj && obj->_refCount == 0) {
-                CLL_LOG_DEBUG("Destroying object 0x%llx", obj);
-                delete obj;
-            } else if(obj) {
-                // Step 4: For objects that still have refCount > 0, they are externally referenced.
-                // We need to restore their reference counts that were decremented in Step 2.
-                // And also clear their children to prevent dangling pointers.
-                for(auto child : obj->_children) {
-                    if(child && visited.contains(child)) {
-                        child->_refCount++; // Restore ref count
-                    }
-                }
-                obj->_children.clear(); // Clear children to prevent dangling pointers
+                _nextFree = cursor;
             }
         }
     }
-} // namespace Ciallang
+
+    std::pair<std::uint32_t, std::uint32_t> MarkSweep::memoryInfo() const {
+        std::uint32_t used{ 0 };
+        std::uint32_t total{ 0 };
+        for(const GCObject *cursor = _head; cursor; cursor = cursor->_next) {
+            if(cursor->_refCount > 0) {
+                used += NODE_SIZE;
+            }
+            total += NODE_SIZE;
+        }
+
+        return { used, total };
+    }
+
+    GCObject *toGCObject(const Value &v) noexcept {
+        if(v.isObject())
+            return v.toObject();
+        if(v.isString())
+            return v.toString();
+        if(v.isOctet())
+            return v.toOctet();
+        return nullptr;
+    }
+
+} // namespace Cial

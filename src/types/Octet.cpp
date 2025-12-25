@@ -12,7 +12,7 @@
 
 #include "Octet.hpp"
 
-namespace Ciallang {
+namespace Cial {
     Octet::Octet(const std::uint8_t *src, std::uint32_t size) {
         _size = size;
         _buf = new std::uint8_t[_size];
@@ -39,4 +39,6 @@ namespace Ciallang {
             std::memcpy(dst + sizeof(decltype(_size)), _buf, _size);
         }
     }
-} // namespace Ciallang
+
+    Value Octet::create(const std::uint8_t *value, const std::uint32_t size) { return Value{ new Octet(value, size) }; }
+} // namespace Cial

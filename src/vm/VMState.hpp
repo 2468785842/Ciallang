@@ -17,15 +17,15 @@
 
 #include "Chunk.hpp"
 #include "FastRegisterPool.hpp"
+#include "Runtime.hpp"
 #include "gen/IRGenerator.hpp"
-#include "types/Class.hpp"
 #include "types/Function.hpp"
 
 #include "types/Value.hpp"
 
 #include "vm/Register.hpp"
 
-namespace Ciallang::Bytecode {
+namespace Cial::Bytecode {
     // enum class ContextType {
     //     TopLevel,
     //     Function,
@@ -82,7 +82,10 @@ namespace Ciallang::Bytecode {
 
     class VMState {
     public:
-        explicit VMState(Inter::SymbolTable &symbolTable) : _symbolTable(symbolTable) {}
+        MarkSweep gc;
+
+        explicit VMState(Inter::SymbolTable &symbolTable, Runtime &rt) :
+            gc{ 1024, rt }, _rt(rt), _symbolTable(symbolTable) {}
 
         void run();
 
@@ -91,16 +94,16 @@ namespace Ciallang::Bytecode {
         [[nodiscard]] Value reg(Register reg) const;
 
         [[nodiscard]] Value global(const size_t symbolIndex) const {
-            return _globalObject.getStaticField(getSymbol(symbolIndex));
+            return _rt.gObj.contains(getSymbol(symbolIndex)) ? _rt.gObj[getSymbol(symbolIndex)] : Value{};
         }
 
-        void global(const size_t symbolIndex, const Value &value) {
-            _globalObject.setStaticField(getSymbol(symbolIndex), value);
+        void global(const size_t symbolIndex, const Value &value) const { _rt.gObj[getSymbol(symbolIndex)] = value; }
+
+        [[nodiscard]] Value global(const std::string &name) const {
+            return _rt.gObj.contains(name) ? _rt.gObj[name] : Value{};
         }
 
-        [[nodiscard]] Value global(const std::string &name) const { return _globalObject.getStaticField(name); }
-
-        void global(const std::string &name, const Value &value) { _globalObject.setStaticField(name, value); }
+        void global(const std::string &name, const Value &value) const { _rt.gObj[name] = value; }
 
         void setZF(const bool zf) { _zf = zf; }
 
@@ -155,7 +158,7 @@ namespace Ciallang::Bytecode {
                 ss << fmt::format("{: <6}: {}\n", Label{ pc }, Op::Instruction::dump(*instruction, *this, false));
 
                 if(instruction->opcode == Op::OpCode::Load) {
-                    if(auto value = Op::Load::value(*instruction); value.isObject()) {
+                    if(auto value = current()->chunk->getConstant(Op::Load::value(*instruction)); value.isObject()) {
                         if(auto fun = dynamic_cast<Function *>(value.toObject())) {
                             functions.push_back(fun);
                         }
@@ -183,14 +186,14 @@ namespace Ciallang::Bytecode {
         [[nodiscard]] size_t getRegPoolTop() const { return _regPool.used(); }
 
     private:
+        Runtime &_rt;
         Inter::SymbolTable &_symbolTable;
         CallFrame *_currentFrame{ nullptr };
-        // 栈的最大深度为1024
+        // Stack Max Depth Is 1024
         static constexpr auto MAX_CALL_DEPTH = 1024;
         FastRegisterPool _regPool{};
         CallFrame _callStack[MAX_CALL_DEPTH];
         size_t _stackTop{ 0 };
-        ClassObject _globalObject{ "global" };
         bool _zf{ false };
     };
-} // namespace Ciallang::Bytecode
+} // namespace Cial::Bytecode

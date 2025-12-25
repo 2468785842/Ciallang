@@ -20,7 +20,7 @@
 #include "lexer/Token.hpp"
 #include "logging/Logger.hpp"
 
-namespace Ciallang {
+namespace Cial {
     class AstFormatter final : public Syntax::AstNode::Visitor {
     public:
         explicit AstFormatter() = default;
@@ -323,4 +323,4 @@ namespace Ciallang {
         }
     };
 
-} // namespace Ciallang
+} // namespace Cial

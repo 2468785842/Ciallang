@@ -25,7 +25,7 @@
 
 #include <fmt/format.h>
 
-using namespace Ciallang::Syntax;
+using namespace Cial::Syntax;
 
 std::multimap<std::int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
     // block comment, line comment
@@ -703,7 +703,7 @@ bool Lexer::identifier(Token *&token) {
         return true;
     }
 
-    token = makeToken(TokenType::Identifier, createString(name.c_str(), name.size()));
+    token = makeToken(TokenType::Identifier, String::create(name.c_str(), name.size()));
     return true;
 }
 
@@ -1178,7 +1178,7 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
         str << runeType.data;
     }
 
-    token = makeToken(TokenType::ConstVal, createString(str.str().c_str(), str.str().size()));
+    token = makeToken(TokenType::ConstVal, String::create(str.str().c_str(), str.str().size()));
 
     return strPsState;
 }
@@ -1205,7 +1205,7 @@ bool Lexer::octetLiteral(Token *&token) {
             if(ch == '%') {
                 ch = read(false);
                 if(ch == '>') {
-                    token = makeToken(TokenType::ConstVal, createOctet(buf.data(), buf.size()));
+                    token = makeToken(TokenType::ConstVal, Octet::create(buf.data(), buf.size()));
                     return true;
                 }
                 _sourceFile.restoreTopMark();

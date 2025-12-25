@@ -12,9 +12,12 @@
 
 #include "Value.hpp"
 
+#include "Object.hpp"
+#include "Octet.hpp"
+#include "String.hpp"
 #include "logging/Logger.hpp"
 
-namespace Ciallang {
+namespace Cial {
 
     Value::Value(const Integer value) : _value{ ._integer = value }, _type(ValueType::Integer) {}
 
@@ -121,45 +124,45 @@ namespace Ciallang {
         }
     }
 
-    Value Value::operator+(const Value &tjsValue) const {
-        switch(tjsValue.type()) {
+    Value Value::operator+(const Value &value) const {
+        switch(value.type()) {
             case ValueType::Integer:
-                return Value{ this->toInteger() + tjsValue.toInteger() };
+                return Value{ this->toInteger() + value.toInteger() };
             case ValueType::Real:
-                return Value{ this->toReal() + tjsValue.toReal() };
+                return Value{ this->toReal() + value.toReal() };
             default:
                 throw std::logic_error("not support add operator");
         }
     }
 
-    Value Value::operator-(const Value &tjsValue) const {
-        switch(tjsValue.type()) {
+    Value Value::operator-(const Value &value) const {
+        switch(value.type()) {
             case ValueType::Integer:
-                return Value{ this->toInteger() - tjsValue.toInteger() };
+                return Value{ this->toInteger() - value.toInteger() };
             case ValueType::Real:
-                return Value{ this->toReal() - tjsValue.toReal() };
+                return Value{ this->toReal() - value.toReal() };
             default:
                 throw std::logic_error("not support sub operator");
         }
     }
 
-    Value Value::operator*(const Value &tjsValue) const {
-        switch(tjsValue.type()) {
+    Value Value::operator*(const Value &value) const {
+        switch(value.type()) {
             case ValueType::Integer:
-                return Value{ this->toInteger() * tjsValue.toInteger() };
+                return Value{ this->toInteger() * value.toInteger() };
             case ValueType::Real:
-                return Value{ this->toReal() * tjsValue.toReal() };
+                return Value{ this->toReal() * value.toReal() };
             default:
                 throw std::logic_error("not support mul operator");
         }
     }
 
-    Value Value::operator/(const Value &tjsValue) const {
-        switch(tjsValue.type()) {
+    Value Value::operator/(const Value &value) const {
+        switch(value.type()) {
             case ValueType::Integer:
-                return Value{ this->toInteger() / tjsValue.toInteger() };
+                return Value{ this->toInteger() / value.toInteger() };
             case ValueType::Real:
-                return Value{ this->toReal() / tjsValue.toReal() };
+                return Value{ this->toReal() / value.toReal() };
             default:
                 throw std::logic_error("not support div operator");
         }
@@ -175,26 +178,34 @@ namespace Ciallang {
                 throw std::logic_error("not number!! `operator-` can't use");
         }
     }
+    bool Value::discernCompare(const Value &value) const {
+        if(!this->operator==(value)) {
+            return false;
+        }
+        // TODO: implement
+        return true;
+    }
 
-    bool Value::operator==(const Value &tjsValue) const {
-        if(type() != tjsValue.type())
+    bool Value::operator==(const Value &value) const {
+        if(type() != value.type())
             return false;
         switch(type()) {
             case ValueType::Integer:
-                return toInteger() == tjsValue.toInteger();
+                return toInteger() == value.toInteger();
             case ValueType::Real:
-                return toReal() == tjsValue.toReal();
+                return toReal() == value.toReal();
             case ValueType::String:
-                return toString() == tjsValue.toString();
+                return toString() == value.toString();
             case ValueType::Object:
-                return toObject() == tjsValue.toObject();
+                return toObject() == value.toObject();
             case ValueType::Octet:
-                return toOctet() == tjsValue.toOctet();
+                return toOctet() == value.toOctet();
+            case ValueType::Void:
+                return true;
             default:;
         }
 
-        CLL_LOG_FATAL("not impl `==` operator in Value");
-        std::abort();
+        return false;
     }
 
     std::partial_ordering Value::operator<=>(const Value &rhs) const {
@@ -227,4 +238,4 @@ namespace Ciallang {
         }
         return os << "unknown";
     }
-} // namespace Ciallang
+} // namespace Cial

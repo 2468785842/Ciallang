@@ -16,7 +16,7 @@
 
 #include "vm/VMState.hpp"
 
-namespace Ciallang {
+namespace Cial {
     ClassObject::~ClassObject() noexcept {
         if(_base) {
             _base->decRef();
@@ -49,7 +49,7 @@ namespace Ciallang {
         return it != _methodsDef.end() ? it->second : Value{};
     }
 
-    [[nodiscard]] std::vector<Value> ClassObject::getAllMethod() const noexcept {
+    [[nodiscard]] std::vector<Value> ClassObject::getMethods() const noexcept {
         std::vector<Value> result;
         for(auto &method : _methodsDef | std::views::values) {
             result.push_back(method);
@@ -86,21 +86,21 @@ namespace Ciallang {
     }
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
-        const Value &instanceObjVal = createObject<InstanceObject>(this);
-        auto *instanceObj = dynamic_cast<InstanceObject *>(instanceObjVal.toObject());
+        auto *instanceObj = vmState.gc.allocate<InstanceObject>(this);
 
         for(auto &[k, v] : getFieldDefs()) {
             instanceObj->setField(k, v.defValReg ? vmState.reg(v.defValReg.value()) : Value{});
         }
 
-        for(auto &v : getAllMethod()) {
-            instanceObj->setField(v.toObject()->name(), createObject<ClassFunction>(instanceObjVal, v));
+        for(auto &v : getMethods()) {
+            instanceObj->setField(v.toObject()->name(),
+                                  Value{ vmState.gc.allocate<ClassFunction>(Value{ instanceObj }, v) });
         }
-        vmState.reg(ret, instanceObjVal);
+        vmState.reg(ret, Value{ instanceObj });
     }
 
     void InstanceObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         throw std::runtime_error("Not implemented InstanceObject call");
     }
 
-} // namespace Ciallang
+} // namespace Cial

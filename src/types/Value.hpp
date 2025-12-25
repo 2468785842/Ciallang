@@ -14,14 +14,9 @@
 
 #include <fmt/ostream.h>
 
-#include "Object.hpp"
-#include "Octet.hpp"
-#include "String.hpp"
 #include "Types.hpp"
 
-#include "gc/GC.hpp"
-
-namespace Ciallang {
+namespace Cial {
     class Value {
 
     public:
@@ -73,17 +68,18 @@ namespace Ciallang {
 
         [[nodiscard]] const char *name() const;
 
-        Value operator+(const Value &tjsValue) const;
+        Value operator+(const Value &value) const;
 
-        Value operator-(const Value &tjsValue) const;
+        Value operator-(const Value &value) const;
 
-        Value operator*(const Value &tjsValue) const;
+        Value operator*(const Value &value) const;
 
-        Value operator/(const Value &tjsValue) const;
+        Value operator/(const Value &value) const;
 
         Value operator-() const;
 
-        bool operator==(const Value &tjsValue) const;
+        [[nodiscard]] bool discernCompare(const Value &value) const;
+        bool operator==(const Value &value) const;
 
         std::partial_ordering operator<=>(const Value &rhs) const;
 
@@ -101,29 +97,12 @@ namespace Ciallang {
         friend std::ostream &operator<<(std::ostream &os, const Value &d);
     };
 
-    static Value createInteger(const Integer value) { return Value{ value }; }
+    inline Value createInteger(const Integer value) { return Value{ value }; }
 
-    static Value createReal(const Real value) { return Value{ value }; }
+    inline Value createReal(const Real value) { return Value{ value }; }
 
-    template <class R, class... Args>
-        requires is_gc_object_v<R>
-    static Value createObject(Args... args) {
-        return Value{ new R{ std::forward<Args>(args)... } };
-    }
-
-    static Value createOctet(const std::uint8_t *value, const std::uint32_t size) {
-        return Value{ new Octet{ value, size } };
-    }
-
-    template <size_t N>
-    static Value createString(const char (&arr)[N]) {
-        return Value{ new String{ arr, N } };
-    }
-
-    static Value createString(const char *str, const std::uint32_t size) { return Value{ new String{ str, size } }; }
-
-} // namespace Ciallang
+} // namespace Cial
 
 // support fmt::format
 template <>
-struct fmt::formatter<Ciallang::Value> : ostream_formatter {};
+struct fmt::formatter<Cial::Value> : ostream_formatter {};

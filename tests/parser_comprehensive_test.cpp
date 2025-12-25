@@ -14,7 +14,7 @@
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"
 
-using namespace Ciallang;
+using namespace Cial;
 
 TEST_CASE("语法解析器 - 表达式解析") {
     Common::SourceFile sourceFile{};

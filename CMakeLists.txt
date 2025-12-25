@@ -65,13 +65,13 @@ target_link_libraries(
 )
 
 if(${BUILD_EXECUTABLE})
-    add_executable(cll
+    add_executable(cial
             src/main.cpp
             ${SOURCE_FILES}
     )
-#    target_precompile_headers(cll PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
+#    target_precompile_headers(cial PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
     target_link_libraries(
-            cll
+            cial
             PRIVATE
             fmt::fmt utf8proc frozen::frozen argparse::argparse spdlog::spdlog
     )

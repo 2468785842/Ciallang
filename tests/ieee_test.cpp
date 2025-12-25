@@ -8,7 +8,7 @@
 
 #include "lexer/IEEETypes.hpp"
 
-using namespace Ciallang::Syntax::IEEE;
+using namespace Cial::Syntax::IEEE;
 
 TEST_CASE("IEEE 754 - Basic Constants") {
     SECTION("Constants are correctly defined") {

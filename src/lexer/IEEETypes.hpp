@@ -34,7 +34,7 @@
 // +-+-----------+---------------------------+
 // s = sign,  negative if this is 1, otherwise positive.
 
-namespace Ciallang::Syntax::IEEE {
+namespace Cial::Syntax::IEEE {
 
     // Concepts for IEEE floating point operations
     template <typename T>
@@ -142,4 +142,4 @@ namespace Ciallang::Syntax::IEEE {
         [[nodiscard]] static constexpr Double signaling_nan() noexcept { return Double(N_NaN); }
     };
 
-} // namespace Ciallang::Syntax::IEEE
+} // namespace Cial::Syntax::IEEE

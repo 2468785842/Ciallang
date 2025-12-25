@@ -13,7 +13,7 @@
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"
 
-using namespace Ciallang;
+using namespace Cial;
 
 TEST_CASE("语句 - 变量声明语句") {
     Common::SourceFile sourceFile{};

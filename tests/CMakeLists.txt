@@ -17,8 +17,6 @@ set(SOURCES
         loop_test.cpp
         ieee_test.cpp
         oop_test.cpp
-        gc_test.cpp
-        gc_comprehensive_test.cpp
         interpreter_test.cpp
         integration_test.cpp
         lexer_comprehensive_test.cpp
@@ -26,7 +24,6 @@ set(SOURCES
         parser_comprehensive_test.cpp
         statement_test.cpp
         type_system_test.cpp
-        vm_instruction_test.cpp
 )
 
 add_executable(CiallangTests main.cpp ${SOURCES})

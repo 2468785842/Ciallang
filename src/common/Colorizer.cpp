@@ -16,7 +16,7 @@
 
 #include <sstream>
 
-namespace Ciallang::Common {
+namespace Cial::Common {
     static bool TerminalSupportsColor();
 
     bool G_ColorEnabled = TerminalSupportsColor();
@@ -80,4 +80,4 @@ namespace Ciallang::Common {
 #endif
         return term_supports_color;
     }
-} // namespace Ciallang::Common
+} // namespace Cial::Common
