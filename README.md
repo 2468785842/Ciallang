@@ -116,7 +116,7 @@
        ```
 4. 运行解释器：
    ```sh
-   ./cll <script-file>
+   ./cial <script-file>
    ```
 
 ---

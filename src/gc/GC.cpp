@@ -30,9 +30,14 @@ namespace Cial {
         // MarkSweep may free this portion of memory
         if(_refCount == 0)
             return;
-        // MarkSweep owners. We are only calling the destructor. We aren't freeing the memory!
-        if(--_refCount == 0)
-            this->~GCObject();
+        if(--_refCount == 0) {
+            // MarkSweep owners. We are only calling the destructor. We aren't freeing the memory!
+            if(_isMalloc) {
+                this->~GCObject();
+            } else {
+                delete this;
+            }
+        }
     }
 
     GCObject *MarkSweep::findIdleNode() {

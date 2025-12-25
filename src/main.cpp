@@ -20,7 +20,7 @@
 
 int main(int argc, char **argv) {
     if(argc < 2) {
-        fmt::println("Usage: cll <script-file>");
+        fmt::println("Usage: cial <script-file>");
         return 0;
     }
 
@@ -38,7 +38,8 @@ int main(int argc, char **argv) {
 
     auto chunk = codeGen.parseAst(r, globalNode);
 
-    Cial::Bytecode::VMState interpreter{ globalTable };
+    Cial::Runtime rt;
+    Cial::Bytecode::VMState interpreter{ globalTable, rt };
     // interpreter.global(&Ciallang::Standard::S_PrintFunction);
     interpreter.global("println", Cial::StdLib::S_PrintlnFunction);
 

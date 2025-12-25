@@ -32,8 +32,9 @@ namespace Cial {
         virtual Opt<Vec<GCObject *>> getRefs() = 0;
 
     private:
-        std::uint32_t _refCount{ 0 };
+        bool _isMalloc{ false };
         bool _marked{ false };
+        std::uint32_t _refCount{ 0 };
         GCObject *_next{ nullptr };
     };
 
@@ -76,6 +77,7 @@ namespace Cial {
 
             GCObject *next = _nextFree->_next;
             T *newObj = new(_nextFree) T(std::forward<Args>(args)...);
+            newObj->_isMalloc = true;
             newObj->_marked = false;
             newObj->_refCount = 0;
             newObj->_next = next;
@@ -107,8 +109,9 @@ namespace Cial {
             GCObject *head{ nullptr };
             for(int i = 0; i < freeListSize; ++i) {
                 auto *gcObj = static_cast<GCObject *>(malloc(NODE_SIZE));
-                gcObj->_refCount = 0;
+                gcObj->_isMalloc = true;
                 gcObj->_marked = false;
+                gcObj->_refCount = 0;
                 gcObj->_next = head;
                 head = gcObj;
             }

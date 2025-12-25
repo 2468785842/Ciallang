@@ -21,7 +21,7 @@ namespace Cial::Bytecode {
     public:
         ~Chunk() {
             for(const auto &inst : _instructions) {
-                inst->~Instruction();
+                delete inst;
             }
             _instructions.clear();
         }
