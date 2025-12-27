@@ -43,7 +43,7 @@ namespace Cial::Inter {
 
     Syntax::OptReg IRGenerator::generate(const Syntax::ValueExprNode *node) {
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::Load>(dst, _chunk->addConstant(node->token->value()));
+        _chunk->emit<Bytecode::Op::OpCode::Load>(dst, _chunk->addConstant(node->token->constVal()));
 
         if(_r.isFailed())
             return {};
@@ -62,8 +62,8 @@ namespace Cial::Inter {
             Bytecode::Register dst = allocateRegister();
 
             if(auto *identifier = dynamic_cast<const Syntax::IdentifierExprNode *>(node->rhs); identifier) {
-                _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1.value(), _chunk->addConstant(identifier->token->value()),
-                                                          dst);
+                _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1.value(),
+                                                          _chunk->addConstant(identifier->token->constVal()), dst);
             } else {
                 auto reg2 = node->rhs->generateBytecode(this);
 
@@ -148,8 +148,7 @@ namespace Cial::Inter {
         auto memberReg = member->generateBytecode(this);
 
         CLL_ASSERT(memberReg, "memberReg is empty");
-        for(size_t i = node->arguments.size(); i > 0; i--) {
-            const auto *exprNode = node->arguments[i - 1];
+        for(const auto *exprNode : node->arguments) {
             if(!exprNode) {
                 _chunk->emit<Bytecode::Op::OpCode::PushReg>(loadVoidReg(*_chunk));
             } else {
@@ -171,7 +170,7 @@ namespace Cial::Inter {
 
     Syntax::OptReg IRGenerator::generate(const Syntax::AssignExprNode *node) {
         // TODO: member access
-        const auto identifier = node->lhs->token->value();
+        const auto identifier = node->lhs->token->constVal();
 
         auto variable = resolveLocalVariable(identifier.value<Atom>());
 
@@ -203,7 +202,7 @@ namespace Cial::Inter {
     }
 
     Syntax::OptReg IRGenerator::generate(const Syntax::VarDeclNode *node) {
-        const auto identifier = node->token->value().value<Atom>();
+        const auto identifier = node->token->constVal().value<Atom>();
 
         // global
         if(_scopeChain.size() == 1) {
@@ -266,7 +265,7 @@ namespace Cial::Inter {
         auto funReg = allocateRegister();
         auto funChunk = generateChunk(node);
 
-        const auto identifier = node->token->value().value<Atom>();
+        const auto identifier = node->token->constVal().value<Atom>();
 
         _chunk->emit<Bytecode::Op::OpCode::Load>(
             funReg,
@@ -331,7 +330,7 @@ namespace Cial::Inter {
     }
 
     Syntax::OptReg IRGenerator::generate(const Syntax::IdentifierExprNode *node) {
-        const auto identifier = node->token->value().value<Atom>();
+        const auto identifier = node->token->constVal().value<Atom>();
 
         auto variable = resolveLocalVariable(identifier);
 
@@ -561,7 +560,7 @@ namespace Cial::Inter {
         Syntax::OptReg paramReg{};
 
         for(auto &[token, exprNode] : node->parameters) {
-            const auto varName = token.value().value<Atom>();
+            const auto varName = token.constVal().value<Atom>();
 
             if(exprNode) {
                 auto defaultParameter = exprNode->generateBytecode(&gen);

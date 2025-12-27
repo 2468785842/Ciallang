@@ -192,7 +192,7 @@ namespace Cial::Syntax {
 
         [[nodiscard]] constexpr TokenType type() const noexcept { return _type; }
 
-        [[nodiscard]] Constant value() const noexcept { return Constant{ _constType, _value }; }
+        [[nodiscard]] Constant constVal() const noexcept { return Constant{ _constType, _value }; }
 
         [[nodiscard]] constexpr const char *name() const noexcept { return tokenTypeToStr(_type); }
 

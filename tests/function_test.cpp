@@ -6,10 +6,6 @@
 
 #include <catch.hpp>
 
-#include "ast/AstBuilder.hpp"
-#include "ast/DeclNode.hpp"
-#include "ast/ExprNode.hpp"
-#include "ast/StmtNode.hpp"
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"
 #include "vm/VMState.hpp"
@@ -19,12 +15,14 @@ using namespace Cial;
 TEST_CASE("函数声明 - 简单函数定义") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
 
     sourceFile.load(r, R"(
         function empty() { }
         function foo() { return 42; }
         function add(a, b) { return a + b; }
+        var rEmpty = empty();
+        var rFoo = foo();
+        var rAdd = add(1, 2);
     )");
     Runtime rt{};
     Syntax::Parser parser{ rt, sourceFile };
@@ -45,81 +43,78 @@ TEST_CASE("函数声明 - 简单函数定义") {
     REQUIRE(vm.global("empty").isObject());
     REQUIRE(vm.global("foo").isObject());
     REQUIRE(vm.global("add").isObject());
+
+    REQUIRE(vm.global("rEmpty").isVoid());
+
+    Value rFoo = vm.global("rFoo");
+    REQUIRE(rFoo.isInteger());
+    REQUIRE(rFoo.toInteger() == 42);
+
+    Value rAdd = vm.global("rAdd");
+
+    REQUIRE(rAdd.isInteger());
+    REQUIRE(rAdd.toInteger() == 3);
 }
 
 TEST_CASE("函数声明 - 参数列表") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
 
-    SECTION("单个参数") {
-        sourceFile.load(r, "function single(x) { return x; }");
-        Runtime rt{};
-        Syntax::Parser parser{ rt, sourceFile };
+    sourceFile.load(r, R"(
+        function single(x) { return x; } var rSingle = single(1);
+        function multi(a, b, c) { return a + b + c; } var rMulti = multi(1, 2, 3);
+        function complex(param1, param_2, param3) { return param1; } var rComplex1 = complex(); var rComplex2 = complex(1); var rComplex3 = complex(1, 2, 3);
+    )");
+    Runtime rt{};
+    Syntax::Parser parser{ rt, sourceFile };
 
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
+    auto *globalNode = parser.parse(r);
+    REQUIRE(globalNode != nullptr);
+    REQUIRE_FALSE(r.isFailed());
 
-        Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
-        REQUIRE(chunk != nullptr);
-        REQUIRE_FALSE(r.isFailed());
+    Inter::IRGenerator codeGen{ sourceFile };
+    auto chunk = codeGen.parseAst(r, globalNode);
+    REQUIRE(chunk != nullptr);
+    REQUIRE_FALSE(r.isFailed());
 
-        Bytecode::VMState vm{ rt };
-        vm.allocCallFrame(chunk.get());
-        vm.run();
-        REQUIRE(vm.global("single").isObject());
-    }
+    Bytecode::VMState vm{ rt };
+    vm.allocCallFrame(chunk.get());
+    vm.run();
 
-    SECTION("多个参数") {
-        sourceFile.load(r, "function multi(a, b, c) { return a + b + c; }");
-        Runtime rt{};
-        Syntax::Parser parser{ rt, sourceFile };
+    REQUIRE(vm.global("single").isObject());
+    REQUIRE(vm.global("multi").isObject());
+    REQUIRE(vm.global("complex").isObject());
 
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
+    Value rSingle = vm.global("rSingle");
+    REQUIRE(rSingle.isInteger());
+    REQUIRE(rSingle.toInteger() == 1);
 
-        Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
-        REQUIRE(chunk != nullptr);
-        REQUIRE_FALSE(r.isFailed());
+    Value rMulti = vm.global("rMulti");
 
-        Bytecode::VMState vm{ rt };
-        vm.allocCallFrame(chunk.get());
-        vm.run();
-        REQUIRE(vm.global("multi").isObject());
-    }
+    REQUIRE(rMulti.isInteger());
+    REQUIRE(rMulti.toInteger() == 6);
 
-    SECTION("复杂参数名") {
-        sourceFile.load(r, "function complex(param1, param_2, param3) { return param1; }");
-        Runtime rt{};
-        Syntax::Parser parser{ rt, sourceFile };
+    Value rComplex1 = vm.global("rComplex1");
 
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
+    REQUIRE(rComplex1.isVoid());
 
-        Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
-        REQUIRE(chunk != nullptr);
-        REQUIRE_FALSE(r.isFailed());
+    Value rComplex2 = vm.global("rComplex2");
 
-        Bytecode::VMState vm{ rt };
-        vm.allocCallFrame(chunk.get());
-        vm.run();
-        REQUIRE(vm.global("complex").isObject());
-    }
+    REQUIRE(rComplex2.isInteger());
+    REQUIRE(rComplex2.toInteger() == 1);
+
+    Value rComplex3 = vm.global("rComplex3");
+
+    REQUIRE(rComplex3.isInteger());
+    REQUIRE(rComplex3.toInteger() == 1);
 }
 
 TEST_CASE("函数声明 - 函数体内容") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
 
     SECTION("带变量声明的函数体") {
-        sourceFile.load(r, "function test() { var x = 10; var y = 20; return x + y; }");
+        sourceFile.load(r, "function test() { var x = 10; var y = 20; return x + y; } var rTest = test();");
         Runtime rt{};
         Syntax::Parser parser{ rt, sourceFile };
 
@@ -136,10 +131,14 @@ TEST_CASE("函数声明 - 函数体内容") {
         vm.allocCallFrame(chunk.get());
         vm.run();
         REQUIRE(vm.global("test").isObject());
+
+        Value rTest = vm.global("rTest");
+        REQUIRE(rTest.isInteger());
+        REQUIRE(rTest.toInteger() == 30);
     }
 
     SECTION("带控制流的函数体") {
-        sourceFile.load(r, "function control() { if (true) return 1; else return 0; }");
+        sourceFile.load(r, "function control() { if (true) return 1; else return 0; } var rControl = control();");
         Runtime rt{};
         Syntax::Parser parser{ rt, sourceFile };
 
@@ -156,10 +155,13 @@ TEST_CASE("函数声明 - 函数体内容") {
         vm.allocCallFrame(chunk.get());
         vm.run();
         REQUIRE(vm.global("control").isObject());
+        Value rControl = vm.global("rControl");
+        REQUIRE(rControl.isInteger());
+        REQUIRE(rControl.toInteger() == 1);
     }
 
     SECTION("带循环的函数体") {
-        sourceFile.load(r, "function loop() { while (i < 10) i = i + 1; return i; }");
+        sourceFile.load(r, "function loop() { var i = 0; while (i < 10) i = i + 1; return i; } var rLoop = loop();");
         Runtime rt{};
         Syntax::Parser parser{ rt, sourceFile };
 
@@ -176,6 +178,9 @@ TEST_CASE("函数声明 - 函数体内容") {
         vm.allocCallFrame(chunk.get());
         vm.run();
         REQUIRE(vm.global("loop").isObject());
+        Value rLoop = vm.global("rLoop");
+        REQUIRE(rLoop.isInteger());
+        REQUIRE(rLoop.toInteger() == 10);
     }
 }
 

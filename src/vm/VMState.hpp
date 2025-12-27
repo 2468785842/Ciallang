@@ -181,7 +181,12 @@ namespace Cial::Bytecode {
             return ss.str();
         }
 
-        void pushVoid(const size_t n) { _regPool.allocFrame(n); }
+        void pushVoid(const size_t n) {
+            const size_t base = _regPool.allocFrame(n);
+            for(std::size_t i = 0; i < n; i++) {
+                *_regPool.ptrAt(base) = Value{};
+            }
+        }
 
         void push(const Value &v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = v; }
 
