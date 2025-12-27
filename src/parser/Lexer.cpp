@@ -20,7 +20,7 @@
 #include "types/Octet.hpp"
 #include "types/Value.hpp"
 
-#include "IEEETypes.hpp"
+#include "types/Real.hpp"
 #include "types/String.hpp"
 
 #include <fmt/format.h>
@@ -29,65 +29,64 @@ using namespace Cial::Syntax;
 
 std::multimap<std::int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
     // block comment, line comment
-    { '/', bind_front(&Lexer::lineComment) },
-    { '/', bind_front(&Lexer::blockComment) },
-    { '/', bind_front(&Lexer::slash) },
-    { '\\', bind_front(&Lexer::backslash) },
+    { '/', std::bind_front(&Lexer::lineComment) },
+    { '/', std::bind_front(&Lexer::blockComment) },
+    { '/', std::bind_front(&Lexer::slash) },
+    { '\\', std::bind_front(&Lexer::backslash) },
 
-    { '=', bind_front(&Lexer::equalSign) },
-    { '!', bind_front(&Lexer::exclamationSign) },
-    { '&', bind_front(&Lexer::ampersandSign) },
-    { '|', bind_front(&Lexer::vertLineSign) },
+    { '=', std::bind_front(&Lexer::equalSign) },
+    { '!', std::bind_front(&Lexer::exclamationSign) },
+    { '&', std::bind_front(&Lexer::ampersandSign) },
+    { '|', std::bind_front(&Lexer::vertLineSign) },
 
-    { '.', bind_front(&Lexer::numberConstVal) },
-    { '.', bind_front(&Lexer::dotSign) },
+    { '.', std::bind_front(&Lexer::numberConstVal) },
+    { '.', std::bind_front(&Lexer::dotSign) },
 
-    { '-', bind_front(&Lexer::minus) },
+    { '-', std::bind_front(&Lexer::minus) },
 
-    { '+', bind_front(&Lexer::plus) },
+    { '+', std::bind_front(&Lexer::plus) },
 
-    { '*', bind_front(&Lexer::mul) },
+    { '*', std::bind_front(&Lexer::mul) },
 
     // "> operator more..."
-    { '>', bind_front(&Lexer::gtSign) },
+    { '>', std::bind_front(&Lexer::gtSign) },
 
     // "<%" octet literal
-    { '<', bind_front(&Lexer::octetLiteral) },
+    { '<', std::bind_front(&Lexer::octetLiteral) },
 
     // "< operator more..."
-    { '<', bind_front(&Lexer::ltSign) },
-    { '%', bind_front(&Lexer::percent) },
-    { '^', bind_front(&Lexer::chevron) },
-    { '[', bind_front(&Lexer::singletonSign) },
-    { ']', bind_front(&Lexer::singletonSign) },
-    { '(', bind_front(&Lexer::singletonSign) },
-    { ')', bind_front(&Lexer::singletonSign) },
-    { '~', bind_front(&Lexer::singletonSign) },
-    { '?', bind_front(&Lexer::singletonSign) },
-    { ':', bind_front(&Lexer::singletonSign) },
-    { ',', bind_front(&Lexer::singletonSign) },
-    { '{', bind_front(&Lexer::singletonSign) },
-    { '}', bind_front(&Lexer::singletonSign) },
-    { '#', bind_front(&Lexer::singletonSign) },
-    { '$', bind_front(&Lexer::singletonSign) },
+    { '<', std::bind_front(&Lexer::ltSign) },
+    { '%', std::bind_front(&Lexer::percent) },
+    { '^', std::bind_front(&Lexer::chevron) },
+    { '[', std::bind_front(&Lexer::singletonSign) },
+    { ']', std::bind_front(&Lexer::singletonSign) },
+    { '(', std::bind_front(&Lexer::singletonSign) },
+    { ')', std::bind_front(&Lexer::singletonSign) },
+    { '~', std::bind_front(&Lexer::singletonSign) },
+    { '?', std::bind_front(&Lexer::singletonSign) },
+    { ':', std::bind_front(&Lexer::singletonSign) },
+    { ',', std::bind_front(&Lexer::singletonSign) },
+    { '{', std::bind_front(&Lexer::singletonSign) },
+    { '}', std::bind_front(&Lexer::singletonSign) },
+    { '#', std::bind_front(&Lexer::singletonSign) },
+    { '$', std::bind_front(&Lexer::singletonSign) },
 
     // line terminator
-    { ';', bind_front(&Lexer::lineTerminator) },
-    { '\'', bind_front(&Lexer::stringConstVal) },
-    { '"', bind_front(&Lexer::stringConstVal) },
-    { '@', bind_front(&Lexer::templateStringConstVal) },
+    { ';', std::bind_front(&Lexer::lineTerminator) },
+    { '\'', std::bind_front(&Lexer::stringConstVal) },
+    { '"', std::bind_front(&Lexer::stringConstVal) },
+    { '@', std::bind_front(&Lexer::templateStringConstVal) },
 };
 
 [[maybe_unused]] void *Lexer::S_LoadCases = [] {
     // number literal
-    string numberMarks = "0123456789";
-    for(auto &mark : numberMarks)
-        S_Cases.emplace(mark, bind_front(&Lexer::numberConstVal));
+    for(std::string numberMarks = "0123456789"; auto &mark : numberMarks)
+        S_Cases.emplace(mark, std::bind_front(&Lexer::numberConstVal));
 
     return nullptr;
 }();
 
-Lexer::Lexer(SourceFile &sourceFile) : _sourceFile(sourceFile) {}
+Lexer::Lexer(Runtime &rt, SourceFile &sourceFile) : _rt(rt), _sourceFile(sourceFile) {}
 
 bool Lexer::boringMatch(Token *&token, const OperatorTokenSet &signMap) {
     for(const auto &[sign, _token] : signMap) {
@@ -126,7 +125,7 @@ void Lexer::rewindOneChar() const {
     }
 }
 
-pair<uint32_t, uint32_t> Lexer::getCurrentRowCol() const {
+std::pair<uint32_t, uint32_t> Lexer::getCurrentRowCol() const {
     return std::make_pair(_sourceFile.columnByIndex(_sourceFile.pos()),
                           _sourceFile.lineByIndex(_sourceFile.pos())->line);
 }
@@ -238,7 +237,7 @@ void Lexer::skipComment() {
 
         CLL_ASSERT(token != nullptr, "token is null");
 
-        auto isComment = token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment;
+        const auto isComment = token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment;
 
         _tokens.pop_back();
 
@@ -295,12 +294,12 @@ int32_t Lexer::read(const bool skipWhitespace) {
  * @return 是否匹配成功? succeed -> true
  *                     failed  -> false
  */
-bool Lexer::match(const string &literal) {
+bool Lexer::match(const std::string &literal) {
     _sourceFile.pushMark();
     DEFER { _sourceFile.popMark(); };
 
     // 实际可以少循环一次, 因为 ch 一定和 literal[0] 匹配
-    return ranges::all_of(literal, [&](const auto targetCh) {
+    return std::ranges::all_of(literal, [&](const auto targetCh) {
         if(targetCh != read(false)) {
             _sourceFile.restoreTopMark();
             return false;
@@ -381,7 +380,7 @@ bool Lexer::numberConstVal(Token *&token) {
     auto hasActualDigits = false;
     auto valueType = ValueType::Integer;
 
-    while(valid.find_first_of(static_cast<char>(ch)) != string::npos) {
+    while(valid.find_first_of(static_cast<char>(ch)) != std::string::npos) {
         if(ch == '.') {
             if(valueType == ValueType::Real) {
                 token = makeToken(TokenType::Invalid);
@@ -451,8 +450,8 @@ bool Lexer::numberConstVal(Token *&token) {
 
     rewindOneChar();
 
-    const auto fixValue = [&](const Real &val) {
-        Real ret = val;
+    const auto fixValue = [&](const double &val) {
+        double ret = val;
         if(shifting > 0)
             ret *= pow(10, shifting);
         if(shifting < 0)
@@ -462,16 +461,15 @@ bool Lexer::numberConstVal(Token *&token) {
 
     if(!stream.str().empty()) {
         if(valueType == ValueType::Real) {
-            Real val = 0.0;
+            double val{ 0.0 };
             stream >> val;
-            val = fixValue(val);
-            token = makeToken(TokenType::ConstVal, createReal(val));
+            token = makeToken(TokenType::ConstVal, Real(fixValue(val)));
         }
         if(valueType == ValueType::Integer) {
             Integer val = 0;
             stream >> val;
-            val = static_cast<Integer>(fixValue(static_cast<Real>(val)));
-            token = makeToken(TokenType::ConstVal, createInteger(val));
+            val = static_cast<Integer>(fixValue(static_cast<double>(val)));
+            token = makeToken(TokenType::ConstVal, val);
         }
         return true;
     }
@@ -479,7 +477,8 @@ bool Lexer::numberConstVal(Token *&token) {
 }
 
 // regex expr : 0x\\d*\.?\\d+[pP]\\d*
-bool Lexer::parseNonDecimalNumber(Token *&token, stringstream &ss, int8_t (*validDigits)(char), const int8_t base) {
+bool Lexer::parseNonDecimalNumber(Token *&token, std::stringstream &ss, std::int8_t (*validDigits)(char),
+                                  const std::int8_t base) {
     bool isReal = false;
     extractNumber(validDigits, "Pp", ss, isReal);
 
@@ -494,8 +493,8 @@ bool Lexer::parseNonDecimalNumber(Token *&token, stringstream &ss, int8_t (*vali
     return parseNonDecimalInteger(token, str, validDigits, base);
 }
 
-void Lexer::parseNonDecimalReal(Token *&token, const string &decimalStr, int8_t (*validDigits)(char),
-                                const int8_t baseBits) {
+void Lexer::parseNonDecimalReal(Token *&token, const std::string &decimalStr, std::int8_t (*validDigits)(char),
+                                const std::int8_t baseBits) {
     // parse non-decimal(hex decimal, octal or binary) floating-point number.
     // this routine heavily depends on IEEE double floating-point number expression.
     uint64_t main = 0ull; // significand
@@ -571,59 +570,59 @@ void Lexer::parseNonDecimalReal(Token *&token, const string &decimalStr, int8_t 
         }
     }
 
-    main >>= (64 - 1 - IEEE::SIGNIFICAND_BITS);
+    main >>= 64 - 1 - SIGNIFICAND_BITS;
 
     if(main == 0) {
         // zero
-        token = makeToken(TokenType::ConstVal, createReal(0.0));
+        token = makeToken(TokenType::ConstVal, Real(0.0));
         return;
     }
 
-    main &= (1ull << IEEE::SIGNIFICAND_BITS) - 1ull;
+    main &= (1ull << SIGNIFICAND_BITS) - 1ull;
 
-    if(exp < IEEE::EXP_MIN) {
+    if(exp < EXP_MIN) {
         // informal
         // treat as zero
-        token = makeToken(TokenType::ConstVal, createReal(0.0));
+        token = makeToken(TokenType::ConstVal, Real(0.0));
         return;
     }
 
-    if(exp > IEEE::EXP_MAX) {
+    if(exp > EXP_MAX) {
         // too large
         // treat as infinity
 
-        token = makeToken(TokenType::ConstVal, createReal(static_cast<double>(IEEE::P_INF)));
+        token = makeToken(TokenType::ConstVal, Real(P_INF));
         return;
     }
 
-    Real temp = 0.0;
+    Real temp{ 0.0 };
 
     // compose IEEE double
-    *reinterpret_cast<Integer *>(&temp) =
-        IEEE::make_sign(false) | IEEE::make_exponent(exp) | IEEE::make_significand(main);
+    *reinterpret_cast<Integer *>(&temp) = makeSign(false) | makeExponent(exp) | make_significand(main);
 
-    token = makeToken(TokenType::ConstVal, createReal(temp));
+    token = makeToken(TokenType::ConstVal, temp);
 }
 
-bool Lexer::parseNonDecimalInteger(Token *&token, const string &decimalStr, int8_t (*validDigits)(char),
+bool Lexer::parseNonDecimalInteger(Token *&token, const std::string &decimalStr, int8_t (*validDigits)(char),
                                    const int8_t baseBits) {
-    int64_t v = 0;
+    Integer v = 0;
     for(const auto decimal : decimalStr) {
         v <<= baseBits;
         v += validDigits(decimal);
     }
-    token = makeToken(TokenType::ConstVal, createInteger(v));
+    token = makeToken(TokenType::ConstVal, v);
     return true;
 }
 
 // 如果是 . | p | P 那么isReal = true
-void Lexer::extractNumber(int8_t (*validDigits)(char), const string &expMark, stringstream &ss, bool &isReal) {
+void Lexer::extractNumber(std::int8_t (*validDigits)(char), const std::string &expMark, std::stringstream &ss,
+                          bool &isReal) {
     // 小数点
     bool pointFound = false;
     // 指数
     bool expFound = false;
 
-    const string valid = "+-.0123456789" + expMark;
+    const std::string valid = "+-.0123456789" + expMark;
     auto ch = static_cast<char>(read(false));
     do {
         if(!expFound) {
@@ -636,7 +635,7 @@ void Lexer::extractNumber(int8_t (*validDigits)(char), const string &expMark, st
                 expFound = true;
                 ss << ch;
                 ch = static_cast<char>(read());
-                if(valid.find_first_of(ch) == string::npos)
+                if(valid.find_first_of(ch) == std::string::npos)
                     break;
                 if(ch == '+' || ch == '-') {
                     ss << ch;
@@ -655,7 +654,7 @@ void Lexer::extractNumber(int8_t (*validDigits)(char), const string &expMark, st
             break;
         }
         ch = static_cast<char>(read(false));
-    } while(valid.find_first_of(ch) != string::npos);
+    } while(valid.find_first_of(ch) != std::string::npos);
 
     isReal = pointFound || expFound;
 }
@@ -667,10 +666,10 @@ bool Lexer::identifier(Token *&token) {
         return false;
 
     static std::unordered_map<std::string, Token> Keywords{
-        { "true", Token{ TokenType::ConstVal, createInteger(1) } },
-        { "false", Token{ TokenType::ConstVal, createInteger(0) } },
-        { "Infinity", Token{ TokenType::ConstVal, createReal(IEEE::Double::negative_infinity().value()) } },
-        { "NaN", Token{ TokenType::ConstVal, createReal(IEEE::Double::signaling_nan().value()) } },
+        { "true", Token{ TokenType::ConstVal, 1 } },
+        { "false", Token{ TokenType::ConstVal, 0 } },
+        { "Infinity", Token{ TokenType::ConstVal, Real::negativeInf() } },
+        { "NaN", Token{ TokenType::ConstVal, Real::signalingNan() } },
 
         { "function", Token{ TokenType::Function } },
         { "class", Token{ TokenType::Class } },
@@ -703,7 +702,7 @@ bool Lexer::identifier(Token *&token) {
         return true;
     }
 
-    token = makeToken(TokenType::Identifier, String::create(name.c_str(), name.size()));
+    token = makeToken(TokenType::Identifier, _rt.atomTable.intern(name.c_str(), name.size()));
     return true;
 }
 
@@ -1047,7 +1046,7 @@ bool Lexer::templateStringConstVal(Token *&token) {
 
 StringParseState Lexer::internalStringParser(Token *&token, const char delimiter, bool *templateOver,
                                              const bool templateMode) {
-    stringstream str{ string{} };
+    std::stringstream str{ std::string{} };
     auto strPsState = StringParseState::None;
     if(templateOver)
         *templateOver = false;
@@ -1178,7 +1177,7 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
         str << runeType.data;
     }
 
-    token = makeToken(TokenType::ConstVal, String::create(str.str().c_str(), str.str().size()));
+    token = makeToken(TokenType::ConstVal, _rt.atomTable.intern(str.str().c_str(), str.str().size()));
 
     return strPsState;
 }
@@ -1189,8 +1188,8 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
 bool Lexer::octetLiteral(Token *&token) {
     _sourceFile.pushMark();
     DEFER { _sourceFile.popMark(); };
-    stringstream stream{ string{} };
-    vector<uint8_t> buf{};
+    std::stringstream stream{ std::string{} };
+    std::vector<uint8_t> buf{};
     // parse an octet literal;
     // syntax is:
     // <% xx xx xx xx xx xx ... %>
@@ -1205,7 +1204,7 @@ bool Lexer::octetLiteral(Token *&token) {
             if(ch == '%') {
                 ch = read(false);
                 if(ch == '>') {
-                    token = makeToken(TokenType::ConstVal, Octet::create(buf.data(), buf.size()));
+                    token = makeToken(TokenType::ConstVal, _rt.octetTable.intern(buf.data(), buf.size()));
                     return true;
                 }
                 _sourceFile.restoreTopMark();

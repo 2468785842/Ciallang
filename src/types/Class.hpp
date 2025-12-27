@@ -20,12 +20,10 @@
 #include "vm/VMState.hpp"
 
 namespace Cial {
-    class Function;
 
     class ClassFunction final : public Object {
     public:
         ClassFunction(const Value &thisValue, const Value &function) : _thisValue(thisValue), _function(function) {}
-        [[nodiscard]] const char *name() const noexcept override { return getFunction()->name(); }
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
@@ -50,11 +48,9 @@ namespace Cial {
     public:
         ClassObject() = delete;
 
-        explicit ClassObject(std::string name, const size_t arity = 0) : _name(std::move(name)), _arity(arity) {}
+        explicit ClassObject(Atom name, const size_t arity = 0) : Object(name), _arity(arity) {}
 
         ~ClassObject() noexcept override;
-
-        [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
@@ -62,23 +58,21 @@ namespace Cial {
 
         [[nodiscard]] ClassObject *base() const noexcept { return _base; }
 
-        void setStaticField(const std::string &name, const Value &field) noexcept;
+        void setStaticField(Atom name, const Value &field) noexcept;
 
-        [[nodiscard]] Value getStaticField(const std::string &name) const noexcept;
+        [[nodiscard]] Value getStaticField(Atom name) const noexcept;
 
-        void setMethod(const std::string &name, const Value &method) noexcept;
+        void setMethod(Atom name, const Value &method) noexcept;
 
-        [[nodiscard]] Value getMethod(const std::string &name) const noexcept;
+        [[nodiscard]] Value getMethod(Atom name) const noexcept;
 
         [[nodiscard]] std::vector<Value> getMethods() const noexcept;
 
-        void setFieldDef(const std::string &name, const FieldMeta &fieldMeta) noexcept;
+        void setFieldDef(Atom name, const FieldMeta &fieldMeta) noexcept;
 
-        [[nodiscard]] FieldMeta getFieldDef(const std::string &name) const noexcept;
+        [[nodiscard]] FieldMeta getFieldDef(Atom name) const noexcept;
 
-        [[nodiscard]] const std::unordered_map<std::string, FieldMeta> &getFieldDefs() const noexcept {
-            return _fieldsDef;
-        }
+        [[nodiscard]] const std::unordered_map<Atom, FieldMeta> &getFieldDefs() const noexcept { return _fieldsDef; }
 
         Opt<Vec<GCObject *>> getRefs() override {
             Vec<GCObject *> refs{};
@@ -102,11 +96,10 @@ namespace Cial {
 
     private:
         ClassObject *_base{ nullptr };
-        std::string _name;
         size_t _arity{ 0 };
-        std::unordered_map<std::string, Value> _methodsDef{};
-        std::unordered_map<std::string, FieldMeta> _fieldsDef{};
-        std::unordered_map<std::string, Value> _staticFields{};
+        std::unordered_map<Atom, Value> _methodsDef{};
+        std::unordered_map<Atom, FieldMeta> _fieldsDef{};
+        std::unordered_map<Atom, Value> _staticFields{};
     };
 
     class InstanceObject final : public Object {
@@ -125,20 +118,17 @@ namespace Cial {
             }
         }
 
-        [[nodiscard]] const char *name() const noexcept override { return _class ? _class->name() : "unknown"; }
-
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
         [[nodiscard]] ClassObject *klass() const noexcept { return _class; }
 
-        void setField(const std::string &name, const Value &field) noexcept;
+        void setField(Atom name, const Value &field) noexcept;
 
-        [[nodiscard]] Value getField(const std::string &name) const noexcept;
+        [[nodiscard]] Value getField(Atom name) const noexcept;
 
-        void setMethod(const std::string &name, const Value &method) noexcept;
+        void setMethod(Atom name, const Value &method) noexcept;
 
-        [[nodiscard]] Value getMethod(const std::string &name) const noexcept;
-
+        [[nodiscard]] Value getMethod(Atom name) const noexcept;
 
         Opt<Vec<GCObject *>> getRefs() override {
             Vec<GCObject *> refs{};
@@ -162,7 +152,7 @@ namespace Cial {
 
     private:
         ClassObject *_class{ nullptr };
-        std::unordered_map<std::string, Value> _fields{};
-        std::unordered_map<std::string, Value> _methods{};
+        std::unordered_map<Atom, Value> _fields{};
+        std::unordered_map<Atom, Value> _methods{};
     };
 } // namespace Cial

@@ -20,7 +20,6 @@
 #include "logging/Logger.hpp"
 
 namespace Cial::Common {
-    using namespace std;
 
     class [[nodiscard]] Result {
     public:
@@ -30,12 +29,12 @@ namespace Cial::Common {
 
         constexpr void succeed() noexcept { _success = true; }
 
-        void info(const string &message, const SourceLocation &loc = {}, const string &details = {}) {
+        void info(const std::string &message, const SourceLocation &loc = {}, const std::string &details = {}) {
             CLL_LOG_INFO(message.c_str());
             _messages.emplace_back(message, loc, details, ResultMessage::Types::info);
         }
 
-        void error(const string &message, const SourceLocation &loc = {}, const string &details = {}) {
+        void error(const std::string &message, const SourceLocation &loc = {}, const std::string &details = {}) {
             CLL_LOG_ERROR(message.c_str());
             _messages.emplace_back(message, loc, details, ResultMessage::Types::error);
             fail();

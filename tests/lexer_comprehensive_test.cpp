@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "../src/parser/Lexer.hpp"
 #include "common/SourceFile.hpp"
-#include "lexer/Lexer.hpp"
 #include "types/String.hpp"
 
 using namespace Cial;

@@ -101,8 +101,7 @@ namespace Cial::Common {
 
     int64_t utf8Strlen(const std::string &str) {
         int64_t len = 0;
-        auto p = str.data();
-        for(; *p; len++) {
+        for(auto p = str.data(); *p; len++) {
             const auto c = static_cast<uint8_t>(*p);
 
             size_t cp_size;

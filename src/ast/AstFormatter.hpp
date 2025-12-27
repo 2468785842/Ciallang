@@ -1,4 +1,5 @@
 /*
+ * TODO: refactor
  * Copyright (c) 2024/6/14 下午9:51
  *
  * /\  _` \   __          /\_ \  /\_ \
@@ -17,8 +18,8 @@
 #include "DeclNode.hpp"
 #include "ExprNode.hpp"
 #include "StmtNode.hpp"
-#include "lexer/Token.hpp"
 #include "logging/Logger.hpp"
+#include "parser/Token.hpp"
 
 namespace Cial {
     class AstFormatter final : public Syntax::AstNode::Visitor {
@@ -109,51 +110,51 @@ namespace Cial {
         }
 
         void visit(const Syntax::VarDeclNode *node) override {
-            printNode("DeclareVar");
-            child(
-                [&] {
-                    // Variable (name)
-                    printNode("Variable", node->token->value());
-                    // "="
-                    printNode("=");
-                    // rhs
-                    node->rhs->accept(this);
-                },
-                false);
+            // printNode("DeclareVar");
+            // child(
+            //     [&] {
+            //         // Variable (name)
+            //         printNode("Variable", node->token->value());
+            //         // "="
+            //         printNode("=");
+            //         // rhs
+            //         node->rhs->accept(this);
+            //     },
+            //     false);
         }
 
         void visit(const Syntax::FunctionDeclNode *node) override {
             printNode("FunctionDecl");
-            child(
-                [&] {
-                    // Parameters
-                    printNode("(Parameters)");
-                    child(
-                        [&] {
-                            for(size_t i = 0; i < node->parameters.size(); ++i) {
-                                const auto &[token, exprNode] = node->parameters[i];
-                                const bool hasSibling = i + 1 < node->parameters.size();
-                                // 参数名称作为 label，参数表达式作为子节点（如果有）
-                                // 若 exprNode 非空则把它作为 child，否则只打印名称
-                                child(
-                                    [&] {
-                                        // 打成 "name" 然后把 exprNode 当成子节点（如果存在）
-                                        printNode(token.value().toString()->toStdStr());
-                                        if(exprNode) {
-                                            // 将参数的 expr 作为该名称的子节点
-                                            child(exprNode, false);
-                                        }
-                                    },
-                                    hasSibling);
-                            }
-                        },
-                        false);
-
-                    // Body
-                    printNode("(Body)");
-                    child(node->body, false);
-                },
-                false);
+            // child(
+            //     [&] {
+            //         // Parameters
+            //         printNode("(Parameters)");
+            //         child(
+            //             [&] {
+            //                 for(size_t i = 0; i < node->parameters.size(); ++i) {
+            //                     const auto &[token, exprNode] = node->parameters[i];
+            //                     const bool hasSibling = i + 1 < node->parameters.size();
+            //                     // 参数名称作为 label，参数表达式作为子节点（如果有）
+            //                     // 若 exprNode 非空则把它作为 child，否则只打印名称
+            //                     child(
+            //                         [&] {
+            //                             // 打成 "name" 然后把 exprNode 当成子节点（如果存在）
+            //                             printNode(token.value().toString()->toStdStr());
+            //                             if(exprNode) {
+            //                                 // 将参数的 expr 作为该名称的子节点
+            //                                 child(exprNode, false);
+            //                             }
+            //                         },
+            //                         hasSibling);
+            //                 }
+            //             },
+            //             false);
+            //
+            //         // Body
+            //         printNode("(Body)");
+            //         child(node->body, false);
+            //     },
+            //     false);
         }
 
         void visit(const Syntax::ClassDeclNode *node) override {
@@ -310,16 +311,16 @@ namespace Cial {
         void visit(const Syntax::IdentifierExprNode *node) override {
             printPrefix();
             // 打成 Identifier (name)
-            if(node->token && node->token->value().isString()) {
-                _ss << fmt::format("Identifier ({})", node->token->value()) << '\n';
-            } else {
-                _ss << fmt::format("Identifier") << '\n';
-            }
+            // if(node->token && node->token->value().value<Atom>().isString()) {
+            //     _ss << fmt::format("Identifier ({})", node->token->value()) << '\n';
+            // } else {
+            //     _ss << fmt::format("Identifier") << '\n';
+            // }
         }
 
         void visit(const Syntax::ValueExprNode *node) override {
-            printPrefix();
-            _ss << fmt::format("Value ({})", node->token->value()) << '\n';
+            // printPrefix();
+            // _ss << fmt::format("Value ({})", node->token->value()) << '\n';
         }
     };
 

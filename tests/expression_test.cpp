@@ -19,11 +19,11 @@ using namespace Cial;
 TEST_CASE("表达式 - 字面量表达式") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
+    AtomTable atomTable{};
 
     SECTION("整数字面量") {
         sourceFile.load(r, "123;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
+        Syntax::Parser parser{ atomTable, sourceFile };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);

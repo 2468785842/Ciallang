@@ -24,14 +24,15 @@ find_package(fmt CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 set(SOURCE_FILES
-        src/lexer/Lexer.cpp
+        src/parser/AtomTable.cpp
+        src/parser/OctetTable.cpp
+        src/parser/Lexer.cpp
+        src/parser/Parser.cpp
 
         src/common/SourceLocation.cpp
         src/common/SourceFile.cpp
         src/common/Colorizer.cpp
         src/common/UTF8.cpp
-
-        src/parser/Parser.cpp
 
         src/gen/IRGenerator.cpp
 
@@ -39,6 +40,8 @@ set(SOURCE_FILES
         src/vm/VMState.cpp
         src/vm/Rlc.cpp
         src/vm/Instruction.cpp
+        src/vm/Chunk.cpp
+        src/vm/Constant.cpp
 
         src/types/Class.cpp
         src/types/Function.cpp

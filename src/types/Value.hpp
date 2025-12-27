@@ -16,6 +16,8 @@
 
 #include "Types.hpp"
 
+#include "Real.hpp"
+
 namespace Cial {
     class Value {
 
@@ -96,10 +98,6 @@ namespace Cial {
 
         friend std::ostream &operator<<(std::ostream &os, const Value &d);
     };
-
-    inline Value createInteger(const Integer value) { return Value{ value }; }
-
-    inline Value createReal(const Real value) { return Value{ value }; }
 
 } // namespace Cial
 

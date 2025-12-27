@@ -14,9 +14,9 @@
 
 #pragma once
 
+#include "Lexer.hpp"
 #include "ast/AstBuilder.hpp"
 #include "common/SourceFile.hpp"
-#include "lexer/Lexer.hpp"
 
 namespace Cial::Syntax {
     using namespace Common;
@@ -79,10 +79,9 @@ namespace Cial::Syntax {
 
     class Parser {
     public:
-        Parser(SourceFile &sourceFile, AstBuilder &builder) :
-            _lexer(Lexer{ sourceFile }), _astBuilder(builder), _sourceFile(sourceFile) {}
+        Parser(Runtime &rt, SourceFile &sourceFile) : _lexer(Lexer{ rt, sourceFile }), _sourceFile(sourceFile) {}
 
-        void error(Result &r, const string &message, const SourceLocation &location) const {
+        void error(Result &r, const std::string &message, const SourceLocation &location) const {
             _sourceFile.error(r, message, location);
         }
 
@@ -110,11 +109,11 @@ namespace Cial::Syntax {
 
         bool expect(Result &r, TokenType tokenType);
 
-        [[nodiscard]] AstBuilder *astBuilder() const { return &_astBuilder; }
+        [[nodiscard]] AstBuilder *astBuilder() { return &_astBuilder; }
 
     private:
         Lexer _lexer;
-        AstBuilder &_astBuilder;
+        AstBuilder _astBuilder{};
         SourceFile &_sourceFile;
 
         Precedence nextInfixPrecedence();

@@ -24,7 +24,7 @@
 namespace Cial::Bytecode::Op {
 
     void Load::execute(const Instruction &itt, const VMState &vmState) {
-        vmState.reg(reg(itt), vmState.current()->chunk->getConstant(value(itt)));
+        vmState.reg(reg(itt), vmState.curFrame()->chunk->getConstant(value(itt)).createValue(vmState.rt()));
     }
 
     std::string Load::dump(const Instruction &itt, const VMState &, bool) {
@@ -114,11 +114,12 @@ namespace Cial::Bytecode::Op {
 
     void DGlobal::execute(const Instruction &itt, const VMState &vmState) {
         const auto &value = vmState.reg(src(itt));
-        vmState.global(symbolIndex(itt), Value{ value });
+        vmState.global(atom(itt), Value{ value });
     }
 
     std::string DGlobal::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        const auto &symbol = fmt::format("\"{}\"", vmState.getSymbol(symbolIndex(itt)));
+        auto *aEntry = vmState.rt().atomTable.get(atom(itt));
+        const auto &symbol = fmt::format("\"{}\"", aEntry->str);
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "dglobal", src(itt), symbol);
 
         if(!info)
@@ -128,18 +129,19 @@ namespace Cial::Bytecode::Op {
     }
 
     void GGlobal::execute(const Instruction &itt, const VMState &vmState) {
-        const auto &value = vmState.global(symbolIndex(itt));
+        const auto &value = vmState.global(atom(itt));
         vmState.reg(dst(itt), value);
     }
 
     std::string GGlobal::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        const auto &symbol = fmt::format("\"{}\"", vmState.getSymbol(symbolIndex(itt)));
+        auto *aEntry = vmState.rt().atomTable.get(atom(itt));
+        const auto &symbol = fmt::format("\"{}\"", aEntry->str);
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gglobal", symbol, dst(itt));
 
         if(!info)
             return insDump;
 
-        return fmt::format("{: <30} ; {} = {}", insDump, symbol, vmState.global(symbolIndex(itt)));
+        return fmt::format("{: <30} ; {} = {}", insDump, symbol, vmState.global(atom(itt)));
     }
 
     void Test::execute(const Instruction &itt, VMState &vmState) {
@@ -297,7 +299,15 @@ namespace Cial::Bytecode::Op {
         CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
 
         if(const auto *inst = dynamic_cast<InstanceObject *>(instObj.toObject())) {
-            const auto tmp = inst->getField(name(itt, vmState));
+            Atom a{};
+            if(itt.getOperand2Type() == Operand::Type::Atom)
+                a = itt.getOperand2<Atom>();
+            if(itt.getOperand2Type() == Operand::Type::Register) {
+                const String *str = vmState.reg(itt.getOperand2<Register>()).toString();
+                a = vmState.rt().atomTable.intern(str->getData(), str->length());
+            }
+            const auto tmp = inst->getField(a);
+            vmState.rt().atomTable.release(a);
             vmState.reg(dst(itt), tmp);
             return;
         }
@@ -315,16 +325,15 @@ namespace Cial::Bytecode::Op {
     }
 
 
-    const char *GProp::name(const Instruction &itt, const VMState &vmState) {
-        if(itt.getOperand2Type() == Operand::Type::ConstIndex)
-            return vmState.current()->chunk->getConstant(itt.getOperand2<ConstIndex>()).toString()->getData();
-        if(itt.getOperand2Type() == Operand::Type::Register)
-            return vmState.reg(itt.getOperand2<Register>()).toString()->getData();
-        CLL_ASSERT(false, "unknown inst gprop operand2 type");
-    }
-
     std::string GProp::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gpropd", obj(itt), name(itt, vmState), dst(itt));
+
+        const char *str;
+        if(itt.getOperand2Type() == Operand::Type::Atom)
+            str = vmState.rt().atomTable.get(itt.getOperand2<Atom>())->str;
+        if(itt.getOperand2Type() == Operand::Type::Register) {
+            str = vmState.reg(itt.getOperand2<Register>()).toString()->getData();
+        }
+        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gpropd", obj(itt), str, dst(itt));
         if(!info)
             return insDump;
         return fmt::format("{: <30} ; {} = {}", insDump, obj(itt), vmState.reg(obj(itt)));
@@ -332,8 +341,8 @@ namespace Cial::Bytecode::Op {
 
 
     const char *SProp::name(const Instruction &itt, const VMState &vmState) {
-        if(itt.getOperand2Type() == Operand::Type::ConstIndex)
-            return vmState.current()->chunk->getConstant(itt.getOperand2<ConstIndex>()).toString()->getData();
+        if(itt.getOperand2Type() == Operand::Type::Atom)
+            return vmState.rt().atomTable.get(itt.getOperand2<Atom>())->str;
         if(itt.getOperand2Type() == Operand::Type::Register)
             return vmState.reg(itt.getOperand2<Register>()).toString()->getData();
         CLL_ASSERT(false, "unknown inst sprop operand2 type");
@@ -341,7 +350,7 @@ namespace Cial::Bytecode::Op {
 
     Value SProp::value(const Instruction &itt, const VMState &vmState) {
         if(itt.getOperand3Type() == Operand::Type::ConstIndex)
-            return vmState.current()->chunk->getConstant(itt.getOperand3<ConstIndex>());
+            return vmState.curFrame()->chunk->getConstant(itt.getOperand3<ConstIdx>()).createValue(vmState.rt());
         if(itt.getOperand3Type() == Operand::Type::Register)
             return vmState.reg(itt.getOperand3<Register>());
         CLL_ASSERT(false, "unknown inst sprop operand3 type");
@@ -364,36 +373,36 @@ namespace Cial::Bytecode::Op {
     }
 
     void GDynamic::execute(const Instruction &itt, const VMState &vmState) {
-        const auto &callFrame = vmState.current();
+        const auto &callFrame = vmState.curFrame();
         Value v{};
         if(callFrame->thisValue.isObject()) {
             if(const auto *instanceObject = dynamic_cast<InstanceObject *>(callFrame->thisValue.toObject())) {
-                v = instanceObject->getField(vmState.getSymbol(symbolIndex(itt)));
+                v = instanceObject->getField(atom(itt));
             }
         }
 
         if(v.isVoid()) {
-            v = vmState.global(symbolIndex(itt));
+            v = vmState.global(atom(itt));
         }
 
         vmState.reg(dst(itt), v);
     }
 
     std::string GDynamic::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        const auto &symbol = fmt::format("\"{}\"", vmState.getSymbol(symbolIndex(itt)));
+        const auto &symbol = fmt::format("\"{}\"", vmState.rt().atomTable.get(atom(itt))->str);
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gdynamic", symbol, dst(itt));
 
         if(!info)
             return insDump;
         Value v{};
-        if(const auto &callFrame = vmState.current(); callFrame->thisValue.isObject()) {
+        if(const auto &callFrame = vmState.curFrame(); callFrame->thisValue.isObject()) {
             if(const auto *instanceObject = dynamic_cast<InstanceObject *>(callFrame->thisValue.toObject())) {
-                v = instanceObject->getField(vmState.getSymbol(symbolIndex(itt)));
+                v = instanceObject->getField(atom(itt));
             }
         }
 
         if(v.isVoid()) {
-            v = vmState.global(symbolIndex(itt));
+            v = vmState.global(atom(itt));
         }
 
         return fmt::format("{: <30} ; {} = {}", insDump, symbol, v);
@@ -401,7 +410,7 @@ namespace Cial::Bytecode::Op {
 
     void Ret::execute(const Instruction &itt, VMState &vmState) {
         const auto &value = vmState.reg(retReg(itt));
-        const auto frame = vmState.current();
+        const auto frame = vmState.curFrame();
         CLL_ASSERT(frame->ret, "frame.ret val is empty");
         vmState.prev()->getReg(frame->ret->index()) = value;
         vmState.freeCallFrame();

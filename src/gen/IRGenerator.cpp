@@ -173,9 +173,7 @@ namespace Cial::Inter {
         // TODO: member access
         const auto identifier = node->lhs->token->value();
 
-        CLL_ASSERT(identifier.isString(), "identifier is not string");
-
-        auto variable = resolveLocalVariable(*identifier.toString());
+        auto variable = resolveLocalVariable(identifier.value<Atom>());
 
         if(variable.has_value() && variable.value()->localVar.has_value()) {
             auto src = node->rhs->generateBytecode(this);
@@ -197,8 +195,7 @@ namespace Cial::Inter {
         auto src = node->rhs->generateBytecode(this);
         CLL_ASSERT(src.has_value(), "global src is not have val");
 
-        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
-                                                    src.value());
+        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier.value<Atom>(), src.value());
 
         if(_r.isFailed())
             return {};
@@ -206,16 +203,13 @@ namespace Cial::Inter {
     }
 
     Syntax::OptReg IRGenerator::generate(const Syntax::VarDeclNode *node) {
-        const auto identifier = node->token->value();
-
-        CLL_ASSERT(identifier.isString(), "identifier is not string");
+        const auto identifier = node->token->value().value<Atom>();
 
         // global
         if(_scopeChain.size() == 1) {
             // can't init
             if(!node->rhs) {
-                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(
-                    _symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()), loadVoidReg(*_chunk));
+                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, loadVoidReg(*_chunk));
                 return {};
             }
 
@@ -224,12 +218,11 @@ namespace Cial::Inter {
             if(_r.isFailed())
                 return {};
 
-            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
-                                                        src.value());
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, src.value());
             return {};
         }
 
-        auto variable = resolveLocalVariable(*identifier.toString());
+        auto variable = resolveLocalVariable(identifier);
 
         // already have this variable, in same scope
         if(variable.has_value() && variable.value()->localVar.has_value()) {
@@ -264,8 +257,7 @@ namespace Cial::Inter {
             dst = loadVoidReg(*_chunk);
         }
 
-        addVariable(
-            Variable{ identifier.toString()->toStdStr(), std::make_optional<LocalVariable>(dst.value(), !!node->rhs) });
+        addVariable(Variable{ identifier, std::make_optional<LocalVariable>(dst.value(), !!node->rhs) });
 
         return {};
     }
@@ -274,80 +266,74 @@ namespace Cial::Inter {
         auto funReg = allocateRegister();
         auto funChunk = generateChunk(node);
 
-        const auto identifier = node->token->value();
-
-        CLL_ASSERT(identifier.isString(), "identifier is not string");
+        const auto identifier = node->token->value().value<Atom>();
 
         _chunk->emit<Bytecode::Op::OpCode::Load>(
             funReg,
-            _chunk->addConstant(Object::create<Function>(funChunk.release(), identifier.toString()->toStdStr(),
-                                                         node->parameters.size())));
+            _chunk->addConstant(Constant{ new FuncMeta(identifier, node->parameters.size(), funChunk.release()) }));
 
         if(_scopeChain.size() == 1) {
             freeRegister(funReg);
-            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
-                                                        funReg);
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, funReg);
             return {};
         }
 
-        addVariable(Variable{ identifier.toString()->toStdStr(), std::make_optional<LocalVariable>(funReg, true) });
+        addVariable(Variable{ identifier, std::make_optional<LocalVariable>(funReg, true) });
 
         return {};
     }
 
 
     Syntax::OptReg IRGenerator::generate(const Syntax::ClassDeclNode *node) {
-        const auto identifier = node->token->value();
-        CLL_ASSERT(identifier.isString(), "class identifier is not string");
-
-        auto thisObjReg = allocateRegister();
-        const Value classObjVal = Object::create<ClassObject>(identifier.toString()->toStdStr());
-        _chunk->emit<Bytecode::Op::OpCode::Load>(thisObjReg, _chunk->addConstant(classObjVal));
-
-        // class is always global in current design
-        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
-                                                    thisObjReg);
-        auto *classObject = dynamic_cast<ClassObject *>(classObjVal.toObject());
-
-        beginScope();
-        for(const auto &declNode : node->body->childrens) {
-            addVariable(Variable{ identifier.toString()->toStdStr() });
-
-            if(const auto *funcDeclNode = dynamic_cast<Syntax::FunctionDeclNode *>(declNode)) {
-                auto funChunk = generateChunk(funcDeclNode);
-                auto funName = funcDeclNode->token->value().toString()->toStdStr();
-                classObject->setMethod(
-                    funName, Object::create<Function>(funChunk.release(), funName, funcDeclNode->parameters.size()));
-            } else if(const auto *varDeclNode = dynamic_cast<Syntax::VarDeclNode *>(declNode)) {
-                const auto varName = varDeclNode->token->value();
-
-                CLL_ASSERT(varName.isString(), "identifier is not string");
-
-                Syntax::OptReg src;
-
-                // can init
-                if(varDeclNode->rhs) {
-                    src = varDeclNode->rhs->generateBytecode(this);
-                    // freeRegister(src.value());
-                    if(_r.isFailed())
-                        return {};
-                }
-
-                classObject->setFieldDef(varName.toString()->toStdStr(), FieldMeta{ src });
-            }
-        }
-
-        endScope();
-        freeRegister(thisObjReg);
+        // TODO:
+        // const auto identifier = node->token->value().value<Atom>();
+        //
+        // auto thisObjReg = allocateRegister();
+        // const Value classObjVal = Object::create<ClassObject>(identifier);
+        // _chunk->emit<Bytecode::Op::OpCode::Load>(thisObjReg, _chunk->addConstant(classObjVal));
+        //
+        // // class is always global in current design
+        // _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier,
+        //                                             thisObjReg);
+        // auto *classObject = dynamic_cast<ClassObject *>(classObjVal.toObject());
+        //
+        // beginScope();
+        // for(const auto &declNode : node->body->childrens) {
+        //     addVariable(Variable{ identifier });
+        //
+        //     if(const auto *funcDeclNode = dynamic_cast<Syntax::FunctionDeclNode *>(declNode)) {
+        //         auto funChunk = generateChunk(funcDeclNode);
+        //         auto funName = funcDeclNode->token->value().value<Atom>();
+        //         classObject->setMethod(
+        //             funName, Object::create<Function>(funChunk.release(), funName, funcDeclNode->parameters.size()));
+        //     } else if(const auto *varDeclNode = dynamic_cast<Syntax::VarDeclNode *>(declNode)) {
+        //         const auto varName = varDeclNode->token->value();
+        //
+        //         CLL_ASSERT(varName.isString(), "identifier is not string");
+        //
+        //         Syntax::OptReg src;
+        //
+        //         // can init
+        //         if(varDeclNode->rhs) {
+        //             src = varDeclNode->rhs->generateBytecode(this);
+        //             // freeRegister(src.value());
+        //             if(_r.isFailed())
+        //                 return {};
+        //         }
+        //
+        //         classObject->setFieldDef(varName.toString()->toStdStr(), FieldMeta{ src });
+        //     }
+        // }
+        //
+        // endScope();
+        // freeRegister(thisObjReg);
         return {};
     }
 
     Syntax::OptReg IRGenerator::generate(const Syntax::IdentifierExprNode *node) {
-        const auto identifier = node->token->value();
+        const auto identifier = node->token->value().value<Atom>();
 
-        CLL_ASSERT(identifier.isString(), "identifier is not string");
-
-        auto variable = resolveLocalVariable(*identifier.toString());
+        auto variable = resolveLocalVariable(identifier);
 
         if(variable.has_value()) {
             if(variable.value()->localVar) {
@@ -362,8 +348,7 @@ namespace Cial::Inter {
 
         // dynamic get
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::GDynamic>(_symbolTable.getOrAddSymbol(identifier.toString()->toStdStr()),
-                                                     dst);
+        _chunk->emit<Bytecode::Op::OpCode::GDynamic>(identifier, dst);
         if(_r.isFailed())
             return {};
 
@@ -555,10 +540,10 @@ namespace Cial::Inter {
         return {};
     }
 
-    std::optional<IRGenerator::Variable *> IRGenerator::resolveLocalVariable(const String &identifier) {
+    std::optional<IRGenerator::Variable *> IRGenerator::resolveLocalVariable(const Atom identifier) {
         for(auto &it : std::ranges::reverse_view(_scopeChain)) {
             for(auto &var : it.variables) {
-                if(var.identifier == identifier.toStdStr()) {
+                if(var.identifier.v == identifier.v) {
                     return &var;
                 }
             }
@@ -568,7 +553,7 @@ namespace Cial::Inter {
 
     std::unique_ptr<Bytecode::Chunk> IRGenerator::generateChunk(const Syntax::FunctionDeclNode *node) const {
 
-        auto gen = IRGenerator{ _sourceFile, _symbolTable };
+        auto gen = IRGenerator{ _sourceFile };
         gen._scopeChain = _scopeChain; // 复制作用域结构
 
         gen.beginScope();
@@ -576,9 +561,7 @@ namespace Cial::Inter {
         Syntax::OptReg paramReg{};
 
         for(auto &[token, exprNode] : node->parameters) {
-            const auto varName = token.value();
-
-            CLL_ASSERT(varName.isString(), "varName is not string");
+            const auto varName = token.value().value<Atom>();
 
             if(exprNode) {
                 auto defaultParameter = exprNode->generateBytecode(&gen);
@@ -588,19 +571,27 @@ namespace Cial::Inter {
                 paramReg = gen.allocateRegister();
             }
 
-            gen.addVariable(
-                Variable{ varName.toString()->toStdStr(), std::make_optional<LocalVariable>(paramReg.value(), true) });
+            gen.addVariable(Variable{ varName, std::make_optional<LocalVariable>(paramReg.value(), true) });
         }
 
         auto funChunk = gen.parseAst(_r, node->body);
         gen.endScope();
 
         // the last instruction is not ret, patch one ret
-        if(funChunk->getInstVec().back()->opcode != Bytecode::Op::OpCode::Ret) {
+        if(auto &instVec = funChunk->getInstVec();
+           instVec.empty() || instVec.back()->opcode != Bytecode::Op::OpCode::Ret) {
             funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
         }
 
         return funChunk;
+    }
+
+    Bytecode::Register IRGenerator::loadVoidReg(Bytecode::Chunk &chunk) {
+        if(!_empty.has_value()) {
+            _empty = allocateRegister();
+            chunk.emit<Bytecode::Op::OpCode::Load>(_empty.value(), ConstIdx{ 0 });
+        }
+        return _empty.value();
     }
 
 } // namespace Cial::Inter

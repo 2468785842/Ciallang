@@ -19,37 +19,28 @@
 #include "String.hpp"
 #include "Value.hpp"
 #include "vm/Chunk.hpp"
+#include "vm/Constant.hpp"
 
 namespace Cial {
 
     class Function final : public Object {
     public:
-        Function() = delete;
-
-        explicit Function(Bytecode::Chunk *chunk, const std::string &name);
-
-        explicit Function(Bytecode::Chunk *chunk, std::string name, size_t arity);
-
-        [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
+        explicit Function(const FuncMeta *funcMeta) : _meta(funcMeta) {}
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
-        [[nodiscard]] const Bytecode::Chunk *chunk() const { return _chunk.get(); }
-
         Opt<Vec<GCObject *>> getRefs() override {
             Vec<GCObject *> refs{};
-            for(auto &v : _chunk->getConstants()) {
-                refs.push_back(toGCObject(v));
-            }
+            // for(auto &v : _chunk->getConstants()) {
+            //     refs.push_back(toGCObject(v));
+            // }
             return refs;
         }
 
         ~Function() noexcept override = default;
 
     private:
-        const std::unique_ptr<Bytecode::Chunk> _chunk;
-        const std::string _name;
-        const size_t _arity;
+        const FuncMeta *_meta;
     };
 
 
@@ -144,16 +135,16 @@ namespace Cial {
     public:
         NativeFunction() = delete;
 
+        NativeFunction(NativeFunction &&) = delete;
+
         template <typename Callable>
-        explicit NativeFunction(const std::string_view name, Callable &&callable) :
+        explicit NativeFunction(Callable &&callable) :
             _callback([callable = std::forward<Callable>(callable)](Value *args) {
                 return detail::invoke_callable(callable, args);
             }),
-            _arity(detail::function_traits<Callable>::arity), _name(name) {}
+            _arity(detail::function_traits<Callable>::arity) {}
 
         Value callProc(Value *values) const { return _callback(values); }
-
-        [[nodiscard]] const char *name() const noexcept override { return _name.c_str(); }
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
@@ -164,7 +155,6 @@ namespace Cial {
     private:
         const Callback _callback;
         const size_t _arity;
-        const std::string _name;
     };
 
 } // namespace Cial

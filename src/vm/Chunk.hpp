@@ -13,10 +13,14 @@
  */
 #pragma once
 
-#include "ConstIndex.hpp"
+#include <memory>
+
+#include "Constant.hpp"
+
 #include "Instruction.hpp"
 
 namespace Cial::Bytecode {
+
     class Chunk {
     public:
         ~Chunk() {
@@ -38,29 +42,31 @@ namespace Cial::Bytecode {
             return inst;
         }
 
-        explicit Chunk() = default;
+        explicit Chunk() {
+            _constants.emplace_back(); // Void
+        }
 
         [[nodiscard]] auto &getInstVec() const noexcept { return _instructions; }
 
         void setRegisterCount(const std::uint32_t count) noexcept { _registerCount = count; }
         [[nodiscard]] std::uint32_t getRegCount() const noexcept { return _registerCount; }
 
-        ConstIndex addConstant(const Value &value) {
-            for(size_t i = 0; i < _constants.size(); ++i) {
+        ConstIdx addConstant(Constant &&value) {
+            for(size_t i = 1; i < _constants.size(); ++i) {
                 if(_constants[i] == value) {
-                    return ConstIndex{ i };
+                    return ConstIdx{ i };
                 }
             }
-            _constants.push_back(value);
-            return ConstIndex{ _constants.size() - 1 };
+            _constants.push_back(std::move(value));
+            return ConstIdx{ _constants.size() - 1 };
         }
 
-        [[nodiscard]] const Value &getConstant(const ConstIndex index) const {
+        [[nodiscard]] const Constant &getConstant(const ConstIdx index) const {
             CLL_ASSERT(index.index() < _constants.size(), "constant index out of range");
             return _constants[index.index()];
         }
 
-        Vec<Value> getConstants() noexcept { return _constants; }
+        Vec<Constant> &getConstants() noexcept { return _constants; }
 
         Chunk(const Chunk &) = delete;
         Chunk &operator=(const Chunk &) = delete;
@@ -68,6 +74,6 @@ namespace Cial::Bytecode {
     private:
         Vec<Op::Instruction *> _instructions{};
         std::uint32_t _registerCount{ 0 };
-        Vec<Value> _constants{};
+        Vec<Constant> _constants{};
     };
 } // namespace Cial::Bytecode

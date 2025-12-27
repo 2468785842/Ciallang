@@ -33,18 +33,16 @@ namespace Cial {
         }
     }
 
-    void ClassObject::setStaticField(const std::string &name, const Value &field) noexcept {
-        _staticFields[name] = field;
-    }
+    void ClassObject::setStaticField(Atom name, const Value &field) noexcept { _staticFields[name] = field; }
 
-    [[nodiscard]] Value ClassObject::getStaticField(const std::string &name) const noexcept {
+    [[nodiscard]] Value ClassObject::getStaticField(Atom name) const noexcept {
         const auto it = _staticFields.find(name);
         return it != _staticFields.end() ? it->second : Value{};
     }
 
-    void ClassObject::setMethod(const std::string &name, const Value &method) noexcept { _methodsDef[name] = method; }
+    void ClassObject::setMethod(Atom name, const Value &method) noexcept { _methodsDef[name] = method; }
 
-    Value ClassObject::getMethod(const std::string &name) const noexcept {
+    Value ClassObject::getMethod(Atom name) const noexcept {
         const auto it = _methodsDef.find(name);
         return it != _methodsDef.end() ? it->second : Value{};
     }
@@ -57,32 +55,30 @@ namespace Cial {
         return result;
     }
 
-    void ClassObject::setFieldDef(const std::string &name, const FieldMeta &fieldMeta) noexcept {
-        _fieldsDef[name] = fieldMeta;
-    }
+    void ClassObject::setFieldDef(Atom name, const FieldMeta &fieldMeta) noexcept { _fieldsDef[name] = fieldMeta; }
 
-    [[nodiscard]] FieldMeta ClassObject::getFieldDef(const std::string &name) const noexcept {
+    [[nodiscard]] FieldMeta ClassObject::getFieldDef(Atom name) const noexcept {
         const auto it = _fieldsDef.find(name);
         return it != _fieldsDef.end() ? it->second : FieldMeta{};
     }
 
-    void InstanceObject::setField(const std::string &name, const Value &field) noexcept { _fields[name] = field; }
+    void InstanceObject::setField(Atom name, const Value &field) noexcept { _fields[name] = field; }
 
-    [[nodiscard]] Value InstanceObject::getField(const std::string &name) const noexcept {
+    [[nodiscard]] Value InstanceObject::getField(Atom name) const noexcept {
         const auto it = _fields.find(name);
         return it != _fields.end() ? it->second : Value{};
     }
 
-    void InstanceObject::setMethod(const std::string &name, const Value &method) noexcept { _methods[name] = method; }
+    void InstanceObject::setMethod(Atom name, const Value &method) noexcept { _methods[name] = method; }
 
-    [[nodiscard]] Value InstanceObject::getMethod(const std::string &name) const noexcept {
+    [[nodiscard]] Value InstanceObject::getMethod(Atom name) const noexcept {
         const auto it = _methods.find(name);
         return it != _methods.end() ? it->second : Value{};
     }
 
     void ClassFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         getFunction()->call(vmState, ret, argCount);
-        vmState.current()->thisValue = _thisValue;
+        vmState.curFrame()->thisValue = _thisValue;
     }
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
@@ -93,7 +89,7 @@ namespace Cial {
         }
 
         for(auto &v : getMethods()) {
-            instanceObj->setField(v.toObject()->name(),
+            instanceObj->setField(v.toObject()->getName(),
                                   Value{ vmState.gc.allocate<ClassFunction>(Value{ instanceObj }, v) });
         }
         vmState.reg(ret, Value{ instanceObj });

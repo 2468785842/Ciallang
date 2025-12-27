@@ -22,47 +22,10 @@
 
 namespace Cial::Inter {
 
-    class SymbolTable {
-    public:
-        [[nodiscard]] std::optional<size_t> getSymbolIndex(const std::string &identifier) const {
-            const auto symbol = _table.find(identifier);
-            if(symbol == _table.end()) {
-                return {};
-            }
-            return symbol->second;
-        }
-
-        size_t addSymbol(const std::string &identifier) {
-            _table[identifier] = _symbolNextIndex++;
-            return _symbolNextIndex - 1;
-        }
-
-        size_t getOrAddSymbol(const std::string &identifier) {
-            if(const auto s = getSymbolIndex(identifier)) {
-                return *s;
-            }
-            return addSymbol(identifier);
-        }
-
-        [[nodiscard]] const char *getSymbol(const size_t index) const {
-            for(const auto &[k, v] : _table) {
-                if(v == index) {
-                    return k.c_str();
-                }
-            }
-            return "";
-        }
-
-    private:
-        std::unordered_map<std::string, size_t> _table{};
-        std::uint32_t _symbolNextIndex{ 0 };
-    };
-
     class IRGenerator {
 
     public:
-        explicit IRGenerator(Common::SourceFile &sourceFile, SymbolTable &symbolTable) :
-            _sourceFile(sourceFile), _symbolTable(symbolTable) {}
+        explicit IRGenerator(Common::SourceFile &sourceFile) : _sourceFile(sourceFile) {}
 
         std::unique_ptr<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node);
 
@@ -130,7 +93,7 @@ namespace Cial::Inter {
         };
 
         struct Variable {
-            std::string identifier;
+            Atom identifier;
             std::optional<LocalVariable> localVar;
         };
 
@@ -139,8 +102,6 @@ namespace Cial::Inter {
         };
 
         std::vector<ScopeContext> _scopeChain{};
-
-        SymbolTable &_symbolTable;
 
         Bytecode::Register allocateRegister() {
             if(!_freeRegisters.empty()) {
@@ -169,17 +130,11 @@ namespace Cial::Inter {
             _scopeChain.pop_back();
         }
 
-        void addVariable(Variable &&variable) { _scopeChain.back().variables.emplace_back(std::move(variable)); }
+        void addVariable(Variable &&variable) { _scopeChain.back().variables.emplace_back(variable); }
 
-        Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk) {
-            if(!_empty.has_value()) {
-                _empty = allocateRegister();
-                chunk.emit<Bytecode::Op::OpCode::Load>(_empty.value(), _chunk->addConstant(Value{}));
-            }
-            return _empty.value();
-        }
+        Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk);
 
-        std::optional<Variable *> resolveLocalVariable(const String &identifier);
+        std::optional<Variable *> resolveLocalVariable(Atom identifier);
 
         std::unique_ptr<Bytecode::Chunk> generateChunk(const Syntax::FunctionDeclNode *node) const;
 

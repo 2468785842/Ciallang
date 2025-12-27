@@ -13,6 +13,7 @@
 #pragma once
 
 #include "gc/GC.hpp"
+#include "parser/AtomTable.hpp"
 
 namespace Cial::Bytecode {
     class VMState;
@@ -22,10 +23,14 @@ namespace Cial::Bytecode {
 namespace Cial {
     class Object : public GCObject {
     public:
-        Object() = default;
+        explicit Object() = default;
+        explicit Object(const Atom name) : _name{ name } {}
+
         ~Object() noexcept override = default;
 
-        [[nodiscard]] virtual const char *name() const noexcept = 0;
+        [[nodiscard]] Atom getName() const noexcept { return _name; }
+
+        void setName(const Atom atom) noexcept { _name = atom; }
 
         virtual void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) = 0;
 
@@ -34,6 +39,9 @@ namespace Cial {
         static Value create(Args... args) {
             return Value{ new R(std::forward<Args>(args)...) };
         }
+
+    private:
+        Atom _name = ATOM_INVALID;
     };
 
 } // namespace Cial

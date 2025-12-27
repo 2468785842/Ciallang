@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025/12/24 上午8:08
+ * Copyright (c) 2024/6/13 下午8:15
  *
  * /\  _` \   __          /\_ \  /\_ \
  * \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -11,20 +11,8 @@
  *                                                            \_/__/
  *
  */
-#pragma once
 
-#include <unordered_map>
+#include "Chunk.hpp"
 
-#include "parser/AtomTable.hpp"
-#include "parser/OctetTable.hpp"
-#include "types/Value.hpp"
 
-namespace Cial {
-
-    class Runtime {
-    public:
-        std::unordered_map<Atom, Value> gObj{};
-        AtomTable atomTable{};
-        OctetTable octetTable{};
-    };
-} // namespace Cial
+namespace Cial::Bytecode {}

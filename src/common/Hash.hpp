@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025/12/24 上午8:08
+ * Copyright (c) 2024/5/6 下午8:16
  *
  * /\  _` \   __          /\_ \  /\_ \
  * \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -11,20 +11,19 @@
  *                                                            \_/__/
  *
  */
+
 #pragma once
 
-#include <unordered_map>
-
-#include "parser/AtomTable.hpp"
-#include "parser/OctetTable.hpp"
-#include "types/Value.hpp"
+#include <cstdint>
 
 namespace Cial {
 
-    class Runtime {
-    public:
-        std::unordered_map<Atom, Value> gObj{};
-        AtomTable atomTable{};
-        OctetTable octetTable{};
-    };
+    inline std::uint32_t fnv1a(const char *s, const size_t len) {
+        std::uint32_t h = 2166136261u;
+        for(size_t i = 0; i < len; ++i) {
+            h ^= static_cast<std::uint8_t>(s[i]);
+            h *= 16777619u;
+        }
+        return h;
+    }
 } // namespace Cial

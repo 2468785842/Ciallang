@@ -159,7 +159,7 @@ namespace Cial::Common {
         _linesByNumber.clear();
         _linesByIndexRange.clear();
 
-        if(ifstream file{ _path.string(), std::ios::in | std::ios::binary }; file.is_open()) {
+        if(std::ifstream file{ _path.string(), std::ios::in | std::ios::binary }; file.is_open()) {
 
             file.unsetf(std::ios::skipws);
             file.seekg(0, std::ios::end);
@@ -220,7 +220,7 @@ namespace Cial::Common {
 
     uint8_t SourceFile::operator[](const size_t index) const { return _buffer[index]; }
 
-    const filesystem::path &SourceFile::path() const { return _path; }
+    const std::filesystem::path &SourceFile::path() const { return _path; }
 
     uint32_t SourceFile::columnByIndex(const size_t index) const {
         const auto line = lineByIndex(index);

@@ -19,8 +19,8 @@
 
 #include "test_config.h"
 
+#include "../src/parser/Lexer.hpp"
 #include "common/SourceFile.hpp"
-#include "lexer/Lexer.hpp"
 
 TEST_CASE("词法分析 - 基本功能") {
     Cial::Common::SourceFile source_file{ TEST_FILES_PATH "/startup.tjs" };

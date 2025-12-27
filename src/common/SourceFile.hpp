@@ -74,7 +74,7 @@ namespace Cial::Common {
 
         uint8_t operator[](size_t index) const;
 
-        [[nodiscard]] const filesystem::path &path() const;
+        [[nodiscard]] const std::filesystem::path &path() const;
 
         [[nodiscard]] uint32_t columnByIndex(size_t index) const;
 

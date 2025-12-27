@@ -84,8 +84,7 @@ namespace Cial::Bytecode {
     public:
         MarkSweep gc;
 
-        explicit VMState(Inter::SymbolTable &symbolTable, Runtime &rt) :
-            gc{ 1024, rt }, _rt(rt), _symbolTable(symbolTable) {}
+        explicit VMState(Runtime &rt) : gc{ 1024, rt }, _rt(rt) {}
 
         void run();
 
@@ -93,17 +92,22 @@ namespace Cial::Bytecode {
 
         [[nodiscard]] Value reg(Register reg) const;
 
-        [[nodiscard]] Value global(const size_t symbolIndex) const {
-            return _rt.gObj.contains(getSymbol(symbolIndex)) ? _rt.gObj[getSymbol(symbolIndex)] : Value{};
-        }
+        [[nodiscard]] Value global(const Atom atom) const { return _rt.gObj.contains(atom) ? _rt.gObj[atom] : Value{}; }
 
-        void global(const size_t symbolIndex, const Value &value) const { _rt.gObj[getSymbol(symbolIndex)] = value; }
+        void global(const Atom atom, const Value &value) const { _rt.gObj[atom] = value; }
 
         [[nodiscard]] Value global(const std::string &name) const {
-            return _rt.gObj.contains(name) ? _rt.gObj[name] : Value{};
+            const auto atom = rt().atomTable.intern(name.c_str(), name.length());
+            Value v = _rt.gObj.contains(atom) ? _rt.gObj[atom] : Value{};
+            rt().atomTable.release(atom);
+            return v;
         }
 
-        void global(const std::string &name, const Value &value) const { _rt.gObj[name] = value; }
+        void global(const std::string &name, const Value &value) const {
+            const auto atom = rt().atomTable.intern(name.c_str(), name.length());
+            _rt.gObj[atom] = value;
+            rt().atomTable.release(atom);
+        }
 
         void setZF(const bool zf) { _zf = zf; }
 
@@ -131,8 +135,8 @@ namespace Cial::Bytecode {
             return _currentFrame->chunk->getInstVec();
         }
 
-        [[nodiscard]] CallFrame *current() noexcept { return _currentFrame; }
-        [[nodiscard]] const CallFrame *current() const noexcept { return _currentFrame; }
+        [[nodiscard]] CallFrame *curFrame() noexcept { return _currentFrame; }
+        [[nodiscard]] const CallFrame *curFrame() const noexcept { return _currentFrame; }
 
         [[nodiscard]] CallFrame *prev() noexcept { return &_callStack[_stackTop - 2]; }
         [[nodiscard]] const CallFrame *prev() const noexcept { return &_callStack[_stackTop - 2]; }
@@ -150,44 +154,45 @@ namespace Cial::Bytecode {
 
         [[nodiscard]] std::string dumpInstruction(const Chunk &chunk) const {
             std::stringstream ss{};
-            size_t pc{};
-            std::vector<Function *> functions{};
-            while(pc < chunk.getInstVec().size()) {
-                const auto &instruction = chunk.getInstVec()[pc];
-
-                ss << fmt::format("{: <6}: {}\n", Label{ pc }, Op::Instruction::dump(*instruction, *this, false));
-
-                if(instruction->opcode == Op::OpCode::Load) {
-                    if(auto value = current()->chunk->getConstant(Op::Load::value(*instruction)); value.isObject()) {
-                        if(auto fun = dynamic_cast<Function *>(value.toObject())) {
-                            functions.push_back(fun);
-                        }
-                    }
-                }
-
-                ++pc;
-            }
-
-            for(const auto &fun : functions) {
-                ss << fmt::format("{:=^30}\n", fmt::format(" function {} ", fun->name()))
-                   << dumpInstruction(*fun->chunk());
-            }
+            // size_t pc{};
+            // std::vector<Function *> functions{};
+            // while(pc < chunk.getInstVec().size()) {
+            //     const auto &instruction = chunk.getInstVec()[pc];
+            //
+            //     ss << fmt::format("{: <6}: {}\n", Label{ pc }, Op::Instruction::dump(*instruction, *this, false));
+            //
+            //     if(instruction->opcode == Op::OpCode::Load) {
+            //         if(auto value = curFrame()->chunk->getConstant(Op::Load::value(*instruction)); value.isObject())
+            //         {
+            //             if(auto fun = dynamic_cast<Function *>(value.toObject())) {
+            //                 functions.push_back(fun);
+            //             }
+            //         }
+            //     }
+            //
+            //     ++pc;
+            // }
+            //
+            // for(const auto &fun : functions) {
+            //     ss << fmt::format("{:=^30}\n", fmt::format(" function {} ", fun->getName()))
+            //        << dumpInstruction(*fun->chunk());
+            // }
 
             return ss.str();
         }
-
-        [[nodiscard]] const char *getSymbol(const size_t index) const { return _symbolTable.getSymbol(index); }
 
         void pushVoid(const size_t n) { _regPool.allocFrame(n); }
 
         void push(const Value &v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = v; }
 
         void pop(const size_t count) { _regPool.freeFrame(count); }
+
         [[nodiscard]] size_t getRegPoolTop() const { return _regPool.used(); }
+
+        [[nodiscard]] Runtime &rt() const { return _rt; }
 
     private:
         Runtime &_rt;
-        Inter::SymbolTable &_symbolTable;
         CallFrame *_currentFrame{ nullptr };
         // Stack Max Depth Is 1024
         static constexpr auto MAX_CALL_DEPTH = 1024;

@@ -4,7 +4,6 @@
 
 #include <catch.hpp>
 
-#include "ast/AstBuilder.hpp"
 #include "ast/AstFormatter.hpp"
 #include "common/SourceFile.hpp"
 #include "gen/IRGenerator.hpp"
@@ -18,10 +17,9 @@ using namespace Cial;
 TEST_CASE("OOP - 类声明与实例化") {
     Common::Result r{};
     Common::SourceFile sourceFile{};
-    Syntax::AstBuilder astBuilder{};
     Runtime rt;
 
-    Syntax::Parser parser{ sourceFile, astBuilder };
+    Syntax::Parser parser{ rt, sourceFile };
 
     sourceFile.load(r, R"(
         class A { }
@@ -32,12 +30,11 @@ TEST_CASE("OOP - 类声明与实例化") {
     REQUIRE(globalNode != nullptr);
     REQUIRE_FALSE(r.isFailed());
 
-    Inter::SymbolTable globalTable{};
-    Inter::IRGenerator codeGen{ sourceFile, globalTable };
+    Inter::IRGenerator codeGen{ sourceFile };
     auto chunk = codeGen.parseAst(r, globalNode);
     REQUIRE(chunk != nullptr);
 
-    Bytecode::VMState vm{ globalTable, rt };
+    Bytecode::VMState vm{ rt };
     vm.allocCallFrame(chunk.get());
     vm.run();
 
@@ -45,18 +42,20 @@ TEST_CASE("OOP - 类声明与实例化") {
     REQUIRE(val.isObject());
     auto *inst = dynamic_cast<InstanceObject *>(val.toObject());
     REQUIRE(inst != nullptr);
-    REQUIRE(std::string{ inst->klass()->name() } == "A");
+    REQUIRE(rt.atomTable.get(inst->klass()->getName())->str[0] == 'A');
 }
 
 TEST_CASE("OOP - 类方法定义与调用") {
     Common::Result r{};
     Common::SourceFile sourceFile{};
     Syntax::AstBuilder astBuilder{};
-    Syntax::Parser parser{ sourceFile, astBuilder };
+    AtomTable atomTable{};
+    OctetTable octetTable{};
+    Runtime rt;
+
+    Syntax::Parser parser{ rt, sourceFile };
 
     SECTION("实例方法调用") {
-
-        Runtime rt;
 
         sourceFile.load(r, R"(
             class A { function add(x, y) { return x + y; } }
@@ -66,20 +65,17 @@ TEST_CASE("OOP - 类方法定义与调用") {
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
         REQUIRE_FALSE(r.isFailed());
-        Inter::SymbolTable globalTable{};
-        Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        Inter::IRGenerator codeGen{ sourceFile };
         auto chunk = codeGen.parseAst(r, globalNode);
         REQUIRE(chunk != nullptr);
 
-        Bytecode::VMState vm{ globalTable, rt };
+        Bytecode::VMState vm{ rt };
         vm.allocCallFrame(chunk.get());
         vm.run();
         REQUIRE(vm.global("res").toInteger() == 3);
     }
 
     SECTION("实例成员访问") {
-
-        Runtime rt;
 
         sourceFile.load(r, R"(
             class A { var a = 1; }
@@ -89,12 +85,11 @@ TEST_CASE("OOP - 类方法定义与调用") {
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
         REQUIRE_FALSE(r.isFailed());
-        Inter::SymbolTable globalTable{};
-        Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        Inter::IRGenerator codeGen{ sourceFile };
         auto chunk = codeGen.parseAst(r, globalNode);
         REQUIRE(chunk != nullptr);
 
-        Bytecode::VMState vm{ globalTable, rt };
+        Bytecode::VMState vm{ rt };
         vm.allocCallFrame(chunk.get());
         vm.run();
         REQUIRE(vm.global("res").toInteger() == 1);
@@ -106,11 +101,14 @@ TEST_CASE("OOP - 类访问变量") {
     Common::Result r{};
     Common::SourceFile sourceFile{};
     Syntax::AstBuilder astBuilder{};
-    Syntax::Parser parser{ sourceFile, astBuilder };
+    AtomTable atomTable{};
+    OctetTable octetTable{};
+
+    Runtime rt;
+
+    Syntax::Parser parser{ rt, sourceFile };
 
     SECTION("实例成员初始化变量访问") {
-
-        Runtime rt;
 
         sourceFile.load(r, R"(
             var a = 1;
@@ -124,20 +122,17 @@ TEST_CASE("OOP - 类访问变量") {
         REQUIRE(globalNode != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
-        Inter::SymbolTable globalTable{};
-        Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        Inter::IRGenerator codeGen{ sourceFile };
         auto chunk = codeGen.parseAst(r, globalNode);
         REQUIRE(chunk != nullptr);
 
-        Bytecode::VMState vm{ globalTable, rt };
+        Bytecode::VMState vm{ rt };
         vm.allocCallFrame(chunk.get());
         vm.run();
         REQUIRE(vm.global("o").toInteger() == 1);
     }
 
     SECTION("实例成员方法初始化变量访问") {
-
-        Runtime rt;
 
         sourceFile.load(r, R"(
             var a = 1;
@@ -151,20 +146,17 @@ TEST_CASE("OOP - 类访问变量") {
         REQUIRE(globalNode != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
-        Inter::SymbolTable globalTable{};
-        Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        Inter::IRGenerator codeGen{ sourceFile };
         auto chunk = codeGen.parseAst(r, globalNode);
         REQUIRE(chunk != nullptr);
 
-        Bytecode::VMState vm{ globalTable, rt };
+        Bytecode::VMState vm{ rt };
         vm.allocCallFrame(chunk.get());
         vm.run();
         REQUIRE(vm.global("o").toInteger() == 1);
     }
 
     SECTION("实例成员函数访问成员变量") {
-
-        Runtime rt;
 
         sourceFile.load(r, R"(
             class A {
@@ -178,12 +170,11 @@ TEST_CASE("OOP - 类访问变量") {
         REQUIRE(globalNode != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
-        Inter::SymbolTable globalTable{};
-        Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        Inter::IRGenerator codeGen{ sourceFile };
         auto chunk = codeGen.parseAst(r, globalNode);
         REQUIRE(chunk != nullptr);
 
-        Bytecode::VMState vm{ globalTable, rt };
+        Bytecode::VMState vm{ rt };
         vm.allocCallFrame(chunk.get());
         vm.run();
         REQUIRE(vm.global("o").toInteger() == 1);

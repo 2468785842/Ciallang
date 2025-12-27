@@ -14,8 +14,8 @@
 
 #include "AstNode.hpp"
 
+#include "../parser/Token.hpp"
 #include "gen/IRGenerator.hpp"
-#include "lexer/Token.hpp"
 
 namespace Cial::Syntax {
     class ExprNode : public AstNode {

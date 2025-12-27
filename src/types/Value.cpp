@@ -232,7 +232,7 @@ namespace Cial {
             case ValueType::Octet:
                 throw std::logic_error("not support");
             case ValueType::Object:
-                return os << "<object>[" << d.toObject()->name() << ']';
+                return os << "<object>";
             case ValueType::Void:
                 return os << "void";
         }

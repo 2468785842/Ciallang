@@ -13,13 +13,17 @@
  */
 
 #pragma once
+
 #include <frozen/string.h>
 #include <frozen/unordered_map.h>
 
 #include <utility>
 
+#include "AtomTable.hpp"
+#include "OctetTable.hpp"
 #include "common/SourceLocation.hpp"
 #include "types/Value.hpp"
+#include "vm/Chunk.hpp"
 
 namespace Cial::Syntax {
     using namespace Common;
@@ -156,6 +160,8 @@ namespace Cial::Syntax {
         return "unknown";
     }
 
+    enum class TokenValueType : std::uint8_t { None, Integer, Real, Atom, OctetIdx };
+
     struct Token {
         Common::SourceLocation location{};
 
@@ -163,27 +169,37 @@ namespace Cial::Syntax {
 
         constexpr explicit Token(const TokenType type) : _type(type) {}
 
-        explicit Token(const TokenType type, const Value &value) : _type(type), _value(value) {}
+        explicit Token(const TokenType type, const Integer value) :
+            _type(type), _constType(ConstantType::Integer), _value(std::bit_cast<std::uint64_t>(value)) {}
+
+        explicit Token(const TokenType type, const Real value) :
+            _type(type), _constType(ConstantType::Real), _value(std::bit_cast<std::uint64_t>(value)) {}
+
+        explicit Token(const TokenType type, const Atom value) :
+            _type(type), _constType(ConstantType::Atom), _value(std::bit_cast<std::uint64_t>(value)) {}
+
+        explicit Token(const TokenType type, const OctetIdx value) :
+            _type(type), _constType(ConstantType::OctetIdx), _value(std::bit_cast<std::uint64_t>(value)) {}
 
         Token(const Token &token) noexcept {
             _type = token._type;
+            _constType = token._constType;
             _value = token._value;
             location = token.location;
         }
 
         bool operator==(const TokenType tokenType) const { return _type == tokenType; }
 
-        bool operator==(const Token &token) const { return _type == token.type() && _value == token.value(); }
-
         [[nodiscard]] constexpr TokenType type() const noexcept { return _type; }
 
-        [[nodiscard]] Value value() const noexcept { return _value; }
+        [[nodiscard]] Constant value() const noexcept { return Constant{ _constType, _value }; }
 
         [[nodiscard]] constexpr const char *name() const noexcept { return tokenTypeToStr(_type); }
 
     private:
         TokenType _type = TokenType::Void;
-        Value _value{};
+        ConstantType _constType = ConstantType::None;
+        std::uint64_t _value{}; // Integer, Real, Atom(String Index) or OctetIdx
     };
 
     enum class StringParseState {

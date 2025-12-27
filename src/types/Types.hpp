@@ -17,13 +17,6 @@
 #include <vector>
 
 namespace Cial {
-#if defined(LLONG_MAX)
-    using Integer = long long;
-    using Real = double;
-#else
-    using Integer = int;
-    using Real = float;
-#endif
 
     enum class ValueType : std::uint8_t {
         Void, // empty
@@ -34,6 +27,8 @@ namespace Cial {
         Real
     };
 
+    using Integer = long long;
+    class Real;
     class String;
     class Octet;
     class Object;

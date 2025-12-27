@@ -15,10 +15,11 @@
 
 #include <optional>
 
-#include "ConstIndex.hpp"
+#include "Constant.hpp"
 #include "Label.hpp"
 #include "Register.hpp"
 #include "logging/Logger.hpp"
+#include "parser/AtomTable.hpp"
 
 #include "types/Value.hpp"
 
@@ -71,23 +72,26 @@ namespace Cial::Bytecode::Op {
     using DumpCallback = std::string (*)(const Instruction &, const VMState &, bool);
 
     struct Operand {
-        enum class Type { None, Register, Label, ConstIndex, Number };
+        enum class Type { None, Register, Label, ConstIndex, Number, Atom };
         union {
             Register reg;
             Label label;
-            ConstIndex ci;
+            ConstIdx ci;
             size_t n;
+            Atom atom;
         } operand;
 
         Type type{ Type::None };
 
-        explicit Operand(const ConstIndex value) : operand{ .ci = value }, type(Type::ConstIndex) {}
+        explicit Operand(const ConstIdx value) : operand{ .ci = value }, type(Type::ConstIndex) {}
 
         explicit Operand(const Register value) : operand{ .reg = value }, type(Type::Register) {}
 
         explicit Operand(const Label value) : operand{ .label = value }, type(Type::Label) {}
 
         explicit Operand(const size_t value) : operand{ .n = value }, type(Type::Number) {}
+
+        explicit Operand(const Atom value) : operand{ .atom = value }, type(Type::Atom) {}
 
         Operand(const Operand &other) = delete;
 
@@ -147,18 +151,21 @@ namespace Cial::Bytecode::Op {
         }
 
         template <typename T>
-        [[nodiscard]] T getOperand1() const {
-            return getOperand<T>(_operand1);
+        [[nodiscard]] constexpr T getOperand1() const {
+            CLL_ASSERT(_operand1, "operand1 is empty");
+            return getOperand<T>(*_operand1);
         }
 
         template <typename T>
-        [[nodiscard]] T getOperand2() const {
-            return getOperand<T>(_operand2);
+        [[nodiscard]] constexpr T getOperand2() const {
+            CLL_ASSERT(_operand2, "operand2 is empty");
+            return getOperand<T>(*_operand2);
         }
 
         template <typename T>
-        [[nodiscard]] T getOperand3() const {
-            return getOperand<T>(_operand3);
+        [[nodiscard]] constexpr T getOperand3() const {
+            CLL_ASSERT(_operand3, "operand3 is empty");
+            return getOperand<T>(*_operand3);
         }
 
         [[nodiscard]] const Operand::Type &getOperand1Type() const { return _operand1->type; }
@@ -182,23 +189,26 @@ namespace Cial::Bytecode::Op {
         std::optional<Operand> _operand3;
 
         template <typename T>
-        [[nodiscard]] T getOperand(const std::optional<Operand> &operand) const {
+        [[nodiscard]] constexpr T getOperand(const Operand &operand) const {
             if constexpr(std::is_same_v<T, Register>) {
-                CLL_ASSERT(operand->type == Operand::Type::Register, "operand type is not Register");
-                return operand->operand.reg;
+                CLL_ASSERT(operand.type == Operand::Type::Register, "operand type is not Register");
+                return operand.operand.reg;
             } else if constexpr(std::is_same_v<T, Label>) {
-                CLL_ASSERT(operand->type == Operand::Type::Label, "operand type is not Label");
-                return operand->operand.label;
-            } else if constexpr(std::is_same_v<T, ConstIndex>) {
-                CLL_ASSERT(operand->type == Operand::Type::ConstIndex, "operand type is not ConstIndex");
-                return operand->operand.ci;
+                CLL_ASSERT(operand.type == Operand::Type::Label, "operand type is not Label");
+                return operand.operand.label;
+            } else if constexpr(std::is_same_v<T, ConstIdx>) {
+                CLL_ASSERT(operand.type == Operand::Type::ConstIndex, "operand type is not ConstIdx");
+                return operand.operand.ci;
             } else if constexpr(std::is_same_v<T, size_t>) {
-                CLL_ASSERT(operand->type == Operand::Type::Number, "operand type is not Number");
-                return operand->operand.n;
+                CLL_ASSERT(operand.type == Operand::Type::Number, "operand type is not Number");
+                return operand.operand.n;
+            } else if constexpr(std::is_same_v<T, Atom>) {
+                CLL_ASSERT(operand.type == Operand::Type::Atom, "operand type is not Atom");
+                return operand.operand.atom;
             } else {
-                static_assert(std::is_same_v<T, int> && "operand type is not support");
-                return nullptr;
+                static_assert(!std::is_same_v<T, T> && "operand type is not support");
             }
+            throw std::logic_error("unreachable");
         }
     };
 
@@ -206,15 +216,15 @@ namespace Cial::Bytecode::Op {
         static void execute(const Instruction &, const VMState &) {}
 
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool) {
-            return fmt::format("{: <10}", "load");
+            return fmt::format("{: <10}", "nop");
         }
-    }; // struct Load
+    }; // struct NOP
 
 
     struct Load {
         static Register reg(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static ConstIndex value(const Instruction &itt) { return itt.getOperand2<ConstIndex>(); }
+        static ConstIdx value(const Instruction &itt) { return itt.getOperand2<ConstIdx>(); }
 
         static void execute(const Instruction &, const VMState &);
 
@@ -306,7 +316,7 @@ namespace Cial::Bytecode::Op {
     }; // struct Mov
 
     struct DGlobal {
-        static size_t symbolIndex(const Instruction &itt) { return itt.getOperand1<size_t>(); }
+        static Atom atom(const Instruction &itt) { return itt.getOperand1<Atom>(); }
 
         static Register src(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
@@ -316,7 +326,7 @@ namespace Cial::Bytecode::Op {
     }; // struct DGlobal
 
     struct GGlobal {
-        static size_t symbolIndex(const Instruction &itt) { return itt.getOperand1<size_t>(); }
+        static Atom atom(const Instruction &itt) { return itt.getOperand1<Atom>(); }
 
         static Register dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
 
@@ -464,8 +474,6 @@ namespace Cial::Bytecode::Op {
     struct GProp {
         static Register obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static const char *name(const Instruction &itt, const VMState &vmState);
-
         static Register dst(const Instruction &itt) { return itt.getOperand3<Register>(); }
 
         static void execute(const Instruction &, const VMState &);
@@ -486,7 +494,7 @@ namespace Cial::Bytecode::Op {
     }; // struct SProp
 
     struct GDynamic {
-        static size_t symbolIndex(const Instruction &itt) { return itt.getOperand1<size_t>(); }
+        static Atom atom(const Instruction &itt) { return itt.getOperand1<Atom>(); }
 
         static Register dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
 

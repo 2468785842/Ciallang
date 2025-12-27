@@ -20,24 +20,19 @@
 
 namespace Cial {
 
-    Function::Function(Bytecode::Chunk *chunk, const std::string &name) : Function(chunk, name, 0) {}
-
-    Function::Function(Bytecode::Chunk *chunk, std::string name, const size_t arity) :
-        _chunk(chunk), _name(std::move(name)), _arity(arity) {}
-
     void Function::call(Bytecode::VMState &vmState, Bytecode::Register ret, const size_t argCount) {
-        const auto cnt = static_cast<std::int64_t>(_arity - argCount);
+        const auto cnt = static_cast<std::int64_t>(_meta->arity - argCount);
         if(cnt > 0)
             vmState.pushVoid(cnt);
-        vmState.allocCallFrame(_chunk.get(), ret);
+        vmState.allocCallFrame(_meta->chunk, ret);
         // Faster move Reg window ptr, WARING: reverse args
-        auto *currentCallFrame = vmState.current();
-        currentCallFrame->baseRegSP -= _arity;
+        auto *currentCallFrame = vmState.curFrame();
+        currentCallFrame->baseRegSP -= _meta->arity;
     }
 
     void NativeFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         const auto values = std::make_unique<Value[]>(_arity);
-        const Bytecode::CallFrame *curCallFrame = vmState.current();
+        const Bytecode::CallFrame *curCallFrame = vmState.curFrame();
         const size_t base = vmState.getRegPoolTop() - argCount;
         // Faster operation
         for(std::uint32_t i = 0; i < argCount; i++) {

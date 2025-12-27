@@ -14,6 +14,8 @@ namespace Cial {
     public:
         explicit String(const char *str, std::uint32_t len);
 
+        [[nodiscard]] std::uint32_t length() const { return _len; }
+
         [[nodiscard]] const char *getData() const { return _longStr ? _longStr : _shortStr; }
 
         [[nodiscard]] std::string toStdStr() const { return std::string{ getData(), static_cast<size_t>(_len) }; }

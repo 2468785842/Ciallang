@@ -13,7 +13,7 @@
 #pragma once
 
 #include "common/SourceLocation.hpp"
-#include "lexer/Token.hpp"
+#include "parser/Token.hpp"
 #include "vm/Register.hpp"
 
 namespace Cial::Inter {
