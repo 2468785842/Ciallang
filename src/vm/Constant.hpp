@@ -15,11 +15,12 @@
 
 #include <fmt/ostream.h>
 
+#include "Register.hpp"
+#include "Runtime.hpp"
+
 #include "logging/Logger.hpp"
 #include "parser/AtomTable.hpp"
 #include "parser/OctetTable.hpp"
-
-#include "Runtime.hpp"
 
 namespace Cial::Bytecode {
     class Chunk;
@@ -39,18 +40,47 @@ namespace Cial {
     };
 
     struct FuncMeta {
+        struct LocalVariable {
+            Atom identifier;
+            Bytecode::Register reg;
+            // when (var.startPC <= inst.pc) you can use
+            std::uint32_t startPC; // Effective start PC
+            // when (var.endPC > inst.pc) you can't use
+            std::uint32_t endPC; // Invalid PC (scope ended)
+        };
+
         Atom name;
         std::uint32_t arity;
         Bytecode::Chunk *chunk;
-        explicit FuncMeta(const Atom name, const std::uint32_t argCount, Bytecode::Chunk *chunk) :
-            name(name), arity(argCount), chunk(chunk) {}
+        Vec<LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
+        explicit FuncMeta(const Atom name, const std::uint32_t argCount, Bytecode::Chunk *chunk,
+                          Vec<LocalVariable> &&localVars) :
+            name(name), arity(argCount), chunk(chunk), localVars(localVars) {}
+
+        explicit FuncMeta(FuncMeta &&funcMeta) noexcept :
+            name(funcMeta.name), arity(funcMeta.arity), chunk(funcMeta.chunk),
+            localVars(std::move(funcMeta.localVars)) {
+            funcMeta.chunk = nullptr;
+        }
+
+        FuncMeta &operator=(FuncMeta &&funcMeta) noexcept {
+            if(this != &funcMeta) {
+                this->~FuncMeta();
+                new(this) FuncMeta{ std::move(funcMeta) };
+            }
+            return *this;
+        }
+
+        explicit FuncMeta(const FuncMeta &) noexcept = delete;
+        FuncMeta &operator=(const FuncMeta &) noexcept = delete;
+
         ~FuncMeta() noexcept;
-        bool operator==(const FuncMeta &funcMeta) const { return false; }
+        bool operator==(const FuncMeta &) const { return false; }
     };
 
     struct ClassMeta {
         std::uint32_t argCount;
-        bool operator==(const ClassMeta &classMeta) const { return false; }
+        bool operator==(const ClassMeta &) const { return false; }
     };
 
     // Enum, Type, Value

@@ -31,19 +31,19 @@ namespace Cial::Bytecode {
 
     label_Dispatch: {
         const auto &instList = instructions();
-        const Op::Instruction &instruction = instList[_currentFrame->pc];
+        const Op::Instruction *instruction = instList[_currentFrame->pc];
         if(_currentFrame->pc >= instList.size() || _stackTop == 0) {
             freeCallFrame();
             return;
         }
-        goto *labels[static_cast<size_t>(instruction.opcode)];
+        goto *labels[static_cast<size_t>(instruction->opcode)];
     }
 
 #define HANDLE_OPCODE(OP)                                                                                              \
     label_##OP : {                                                                                                     \
-        const Op::Instruction &instruction = instructions()[_currentFrame->pc];                                        \
+        const Op::Instruction *instruction = instructions()[_currentFrame->pc];                                        \
         ++_currentFrame->pc;                                                                                           \
-        Op::OP::execute(instruction, *this);                                                                           \
+        Op::OP::execute(*instruction, *this);                                                                          \
         goto label_Dispatch;                                                                                           \
     }
 
@@ -52,7 +52,7 @@ namespace Cial::Bytecode {
 #else
         for(;;) {
             // cache hit
-            size_t &pc = _currentFrame->pc;
+            std::uint64_t &pc = _currentFrame->pc;
             const auto &instList = instructions();
 
             if(pc >= instList.size())

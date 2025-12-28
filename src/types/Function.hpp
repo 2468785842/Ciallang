@@ -25,7 +25,9 @@ namespace Cial {
 
     class Function final : public Object {
     public:
-        explicit Function(const FuncMeta *funcMeta) : _meta(funcMeta) {}
+        const FuncMeta *meta;
+
+        explicit Function(const FuncMeta *funcMeta) : meta(funcMeta) {}
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
@@ -38,9 +40,6 @@ namespace Cial {
         }
 
         ~Function() noexcept override = default;
-
-    private:
-        const FuncMeta *_meta;
     };
 
 

@@ -21,12 +21,12 @@
 namespace Cial {
 
     void Function::call(Bytecode::VMState &vmState, Bytecode::Register ret, const size_t argCount) {
-        if(const auto cnt = _meta->arity - argCount; cnt > 0)
+        if(const auto cnt = meta->arity - argCount; cnt > 0)
             vmState.pushVoid(cnt);
-        vmState.allocCallFrame(_meta->chunk, ret);
+        vmState.allocCallFrame(meta->chunk, ret);
         // Faster move Reg window ptr, WARING: reverse args
         auto *currentCallFrame = vmState.curFrame();
-        currentCallFrame->baseRegSP -= _meta->arity;
+        currentCallFrame->baseRegSP -= meta->arity;
     }
 
     void NativeFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {

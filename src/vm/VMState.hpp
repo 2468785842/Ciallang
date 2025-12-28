@@ -39,10 +39,10 @@ namespace Cial::Bytecode {
 
     struct CallFrame {
         const Chunk *chunk{};
-        size_t baseRegSP{};
         std::optional<Register> ret{};
-        size_t pc{};
         Value thisValue{};
+        std::uint64_t baseRegSP{};
+        std::uint64_t pc{};
 
         explicit CallFrame() = default;
 

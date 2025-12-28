@@ -22,7 +22,6 @@
 
 #include "logging/Logger.hpp"
 #include "vm/Instruction.hpp"
-#include "vm/VMState.hpp"
 
 namespace Cial::Inter {
 
@@ -174,7 +173,7 @@ namespace Cial::Inter {
 
         auto variable = resolveLocalVariable(identifier.value<Atom>());
 
-        if(variable.has_value() && variable.value()->localVar.has_value()) {
+        if(variable && variable.value()) {
             auto src = node->rhs->generateBytecode(this);
             CLL_ASSERT(src.has_value(), "src is not have val");
 
@@ -183,7 +182,6 @@ namespace Cial::Inter {
 
             freeRegister(src.value());
             _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), dst.value());
-            variable.value()->localVar->init = true;
             if(_r.isFailed())
                 return {};
 
@@ -205,7 +203,7 @@ namespace Cial::Inter {
         const auto identifier = node->token->constVal().value<Atom>();
 
         // global
-        if(_scopeChain.size() == 1) {
+        if(isTopScope()) {
             // can't init
             if(!node->rhs) {
                 _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, loadVoidReg(*_chunk));
@@ -224,7 +222,7 @@ namespace Cial::Inter {
         auto variable = resolveLocalVariable(identifier);
 
         // already have this variable, in same scope
-        if(variable.has_value() && variable.value()->localVar.has_value()) {
+        if(variable.has_value() && variable.value()) {
             if(!node->rhs)
                 return {};
 
@@ -236,7 +234,7 @@ namespace Cial::Inter {
 
             CLL_ASSERT(src.has_value(), "src is not have val");
 
-            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), variable.value()->localVar->reg);
+            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), variable.value()->reg);
             return {};
         }
 
@@ -256,7 +254,7 @@ namespace Cial::Inter {
             dst = loadVoidReg(*_chunk);
         }
 
-        addVariable(Variable{ identifier, std::make_optional<LocalVariable>(dst.value(), !!node->rhs) });
+        addLocalVariable(FuncMeta::LocalVariable{ identifier, dst.value(), getNextInstPos() });
 
         return {};
     }
@@ -267,17 +265,16 @@ namespace Cial::Inter {
 
         const auto identifier = node->token->constVal().value<Atom>();
 
-        _chunk->emit<Bytecode::Op::OpCode::Load>(
-            funReg,
-            _chunk->addConstant(Constant{ new FuncMeta(identifier, node->parameters.size(), funChunk.release()) }));
+        _chunk->emit<Bytecode::Op::OpCode::Load>(funReg,
+                                                 _chunk->addConstant(Constant{ new FuncMeta(std::move(funChunk)) }));
 
-        if(_scopeChain.size() == 1) {
+        if(isTopScope()) {
             freeRegister(funReg);
             _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, funReg);
             return {};
         }
 
-        addVariable(Variable{ identifier, std::make_optional<LocalVariable>(funReg, true) });
+        addLocalVariable(FuncMeta::LocalVariable{ identifier, funReg, getNextInstPos() });
 
         return {};
     }
@@ -335,14 +332,7 @@ namespace Cial::Inter {
         auto variable = resolveLocalVariable(identifier);
 
         if(variable.has_value()) {
-            if(variable.value()->localVar) {
-                if(!variable.value()->localVar->init) {
-                    error(_r, "variable no initialization", node->location);
-                    return {};
-                }
-                return variable.value()->localVar->reg;
-            }
-            throw std::bad_cast{};
+            return variable.value()->reg;
         }
 
         // dynamic get
@@ -539,21 +529,18 @@ namespace Cial::Inter {
         return {};
     }
 
-    std::optional<IRGenerator::Variable *> IRGenerator::resolveLocalVariable(const Atom identifier) {
-        for(auto &it : std::ranges::reverse_view(_scopeChain)) {
-            for(auto &var : it.variables) {
-                if(var.identifier.v == identifier.v) {
-                    return &var;
-                }
+    std::optional<FuncMeta::LocalVariable *> IRGenerator::resolveLocalVariable(const Atom identifier) {
+        for(auto &var : std::ranges::reverse_view(_localVars)) {
+            if(var.endPC == 0 && var.identifier.v == identifier.v) {
+                return &var;
             }
         }
         return {};
     }
 
-    std::unique_ptr<Bytecode::Chunk> IRGenerator::generateChunk(const Syntax::FunctionDeclNode *node) const {
+    FuncMeta IRGenerator::generateChunk(const Syntax::FunctionDeclNode *node) const {
 
         auto gen = IRGenerator{ _sourceFile };
-        gen._scopeChain = _scopeChain; // 复制作用域结构
 
         gen.beginScope();
 
@@ -569,8 +556,8 @@ namespace Cial::Inter {
             } else {
                 paramReg = gen.allocateRegister();
             }
-
-            gen.addVariable(Variable{ varName, std::make_optional<LocalVariable>(paramReg.value(), true) });
+            const auto startPC = gen.getNextInstPos();
+            gen.addLocalVariable(FuncMeta::LocalVariable{ varName, paramReg.value(), startPC });
         }
 
         auto funChunk = gen.parseAst(_r, node->body);
@@ -582,7 +569,8 @@ namespace Cial::Inter {
             funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
         }
 
-        return funChunk;
+        return FuncMeta{ node->token->constVal().value<Atom>(), static_cast<std::uint32_t>(node->parameters.size()),
+                         funChunk.release(), std::move(gen._localVars) };
     }
 
     Bytecode::Register IRGenerator::loadVoidReg(Bytecode::Chunk &chunk) {

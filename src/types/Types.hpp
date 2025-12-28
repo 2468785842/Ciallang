@@ -27,7 +27,7 @@ namespace Cial {
         Real
     };
 
-    using Integer = long long;
+    using Integer = std::int64_t;
     class Real;
     class String;
     class Octet;

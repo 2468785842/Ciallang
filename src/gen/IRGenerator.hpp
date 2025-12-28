@@ -75,34 +75,26 @@ namespace Cial::Inter {
 
         Syntax::OptReg _empty{};
 
-        std::vector<Bytecode::Register> _freeRegisters{};
-        std::uint32_t _regNextIndex{ 0 };
+        Vec<Bytecode::Register> _freeRegisters{};
 
         struct LoopContext {
-            std::optional<Bytecode::Label> continueLabel;
-            std::optional<Bytecode::Label> breakLabel;
-            std::vector<Bytecode::Op::Instruction *> continues;
-            std::vector<Bytecode::Op::Instruction *> breaks;
+            Opt<Bytecode::Label> continueLabel;
+            Opt<Bytecode::Label> breakLabel;
+            Vec<Bytecode::Op::Instruction *> continues;
+            Vec<Bytecode::Op::Instruction *> breaks;
         };
 
-        std::vector<LoopContext> _loopStack{};
+        Vec<LoopContext> _loopStack{};
 
-        struct LocalVariable {
-            Bytecode::Register reg;
-            bool init;
-        };
+        Vec<std::uint32_t> _scopeStartPC{};
+        Vec<FuncMeta::LocalVariable> _localVars{};
 
-        struct Variable {
-            Atom identifier;
-            std::optional<LocalVariable> localVar;
-        };
+        std::uint32_t _regNextIndex{ 0 };
 
-        struct ScopeContext {
-            std::vector<Variable> variables{};
-        };
-
-        std::vector<ScopeContext> _scopeChain{};
-
+        /**
+         * allocate a temp register in this chunk
+         * @return register
+         */
         Bytecode::Register allocateRegister() {
             if(!_freeRegisters.empty()) {
                 const Bytecode::Register reg = _freeRegisters.back();
@@ -116,27 +108,35 @@ namespace Cial::Inter {
 
         void freeRegister(const Bytecode::Register reg) { _freeRegisters.push_back(reg); }
 
-        Bytecode::Label makeLabel() const { return Bytecode::Label{ _chunk->getInstVec().size() }; }
-
-        void beginScope() { _scopeChain.emplace_back(); }
-
-        void endScope() {
-            const auto &scope = _scopeChain.back();
-            for(const auto &var : scope.variables) {
-                if(var.localVar.has_value()) {
-                    freeRegister(var.localVar->reg);
-                }
-            }
-            _scopeChain.pop_back();
+        [[nodiscard]] std::uint32_t getNextInstPos() const {
+            return static_cast<std::uint32_t>(this->_chunk->getInstVec().size());
         }
 
-        void addVariable(Variable &&variable) { _scopeChain.back().variables.emplace_back(variable); }
+        Bytecode::Label makeLabel() const { return Bytecode::Label{ getNextInstPos() }; }
+
+        std::uint32_t &getScopeInstPos() noexcept { return _scopeStartPC.back(); }
+
+        bool isTopScope() const noexcept { return _scopeStartPC.size() == 1; }
+
+        void beginScope() { _scopeStartPC.emplace_back(getNextInstPos()); }
+
+        void endScope() {
+            for(auto &localVar : _localVars) {
+                if(localVar.startPC > _scopeStartPC.back()) {
+                    freeRegister(localVar.reg);
+                    localVar.endPC = getNextInstPos();
+                }
+            }
+            _scopeStartPC.pop_back();
+        }
+
+        void addLocalVariable(FuncMeta::LocalVariable &&variable) { _localVars.emplace_back(variable); }
+
+        std::optional<FuncMeta::LocalVariable *> resolveLocalVariable(Atom identifier);
 
         Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk);
 
-        std::optional<Variable *> resolveLocalVariable(Atom identifier);
-
-        std::unique_ptr<Bytecode::Chunk> generateChunk(const Syntax::FunctionDeclNode *node) const;
+        FuncMeta generateChunk(const Syntax::FunctionDeclNode *node) const;
 
         void error(Common::Result &r, const std::string &message, const Common::SourceLocation &location) const {
             _sourceFile.error(r, message, location);
