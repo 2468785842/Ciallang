@@ -307,9 +307,6 @@ namespace Cial::Bytecode::Op {
                 a = vmState.rt().atomTable.intern(str->getData(), str->length());
             }
             const auto tmp = inst->getField(a);
-            // if(itt.getOperand2Type() == Operand::Type::Register) {
-            // vmState.rt().atomTable.release(a);
-            // }
             vmState.reg(dst(itt), tmp);
             return;
         }

@@ -29,9 +29,8 @@ namespace Cial {
 
         const auto it = _map.find(key);
         if(it != _map.end()) {
-            for(Atom a : it->second) {
+            for(const Atom a : it->second) {
                 if(const AtomEntry *e = _atoms[a.v]; memcmp(e->str, s, len) == 0) {
-                    ++a.ref;
                     return a;
                 }
             }
@@ -51,8 +50,8 @@ namespace Cial {
         memcpy(e->str, s, len);
         e->str[len] = '\0';
 
-        const Atom a = addEntry(e);
-
+        const Atom a{ _atoms.size() };
+        _atoms.push_back(e);
         if(it == _map.end()) {
             _map[key] = { a };
         } else {
@@ -67,24 +66,5 @@ namespace Cial {
             return nullptr;
         }
         return _atoms[a.v];
-    }
-
-    void AtomTable::release(Atom a) {
-        if(a.v == ATOM_INVALID.v || a.v >= _atoms.size() || --a.ref != 0)
-            return;
-        auto *&entry = _atoms[a.v];
-        const uint64_t key = static_cast<uint64_t>(entry->hash) << 32 | static_cast<uint64_t>(entry->length);
-        std::vector<Atom> newBucket{};
-        newBucket.reserve(_map[key].size() - 1);
-        for(const Atom atom : _map[key]) {
-            if(a.v != atom.v) {
-                newBucket.push_back(atom);
-            }
-        }
-        _map[key] = std::move(newBucket);
-        free(entry->str);
-        delete entry;
-        entry = nullptr;
-        _freeAtoms.push(a);
     }
 } // namespace Cial

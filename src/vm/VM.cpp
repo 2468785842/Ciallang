@@ -46,10 +46,12 @@ namespace Cial {
         Common::Result r{};
 
         sourceFile.load(r, expr.getData());
+        assert(!r.isFailed());
 
         Syntax::Parser parser{ rt, sourceFile };
 
         Syntax::ExprNode *node = parser.parseExpression(r);
+        assert(!r.isFailed());
 
         Inter::IRGenerator codeGen{ sourceFile };
 
@@ -57,6 +59,7 @@ namespace Cial {
 
         OptReg retReg{};
         auto chunk = codeGen.parseAst(r, node, retReg);
+        assert(!r.isFailed());
         assert(retReg);
         if(chunk->getRegCount() == 0)
             return { &rt, Value{} };

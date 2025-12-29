@@ -22,8 +22,7 @@
 namespace Cial {
 
     struct Atom {
-        std::uint32_t v{ 0 };
-        std::uint32_t ref{ 0 };
+        std::uint64_t v{ 0 };
 
         constexpr bool operator==(const Atom a) const noexcept { return v == a.v; }
     };
@@ -44,9 +43,10 @@ namespace Cial {
 
         ~AtomTable() {
             for(size_t i = 1; i < _atoms.size(); ++i) {
-                if(_atoms[i])
+                if(_atoms[i]) {
                     free(_atoms[i]->str);
-                delete _atoms[i];
+                    delete _atoms[i];
+                }
             }
         }
 
@@ -54,25 +54,11 @@ namespace Cial {
         AtomTable &operator=(const AtomTable &) = delete;
 
         Atom intern(const char *s, size_t len);
-        void release(Atom a);
         [[nodiscard]] AtomEntry *get(Atom a) const;
 
     private:
         std::vector<AtomEntry *> _atoms{}; // index = Atom, atoms[0] = nullptr
         std::unordered_map<std::uint64_t, std::vector<Atom>> _map{}; // key to list of Atoms for collision handling
-        std::stack<Atom> _freeAtoms{};
-
-        Atom addEntry(AtomEntry *entry) {
-            if(_freeAtoms.empty()) {
-                const Atom a{ static_cast<std::uint32_t>(_atoms.size()) };
-                _atoms.push_back(entry);
-                return a;
-            }
-            const Atom a = _freeAtoms.top();
-            _freeAtoms.pop();
-            _atoms[a.v] = entry;
-            return a;
-        }
     };
 
 } // namespace Cial

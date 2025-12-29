@@ -100,14 +100,12 @@ namespace Cial::Bytecode {
         [[nodiscard]] Value global(const std::string &name) const {
             const auto atom = rt().atomTable.intern(name.c_str(), name.length());
             Value v = _rt.gObj.contains(atom) ? _rt.gObj[atom] : Value{};
-            // rt().atomTable.release(atom);
             return v;
         }
 
         void global(const std::string &name, const Value &value) const {
             const auto atom = rt().atomTable.intern(name.c_str(), name.length());
             _rt.gObj[atom] = value;
-            // rt().atomTable.release(atom);
         }
 
         void setZF(const bool zf) { _zf = zf; }
