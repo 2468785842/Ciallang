@@ -177,7 +177,7 @@ namespace Cial {
                 CONSTANT_TYPE_ENUM_F(CHECK_EQ, *, )
 #undef CHECK_EQ
                 default:
-                    return true;
+                    return false;
             }
         }
 

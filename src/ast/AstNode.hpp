@@ -67,8 +67,6 @@ namespace Cial::Syntax {
 
     class StmtDeclNode;
 
-    using OptReg = std::optional<Bytecode::Register>;
-
     class AstNode {
     protected:
         explicit AstNode(const char *name) : _name(name) {}
@@ -88,7 +86,7 @@ namespace Cial::Syntax {
 
         virtual void accept(Visitor *) const = 0;
 
-        virtual OptReg generateBytecode(Inter::IRGenerator *) const = 0;
+        virtual void generateBytecode(Inter::IRGenerator *, OptReg &) const = 0;
 
         [[nodiscard]] std::string_view name() const noexcept { return _name; }
 

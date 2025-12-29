@@ -25,9 +25,10 @@
 
 namespace Cial::Inter {
 
-    std::unique_ptr<Bytecode::Chunk> IRGenerator::parseAst(const Common::Result &r, const Syntax::AstNode *node) {
+    std::unique_ptr<Bytecode::Chunk> IRGenerator::parseAst(const Common::Result &r, const Syntax::AstNode *node,
+                                                           OptReg &retReg) {
         _r = r;
-        node->generateBytecode(this);
+        node->generateBytecode(this, retReg);
         if(_r.isFailed()) {
             return nullptr;
         }
@@ -36,27 +37,28 @@ namespace Cial::Inter {
         return chunk;
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::ExprStmtNode *node) {
-        return node->expression->generateBytecode(this);
+    void IRGenerator::generate(const Syntax::ExprStmtNode *node, OptReg &retReg) {
+        return node->expression->generateBytecode(this, retReg);
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::ValueExprNode *node) {
+    void IRGenerator::generate(const Syntax::ValueExprNode *node, OptReg &retReg) {
         auto dst = allocateRegister();
         _chunk->emit<Bytecode::Op::OpCode::Load>(dst, _chunk->addConstant(node->token->constVal()));
 
         if(_r.isFailed())
-            return {};
-        return dst;
+            return;
+        retReg = dst;
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::BinaryExprNode *node) {
+    void IRGenerator::generate(const Syntax::BinaryExprNode *node, OptReg &retReg) {
         using enum Syntax::TokenType;
 
         if(node->token->type() == Dot) {
-            auto reg1 = node->lhs->generateBytecode(this);
+            OptReg reg1{};
+            node->lhs->generateBytecode(this, reg1);
 
             if(_r.isFailed())
-                return {};
+                return;
             CLL_ASSERT(reg1, "reg1 is empty");
             Bytecode::Register dst = allocateRegister();
 
@@ -64,23 +66,27 @@ namespace Cial::Inter {
                 _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1.value(),
                                                           _chunk->addConstant(identifier->token->constVal()), dst);
             } else {
-                auto reg2 = node->rhs->generateBytecode(this);
+                OptReg reg2{};
+                node->rhs->generateBytecode(this, reg2);
 
                 if(_r.isFailed())
-                    return {};
+                    return;
                 CLL_ASSERT(reg2, "reg2 is empty");
                 _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1.value(), reg2.value(), dst);
             }
-            return dst;
+            retReg = dst;
+            return;
         }
 
-        auto reg1 = node->lhs->generateBytecode(this);
-        auto reg2 = node->rhs->generateBytecode(this);
+        OptReg reg1{};
+        node->lhs->generateBytecode(this, reg1);
+        OptReg reg2{};
+        node->rhs->generateBytecode(this, reg2);
 
         auto dst = allocateRegister();
 
         if(_r.isFailed())
-            return {};
+            return;
 
         CLL_ASSERT(reg1.has_value(), "reg1 is empty");
         CLL_ASSERT(reg2.has_value(), "reg2 is empty");
@@ -118,42 +124,42 @@ namespace Cial::Inter {
                 break;
             default:
                 CLL_LOG_ERROR("unknow binary operator");
-                return {};
+                return;
         }
 
         if(_r.isFailed())
-            return {};
-        return dst;
+            return;
+        retReg = dst;
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::UnaryExprNode *node) {
+    void IRGenerator::generate(const Syntax::UnaryExprNode *node, OptReg &retReg) {
         using enum Syntax::TokenType;
         switch(node->token->type()) {
             case New:
-                return node->rhs->generateBytecode(this);
+                node->rhs->generateBytecode(this, retReg);
+                break;
             default:
                 CLL_LOG_ERROR("unknow unary operator");
-                return {};
         }
-
-        return {};
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::ProcCallExprNode *node) {
+    void IRGenerator::generate(const Syntax::ProcCallExprNode *node, OptReg &retReg) {
         auto *member = node->memberAccess;
         auto dst = allocateRegister();
 
         std::vector<Bytecode::Register> arguments{};
-        auto memberReg = member->generateBytecode(this);
+        OptReg memberReg{};
+        member->generateBytecode(this, memberReg);
 
         CLL_ASSERT(memberReg, "memberReg is empty");
         for(const auto *exprNode : node->arguments) {
             if(!exprNode) {
                 _chunk->emit<Bytecode::Op::OpCode::PushReg>(loadVoidReg(*_chunk));
             } else {
-                auto reg = exprNode->generateBytecode(this);
+                OptReg reg;
+                exprNode->generateBytecode(this, reg);
                 if(_r.isFailed())
-                    return {};
+                    return;
                 CLL_ASSERT(reg, "reg is empty");
                 _chunk->emit<Bytecode::Op::OpCode::PushReg>(*reg);
             }
@@ -163,43 +169,46 @@ namespace Cial::Inter {
         if(!node->arguments.empty()) {
             _chunk->emit<Bytecode::Op::OpCode::PopN>(node->arguments.size());
         }
-        return dst;
+        retReg = dst;
     }
 
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::AssignExprNode *node) {
+    void IRGenerator::generate(const Syntax::AssignExprNode *node, OptReg &retReg) {
         // TODO: member access
         const auto identifier = node->lhs->token->constVal();
 
         auto variable = resolveLocalVariable(identifier.value<Atom>());
 
         if(variable && variable.value()) {
-            auto src = node->rhs->generateBytecode(this);
+            OptReg src{};
+            node->rhs->generateBytecode(this, src);
             CLL_ASSERT(src.has_value(), "src is not have val");
 
-            auto dst = node->lhs->generateBytecode(this);
+            OptReg dst;
+            node->lhs->generateBytecode(this, dst);
             CLL_ASSERT(dst.has_value(), "dst is not have val");
 
             freeRegister(src.value());
             _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), dst.value());
             if(_r.isFailed())
-                return {};
+                return;
 
-            return dst;
+            retReg = dst;
         }
 
         // global maybe
-        auto src = node->rhs->generateBytecode(this);
+        OptReg src;
+        node->rhs->generateBytecode(this, src);
         CLL_ASSERT(src.has_value(), "global src is not have val");
 
         _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier.value<Atom>(), src.value());
 
         if(_r.isFailed())
-            return {};
-        return src;
+            return;
+        retReg = src;
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::VarDeclNode *node) {
+    void IRGenerator::generate(const Syntax::VarDeclNode *node, OptReg &retReg) {
         const auto identifier = node->token->constVal().value<Atom>();
 
         // global
@@ -207,16 +216,17 @@ namespace Cial::Inter {
             // can't init
             if(!node->rhs) {
                 _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, loadVoidReg(*_chunk));
-                return {};
+                return;
             }
 
-            auto src = node->rhs->generateBytecode(this);
+            OptReg src;
+            node->rhs->generateBytecode(this, src);
             freeRegister(src.value());
             if(_r.isFailed())
-                return {};
+                return;
 
             _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, src.value());
-            return {};
+            return;
         }
 
         auto variable = resolveLocalVariable(identifier);
@@ -224,42 +234,35 @@ namespace Cial::Inter {
         // already have this variable, in same scope
         if(variable.has_value() && variable.value()) {
             if(!node->rhs)
-                return {};
+                return;
 
-            auto src = node->rhs->generateBytecode(this);
+            OptReg src;
+            node->rhs->generateBytecode(this, src);
             freeRegister(src.value());
 
             if(!_r.isFailed())
-                return {};
+                return;
 
             CLL_ASSERT(src.has_value(), "src is not have val");
 
             _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), variable.value()->reg);
-            return {};
+            return;
         }
 
-        Syntax::OptReg dst{};
+        OptReg dst = loadVoidReg(*_chunk);
         // can init
         if(node->rhs) {
-            dst = allocateRegister();
-            auto src = node->rhs->generateBytecode(this);
-            freeRegister(src.value());
+            node->rhs->generateBytecode(this, dst);
 
             if(_r.isFailed())
-                return {};
-            CLL_ASSERT(src.has_value(), "src is not have val");
-
-            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), dst.value());
-        } else {
-            dst = loadVoidReg(*_chunk);
+                return;
+            CLL_ASSERT(dst.has_value(), "src is not have val");
         }
 
         addLocalVariable(FuncMeta::LocalVariable{ identifier, dst.value(), getNextInstPos() });
-
-        return {};
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::FunctionDeclNode *node) {
+    void IRGenerator::generate(const Syntax::FunctionDeclNode *node, OptReg &retReg) {
         auto funReg = allocateRegister();
         auto funChunk = generateChunk(node);
 
@@ -271,16 +274,14 @@ namespace Cial::Inter {
         if(isTopScope()) {
             freeRegister(funReg);
             _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, funReg);
-            return {};
+            return;
         }
 
         addLocalVariable(FuncMeta::LocalVariable{ identifier, funReg, getNextInstPos() });
-
-        return {};
     }
 
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::ClassDeclNode *node) {
+    void IRGenerator::generate(const Syntax::ClassDeclNode *node, OptReg &retReg) {
         // TODO:
         // const auto identifier = node->token->value().value<Atom>();
         //
@@ -307,14 +308,14 @@ namespace Cial::Inter {
         //
         //         CLL_ASSERT(varName.isString(), "identifier is not string");
         //
-        //         Syntax::OptReg src;
+        //         OptReg src;
         //
         //         // can init
         //         if(varDeclNode->rhs) {
-        //             src = varDeclNode->rhs->generateBytecode(this);
+        //             src = varDeclNode->rhs->generateBytecode(this, retReg);
         //             // freeRegister(src.value());
         //             if(_r.isFailed())
-        //                 return {};
+        //                 return;
         //         }
         //
         //         classObject->setFieldDef(varName.toString()->toStdStr(), FieldMeta{ src });
@@ -323,54 +324,53 @@ namespace Cial::Inter {
         //
         // endScope();
         // freeRegister(thisObjReg);
-        return {};
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::IdentifierExprNode *node) {
+    void IRGenerator::generate(const Syntax::IdentifierExprNode *node, OptReg &retReg) {
         const auto identifier = node->token->constVal().value<Atom>();
 
         auto variable = resolveLocalVariable(identifier);
 
         if(variable.has_value()) {
-            return variable.value()->reg;
+            retReg = variable.value()->reg;
+            return;
         }
 
         // dynamic get
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::GDynamic>(identifier, dst);
+        _chunk->emit<Bytecode::Op::OpCode::GUpval>(identifier, dst);
         if(_r.isFailed())
-            return {};
+            return;
 
-        return dst;
+        retReg = dst;
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::StmtDeclNode *node) {
-        return node->statement->generateBytecode(this);
+    void IRGenerator::generate(const Syntax::StmtDeclNode *node, OptReg &retReg) {
+        return node->statement->generateBytecode(this, retReg);
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::BlockStmtNode *node) {
+    void IRGenerator::generate(const Syntax::BlockStmtNode *node, OptReg &retReg) {
         beginScope();
         for(const auto children : node->childrens) {
-            children->generateBytecode(this);
+            children->generateBytecode(this, retReg);
             if(_r.isFailed())
-                return {};
+                return;
         }
         endScope();
-
-        return {};
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::IfStmtNode *node) {
-        auto testReg = node->test->generateBytecode(this);
+    void IRGenerator::generate(const Syntax::IfStmtNode *node, OptReg &retReg) {
+        OptReg testReg;
+        node->test->generateBytecode(this, testReg);
         if(_r.isFailed())
-            return {};
+            return;
 
         CLL_ASSERT(testReg.has_value(), "testReg is not have val");
 
         _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
 
         auto *jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
-        node->body->generateBytecode(this);
+        node->body->generateBytecode(this, retReg);
         Bytecode::Op::Instruction *jmp = nullptr;
 
         if(node->elseBody) {
@@ -380,20 +380,18 @@ namespace Cial::Inter {
         Bytecode::Op::JmpNE::setTarget(*jmpNE, makeLabel());
 
         if(node->elseBody) {
-            node->elseBody->generateBytecode(this);
+            node->elseBody->generateBytecode(this, retReg);
             Bytecode::Op::Jmp::setTarget(*jmp, makeLabel());
         }
 
         freeRegister(testReg.value());
-
-        return {};
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::DoWhileStmtNode *node) {
+    void IRGenerator::generate(const Syntax::DoWhileStmtNode *node, OptReg &retReg) {
         const auto bodyLabel = makeLabel();
         _loopStack.push_back(LoopContext{});
 
-        node->body->generateBytecode(this);
+        node->body->generateBytecode(this, retReg);
 
         const auto testLabel = makeLabel();
         _loopStack.back().continueLabel = testLabel;
@@ -401,9 +399,10 @@ namespace Cial::Inter {
             Bytecode::Op::Jmp::setTarget(*ct, testLabel);
         }
 
-        auto testReg = node->test->generateBytecode(this);
+        OptReg testReg;
+        node->test->generateBytecode(this, testReg);
         if(_r.isFailed())
-            return {};
+            return;
         CLL_ASSERT(testReg.has_value(), "testReg is not have val");
 
         _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
@@ -418,28 +417,27 @@ namespace Cial::Inter {
 
         freeRegister(testReg.value());
         _loopStack.pop_back();
-        return {};
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::ForStmtNode *node) {
+    void IRGenerator::generate(const Syntax::ForStmtNode *node, OptReg &retReg) {
         if(node->init)
-            node->init->generateBytecode(this);
+            node->init->generateBytecode(this, retReg);
 
         const auto testLabel = makeLabel();
         _loopStack.push_back(LoopContext{});
 
         Bytecode::Op::Instruction *jmpNE{ nullptr };
-        Syntax::OptReg testReg{};
+        OptReg testReg{};
         if(node->test) {
-            testReg = node->test->generateBytecode(this);
+            node->test->generateBytecode(this, testReg);
             if(_r.isFailed())
-                return {};
+                return;
             CLL_ASSERT(testReg.has_value(), "testReg is not have val");
             _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
             jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
         }
 
-        node->body->generateBytecode(this);
+        node->body->generateBytecode(this, retReg);
 
         const auto stepLabel = makeLabel();
         _loopStack.back().continueLabel = stepLabel;
@@ -448,7 +446,8 @@ namespace Cial::Inter {
         }
 
         if(node->step) {
-            auto stepReg = node->step->generateBytecode(this);
+            OptReg stepReg{};
+            node->step->generateBytecode(this, stepReg);
             if(stepReg)
                 freeRegister(stepReg.value());
         }
@@ -464,25 +463,25 @@ namespace Cial::Inter {
         if(testReg)
             freeRegister(testReg.value());
         _loopStack.pop_back();
-        return {};
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::WhileStmtNode *node) {
+    void IRGenerator::generate(const Syntax::WhileStmtNode *node, OptReg &retReg) {
 
         const auto loopLabel = makeLabel();
 
         _loopStack.push_back(LoopContext{ .continueLabel = loopLabel });
 
-        auto testReg = node->test->generateBytecode(this);
+        OptReg testReg;
+        node->test->generateBytecode(this, testReg);
         if(_r.isFailed())
-            return {};
+            return;
 
         CLL_ASSERT(testReg.has_value(), "testReg is not have val");
 
         _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
         auto *jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
 
-        node->body->generateBytecode(this);
+        node->body->generateBytecode(this, retReg);
         Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), loopLabel);
         const auto exitLabel = makeLabel();
         Bytecode::Op::JmpNE::setTarget(*jmpNE, exitLabel);
@@ -494,20 +493,18 @@ namespace Cial::Inter {
         freeRegister(testReg.value());
 
         _loopStack.pop_back();
-        return {};
     }
 
-    Syntax::OptReg IRGenerator::generate([[maybe_unused]] const Syntax::BreakStmtNode *node) {
+    void IRGenerator::generate([[maybe_unused]] const Syntax::BreakStmtNode *node, OptReg &retReg) {
         if(_loopStack.empty())
-            return {};
+            return;
         auto *itt = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
         _loopStack.back().breaks.push_back(itt);
-        return {};
     }
 
-    Syntax::OptReg IRGenerator::generate([[maybe_unused]] const Syntax::ContinueStmtNode *node) {
+    void IRGenerator::generate([[maybe_unused]] const Syntax::ContinueStmtNode *node, OptReg &retReg) {
         if(_loopStack.empty())
-            return {};
+            return;
         if(_loopStack.back().continueLabel.has_value()) {
             Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(),
                                          _loopStack.back().continueLabel.value());
@@ -515,18 +512,17 @@ namespace Cial::Inter {
             auto *itt = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
             _loopStack.back().continues.push_back(itt);
         }
-        return {};
     }
 
-    Syntax::OptReg IRGenerator::generate(const Syntax::ReturnStmtNode *node) {
+    void IRGenerator::generate(const Syntax::ReturnStmtNode *node, OptReg &retReg) {
         if(node->expr) {
-            auto reg = node->expr->generateBytecode(this);
+            OptReg reg;
+            node->expr->generateBytecode(this, reg);
             CLL_ASSERT(reg.has_value(), "reg is not have val");
             _chunk->emit<Bytecode::Op::OpCode::Ret>(reg.value());
-            return {};
+            return;
         }
         _chunk->emit<Bytecode::Op::OpCode::Ret>(loadVoidReg(*_chunk));
-        return {};
     }
 
     std::optional<FuncMeta::LocalVariable *> IRGenerator::resolveLocalVariable(const Atom identifier) {
@@ -544,13 +540,14 @@ namespace Cial::Inter {
 
         gen.beginScope();
 
-        Syntax::OptReg paramReg{};
+        OptReg paramReg{};
 
         for(auto &[token, exprNode] : node->parameters) {
             const auto varName = token.constVal().value<Atom>();
 
             if(exprNode) {
-                auto defaultParameter = exprNode->generateBytecode(&gen);
+                OptReg defaultParameter{};
+                exprNode->generateBytecode(&gen, defaultParameter);
                 CLL_ASSERT(defaultParameter.has_value(), "defaultParameter is not have val");
                 paramReg = defaultParameter.value();
             } else {
@@ -560,7 +557,8 @@ namespace Cial::Inter {
             gen.addLocalVariable(FuncMeta::LocalVariable{ varName, paramReg.value(), startPC });
         }
 
-        auto funChunk = gen.parseAst(_r, node->body);
+        OptReg tmpReg{};
+        auto funChunk = gen.parseAst(_r, node->body, tmpReg);
         gen.endScope();
 
         // the last instruction is not ret, patch one ret

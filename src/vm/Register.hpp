@@ -29,5 +29,9 @@ namespace Cial::Bytecode {
     };
 } // namespace Cial::Bytecode
 
+namespace Cial {
+    using OptReg = std::optional<Bytecode::Register>;
+}
+
 template <>
 struct fmt::formatter<Cial::Bytecode::Register> : ostream_formatter {};

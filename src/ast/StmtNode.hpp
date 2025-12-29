@@ -31,7 +31,9 @@ namespace Cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
     };
 
     class ExprStmtNode final : public StmtNode {
@@ -46,7 +48,9 @@ namespace Cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
     };
 
     class IfStmtNode final : public StmtNode {
@@ -62,7 +66,9 @@ namespace Cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
     };
 
 
@@ -78,7 +84,9 @@ namespace Cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
     };
 
     class ForStmtNode final : public StmtNode {
@@ -96,7 +104,9 @@ namespace Cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
     };
 
     class WhileStmtNode final : public StmtNode {
@@ -111,7 +121,9 @@ namespace Cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
     };
 
     class BreakStmtNode final : public StmtNode {
@@ -120,7 +132,9 @@ namespace Cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
     };
 
     class ContinueStmtNode final : public StmtNode {
@@ -129,7 +143,9 @@ namespace Cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
     };
 
     class ReturnStmtNode final : public StmtNode {
@@ -140,6 +156,8 @@ namespace Cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        OptReg generateBytecode(Inter::IRGenerator *gen) const override { return gen->generate(this); }
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
     };
 } // namespace Cial::Syntax

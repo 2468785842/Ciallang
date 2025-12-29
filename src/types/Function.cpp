@@ -27,6 +27,7 @@ namespace Cial {
         // Faster move Reg window ptr, WARING: reverse args
         auto *currentCallFrame = vmState.curFrame();
         currentCallFrame->baseRegSP -= meta->arity;
+        currentCallFrame->funcMeta = meta;
     }
 
     void NativeFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
@@ -35,7 +36,7 @@ namespace Cial {
         const size_t base = vmState.getRegPoolTop() - argCount;
         // Faster operation
         for(std::uint32_t i = 0; i < argCount; i++) {
-            new(&values[i]) Value{ curCallFrame->getReg(base - i) };
+            new(&values[i]) Value{ curCallFrame->getReg(Bytecode::Register{ base - i }) };
         }
 
         const auto &value = callProc(values.get());

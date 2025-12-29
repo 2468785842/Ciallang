@@ -94,8 +94,8 @@ namespace Cial {
     }
 
     GCObject *toGCObject(const Value &v) noexcept {
-        if(v.isObject())
-            return v.toObject();
+        // if(v.isObject())
+        // return v.toObject();
         if(v.isString())
             return v.toString();
         if(v.isOctet())

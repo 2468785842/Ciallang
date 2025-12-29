@@ -11,26 +11,20 @@
  *                                                            \_/__/
  *
  */
-#pragma once
 
-#include <unordered_map>
-
-#include "parser/AtomTable.hpp"
-#include "parser/OctetTable.hpp"
-#include "types/Value.hpp"
+#include "Runtime.hpp"
 
 namespace Cial {
 
-    class MarkSweepHeader;
+    void Runtime::addHandleVal(MarkSweepHeader *ptr) { handles.push_back(ptr); }
 
-    class Runtime {
-    public:
-        std::unordered_map<Atom, Value> gObj{};
-        std::vector<MarkSweepHeader *> handles{};
-        AtomTable atomTable{};
-        OctetTable octetTable{};
-        void addHandleVal(MarkSweepHeader *);
+    void Runtime::removeHandleVal(const MarkSweepHeader *ptr) {
+        for(auto it = handles.begin(); it != handles.end(); ++it) {
+            if(*it == ptr) {
+                handles.erase(it);
+                return;
+            }
+        }
+    }
 
-        void removeHandleVal(const MarkSweepHeader *);
-    };
 } // namespace Cial

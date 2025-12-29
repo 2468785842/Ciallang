@@ -21,14 +21,7 @@ namespace Cial::Bytecode {
 } // namespace Cial::Bytecode
 
 namespace Cial {
-    class Object;
-
-    struct Closure {
-        Object *object;
-        Object *context;
-    };
-
-    class Object : public GCObject {
+    class Object : public MarkSweepHeader {
     public:
         explicit Object() = default;
         explicit Object(const Atom name) : _name{ name } {}
@@ -48,7 +41,7 @@ namespace Cial {
         }
 
     private:
-        Closure closure{};
+        Object *context = nullptr;
         Atom _name = ATOM_INVALID;
     };
 

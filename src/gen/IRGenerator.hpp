@@ -27,45 +27,57 @@ namespace Cial::Inter {
     public:
         explicit IRGenerator(Common::SourceFile &sourceFile) : _sourceFile(sourceFile) {}
 
-        std::unique_ptr<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node);
+        std::unique_ptr<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node, OptReg &retReg);
 
-        Syntax::OptReg generate(const Syntax::ValueExprNode *);
+        void beginScope() { _scopeStartPC.emplace_back(getNextInstPos()); }
 
-        Syntax::OptReg generate(const Syntax::IdentifierExprNode *);
+        void endScope() {
+            for(auto &localVar : _localVars) {
+                if(localVar.startPC > _scopeStartPC.back()) {
+                    freeRegister(localVar.reg);
+                    localVar.endPC = getNextInstPos();
+                }
+            }
+            _scopeStartPC.pop_back();
+        }
 
-        Syntax::OptReg generate(const Syntax::BinaryExprNode *);
+        void generate(const Syntax::ValueExprNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::UnaryExprNode *);
+        void generate(const Syntax::IdentifierExprNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::ProcCallExprNode *);
+        void generate(const Syntax::BinaryExprNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::AssignExprNode *);
+        void generate(const Syntax::UnaryExprNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::BlockStmtNode *);
+        void generate(const Syntax::ProcCallExprNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::ExprStmtNode *);
+        void generate(const Syntax::AssignExprNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::IfStmtNode *);
+        void generate(const Syntax::BlockStmtNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::VarDeclNode *);
+        void generate(const Syntax::ExprStmtNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::FunctionDeclNode *);
+        void generate(const Syntax::IfStmtNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::ClassDeclNode *);
+        void generate(const Syntax::VarDeclNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::StmtDeclNode *);
+        void generate(const Syntax::FunctionDeclNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::DoWhileStmtNode *);
+        void generate(const Syntax::ClassDeclNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::ForStmtNode *);
+        void generate(const Syntax::StmtDeclNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::WhileStmtNode *);
+        void generate(const Syntax::DoWhileStmtNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::BreakStmtNode *);
+        void generate(const Syntax::ForStmtNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::ContinueStmtNode *);
+        void generate(const Syntax::WhileStmtNode *, OptReg &);
 
-        Syntax::OptReg generate(const Syntax::ReturnStmtNode *);
+        void generate(const Syntax::BreakStmtNode *, OptReg &);
+
+        void generate(const Syntax::ContinueStmtNode *, OptReg &);
+
+        void generate(const Syntax::ReturnStmtNode *, OptReg &);
 
     private:
         std::unique_ptr<Bytecode::Chunk> _chunk = std::make_unique<Bytecode::Chunk>();
@@ -73,7 +85,7 @@ namespace Cial::Inter {
         Common::SourceFile &_sourceFile;
         Common::Result _r{};
 
-        Syntax::OptReg _empty{};
+        OptReg _empty{};
 
         Vec<Bytecode::Register> _freeRegisters{};
 
@@ -89,7 +101,7 @@ namespace Cial::Inter {
         Vec<std::uint32_t> _scopeStartPC{};
         Vec<FuncMeta::LocalVariable> _localVars{};
 
-        std::uint32_t _regNextIndex{ 0 };
+        std::uint64_t _regNextIndex{ 0 };
 
         /**
          * allocate a temp register in this chunk
@@ -116,19 +128,7 @@ namespace Cial::Inter {
 
         std::uint32_t &getScopeInstPos() noexcept { return _scopeStartPC.back(); }
 
-        bool isTopScope() const noexcept { return _scopeStartPC.size() == 1; }
-
-        void beginScope() { _scopeStartPC.emplace_back(getNextInstPos()); }
-
-        void endScope() {
-            for(auto &localVar : _localVars) {
-                if(localVar.startPC > _scopeStartPC.back()) {
-                    freeRegister(localVar.reg);
-                    localVar.endPC = getNextInstPos();
-                }
-            }
-            _scopeStartPC.pop_back();
-        }
+        [[nodiscard]] bool isTopScope() const noexcept { return _scopeStartPC.size() == 1; }
 
         void addLocalVariable(FuncMeta::LocalVariable &&variable) { _localVars.emplace_back(variable); }
 

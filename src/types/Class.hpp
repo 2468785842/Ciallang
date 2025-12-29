@@ -29,11 +29,11 @@ namespace Cial {
 
         [[nodiscard]] Function *getFunction() const noexcept { return dynamic_cast<Function *>(_function.toObject()); }
 
-        Opt<Vec<GCObject *>> getRefs() override {
-            auto refs = _function.toObject()->getRefs();
-            refs->push_back(toGCObject(_thisValue));
-            return refs;
-        }
+        // Opt<Vec<GCObject *>> getRefs() override {
+        //     auto refs = _function.toObject()->getRefs();
+        //     refs->push_back(toGCObject(_thisValue));
+        //     return refs;
+        // }
 
     private:
         Value _thisValue;
@@ -74,25 +74,25 @@ namespace Cial {
 
         [[nodiscard]] const std::unordered_map<Atom, FieldMeta> &getFieldDefs() const noexcept { return _fieldsDef; }
 
-        Opt<Vec<GCObject *>> getRefs() override {
-            Vec<GCObject *> refs{};
-
-            if(_base) {
-                if(const auto baseOptRefs = _base->getRefs()) {
-                    refs = *baseOptRefs;
-                }
-            }
-
-            for(auto &v : std::views::values(_methodsDef)) {
-                refs.push_back(toGCObject(v));
-            }
-
-            for(auto &v : std::views::values(_staticFields)) {
-                refs.push_back(toGCObject(v));
-            }
-
-            return refs;
-        }
+        // Opt<Vec<GCObject *>> getRefs() override {
+        //     Vec<GCObject *> refs{};
+        //
+        //     if(_base) {
+        //         if(const auto baseOptRefs = _base->getRefs()) {
+        //             refs = *baseOptRefs;
+        //         }
+        //     }
+        //
+        //     for(auto &v : std::views::values(_methodsDef)) {
+        //         refs.push_back(toGCObject(v));
+        //     }
+        //
+        //     for(auto &v : std::views::values(_staticFields)) {
+        //         refs.push_back(toGCObject(v));
+        //     }
+        //
+        //     return refs;
+        // }
 
     private:
         ClassObject *_base{ nullptr };
@@ -108,13 +108,13 @@ namespace Cial {
 
         explicit InstanceObject(ClassObject *klass) : _class(klass) {
             if(_class) {
-                _class->incRef();
+                // _class->incRef();
             }
         }
 
         ~InstanceObject() noexcept override {
             if(_class) {
-                _class->decRef();
+                // _class->decRef();
             }
         }
 
@@ -130,25 +130,25 @@ namespace Cial {
 
         [[nodiscard]] Value getMethod(Atom name) const noexcept;
 
-        Opt<Vec<GCObject *>> getRefs() override {
-            Vec<GCObject *> refs{};
-
-            if(_class) {
-                if(const auto classOptRefs = _class->getRefs()) {
-                    refs = *classOptRefs;
-                }
-            }
-
-            for(auto &v : std::views::values(_fields)) {
-                refs.push_back(toGCObject(v));
-            }
-
-            for(auto &v : std::views::values(_fields)) {
-                refs.push_back(toGCObject(v));
-            }
-
-            return refs;
-        }
+        // Opt<Vec<GCObject *>> getRefs() override {
+        //     Vec<GCObject *> refs{};
+        //
+        //     if(_class) {
+        //         if(const auto classOptRefs = _class->getRefs()) {
+        //             refs = *classOptRefs;
+        //         }
+        //     }
+        //
+        //     for(auto &v : std::views::values(_fields)) {
+        //         refs.push_back(toGCObject(v));
+        //     }
+        //
+        //     for(auto &v : std::views::values(_fields)) {
+        //         refs.push_back(toGCObject(v));
+        //     }
+        //
+        //     return refs;
+        // }
 
     private:
         ClassObject *_class{ nullptr };

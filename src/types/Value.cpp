@@ -27,12 +27,14 @@ namespace Cial {
 
     Value::Value(Octet *value) : _value{ ._octet = value }, _type(ValueType::Octet) { _value._octet->incRef(); }
 
-    Value::Value(Object *value) : _value{ ._object = value }, _type(ValueType::Object) { _value._object->incRef(); }
+    Value::Value(Object *value) : _value{ ._object = value }, _type(ValueType::Object) {
+        // _value._object->incRef();
+    }
 
     Value::~Value() {
         switch(_type) {
             case ValueType::Object:
-                _value._object->decRef();
+                // _value._object->decRef();
                 break;
             case ValueType::String:
                 _value._string->decRef();
@@ -58,7 +60,7 @@ namespace Cial {
                 break;
             case ValueType::Object:
                 _value._object = v._value._object;
-                _value._object->incRef();
+                // _value._object->incRef();
                 break;
             default:
                 _value = v._value;

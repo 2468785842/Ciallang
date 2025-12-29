@@ -26,6 +26,8 @@ namespace Cial {
 
         friend std::ostream &operator<<(std::ostream &os, const String &d) { return os << d.toStdStr(); }
 
+        [[nodiscard]] bool isEmpty() const { return _len == 0; }
+
         template <size_t N>
         static Value create(const char (&arr)[N]) {
             return Value{ new String(arr, N) };
@@ -34,7 +36,7 @@ namespace Cial {
         static Value create(const char *str, std::uint32_t size);
 
     private:
-        char *_longStr;
+        char *_longStr = nullptr;
         char _shortStr[G_ShortStrLen + 1]{};
         int _len;
     };

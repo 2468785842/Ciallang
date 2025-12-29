@@ -38,6 +38,7 @@ namespace Cial::Bytecode {
     // };
 
     struct CallFrame {
+        const FuncMeta *funcMeta{};
         const Chunk *chunk{};
         std::optional<Register> ret{};
         Value thisValue{};
@@ -50,7 +51,7 @@ namespace Cial::Bytecode {
             chunk(chunk_), baseRegSP(pool.allocFrame(chunk_->getRegCount())), ret(ret_), _pool(&pool) {}
 
         CallFrame(CallFrame &&callFrame) noexcept :
-            chunk(callFrame.chunk), baseRegSP(callFrame.baseRegSP), ret(callFrame.ret), pc(callFrame.pc),
+            chunk(callFrame.chunk), ret(callFrame.ret), baseRegSP(callFrame.baseRegSP), pc(callFrame.pc),
             _pool(callFrame._pool) {
             callFrame._pool = nullptr;
         }
@@ -72,9 +73,9 @@ namespace Cial::Bytecode {
             }
         }
 
-        [[nodiscard]] Value &getReg(const size_t index) { return *_pool->ptrAt(baseRegSP + index); }
+        [[nodiscard]] Value &getReg(const Register reg) { return *_pool->ptrAt(baseRegSP + reg.index()); }
 
-        [[nodiscard]] const Value &getReg(const size_t index) const { return *_pool->ptrAt(baseRegSP + index); }
+        [[nodiscard]] const Value &getReg(const Register reg) const { return *_pool->ptrAt(baseRegSP + reg.index()); }
 
     private:
         FastRegisterPool *_pool{ nullptr };
@@ -99,14 +100,14 @@ namespace Cial::Bytecode {
         [[nodiscard]] Value global(const std::string &name) const {
             const auto atom = rt().atomTable.intern(name.c_str(), name.length());
             Value v = _rt.gObj.contains(atom) ? _rt.gObj[atom] : Value{};
-            rt().atomTable.release(atom);
+            // rt().atomTable.release(atom);
             return v;
         }
 
         void global(const std::string &name, const Value &value) const {
             const auto atom = rt().atomTable.intern(name.c_str(), name.length());
             _rt.gObj[atom] = value;
-            rt().atomTable.release(atom);
+            // rt().atomTable.release(atom);
         }
 
         void setZF(const bool zf) { _zf = zf; }
@@ -141,12 +142,14 @@ namespace Cial::Bytecode {
         [[nodiscard]] CallFrame *prev() noexcept { return &_callStack[_stackTop - 2]; }
         [[nodiscard]] const CallFrame *prev() const noexcept { return &_callStack[_stackTop - 2]; }
 
+        [[nodiscard]] Value getUpVal(Atom atom) const;
+
         [[nodiscard]] std::string dumpRegisters() const {
             std::stringstream ss{};
             for(size_t i = 0; i < _stackTop; i++) {
                 const auto &call = _callStack[i];
                 for(size_t j = 0; j < call.chunk->getRegCount(); j++) {
-                    ss << fmt::format("(%{}): {}\n", j, call.getReg(j));
+                    ss << fmt::format("(%{}): {}\n", j, call.getReg(Register{ j }));
                 }
             }
             return ss.str();
@@ -198,12 +201,12 @@ namespace Cial::Bytecode {
 
     private:
         Runtime &_rt;
-        CallFrame *_currentFrame{ nullptr };
+        CallFrame *_currentFrame{ _callStack };
+        FastRegisterPool _regPool{};
         // Stack Max Depth Is 1024
         static constexpr auto MAX_CALL_DEPTH = 1024;
-        FastRegisterPool _regPool{};
         CallFrame _callStack[MAX_CALL_DEPTH];
-        size_t _stackTop{ 0 };
+        size_t _stackTop{ 0 }; // callFrame count
         bool _zf{ false };
     };
 } // namespace Cial::Bytecode

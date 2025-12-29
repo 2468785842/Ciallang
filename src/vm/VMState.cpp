@@ -14,6 +14,7 @@
 #include "VMState.hpp"
 
 #include "Instruction.hpp"
+#include "types/Class.hpp"
 
 namespace Cial::Bytecode {
 
@@ -51,7 +52,6 @@ namespace Cial::Bytecode {
 #undef HANDLE_OPCODE
 #else
         for(;;) {
-            // cache hit
             std::uint64_t &pc = _currentFrame->pc;
             const auto &instList = instructions();
 
@@ -70,8 +70,42 @@ namespace Cial::Bytecode {
 #endif
     }
 
-    void VMState::reg(const Register &reg, const Value &value) const { _currentFrame->getReg(reg.index()) = value; }
+    void VMState::reg(const Register &reg, const Value &value) const { _currentFrame->getReg(reg) = value; }
 
-    Value VMState::reg(const Register reg) const { return _currentFrame->getReg(reg.index()); }
+    Value VMState::reg(const Register reg) const { return _currentFrame->getReg(reg); }
 
+
+    Value VMState::getUpVal(const Atom atom) const {
+
+        // current context
+        if(_currentFrame->thisValue.isObject()) {
+            if(const auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisValue.toObject())) {
+                return instanceObject->getField(atom);
+            }
+        }
+
+        for(std::uint16_t i = _stackTop - 1; i > 0; --i) {
+            const auto &callFrame = _callStack[i - 1];
+            // prev local scope
+            if(callFrame.funcMeta) {
+                for(const auto &localVar : callFrame.funcMeta->localVars) {
+                    if(localVar.endPC > callFrame.pc)
+                        continue;
+                    if(localVar.identifier == atom)
+                        return callFrame.getReg(localVar.reg);
+                }
+            }
+
+            // prev context
+            if(callFrame.thisValue.isObject()) {
+                if(const auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisValue.toObject())) {
+                    return instanceObject->getField(atom);
+                }
+            }
+        }
+
+        // global
+        // TODO: check is exist
+        return global(atom);
+    }
 } // namespace Cial::Bytecode

@@ -307,7 +307,9 @@ namespace Cial::Bytecode::Op {
                 a = vmState.rt().atomTable.intern(str->getData(), str->length());
             }
             const auto tmp = inst->getField(a);
-            vmState.rt().atomTable.release(a);
+            // if(itt.getOperand2Type() == Operand::Type::Register) {
+            // vmState.rt().atomTable.release(a);
+            // }
             vmState.reg(dst(itt), tmp);
             return;
         }
@@ -372,25 +374,13 @@ namespace Cial::Bytecode::Op {
         throw std::runtime_error("not implemented");
     }
 
-    void GDynamic::execute(const Instruction &itt, const VMState &vmState) {
-        const auto &callFrame = vmState.curFrame();
-        Value v{};
-        if(callFrame->thisValue.isObject()) {
-            if(const auto *instanceObject = dynamic_cast<InstanceObject *>(callFrame->thisValue.toObject())) {
-                v = instanceObject->getField(atom(itt));
-            }
-        }
-
-        if(v.isVoid()) {
-            v = vmState.global(atom(itt));
-        }
-
-        vmState.reg(dst(itt), v);
+    void GUpval::execute(const Instruction &itt, const VMState &vmState) {
+        vmState.reg(dst(itt), vmState.getUpVal(atom(itt)));
     }
 
-    std::string GDynamic::dump(const Instruction &itt, const VMState &vmState, const bool info) {
+    std::string GUpval::dump(const Instruction &itt, const VMState &vmState, const bool info) {
         const auto &symbol = fmt::format("\"{}\"", vmState.rt().atomTable.get(atom(itt))->str);
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gdynamic", symbol, dst(itt));
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gupval", symbol, dst(itt));
 
         if(!info)
             return insDump;
@@ -412,7 +402,7 @@ namespace Cial::Bytecode::Op {
         const auto &value = vmState.reg(retReg(itt));
         const auto frame = vmState.curFrame();
         CLL_ASSERT(frame->ret, "frame.ret val is empty");
-        vmState.prev()->getReg(frame->ret->index()) = value;
+        vmState.prev()->getReg(*frame->ret) = value;
         vmState.freeCallFrame();
     }
 

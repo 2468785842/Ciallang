@@ -19,17 +19,17 @@
 namespace Cial {
     ClassObject::~ClassObject() noexcept {
         if(_base) {
-            _base->decRef();
+            // _base->decRef();
         }
     }
 
     void ClassObject::setBase(ClassObject *base) noexcept {
         if(_base) {
-            _base->decRef();
+            // _base->decRef();
         }
         _base = base;
         if(_base) {
-            _base->incRef();
+            // _base->incRef();
         }
     }
 
@@ -82,17 +82,17 @@ namespace Cial {
     }
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
-        auto *instanceObj = vmState.gc.allocate<InstanceObject>(this);
-
-        for(auto &[k, v] : getFieldDefs()) {
-            instanceObj->setField(k, v.defValReg ? vmState.reg(v.defValReg.value()) : Value{});
-        }
-
-        for(auto &v : getMethods()) {
-            instanceObj->setField(v.toObject()->getName(),
-                                  Value{ vmState.gc.allocate<ClassFunction>(Value{ instanceObj }, v) });
-        }
-        vmState.reg(ret, Value{ instanceObj });
+        // auto *instanceObj = vmState.gc.allocate<InstanceObject>(this);
+        //
+        // for(auto &[k, v] : getFieldDefs()) {
+        //     instanceObj->setField(k, v.defValReg ? vmState.reg(v.defValReg.value()) : Value{});
+        // }
+        //
+        // for(auto &v : getMethods()) {
+        //     instanceObj->setField(v.toObject()->getName(),
+        //                           Value{ vmState.gc.allocate<ClassFunction>(Value{ instanceObj }, v) });
+        // }
+        // vmState.reg(ret, Value{ instanceObj });
     }
 
     void InstanceObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {

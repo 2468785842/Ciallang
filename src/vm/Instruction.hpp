@@ -50,7 +50,7 @@
     O(Call)                                                                                                            \
     O(GProp)                                                                                                           \
     O(SProp)                                                                                                           \
-    O(GDynamic)                                                                                                        \
+    O(GUpval)                                                                                                          \
     O(Ret)
 
 namespace Cial::Bytecode {
@@ -493,7 +493,7 @@ namespace Cial::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
     }; // struct SProp
 
-    struct GDynamic {
+    struct GUpval {
         static Atom atom(const Instruction &itt) { return itt.getOperand1<Atom>(); }
 
         static Register dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
@@ -501,7 +501,7 @@ namespace Cial::Bytecode::Op {
         static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
-    }; // struct GDynamic
+    }; // struct GUpval
 
     struct Ret {
         static Register retReg(const Instruction &itt) { return itt.getOperand1<Register>(); }

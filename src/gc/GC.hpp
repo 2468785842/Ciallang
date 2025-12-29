@@ -38,6 +38,12 @@ namespace Cial {
         GCObject *_next{ nullptr };
     };
 
+    class MarkSweepHeader {
+    public:
+        MarkSweepHeader() = default;
+        virtual ~MarkSweepHeader() = default;
+    };
+
     GCObject *toGCObject(const Value &v) noexcept;
 
     // 类型 trait

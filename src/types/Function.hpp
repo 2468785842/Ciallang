@@ -31,13 +31,13 @@ namespace Cial {
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
-        Opt<Vec<GCObject *>> getRefs() override {
-            Vec<GCObject *> refs{};
-            // for(auto &v : _chunk->getConstants()) {
-            //     refs.push_back(toGCObject(v));
-            // }
-            return refs;
-        }
+        // Opt<Vec<GCObject *>> getRefs() override {
+        //     Vec<GCObject *> refs{};
+        //     // for(auto &v : _chunk->getConstants()) {
+        //     //     refs.push_back(toGCObject(v));
+        //     // }
+        //     return refs;
+        // }
 
         ~Function() noexcept override = default;
     };
@@ -147,7 +147,7 @@ namespace Cial {
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
-        Opt<Vec<GCObject *>> getRefs() override { return {}; }
+        // Opt<Vec<GCObject *>> getRefs() override { return {}; }
 
         ~NativeFunction() noexcept override = default;
 

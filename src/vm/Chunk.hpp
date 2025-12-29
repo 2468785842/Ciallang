@@ -73,7 +73,7 @@ namespace Cial::Bytecode {
 
     private:
         Vec<Op::Instruction *> _instructions{};
-        std::uint32_t _registerCount{ 0 };
         Vec<Constant> _constants{};
+        std::uint32_t _registerCount{ 0 };
     };
 } // namespace Cial::Bytecode

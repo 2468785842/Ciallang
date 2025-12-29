@@ -8,6 +8,7 @@
 
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"
+#include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
 using namespace Cial;
@@ -20,9 +21,6 @@ TEST_CASE("函数声明 - 简单函数定义") {
         function empty() { }
         function foo() { return 42; }
         function add(a, b) { return a + b; }
-        var rEmpty = empty();
-        var rFoo = foo();
-        var rAdd = add(1, 2);
     )");
     Runtime rt{};
     Syntax::Parser parser{ rt, sourceFile };
@@ -32,28 +30,31 @@ TEST_CASE("函数声明 - 简单函数定义") {
     REQUIRE_FALSE(r.isFailed());
 
     Inter::IRGenerator codeGen{ sourceFile };
-    auto chunk = codeGen.parseAst(r, globalNode);
+    OptReg retReg{};
+    auto chunk = codeGen.parseAst(r, globalNode, retReg);
     REQUIRE(chunk != nullptr);
     REQUIRE_FALSE(r.isFailed());
 
-    Bytecode::VMState vm{ rt };
-    vm.allocCallFrame(chunk.get());
-    vm.run();
+    Bytecode::VMState vmState{ rt };
+    vmState.allocCallFrame(chunk.get());
+    vmState.run();
 
-    REQUIRE(vm.global("empty").isObject());
-    REQUIRE(vm.global("foo").isObject());
-    REQUIRE(vm.global("add").isObject());
+    VM vm{ &vmState };
 
-    REQUIRE(vm.global("rEmpty").isVoid());
+    REQUIRE(vm.getGlobal("empty"_str).value.toObject());
+    REQUIRE(vm.getGlobal("foo"_str).value.toObject());
+    REQUIRE(vm.getGlobal("add"_str).value.toObject());
 
-    Value rFoo = vm.global("rFoo");
-    REQUIRE(rFoo.isInteger());
-    REQUIRE(rFoo.toInteger() == 42);
+    REQUIRE(vm.evalExpr("empty()"_str).value.isVoid());
 
-    Value rAdd = vm.global("rAdd");
+    VM::Handle rFoo = vm.evalExpr("foo()"_str);
+    REQUIRE(rFoo.value.isInteger());
+    REQUIRE(rFoo.value.toInteger() == 42);
 
-    REQUIRE(rAdd.isInteger());
-    REQUIRE(rAdd.toInteger() == 3);
+    VM::Handle rAdd = vm.evalExpr("add(1, 2)"_str);
+
+    REQUIRE(rAdd.value.isInteger());
+    REQUIRE(rAdd.value.toInteger() == 3);
 }
 
 TEST_CASE("函数声明 - 参数列表") {
@@ -73,7 +74,8 @@ TEST_CASE("函数声明 - 参数列表") {
     REQUIRE_FALSE(r.isFailed());
 
     Inter::IRGenerator codeGen{ sourceFile };
-    auto chunk = codeGen.parseAst(r, globalNode);
+    OptReg retReg{};
+    auto chunk = codeGen.parseAst(r, globalNode, retReg);
     REQUIRE(chunk != nullptr);
     REQUIRE_FALSE(r.isFailed());
 
@@ -123,7 +125,8 @@ TEST_CASE("函数声明 - 函数体内容") {
         REQUIRE_FALSE(r.isFailed());
 
         Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
+        OptReg retReg{};
+        auto chunk = codeGen.parseAst(r, globalNode, retReg);
         REQUIRE(chunk != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
@@ -147,7 +150,8 @@ TEST_CASE("函数声明 - 函数体内容") {
         REQUIRE_FALSE(r.isFailed());
 
         Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
+        OptReg retReg{};
+        auto chunk = codeGen.parseAst(r, globalNode, retReg);
         REQUIRE(chunk != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
@@ -170,7 +174,8 @@ TEST_CASE("函数声明 - 函数体内容") {
         REQUIRE_FALSE(r.isFailed());
 
         Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
+        OptReg retReg{};
+        auto chunk = codeGen.parseAst(r, globalNode, retReg);
         REQUIRE(chunk != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
@@ -198,7 +203,8 @@ TEST_CASE("函数声明 - 函数调用") {
         REQUIRE_FALSE(r.isFailed());
 
         Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
+        OptReg retReg{};
+        auto chunk = codeGen.parseAst(r, globalNode, retReg);
         REQUIRE(chunk != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
@@ -222,7 +228,8 @@ TEST_CASE("函数声明 - 函数调用") {
         REQUIRE_FALSE(r.isFailed());
 
         Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
+        OptReg retReg{};
+        auto chunk = codeGen.parseAst(r, globalNode, retReg);
         REQUIRE(chunk != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
@@ -231,7 +238,7 @@ TEST_CASE("函数声明 - 函数调用") {
         vm.run();
         REQUIRE(vm.global("add").isObject());
 
-        Value v = vm.curFrame()->getReg(0);
+        Value v = vm.curFrame()->getReg(Bytecode::Register{ 0 });
         REQUIRE(v.isInteger());
         REQUIRE(v.toInteger() == 3);
     }
@@ -246,7 +253,8 @@ TEST_CASE("函数声明 - 函数调用") {
         REQUIRE_FALSE(r.isFailed());
 
         Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
+        OptReg retReg{};
+        auto chunk = codeGen.parseAst(r, globalNode, retReg);
         REQUIRE(chunk != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
@@ -256,7 +264,7 @@ TEST_CASE("函数声明 - 函数调用") {
         REQUIRE(vm.global("outer").isObject());
         REQUIRE(vm.global("inner").isObject());
 
-        Value v = vm.curFrame()->getReg(0);
+        Value v = vm.curFrame()->getReg(Bytecode::Register{ 0 });
         REQUIRE(v.isInteger());
         REQUIRE(v.toInteger() == 42);
     }
@@ -277,7 +285,8 @@ TEST_CASE("函数声明 - 多个函数定义") {
         REQUIRE_FALSE(r.isFailed());
 
         Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
+        OptReg retReg{};
+        auto chunk = codeGen.parseAst(r, globalNode, retReg);
         REQUIRE(chunk != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
@@ -299,7 +308,8 @@ TEST_CASE("函数声明 - 多个函数定义") {
         REQUIRE_FALSE(r.isFailed());
 
         Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
+        OptReg retReg{};
+        auto chunk = codeGen.parseAst(r, globalNode, retReg);
         REQUIRE(chunk != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
@@ -331,7 +341,8 @@ TEST_CASE("函数声明 - 递归函数") {
         REQUIRE_FALSE(r.isFailed());
 
         Inter::IRGenerator codeGen{ sourceFile };
-        auto chunk = codeGen.parseAst(r, globalNode);
+        OptReg retReg{};
+        auto chunk = codeGen.parseAst(r, globalNode, retReg);
         REQUIRE(chunk != nullptr);
         REQUIRE_FALSE(r.isFailed());
 
@@ -340,7 +351,7 @@ TEST_CASE("函数声明 - 递归函数") {
         vm.run();
 
         REQUIRE(vm.global("factorial").isObject());
-        Value v = vm.curFrame()->getReg(0);
+        Value v = vm.curFrame()->getReg(Bytecode::Register{ 0 });
         REQUIRE(v.isInteger());
         REQUIRE(v.toInteger() == 6);
     }

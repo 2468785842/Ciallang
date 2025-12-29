@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025/12/24 上午8:08
+ * Copyright (c) 2025/12/29 上午8:08
  *
  * /\  _` \   __          /\_ \  /\_ \
  * \ \ \/\_\ /\_\     __  \//\ \ \//\ \      __      ___      __
@@ -12,25 +12,35 @@
  *
  */
 #pragma once
-
-#include <unordered_map>
-
-#include "parser/AtomTable.hpp"
-#include "parser/OctetTable.hpp"
 #include "types/Value.hpp"
 
 namespace Cial {
+    class Runtime;
+    namespace Bytecode {
+        class VMState;
+    }
+} // namespace Cial
 
-    class MarkSweepHeader;
-
-    class Runtime {
+namespace Cial {
+    class VM {
     public:
-        std::unordered_map<Atom, Value> gObj{};
-        std::vector<MarkSweepHeader *> handles{};
-        AtomTable atomTable{};
-        OctetTable octetTable{};
-        void addHandleVal(MarkSweepHeader *);
+        class Handle {
+            Runtime *rt;
 
-        void removeHandleVal(const MarkSweepHeader *);
+        public:
+            Value value;
+            Handle(Runtime *rt, const Value &o) noexcept;
+
+            ~Handle() noexcept;
+        };
+
+        explicit VM(Bytecode::VMState *vmState);
+
+        [[nodiscard]] Handle getGlobal(const String &name) const;
+
+        [[nodiscard]] Handle evalExpr(const String &expr) const;
+
+    private:
+        Bytecode::VMState *_vmState;
     };
 } // namespace Cial
