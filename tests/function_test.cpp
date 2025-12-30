@@ -11,6 +11,8 @@
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
+#include "types/Function.hpp"
+
 using namespace Cial;
 
 TEST_CASE("函数声明 - 简单函数定义") {
@@ -22,7 +24,7 @@ TEST_CASE("函数声明 - 简单函数定义") {
         function foo() { return 42; }
         function add(a, b) { return a + b; }
     )");
-    Runtime rt{};
+    Runtime rt{ 3 };
     Syntax::Parser parser{ rt, sourceFile };
 
     auto *globalNode = parser.parse(r);

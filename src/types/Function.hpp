@@ -18,10 +18,9 @@
 #include "Object.hpp"
 #include "String.hpp"
 #include "Value.hpp"
-#include "vm/Chunk.hpp"
-#include "vm/Constant.hpp"
 
 namespace Cial {
+    struct FuncMeta;
 
     class Function final : public Object {
     public:

@@ -22,6 +22,8 @@ namespace Cial::Bytecode {
 
 namespace Cial {
     class Object : public MarkSweepHeader {
+        friend class Runtime;
+
     public:
         explicit Object() = default;
         explicit Object(const Atom name) : _name{ name } {}
@@ -34,10 +36,10 @@ namespace Cial {
 
         virtual void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) = 0;
 
-        template <class R, class... Args>
-            requires is_gc_object_v<R>
-        static Value create(Args... args) {
-            return Value{ new R(std::forward<Args>(args)...) };
+        void marked() noexcept override {
+            MarkSweepHeader::marked();
+            if(context)
+                context->marked();
         }
 
     private:

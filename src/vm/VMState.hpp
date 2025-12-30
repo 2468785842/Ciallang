@@ -19,7 +19,6 @@
 #include "FastRegisterPool.hpp"
 #include "Runtime.hpp"
 #include "gen/IRGenerator.hpp"
-#include "types/Function.hpp"
 
 #include "types/Value.hpp"
 
@@ -37,55 +36,11 @@ namespace Cial::Bytecode {
     //     SuperClassGetter,
     // };
 
-    struct CallFrame {
-        const FuncMeta *funcMeta{};
-        const Chunk *chunk{};
-        std::optional<Register> ret{};
-        Value thisValue{};
-        std::uint64_t baseRegSP{};
-        std::uint64_t pc{};
-
-        explicit CallFrame() = default;
-
-        explicit CallFrame(const Chunk *chunk_, const std::optional<Register> ret_, FastRegisterPool &pool) :
-            chunk(chunk_), baseRegSP(pool.allocFrame(chunk_->getRegCount())), ret(ret_), _pool(&pool) {}
-
-        CallFrame(CallFrame &&callFrame) noexcept :
-            chunk(callFrame.chunk), ret(callFrame.ret), baseRegSP(callFrame.baseRegSP), pc(callFrame.pc),
-            _pool(callFrame._pool) {
-            callFrame._pool = nullptr;
-        }
-
-        CallFrame &operator=(CallFrame &&callFrame) noexcept {
-            if(this != &callFrame) {
-                new(this) CallFrame(std::move(callFrame));
-            }
-
-            return *this;
-        }
-
-        CallFrame(const CallFrame &) = delete;
-        CallFrame &operator=(const CallFrame &) = delete;
-
-        ~CallFrame() {
-            if(_pool) {
-                _pool->freeFrame(chunk->getRegCount());
-            }
-        }
-
-        [[nodiscard]] Value &getReg(const Register reg) { return *_pool->ptrAt(baseRegSP + reg.index()); }
-
-        [[nodiscard]] const Value &getReg(const Register reg) const { return *_pool->ptrAt(baseRegSP + reg.index()); }
-
-    private:
-        FastRegisterPool *_pool{ nullptr };
-    };
-
     class VMState {
     public:
-        MarkSweep gc;
+        Runtime &rt;
 
-        explicit VMState(Runtime &rt) : gc{ 1024, rt }, _rt(rt) {}
+        explicit VMState(Runtime &rt) : rt(rt) {}
 
         void run();
 
@@ -93,33 +48,33 @@ namespace Cial::Bytecode {
 
         [[nodiscard]] Value reg(Register reg) const;
 
-        [[nodiscard]] Value global(const Atom atom) const { return _rt.gObj.contains(atom) ? _rt.gObj[atom] : Value{}; }
+        [[nodiscard]] Value global(const Atom atom) const { return rt.gObj.contains(atom) ? rt.gObj[atom] : Value{}; }
 
-        void global(const Atom atom, const Value &value) const { _rt.gObj[atom] = value; }
+        void global(const Atom atom, const Value &value) const { rt.gObj[atom] = value; }
 
         [[nodiscard]] Value global(const std::string &name) const {
-            const auto atom = rt().atomTable.intern(name.c_str(), name.length());
-            Value v = _rt.gObj.contains(atom) ? _rt.gObj[atom] : Value{};
+            const auto atom = rt.atomTable.intern(name.c_str(), name.length());
+            Value v = rt.gObj.contains(atom) ? rt.gObj[atom] : Value{};
             return v;
         }
 
         void global(const std::string &name, const Value &value) const {
-            const auto atom = rt().atomTable.intern(name.c_str(), name.length());
-            _rt.gObj[atom] = value;
+            const auto atom = rt.atomTable.intern(name.c_str(), name.length());
+            rt.gObj[atom] = value;
         }
 
         void setZF(const bool zf) { _zf = zf; }
 
         [[nodiscard]] bool getZF() const { return _zf; }
 
-        void setPC(const Label &label) { _callStack[_stackTop - 1].pc = label.address(); }
+        void setPC(const Label &label) const { _callStack[_stackTop - 1].pc = label.address(); }
 
         [[nodiscard]] size_t getPC() const { return _currentFrame->pc; }
 
         void allocCallFrame(const Chunk *chunk, const std::optional<Register> &ret = {}) {
-            if(_stackTop >= MAX_CALL_DEPTH)
+            if(_stackTop >= Runtime::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
-            _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ chunk, ret, _regPool };
+            _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ chunk, ret, rt.regPool };
         }
 
         void freeCallFrame() {
@@ -182,29 +137,23 @@ namespace Cial::Bytecode {
             return ss.str();
         }
 
-        void pushVoid(const size_t n) {
-            const size_t base = _regPool.allocFrame(n);
+        void pushVoid(const size_t n) const {
+            const size_t base = rt.regPool.allocFrame(n);
             for(std::size_t i = 0; i < n; i++) {
-                *_regPool.ptrAt(base) = Value{};
+                *rt.regPool.ptrAt(base) = Value{};
             }
         }
 
-        void push(const Value &v) { *_regPool.ptrAt(_regPool.allocFrame(1)) = v; }
+        void push(const Value &v) const { *rt.regPool.ptrAt(rt.regPool.allocFrame(1)) = v; }
 
-        void pop(const size_t count) { _regPool.freeFrame(count); }
+        void pop(const size_t count) const { rt.regPool.freeFrame(count); }
 
-        [[nodiscard]] size_t getRegPoolTop() const { return _regPool.used(); }
-
-        [[nodiscard]] Runtime &rt() const { return _rt; }
+        [[nodiscard]] size_t getRegPoolTop() const { return rt.regPool.used(); }
 
     private:
-        Runtime &_rt;
-        CallFrame *_currentFrame{ _callStack };
-        FastRegisterPool _regPool{};
-        // Stack Max Depth Is 1024
-        static constexpr auto MAX_CALL_DEPTH = 1024;
-        CallFrame _callStack[MAX_CALL_DEPTH];
-        size_t _stackTop{ 0 }; // callFrame count
+        CallFrame *_currentFrame{ rt.callStack };
+        CallFrame *_callStack{ rt.callStack };
+        size_t _stackTop{ rt.stackTop }; // callFrame count
         bool _zf{ false };
     };
 } // namespace Cial::Bytecode

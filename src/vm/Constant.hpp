@@ -16,15 +16,18 @@
 #include <fmt/ostream.h>
 
 #include "Register.hpp"
-#include "Runtime.hpp"
 
 #include "logging/Logger.hpp"
 #include "parser/AtomTable.hpp"
 #include "parser/OctetTable.hpp"
+#include "types/Value.hpp"
 
-namespace Cial::Bytecode {
-    class Chunk;
-}
+namespace Cial {
+    class Runtime;
+    namespace Bytecode {
+        class Chunk;
+    }
+} // namespace Cial
 
 namespace Cial {
     class [[nodiscard]] ConstIdx {
@@ -181,7 +184,7 @@ namespace Cial {
             }
         }
 
-        [[nodiscard]] Value createValue(const Runtime &rt) const noexcept;
+        [[nodiscard]] Value createValue(Runtime *rt) const noexcept;
 
     private:
         ConstantType _type;

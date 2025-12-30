@@ -16,6 +16,7 @@
 
 #include "Function.hpp"
 
+#include "vm/Constant.hpp"
 #include "vm/VMState.hpp"
 
 namespace Cial {
@@ -32,7 +33,7 @@ namespace Cial {
 
     void NativeFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         const auto values = std::make_unique<Value[]>(_arity);
-        const Bytecode::CallFrame *curCallFrame = vmState.curFrame();
+        const CallFrame *curCallFrame = vmState.curFrame();
         const size_t base = vmState.getRegPoolTop() - argCount;
         // Faster operation
         for(std::uint32_t i = 0; i < argCount; i++) {

@@ -8,7 +8,7 @@ namespace Cial {
 
     String::String(const char *str, const std::uint32_t len) : _len(len) {
         char *buf = _shortStr;
-        if(len > G_ShortStrLen) {
+        if(len > SHORT_STR_LEN) {
             _longStr = new char[len + 1];
             buf = _longStr;
         }
@@ -16,6 +16,28 @@ namespace Cial {
         std::memcpy(buf, str, len);
     }
 
-    Value String::create(const char *str, const std::uint32_t size) { return Value{ new String(str, size) }; }
+
+    String::~String() noexcept {
+        if(this->_len > SHORT_STR_LEN) {
+            delete[] _longStr;
+        }
+    }
+
+    String::String(String &&str) noexcept : _len(str._len) {
+        if(this->_len > SHORT_STR_LEN) {
+            _longStr = str._longStr;
+        } else {
+            _shortStr[this->_len] = '\0';
+            std::memcpy(this->_shortStr, str._shortStr, this->_len);
+        }
+    }
+
+    String &String::operator=(String &&str) noexcept {
+        if(this != &str) {
+            this->~String();
+            new(this) String(std::move(str));
+        }
+        return *this;
+    }
 
 } // namespace Cial

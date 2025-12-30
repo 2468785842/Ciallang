@@ -24,7 +24,7 @@
 namespace Cial::Bytecode::Op {
 
     void Load::execute(const Instruction &itt, const VMState &vmState) {
-        vmState.reg(reg(itt), vmState.curFrame()->chunk->getConstant(value(itt)).createValue(vmState.rt()));
+        vmState.reg(reg(itt), vmState.curFrame()->chunk->getConstant(value(itt)).createValue(&vmState.rt));
     }
 
     std::string Load::dump(const Instruction &itt, const VMState &, bool) {
@@ -118,8 +118,8 @@ namespace Cial::Bytecode::Op {
     }
 
     std::string DGlobal::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        auto *aEntry = vmState.rt().atomTable.get(atom(itt));
-        const auto &symbol = fmt::format("\"{}\"", aEntry->str);
+        const auto *aEntry = vmState.rt.atomTable.get(atom(itt));
+        const auto &symbol = fmt::format("\"{}\"", *aEntry->str);
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "dglobal", src(itt), symbol);
 
         if(!info)
@@ -134,8 +134,8 @@ namespace Cial::Bytecode::Op {
     }
 
     std::string GGlobal::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        auto *aEntry = vmState.rt().atomTable.get(atom(itt));
-        const auto &symbol = fmt::format("\"{}\"", aEntry->str);
+        auto *aEntry = vmState.rt.atomTable.get(atom(itt));
+        const auto &symbol = fmt::format("\"{}\"", *aEntry->str);
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gglobal", symbol, dst(itt));
 
         if(!info)
@@ -304,7 +304,7 @@ namespace Cial::Bytecode::Op {
                 a = itt.getOperand2<Atom>();
             if(itt.getOperand2Type() == Operand::Type::Register) {
                 const String *str = vmState.reg(itt.getOperand2<Register>()).toString();
-                a = vmState.rt().atomTable.intern(str->getData(), str->length());
+                a = vmState.rt.atomTable.intern(str->getData(), str->length());
             }
             const auto tmp = inst->getField(a);
             vmState.reg(dst(itt), tmp);
@@ -326,30 +326,31 @@ namespace Cial::Bytecode::Op {
 
     std::string GProp::dump(const Instruction &itt, const VMState &vmState, const bool info) {
 
-        const char *str;
+        const String *str{ nullptr };
         if(itt.getOperand2Type() == Operand::Type::Atom)
-            str = vmState.rt().atomTable.get(itt.getOperand2<Atom>())->str;
+            str = vmState.rt.atomTable.get(itt.getOperand2<Atom>())->str;
         if(itt.getOperand2Type() == Operand::Type::Register) {
-            str = vmState.reg(itt.getOperand2<Register>()).toString()->getData();
+            str = vmState.reg(itt.getOperand2<Register>()).toString();
         }
-        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gpropd", obj(itt), str, dst(itt));
+        assert(str != nullptr);
+        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gpropd", obj(itt), *str, dst(itt));
         if(!info)
             return insDump;
         return fmt::format("{: <30} ; {} = {}", insDump, obj(itt), vmState.reg(obj(itt)));
     }
 
 
-    const char *SProp::name(const Instruction &itt, const VMState &vmState) {
+    const String *SProp::name(const Instruction &itt, const VMState &vmState) {
         if(itt.getOperand2Type() == Operand::Type::Atom)
-            return vmState.rt().atomTable.get(itt.getOperand2<Atom>())->str;
+            return vmState.rt.atomTable.get(itt.getOperand2<Atom>())->str;
         if(itt.getOperand2Type() == Operand::Type::Register)
-            return vmState.reg(itt.getOperand2<Register>()).toString()->getData();
+            return vmState.reg(itt.getOperand2<Register>()).toString();
         CLL_ASSERT(false, "unknown inst sprop operand2 type");
     }
 
     Value SProp::value(const Instruction &itt, const VMState &vmState) {
         if(itt.getOperand3Type() == Operand::Type::ConstIndex)
-            return vmState.curFrame()->chunk->getConstant(itt.getOperand3<ConstIdx>()).createValue(vmState.rt());
+            return vmState.curFrame()->chunk->getConstant(itt.getOperand3<ConstIdx>()).createValue(&vmState.rt);
         if(itt.getOperand3Type() == Operand::Type::Register)
             return vmState.reg(itt.getOperand3<Register>());
         CLL_ASSERT(false, "unknown inst sprop operand3 type");
@@ -376,21 +377,12 @@ namespace Cial::Bytecode::Op {
     }
 
     std::string GUpval::dump(const Instruction &itt, const VMState &vmState, const bool info) {
-        const auto &symbol = fmt::format("\"{}\"", vmState.rt().atomTable.get(atom(itt))->str);
+        const auto &symbol = fmt::format("\"{}\"", *vmState.rt.atomTable.get(atom(itt))->str);
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gupval", symbol, dst(itt));
 
         if(!info)
             return insDump;
-        Value v{};
-        if(const auto &callFrame = vmState.curFrame(); callFrame->thisValue.isObject()) {
-            if(const auto *instanceObject = dynamic_cast<InstanceObject *>(callFrame->thisValue.toObject())) {
-                v = instanceObject->getField(atom(itt));
-            }
-        }
-
-        if(v.isVoid()) {
-            v = vmState.global(atom(itt));
-        }
+        Value v = vmState.getUpVal(atom(itt));
 
         return fmt::format("{: <30} ; {} = {}", insDump, symbol, v);
     }

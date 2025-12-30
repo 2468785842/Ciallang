@@ -78,7 +78,7 @@ namespace Cial {
 
     void ClassFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         getFunction()->call(vmState, ret, argCount);
-        vmState.curFrame()->thisValue = _thisValue;
+        // vmState.curFrame()->thisObj = _thisValue;
     }
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {

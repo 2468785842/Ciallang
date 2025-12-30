@@ -13,8 +13,6 @@
  */
 #pragma once
 
-#include <memory>
-
 #include "Constant.hpp"
 
 #include "Instruction.hpp"

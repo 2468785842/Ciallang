@@ -13,86 +13,68 @@
  */
 #pragma once
 
-#include <ranges>
-
-#include "vm/Runtime.hpp"
+#include <functional>
 
 namespace Cial {
 
-    class GCObject {
-        friend class MarkSweep;
+    class RefCountHeader {
 
     public:
-        GCObject() = default;
-        virtual ~GCObject() = default;
+        RefCountHeader() = default;
+        virtual ~RefCountHeader() = default;
 
         void incRef();
         void decRef();
 
-        virtual Opt<Vec<GCObject *>> getRefs() = 0;
-
     private:
-        bool _isMalloc{ false };
-        bool _marked{ false };
         std::uint32_t _refCount{ 0 };
-        GCObject *_next{ nullptr };
     };
 
     class MarkSweepHeader {
+        friend class MarkSweep;
+        friend class Runtime;
+
     public:
         MarkSweepHeader() = default;
         virtual ~MarkSweepHeader() = default;
+        virtual void marked() noexcept {
+            if(!_marked)
+                _marked = true;
+        }
+
+    private:
+        MarkSweepHeader *_next{ nullptr };
+        bool _marked{ false };
+        bool _isFree{ false };
     };
 
-    GCObject *toGCObject(const Value &v) noexcept;
-
     // 类型 trait
-    template <typename T>
-    static constexpr bool is_gc_object_v = std::is_base_of_v<GCObject, T>;
+    // template <typename T>
+    // static constexpr bool is_gc_object_v = std::is_base_of_v<RefCountHeader, T>;
 
     static constexpr size_t NODE_SIZE = 128; // Byte
 
     class MarkSweep {
+        friend class Runtime;
+
     public:
-        explicit MarkSweep(const size_t size, Runtime &rt) : _roots(rt), _head(initFreeList(resolveHeapSize(size))) {
-            _nextFree = _head;
-        }
+        using MarkFunc = std::function<void()>;
+        explicit MarkSweep(const size_t size) : _head(initFreeList(size)) { _nextFree = _head; }
 
         ~MarkSweep() {
-            for(GCObject *cursor = _head; cursor;) {
-                GCObject *nextGCObject = cursor->_next;
+            for(MarkSweepHeader *cursor = _head; cursor;) {
+                MarkSweepHeader *nextMarkSweepHeader = cursor->_next;
                 free(cursor);
-                cursor = nextGCObject;
+                cursor = nextMarkSweepHeader;
             }
         }
 
-        void collect() {
-            for(const auto &v : _roots.gObj | std::views::values) {
-                if(GCObject *gcObj = toGCObject(v))
-                    mark(gcObj);
-            }
+        void collect(const MarkFunc &mark) {
+            mark();
             sweep();
         }
 
-        template <typename T, typename... Args>
-            requires std::is_base_of_v<GCObject, T>
-        T *allocate(Args &&...args) {
-            if(!_nextFree || _nextFree->_refCount > 0) {
-                findIdleNode();
-            }
-
-            GCObject *next = _nextFree->_next;
-            T *newObj = new(_nextFree) T(std::forward<Args>(args)...);
-            newObj->_isMalloc = true;
-            newObj->_marked = false;
-            newObj->_refCount = 0;
-            newObj->_next = next;
-
-            _nextFree = _nextFree->_next;
-            return newObj;
-        }
-
-        GCObject *findIdleNode();
+        MarkSweepHeader *findIdleNode(const MarkFunc &mark);
 
         void sweep();
 
@@ -100,43 +82,20 @@ namespace Cial {
         [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> memoryInfo() const;
 
     private:
-        Runtime &_roots;
-        GCObject *_nextFree{ nullptr };
-        GCObject *_head{ nullptr };
+        MarkSweepHeader *_nextFree{ nullptr };
+        MarkSweepHeader *_head{ nullptr };
 
-        static constexpr size_t resolveHeapSize(const size_t size) {
-            if(size < NODE_SIZE) {
-                return NODE_SIZE;
-            }
-            return size / NODE_SIZE * NODE_SIZE;
-        }
-
-        static GCObject *initFreeList(const size_t freeListSize) {
-            GCObject *head{ nullptr };
+        static MarkSweepHeader *initFreeList(const size_t freeListSize) {
+            MarkSweepHeader *head{ nullptr };
             for(int i = 0; i < freeListSize; ++i) {
-                auto *gcObj = static_cast<GCObject *>(malloc(NODE_SIZE));
-                gcObj->_isMalloc = true;
+                auto *gcObj = static_cast<MarkSweepHeader *>(malloc(NODE_SIZE));
                 gcObj->_marked = false;
-                gcObj->_refCount = 0;
+                gcObj->_isFree = true;
                 gcObj->_next = head;
                 head = gcObj;
             }
 
             return head;
-        }
-
-        static void mark(GCObject *obj) {
-            if(!obj || obj->_marked)
-                return;
-            obj->_marked = true;
-
-            const auto refs = obj->getRefs();
-            if(!refs)
-                return;
-
-            for(const auto &field : *refs) {
-                mark(field);
-            }
         }
     };
 

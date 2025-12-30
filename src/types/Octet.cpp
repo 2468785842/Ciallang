@@ -40,5 +40,4 @@ namespace Cial {
         }
     }
 
-    Value Octet::create(const std::uint8_t *value, const std::uint32_t size) { return Value{ new Octet(value, size) }; }
 } // namespace Cial

@@ -484,7 +484,7 @@ namespace Cial::Bytecode::Op {
     struct SProp {
         static Register obj(const Instruction &itt) { return itt.getOperand1<Register>(); }
 
-        static const char *name(const Instruction &itt, const VMState &vmState);
+        static const String *name(const Instruction &itt, const VMState &vmState);
 
         static Value value(const Instruction &itt, const VMState &vmState);
 

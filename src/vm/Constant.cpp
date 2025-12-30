@@ -14,33 +14,35 @@
 
 #include "Constant.hpp"
 
-#include "Chunk.hpp"
 #include "types/Class.hpp"
 #include "types/Function.hpp"
 #include "types/Octet.hpp"
 #include "types/String.hpp"
 
+#include "Chunk.hpp"
+#include "Runtime.hpp"
+
 namespace Cial {
     FuncMeta::~FuncMeta() noexcept { delete chunk; }
 
-    Value Constant::createValue(const Runtime &rt) const noexcept {
+    Value Constant::createValue(Runtime *rt) const noexcept {
         switch(_type) {
             case ConstantType::Integer:
                 return Value{ value<Integer>() };
             case ConstantType::Real:
                 return Value{ _value.real };
             case ConstantType::Atom: {
-                const auto *aEntry = rt.atomTable.get(value<Atom>());
-                return Value{ new String(aEntry->str, aEntry->length) };
+                const auto *str = rt->atomTable.get(value<Atom>())->str;
+                return Value{ new String(str->getData(), str->length()) };
             }
             case ConstantType::OctetIdx: {
-                const auto *oEntry = rt.octetTable.get(value<OctetIdx>());
+                const auto *oEntry = rt->octetTable.get(value<OctetIdx>());
                 return Value{ new Octet(oEntry->data, oEntry->size) };
             }
             case ConstantType::None:
                 break;
             case ConstantType::FuncMeta: {
-                return Value{ new Function(value<FuncMeta *>()) };
+                return Value{ rt->allocate<Function>(value<FuncMeta *>()) };
             }
             case ConstantType::ClassMeta:
                 break;

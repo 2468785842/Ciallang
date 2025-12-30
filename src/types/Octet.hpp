@@ -12,11 +12,10 @@
 
 #pragma once
 
-#include "Types.hpp"
 #include "gc/GC.hpp"
 
 namespace Cial {
-    class Octet final : public GCObject {
+    class Octet final : public RefCountHeader {
     public:
         explicit Octet(const std::uint8_t *src, std::uint32_t size);
 
@@ -33,10 +32,6 @@ namespace Cial {
         [[nodiscard]] int getPersistSize() const { return static_cast<int>(sizeof(decltype(_size)) + _size); }
 
         void persist(std::uint8_t *dst);
-
-        Opt<Vec<GCObject *>> getRefs() override { return {}; }
-
-        static Value create(const std::uint8_t *value, std::uint32_t size);
 
     private:
         std::uint8_t *_buf;

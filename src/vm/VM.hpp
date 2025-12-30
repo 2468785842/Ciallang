@@ -119,12 +119,12 @@ namespace Cial {
 
         template <typename T>
         Handle<T> getGlobal(const String &name) const {
-            return { &_vmState->rt(), _vmState->global(name.getData()) };
+            return { &_vmState->rt, _vmState->global(name.getData()) };
         }
 
         template <typename T>
         Handle<T> evalExpr(const String &expr) const {
-            Runtime &rt = _vmState->rt();
+            Runtime &rt = _vmState->rt;
             if(expr.isEmpty())
                 return Handle<T>{ &rt, Value{} };
 

@@ -19,7 +19,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include "gc/GC.hpp"
+#include "types/String.hpp"
+
 namespace Cial {
+    class Runtime;
 
     struct Atom {
         std::uint64_t v{ 0 };
@@ -29,10 +33,15 @@ namespace Cial {
 
     static constexpr Atom ATOM_INVALID{};
 
-    struct AtomEntry {
+    struct AtomEntry : MarkSweepHeader {
         std::uint32_t hash;
         std::uint32_t length;
-        char *str; // null-terminated
+        String *str;
+
+        explicit AtomEntry(const std::uint32_t hash, const std::uint32_t length, String *str) :
+            hash(hash), length(length), str(str) {}
+
+        ~AtomEntry() noexcept override { delete str; }
     };
 
     class AtomTable {
@@ -43,17 +52,15 @@ namespace Cial {
 
         ~AtomTable() {
             for(size_t i = 1; i < _atoms.size(); ++i) {
-                if(_atoms[i]) {
-                    free(_atoms[i]->str);
-                    delete _atoms[i];
-                }
+                delete _atoms[i];
             }
         }
 
         AtomTable(const AtomTable &) = delete;
         AtomTable &operator=(const AtomTable &) = delete;
 
-        Atom intern(const char *s, size_t len);
+        Atom intern(const char *s, std::uint32_t len);
+        Atom internWithGC(Runtime *rt, const char *s, std::uint32_t len);
         [[nodiscard]] AtomEntry *get(Atom a) const;
 
     private:
