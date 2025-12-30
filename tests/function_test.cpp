@@ -32,6 +32,7 @@ TEST_CASE("函数声明 - 简单函数定义") {
     Inter::IRGenerator codeGen{ sourceFile };
     OptReg retReg{};
     auto chunk = codeGen.parseAst(r, globalNode, retReg);
+
     REQUIRE(chunk != nullptr);
     REQUIRE_FALSE(r.isFailed());
 
@@ -41,20 +42,13 @@ TEST_CASE("函数声明 - 简单函数定义") {
 
     VM vm{ &vmState };
 
-    REQUIRE(vm.getGlobal("empty"_str).value.toObject());
-    REQUIRE(vm.getGlobal("foo"_str).value.toObject());
-    REQUIRE(vm.getGlobal("add"_str).value.toObject());
+    REQUIRE(*vm.getGlobal<Object *>("empty"_str));
+    REQUIRE(*vm.getGlobal<Object *>("foo"_str));
+    REQUIRE(*vm.getGlobal<Object *>("add"_str));
 
-    REQUIRE(vm.evalExpr("empty()"_str).value.isVoid());
-
-    VM::Handle rFoo = vm.evalExpr("foo()"_str);
-    REQUIRE(rFoo.value.isInteger());
-    REQUIRE(rFoo.value.toInteger() == 42);
-
-    VM::Handle rAdd = vm.evalExpr("add(1, 2)"_str);
-
-    REQUIRE(rAdd.value.isInteger());
-    REQUIRE(rAdd.value.toInteger() == 3);
+    REQUIRE(vm.evalExpr<Value>("empty()"_str)->isVoid());
+    REQUIRE(*vm.evalExpr<Integer>("foo()"_str) == 42);
+    REQUIRE(*vm.evalExpr<Integer>("add(1, 2)"_str) == 3);
 }
 
 TEST_CASE("函数声明 - 参数列表") {
@@ -79,36 +73,21 @@ TEST_CASE("函数声明 - 参数列表") {
     REQUIRE(chunk != nullptr);
     REQUIRE_FALSE(r.isFailed());
 
-    Bytecode::VMState vm{ rt };
-    vm.allocCallFrame(chunk.get());
-    vm.run();
+    Bytecode::VMState vmState{ rt };
+    vmState.allocCallFrame(chunk.get());
+    vmState.run();
 
-    REQUIRE(vm.global("single").isObject());
-    REQUIRE(vm.global("multi").isObject());
-    REQUIRE(vm.global("complex").isObject());
+    VM vm{ &vmState };
 
-    Value rSingle = vm.global("rSingle");
-    REQUIRE(rSingle.isInteger());
-    REQUIRE(rSingle.toInteger() == 1);
+    REQUIRE(*vm.getGlobal<Function *>("single"_str));
+    REQUIRE(*vm.getGlobal<Function *>("multi"_str));
+    REQUIRE(*vm.getGlobal<Function *>("complex"_str));
 
-    Value rMulti = vm.global("rMulti");
-
-    REQUIRE(rMulti.isInteger());
-    REQUIRE(rMulti.toInteger() == 6);
-
-    Value rComplex1 = vm.global("rComplex1");
-
-    REQUIRE(rComplex1.isVoid());
-
-    Value rComplex2 = vm.global("rComplex2");
-
-    REQUIRE(rComplex2.isInteger());
-    REQUIRE(rComplex2.toInteger() == 1);
-
-    Value rComplex3 = vm.global("rComplex3");
-
-    REQUIRE(rComplex3.isInteger());
-    REQUIRE(rComplex3.toInteger() == 1);
+    REQUIRE(*vm.getGlobal<Integer>("rSingle"_str) == 1);
+    REQUIRE(*vm.getGlobal<Integer>("rMulti"_str) == 6);
+    REQUIRE(vm.getGlobal<Value>("rComplex1"_str)->isVoid());
+    REQUIRE(*vm.getGlobal<Integer>("rComplex2"_str) == 1);
+    REQUIRE(*vm.getGlobal<Integer>("rComplex3"_str) == 1);
 }
 
 TEST_CASE("函数声明 - 函数体内容") {

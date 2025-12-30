@@ -87,7 +87,7 @@ namespace Cial {
 
     private:
         union {
-            Integer _integer;
+            Integer _integer{};
             Real _real;
             String *_string;
             Octet *_octet;

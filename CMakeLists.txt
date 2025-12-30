@@ -37,7 +37,6 @@ set(SOURCE_FILES
         src/gen/IRGenerator.cpp
 
         # ############################################
-        src/vm/VM.cpp
         src/vm/VMState.cpp
         src/vm/Runtime.cpp
         src/vm/Rlc.cpp
