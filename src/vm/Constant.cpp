@@ -43,7 +43,7 @@ namespace Cial {
             case ConstantType::None:
                 break;
             case ConstantType::FuncMeta: {
-                return Value{ rt->allocate<Function>(value<FuncMeta *>()) };
+                return Value{ rt->create<Function>(value<FuncMeta *>()) };
             }
             case ConstantType::ClassMeta:
                 break;

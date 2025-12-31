@@ -566,10 +566,10 @@ namespace Cial::Inter {
             funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
         }
 
-        auto *chunk = _rt.allocateNoGC<Bytecode::Chunk>(std::move(*funChunk));
-        return _rt.allocateNoGC<FuncMeta>(node->token->constVal().value<Atom>(),
-                                          static_cast<std::uint32_t>(node->parameters.size()), chunk,
-                                          std::move(gen._localVars));
+        auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
+        return _rt.createNoGC<FuncMeta>(node->token->constVal().value<Atom>(),
+                                        static_cast<std::uint32_t>(node->parameters.size()), chunk,
+                                        std::move(gen._localVars));
     }
 
     Bytecode::Register IRGenerator::loadVoidReg(Bytecode::Chunk &chunk) {

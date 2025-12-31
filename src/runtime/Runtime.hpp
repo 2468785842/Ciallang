@@ -52,13 +52,10 @@ namespace Cial {
             }
         }
 
+    private:
         template <typename T, typename... Args>
             requires std::is_base_of_v<MarkSweepHeader, T>
         T *allocate(Args &&...args) {
-            if(!markSweep._nextFree || !markSweep._nextFree->_isFree) {
-                markSweep.findIdleNode([this] { collectMark(); });
-            }
-
             MarkSweepHeader *next = markSweep._nextFree->_next;
             T *newObj = new(markSweep._nextFree) T(std::forward<Args>(args)...);
             newObj->_next = next;
@@ -69,11 +66,22 @@ namespace Cial {
             return newObj;
         }
 
+    public:
+        template <typename T, typename... Args>
+            requires std::is_base_of_v<MarkSweepHeader, T>
+        T *create(Args &&...args) {
+            if(!markSweep._nextFree || !markSweep._nextFree->_isFree) {
+                markSweep.findIdleNode([this] { collectMark(); });
+            }
+
+            return allocate<T>(std::forward<Args>(args)...);
+        }
+
     private:
         friend class Inter::IRGenerator;
         template <typename T, typename... Args>
             requires std::is_base_of_v<MarkSweepHeader, T>
-        T *allocateNoGC(Args &&...args) {
+        T *createNoGC(Args &&...args) {
             if(!markSweep._nextFree || !markSweep._nextFree->_isFree) {
                 markSweep.find();
                 if(!markSweep._nextFree) {
@@ -81,14 +89,7 @@ namespace Cial {
                 }
             }
 
-            MarkSweepHeader *next = markSweep._nextFree->_next;
-            T *newObj = new(markSweep._nextFree) T(std::forward<Args>(args)...);
-            newObj->_next = next;
-            newObj->_marked = false;
-            newObj->_isFree = false;
-
-            markSweep._nextFree = next;
-            return newObj;
+            return allocate<T>(std::forward<Args>(args)...);
         }
     };
 } // namespace Cial
