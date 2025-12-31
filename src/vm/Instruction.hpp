@@ -23,6 +23,12 @@
 
 #include "types/Value.hpp"
 
+namespace Cial::Bytecode {
+    class VMState;
+}
+
+namespace Cial::Bytecode::Op {
+
 #define OPCODE_ENUMS(O)                                                                                                \
     O(NOP)                                                                                                             \
     O(Load)                                                                                                            \
@@ -52,12 +58,6 @@
     O(SProp)                                                                                                           \
     O(GUpval)                                                                                                          \
     O(Ret)
-
-namespace Cial::Bytecode {
-    class VMState;
-}
-
-namespace Cial::Bytecode::Op {
 
     enum class OpCode : std::uint16_t {
 #define OPCODE_ENUM_CLASS(OP) OP,

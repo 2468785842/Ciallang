@@ -28,8 +28,8 @@ namespace Cial {
 
         explicit CallFrame() = default;
 
-        explicit CallFrame(Bytecode::Chunk *chunk_, const OptReg ret, Bytecode::FastRegisterPool &pool) :
-            chunk(chunk_), ret(ret), _pool(&pool), _sp(pool.allocFrame(chunk_->getRegCount())) {}
+        explicit CallFrame(Bytecode::Chunk *chunk, const OptReg ret, Bytecode::FastRegisterPool &pool) :
+            chunk(chunk), ret(ret), _pool(&pool), _sp(pool.allocFrame(chunk->getRegCount())) {}
 
         explicit CallFrame(FuncMeta *funcMeta, const OptReg ret, Bytecode::FastRegisterPool &pool) :
             chunk(funcMeta->chunk), funcMeta(funcMeta), ret(ret), _pool(&pool),
@@ -57,6 +57,7 @@ namespace Cial {
         ~CallFrame() {
             if(_pool) {
                 _pool->freeFrame(chunk->getRegCount());
+                _pool = nullptr;
             }
         }
 

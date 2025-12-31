@@ -155,19 +155,24 @@ namespace Cial {
             assert(!chunk->getInstVec().empty());
 
             auto *evalChunk = _vmState->rt.allocate<Bytecode::Chunk>(std::move(*chunk.release()));
-            OptReg retReg{};
-            if(auto &instVec = evalChunk->getInstVec(); instVec.back()->opcode == Bytecode::Op::OpCode::Ret) {
-                retReg = Bytecode::Op::Ret::retReg(*instVec.back());
-            }
 
-            _vmState->allocCallFrame(evalChunk);
+            Bytecode::Register retReg{ 0 };
+            Bytecode::Chunk tmpChunk{};
+            tmpChunk.setRegisterCount(1); // accept ret val
+
+            _vmState->allocCallFrame(&tmpChunk);
+            _vmState->allocCallFrame(evalChunk, retReg);
+
+            std::uint32_t stackTop = _vmState->context.stackTop;
 
             _vmState->run();
-            Value ret{};
-            if(retReg) {
-                ret = _vmState->reg(*retReg);
-            }
+            Value ret = _vmState->reg(retReg);
 
+            // when evalChunk include `ret` inst, `ret` will call freeCallFrame, so we need check
+            // keep Stack balancing
+            if(stackTop - 1 != _vmState->context.stackTop) {
+                _vmState->freeCallFrame();
+            }
             _vmState->freeCallFrame();
 
             return Handle<T>{ &rt, ret };

@@ -389,11 +389,10 @@ namespace Cial::Bytecode::Op {
 
     void Ret::execute(const Instruction &itt, VMState &vmState) {
         const auto &value = vmState.reg(retReg(itt));
-        // ret is empty, which suggests curFrame might not have been called by the `call` instruction
-        if(const OptReg r = vmState.curFrame()->ret) {
-            vmState.prev()->getReg(*r) = value;
-            vmState.freeCallFrame();
-        }
+        const auto frame = vmState.curFrame();
+        CLL_ASSERT(frame->ret, "frame.ret val is empty");
+        vmState.prev()->getReg(*frame->ret) = value;
+        vmState.freeCallFrame();
     }
 
     std::string Ret::dump(const Instruction &itt, const VMState &, bool) {

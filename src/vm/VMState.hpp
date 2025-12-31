@@ -87,7 +87,6 @@ namespace Cial::Bytecode {
                 throw std::runtime_error("Call stack underflow");
             _currentFrame = _stackTop > 0 ? &_callStack[--_stackTop - 1] : nullptr;
             _callStack[_stackTop].~CallFrame();
-            new(&_callStack[_stackTop]) CallFrame{};
         }
 
         [[nodiscard]] const std::vector<Op::Instruction *> &instructions() const noexcept {
@@ -158,7 +157,7 @@ namespace Cial::Bytecode {
     private:
         CallFrame *_currentFrame{ context.callStack };
         CallFrame *_callStack{ context.callStack };
-        size_t _stackTop{ context.stackTop }; // callFrame count
+        size_t &_stackTop{ context.stackTop }; // callFrame count
         bool _zf{ false };
     };
 } // namespace Cial::Bytecode
