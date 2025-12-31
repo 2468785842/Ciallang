@@ -25,16 +25,15 @@
 
 namespace Cial::Inter {
 
-    std::unique_ptr<Bytecode::Chunk> IRGenerator::parseAst(const Common::Result &r, const Syntax::AstNode *node,
-                                                           OptReg &retReg) {
+    Opt<Bytecode::Chunk> IRGenerator::parseAst(const Common::Result &r, const Syntax::AstNode *node, OptReg &retReg) {
         _r = r;
         node->generateBytecode(this, retReg);
         if(_r.isFailed()) {
-            return nullptr;
+            return {};
         }
         auto chunk = std::move(_chunk);
         _chunk = std::make_unique<Bytecode::Chunk>();
-        return chunk;
+        return Bytecode::Chunk{ std::move(*chunk.release()) };
     }
 
     void IRGenerator::generate(const Syntax::ExprStmtNode *node, OptReg &retReg) {
@@ -558,6 +557,7 @@ namespace Cial::Inter {
 
         OptReg ignoreReg{};
         auto funChunk = gen.parseAst(_r, node->body, ignoreReg);
+        assert(funChunk);
         gen.endScope();
 
         // the last instruction is not ret, patch one ret
@@ -565,7 +565,8 @@ namespace Cial::Inter {
            instVec.empty() || instVec.back()->opcode != Bytecode::Op::OpCode::Ret) {
             funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
         }
-        auto *chunk = _rt.allocateNoGC<Bytecode::Chunk>(std::move(*funChunk.release()));
+
+        auto *chunk = _rt.allocateNoGC<Bytecode::Chunk>(std::move(*funChunk));
         return _rt.allocateNoGC<FuncMeta>(node->token->constVal().value<Atom>(),
                                           static_cast<std::uint32_t>(node->parameters.size()), chunk,
                                           std::move(gen._localVars));

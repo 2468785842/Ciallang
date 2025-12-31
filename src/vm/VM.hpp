@@ -42,6 +42,11 @@ namespace Cial {
     };
 
     template <>
+    struct HandleConvert<bool> : DefaultHandleConvert {
+        static bool fromValue(const Value &v) { return v.toBool(); }
+    };
+
+    template <>
     struct HandleConvert<Integer> : DefaultHandleConvert {
         static Integer fromValue(const Value &v) { return v.toInteger(); }
     };
@@ -123,7 +128,7 @@ namespace Cial {
         }
 
         template <typename T>
-        Handle<T> eval(const String &code) const {
+        [[nodiscard]] Handle<T> eval(const String &code) const {
             Runtime &rt = _vmState->rt;
             if(code.isEmpty())
                 return Handle<T>{ &rt, Value{} };
@@ -150,11 +155,12 @@ namespace Cial {
             OptReg ignoreReg{};
             auto chunk = codeGen.parseAst(r, node, ignoreReg);
 
+            assert(chunk);
             assert(!r.isFailed());
             assert(chunk->getRegCount() != 0);
             assert(!chunk->getInstVec().empty());
 
-            auto *evalChunk = _vmState->rt.allocate<Bytecode::Chunk>(std::move(*chunk.release()));
+            auto *evalChunk = _vmState->rt.allocate<Bytecode::Chunk>(std::move(*chunk));
 
             Bytecode::Register retReg{ 0 };
             Bytecode::Chunk tmpChunk{};
@@ -179,7 +185,7 @@ namespace Cial {
         }
 
         template <typename T>
-        Handle<T> evalExpr(const String &expr) const {
+        [[nodiscard]] Handle<T> evalExpr(const String &expr) const {
             Runtime &rt = _vmState->rt;
             if(expr.isEmpty())
                 return Handle<T>{ &rt, Value{} };
@@ -202,18 +208,22 @@ namespace Cial {
             OptReg retReg{};
             auto chunk = codeGen.parseAst(r, node, retReg);
 
+            assert(chunk);
             assert(!r.isFailed());
             assert(retReg);
             assert(chunk->getRegCount() != 0);
             assert(!chunk->getInstVec().empty());
 
-            _vmState->allocCallFrame(chunk.get());
+            _vmState->allocCallFrame(&*chunk);
             _vmState->run();
             Value ret = _vmState->reg(*retReg);
             _vmState->freeCallFrame();
 
             return Handle<T>{ &rt, ret };
         }
+
+        void eval(const String &code) const { auto h = eval<Value>(code); }
+        void evalExpr(const String &expr) const { auto h = evalExpr<Value>(expr); }
 
     private:
         Bytecode::VMState *_vmState;

@@ -27,7 +27,7 @@ namespace Cial::Inter {
     public:
         explicit IRGenerator(Runtime &rt, Common::SourceFile &sourceFile) : _rt(rt), _sourceFile(sourceFile) {}
 
-        std::unique_ptr<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node, OptReg &retReg);
+        Opt<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node, OptReg &retReg);
 
         void beginScope() { _scopeStartPC.emplace_back(getNextInstPos()); }
 
