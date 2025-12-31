@@ -4,10 +4,10 @@
 
 #include <catch.hpp>
 
-#include "ast/AstFormatter.hpp"
 #include "common/SourceFile.hpp"
 #include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
+#include "parser/ast/AstFormatter.hpp"
 #include "types/Class.hpp"
 #include "types/Object.hpp"
 #include "vm/VMState.hpp"

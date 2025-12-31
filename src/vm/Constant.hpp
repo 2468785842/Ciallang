@@ -16,10 +16,11 @@
 #include <fmt/ostream.h>
 
 #include "Register.hpp"
+#include "gen/LocalVariable.hpp"
 
 #include "logging/Logger.hpp"
-#include "parser/AtomTable.hpp"
-#include "parser/OctetTable.hpp"
+#include "runtime/AtomTable.hpp"
+#include "runtime/OctetTable.hpp"
 #include "types/Value.hpp"
 
 namespace Cial {
@@ -42,23 +43,11 @@ namespace Cial {
         friend std::ostream &operator<<(std::ostream &os, const ConstIdx &reg) { return os << '*' << reg._index; }
     };
 
-    struct FuncMeta {
-        struct LocalVariable {
-            Atom identifier;
-            Bytecode::Register reg;
-            // when (var.startPC <= inst.pc) you can use
-            std::uint32_t startPC; // Effective start PC
-            // when (var.endPC > inst.pc) you can't use
-            std::uint32_t endPC; // Invalid PC (scope ended)
-        };
-
+    struct FuncMeta : MarkSweepHeader {
         Atom name;
         std::uint32_t arity;
-        Bytecode::Chunk *chunk;
+        Bytecode::Chunk *chunk; // manager for gc
         Vec<LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
-        explicit FuncMeta(const Atom name, const std::uint32_t argCount, Bytecode::Chunk *chunk,
-                          Vec<LocalVariable> &&localVars) :
-            name(name), arity(argCount), chunk(chunk), localVars(localVars) {}
 
         explicit FuncMeta(FuncMeta &&funcMeta) noexcept :
             name(funcMeta.name), arity(funcMeta.arity), chunk(funcMeta.chunk),
@@ -77,8 +66,15 @@ namespace Cial {
         explicit FuncMeta(const FuncMeta &) noexcept = delete;
         FuncMeta &operator=(const FuncMeta &) noexcept = delete;
 
-        ~FuncMeta() noexcept;
+        void marked() noexcept override;
+
         bool operator==(const FuncMeta &) const { return false; }
+
+    private:
+        friend class Runtime;
+        explicit FuncMeta(const Atom name, const std::uint32_t argCount, Bytecode::Chunk *chunk,
+                          Vec<LocalVariable> &&localVars) :
+            name(name), arity(argCount), chunk(chunk), localVars(localVars) {}
     };
 
     struct ClassMeta {
@@ -131,23 +127,6 @@ namespace Cial {
                 new(this) Constant{ std::move(constant) };
             }
             return *this;
-        }
-
-        ~Constant() {
-            switch(_type) {
-#define RELEASE_POINTER(E, F)                                                                                          \
-    case ConstantType::E:                                                                                              \
-        delete _value.F;                                                                                               \
-        break;
-#define RELEASE_VALUE(E, F)
-#define CHECK_RELEASE_VALUE(E, T, V, F) F(E, V)
-                CONSTANT_TYPE_ENUM_F(CHECK_RELEASE_VALUE, RELEASE_POINTER, RELEASE_VALUE)
-#undef CHECK_RELEASE_VALUE
-#undef RELEASE_POINTER
-#undef RELEASE_VALUE
-                default:
-                    break;
-            }
         }
 
         [[nodiscard]] constexpr ConstantType type() const noexcept { return _type; }

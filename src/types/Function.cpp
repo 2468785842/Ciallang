@@ -16,6 +16,9 @@
 
 #include "Function.hpp"
 
+#include "Object.hpp"
+
+#include "vm/CallFrame.hpp"
 #include "vm/Constant.hpp"
 #include "vm/VMState.hpp"
 
@@ -24,11 +27,10 @@ namespace Cial {
     void Function::call(Bytecode::VMState &vmState, Bytecode::Register ret, const size_t argCount) {
         if(const auto cnt = meta->arity - argCount; cnt > 0)
             vmState.pushVoid(cnt);
-        vmState.allocCallFrame(meta->chunk, ret);
+        vmState.allocCallFrame(meta, ret);
         // Faster move Reg window ptr, WARING: reverse args
         auto *currentCallFrame = vmState.curFrame();
-        currentCallFrame->baseRegSP -= meta->arity;
-        currentCallFrame->funcMeta = meta;
+        currentCallFrame->context = getContext();
     }
 
     void NativeFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {

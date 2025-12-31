@@ -7,12 +7,12 @@
 #include <catch.hpp>
 #include <memory>
 
-#include "ast/AstBuilder.hpp"
-#include "ast/DeclNode.hpp"
-#include "ast/ExprNode.hpp"
-#include "ast/StmtNode.hpp"
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"
+#include "parser/ast/AstBuilder.hpp"
+#include "parser/ast/DeclNode.hpp"
+#include "parser/ast/ExprNode.hpp"
+#include "parser/ast/StmtNode.hpp"
 
 using namespace Cial;
 

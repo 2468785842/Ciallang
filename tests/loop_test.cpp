@@ -4,12 +4,12 @@
 
 #include <catch.hpp>
 
-#include "ast/AstNode.hpp"
-#include "ast/DeclNode.hpp"
-#include "ast/StmtNode.hpp"
 #include "common/SourceFile.hpp"
 #include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
+#include "parser/ast/AstNode.hpp"
+#include "parser/ast/DeclNode.hpp"
+#include "parser/ast/StmtNode.hpp"
 #include "vm/Instruction.hpp"
 #include "vm/VMState.hpp"
 

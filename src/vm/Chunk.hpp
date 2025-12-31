@@ -19,9 +19,9 @@
 
 namespace Cial::Bytecode {
 
-    class Chunk {
+    class Chunk : public MarkSweepHeader {
     public:
-        ~Chunk() {
+        ~Chunk() override {
             for(const auto &inst : _instructions) {
                 delete inst;
             }
@@ -66,8 +66,20 @@ namespace Cial::Bytecode {
 
         Vec<Constant> &getConstants() noexcept { return _constants; }
 
+        void marked() noexcept override {
+            for(auto &inst : _constants) {
+                if(inst.type() == ConstantType::FuncMeta) {
+                    inst.value<FuncMeta *>()->marked();
+                } else if(inst.type() == ConstantType::ClassMeta) {
+                }
+            }
+        }
+
         Chunk(const Chunk &) = delete;
         Chunk &operator=(const Chunk &) = delete;
+
+        Chunk(Chunk &&chunk) = default;
+        Chunk &operator=(Chunk &&chunk) = default;
 
     private:
         Vec<Op::Instruction *> _instructions{};

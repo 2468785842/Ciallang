@@ -78,6 +78,13 @@ namespace Cial {
 
         void sweep();
 
+        void find() {
+            _nextFree = _head;
+            while(_nextFree && !_nextFree->_isFree) {
+                _nextFree = _nextFree->_next;
+            }
+        }
+
         // Byte Unit
         [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> memoryInfo() const;
 

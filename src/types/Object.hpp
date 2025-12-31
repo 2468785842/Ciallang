@@ -13,7 +13,7 @@
 #pragma once
 
 #include "gc/GC.hpp"
-#include "parser/AtomTable.hpp"
+#include "runtime/AtomTable.hpp"
 
 namespace Cial::Bytecode {
     class VMState;
@@ -22,7 +22,7 @@ namespace Cial::Bytecode {
 
 namespace Cial {
     class Object : public MarkSweepHeader {
-        friend class Runtime;
+        friend class Context;
 
     public:
         explicit Object() = default;
@@ -41,6 +41,8 @@ namespace Cial {
             if(context)
                 context->marked();
         }
+
+        [[nodiscard]] Object *getContext() const noexcept { return context; }
 
     private:
         Object *context = nullptr;

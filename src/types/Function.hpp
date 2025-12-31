@@ -18,25 +18,24 @@
 #include "Object.hpp"
 #include "String.hpp"
 #include "Value.hpp"
+#include "vm/Chunk.hpp"
+#include "vm/Constant.hpp"
 
 namespace Cial {
     struct FuncMeta;
 
     class Function final : public Object {
     public:
-        const FuncMeta *meta;
+        FuncMeta *meta;
 
-        explicit Function(const FuncMeta *funcMeta) : meta(funcMeta) {}
+        explicit Function(FuncMeta *funcMeta) : Object(funcMeta->name), meta(funcMeta) {}
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
-        // Opt<Vec<GCObject *>> getRefs() override {
-        //     Vec<GCObject *> refs{};
-        //     // for(auto &v : _chunk->getConstants()) {
-        //     //     refs.push_back(toGCObject(v));
-        //     // }
-        //     return refs;
-        // }
+        void marked() noexcept override {
+            Object::marked();
+            meta->marked();
+        }
 
         ~Function() noexcept override = default;
     };

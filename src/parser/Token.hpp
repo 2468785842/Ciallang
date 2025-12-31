@@ -19,9 +19,9 @@
 
 #include <utility>
 
-#include "AtomTable.hpp"
-#include "OctetTable.hpp"
 #include "common/SourceLocation.hpp"
+#include "runtime/AtomTable.hpp"
+#include "runtime/OctetTable.hpp"
 #include "types/Value.hpp"
 #include "vm/Chunk.hpp"
 
@@ -163,7 +163,7 @@ namespace Cial::Syntax {
     enum class TokenValueType : std::uint8_t { None, Integer, Real, Atom, OctetIdx };
 
     struct Token {
-        Common::SourceLocation location{};
+        SourceLocation location{};
 
         explicit Token() = default;
 

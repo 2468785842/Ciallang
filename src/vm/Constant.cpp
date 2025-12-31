@@ -20,10 +20,11 @@
 #include "types/String.hpp"
 
 #include "Chunk.hpp"
-#include "Runtime.hpp"
+#include "runtime/Runtime.hpp"
 
 namespace Cial {
-    FuncMeta::~FuncMeta() noexcept { delete chunk; }
+
+    void FuncMeta::marked() noexcept { chunk->marked(); }
 
     Value Constant::createValue(Runtime *rt) const noexcept {
         switch(_type) {

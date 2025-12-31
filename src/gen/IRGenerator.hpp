@@ -12,9 +12,9 @@
 
 #pragma once
 
-#include "ast/AstNode.hpp"
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
+#include "parser/ast/AstNode.hpp"
 #include "types/String.hpp"
 #include "vm/Chunk.hpp"
 #include "vm/Label.hpp"
@@ -25,7 +25,7 @@ namespace Cial::Inter {
     class IRGenerator {
 
     public:
-        explicit IRGenerator(Common::SourceFile &sourceFile) : _sourceFile(sourceFile) {}
+        explicit IRGenerator(Runtime &rt, Common::SourceFile &sourceFile) : _rt(rt), _sourceFile(sourceFile) {}
 
         std::unique_ptr<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node, OptReg &retReg);
 
@@ -82,6 +82,7 @@ namespace Cial::Inter {
     private:
         std::unique_ptr<Bytecode::Chunk> _chunk = std::make_unique<Bytecode::Chunk>();
 
+        Runtime &_rt;
         Common::SourceFile &_sourceFile;
         Common::Result _r{};
 
@@ -99,7 +100,7 @@ namespace Cial::Inter {
         Vec<LoopContext> _loopStack{};
 
         Vec<std::uint32_t> _scopeStartPC{};
-        Vec<FuncMeta::LocalVariable> _localVars{};
+        Vec<LocalVariable> _localVars{};
 
         std::uint64_t _regNextIndex{ 0 };
 
@@ -130,13 +131,13 @@ namespace Cial::Inter {
 
         [[nodiscard]] bool isTopScope() const noexcept { return _scopeStartPC.size() == 1; }
 
-        void addLocalVariable(FuncMeta::LocalVariable &&variable) { _localVars.emplace_back(variable); }
+        void addLocalVariable(LocalVariable &&variable) { _localVars.emplace_back(variable); }
 
-        std::optional<FuncMeta::LocalVariable *> resolveLocalVariable(Atom identifier);
+        std::optional<LocalVariable *> resolveLocalVariable(Atom identifier);
 
         Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk);
 
-        FuncMeta generateChunk(const Syntax::FunctionDeclNode *node) const;
+        FuncMeta *generateChunk(const Syntax::FunctionDeclNode *node) const;
 
         void error(Common::Result &r, const std::string &message, const Common::SourceLocation &location) const {
             _sourceFile.error(r, message, location);

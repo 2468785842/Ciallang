@@ -77,8 +77,8 @@ namespace Cial::Bytecode {
     Value VMState::getUpVal(const Atom atom) const {
 
         // current context
-        if(_currentFrame->thisObj) {
-            if(const auto *instanceObject = dynamic_cast<const InstanceObject *>(_currentFrame->thisObj)) {
+        if(_currentFrame->context) {
+            if(const auto *instanceObject = dynamic_cast<const InstanceObject *>(_currentFrame->context)) {
                 return instanceObject->getField(atom);
             }
         }
@@ -96,8 +96,8 @@ namespace Cial::Bytecode {
             }
 
             // prev context
-            if(callFrame.thisObj) {
-                if(const auto *instanceObject = dynamic_cast<const InstanceObject *>(callFrame.thisObj)) {
+            if(callFrame.context) {
+                if(const auto *instanceObject = dynamic_cast<const InstanceObject *>(callFrame.context)) {
                     return instanceObject->getField(atom);
                 }
             }

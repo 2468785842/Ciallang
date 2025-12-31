@@ -24,8 +24,6 @@ find_package(fmt CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 set(SOURCE_FILES
-        src/parser/AtomTable.cpp
-        src/parser/OctetTable.cpp
         src/parser/Lexer.cpp
         src/parser/Parser.cpp
 
@@ -36,9 +34,11 @@ set(SOURCE_FILES
 
         src/gen/IRGenerator.cpp
 
-        # ############################################
+        src/runtime/Runtime.cpp
+        src/runtime/AtomTable.cpp
+        src/runtime/OctetTable.cpp
+
         src/vm/VMState.cpp
-        src/vm/Runtime.cpp
         src/vm/Rlc.cpp
         src/vm/Instruction.cpp
         src/vm/Chunk.cpp

@@ -19,7 +19,7 @@
 #include "Label.hpp"
 #include "Register.hpp"
 #include "logging/Logger.hpp"
-#include "parser/AtomTable.hpp"
+#include "runtime/AtomTable.hpp"
 
 #include "types/Value.hpp"
 

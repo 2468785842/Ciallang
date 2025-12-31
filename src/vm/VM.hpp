@@ -13,12 +13,12 @@
  */
 #pragma once
 
-#include "Runtime.hpp"
 #include "VMState.hpp"
+#include "runtime/Runtime.hpp"
 
-#include "ast/ExprNode.hpp"
 #include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
+#include "parser/ast/ExprNode.hpp"
 
 #include "types/Value.hpp"
 
@@ -123,6 +123,57 @@ namespace Cial {
         }
 
         template <typename T>
+        Handle<T> eval(const String &code) const {
+            Runtime &rt = _vmState->rt;
+            if(code.isEmpty())
+                return Handle<T>{ &rt, Value{} };
+
+            bool isSub = _vmState->context.stackTop != 0;
+
+            Common::SourceFile sourceFile{};
+            Common::Result r{};
+
+            sourceFile.load(r, code.toStdStr());
+            assert(!r.isFailed());
+
+            Syntax::Parser parser{ rt, sourceFile };
+
+            Syntax::AstNode *node = parser.parse(r);
+            assert(!r.isFailed());
+
+            Inter::IRGenerator codeGen{ rt, sourceFile };
+
+            if(isSub) {
+                codeGen.beginScope();
+            }
+
+            OptReg ignoreReg{};
+            auto chunk = codeGen.parseAst(r, node, ignoreReg);
+
+            assert(!r.isFailed());
+            assert(chunk->getRegCount() != 0);
+            assert(!chunk->getInstVec().empty());
+
+            auto *evalChunk = _vmState->rt.allocate<Bytecode::Chunk>(std::move(*chunk.release()));
+            OptReg retReg{};
+            if(auto &instVec = evalChunk->getInstVec(); instVec.back()->opcode == Bytecode::Op::OpCode::Ret) {
+                retReg = Bytecode::Op::Ret::retReg(*instVec.back());
+            }
+
+            _vmState->allocCallFrame(evalChunk);
+
+            _vmState->run();
+            Value ret{};
+            if(retReg) {
+                ret = _vmState->reg(*retReg);
+            }
+
+            _vmState->freeCallFrame();
+
+            return Handle<T>{ &rt, ret };
+        }
+
+        template <typename T>
         Handle<T> evalExpr(const String &expr) const {
             Runtime &rt = _vmState->rt;
             if(expr.isEmpty())
@@ -131,7 +182,7 @@ namespace Cial {
             Common::SourceFile sourceFile{};
             Common::Result r{};
 
-            sourceFile.load(r, expr.getData());
+            sourceFile.load(r, expr.toStdStr());
             assert(!r.isFailed());
 
             Syntax::Parser parser{ rt, sourceFile };
@@ -139,7 +190,7 @@ namespace Cial {
             Syntax::ExprNode *node = parser.parseExpression(r);
             assert(!r.isFailed());
 
-            Inter::IRGenerator codeGen{ sourceFile };
+            Inter::IRGenerator codeGen{ rt, sourceFile };
 
             codeGen.beginScope();
 

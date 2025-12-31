@@ -15,7 +15,6 @@
 #pragma once
 
 #include <cstdint>
-#include <stack>
 #include <unordered_map>
 #include <vector>
 
@@ -51,8 +50,8 @@ namespace Cial {
         }
 
         ~AtomTable() {
-            for(size_t i = 1; i < _atoms.size(); ++i) {
-                delete _atoms[i];
+            for(auto [v] : _handleAtoms) {
+                delete _atoms[v];
             }
         }
 
@@ -60,10 +59,12 @@ namespace Cial {
         AtomTable &operator=(const AtomTable &) = delete;
 
         Atom intern(const char *s, std::uint32_t len);
-        Atom internWithGC(Runtime *rt, const char *s, std::uint32_t len);
+        Atom intern(Runtime *rt, const char *s, std::uint32_t len);
+
         [[nodiscard]] AtomEntry *get(Atom a) const;
 
     private:
+        std::vector<Atom> _handleAtoms{};
         std::vector<AtomEntry *> _atoms{}; // index = Atom, atoms[0] = nullptr
         std::unordered_map<std::uint64_t, std::vector<Atom>> _map{}; // key to list of Atoms for collision handling
     };

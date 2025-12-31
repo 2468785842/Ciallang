@@ -14,13 +14,15 @@
 
 #include "AtomTable.hpp"
 
+#include "Runtime.hpp"
 #include "common/Hash.hpp"
 #include "logging/Logger.hpp"
-#include "vm/Runtime.hpp"
 
 namespace Cial {
 
-    Atom AtomTable::intern(const char *s, const std::uint32_t len) {
+    Atom AtomTable::intern(const char *s, const std::uint32_t len) { return intern(nullptr, s, len); }
+
+    Atom AtomTable::intern(Runtime *rt, const char *s, std::uint32_t len) {
         if(len == 0) {
             return ATOM_INVALID; // Handle empty string as invalid, adjust if needed
         }
@@ -38,42 +40,16 @@ namespace Cial {
             // Hash collision (same hash and length, different content) - proceed to create new entry
         }
 
-        // Create new atom
-        auto *e = new AtomEntry{ h, len, new String{ s, len } };
-
         const Atom a{ _atoms.size() };
-        _atoms.push_back(e);
-        if(it == _map.end()) {
-            _map[key] = { a };
+
+        // Create new atom
+        AtomEntry *e{};
+        if(rt) {
+            e = rt->allocate<AtomEntry>(h, len, new String{ s, len });
         } else {
-            it->second.push_back(a);
+            e = new AtomEntry{ h, len, new String{ s, len } };
+            _handleAtoms.push_back(a);
         }
-
-        return a;
-    }
-
-    Atom AtomTable::internWithGC(Runtime *rt, const char *s, std::uint32_t len) {
-        if(len == 0) {
-            return ATOM_INVALID; // Handle empty string as invalid, adjust if needed
-        }
-
-        const uint32_t h = fnv1a(s, len);
-        const uint64_t key = static_cast<uint64_t>(h) << 32 | static_cast<uint64_t>(len);
-
-        const auto it = _map.find(key);
-        if(it != _map.end()) {
-            for(const Atom a : it->second) {
-                if(const AtomEntry *e = _atoms[a.v]; memcmp(e->str->getData(), s, len) == 0) {
-                    return a;
-                }
-            }
-            // Hash collision (same hash and length, different content) - proceed to create new entry
-        }
-
-        // Create new atom
-        auto *e = rt->allocate<AtomEntry>(h, len, new String{ s, len });
-
-        const Atom a{ _atoms.size() };
         _atoms.push_back(e);
         if(it == _map.end()) {
             _map[key] = { a };

@@ -14,9 +14,9 @@
 
 #include <ranges>
 
-#include "ast/DeclNode.hpp"
-#include "ast/ExprNode.hpp"
-#include "ast/StmtNode.hpp"
+#include "parser/ast/DeclNode.hpp"
+#include "parser/ast/ExprNode.hpp"
+#include "parser/ast/StmtNode.hpp"
 #include "types/Class.hpp"
 #include "types/Function.hpp"
 
@@ -259,17 +259,16 @@ namespace Cial::Inter {
             CLL_ASSERT(dst.has_value(), "src is not have val");
         }
 
-        addLocalVariable(FuncMeta::LocalVariable{ identifier, dst.value(), getNextInstPos() });
+        addLocalVariable(LocalVariable{ identifier, dst.value(), getNextInstPos() });
     }
 
     void IRGenerator::generate(const Syntax::FunctionDeclNode *node, OptReg &retReg) {
         auto funReg = allocateRegister();
-        auto funChunk = generateChunk(node);
+        auto *funcMeta = generateChunk(node);
 
         const auto identifier = node->token->constVal().value<Atom>();
 
-        _chunk->emit<Bytecode::Op::OpCode::Load>(funReg,
-                                                 _chunk->addConstant(Constant{ new FuncMeta(std::move(funChunk)) }));
+        _chunk->emit<Bytecode::Op::OpCode::Load>(funReg, _chunk->addConstant(Constant{ funcMeta }));
 
         if(isTopScope()) {
             freeRegister(funReg);
@@ -277,7 +276,7 @@ namespace Cial::Inter {
             return;
         }
 
-        addLocalVariable(FuncMeta::LocalVariable{ identifier, funReg, getNextInstPos() });
+        addLocalVariable(LocalVariable{ identifier, funReg, getNextInstPos() });
     }
 
 
@@ -525,7 +524,7 @@ namespace Cial::Inter {
         _chunk->emit<Bytecode::Op::OpCode::Ret>(loadVoidReg(*_chunk));
     }
 
-    std::optional<FuncMeta::LocalVariable *> IRGenerator::resolveLocalVariable(const Atom identifier) {
+    std::optional<LocalVariable *> IRGenerator::resolveLocalVariable(const Atom identifier) {
         for(auto &var : std::ranges::reverse_view(_localVars)) {
             if(var.endPC == 0 && var.identifier.v == identifier.v) {
                 return &var;
@@ -534,9 +533,9 @@ namespace Cial::Inter {
         return {};
     }
 
-    FuncMeta IRGenerator::generateChunk(const Syntax::FunctionDeclNode *node) const {
+    FuncMeta *IRGenerator::generateChunk(const Syntax::FunctionDeclNode *node) const {
 
-        auto gen = IRGenerator{ _sourceFile };
+        auto gen = IRGenerator{ _rt, _sourceFile };
 
         gen.beginScope();
 
@@ -554,11 +553,11 @@ namespace Cial::Inter {
                 paramReg = gen.allocateRegister();
             }
             const auto startPC = gen.getNextInstPos();
-            gen.addLocalVariable(FuncMeta::LocalVariable{ varName, paramReg.value(), startPC });
+            gen.addLocalVariable(LocalVariable{ varName, paramReg.value(), startPC });
         }
 
-        OptReg tmpReg{};
-        auto funChunk = gen.parseAst(_r, node->body, tmpReg);
+        OptReg ignoreReg{};
+        auto funChunk = gen.parseAst(_r, node->body, ignoreReg);
         gen.endScope();
 
         // the last instruction is not ret, patch one ret
@@ -566,9 +565,10 @@ namespace Cial::Inter {
            instVec.empty() || instVec.back()->opcode != Bytecode::Op::OpCode::Ret) {
             funChunk->emit<Bytecode::Op::OpCode::Ret>(gen.loadVoidReg(*funChunk));
         }
-
-        return FuncMeta{ node->token->constVal().value<Atom>(), static_cast<std::uint32_t>(node->parameters.size()),
-                         funChunk.release(), std::move(gen._localVars) };
+        auto *chunk = _rt.allocateNoGC<Bytecode::Chunk>(std::move(*funChunk.release()));
+        return _rt.allocateNoGC<FuncMeta>(node->token->constVal().value<Atom>(),
+                                          static_cast<std::uint32_t>(node->parameters.size()), chunk,
+                                          std::move(gen._localVars));
     }
 
     Bytecode::Register IRGenerator::loadVoidReg(Bytecode::Chunk &chunk) {

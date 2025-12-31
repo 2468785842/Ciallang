@@ -17,8 +17,9 @@
 
 #include "Chunk.hpp"
 #include "FastRegisterPool.hpp"
-#include "Runtime.hpp"
 #include "gen/IRGenerator.hpp"
+#include "runtime/Context.hpp"
+#include "runtime/Runtime.hpp"
 
 #include "types/Value.hpp"
 
@@ -39,8 +40,9 @@ namespace Cial::Bytecode {
     class VMState {
     public:
         Runtime &rt;
+        Context &context;
 
-        explicit VMState(Runtime &rt) : rt(rt) {}
+        explicit VMState(Context &context) : rt(context.rt), context(context) {}
 
         void run();
 
@@ -48,19 +50,21 @@ namespace Cial::Bytecode {
 
         [[nodiscard]] Value reg(Register reg) const;
 
-        [[nodiscard]] Value global(const Atom atom) const { return rt.gObj.contains(atom) ? rt.gObj[atom] : Value{}; }
+        [[nodiscard]] Value global(const Atom atom) const {
+            return context.gObj.contains(atom) ? context.gObj[atom] : Value{};
+        }
 
-        void global(const Atom atom, const Value &value) const { rt.gObj[atom] = value; }
+        void global(const Atom atom, const Value &value) const { context.gObj[atom] = value; }
 
         [[nodiscard]] Value global(const std::string &name) const {
             const auto atom = rt.atomTable.intern(name.c_str(), name.length());
-            Value v = rt.gObj.contains(atom) ? rt.gObj[atom] : Value{};
+            Value v = context.gObj.contains(atom) ? context.gObj[atom] : Value{};
             return v;
         }
 
         void global(const std::string &name, const Value &value) const {
             const auto atom = rt.atomTable.intern(name.c_str(), name.length());
-            rt.gObj[atom] = value;
+            context.gObj[atom] = value;
         }
 
         void setZF(const bool zf) { _zf = zf; }
@@ -71,10 +75,11 @@ namespace Cial::Bytecode {
 
         [[nodiscard]] size_t getPC() const { return _currentFrame->pc; }
 
-        void allocCallFrame(const Chunk *chunk, const std::optional<Register> &ret = {}) {
-            if(_stackTop >= Runtime::maxCallDepth)
+        template <typename T>
+        void allocCallFrame(T *arg, const OptReg &ret = {}) {
+            if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
-            _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ chunk, ret, rt.regPool };
+            _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, context.regPool };
         }
 
         void freeCallFrame() {
@@ -138,22 +143,22 @@ namespace Cial::Bytecode {
         }
 
         void pushVoid(const size_t n) const {
-            const size_t base = rt.regPool.allocFrame(n);
+            const size_t base = context.regPool.allocFrame(n);
             for(std::size_t i = 0; i < n; i++) {
-                *rt.regPool.ptrAt(base) = Value{};
+                *context.regPool.ptrAt(base) = Value{};
             }
         }
 
-        void push(const Value &v) const { *rt.regPool.ptrAt(rt.regPool.allocFrame(1)) = v; }
+        void push(const Value &v) const { *context.regPool.ptrAt(context.regPool.allocFrame(1)) = v; }
 
-        void pop(const size_t count) const { rt.regPool.freeFrame(count); }
+        void pop(const size_t count) const { context.regPool.freeFrame(count); }
 
-        [[nodiscard]] size_t getRegPoolTop() const { return rt.regPool.used(); }
+        [[nodiscard]] size_t getRegPoolTop() const { return context.regPool.used(); }
 
     private:
-        CallFrame *_currentFrame{ rt.callStack };
-        CallFrame *_callStack{ rt.callStack };
-        size_t _stackTop{ rt.stackTop }; // callFrame count
+        CallFrame *_currentFrame{ context.callStack };
+        CallFrame *_callStack{ context.callStack };
+        size_t _stackTop{ context.stackTop }; // callFrame count
         bool _zf{ false };
     };
 } // namespace Cial::Bytecode

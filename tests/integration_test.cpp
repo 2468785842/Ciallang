@@ -7,10 +7,10 @@
 
 #include <catch.hpp>
 
-#include "ast/AstBuilder.hpp"
 #include "common/SourceFile.hpp"
 #include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
+#include "parser/ast/AstBuilder.hpp"
 #include "stdlib/Print.hpp"
 #include "vm/VMState.hpp"
 

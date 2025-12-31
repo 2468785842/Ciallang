@@ -16,10 +16,10 @@
 
 #include "vm/VMState.hpp"
 
-#include "ast/AstFormatter.hpp"
 #include "common/SourceFile.hpp"
 #include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
+#include "parser/ast/AstFormatter.hpp"
 #include "stdlib/Print.hpp"
 #include "test_config.h"
 

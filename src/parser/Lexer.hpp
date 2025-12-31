@@ -17,7 +17,7 @@
 #include "Token.hpp"
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
-#include "vm/Runtime.hpp"
+#include "runtime/Runtime.hpp"
 
 namespace Cial::Syntax {
 

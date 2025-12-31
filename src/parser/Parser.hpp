@@ -15,8 +15,8 @@
 #pragma once
 
 #include "Lexer.hpp"
-#include "ast/AstBuilder.hpp"
 #include "common/SourceFile.hpp"
+#include "parser/ast/AstBuilder.hpp"
 
 namespace Cial::Syntax {
     using namespace Common;

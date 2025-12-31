@@ -14,10 +14,10 @@
 
 #include "Parser.hpp"
 
-#include "ast/DeclNode.hpp"
-#include "ast/ExprNode.hpp"
-#include "ast/StmtNode.hpp"
 #include "logging/Logger.hpp"
+#include "parser/ast/DeclNode.hpp"
+#include "parser/ast/ExprNode.hpp"
+#include "parser/ast/StmtNode.hpp"
 
 namespace Cial::Syntax {
     using namespace Common;

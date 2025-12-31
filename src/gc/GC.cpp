@@ -32,13 +32,6 @@ namespace Cial {
     }
 
     MarkSweepHeader *MarkSweep::findIdleNode(const MarkFunc &mark) {
-        auto find = [&] {
-            _nextFree = _head;
-            while(_nextFree && !_nextFree->_isFree) {
-                _nextFree = _nextFree->_next;
-            }
-        };
-
         find();
         if(!_nextFree)
             collect(mark);
