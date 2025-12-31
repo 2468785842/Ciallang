@@ -35,6 +35,9 @@ namespace Cial {
 
     class Value;
 
+    template <typename K, typename V>
+    using Map = std::unordered_map<K, V>;
+
     template <typename T>
     using Vec = std::vector<T>;
 

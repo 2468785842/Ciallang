@@ -58,6 +58,7 @@ namespace Cial {
         AtomTable(const AtomTable &) = delete;
         AtomTable &operator=(const AtomTable &) = delete;
 
+        Atom intern(const String &str);
         Atom intern(const char *s, std::uint32_t len);
         Atom intern(Runtime *rt, const char *s, std::uint32_t len);
 

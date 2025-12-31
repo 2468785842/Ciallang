@@ -128,17 +128,21 @@ namespace Cial {
         }
 
         template <typename T>
-        [[nodiscard]] Handle<T> eval(const String &code) const {
+        [[nodiscard]] Handle<T> eval(const String &str, bool filepath = false) const {
             Runtime &rt = _vmState->rt;
-            if(code.isEmpty())
+            if(str.isEmpty())
                 return Handle<T>{ &rt, Value{} };
 
             bool isSub = _vmState->context.stackTop != 0;
 
-            Common::SourceFile sourceFile{};
             Common::Result r{};
-
-            sourceFile.load(r, code.toStdStr());
+            Common::SourceFile sourceFile;
+            if(filepath) {
+                sourceFile = Common::SourceFile{ str.toStdStr() };
+                sourceFile.load(r);
+            } else {
+                sourceFile.load(r, str.toStdStr());
+            }
             assert(!r.isFailed());
 
             Syntax::Parser parser{ rt, sourceFile };
@@ -164,7 +168,7 @@ namespace Cial {
 
             Bytecode::Register retReg{ 0 };
             Bytecode::Chunk tmpChunk{};
-            tmpChunk.setRegisterCount(1); // accept ret val
+            tmpChunk.setRegCount(1); // accept ret val
 
             _vmState->allocCallFrame(&tmpChunk);
             _vmState->allocCallFrame(evalChunk, retReg);
@@ -222,7 +226,7 @@ namespace Cial {
             return Handle<T>{ &rt, ret };
         }
 
-        void eval(const String &code) const { auto h = eval<Value>(code); }
+        void eval(const String &str, const bool filepath = false) const { auto h = eval<Value>(str, filepath); }
         void evalExpr(const String &expr) const { auto h = evalExpr<Value>(expr); }
 
     private:

@@ -61,8 +61,6 @@ TEST_CASE("函数声明 - 参数列表") {
 }
 
 TEST_CASE("函数声明 - 函数体内容") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
 
     SECTION("带变量声明的函数体") {
 
@@ -122,8 +120,6 @@ TEST_CASE("函数声明 - 函数体内容") {
 }
 
 TEST_CASE("函数声明 - 函数调用") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
 
     SECTION("无参数函数调用") {
         Runtime rt{};
@@ -166,9 +162,6 @@ TEST_CASE("函数声明 - 函数调用") {
 }
 
 TEST_CASE("函数声明 - 多个函数定义") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
 
     SECTION("多个独立函数") {
 
@@ -209,9 +202,6 @@ TEST_CASE("函数声明 - 多个函数定义") {
 }
 
 TEST_CASE("函数声明 - 递归函数") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
 
     SECTION("直接递归") {
 

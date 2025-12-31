@@ -21,9 +21,9 @@
 
 namespace Cial {
 
-    class ClassFunction final : public Object {
+    class Property final : public Object {
     public:
-        ClassFunction(const Value &thisValue, const Value &function) : _thisValue(thisValue), _function(function) {}
+        Property(const Value &thisValue, const Value &function) : _thisValue(thisValue), _function(function) {}
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 

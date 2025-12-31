@@ -14,84 +14,46 @@
 
 #include <catch.hpp>
 
-#include "vm/VMState.hpp"
-
-#include "common/SourceFile.hpp"
-#include "gen/IRGenerator.hpp"
-#include "parser/Parser.hpp"
-#include "parser/ast/AstFormatter.hpp"
 #include "stdlib/Print.hpp"
 #include "test_config.h"
 
+#include "vm/VM.hpp"
+#include "vm/VMState.hpp"
+
+#include "types/Function.hpp"
+
+using namespace Cial;
+
 TEST_CASE("解释器 - Hello World") {
-    Cial::Common::Result r{};
-
-    Cial::Common::SourceFile sourceFile{};
-    sourceFile.load(r, "println(\"Hello World!\");");
-    Cial::Syntax::AstBuilder astBuilder{};
-    Cial::Syntax::Parser parser{ sourceFile, astBuilder };
-    auto *globalNode = parser.parse(r);
-
-    Cial::Inter::SymbolTable globalTable{};
-    Cial::Inter::IRGenerator codeGen{ sourceFile, globalTable };
-    auto chunk = codeGen.parseAst(r, globalNode);
-
-    Cial::Runtime rt;
-    Cial::Bytecode::VMState vm{ globalTable, rt };
-
-    vm.global("println", Cial::StdLib::S_PrintlnFunction);
-
-    vm.allocCallFrame(chunk.get());
-    vm.run();
+    Runtime rt{};
+    Context context{ rt };
+    context.registryFunc("println"_str, &StdLib::S_PrintlnFunction);
+    Bytecode::VMState vmState{ context };
+    const VM vm{ &vmState };
+    vm.evalExpr(R"(println("Hello World!"))"_str);
 }
 
 TEST_CASE("解释器 - 执行测试") {
-    Cial::Common::Result r{};
-
-    Cial::Common::SourceFile sourceFile{ TEST_FILES_PATH R"(/startup.tjs)" };
-    sourceFile.load(r);
-
-    Cial::Syntax::AstBuilder astBuilder{};
-    Cial::Syntax::Parser parser{ sourceFile, astBuilder };
-    auto *globalNode = parser.parse(r);
-
-    Cial::Inter::SymbolTable globalTable{};
-    Cial::Inter::IRGenerator codeGen{ sourceFile, globalTable };
-    auto chunk = codeGen.parseAst(r, globalNode);
-
-    Cial::Runtime rt;
-    Cial::Bytecode::VMState vm{ globalTable, rt };
-
-    vm.global("println", Cial::StdLib::S_PrintlnFunction);
-
-    vm.allocCallFrame(chunk.get());
-    vm.run();
+    Runtime rt{};
+    Context context{ rt };
+    context.registryFunc("println"_str, &StdLib::S_PrintlnFunction);
+    Bytecode::VMState vmState{ context };
+    const VM vm{ &vmState };
+    vm.eval(String(TEST_FILES_PATH R"(/startup.tjs)"), true);
 }
 
 TEST_CASE("解释器 - 脚本执行性能") {
     BENCHMARK("fib 15") {
-        Cial::Common::Result r{};
-
-        Cial::Common::SourceFile sourceFile{};
-        sourceFile.load(r, R"(
+        Runtime rt{};
+        Context context{ rt };
+        Bytecode::VMState vmState{ context };
+        const VM vm{ &vmState };
+        vm.eval(R"(
             function fib(n) {
                 if(n < 2) return n;
                 return fib(n - 2) + fib(n - 1);
             }
             fib(15);
-        )");
-        Cial::Syntax::AstBuilder astBuilder{};
-        Cial::Syntax::Parser parser{ sourceFile, astBuilder };
-        auto *globalNode = parser.parse(r);
-
-        Cial::Inter::SymbolTable globalTable{};
-        Cial::Inter::IRGenerator codeGen{ sourceFile, globalTable };
-        auto chunk = codeGen.parseAst(r, globalNode);
-
-        Cial::Runtime rt;
-        Cial::Bytecode::VMState vm{ globalTable, rt };
-
-        vm.allocCallFrame(chunk.get());
-        vm.run();
+        )"_str);
     };
 }

@@ -46,7 +46,7 @@ namespace Cial::Bytecode {
 
         [[nodiscard]] auto &getInstVec() const noexcept { return _instructions; }
 
-        void setRegisterCount(const std::uint32_t count) noexcept { _registerCount = count; }
+        void setRegCount(const std::uint32_t count) noexcept { _registerCount = count; }
         [[nodiscard]] std::uint32_t getRegCount() const noexcept { return _registerCount; }
 
         ConstIdx addConstant(Constant &&value) {

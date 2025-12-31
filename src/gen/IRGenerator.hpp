@@ -115,7 +115,7 @@ namespace Cial::Inter {
                 return reg;
             }
             const Bytecode::Register reg{ _regNextIndex++ };
-            _chunk->setRegisterCount(_regNextIndex);
+            _chunk->setRegCount(_regNextIndex);
             return reg;
         }
 

@@ -20,6 +20,8 @@
 
 namespace Cial {
 
+    Atom AtomTable::intern(const String &str) { return intern(nullptr, str.getData(), str.length()); }
+
     Atom AtomTable::intern(const char *s, const std::uint32_t len) { return intern(nullptr, s, len); }
 
     Atom AtomTable::intern(Runtime *rt, const char *s, std::uint32_t len) {

@@ -24,6 +24,7 @@
 #include "vm/FastRegisterPool.hpp"
 
 #include "gc/GC.hpp"
+#include "types/Function.hpp"
 #include "types/Object.hpp"
 #include "types/Value.hpp"
 
@@ -43,6 +44,11 @@ namespace Cial {
         size_t stackTop{ 0 }; // callFrame count
 
         explicit Context(Runtime &rt) noexcept : rt(rt) {}
+
+        void registryFunc(const String &name, NativeFunction *func) noexcept {
+            const Atom a = rt.atomTable.intern(name);
+            gObj[a] = Value{ func };
+        }
 
         void collectMark() {
             rt.collectMark();

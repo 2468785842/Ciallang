@@ -145,8 +145,6 @@ namespace Cial {
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
-        // Opt<Vec<GCObject *>> getRefs() override { return {}; }
-
         ~NativeFunction() noexcept override = default;
 
     private:

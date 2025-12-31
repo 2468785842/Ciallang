@@ -76,10 +76,10 @@ namespace Cial {
         return it != _methods.end() ? it->second : Value{};
     }
 
-    void ClassFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
-        getFunction()->call(vmState, ret, argCount);
-        // vmState.curFrame()->thisObj = _thisValue;
-    }
+    // void ClassFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
+    //     getFunction()->call(vmState, ret, argCount);
+    //     // vmState.curFrame()->thisObj = _thisValue;
+    // }
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         // auto *instanceObj = vmState.gc.allocate<InstanceObject>(this);

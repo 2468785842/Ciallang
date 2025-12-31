@@ -17,7 +17,7 @@ set(SOURCES
 #        loop_test.cpp
 #        ieee_test.cpp
 #        oop_test.cpp
-#        interpreter_test.cpp
+        interpreter_test.cpp
 #        integration_test.cpp
 #        lexer_comprehensive_test.cpp
 #        lexer_test.cpp

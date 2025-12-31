@@ -14,6 +14,7 @@
 #pragma once
 
 #include <fmt/ostream.h>
+#include <ranges>
 
 #include "Register.hpp"
 #include "gen/LocalVariable.hpp"
@@ -49,20 +50,8 @@ namespace Cial {
         Bytecode::Chunk *chunk; // manager for gc
         Vec<LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
 
-        explicit FuncMeta(FuncMeta &&funcMeta) noexcept :
-            name(funcMeta.name), arity(funcMeta.arity), chunk(funcMeta.chunk),
-            localVars(std::move(funcMeta.localVars)) {
-            funcMeta.chunk = nullptr;
-        }
-
-        FuncMeta &operator=(FuncMeta &&funcMeta) noexcept {
-            if(this != &funcMeta) {
-                this->~FuncMeta();
-                new(this) FuncMeta{ std::move(funcMeta) };
-            }
-            return *this;
-        }
-
+        explicit FuncMeta(FuncMeta &&funcMeta) = delete;
+        FuncMeta &operator=(FuncMeta &&funcMeta) = delete;
         explicit FuncMeta(const FuncMeta &) noexcept = delete;
         FuncMeta &operator=(const FuncMeta &) noexcept = delete;
 
@@ -72,14 +61,51 @@ namespace Cial {
 
     private:
         friend class Runtime;
-        explicit FuncMeta(const Atom name, const std::uint32_t argCount, Bytecode::Chunk *chunk,
+        explicit FuncMeta(const Atom name, const std::uint32_t arity, Bytecode::Chunk *chunk,
                           Vec<LocalVariable> &&localVars) :
-            name(name), arity(argCount), chunk(chunk), localVars(localVars) {}
+            name(name), arity(arity), chunk(chunk), localVars(localVars) {}
     };
 
-    struct ClassMeta {
-        std::uint32_t argCount;
+    struct MemberShapMeta {
+        bool isStatic;
+        bool isHidden;
+        bool isMethod;
+    };
+
+    struct PropMeta {
+        Atom name;
+        OptReg defValReg{};
+    };
+
+    struct ClassMeta : MarkSweepHeader {
+        Atom name;
+        std::uint32_t arity;
+        Map<Atom, MemberShapMeta> memberShapMetas;
+        Map<Atom, void *> memberMetas;
+
+        void setMember(const MemberShapMeta shapMeta, FuncMeta *funcMeta) {
+            memberShapMetas[funcMeta->name] = shapMeta;
+            memberMetas[funcMeta->name] = funcMeta;
+        }
+
+        void setMember(MemberShapMeta shapMeta, PropMeta *propMeta) {
+            memberShapMetas[propMeta->name] = shapMeta;
+            memberMetas[propMeta->name] = propMeta;
+        }
+
+        void marked() noexcept override {
+            for(const auto &[k, v] : memberShapMetas) {
+                if(v.isMethod) {
+                    static_cast<MarkSweepHeader *>(memberMetas[k])->marked();
+                }
+            }
+        }
+
         bool operator==(const ClassMeta &) const { return false; }
+
+    private:
+        friend class Runtime;
+        explicit ClassMeta(const Atom name, const std::uint32_t arity) : name(name), arity(arity) {}
     };
 
     // Enum, Type, Value
