@@ -68,6 +68,7 @@ namespace Cial {
         }
 
     private:
+        friend class Bytecode::VMState;
         Bytecode::FastRegisterPool *_pool{ nullptr };
         std::uint64_t _sp{};
     };

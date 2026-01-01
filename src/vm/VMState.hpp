@@ -46,6 +46,8 @@ namespace Cial::Bytecode {
 
         void run();
 
+        void runFlat();
+
         void reg(const Register &reg, const Value &value) const;
 
         [[nodiscard]] Value reg(Register reg) const;
@@ -89,7 +91,7 @@ namespace Cial::Bytecode {
             _callStack[_stackTop].~CallFrame();
         }
 
-        [[nodiscard]] const std::vector<Op::Instruction *> &instructions() const noexcept {
+        [[nodiscard]] const Vec<Op::Instruction *> &instructions() const noexcept {
             return _currentFrame->chunk->getInstVec();
         }
 
@@ -99,6 +101,7 @@ namespace Cial::Bytecode {
         [[nodiscard]] CallFrame *prev() noexcept { return &_callStack[_stackTop - 2]; }
         [[nodiscard]] const CallFrame *prev() const noexcept { return &_callStack[_stackTop - 2]; }
 
+        [[nodiscard]] Value getThis(Atom atom) const;
         [[nodiscard]] Value getUpVal(Atom atom) const;
 
         [[nodiscard]] std::string dumpRegisters() const {

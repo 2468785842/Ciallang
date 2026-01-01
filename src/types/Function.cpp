@@ -25,27 +25,33 @@
 namespace Cial {
 
     void Function::call(Bytecode::VMState &vmState, Bytecode::Register ret, const size_t argCount) {
-        if(const auto cnt = meta->arity - argCount; cnt > 0)
+        const auto cnt = meta->arity - argCount;
+        if(cnt > 0)
             vmState.pushVoid(cnt);
+
         vmState.allocCallFrame(meta, ret);
-        // Faster move Reg window ptr, WARING: reverse args
+        // Fast move Reg window ptr, WARING: reverse args
         auto *currentCallFrame = vmState.curFrame();
         currentCallFrame->context = getContext();
+        vmState.run();
+
+        if(cnt > 0)
+            vmState.pop(cnt);
     }
 
     void NativeFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
-        const auto values = std::make_unique<Value[]>(_arity);
-        const CallFrame *curCallFrame = vmState.curFrame();
-        const size_t used = vmState.getRegPoolTop();
-        const size_t base = used - argCount; // absolute
-        const size_t sp = used - curCallFrame->chunk->getRegCount();
-        // Faster operation
-        for(std::uint32_t i = 0; i < argCount; i++) {
-            new(&values[i]) Value{ curCallFrame->getReg(Bytecode::Register{ base - sp - i }) };
-        }
 
-        const auto &value = callProc(values.get());
+        const auto cnt = _arity - argCount;
+        if(cnt > 0)
+            vmState.pushVoid(cnt);
+
+        const size_t used = vmState.getRegPoolTop();
+
+        const auto &value = callProc(&vmState.curFrame()->getReg(Bytecode::Register{ used - argCount }));
 
         vmState.reg(ret, value);
+
+        if(cnt > 0)
+            vmState.pop(cnt);
     }
 } // namespace Cial

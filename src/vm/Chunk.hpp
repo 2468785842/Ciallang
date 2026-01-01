@@ -67,10 +67,12 @@ namespace Cial::Bytecode {
         Vec<Constant> &getConstants() noexcept { return _constants; }
 
         void marked() noexcept override {
+            MarkSweepHeader::marked();
             for(auto &inst : _constants) {
                 if(inst.type() == ConstantType::FuncMeta) {
                     inst.value<FuncMeta *>()->marked();
                 } else if(inst.type() == ConstantType::ClassMeta) {
+                    inst.value<ClassMeta *>()->marked();
                 }
             }
         }

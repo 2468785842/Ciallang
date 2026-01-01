@@ -45,7 +45,6 @@ namespace Cial {
     };
 
     struct FuncMeta : MarkSweepHeader {
-        Atom name;
         std::uint32_t arity;
         Bytecode::Chunk *chunk; // manager for gc
         Vec<LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
@@ -61,43 +60,54 @@ namespace Cial {
 
     private:
         friend class Runtime;
-        explicit FuncMeta(const Atom name, const std::uint32_t arity, Bytecode::Chunk *chunk,
-                          Vec<LocalVariable> &&localVars) :
-            name(name), arity(arity), chunk(chunk), localVars(localVars) {}
+        explicit FuncMeta(const std::uint32_t arity, Bytecode::Chunk *chunk, Vec<LocalVariable> &&localVars) :
+            arity(arity), chunk(chunk), localVars(localVars) {}
     };
 
     struct MemberShapMeta {
-        bool isStatic;
-        bool isHidden;
-        bool isMethod;
+        Atom name{ ATOM_INVALID };
+        bool isMethod{ false };
+        bool isStatic{ false };
+        bool isHidden{ false };
     };
 
-    struct PropMeta {
-        Atom name;
+    struct PropMeta : MarkSweepHeader {
         OptReg defValReg{};
+
+    private:
+        friend class Runtime;
+        explicit PropMeta(const OptReg defValReg) : defValReg(defValReg) {}
     };
 
     struct ClassMeta : MarkSweepHeader {
-        Atom name;
+        Atom className;
         std::uint32_t arity;
         Map<Atom, MemberShapMeta> memberShapMetas;
-        Map<Atom, void *> memberMetas;
+        Map<Atom, MarkSweepHeader *> memberMetas;
 
-        void setMember(const MemberShapMeta shapMeta, FuncMeta *funcMeta) {
-            memberShapMetas[funcMeta->name] = shapMeta;
-            memberMetas[funcMeta->name] = funcMeta;
+        explicit ClassMeta(ClassMeta &&classMeta) = delete;
+        ClassMeta &operator=(ClassMeta &&classMeta) = delete;
+        explicit ClassMeta(const ClassMeta &) noexcept = delete;
+        ClassMeta &operator=(const ClassMeta &) noexcept = delete;
+
+        template <typename T>
+            requires std::is_same_v<T, PropMeta> || std::is_same_v<T, FuncMeta>
+        void setMember(MemberShapMeta shapMeta, T *memberMeta) {
+            shapMeta.isMethod = std::is_same_v<T, FuncMeta>;
+            memberShapMetas[shapMeta.name] = shapMeta;
+            memberMetas[shapMeta.name] = memberMeta;
         }
 
-        void setMember(MemberShapMeta shapMeta, PropMeta *propMeta) {
-            memberShapMetas[propMeta->name] = shapMeta;
-            memberMetas[propMeta->name] = propMeta;
+        template <typename T>
+            requires std::is_same_v<T, PropMeta> || std::is_same_v<T, FuncMeta>
+        T *getMember(const Atom &name) {
+            return static_cast<T *>(memberMetas[name]);
         }
 
         void marked() noexcept override {
-            for(const auto &[k, v] : memberShapMetas) {
-                if(v.isMethod) {
-                    static_cast<MarkSweepHeader *>(memberMetas[k])->marked();
-                }
+            MarkSweepHeader::marked();
+            for(const auto &v : memberMetas | std::views::values) {
+                v->marked();
             }
         }
 
@@ -105,7 +115,7 @@ namespace Cial {
 
     private:
         friend class Runtime;
-        explicit ClassMeta(const Atom name, const std::uint32_t arity) : name(name), arity(arity) {}
+        explicit ClassMeta(const Atom className, const std::uint32_t arity) : className(className), arity(arity) {}
     };
 
     // Enum, Type, Value

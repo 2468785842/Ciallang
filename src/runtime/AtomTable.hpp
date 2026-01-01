@@ -31,6 +31,7 @@ namespace Cial {
     };
 
     static constexpr Atom ATOM_INVALID{};
+    static constexpr Atom ATOM_FUNCTION{};
 
     struct AtomEntry : MarkSweepHeader {
         std::uint32_t hash;
@@ -47,6 +48,7 @@ namespace Cial {
     public:
         explicit AtomTable() {
             _atoms.push_back(nullptr); // Reserve index 0 as invalid
+            intern("Function"_str); // ATOM_FUNCTION
         }
 
         ~AtomTable() {

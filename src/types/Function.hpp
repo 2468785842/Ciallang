@@ -28,7 +28,7 @@ namespace Cial {
     public:
         FuncMeta *meta;
 
-        explicit Function(FuncMeta *funcMeta) : Object(funcMeta->name), meta(funcMeta) {}
+        explicit Function(FuncMeta *funcMeta) : Object(ATOM_FUNCTION), meta(funcMeta) {}
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
@@ -36,8 +36,6 @@ namespace Cial {
             Object::marked();
             meta->marked();
         }
-
-        ~Function() noexcept override = default;
     };
 
 

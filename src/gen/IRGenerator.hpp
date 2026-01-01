@@ -29,17 +29,25 @@ namespace Cial::Inter {
 
         Opt<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node, OptReg &retReg);
 
-        void beginScope() { _scopeStartPC.emplace_back(getNextInstPos()); }
+        void addLocalVar(LocalVariable &&variable) { _localVars.emplace_back(variable); }
 
-        void endScope() {
-            for(auto &localVar : _localVars) {
-                if(localVar.startPC > _scopeStartPC.back()) {
-                    freeRegister(localVar.reg);
-                    localVar.endPC = getNextInstPos();
-                }
+        /**
+         * allocate a temp register in this chunk
+         * @return register
+         */
+        Bytecode::Register allocateRegister() {
+            if(!_freeRegisters.empty()) {
+                const Bytecode::Register reg = _freeRegisters.back();
+                _freeRegisters.pop_back();
+                return reg;
             }
-            _scopeStartPC.pop_back();
+            const Bytecode::Register reg{ _regNextIndex++ };
+            return reg;
         }
+
+        void freeRegister(const Bytecode::Register reg) { _freeRegisters.push_back(reg); }
+
+        void makeVirtualGlobalScope() { _scopeStartPC.emplace_back(0); }
 
         void generate(const Syntax::ValueExprNode *, OptReg &);
 
@@ -80,7 +88,7 @@ namespace Cial::Inter {
         void generate(const Syntax::ReturnStmtNode *, OptReg &);
 
     private:
-        std::unique_ptr<Bytecode::Chunk> _chunk = std::make_unique<Bytecode::Chunk>();
+        Box<Bytecode::Chunk> _chunk = std::make_unique<Bytecode::Chunk>();
 
         Runtime &_rt;
         Common::SourceFile &_sourceFile;
@@ -104,34 +112,25 @@ namespace Cial::Inter {
 
         std::uint64_t _regNextIndex{ 0 };
 
-        /**
-         * allocate a temp register in this chunk
-         * @return register
-         */
-        Bytecode::Register allocateRegister() {
-            if(!_freeRegisters.empty()) {
-                const Bytecode::Register reg = _freeRegisters.back();
-                _freeRegisters.pop_back();
-                return reg;
-            }
-            const Bytecode::Register reg{ _regNextIndex++ };
-            _chunk->setRegCount(_regNextIndex);
-            return reg;
-        }
-
-        void freeRegister(const Bytecode::Register reg) { _freeRegisters.push_back(reg); }
-
         [[nodiscard]] std::uint32_t getNextInstPos() const {
             return static_cast<std::uint32_t>(this->_chunk->getInstVec().size());
         }
 
         Bytecode::Label makeLabel() const { return Bytecode::Label{ getNextInstPos() }; }
 
-        std::uint32_t &getScopeInstPos() noexcept { return _scopeStartPC.back(); }
-
         [[nodiscard]] bool isTopScope() const noexcept { return _scopeStartPC.size() == 1; }
 
-        void addLocalVariable(LocalVariable &&variable) { _localVars.emplace_back(variable); }
+        void beginScope() { _scopeStartPC.emplace_back(getNextInstPos()); }
+
+        void endScope() {
+            for(auto &localVar : _localVars) {
+                if(localVar.startPC > _scopeStartPC.back()) {
+                    freeRegister(localVar.reg);
+                    localVar.endPC = getNextInstPos();
+                }
+            }
+            _scopeStartPC.pop_back();
+        }
 
         std::optional<LocalVariable *> resolveLocalVariable(Atom identifier);
 

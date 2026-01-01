@@ -17,50 +17,6 @@
 #include "vm/VMState.hpp"
 
 namespace Cial {
-    ClassObject::~ClassObject() noexcept {
-        if(_base) {
-            // _base->decRef();
-        }
-    }
-
-    void ClassObject::setBase(ClassObject *base) noexcept {
-        if(_base) {
-            // _base->decRef();
-        }
-        _base = base;
-        if(_base) {
-            // _base->incRef();
-        }
-    }
-
-    void ClassObject::setStaticField(Atom name, const Value &field) noexcept { _staticFields[name] = field; }
-
-    [[nodiscard]] Value ClassObject::getStaticField(Atom name) const noexcept {
-        const auto it = _staticFields.find(name);
-        return it != _staticFields.end() ? it->second : Value{};
-    }
-
-    void ClassObject::setMethod(Atom name, const Value &method) noexcept { _methodsDef[name] = method; }
-
-    Value ClassObject::getMethod(Atom name) const noexcept {
-        const auto it = _methodsDef.find(name);
-        return it != _methodsDef.end() ? it->second : Value{};
-    }
-
-    [[nodiscard]] std::vector<Value> ClassObject::getMethods() const noexcept {
-        std::vector<Value> result;
-        for(auto &method : _methodsDef | std::views::values) {
-            result.push_back(method);
-        }
-        return result;
-    }
-
-    void ClassObject::setFieldDef(Atom name, const FieldMeta &fieldMeta) noexcept { _fieldsDef[name] = fieldMeta; }
-
-    [[nodiscard]] FieldMeta ClassObject::getFieldDef(Atom name) const noexcept {
-        const auto it = _fieldsDef.find(name);
-        return it != _fieldsDef.end() ? it->second : FieldMeta{};
-    }
 
     void InstanceObject::setField(Atom name, const Value &field) noexcept { _fields[name] = field; }
 

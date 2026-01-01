@@ -43,4 +43,7 @@ namespace Cial {
 
     template <typename T>
     using Opt = std::optional<T>;
+
+    template <typename T>
+    using Box = std::unique_ptr<T>;
 } // namespace Cial

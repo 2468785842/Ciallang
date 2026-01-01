@@ -81,6 +81,6 @@ if(${BUILD_EXECUTABLE})
     )
 endif()
 
-if (${ENABLE_TESTS} AND ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+if (${ENABLE_TESTS})
     add_subdirectory(tests)
 endif ()

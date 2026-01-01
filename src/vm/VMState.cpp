@@ -14,9 +14,17 @@
 #include "VMState.hpp"
 
 #include "Instruction.hpp"
+#include "common/Defer.hpp"
 #include "types/Class.hpp"
 
 namespace Cial::Bytecode {
+
+    void VMState::runFlat() {
+        const size_t sourceSP = _currentFrame->_sp;
+        DEFER { _currentFrame->_sp = sourceSP; };
+        _currentFrame->_sp = prev()->_sp;
+        run();
+    }
 
     void VMState::run() {
 // #define CLL_COMPUTED_GOTO
@@ -34,7 +42,6 @@ namespace Cial::Bytecode {
         const auto &instList = instructions();
         const Op::Instruction *instruction = instList[_currentFrame->pc];
         if(_currentFrame->pc >= instList.size() || _stackTop == 0) {
-            freeCallFrame();
             return;
         }
         goto *labels[static_cast<size_t>(instruction->opcode)];
@@ -66,13 +73,35 @@ namespace Cial::Bytecode {
             // fmt::println("{}\n", Op::Instruction::dump(*instruction, *this, true));
             Op::Instruction::execute(*instruction, *this);
         }
-        // freeCallFrame();
 #endif
     }
 
     void VMState::reg(const Register &reg, const Value &value) const { _currentFrame->getReg(reg) = value; }
 
     Value VMState::reg(const Register reg) const { return _currentFrame->getReg(reg); }
+
+    Value VMState::getThis(const Atom atom) const {
+
+        // current context
+        if(_currentFrame->context) {
+            if(const auto *instanceObject = dynamic_cast<const InstanceObject *>(_currentFrame->context)) {
+                return instanceObject->getField(atom);
+            }
+        }
+
+        for(std::uint16_t i = _stackTop - 1; i > 0; --i) {
+            // prev context
+            if(const auto &callFrame = _callStack[i - 1]; callFrame.context) {
+                if(const auto *instanceObject = dynamic_cast<const InstanceObject *>(callFrame.context)) {
+                    return instanceObject->getField(atom);
+                }
+            }
+        }
+
+        // global
+        // TODO: check is exist
+        return global(atom);
+    }
 
     Value VMState::getUpVal(const Atom atom) const {
 

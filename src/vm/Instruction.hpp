@@ -57,6 +57,7 @@ namespace Cial::Bytecode::Op {
     O(GProp)                                                                                                           \
     O(SProp)                                                                                                           \
     O(GUpval)                                                                                                          \
+    O(GThis)                                                                                                           \
     O(Ret)
 
     enum class OpCode : std::uint16_t {
@@ -179,9 +180,9 @@ namespace Cial::Bytecode::Op {
                 static_cast<int>(_operand3.has_value());
         }
 
-        static void execute(const Instruction &itt, VMState &vmState);
+        static void execute(const Instruction &inst, VMState &vmState);
 
-        static std::string dump(const Instruction &itt, const VMState &vmState, bool info);
+        static std::string dump(const Instruction &inst, const VMState *vmState = nullptr);
 
     private:
         std::optional<Operand> _operand1;
@@ -215,7 +216,7 @@ namespace Cial::Bytecode::Op {
     struct NOP {
         static void execute(const Instruction &, const VMState &) {}
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool) {
+        [[nodiscard]] static std::string dump(const Instruction &, const VMState *) {
             return fmt::format("{: <10}", "nop");
         }
     }; // struct NOP
@@ -228,7 +229,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Load
 
     struct PushReg {
@@ -236,7 +237,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct PushReg
 
     struct PopN {
@@ -244,7 +245,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct PushReg
 
     struct CP {
@@ -254,7 +255,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct CP
 
     struct Add {
@@ -266,7 +267,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Add
 
     struct Sub {
@@ -278,7 +279,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Sub
 
     struct Mul {
@@ -290,7 +291,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Mul
 
     struct Div {
@@ -302,7 +303,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Div
 
     struct Mov {
@@ -312,7 +313,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Mov
 
     struct DGlobal {
@@ -322,7 +323,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct DGlobal
 
     struct GGlobal {
@@ -332,7 +333,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GGlobal
 
     struct Test {
@@ -340,7 +341,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Test
 
     struct EQ {
@@ -352,7 +353,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct EQ
 
     struct NEQ {
@@ -364,7 +365,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct NEQ
 
     struct LT {
@@ -376,7 +377,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct LT
 
     struct LE {
@@ -388,7 +389,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct LE
 
     struct GT {
@@ -400,7 +401,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GT
 
     struct GE {
@@ -412,7 +413,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GE
 
     struct AbsEQ {
@@ -424,7 +425,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct AbsEQ
 
     struct Jmp {
@@ -435,7 +436,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Jmp
 
     struct JmpE {
@@ -445,7 +446,7 @@ namespace Cial::Bytecode::Op {
         static void setTarget(Instruction &itt, Label label) { itt.setOperand1(label); }
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct JmpE
 
     struct JmpNE {
@@ -456,7 +457,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct JmpNE
 
     struct Call {
@@ -468,7 +469,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Call
 
     struct GProp {
@@ -478,7 +479,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GProp
 
     struct SProp {
@@ -490,8 +491,18 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
-    }; // struct SProp
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct SProp                                                                                          \
+
+    struct GThis {
+        static Atom atom(const Instruction &itt) { return itt.getOperand1<Atom>(); }
+
+        static Register dst(const Instruction &itt) { return itt.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct GThis
 
     struct GUpval {
         static Atom atom(const Instruction &itt) { return itt.getOperand1<Atom>(); }
@@ -500,7 +511,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, const VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GUpval
 
     struct Ret {
@@ -508,7 +519,7 @@ namespace Cial::Bytecode::Op {
 
         static void execute(const Instruction &, VMState &);
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState &, bool);
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Ret
 
 }; // namespace Cial::Bytecode::Op

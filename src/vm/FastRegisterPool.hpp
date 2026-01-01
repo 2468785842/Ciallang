@@ -67,7 +67,7 @@ namespace Cial::Bytecode {
             ~Block() { delete[] data; }
         };
 
-        std::vector<Block> _blocks;
+        Vec<Block> _blocks;
         size_t _blockSize;
         size_t _sp; // 全局栈指针（相对于首块）
 

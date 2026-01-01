@@ -29,77 +29,23 @@ namespace Cial {
 
         [[nodiscard]] Function *getFunction() const noexcept { return dynamic_cast<Function *>(_function.toObject()); }
 
-        // Opt<Vec<GCObject *>> getRefs() override {
-        //     auto refs = _function.toObject()->getRefs();
-        //     refs->push_back(toGCObject(_thisValue));
-        //     return refs;
-        // }
-
     private:
         Value _thisValue;
         Value _function;
     };
 
-    struct FieldMeta {
-        std::optional<Bytecode::Register> defValReg{};
-    };
-
     class ClassObject final : public Object {
     public:
-        ClassObject() = delete;
+        ClassMeta *meta;
 
-        explicit ClassObject(Atom name, const size_t arity = 0) : Object(name), _arity(arity) {}
-
-        ~ClassObject() noexcept override;
+        explicit ClassObject(ClassMeta *classMeta) : Object(classMeta->className), meta(classMeta) {}
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
-        void setBase(ClassObject *base) noexcept;
-
-        [[nodiscard]] ClassObject *base() const noexcept { return _base; }
-
-        void setStaticField(Atom name, const Value &field) noexcept;
-
-        [[nodiscard]] Value getStaticField(Atom name) const noexcept;
-
-        void setMethod(Atom name, const Value &method) noexcept;
-
-        [[nodiscard]] Value getMethod(Atom name) const noexcept;
-
-        [[nodiscard]] std::vector<Value> getMethods() const noexcept;
-
-        void setFieldDef(Atom name, const FieldMeta &fieldMeta) noexcept;
-
-        [[nodiscard]] FieldMeta getFieldDef(Atom name) const noexcept;
-
-        [[nodiscard]] const std::unordered_map<Atom, FieldMeta> &getFieldDefs() const noexcept { return _fieldsDef; }
-
-        // Opt<Vec<GCObject *>> getRefs() override {
-        //     Vec<GCObject *> refs{};
-        //
-        //     if(_base) {
-        //         if(const auto baseOptRefs = _base->getRefs()) {
-        //             refs = *baseOptRefs;
-        //         }
-        //     }
-        //
-        //     for(auto &v : std::views::values(_methodsDef)) {
-        //         refs.push_back(toGCObject(v));
-        //     }
-        //
-        //     for(auto &v : std::views::values(_staticFields)) {
-        //         refs.push_back(toGCObject(v));
-        //     }
-        //
-        //     return refs;
-        // }
-
-    private:
-        ClassObject *_base{ nullptr };
-        size_t _arity{ 0 };
-        std::unordered_map<Atom, Value> _methodsDef{};
-        std::unordered_map<Atom, FieldMeta> _fieldsDef{};
-        std::unordered_map<Atom, Value> _staticFields{};
+        void marked() noexcept override {
+            Object::marked();
+            meta->marked();
+        }
     };
 
     class InstanceObject final : public Object {

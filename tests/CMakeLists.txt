@@ -14,6 +14,7 @@ configure_file(test_config.h.in test_config.h)
 set(SOURCES
 #        expression_test.cpp
         function_test.cpp
+        scope_test.cpp
 #        loop_test.cpp
 #        ieee_test.cpp
 #        oop_test.cpp

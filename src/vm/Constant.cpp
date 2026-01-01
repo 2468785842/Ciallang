@@ -24,10 +24,15 @@
 
 namespace Cial {
 
-    void FuncMeta::marked() noexcept { chunk->marked(); }
+    void FuncMeta::marked() noexcept {
+        MarkSweepHeader::marked();
+        chunk->marked();
+    }
 
     Value Constant::createValue(Runtime *rt) const noexcept {
         switch(_type) {
+            case ConstantType::None:
+                break;
             case ConstantType::Integer:
                 return Value{ value<Integer>() };
             case ConstantType::Real:
@@ -40,13 +45,11 @@ namespace Cial {
                 const auto *oEntry = rt->octetTable.get(value<OctetIdx>());
                 return Value{ new Octet(oEntry->data, oEntry->size) };
             }
-            case ConstantType::None:
-                break;
             case ConstantType::FuncMeta: {
                 return Value{ rt->create<Function>(value<FuncMeta *>()) };
             }
             case ConstantType::ClassMeta:
-                break;
+                return Value{ rt->create<ClassObject>(value<ClassMeta *>()) };
         }
         return Value{};
     }

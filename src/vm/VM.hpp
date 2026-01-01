@@ -133,8 +133,6 @@ namespace Cial {
             if(str.isEmpty())
                 return Handle<T>{ &rt, Value{} };
 
-            bool isSub = _vmState->context.stackTop != 0;
-
             Common::Result r{};
             Common::SourceFile sourceFile;
             if(filepath) {
@@ -152,12 +150,21 @@ namespace Cial {
 
             Inter::IRGenerator codeGen{ rt, sourceFile };
 
+            bool isSub = _vmState->context.stackTop != 0;
+
             if(isSub) {
-                codeGen.beginScope();
+                for(auto localVar : _vmState->prev()->funcMeta->localVars) {
+                    if(localVar.startPC > _vmState->curFrame()->pc && _vmState->curFrame()->pc <= localVar.endPC) {
+                        localVar.startPC = 0;
+                        localVar.endPC = 0;
+                        codeGen.addLocalVar(LocalVariable{ localVar });
+                    }
+                }
             }
 
             OptReg ignoreReg{};
-            auto chunk = codeGen.parseAst(r, node, ignoreReg);
+            Opt<Bytecode::Chunk> chunk = codeGen.parseAst(r, node, ignoreReg);
+
 
             assert(chunk);
             assert(!r.isFailed());
@@ -172,10 +179,13 @@ namespace Cial {
 
             _vmState->allocCallFrame(&tmpChunk);
             _vmState->allocCallFrame(evalChunk, retReg);
-
             std::uint32_t stackTop = _vmState->context.stackTop;
 
-            _vmState->run();
+            if(isSub) {
+                _vmState->runFlat();
+            } else {
+                _vmState->run();
+            }
             Value ret = _vmState->reg(retReg);
 
             // when evalChunk include `ret` inst, `ret` will call freeCallFrame, so we need check
@@ -207,10 +217,20 @@ namespace Cial {
 
             Inter::IRGenerator codeGen{ rt, sourceFile };
 
-            codeGen.beginScope();
+            bool isSub = _vmState->context.stackTop != 0;
+
+            if(isSub) {
+                for(auto localVar : _vmState->prev()->funcMeta->localVars) {
+                    if(localVar.startPC > _vmState->curFrame()->pc && _vmState->curFrame()->pc <= localVar.endPC) {
+                        localVar.startPC = 0;
+                        localVar.endPC = 0;
+                        codeGen.addLocalVar(LocalVariable{ localVar });
+                    }
+                }
+            }
 
             OptReg retReg{};
-            auto chunk = codeGen.parseAst(r, node, retReg);
+            Opt<Bytecode::Chunk> chunk = codeGen.parseAst(r, node, retReg);
 
             assert(chunk);
             assert(!r.isFailed());
@@ -219,7 +239,12 @@ namespace Cial {
             assert(!chunk->getInstVec().empty());
 
             _vmState->allocCallFrame(&*chunk);
-            _vmState->run();
+
+            if(isSub) {
+                _vmState->runFlat();
+            } else {
+                _vmState->run();
+            }
             Value ret = _vmState->reg(*retReg);
             _vmState->freeCallFrame();
 
