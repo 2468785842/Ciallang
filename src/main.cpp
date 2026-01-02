@@ -16,7 +16,10 @@
 #include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
 #include "stdlib/Print.hpp"
+#include "vm/VM.hpp"
 #include "vm/VMState.hpp"
+
+using namespace Cial;
 
 int main(int argc, char **argv) {
     if(argc < 2) {
@@ -24,34 +27,17 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    Cial::Common::Result r{};
-
-    Cial::Common::SourceFile sourceFile{ argv[1] };
-    sourceFile.load(r);
-
-    Cial::Syntax::AstBuilder astBuilder{};
-    Cial::Syntax::Parser parser{ sourceFile, astBuilder };
-    auto *globalNode = parser.parse(r);
-
-    Cial::Inter::SymbolTable globalTable;
-    Cial::Inter::IRGenerator codeGen{ sourceFile, globalTable };
-
-    auto chunk = codeGen.parseAst(r, globalNode);
-
-    Cial::Runtime rt;
-    Cial::Bytecode::VMState interpreter{ globalTable, rt };
-    // interpreter.global(&Ciallang::Standard::S_PrintFunction);
-    interpreter.global("println", Cial::StdLib::S_PrintlnFunction);
-
-    fmt::println("{}", interpreter.dumpInstruction(*chunk));
-
     auto start = std::chrono::high_resolution_clock::now();
-    interpreter.allocCallFrame(chunk.get());
-    interpreter.run();
+    Runtime rt{};
+    Context context{ rt };
+    context.registryFunc("print"_str, &StdLib::S_PrintFunction);
+    context.registryFunc("println"_str, &StdLib::S_PrintlnFunction);
+    Bytecode::VMState vmState{ context };
+    const VM vm{ &vmState };
+    vm.eval(String(argv[1]), true);
+
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = duration_cast<std::chrono::nanoseconds>(end - start);
-
-    fmt::println("{}", interpreter.dumpRegisters());
 
     fmt::println("Time taken by function: {}ns", duration.count());
 
