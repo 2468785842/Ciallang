@@ -41,7 +41,6 @@ set(SOURCE_FILES
         src/vm/VMState.cpp
         src/vm/Rlc.cpp
         src/vm/Instruction.cpp
-        src/vm/Chunk.cpp
         src/vm/Constant.cpp
 
         src/types/Class.cpp

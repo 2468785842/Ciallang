@@ -67,6 +67,8 @@ namespace Cial::Inter {
 
         void generate(const Syntax::IfStmtNode *, OptReg &);
 
+        void generate(const Syntax::SwitchStmtNode *, OptReg &);
+
         void generate(const Syntax::VarDeclNode *, OptReg &);
 
         void generate(const Syntax::FunctionDeclNode *, OptReg &);

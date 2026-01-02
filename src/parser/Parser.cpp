@@ -343,16 +343,12 @@ namespace Cial::Syntax {
 
     const DeclParser *Parser::declParserFor(const TokenType type) {
         const auto it = S_DeclParsers.find(type);
-        if(it != S_DeclParsers.end())
-            return it->second;
-        return nullptr;
+        return it != S_DeclParsers.end() ? it->second : nullptr;
     }
 
     const StmtParser *Parser::stmtParserFor(const TokenType type) {
         const auto it = S_StmtParsers.find(type);
-        if(it != S_StmtParsers.end())
-            return it->second;
-        return nullptr;
+        return it != S_StmtParsers.end() ? it->second : nullptr;
     }
 
     /**
@@ -364,9 +360,7 @@ namespace Cial::Syntax {
      */
     const PrefixParser *Parser::prefixParserFor(const TokenType type) {
         const auto it = S_PrefixParsers.find(type);
-        if(it != S_PrefixParsers.end())
-            return it->second;
-        return nullptr;
+        return it != S_PrefixParsers.end() ? it->second : nullptr;
     }
 
     /**
@@ -376,9 +370,7 @@ namespace Cial::Syntax {
      */
     const InfixParser *Parser::infixParserFor(const TokenType type) {
         const auto it = S_InfixParsers.find(type);
-        if(it != S_InfixParsers.end())
-            return it->second;
-        return nullptr;
+        return it != S_InfixParsers.end() ? it->second : nullptr;
     }
 
     /////////////////////////////////////////////////////////////////
@@ -561,6 +553,88 @@ namespace Cial::Syntax {
         }
 
         return ifNode;
+    }
+
+    StmtNode *SwitchStmtParser::parse(Result &r, Parser *parser, Token *token) const {
+        // TODO:
+        const auto *test = createExpressionNode(r, parser);
+
+        if(!test)
+            return nullptr;
+
+        auto *switchNode = parser->astBuilder()->makeNode<SwitchStmtNode>(test);
+        switchNode->location.start(token->location.start());
+
+        auto *scope = parser->astBuilder()->makeNode<BlockStmtNode>();
+        scope->location.start(test->location.end());
+
+        if(!parser->peek(TokenType::LeftCurlyBrace)) {
+            parser->error(r, "switch expected token '{'", token->location);
+            return nullptr;
+        }
+
+        parser->consume();
+
+        while(parser->peek(TokenType::Case)) {
+            parser->consume();
+            auto *node = parser->parseExpression(r);
+            if(!node) {
+                parser->error(r, "case expected expression", token->location);
+                return nullptr;
+            }
+
+            switchNode->matchCases.push_back(node);
+
+            if(!parser->peek(TokenType::Colon)) {
+                parser->error(r, "case expected ':'", token->location);
+                return nullptr;
+            }
+
+            Token colonToken{};
+            parser->consume(colonToken);
+
+            auto *caseScope = parser->astBuilder()->makeNode<BlockStmtNode>();
+            caseScope->location.start(colonToken.location.start());
+
+            while(DeclNode *declNode = parser->parseDeclaration(r)) {
+                caseScope->childrens.push_back(declNode);
+            }
+
+            if(caseScope->childrens.empty()) {
+                switchNode->matchBodies.push_back(nullptr);
+                continue;
+            }
+
+            caseScope->location.end(caseScope->childrens.back()->location.end());
+
+            switchNode->matchBodies.push_back(caseScope);
+        }
+
+        if(parser->peek(TokenType::Default)) {
+            if(!parser->peek(TokenType::Colon)) {
+                parser->error(r, "switch default branch expected ':'", token->location);
+                return nullptr;
+            }
+
+            auto *defaultScope = parser->astBuilder()->makeNode<BlockStmtNode>();
+
+            while(DeclNode *declNode = parser->parseDeclaration(r)) {
+                defaultScope->childrens.push_back(declNode);
+            }
+            switchNode->defaultBody = defaultScope;
+        }
+
+        if(!parser->expect(r, TokenType::RightCurlyBrace)) {
+            return nullptr;
+        }
+
+        Token closeToken{};
+        parser->consume(closeToken);
+
+        scope->location.end(closeToken.location.end());
+        switchNode->location.end(scope->location.end());
+
+        return switchNode;
     }
 
     StmtNode *DoWhileStmtParser::parse(Result &r, Parser *parser, Token *token) const {

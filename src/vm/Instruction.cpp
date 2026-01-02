@@ -89,7 +89,6 @@ namespace Cial::Bytecode::Op {
         vmState.global(atom(inst), Value{ value });
     }
 
-
     void GGlobal::execute(const Instruction &inst, const VMState &vmState) {
         const auto &value = vmState.global(atom(inst));
         vmState.reg(dst(inst), value);
@@ -152,6 +151,7 @@ namespace Cial::Bytecode::Op {
         // TODO:
         assert(false);
     }
+
     void Jmp::execute(const Instruction &inst, VMState &vmState) { vmState.setPC(label(inst)); }
 
     void JmpE::execute(const Instruction &inst, VMState &vmState) {
@@ -160,7 +160,6 @@ namespace Cial::Bytecode::Op {
         }
     }
 
-
     void JmpNE::execute(const Instruction &inst, VMState &vmState) {
         if(!vmState.getZF()) {
             vmState.setPC(label(inst));
@@ -168,24 +167,19 @@ namespace Cial::Bytecode::Op {
     }
 
     void Call::execute(const Instruction &inst, VMState &vmState) {
-        // call const ref is Faster
         const auto &object = vmState.reg(memberReg(inst));
-        CLL_ASSERT(object.isObject(), "memberReg is not object");
+        VM_ASSERT(object.isObject() && "memberReg is not object", &vmState);
         object.toObject()->call(vmState, dst(inst), argCount(inst));
     }
+
     void GProp::execute(const Instruction &inst, const VMState &vmState) {
         const auto &val = vmState.reg(obj(inst));
-        CLL_ASSERT(val.isObject(), "gprop obj is not object");
+        VM_ASSERT(val.isObject() && "gprop obj is not object", &vmState);
 
-        if(const auto *instObj = dynamic_cast<InstanceObject *>(val.toObject())) {
-            Atom a{};
-            if(inst.getOperand2Type() == Operand::Type::Atom)
-                a = inst.getOperand2<Atom>();
-            if(inst.getOperand2Type() == Operand::Type::Register) {
-                const String *str = vmState.reg(inst.getOperand2<Register>()).toString();
-                a = vmState.rt.atomTable.intern(str->getData(), str->length());
-            }
-            const auto tmp = instObj->getField(a);
+        if(auto *instObj = dynamic_cast<InstanceObject *>(val.toObject())) {
+            const Value v = vmState.reg(memberReg(inst));
+            VM_ASSERT(v.isString(), &vmState);
+            const auto tmp = instObj->getProp(vmState.rt.atomTable.intern(*v.toString()));
             vmState.reg(dst(inst), tmp);
             return;
         }
@@ -303,24 +297,18 @@ namespace Cial::Bytecode::Op {
     }
 
     std::string DGlobal::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} atom_{: <4}", "dglobal", src(inst), atom(inst).v);
+
+        if(!vmState)
+            return insDump;
         const auto *aEntry = vmState->rt.atomTable.get(atom(inst));
-        const auto &symbol = fmt::format("\"{}\"", *aEntry->str);
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "dglobal", src(inst), symbol);
 
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}", insDump, src(inst), vmState->reg(src(inst)));
+        return fmt::format("{: <30};{}={} atom_{}=\"{}\"", insDump, src(inst), vmState->reg(src(inst)), atom(inst).v,
+                           *aEntry->str);
     }
+
     std::string GGlobal::dump(const Instruction &inst, const VMState *vmState) {
-        auto *aEntry = vmState->rt.atomTable.get(atom(inst));
-        const auto &symbol = fmt::format("\"{}\"", *aEntry->str);
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gglobal", symbol, dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}", insDump, symbol, vmState->global(atom(inst)));
+        return fmt::format("{: <10} atom_{: <4} {: <4}", "gglobal", atom(inst).v, dst(inst));
     }
 
     std::string Test::dump(const Instruction &inst, const VMState *vmState) {
@@ -393,22 +381,9 @@ namespace Cial::Bytecode::Op {
         return fmt::format("{: <30} ; {} = {}", insDump, memberReg(inst), vmState->reg(memberReg(inst)));
     }
 
-
     std::string GProp::dump(const Instruction &inst, const VMState *vmState) {
-
-        const String *str{ nullptr };
-        if(inst.getOperand2Type() == Operand::Type::Atom)
-            str = vmState->rt.atomTable.get(inst.getOperand2<Atom>())->str;
-        if(inst.getOperand2Type() == Operand::Type::Register) {
-            str = vmState->reg(inst.getOperand2<Register>()).toString();
-        }
-        assert(str != nullptr);
-        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "gpropd", obj(inst), *str, dst(inst));
-        if(!vmState)
-            return insDump;
-        return fmt::format("{: <30} ; {} = {}", insDump, obj(inst), vmState->reg(obj(inst)));
+        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "gprop", obj(inst), memberReg(inst), dst(inst));
     }
-
 
     std::string SProp::dump(const Instruction &inst, const VMState *vmState) {
         // TODO:
@@ -416,27 +391,12 @@ namespace Cial::Bytecode::Op {
     }
 
     std::string GThis::dump(const Instruction &inst, const VMState *vmState) {
-        const auto &symbol = fmt::format("\"{}\"", *vmState->rt.atomTable.get(atom(inst))->str);
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gthis", symbol, dst(inst));
-
-        if(!vmState)
-            return insDump;
-        Value v = vmState->getThis(atom(inst));
-
-        return fmt::format("{: <30} ; {} = {}", insDump, symbol, v);
+        return fmt::format("{: <10} atom_{: <4} {: <4}", "gthis", atom(inst).v, dst(inst));
     }
 
     std::string GUpval::dump(const Instruction &inst, const VMState *vmState) {
-        const auto &symbol = fmt::format("\"{}\"", *vmState->rt.atomTable.get(atom(inst))->str);
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gupval", symbol, dst(inst));
-
-        if(!vmState)
-            return insDump;
-        Value v = vmState->getUpVal(atom(inst));
-
-        return fmt::format("{: <30} ; {} = {}", insDump, symbol, v);
+        return fmt::format("{: <10} atom_{: <4} {: <4}", "gupval", atom(inst).v, dst(inst));
     }
-
 
     std::string Ret::dump(const Instruction &inst, const VMState *vmState) {
         return fmt::format("{: <10} {}", "ret", retReg(inst));

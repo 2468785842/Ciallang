@@ -32,7 +32,7 @@ namespace Cial {
         vmState.allocCallFrame(meta, ret);
         // Fast move Reg window ptr, WARING: reverse args
         auto *currentCallFrame = vmState.curFrame();
-        currentCallFrame->context = getContext();
+        currentCallFrame->thisObj = thisObj;
         vmState.run();
 
         if(cnt > 0)

@@ -22,7 +22,7 @@ namespace Cial {
     struct CallFrame {
         Bytecode::Chunk *chunk{};
         FuncMeta *funcMeta{}; // funcMeta != nullptr is function call
-        Object *context{};
+        Object *thisObj{};
         OptReg ret{};
         std::uint64_t pc{};
 
@@ -36,10 +36,10 @@ namespace Cial {
             _sp(pool.allocFrame(funcMeta->chunk->getRegCount()) - funcMeta->arity) {}
 
         CallFrame(CallFrame &&callFrame) noexcept :
-            chunk(callFrame.chunk), funcMeta(callFrame.funcMeta), context(callFrame.context), ret(callFrame.ret),
+            chunk(callFrame.chunk), funcMeta(callFrame.funcMeta), thisObj(callFrame.thisObj), ret(callFrame.ret),
             pc(callFrame.pc), _pool(callFrame._pool), _sp(callFrame._sp) {
             callFrame.funcMeta = nullptr;
-            callFrame.context = nullptr;
+            callFrame.thisObj = nullptr;
             callFrame._pool = nullptr;
         }
 

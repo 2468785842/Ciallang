@@ -68,7 +68,7 @@ namespace Cial {
         Atom name{ ATOM_INVALID };
         bool isMethod{ false };
         bool isStatic{ false };
-        bool isHidden{ false };
+        bool isConst{ false };
     };
 
     struct PropMeta : MarkSweepHeader {
@@ -82,31 +82,56 @@ namespace Cial {
     struct ClassMeta : MarkSweepHeader {
         Atom className;
         std::uint32_t arity;
-        Map<Atom, MemberShapMeta> memberShapMetas;
-        Map<Atom, MarkSweepHeader *> memberMetas;
+        Vec<MemberShapMeta> memberShapMetas;
+        Vec<MarkSweepHeader *> memberMetas;
 
         explicit ClassMeta(ClassMeta &&classMeta) = delete;
         ClassMeta &operator=(ClassMeta &&classMeta) = delete;
         explicit ClassMeta(const ClassMeta &) noexcept = delete;
         ClassMeta &operator=(const ClassMeta &) noexcept = delete;
 
-        template <typename T>
-            requires std::is_same_v<T, PropMeta> || std::is_same_v<T, FuncMeta>
-        void setMember(MemberShapMeta shapMeta, T *memberMeta) {
-            shapMeta.isMethod = std::is_same_v<T, FuncMeta>;
-            memberShapMetas[shapMeta.name] = shapMeta;
-            memberMetas[shapMeta.name] = memberMeta;
+        [[nodiscard]] bool hasMember(const Atom name) const noexcept {
+            const size_t len = memberShapMetas.size();
+            for(size_t i = 0; i < len; ++i) {
+                if(memberShapMetas[i].name == name) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         template <typename T>
             requires std::is_same_v<T, PropMeta> || std::is_same_v<T, FuncMeta>
-        T *getMember(const Atom &name) {
-            return static_cast<T *>(memberMetas[name]);
+        void setMember(MemberShapMeta shapMeta, T *memberMeta) noexcept {
+            shapMeta.isMethod = std::is_same_v<T, FuncMeta>;
+            const size_t len = memberShapMetas.size();
+            for(size_t i = 0; i < len; ++i) {
+                if(auto &memberShapeMeta = memberShapMetas[i]; memberShapeMeta.name == shapMeta.name) {
+                    memberShapeMeta = shapMeta;
+                    memberMetas[i] = memberMeta;
+                    return;
+                }
+            }
+            memberShapMetas.push_back(shapMeta);
+            memberMetas.push_back(memberMeta);
+        }
+
+        template <typename T>
+            requires std::is_same_v<T, PropMeta> || std::is_same_v<T, FuncMeta>
+        T *getMember(const Atom &name) noexcept {
+            T *memberMeta{};
+            const size_t len = memberShapMetas.size();
+            for(size_t i = 0; i < len; ++i) {
+                if(memberShapMetas[i].name == name) {
+                    memberMeta = static_cast<T *>(memberMetas[i]);
+                }
+            }
+            return memberMeta;
         }
 
         void marked() noexcept override {
             MarkSweepHeader::marked();
-            for(const auto &v : memberMetas | std::views::values) {
+            for(const auto &v : memberMetas) {
                 v->marked();
             }
         }

@@ -20,6 +20,7 @@
 
 #include "gc/GC.hpp"
 #include "types/String.hpp"
+#include "types/Types.hpp"
 
 namespace Cial {
     class Runtime;
@@ -67,9 +68,9 @@ namespace Cial {
         [[nodiscard]] AtomEntry *get(Atom a) const;
 
     private:
-        std::vector<Atom> _handleAtoms{};
-        std::vector<AtomEntry *> _atoms{}; // index = Atom, atoms[0] = nullptr
-        std::unordered_map<std::uint64_t, std::vector<Atom>> _map{}; // key to list of Atoms for collision handling
+        Vec<Atom> _handleAtoms{};
+        Vec<AtomEntry *> _atoms{}; // index = Atom, atoms[0] = nullptr
+        Map<std::uint64_t, std::vector<Atom>> _map{}; // key to list of Atoms for collision handling
     };
 
 } // namespace Cial

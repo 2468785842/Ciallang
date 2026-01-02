@@ -27,6 +27,7 @@ namespace Cial {
     class Function final : public Object {
     public:
         FuncMeta *meta;
+        Object *thisObj = nullptr;
 
         explicit Function(FuncMeta *funcMeta) : Object(ATOM_FUNCTION), meta(funcMeta) {}
 
@@ -35,6 +36,8 @@ namespace Cial {
         void marked() noexcept override {
             Object::marked();
             meta->marked();
+            if(thisObj)
+                thisObj->marked();
         }
     };
 

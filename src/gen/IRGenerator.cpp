@@ -62,8 +62,8 @@ namespace Cial::Inter {
             Bytecode::Register dst = allocateRegister();
 
             if(auto *identifier = dynamic_cast<const Syntax::IdentifierExprNode *>(node->rhs); identifier) {
-                _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1.value(),
-                                                          _chunk->addConstant(identifier->token->constVal()), dst);
+                _chunk->emit<Bytecode::Op::OpCode::Load>(dst, _chunk->addConstant(identifier->token->constVal()));
+                _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1.value(), dst, dst);
             } else {
                 OptReg reg2{};
                 node->rhs->generateBytecode(this, reg2);
@@ -305,7 +305,7 @@ namespace Cial::Inter {
                 // can init
                 if(varDeclNode->rhs) {
                     varDeclNode->rhs->generateBytecode(this, src);
-                    // freeRegister(src.value());
+                    freeRegister(src.value());
                     if(_r.isFailed())
                         return;
                 }
@@ -385,6 +385,8 @@ namespace Cial::Inter {
 
         freeRegister(testReg.value());
     }
+
+    void IRGenerator::generate(const Syntax::SwitchStmtNode *node, OptReg &retReg) {}
 
     void IRGenerator::generate(const Syntax::DoWhileStmtNode *node, OptReg &retReg) {
         const auto bodyLabel = makeLabel();

@@ -82,18 +82,11 @@ namespace Cial::Bytecode {
 
     Value VMState::getThis(const Atom atom) const {
 
-        // current context
-        if(_currentFrame->context) {
-            if(const auto *instanceObject = dynamic_cast<const InstanceObject *>(_currentFrame->context)) {
-                return instanceObject->getField(atom);
-            }
-        }
-
-        for(std::uint16_t i = _stackTop - 1; i > 0; --i) {
-            // prev context
-            if(const auto &callFrame = _callStack[i - 1]; callFrame.context) {
-                if(const auto *instanceObject = dynamic_cast<const InstanceObject *>(callFrame.context)) {
-                    return instanceObject->getField(atom);
+        // current thisObj
+        if(_currentFrame->thisObj) {
+            if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj)) {
+                if(instanceObject->hasProp(atom)) {
+                    return instanceObject->getProp(atom);
                 }
             }
         }
@@ -106,9 +99,9 @@ namespace Cial::Bytecode {
     Value VMState::getUpVal(const Atom atom) const {
 
         // current context
-        if(_currentFrame->context) {
-            if(const auto *instanceObject = dynamic_cast<const InstanceObject *>(_currentFrame->context)) {
-                return instanceObject->getField(atom);
+        if(_currentFrame->thisObj) {
+            if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj)) {
+                return instanceObject->getProp(atom);
             }
         }
 
@@ -125,9 +118,9 @@ namespace Cial::Bytecode {
             }
 
             // prev context
-            if(callFrame.context) {
-                if(const auto *instanceObject = dynamic_cast<const InstanceObject *>(callFrame.context)) {
-                    return instanceObject->getField(atom);
+            if(callFrame.thisObj) {
+                if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj)) {
+                    return instanceObject->getProp(atom);
                 }
             }
         }

@@ -17,14 +17,14 @@
 
 // #ifdef VM_DEBUG
 #define VM_ASSERT(condition, vmState)                                                                                  \
-    CLL_ASSERT(                                                                                                        \
-        condition, R"([VM_ASSERT]
+    CLL_ASSERT(condition, R"([VM_ASSERT]
+__asm__start
 %s
+__asm__end
 PC: 0x%x
 Frame depth: %d)",                                                                                                     \
-        Cial::Bytecode::Op::Instruction::dump(*(vmState)->instructions()[(vmState)->curFrame()->pc - 1], (vmState))    \
-            .c_str(),                                                                                                  \
-        (vmState)->curFrame()->pc - 1, (vmState)->context.stackTop);
+               (vmState)->curFrame()->chunk->dumpInstruction().getData(), (vmState)->curFrame()->pc - 1,               \
+               (vmState)->context.stackTop);
 // #else
 // #define VM_ASSERT(x) ((void)0)
 // #endif

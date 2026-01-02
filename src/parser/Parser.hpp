@@ -176,6 +176,11 @@ namespace Cial::Syntax {
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    struct SwitchStmtParser final : StmtParser {
+        SwitchStmtParser() = default;
+        StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     struct DoWhileStmtParser final : StmtParser {
         DoWhileStmtParser() = default;
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
@@ -208,6 +213,7 @@ namespace Cial::Syntax {
 
     static constinit BlockStmtParser S_BlockStmtParser{};
     static constinit IfStmtParser S_IfStmtParser{};
+    static constinit SwitchStmtParser S_SwitchStmtParser{};
     static constinit DoWhileStmtParser S_DoWhileStmtParser{};
     static constinit ForStmtParser S_ForStmtParser{};
     static constinit WhileStmtParser S_WhileStmtParser{};
@@ -218,6 +224,7 @@ namespace Cial::Syntax {
     static constinit auto S_StmtParsers = frozen::make_unordered_map<TokenType, const StmtParser *>({
         { TokenType::LeftCurlyBrace, &S_BlockStmtParser },
         { TokenType::If, &S_IfStmtParser },
+        { TokenType::Switch, &S_SwitchStmtParser },
         { TokenType::Do, &S_DoWhileStmtParser },
         { TokenType::For, &S_ForStmtParser },
         { TokenType::While, &S_WhileStmtParser },
@@ -259,21 +266,13 @@ namespace Cial::Syntax {
         ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
-    //    struct FunctionPrefixParser final : public PrefixParser {
-    //        FunctionPrefixParser() = default;
-    //
-    //        ExprNode *parse(Result &r, Parser *parser, Token *token) override;
-    //    };
-
     static constinit ConstValPrefixParser S_ConstValPrefixParser{};
     static constinit UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
     static constinit IdentifierPrefixParser S_IdentifierPrefixParser;
     static constinit UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
     static constinit ParenthesizedPrefixParser S_ParenthesizedPrefixParser{};
-    //    static inline FunctionPrefixParser S_FunctionPrefixParser{};
 
     static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>({
-        // { TokenType::Const, &S_PrefixParser },
         { TokenType::ConstVal, &S_ConstValPrefixParser },
         { TokenType::Minus, &S_NegatePrefixParser }, // "-"
         { TokenType::Identifier, &S_IdentifierPrefixParser },

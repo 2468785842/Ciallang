@@ -43,7 +43,7 @@ TEST_CASE("解释器 - 执行测试") {
 }
 
 TEST_CASE("解释器 - 脚本执行性能") {
-    BENCHMARK("fib 15") {
+    BENCHMARK("fib 10") {
         Runtime rt{};
         Context context{ rt };
         Bytecode::VMState vmState{ context };
@@ -53,7 +53,7 @@ TEST_CASE("解释器 - 脚本执行性能") {
                 if(n < 2) return n;
                 return fib(n - 2) + fib(n - 1);
             }
-            fib(15);
+            fib(10);
         )"_str);
     };
 }

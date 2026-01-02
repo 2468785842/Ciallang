@@ -14,16 +14,13 @@
 
 #include <catch.hpp>
 
-#include "test_config.h"
-
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
-
-#include "types/Function.hpp"
 
 using namespace Cial;
 
 TEST_CASE("作用域 - 上层访问") {
+    // NOTE: TJS2 doesn't support accessing local variables of parent functions
     Runtime rt{};
     Context context{ rt };
     Bytecode::VMState vmState{ context };
@@ -43,28 +40,59 @@ TEST_CASE("作用域 - 上层访问") {
     )"_str);
     REQUIRE(*r == 5);
 }
+
+TEST_CASE("作用域 - 上下文静态变量访问") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    const VM vm{ &vmState };
+
+    auto r = vm.eval<Integer>(R"(
+        var x = 1;
+
+        class Derived {
+            function getX() {
+                // If x is in the local scope, use x;
+                // Else dynamically look it up in `this`, `super`, or the global scope.
+                // NOTE: So how would a context mechanism like `incontextof` change classes?
+                // NOTE: Perhaps nothing would happen;
+                // NOTE: maybe context mechanisms are not applicable to class scenarios.
+                return x;
+            }
+        }
+
+        // old TJS2 will be Failed use `return (new Derived()).getX();`
+        return new Derived().getX();
+    )"_str);
+
+    REQUIRE(*r == 1);
+
+    r = vm.eval<Integer>(R"(
+        var x = 1;
+
+        class Derived {
+            var x = 2;
+            function getX() { return x; }
+        }
+
+        return new Derived().getX();
+    )"_str);
+    REQUIRE(*r == 2);
+}
+
 //
-// TEST_CASE("解释器 - 执行测试") {
+// TEST_CASE("作用域 - 父类静态变量访问") {
 //     Runtime rt{};
 //     Context context{ rt };
-//     context.registryFunc("println"_str, &StdLib::S_PrintlnFunction);
 //     Bytecode::VMState vmState{ context };
 //     const VM vm{ &vmState };
-//     vm.eval(String(TEST_FILES_PATH R"(/startup.tjs)"), true);
-// }
-//
-// TEST_CASE("解释器 - 脚本执行性能") {
-//     BENCHMARK("fib 15") {
-//         Runtime rt{};
-//         Context context{ rt };
-//         Bytecode::VMState vmState{ context };
-//         const VM vm{ &vmState };
-//         vm.eval(R"(
-//             function fib(n) {
-//                 if(n < 2) return n;
-//                 return fib(n - 2) + fib(n - 1);
-//             }
-//             fib(15);
-//         )"_str);
-//     };
+//     const auto r = vm.eval<Integer>(R"(
+//         class Base {}
+//         Base.a = 1;
+//         class Derived extends Base {
+//             function getSuperA() { return a; }
+//         }
+//         return (new Derived()).getSuperA();
+//     )"_str);
+//     REQUIRE(*r == 5);
 // }

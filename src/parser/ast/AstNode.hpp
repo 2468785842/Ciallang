@@ -47,6 +47,8 @@ namespace Cial::Syntax {
 
     class IfStmtNode;
 
+    class SwitchStmtNode;
+
     class DoWhileStmtNode;
 
     class ForStmtNode;
@@ -124,6 +126,8 @@ namespace Cial::Syntax {
         virtual void visit(const ExprStmtNode *) = 0;
 
         virtual void visit(const IfStmtNode *) = 0;
+
+        virtual void visit(const SwitchStmtNode *) = 0;
 
         virtual void visit(const DoWhileStmtNode *) = 0;
 

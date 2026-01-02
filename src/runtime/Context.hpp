@@ -84,7 +84,7 @@ namespace Cial {
                     callFrame.funcMeta->marked();
                 else
                     callFrame.chunk->marked();
-                callFrame.context->marked();
+                callFrame.thisObj->marked();
             }
         }
     };

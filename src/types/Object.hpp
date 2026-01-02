@@ -36,17 +36,18 @@ namespace Cial {
 
         virtual void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) = 0;
 
-        void marked() noexcept override {
-            MarkSweepHeader::marked();
-            if(context)
-                context->marked();
-        }
-
-        [[nodiscard]] Object *getContext() const noexcept { return context; }
-
     private:
-        Object *context = nullptr;
         Atom _name = ATOM_INVALID;
+    };
+
+    class Function;
+    class Property final : public Object {
+    public:
+        Object *thisObj;
+        Function *setFunc{};
+        Function *getFunc{};
+
+        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
     };
 
 } // namespace Cial

@@ -25,7 +25,7 @@ namespace Cial::Syntax {
 
     class BlockStmtNode final : public StmtNode {
     public:
-        std::vector<DeclNode *> childrens;
+        Vec<DeclNode *> childrens;
 
         explicit BlockStmtNode() : StmtNode("block_statement") {}
 
@@ -71,6 +71,23 @@ namespace Cial::Syntax {
         }
     };
 
+    class SwitchStmtNode final : public StmtNode {
+    public:
+        const ExprNode *test;
+        BlockStmtNode *defaultBody{};
+        Vec<ExprNode *> matchCases;
+        Vec<BlockStmtNode *> matchBodies;
+
+        SwitchStmtNode() = delete;
+
+        explicit SwitchStmtNode(const ExprNode *test) : StmtNode("switch_statement"), test(test) {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
 
     class DoWhileStmtNode final : public StmtNode {
     public:

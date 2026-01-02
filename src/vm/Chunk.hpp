@@ -44,6 +44,12 @@ namespace Cial::Bytecode {
             _constants.emplace_back(); // Void
         }
 
+        Chunk(const Chunk &) = delete;
+        Chunk &operator=(const Chunk &) = delete;
+
+        Chunk(Chunk &&chunk) = default;
+        Chunk &operator=(Chunk &&chunk) = default;
+
         [[nodiscard]] auto &getInstVec() const noexcept { return _instructions; }
 
         void setRegCount(const std::uint32_t count) noexcept { _registerCount = count; }
@@ -77,11 +83,20 @@ namespace Cial::Bytecode {
             }
         }
 
-        Chunk(const Chunk &) = delete;
-        Chunk &operator=(const Chunk &) = delete;
-
-        Chunk(Chunk &&chunk) = default;
-        Chunk &operator=(Chunk &&chunk) = default;
+        [[nodiscard]] String dumpInstruction() const {
+            std::stringstream ss{};
+            size_t pc{};
+            while(pc < _instructions.size()) {
+                const auto &instruction = _instructions[pc];
+                ss << fmt::format("{: <6}: {}", Label{ pc }, Op::Instruction::dump(*instruction, nullptr));
+                if(pc != _instructions.size() - 1) {
+                    ss << '\n';
+                }
+                ++pc;
+            }
+            const std::string_view &sv = ss.view();
+            return String{ sv.data(), static_cast<std::uint32_t>(sv.length()) };
+        }
 
     private:
         Vec<Op::Instruction *> _instructions{};

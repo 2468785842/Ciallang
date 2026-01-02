@@ -80,7 +80,7 @@ namespace Cial::Syntax {
     class ProcCallExprNode final : public ExprNode {
     public:
         const ExprNode *memberAccess;
-        std::vector<ExprNode *> arguments{};
+        Vec<ExprNode *> arguments{};
 
         explicit ProcCallExprNode(const ExprNode *memberAccess) : ExprNode("call"), memberAccess(memberAccess) {
             location = memberAccess->location;

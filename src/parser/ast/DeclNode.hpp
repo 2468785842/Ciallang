@@ -43,7 +43,7 @@ namespace Cial::Syntax {
     public:
         BlockStmtNode *body{ nullptr };
         // name, default value
-        std::vector<std::pair<Token, ExprNode *>> parameters{};
+        Vec<std::pair<Token, ExprNode *>> parameters{};
 
         FunctionDeclNode() = delete;
 

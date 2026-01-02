@@ -115,35 +115,6 @@ namespace Cial::Bytecode {
             return ss.str();
         }
 
-        [[nodiscard]] std::string dumpInstruction(const Chunk &chunk) const {
-            std::stringstream ss{};
-            // size_t pc{};
-            // std::vector<Function *> functions{};
-            // while(pc < chunk.getInstVec().size()) {
-            //     const auto &instruction = chunk.getInstVec()[pc];
-            //
-            //     ss << fmt::format("{: <6}: {}\n", Label{ pc }, Op::Instruction::dump(*instruction, *this, false));
-            //
-            //     if(instruction->opcode == Op::OpCode::Load) {
-            //         if(auto value = curFrame()->chunk->getConstant(Op::Load::value(*instruction)); value.isObject())
-            //         {
-            //             if(auto fun = dynamic_cast<Function *>(value.toObject())) {
-            //                 functions.push_back(fun);
-            //             }
-            //         }
-            //     }
-            //
-            //     ++pc;
-            // }
-            //
-            // for(const auto &fun : functions) {
-            //     ss << fmt::format("{:=^30}\n", fmt::format(" function {} ", fun->getName()))
-            //        << dumpInstruction(*fun->chunk());
-            // }
-
-            return ss.str();
-        }
-
         void pushVoid(const size_t n) const {
             const size_t base = context.regPool.allocFrame(n);
             for(std::size_t i = 0; i < n; i++) {

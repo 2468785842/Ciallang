@@ -17,38 +17,38 @@
 #include "vm/VMState.hpp"
 
 namespace Cial {
+    void InstanceObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
 
-    void InstanceObject::setField(Atom name, const Value &field) noexcept { _fields[name] = field; }
-
-    [[nodiscard]] Value InstanceObject::getField(Atom name) const noexcept {
-        const auto it = _fields.find(name);
-        return it != _fields.end() ? it->second : Value{};
+    Value InstanceObject::getProp(const Atom a) {
+        const auto it = _props.find(a);
+        return it != _props.end() ? it->second : Value{};
     }
 
-    void InstanceObject::setMethod(Atom name, const Value &method) noexcept { _methods[name] = method; }
-
-    [[nodiscard]] Value InstanceObject::getMethod(Atom name) const noexcept {
-        const auto it = _methods.find(name);
-        return it != _methods.end() ? it->second : Value{};
-    }
-
+    bool InstanceObject::hasProp(const Atom a) const { return _class->meta->hasMember(a); }
     // void ClassFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
     //     getFunction()->call(vmState, ret, argCount);
     //     // vmState.curFrame()->thisObj = _thisValue;
     // }
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
-        // auto *instanceObj = vmState.gc.allocate<InstanceObject>(this);
-        //
-        // for(auto &[k, v] : getFieldDefs()) {
-        //     instanceObj->setField(k, v.defValReg ? vmState.reg(v.defValReg.value()) : Value{});
-        // }
-        //
-        // for(auto &v : getMethods()) {
-        //     instanceObj->setField(v.toObject()->getName(),
-        //                           Value{ vmState.gc.allocate<ClassFunction>(Value{ instanceObj }, v) });
-        // }
-        // vmState.reg(ret, Value{ instanceObj });
+        auto *instanceObj = vmState.rt.create<InstanceObject>(this);
+        for(const auto &v : this->meta->memberShapMetas) {
+            if(v.isMethod) {
+                auto *funcMeta = this->meta->getMember<FuncMeta>(v.name);
+                auto *func = vmState.rt.create<Function>(funcMeta);
+                func->thisObj = instanceObj;
+                instanceObj->setProp(v.name, Value{ func });
+                continue;
+            }
+
+            Value propVal{};
+            if(const auto *propMeta = this->meta->getMember<PropMeta>(v.name); propMeta->defValReg) {
+                propVal = vmState.reg(propMeta->defValReg.value());
+            }
+            instanceObj->setProp(v.name, propVal);
+        }
+
+        vmState.reg(ret, Value{ instanceObj });
     }
 
     void InstanceObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {

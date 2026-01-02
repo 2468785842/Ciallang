@@ -17,11 +17,9 @@
 #include "common/Defer.hpp"
 #include "common/UTF8.hpp"
 #include "logging/Logger.hpp"
-#include "types/Octet.hpp"
 #include "types/Value.hpp"
 
 #include "types/Real.hpp"
-#include "types/String.hpp"
 
 #include <fmt/format.h>
 
