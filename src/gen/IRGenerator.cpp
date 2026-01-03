@@ -109,6 +109,12 @@ namespace Cial::Inter {
             case LtOrEqual:
                 _chunk->emit<Bytecode::Op::OpCode::LE>(reg1.value(), reg2.value(), dst);
                 break;
+            case LogicalAnd:
+                _chunk->emit<Bytecode::Op::OpCode::LAnd>(reg1.value(), reg2.value(), dst);
+                break;
+            case LogicalOr:
+                _chunk->emit<Bytecode::Op::OpCode::LOr>(reg1.value(), reg2.value(), dst);
+                break;
             case Plus:
                 _chunk->emit<Bytecode::Op::OpCode::Add>(reg1.value(), reg2.value(), dst);
                 break;
@@ -136,6 +142,14 @@ namespace Cial::Inter {
         switch(node->token->type()) {
             case New:
                 node->rhs->generateBytecode(this, retReg);
+                break;
+            case Exclamation:
+                node->rhs->generateBytecode(this, retReg);
+                _chunk->emit<Bytecode::Op::OpCode::LNot>(*retReg);
+                break;
+            case Minus:
+                node->rhs->generateBytecode(this, retReg);
+                _chunk->emit<Bytecode::Op::OpCode::ChS>(*retReg);
                 break;
             default:
                 CLL_LOG_ERROR("unknow unary operator");
@@ -259,6 +273,9 @@ namespace Cial::Inter {
         }
 
         addLocalVar(LocalVariable{ identifier, dst.value(), getNextInstPos() });
+
+        if(node->next)
+            node->next->generateBytecode(this, retReg);
     }
 
     void IRGenerator::generate(const Syntax::FunctionDeclNode *node, OptReg &retReg) {
@@ -298,19 +315,25 @@ namespace Cial::Inter {
                 const auto funChunk = generateChunk(funcDeclNode);
                 classMeta->setMember(MemberShapMeta{ funName }, funChunk);
             } else if(const auto *varDeclNode = dynamic_cast<Syntax::VarDeclNode *>(declNode)) {
-                const auto varName = varDeclNode->token->constVal().value<Atom>();
-
-                OptReg src;
-
-                // can init
-                if(varDeclNode->rhs) {
-                    varDeclNode->rhs->generateBytecode(this, src);
-                    freeRegister(src.value());
-                    if(_r.isFailed())
-                        return;
-                }
-
-                classMeta->setMember(MemberShapMeta{ varName }, _rt.createNoGC<PropMeta>(src));
+                // TODO:
+                // const auto varName = varDeclNode->token->constVal().value<Atom>();
+                //
+                // Bytecode::Register ret = allocateRegister();
+                //
+                // // can init
+                // if(varDeclNode->rhs) {
+                //     auto gen = IRGenerator{ _rt, _sourceFile };
+                //     gen.makeVirtualGlobalScope();
+                //     OptReg src;
+                //     auto chunk = gen.parseAst(_r, varDeclNode->rhs, src);
+                //     chunk->emit<Bytecode::Op::OpCode::Ret>(src.value());
+                //     if(_r.isFailed())
+                //         return;
+                // }
+                //
+                // classMeta->setMember(MemberShapMeta{ varName }, _rt.createNoGC<PropMeta>(
+                // _rt.createNoGC<FuncMeta>()
+                // ));
             }
         }
 

@@ -387,25 +387,36 @@ namespace Cial::Syntax {
 
         if(parser->peek(TokenType::SemiColon)) {
             parser->consume();
-            varDeclNode = parser->astBuilder()->makeNode<VarDeclNode>(identifier, nullptr);
+            varDeclNode = parser->astBuilder()->makeNode<VarDeclNode>(identifier, nullptr, nullptr);
             varDeclNode->location = line;
             return varDeclNode;
         }
 
-        if(!parser->expect(r, TokenType::Assignment))
-            return nullptr;
+        ExprNode *rhs{};
+        if(parser->peek(TokenType::Assignment)) {
+            parser->consume();
+            rhs = parser->parseExpression(r);
 
-        auto *rhs = parser->parseExpression(r);
+            if(!rhs)
+                return nullptr;
+        }
 
-        if(!rhs)
-            return nullptr;
+        VarDeclNode *varDecl{};
+        if(parser->peek(TokenType::Comma)) {
+            parser->consume();
+            varDecl = dynamic_cast<VarDeclNode *>(parse(r, parser, token));
+            if(!varDecl)
+                return nullptr;
+        }
 
-        if(!parser->expect(r, TokenType::SemiColon)) {
+        if(!varDecl && !parser->expect(r, TokenType::SemiColon)) {
             return nullptr;
         }
 
-        varDeclNode = parser->astBuilder()->makeNode<VarDeclNode>(identifier, rhs);
-        varDeclNode->location = rhs->location;
+        varDeclNode = parser->astBuilder()->makeNode<VarDeclNode>(identifier, rhs, varDecl);
+        varDeclNode->location = line;
+        if(rhs)
+            varDeclNode->location.end(rhs->location.end());
 
         return varDeclNode;
     }

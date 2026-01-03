@@ -170,6 +170,19 @@ namespace Cial {
                 throw std::logic_error("not number!! `operator-` can't use");
         }
     }
+
+    void Value::asLogicalNot() {
+        this->~Value();
+        _value._integer = !toBool();
+        _type = ValueType::Integer;
+    }
+
+    void Value::asSignChange() {
+        this->~Value();
+        _value._integer = -toInteger();
+        _type = ValueType::Integer;
+    }
+
     bool Value::discernCompare(const Value &value) const {
         if(!this->operator==(value)) {
             return false;
@@ -199,6 +212,10 @@ namespace Cial {
 
         return false;
     }
+
+    bool Value::operator&&(const Value &value) const { return this->toBool() && value.toBool(); }
+
+    bool Value::operator||(const Value &value) const { return this->toBool() || value.toBool(); }
 
     std::partial_ordering Value::operator<=>(const Value &rhs) const {
         const auto t1 = type();

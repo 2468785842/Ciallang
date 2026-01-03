@@ -47,6 +47,10 @@ namespace Cial::Inter {
 
         void freeRegister(const Bytecode::Register reg) { _freeRegisters.push_back(reg); }
 
+        /**
+         * create a global scope
+         * ensue we don't get variable from the global scope
+         */
         void makeVirtualGlobalScope() { _scopeStartPC.emplace_back(0); }
 
         void generate(const Syntax::ValueExprNode *, OptReg &);

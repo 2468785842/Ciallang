@@ -72,11 +72,22 @@ namespace Cial {
     };
 
     struct PropMeta : MarkSweepHeader {
-        OptReg defValReg{};
+        FuncMeta *setFunc;
+        FuncMeta *getFunc;
+
+        void marked() noexcept override {
+            MarkSweepHeader::marked();
+            if(setFunc) {
+                setFunc->marked();
+            }
+            if(getFunc) {
+                getFunc->marked();
+            }
+        }
 
     private:
         friend class Runtime;
-        explicit PropMeta(const OptReg defValReg) : defValReg(defValReg) {}
+        explicit PropMeta(FuncMeta *setFunc, FuncMeta *getFunc) : setFunc(setFunc), getFunc(getFunc) {}
     };
 
     struct ClassMeta : MarkSweepHeader {

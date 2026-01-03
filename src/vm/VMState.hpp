@@ -52,6 +52,8 @@ namespace Cial::Bytecode {
 
         [[nodiscard]] Value reg(Register reg) const;
 
+        [[nodiscard]] Value &regRef(Register reg) const;
+
         [[nodiscard]] Value global(const Atom atom) const {
             return context.gObj.contains(atom) ? context.gObj[atom] : Value{};
         }
@@ -73,7 +75,7 @@ namespace Cial::Bytecode {
 
         [[nodiscard]] bool getZF() const { return _zf; }
 
-        void setPC(const Label &label) const { _callStack[_stackTop - 1].pc = label.address(); }
+        void setPC(const Label &label) const { _currentFrame->pc = label.address(); }
 
         [[nodiscard]] size_t getPC() const { return _currentFrame->pc; }
 
@@ -98,8 +100,8 @@ namespace Cial::Bytecode {
         [[nodiscard]] CallFrame *curFrame() noexcept { return _currentFrame; }
         [[nodiscard]] const CallFrame *curFrame() const noexcept { return _currentFrame; }
 
-        [[nodiscard]] CallFrame *prev() noexcept { return &_callStack[_stackTop - 2]; }
-        [[nodiscard]] const CallFrame *prev() const noexcept { return &_callStack[_stackTop - 2]; }
+        [[nodiscard]] CallFrame *prev() noexcept { return _currentFrame - 1; }
+        [[nodiscard]] const CallFrame *prev() const noexcept { return _currentFrame - 1; }
 
         [[nodiscard]] Value getThis(Atom atom) const;
         [[nodiscard]] Value getUpVal(Atom atom) const;

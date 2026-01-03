@@ -41,11 +41,12 @@ namespace Cial {
                 continue;
             }
 
-            Value propVal{};
-            if(const auto *propMeta = this->meta->getMember<PropMeta>(v.name); propMeta->defValReg) {
-                propVal = vmState.reg(propMeta->defValReg.value());
-            }
-            instanceObj->setProp(v.name, propVal);
+            // TODO:
+            // Value propVal{};
+            // if(const auto *propMeta = this->meta->getMember<PropMeta>(v.name); propMeta->defValReg) {
+            //     propVal = vmState.reg(propMeta->defValReg.value());
+            // }
+            // instanceObj->setProp(v.name, propVal);
         }
 
         vmState.reg(ret, Value{ instanceObj });

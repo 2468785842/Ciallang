@@ -104,7 +104,9 @@ namespace Cial {
 
             ~Handle() noexcept { HandleConvert<T>::releaseValue(_rt, _value); }
 
-            T operator*() const { return HandleConvert<T>::fromValue(_value); }
+            [[nodiscard]] T get() const { return HandleConvert<T>::fromValue(_value); }
+
+            T operator*() const { return get(); }
 
             T *operator->() {
                 if constexpr(std::is_same_v<T, Value>) {

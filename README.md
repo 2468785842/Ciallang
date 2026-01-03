@@ -75,7 +75,7 @@
 * [ ] `^A` 按位异或
 * [ ] `A & B` 按位与
 * [x] `A operator B` 相等判断运算符 `== != === !==`
-* [ ] `A operator B` 比较运算符 `< > <= >=`
+* [x] `A operator B` 比较运算符 `< > <= >=`
 * [ ] `A operator B` 位移运算符 `>> << >>>`
 * [x] `A operator B` 加减运算符 `+ -`
 * [ ] `A operator B` 乘除运算符 `% / \ *`

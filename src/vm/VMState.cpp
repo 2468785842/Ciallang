@@ -27,7 +27,10 @@ namespace Cial::Bytecode {
     }
 
     void VMState::run() {
-// #define CLL_COMPUTED_GOTO
+        std::uint64_t &pc = _currentFrame->pc;
+        const auto &instList = instructions();
+        const size_t curStackTop = _stackTop;
+#define CLL_COMPUTED_GOTO
 #ifdef CLL_COMPUTED_GOTO
         // 标签数组
         static void *labels[] = {
@@ -39,37 +42,24 @@ namespace Cial::Bytecode {
         goto label_Dispatch;
 
     label_Dispatch: {
-        const auto &instList = instructions();
-        const Op::Instruction *instruction = instList[_currentFrame->pc];
-        if(_currentFrame->pc >= instList.size() || _stackTop == 0) {
+        if(!(pc < instList.size() && _stackTop != 0 && curStackTop == _stackTop)) {
             return;
         }
-        goto *labels[static_cast<size_t>(instruction->opcode)];
+        goto *labels[static_cast<size_t>(instList[pc]->opcode)];
     }
 
 #define HANDLE_OPCODE(OP)                                                                                              \
     label_##OP : {                                                                                                     \
-        const Op::Instruction *instruction = instructions()[_currentFrame->pc];                                        \
-        ++_currentFrame->pc;                                                                                           \
-        Op::OP::execute(*instruction, *this);                                                                          \
+        Op::OP::execute(*instList[pc++], *this);                                                                       \
         goto label_Dispatch;                                                                                           \
     }
 
         OPCODE_ENUMS(HANDLE_OPCODE)
 #undef HANDLE_OPCODE
 #else
-        for(;;) {
-            std::uint64_t &pc = _currentFrame->pc;
-            const auto &instList = instructions();
 
-            if(pc >= instList.size())
-                break;
-
-            if(_stackTop == 0)
-                break;
-
-            const auto &instruction = instList[pc];
-            ++pc;
+        while(pc < instList.size() && _stackTop != 0 && curStackTop == _stackTop) {
+            const auto *instruction = instList[pc++];
             // fmt::println("{}\n", Op::Instruction::dump(*instruction, *this, true));
             Op::Instruction::execute(*instruction, *this);
         }
@@ -79,6 +69,8 @@ namespace Cial::Bytecode {
     void VMState::reg(const Register &reg, const Value &value) const { _currentFrame->getReg(reg) = value; }
 
     Value VMState::reg(const Register reg) const { return _currentFrame->getReg(reg); }
+
+    Value &VMState::regRef(const Register reg) const { return _currentFrame->getReg(reg); }
 
     Value VMState::getThis(const Atom atom) const {
 

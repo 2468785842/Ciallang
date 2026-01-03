@@ -54,6 +54,8 @@ namespace Cial {
 
         [[nodiscard]] Object *toObject() const;
 
+        [[nodiscard]] bool toBool() const;
+
         [[nodiscard]] bool isVoid() const { return type() == ValueType::Void; }
 
         [[nodiscard]] bool isInteger() const { return type() == ValueType::Integer; }
@@ -65,8 +67,6 @@ namespace Cial {
         [[nodiscard]] bool isOctet() const { return type() == ValueType::Octet; }
 
         [[nodiscard]] bool isObject() const { return type() == ValueType::Object; }
-
-        [[nodiscard]] bool toBool() const;
 
         [[nodiscard]] const char *name() const;
 
@@ -80,8 +80,15 @@ namespace Cial {
 
         Value operator-() const;
 
+        void asLogicalNot();
+
+        void asSignChange();
+
         [[nodiscard]] bool discernCompare(const Value &value) const;
+
         bool operator==(const Value &value) const;
+        bool operator&&(const Value &value) const;
+        bool operator||(const Value &value) const;
 
         std::partial_ordering operator<=>(const Value &rhs) const;
 

@@ -147,6 +147,23 @@ namespace Cial::Bytecode::Op {
         vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
         vmState.setZF(result);
     }
+
+    void LAnd::execute(const Instruction &inst, VMState &vmState) {
+        const auto value1 = vmState.reg(reg1(inst));
+        const auto value2 = vmState.reg(reg2(inst));
+        const bool result = value1 && value2;
+        vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
+        vmState.setZF(result);
+    }
+
+    void LOr::execute(const Instruction &inst, VMState &vmState) {
+        const auto value1 = vmState.reg(reg1(inst));
+        const auto value2 = vmState.reg(reg2(inst));
+        const bool result = value1 || value2;
+        vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
+        vmState.setZF(result);
+    }
+
     void AbsEQ::execute(const Instruction &, VMState &) {
         // TODO:
         assert(false);
@@ -231,6 +248,17 @@ namespace Cial::Bytecode::Op {
     void GUpval::execute(const Instruction &inst, const VMState &vmState) {
         vmState.reg(dst(inst), vmState.getUpVal(atom(inst)));
     }
+
+    void LNot::execute(const Instruction &inst, const VMState &vmState) {
+        const Register srcReg = src(inst);
+        vmState.regRef(srcReg).asLogicalNot();
+    }
+
+    void ChS::execute(const Instruction &inst, const VMState &vmState) {
+        const Register srcReg = src(inst);
+        vmState.regRef(srcReg).asSignChange();
+    }
+
     void Ret::execute(const Instruction &inst, VMState &vmState) {
         const auto &value = vmState.reg(retReg(inst));
         const auto frame = vmState.curFrame();
@@ -297,7 +325,7 @@ namespace Cial::Bytecode::Op {
     }
 
     std::string DGlobal::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} atom_{: <4}", "dglobal", src(inst), atom(inst).v);
+        auto insDump = fmt::format("{: <10} {: <4} atom_{}", "dglobal", src(inst), atom(inst).v);
 
         if(!vmState)
             return insDump;
@@ -308,7 +336,7 @@ namespace Cial::Bytecode::Op {
     }
 
     std::string GGlobal::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{: <4} {: <4}", "gglobal", atom(inst).v, dst(inst));
+        return fmt::format("{: <10} atom_{} {: <4}", "gglobal", atom(inst).v, dst(inst));
     }
 
     std::string Test::dump(const Instruction &inst, const VMState *vmState) {
@@ -344,6 +372,13 @@ namespace Cial::Bytecode::Op {
         return fmt::format("{: <10} {: <4} {: <4} {: <4}", "ge", reg1(inst), reg2(inst), dst(inst));
     }
 
+    std::string LAnd::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "land", reg1(inst), reg2(inst), dst(inst));
+    }
+
+    std::string LOr::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "lor", reg1(inst), reg2(inst), dst(inst));
+    }
 
     std::string AbsEQ::dump(const Instruction &inst, const VMState *vmState) {
         return fmt::format("{: <10} {: <4} {: <4} {: <4}", "abseq", reg1(inst), reg2(inst), dst(inst));
@@ -371,7 +406,6 @@ namespace Cial::Bytecode::Op {
         return fmt::format("{: <30} ; ZF = {}", insDump, vmState->getZF());
     }
 
-
     std::string Call::dump(const Instruction &inst, const VMState *vmState) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "call", memberReg(inst), dst(inst), argCount(inst));
 
@@ -391,16 +425,23 @@ namespace Cial::Bytecode::Op {
     }
 
     std::string GThis::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{: <4} {: <4}", "gthis", atom(inst).v, dst(inst));
+        return fmt::format("{: <10} atom_{} {: <4}", "gthis", atom(inst).v, dst(inst));
     }
 
     std::string GUpval::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{: <4} {: <4}", "gupval", atom(inst).v, dst(inst));
+        return fmt::format("{: <10} atom_{} {: <4}", "gupval", atom(inst).v, dst(inst));
+    }
+
+    std::string LNot::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "lnot", src(inst));
+    }
+
+    std::string ChS::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "chs", src(inst));
     }
 
     std::string Ret::dump(const Instruction &inst, const VMState *vmState) {
         return fmt::format("{: <10} {}", "ret", retReg(inst));
     }
-
 
 } // namespace Cial::Bytecode::Op

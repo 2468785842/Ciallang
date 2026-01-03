@@ -58,6 +58,10 @@ namespace Cial::Bytecode::Op {
     O(SProp)                                                                                                           \
     O(GUpval)                                                                                                          \
     O(GThis)                                                                                                           \
+    O(LNot)                                                                                                            \
+    O(LAnd)                                                                                                            \
+    O(LOr)                                                                                                             \
+    O(ChS)                                                                                                             \
     O(Ret)
 
     enum class OpCode : std::uint16_t {
@@ -515,6 +519,50 @@ namespace Cial::Bytecode::Op {
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GUpval
+
+    struct LNot {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct LNot
+
+    struct LAnd {
+
+        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+
+        static void execute(const Instruction &, VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct LAnd
+
+    struct LOr {
+
+        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+
+        static void execute(const Instruction &, VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct LOr
+
+    struct ChS {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct ChS
 
     struct Ret {
         static Register retReg(const Instruction &inst) { return inst.getOperand1<Register>(); }

@@ -27,10 +27,12 @@ namespace Cial::Syntax {
     class VarDeclNode final : public DeclNode {
     public:
         const ExprNode *rhs;
+        const VarDeclNode *next;
 
         VarDeclNode() = delete;
 
-        explicit VarDeclNode(const Token &token, const ExprNode *rhs) : DeclNode(token, "var_declaration"), rhs(rhs) {}
+        explicit VarDeclNode(const Token &token, const ExprNode *rhs, const VarDeclNode *next) :
+            DeclNode(token, "var_declaration"), rhs(rhs), next(next) {}
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
@@ -69,6 +71,21 @@ namespace Cial::Syntax {
             return gen->generate(this, retReg);
         }
     };
+
+    // class PropertyDeclNode final : public DeclNode {
+    // public:
+    //     BlockStmtNode *getBody{ nullptr };
+    //     BlockStmtNode *setBody{ nullptr };
+    //     PropertyDeclNode() = delete;
+    //
+    //     explicit PropertyDeclNode(const Token &token) : DeclNode(token, "property_declaration") {}
+    //
+    //     void accept(Visitor *visitor) const override { visitor->visit(this); }
+    //
+    //     void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+    //         return gen->generate(this, retReg);
+    //     }
+    // };
 
     class StmtDeclNode final : public DeclNode {
     public:

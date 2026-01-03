@@ -5,472 +5,144 @@
  */
 
 #include <catch.hpp>
-#include <memory>
 
-#include "common/SourceFile.hpp"
-#include "parser/Parser.hpp"
-#include "parser/ast/AstBuilder.hpp"
-#include "parser/ast/DeclNode.hpp"
-#include "parser/ast/ExprNode.hpp"
-#include "parser/ast/StmtNode.hpp"
+#include "vm/VM.hpp"
+#include "vm/VMState.hpp"
 
 using namespace Cial;
 
 TEST_CASE("表达式 - 字面量表达式") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
-    AtomTable atomTable{};
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
 
-    SECTION("整数字面量") {
-        sourceFile.load(r, "123;");
-        Syntax::Parser parser{ atomTable, sourceFile };
+    SECTION("整数字面量") { REQUIRE(*vm.evalExpr<Integer>("123"_str) == 123); }
 
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
+    SECTION("浮点数字面量") { REQUIRE((*vm.evalExpr<Real>("3.14"_str)).value() == Catch::Approx(3.14)); }
 
-        auto *blockStmt = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockStmt != nullptr);
-        REQUIRE(blockStmt->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockStmt->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *valueExpr = dynamic_cast<const Syntax::ValueExprNode *>(exprStmt->expression);
-        REQUIRE(valueExpr != nullptr);
-        REQUIRE(valueExpr->token->type() == Syntax::TokenType::ConstVal);
-        REQUIRE(valueExpr->token->value().toInteger() == 123);
-    }
-
-    SECTION("浮点数字面量") {
-        sourceFile.load(r, "3.14;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockStmt = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockStmt != nullptr);
-        REQUIRE(blockStmt->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockStmt->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *valueExpr = dynamic_cast<const Syntax::ValueExprNode *>(exprStmt->expression);
-        REQUIRE(valueExpr != nullptr);
-        REQUIRE(valueExpr->token->type() == Syntax::TokenType::ConstVal);
-        REQUIRE(valueExpr->token->value().toReal() == Catch::Approx(3.14));
-    }
-
-    SECTION("字符串字面量") {
-        sourceFile.load(r, R"("hello world";)");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockStmt = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockStmt != nullptr);
-        REQUIRE(blockStmt->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockStmt->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *valueExpr = dynamic_cast<const Syntax::ValueExprNode *>(exprStmt->expression);
-        REQUIRE(valueExpr != nullptr);
-        REQUIRE(valueExpr->token->type() == Syntax::TokenType::ConstVal);
-        REQUIRE(valueExpr->token->value().toString()->toStdStr() == "hello world");
-    }
-}
-
-TEST_CASE("表达式 - 标识符表达式") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
-
-    SECTION("变量引用") {
-        sourceFile.load(r, "variableName;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockStmt = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockStmt != nullptr);
-        REQUIRE(blockStmt->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockStmt->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *identExpr = dynamic_cast<const Syntax::IdentifierExprNode *>(exprStmt->expression);
-        REQUIRE(identExpr != nullptr);
-        REQUIRE(identExpr->token != nullptr);
-        // Token的name()返回token类型名，不是标识符值，这里只验证token存在
-        REQUIRE(identExpr->token->type() == Syntax::TokenType::Identifier);
-    }
+    SECTION("字符串字面量") { REQUIRE(*(*vm.evalExpr<String *>(R"("hello world")"_str)) == "hello world"); }
 }
 
 TEST_CASE("表达式 - 二元运算表达式") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
 
-    SECTION("算术运算") {
-        sourceFile.load(r, "a + b;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockStmt = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockStmt != nullptr);
-        REQUIRE(blockStmt->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockStmt->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *binaryExpr = dynamic_cast<const Syntax::BinaryExprNode *>(exprStmt->expression);
-        REQUIRE(binaryExpr != nullptr);
-        REQUIRE(binaryExpr->token->type() == Syntax::TokenType::Plus);
-        REQUIRE(dynamic_cast<const Syntax::IdentifierExprNode *>(binaryExpr->lhs) != nullptr);
-        REQUIRE(dynamic_cast<const Syntax::IdentifierExprNode *>(binaryExpr->rhs) != nullptr);
-    }
+    SECTION("算术运算") { REQUIRE((*vm.evalExpr<Integer>("1 + 2"_str)) == 3); }
 
     SECTION("比较运算") {
-        sourceFile.load(r, "x > y;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockStmt = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockStmt != nullptr);
-        REQUIRE(blockStmt->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockStmt->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *binaryExpr = dynamic_cast<const Syntax::BinaryExprNode *>(exprStmt->expression);
-        REQUIRE(binaryExpr != nullptr);
-        REQUIRE(binaryExpr->token->type() == Syntax::TokenType::Gt);
+        REQUIRE((*vm.evalExpr<bool>("1 > 2"_str)) == false);
+        REQUIRE((*vm.evalExpr<bool>("1 < 2"_str)) == true);
+        REQUIRE((*vm.evalExpr<bool>("1 >= 2"_str)) == false);
+        REQUIRE((*vm.evalExpr<bool>("2 >= 2"_str)) == true);
+        REQUIRE((*vm.evalExpr<bool>("2 <= 2"_str)) == true);
+        REQUIRE((*vm.evalExpr<bool>("3 <= 2"_str)) == false);
     }
 
     SECTION("逻辑运算") {
-        sourceFile.load(r, "a && b;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockStmt = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockStmt != nullptr);
-        REQUIRE(blockStmt->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockStmt->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *binaryExpr = dynamic_cast<const Syntax::BinaryExprNode *>(exprStmt->expression);
-        REQUIRE(binaryExpr != nullptr);
-        REQUIRE(binaryExpr->token->type() == Syntax::TokenType::LogicalAnd);
+        REQUIRE((*vm.evalExpr<bool>("true && false"_str)) == false);
+        REQUIRE((*vm.evalExpr<bool>("true && true"_str)) == true);
     }
 }
 
 TEST_CASE("表达式 - 一元运算表达式") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
 
     SECTION("逻辑非") {
-        sourceFile.load(r, "!flag;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockStmt = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockStmt != nullptr);
-        REQUIRE(blockStmt->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockStmt->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *unaryExpr = dynamic_cast<const Syntax::UnaryExprNode *>(exprStmt->expression);
-        REQUIRE(unaryExpr != nullptr);
-        REQUIRE(unaryExpr->token->type() == Syntax::TokenType::Exclamation);
-        REQUIRE(dynamic_cast<const Syntax::IdentifierExprNode *>(unaryExpr->rhs) != nullptr);
+        REQUIRE((*vm.evalExpr<bool>("!true"_str)) == false);
+        REQUIRE((*vm.evalExpr<bool>("!false"_str)) == true);
     }
 
     SECTION("负号") {
-        sourceFile.load(r, "-value;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockStmt = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockStmt != nullptr);
-        REQUIRE(blockStmt->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockStmt->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *unaryExpr = dynamic_cast<const Syntax::UnaryExprNode *>(exprStmt->expression);
-        REQUIRE(unaryExpr != nullptr);
-        REQUIRE(unaryExpr->token->type() == Syntax::TokenType::Minus);
+        REQUIRE((*vm.evalExpr<Integer>("-1"_str)) == -1);
+        REQUIRE((*vm.evalExpr<Integer>("-(-1)"_str)) == 1);
     }
 }
 
 TEST_CASE("表达式 - 赋值表达式") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
 
-    SECTION("简单赋值") {
-        sourceFile.load(r, "x = 42;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
+    SECTION("简单赋值") { REQUIRE((*vm.eval<Integer>("var a; a = 42; return a;"_str)) == 42); }
 
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockStmt = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockStmt != nullptr);
-        REQUIRE(blockStmt->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockStmt->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *assignExpr = dynamic_cast<const Syntax::AssignExprNode *>(exprStmt->expression);
-        REQUIRE(assignExpr != nullptr);
-        REQUIRE(dynamic_cast<const Syntax::IdentifierExprNode *>(assignExpr->lhs) != nullptr);
-        REQUIRE(dynamic_cast<const Syntax::ValueExprNode *>(assignExpr->rhs) != nullptr);
-    }
-
-    SECTION("复合赋值") {
-        sourceFile.load(r, "x = y = 10;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockNode = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockNode != nullptr);
-        REQUIRE(blockNode->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockNode->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *assignExpr = dynamic_cast<const Syntax::AssignExprNode *>(exprStmt->expression);
-        REQUIRE(assignExpr != nullptr);
-        REQUIRE(dynamic_cast<const Syntax::IdentifierExprNode *>(assignExpr->lhs) != nullptr);
-        REQUIRE(dynamic_cast<const Syntax::AssignExprNode *>(assignExpr->rhs) != nullptr);
-    }
+    SECTION("复合赋值") { REQUIRE((*vm.eval<Integer>("var x, y; x = y = 10; return x + y;"_str)) == 20); }
 }
 
 TEST_CASE("表达式 - 函数调用表达式") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
 
-    SECTION("无参数调用") {
-        sourceFile.load(r, "func();");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockNode = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockNode != nullptr);
-        REQUIRE(blockNode->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockNode->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *callExpr = dynamic_cast<const Syntax::ProcCallExprNode *>(exprStmt->expression);
-        REQUIRE(callExpr != nullptr);
-        REQUIRE(callExpr->arguments.empty());
-    }
+    SECTION("无参数调用") { REQUIRE((*vm.eval<bool>("function func() { return true; } return func();"_str)) == true); }
 
     SECTION("带参数调用") {
-        sourceFile.load(r, "add(1, 2, 3);");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockNode = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockNode != nullptr);
-        REQUIRE(blockNode->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockNode->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *callExpr = dynamic_cast<const Syntax::ProcCallExprNode *>(exprStmt->expression);
-        REQUIRE(callExpr != nullptr);
-        REQUIRE(callExpr->arguments.size() == 3);
+        REQUIRE((*vm.eval<Integer>(R"(
+            function add(a, b, c) { return a + b + c; }
+            return add(1, 2, 3);
+        )"_str)) == 6);
     }
 
     SECTION("嵌套调用") {
-        sourceFile.load(r, "max(min(a, b), c);");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockNode = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockNode != nullptr);
-        REQUIRE(blockNode->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockNode->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *callExpr = dynamic_cast<const Syntax::ProcCallExprNode *>(exprStmt->expression);
-        REQUIRE(callExpr != nullptr);
-        REQUIRE(callExpr->arguments.size() == 2);
+        REQUIRE((*vm.eval<Integer>(R"(
+            function max(a, b) { if(a < b) return b; else return a; }
+            function min(a, b) { if(a > b) return b; else return a; }
+            return max(min(2, 1), 3);
+        )"_str)) == 3);
     }
 
     SECTION("逗号表示隐式void参数 - 两个逗号") {
-        sourceFile.load(r, "func(,);");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockNode = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockNode != nullptr);
-        REQUIRE(blockNode->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockNode->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *callExpr = dynamic_cast<const Syntax::ProcCallExprNode *>(exprStmt->expression);
-        REQUIRE(callExpr != nullptr);
-        REQUIRE(callExpr->arguments.size() == 2);
+        REQUIRE((*vm.eval<bool>(R"(
+            function func(a, b) { return a && b; }
+            return func(,);
+        )"_str)) == false);
     }
 
     SECTION("逗号表示隐式void参数 - 三个逗号") {
-        sourceFile.load(r, "func(,,);");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockNode = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockNode != nullptr);
-        REQUIRE(blockNode->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockNode->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *callExpr = dynamic_cast<const Syntax::ProcCallExprNode *>(exprStmt->expression);
-        REQUIRE(callExpr != nullptr);
-        REQUIRE(callExpr->arguments.size() == 3);
+        REQUIRE((*vm.eval<bool>(R"(
+            function func(a, b, c) { return a && b && c; }
+            return func(,,);
+        )"_str)) == false);
     }
 
     SECTION("逗号表示隐式void参数 - 参数后跟逗号") {
-        sourceFile.load(r, "func(2,);");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockNode = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockNode != nullptr);
-        REQUIRE(blockNode->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockNode->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *callExpr = dynamic_cast<const Syntax::ProcCallExprNode *>(exprStmt->expression);
-        REQUIRE(callExpr != nullptr);
-        REQUIRE(callExpr->arguments.size() == 2);
+        REQUIRE((*vm.eval<bool>(R"(
+            function func(a, b) { return a == 2 && !b; }
+            return func(2,);
+        )"_str)) == true);
     }
 
     SECTION("逗号表示隐式void参数 - 逗号后跟参数") {
-        sourceFile.load(r, "func(,2);");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockNode = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockNode != nullptr);
-        REQUIRE(blockNode->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockNode->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *callExpr = dynamic_cast<const Syntax::ProcCallExprNode *>(exprStmt->expression);
-        REQUIRE(callExpr != nullptr);
-        REQUIRE(callExpr->arguments.size() == 2);
+        REQUIRE((*vm.eval<bool>(R"(
+            function func(a, b) { return !a && b == 2; }
+            return func(,2);
+        )"_str)) == true);
     }
 
     SECTION("逗号表示隐式void参数 - 混合情况") {
-        sourceFile.load(r, "func(a, , b, , c);");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-
-        auto *blockNode = dynamic_cast<Syntax::BlockStmtNode *>(globalNode);
-        REQUIRE(blockNode != nullptr);
-        REQUIRE(blockNode->childrens.size() == 1);
-        auto *stmtDecl = dynamic_cast<Syntax::StmtDeclNode *>(blockNode->childrens[0]);
-        REQUIRE(stmtDecl != nullptr);
-        auto *exprStmt = dynamic_cast<const Syntax::ExprStmtNode *>(stmtDecl->statement);
-        REQUIRE(exprStmt != nullptr);
-        auto *callExpr = dynamic_cast<const Syntax::ProcCallExprNode *>(exprStmt->expression);
-        REQUIRE(callExpr != nullptr);
-        REQUIRE(callExpr->arguments.size() == 5);
+        REQUIRE((*vm.eval<bool>(R"(
+            function func(a, b, c, d, e) { return a == 1 && !b && c == 2 && !d && e == 3; }
+            return func(1, , 2, , 3);
+        )"_str)) == true);
     }
 }
 
 TEST_CASE("表达式 - 复杂表达式组合") {
-    Common::SourceFile sourceFile{};
-    Common::Result r{};
-    Syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
 
-    SECTION("混合表达式") {
-        sourceFile.load(r, "a + b * c - d / e;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
+    SECTION("混合表达式") { REQUIRE((*vm.evalExpr<Integer>("1 + 2 * 3 - 4 / 4"_str)) == 6); }
 
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-    }
+    SECTION("带括号的表达式") { REQUIRE((*vm.evalExpr<Integer>("(1 + 2) * (1 - 2)"_str)) == -3); }
 
-    SECTION("带括号的表达式") {
-        sourceFile.load(r, "(a + b) * (c - d);");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-    }
-
-    SECTION("逻辑表达式组合") {
-        sourceFile.load(r, "a > 0 && b < 10 || c == 5;");
-        Syntax::Parser parser{ sourceFile, astBuilder };
-
-        auto *globalNode = parser.parse(r);
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-    }
+    SECTION("逻辑表达式组合") { REQUIRE((*vm.evalExpr<bool>("1 > 0 && 5 < 10 || 6 == 5"_str)) == true); }
 }

@@ -61,12 +61,13 @@ namespace Cial::Bytecode {
                     return ConstIdx{ i };
                 }
             }
-            _constants.push_back(std::move(value));
+            _constants.emplace_back(std::move(value));
             return ConstIdx{ _constants.size() - 1 };
         }
 
         [[nodiscard]] const Constant &getConstant(const ConstIdx index) const {
-            CLL_ASSERT(index.index() < _constants.size(), "constant index out of range");
+            CLL_ASSERT(index.index() < _constants.size() && "constant index out of range",
+                       this->dumpInstruction().getData());
             return _constants[index.index()];
         }
 
