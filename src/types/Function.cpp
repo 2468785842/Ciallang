@@ -16,10 +16,9 @@
 
 #include "Function.hpp"
 
-#include "Object.hpp"
-
 #include "vm/CallFrame.hpp"
 #include "vm/Constant.hpp"
+#include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
 namespace Cial {
@@ -32,7 +31,7 @@ namespace Cial {
         vmState.allocCallFrame(meta, ret);
         // Fast move Reg window ptr, WARING: reverse args
         auto *currentCallFrame = vmState.curFrame();
-        currentCallFrame->thisObj = thisObj;
+        currentCallFrame->thisObj = Value{ thisObj };
         vmState.run();
 
         if(cnt > 0)
@@ -40,14 +39,16 @@ namespace Cial {
     }
 
     void NativeFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
-
         const auto cnt = _arity - argCount;
         if(cnt > 0)
             vmState.pushVoid(cnt);
 
         const size_t used = vmState.getRegPoolTop();
+        auto *curFrame = vmState.curFrame();
+        Value *args = &curFrame->getReg(Bytecode::Register{ used - argCount });
+        VM vm{ &vmState };
 
-        const auto &value = callProc(&vmState.curFrame()->getReg(Bytecode::Register{ used - argCount }));
+        const auto &value = callProc(&vm, args);
 
         vmState.reg(ret, value);
 

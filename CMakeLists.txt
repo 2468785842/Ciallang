@@ -50,6 +50,7 @@ set(SOURCE_FILES
         src/types/String.cpp
 
         src/stdlib/Debug.cpp
+        src/stdlib/NativeRegister.cpp
 
         src/gc/GC.cpp
 

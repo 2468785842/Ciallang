@@ -36,7 +36,7 @@ namespace Cial {
             if(v.isMethod) {
                 auto *funcMeta = this->meta->getMember<FuncMeta>(v.name);
                 auto *func = vmState.rt.create<Function>(funcMeta);
-                func->thisObj = instanceObj;
+                func->thisObj = Value{ instanceObj };
                 instanceObj->setProp(v.name, Value{ func });
                 continue;
             }

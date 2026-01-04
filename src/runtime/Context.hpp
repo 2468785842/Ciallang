@@ -24,16 +24,19 @@
 #include "vm/FastRegisterPool.hpp"
 
 #include "gc/GC.hpp"
-#include "types/Function.hpp"
+
 #include "types/Object.hpp"
 #include "types/Value.hpp"
+
+#include "stdlib/NativeRegister.hpp"
 
 namespace Cial {
 
     class Context {
     public:
         Runtime &rt;
-        std::unordered_map<Atom, Value> gObj{};
+        Map<Atom, Value> gObj{};
+        NativeRegister nativeRegister{ rt };
 
         Bytecode::FastRegisterPool regPool{};
 
@@ -45,13 +48,32 @@ namespace Cial {
 
         explicit Context(Runtime &rt) noexcept : rt(rt) {}
 
-        void registryFunc(const String &name, NativeFunction *func) noexcept {
+        template <typename T, typename Callable>
+        void registerMethod(const String &name, Callable &&fn, const bool isStatic) {
+            return nativeRegister.registerMethod<T>(name, std::forward<Callable>(fn), isStatic);
+        }
+
+        template <typename T>
+        [[nodiscard]] NativeFunction *findMethod(const String &name, const bool isStatic) const {
+            return nativeRegister.findMethod<T>(name, isStatic);
+        }
+
+        void registryGlobalFunc(const String &name, NativeFunction *func) noexcept {
             const Atom a = rt.atomTable.intern(name);
             gObj[a] = Value{ func };
         }
 
         void collectMark() {
             rt.collectMark();
+
+            for(const auto &[staticMethods, instanceMethods] : nativeRegister.tables | std::views::values) {
+                for(const auto &method : staticMethods | std::views::values) {
+                    method->marked();
+                }
+                for(const auto &method : instanceMethods | std::views::values) {
+                    method->marked();
+                }
+            }
 
             for(const auto &val : gObj | std::views::values) {
                 if(val.isObject()) {
@@ -84,7 +106,8 @@ namespace Cial {
                     callFrame.funcMeta->marked();
                 else
                     callFrame.chunk->marked();
-                callFrame.thisObj->marked();
+                if(callFrame.thisObj.isObject())
+                    callFrame.thisObj.toObject()->marked();
             }
         }
     };

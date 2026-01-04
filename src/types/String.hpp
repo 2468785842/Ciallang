@@ -12,6 +12,7 @@ namespace Cial {
         static constexpr int SHORT_STR_LEN = 21;
 
     public:
+        explicit String(const char c) : _shortStr{ c, '\0' }, _len(1) {}
         explicit String(const char *str) : String(str, std::strlen(str)) {}
 
         template <size_t N>

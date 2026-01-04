@@ -27,7 +27,7 @@ using namespace Cial;
 TEST_CASE("解释器 - Hello World") {
     Runtime rt{};
     Context context{ rt };
-    context.registryFunc("println"_str, &StdLib::S_PrintlnFunction);
+    context.registryGlobalFunc("println"_str, &StdLib::S_PrintlnFunction);
     Bytecode::VMState vmState{ context };
     const VM vm{ &vmState };
     vm.evalExpr(R"(println("Hello World!"))"_str);
@@ -36,7 +36,7 @@ TEST_CASE("解释器 - Hello World") {
 TEST_CASE("解释器 - 执行测试") {
     Runtime rt{};
     Context context{ rt };
-    context.registryFunc("println"_str, &StdLib::S_PrintlnFunction);
+    context.registryGlobalFunc("println"_str, &StdLib::S_PrintlnFunction);
     Bytecode::VMState vmState{ context };
     const VM vm{ &vmState };
     vm.eval(String(TEST_FILES_PATH R"(/startup.tjs)"), true);

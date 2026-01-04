@@ -22,7 +22,7 @@ namespace Cial {
     struct CallFrame {
         Bytecode::Chunk *chunk{};
         FuncMeta *funcMeta{}; // funcMeta != nullptr is function call
-        Object *thisObj{};
+        Value thisObj{};
         OptReg ret{};
         std::uint64_t pc{};
 
@@ -39,7 +39,7 @@ namespace Cial {
             chunk(callFrame.chunk), funcMeta(callFrame.funcMeta), thisObj(callFrame.thisObj), ret(callFrame.ret),
             pc(callFrame.pc), _pool(callFrame._pool), _sp(callFrame._sp) {
             callFrame.funcMeta = nullptr;
-            callFrame.thisObj = nullptr;
+            callFrame.thisObj = Value{};
             callFrame._pool = nullptr;
         }
 

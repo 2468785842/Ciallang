@@ -191,26 +191,56 @@ namespace Cial::Bytecode::Op {
 
     void GProp::execute(const Instruction &inst, const VMState &vmState) {
         const auto &val = vmState.reg(obj(inst));
-        VM_ASSERT(val.isObject() && "gprop obj is not object", &vmState);
-
-        if(auto *instObj = dynamic_cast<InstanceObject *>(val.toObject())) {
-            const Value v = vmState.reg(memberReg(inst));
-            VM_ASSERT(v.isString(), &vmState);
-            const auto tmp = instObj->getProp(vmState.rt.atomTable.intern(*v.toString()));
-            vmState.reg(dst(inst), tmp);
-            return;
+        const String &name = *vmState.reg(memberReg(inst)).toString();
+        if(val.isObject()) {
+            if(auto *instObj = dynamic_cast<InstanceObject *>(val.toObject())) {
+                const auto tmp = instObj->getProp(vmState.rt.atomTable.intern(name));
+                vmState.reg(dst(inst), tmp);
+                return;
+            }
+        }
+        const TypeId tId = ValueToTypeId::getId(val);
+        assert(tId != TypeId::None);
+        NativeFunction *nativeFn{};
+        switch(tId) {
+            case TypeId::Object:
+                nativeFn = vmState.context.findMethod<Object>(name, false);
+                break;
+            case TypeId::Integer:
+                nativeFn = vmState.context.findMethod<Integer>(name, false);
+                break;
+            case TypeId::Real:
+                nativeFn = vmState.context.findMethod<Real>(name, false);
+                break;
+            case TypeId::Octet:
+                nativeFn = vmState.context.findMethod<Octet>(name, false);
+                break;
+            case TypeId::String:
+                nativeFn = vmState.context.findMethod<String>(name, false);
+                break;
+                // case TypeId::Array:
+                //     nativeFn = vmState.context.findMethod<Array>(name, false);
+                //     break;
+                // case TypeId::Dictionary:
+                //     nativeFn = vmState.context.findMethod<Dictionary>(name, false);
+                //     break;
+                // case TypeId::Exception:
+                //     nativeFn = vmState.context.findMethod<Exception>(name, false);
+                //     break;
+                // case TypeId::Date:
+                //     nativeFn = vmState.context.findMethod<Date>(name, false);
+                //     break;
+                // case TypeId::Math:
+                //     nativeFn = vmState.context.findMethod<Math>(name, false);
+                //     break;
+                // case TypeId::RegExp:
+                //     nativeFn = vmState.context.findMethod<RegExp>(name, false);
+                //     break;
         }
 
-        // maybe is static method
-        // if(const auto *klass = dynamic_cast<ClassObject *>(instObj.toObject())) {
-        //     if(auto *fun = klass->getMethod(name)) {
-        //         vmState.reg(dst(inst), Value{ fun });
-        //         return;
-        //     }
-        // }
-
-        // not found return void
-        vmState.reg(dst(inst), Value{});
+        assert(nativeFn != nullptr);
+        nativeFn->setThisObj(val);
+        vmState.reg(dst(inst), Value{ nativeFn });
     }
 
     const String *SProp::name(const Instruction &inst, const VMState &vmState) {

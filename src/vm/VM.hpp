@@ -22,10 +22,6 @@
 
 #include "types/Value.hpp"
 
-namespace Cial::Bytecode {
-    class VMState;
-} // namespace Cial::Bytecode
-
 namespace Cial {
 
     template <typename T>
@@ -86,7 +82,6 @@ namespace Cial {
 
     template <typename T>
     struct HandleConvert<T *> : HandleConvert<Object *> {
-
         static T *fromValue(const Value &v) { return dynamic_cast<T *>(v.toObject()); }
     };
 
@@ -123,6 +118,11 @@ namespace Cial {
         };
 
         explicit VM(Bytecode::VMState *vmState) : _vmState(vmState) {}
+
+        template <typename T, typename... Args>
+        T *create(Args &&...args) {
+            return _vmState->rt.create<T>(std::forward<Args>(args)...);
+        }
 
         template <typename T>
         Handle<T> getGlobal(const String &name) const {

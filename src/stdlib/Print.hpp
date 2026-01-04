@@ -9,16 +9,12 @@
 //                                                            /\____
 //                                                            \_/__/
 //
-
-//
-// Created by LiDon on 2025/9/29.
-//
 #pragma once
 
 #include "types/Function.hpp"
 
 namespace Cial::StdLib {
-    static NativeFunction S_PrintFunction{ [](Value val) { fmt::print("{}", val); } };
+    static NativeFunction S_PrintFunction{ [](VM *, const Value &, Value val) { fmt::print("{}", val); } };
 
-    static NativeFunction S_PrintlnFunction{ [](Value val) { fmt::println("{}", val); } };
+    static NativeFunction S_PrintlnFunction{ [](VM *, const Value &, Value val) { fmt::println("{}", val); } };
 } // namespace Cial::StdLib

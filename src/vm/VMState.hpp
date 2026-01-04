@@ -17,7 +17,6 @@
 
 #include "Chunk.hpp"
 #include "FastRegisterPool.hpp"
-#include "gen/IRGenerator.hpp"
 #include "runtime/Context.hpp"
 #include "runtime/Runtime.hpp"
 
