@@ -20,7 +20,7 @@
 #include "vm/Label.hpp"
 #include "vm/Register.hpp"
 
-namespace Cial::Inter {
+namespace cial::Inter {
 
     class IRGenerator {
 
@@ -148,4 +148,4 @@ namespace Cial::Inter {
             _sourceFile.error(r, message, location);
         }
     };
-} // namespace Cial::Inter
+} // namespace cial::Inter

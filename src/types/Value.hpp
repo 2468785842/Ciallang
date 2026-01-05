@@ -18,7 +18,7 @@
 
 #include "Real.hpp"
 
-namespace Cial {
+namespace cial {
     class Value {
 
     public:
@@ -106,8 +106,8 @@ namespace Cial {
         friend std::ostream &operator<<(std::ostream &os, const Value &d);
     };
 
-} // namespace Cial
+} // namespace cial
 
 // support fmt::format
 template <>
-struct fmt::formatter<Cial::Value> : ostream_formatter {};
+struct fmt::formatter<cial::Value> : ostream_formatter {};

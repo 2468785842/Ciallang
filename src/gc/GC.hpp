@@ -15,7 +15,7 @@
 
 #include <functional>
 
-namespace Cial {
+namespace cial {
 
     class RefCountHeader {
 
@@ -106,4 +106,4 @@ namespace Cial {
         }
     };
 
-} // namespace Cial
+} // namespace cial

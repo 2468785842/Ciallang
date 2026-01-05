@@ -16,7 +16,7 @@
 #include "String.hpp"
 #include "logging/Logger.hpp"
 
-namespace Cial {
+namespace cial {
 
     Value::Value(const Integer value) : _value{ ._integer = value }, _type(ValueType::Integer) {}
 
@@ -247,4 +247,4 @@ namespace Cial {
         }
         return os << "unknown";
     }
-} // namespace Cial
+} // namespace cial

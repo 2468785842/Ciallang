@@ -19,7 +19,7 @@
 #include "common/SourceFile.hpp"
 #include "runtime/Runtime.hpp"
 
-namespace Cial::Syntax {
+namespace cial::Syntax {
 
     class Lexer {
     public:
@@ -186,4 +186,4 @@ namespace Cial::Syntax {
             }
         }
     };
-} // namespace Cial::Syntax
+} // namespace cial::Syntax

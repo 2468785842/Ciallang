@@ -20,7 +20,7 @@
 #include <vector>
 #include "Result.hpp"
 
-namespace Cial::Common {
+namespace cial::Common {
     using SourceFileRangeType = std::pair<size_t, size_t>;
 
     struct SourceFileRangeCompareType {
@@ -96,4 +96,4 @@ namespace Cial::Common {
         std::map<size_t, SourceFileLineType *> _linesByNumber{};
         std::map<SourceFileRangeType, SourceFileLineType, SourceFileRangeCompareType> _linesByIndexRange{};
     };
-} // namespace Cial::Common
+} // namespace cial::Common

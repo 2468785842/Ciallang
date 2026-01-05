@@ -8,30 +8,19 @@
 #include "runtime/Runtime.hpp"
 #include "types/Function.hpp"
 
-namespace Cial {
-
-#define TYPE_ID_PAIR_ENUMS(X)                                                                                          \
-    X(Integer, "Integer")                                                                                              \
-    X(Real, "Real")                                                                                                    \
-    X(Object, "Object")                                                                                                \
-    X(Octet, "Octet")                                                                                                  \
-    X(String, "String")                                                                                                \
-    X(Array, "Array")                                                                                                  \
-    X(Dictionary, "Dictionary")                                                                                        \
-    X(Exception, "Exception")                                                                                          \
-    X(Date, "Date")                                                                                                    \
-    X(Math, "Math")                                                                                                    \
-    X(RegExp, "RegExp")
+namespace cial {
 
     enum class TypeId {
-#define TYPE_ID_ENUM_CLASS(O, N) O,
         None,
-        TYPE_ID_PAIR_ENUMS(TYPE_ID_ENUM_CLASS)
-#undef TYPE_ID_ENUM_CLASS
+        Integer,
+        Real,
+        Object,
+        Octet,
+        String,
     };
 
     template <typename T>
-    struct NativeTypeToTypeId {
+    struct TypeTraits {
         static constexpr TypeId id = [] {
             if constexpr(std::is_same_v<T, Integer>) {
                 return TypeId::Integer;
@@ -45,6 +34,7 @@ namespace Cial {
                 return TypeId::String;
             } else {
                 static_assert(!std::is_same_v<T, T> && "type is not support");
+                return TypeId::None;
             }
         }();
     };
@@ -52,61 +42,65 @@ namespace Cial {
     struct ValueToTypeId {
         static TypeId getId(const Value &v) {
             if(v.isInteger())
-                return NativeTypeToTypeId<Integer>::id;
+                return TypeTraits<Integer>::id;
             if(v.isReal())
-                return NativeTypeToTypeId<Real>::id;
+                return TypeTraits<Real>::id;
             if(v.isObject())
-                return NativeTypeToTypeId<Object>::id;
+                return TypeTraits<Object>::id;
             if(v.isOctet())
-                return NativeTypeToTypeId<Octet>::id;
+                return TypeTraits<Octet>::id;
             if(v.isString())
-                return NativeTypeToTypeId<String>::id;
+                return TypeTraits<String>::id;
             return TypeId::None;
         }
     };
 
     struct MethodTable {
-        Map<Atom, NativeFunction *> staticMethods; // 静态方法，如 Array.from()
-        Map<Atom, NativeFunction *> instanceMethods; // 实例方法，如 arr.push()
+        Map<Atom, NativeFunction *> instanceMethods; // instance method，like `arr.push()`
     };
 
     class NativeRegister {
     public:
         explicit NativeRegister(Runtime &rt) : _rt(rt) {}
 
-        template <typename T, typename Callable>
-        void registerMethod(const Atom name, Callable &&fn, const bool isStatic) {
-            const TypeId type = NativeTypeToTypeId<T>::id;
-            auto &[staticMethods, instanceMethods] = tables[type];
+        template <typename Callable>
+        void registerMethod(const TypeId typeId, const Atom name, Callable &&fn) {
+            auto &[instanceMethods] = tables[typeId];
             auto *nativeFn = _rt.create<NativeFunction>(std::forward<Callable>(fn));
-            if(isStatic) {
-                staticMethods[name] = nativeFn;
-            } else {
-                instanceMethods[name] = nativeFn;
-            }
+            instanceMethods[name] = nativeFn;
         }
 
         template <typename T, typename Callable>
-        void registerMethod(const String &name, Callable &&fn, const bool isStatic) {
-            const Atom a = _rt.atomTable.intern(name);
-            return registerMethod<T>(a, std::forward<Callable>(fn), isStatic);
+        void registerMethod(const Atom name, Callable &&fn) {
+            const TypeId type = TypeTraits<T>::id;
+            registerMethod(type, name, std::forward<Callable>(fn));
         }
 
-        template <typename T>
-        [[nodiscard]] NativeFunction *findMethod(const Atom name, const bool isStatic) const {
-            const TypeId type = NativeTypeToTypeId<T>::id;
-            const auto it = tables.find(type);
+        template <typename T, typename Callable>
+        void registerMethod(const String &name, Callable &&fn) {
+            const Atom a = _rt.atomTable.intern(name);
+            return registerMethod<T>(a, std::forward<Callable>(fn));
+        }
+
+        [[nodiscard]] NativeFunction *findMethod(const TypeId typeId, const Atom name) const {
+            const auto it = tables.find(typeId);
             if(it == tables.end())
                 return nullptr;
-            const auto &methods = isStatic ? it->second.staticMethods : it->second.instanceMethods;
-            const auto fnIt = methods.find(name);
-            return fnIt != methods.end() ? fnIt->second : nullptr;
+            const auto &[instanceMethods] = it->second;
+            const auto fnIt = instanceMethods.find(name);
+            return fnIt != instanceMethods.end() ? fnIt->second : nullptr;
         }
 
         template <typename T>
-        [[nodiscard]] NativeFunction *findMethod(const String &name, const bool isStatic) const {
+        [[nodiscard]] NativeFunction *findMethod(const Atom name) const {
+            const TypeId type = TypeTraits<T>::id;
+            return findMethod(type, name);
+        }
+
+        template <typename T>
+        [[nodiscard]] NativeFunction *findMethod(const String &name) const {
             const Atom a = _rt.atomTable.intern(name);
-            return findMethod<T>(a, isStatic);
+            return findMethod<T>(a);
         }
 
     private:
@@ -115,4 +109,4 @@ namespace Cial {
 
         friend class Context;
     };
-} // namespace Cial
+} // namespace cial

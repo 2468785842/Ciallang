@@ -11,7 +11,7 @@
 
 #include "types/Function.hpp"
 
-using namespace Cial;
+using namespace cial;
 
 TEST_CASE("函数声明 - 简单函数定义") {
     Runtime rt{};

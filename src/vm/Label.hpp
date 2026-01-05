@@ -15,7 +15,7 @@
 
 #include <fmt/ostream.h>
 
-namespace Cial::Bytecode {
+namespace cial::Bytecode {
     class [[nodiscard]] Label {
     public:
         explicit Label(const size_t address) : _address(address) {}
@@ -27,7 +27,7 @@ namespace Cial::Bytecode {
 
         friend std::ostream &operator<<(std::ostream &os, const Label &label) { return os << '@' << label._address; }
     };
-} // namespace Cial::Bytecode
+} // namespace cial::Bytecode
 
 template <>
-struct fmt::formatter<Cial::Bytecode::Label> : ostream_formatter {};
+struct fmt::formatter<cial::Bytecode::Label> : ostream_formatter {};

@@ -15,7 +15,7 @@
 #include "UTF8.hpp"
 #include <utf8proc.h>
 
-namespace Cial::Common {
+namespace cial::Common {
 
     bool isRuneDigit(const int32_t r) {
         if(r < 0x80) {
@@ -178,4 +178,4 @@ namespace Cial::Common {
 
         return cp;
     }
-} // namespace Cial::Common
+} // namespace cial::Common

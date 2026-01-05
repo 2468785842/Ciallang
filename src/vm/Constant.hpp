@@ -24,14 +24,14 @@
 #include "runtime/OctetTable.hpp"
 #include "types/Value.hpp"
 
-namespace Cial {
+namespace cial {
     class Runtime;
     namespace Bytecode {
         class Chunk;
     }
-} // namespace Cial
+} // namespace cial
 
-namespace Cial {
+namespace cial {
     class [[nodiscard]] ConstIdx {
     public:
         explicit ConstIdx(const size_t index) : _index(index) {}
@@ -246,7 +246,7 @@ namespace Cial {
         } _value; // Integer, Real or Atom(String Index)
     };
 
-} // namespace Cial
+} // namespace cial
 
 template <>
-struct fmt::formatter<Cial::ConstIdx> : ostream_formatter {};
+struct fmt::formatter<cial::ConstIdx> : ostream_formatter {};

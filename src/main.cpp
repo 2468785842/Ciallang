@@ -16,7 +16,7 @@
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
-using namespace Cial;
+using namespace cial;
 
 int main(int argc, char **argv) {
     if(argc < 2) {

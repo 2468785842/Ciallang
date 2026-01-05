@@ -27,10 +27,10 @@
 #define CLL_LOG_DEBUG(fmt, ...)
 #endif
 
-#define CLL_LOG_INFO(fmt, ...) ::Cial::logFmt(::Cial::Level::kInfo, fmt, ##__VA_ARGS__)
-#define CLL_LOG_WARN(fmt, ...) ::Cial::logFmt(::Cial::Level::kWarn, fmt, ##__VA_ARGS__)
-#define CLL_LOG_ERROR(fmt, ...) ::Cial::logFmt(::Cial::Level::kError, fmt, ##__VA_ARGS__)
-#define CLL_LOG_FATAL(fmt, ...) ::Cial::logFmt(::Cial::Level::kFatal, fmt, ##__VA_ARGS__)
+#define CLL_LOG_INFO(fmt, ...) ::cial::logFmt(::cial::Level::kInfo, fmt, ##__VA_ARGS__)
+#define CLL_LOG_WARN(fmt, ...) ::cial::logFmt(::cial::Level::kWarn, fmt, ##__VA_ARGS__)
+#define CLL_LOG_ERROR(fmt, ...) ::cial::logFmt(::cial::Level::kError, fmt, ##__VA_ARGS__)
+#define CLL_LOG_FATAL(fmt, ...) ::cial::logFmt(::cial::Level::kFatal, fmt, ##__VA_ARGS__)
 
 #if _DEBUG
 #define CLL_ASSERT(cond, fmt, ...)
@@ -38,13 +38,13 @@
 #define CLL_ASSERT(cond, fmt, ...)                                                                                     \
     do {                                                                                                               \
         if(!(cond)) {                                                                                                  \
-            ::Cial::assertFail(#cond, __FILE__, __LINE__, fmt, ##__VA_ARGS__);                                         \
+            ::cial::assertFail(#cond, __FILE__, __LINE__, fmt, ##__VA_ARGS__);                                         \
             std::abort();                                                                                              \
         }                                                                                                              \
     } while(false)
 #endif
 
-namespace Cial {
+namespace cial {
 
     enum class Level {
         kTrace = 0,
@@ -81,4 +81,4 @@ namespace Cial {
 
     void logFmt(Level level, const char *fmt, ...);
     void assertFail(const char *expr, const char *file, int line, const char *fmt, ...);
-} // namespace Cial
+} // namespace cial

@@ -16,7 +16,7 @@
 
 #include "common/Hash.hpp"
 
-namespace Cial {
+namespace cial {
 
     OctetIdx OctetTable::intern(const std::uint8_t *data, const std::uint32_t size) {
         if(size == 0)
@@ -62,4 +62,4 @@ namespace Cial {
         }
         return _octets[o.v];
     }
-} // namespace Cial
+} // namespace cial

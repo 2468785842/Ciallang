@@ -14,7 +14,7 @@
 #include "stdlib/Print.hpp"
 #include "vm/VMState.hpp"
 
-using namespace Cial;
+using namespace cial;
 
 TEST_CASE("集成测试 - 基本脚本解析") {
     SECTION("简单表达式解析") {

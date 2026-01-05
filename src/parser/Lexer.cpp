@@ -23,7 +23,7 @@
 
 #include <fmt/format.h>
 
-using namespace Cial::Syntax;
+using namespace cial::Syntax;
 
 std::multimap<std::int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
     // block comment, line comment

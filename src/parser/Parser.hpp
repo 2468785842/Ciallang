@@ -18,7 +18,7 @@
 #include "common/SourceFile.hpp"
 #include "parser/ast/AstBuilder.hpp"
 
-namespace Cial::Syntax {
+namespace cial::Syntax {
     using namespace Common;
 
     class Parser;
@@ -386,4 +386,4 @@ namespace Cial::Syntax {
           //            {TokenType::Question,         &S_ConditionalTernaryBinOpParser}, // cond ? expr : expr
           { TokenType::Dot, &S_MemberAccessBinOpParser },
           { TokenType::LParenthesis, &S_ProcCallInfixParser } });
-} // namespace Cial::Syntax
+} // namespace cial::Syntax

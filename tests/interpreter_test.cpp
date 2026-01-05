@@ -22,7 +22,7 @@
 
 #include "types/Function.hpp"
 
-using namespace Cial;
+using namespace cial;
 
 TEST_CASE("解释器 - Hello World") {
     Runtime rt{};

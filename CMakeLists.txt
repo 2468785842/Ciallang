@@ -49,8 +49,9 @@ set(SOURCE_FILES
         src/types/Value.cpp
         src/types/String.cpp
 
-        src/stdlib/Debug.cpp
         src/stdlib/NativeRegister.cpp
+        src/stdlib/Debug.cpp
+        src/stdlib/StringLib.cpp
 
         src/gc/GC.cpp
 

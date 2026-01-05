@@ -42,7 +42,7 @@
 * [ ] `try-catch`
 * [x] `function` 函数定义与调用
 * [ ] `property`
-* [x] `class` 继承未实现
+* [x] `class` // 继承未实现
 * [ ] `with`
 
 #### 数据类型
@@ -93,7 +93,7 @@
 * [ ] Date
 * [ ] Math
 * [ ] RegExp
-* [ ] String
+* [x] String // replace, split, 未实现，需要先实现RegExp和Array
 
 ## 编译与运行
 

@@ -16,7 +16,7 @@
 #include "runtime/AtomTable.hpp"
 #include "vm/Register.hpp"
 
-namespace Cial {
+namespace cial {
 
     struct LocalVariable {
         Atom identifier = ATOM_INVALID;
@@ -26,4 +26,4 @@ namespace Cial {
         // when (var.endPC > inst.pc) you can't use
         std::uint32_t endPC{}; // Invalid PC (scope ended)
     };
-} // namespace Cial
+} // namespace cial

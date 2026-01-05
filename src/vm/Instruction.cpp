@@ -22,7 +22,7 @@
 #include "types/Object.hpp"
 #include "vm/Register.hpp"
 
-namespace Cial::Bytecode::Op {
+namespace cial::Bytecode::Op {
 
     void Instruction::execute(const Instruction &inst, VMState &vmState) {
 #define HANDLE_OPCODE(OP)                                                                                              \
@@ -192,53 +192,19 @@ namespace Cial::Bytecode::Op {
     void GProp::execute(const Instruction &inst, const VMState &vmState) {
         const auto &val = vmState.reg(obj(inst));
         const String &name = *vmState.reg(memberReg(inst)).toString();
+        const Atom atom = vmState.rt.atomTable.intern(name);
         if(val.isObject()) {
             if(auto *instObj = dynamic_cast<InstanceObject *>(val.toObject())) {
-                const auto tmp = instObj->getProp(vmState.rt.atomTable.intern(name));
+                const auto tmp = instObj->getProp(atom);
                 vmState.reg(dst(inst), tmp);
                 return;
             }
         }
         const TypeId tId = ValueToTypeId::getId(val);
         assert(tId != TypeId::None);
-        NativeFunction *nativeFn{};
-        switch(tId) {
-            case TypeId::Object:
-                nativeFn = vmState.context.findMethod<Object>(name, false);
-                break;
-            case TypeId::Integer:
-                nativeFn = vmState.context.findMethod<Integer>(name, false);
-                break;
-            case TypeId::Real:
-                nativeFn = vmState.context.findMethod<Real>(name, false);
-                break;
-            case TypeId::Octet:
-                nativeFn = vmState.context.findMethod<Octet>(name, false);
-                break;
-            case TypeId::String:
-                nativeFn = vmState.context.findMethod<String>(name, false);
-                break;
-                // case TypeId::Array:
-                //     nativeFn = vmState.context.findMethod<Array>(name, false);
-                //     break;
-                // case TypeId::Dictionary:
-                //     nativeFn = vmState.context.findMethod<Dictionary>(name, false);
-                //     break;
-                // case TypeId::Exception:
-                //     nativeFn = vmState.context.findMethod<Exception>(name, false);
-                //     break;
-                // case TypeId::Date:
-                //     nativeFn = vmState.context.findMethod<Date>(name, false);
-                //     break;
-                // case TypeId::Math:
-                //     nativeFn = vmState.context.findMethod<Math>(name, false);
-                //     break;
-                // case TypeId::RegExp:
-                //     nativeFn = vmState.context.findMethod<RegExp>(name, false);
-                //     break;
-        }
-
+        NativeFunction *nativeFn = vmState.context.findMethod(tId, atom);
         assert(nativeFn != nullptr);
+        nativeFn = vmState.rt.create<NativeFunction>(*nativeFn);
         nativeFn->setThisObj(val);
         vmState.reg(dst(inst), Value{ nativeFn });
     }
@@ -474,4 +440,4 @@ namespace Cial::Bytecode::Op {
         return fmt::format("{: <10} {}", "ret", retReg(inst));
     }
 
-} // namespace Cial::Bytecode::Op
+} // namespace cial::Bytecode::Op

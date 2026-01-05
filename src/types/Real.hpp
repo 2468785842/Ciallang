@@ -30,7 +30,7 @@
 // +-+-----------+---------------------------+
 // s = sign,  negative if this is 1, otherwise positive.
 
-namespace Cial {
+namespace cial {
 
     // Concepts for IEEE floating point operations
     template <typename T>
@@ -157,4 +157,4 @@ namespace Cial {
         std::uint64_t _bits{ 0 };
     };
 
-} // namespace Cial
+} // namespace cial

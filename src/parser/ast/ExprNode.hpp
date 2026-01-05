@@ -17,7 +17,7 @@
 #include "gen/IRGenerator.hpp"
 #include "parser/Token.hpp"
 
-namespace Cial::Syntax {
+namespace cial::Syntax {
     class ExprNode : public AstNode {
     protected:
         using AstNode::AstNode;
@@ -129,4 +129,4 @@ namespace Cial::Syntax {
             return gen->generate(this, retReg);
         }
     };
-} // namespace Cial::Syntax
+} // namespace cial::Syntax

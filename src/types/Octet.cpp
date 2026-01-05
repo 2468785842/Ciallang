@@ -12,7 +12,7 @@
 
 #include "Octet.hpp"
 
-namespace Cial {
+namespace cial {
     Octet::Octet(const std::uint8_t *src, std::uint32_t size) {
         _size = size;
         _buf = new std::uint8_t[_size];
@@ -40,4 +40,4 @@ namespace Cial {
         }
     }
 
-} // namespace Cial
+} // namespace cial

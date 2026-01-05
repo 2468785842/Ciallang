@@ -19,7 +19,7 @@
 #include "parser/ast/ExprNode.hpp"
 #include "parser/ast/StmtNode.hpp"
 
-namespace Cial::Syntax {
+namespace cial::Syntax {
     using namespace Common;
 
     static ExprNode *createExpressionNode(Result &r, Parser *parser) {
@@ -871,4 +871,4 @@ namespace Cial::Syntax {
 
         return expr;
     }
-} // namespace Cial::Syntax
+} // namespace cial::Syntax

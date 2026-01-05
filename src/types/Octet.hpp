@@ -14,7 +14,7 @@
 
 #include "gc/GC.hpp"
 
-namespace Cial {
+namespace cial {
     class Octet final : public RefCountHeader {
     public:
         explicit Octet(const std::uint8_t *src, std::uint32_t size);
@@ -39,4 +39,4 @@ namespace Cial {
     };
 
 
-} // namespace Cial
+} // namespace cial

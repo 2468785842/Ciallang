@@ -16,7 +16,7 @@
 
 #include "vm/VMState.hpp"
 
-namespace Cial {
+namespace cial {
     void InstanceObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
 
     Value InstanceObject::getProp(const Atom a) {
@@ -56,4 +56,4 @@ namespace Cial {
         throw std::runtime_error("Not implemented InstanceObject call");
     }
 
-} // namespace Cial
+} // namespace cial

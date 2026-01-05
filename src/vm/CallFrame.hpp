@@ -18,7 +18,7 @@
 
 #include "types/Value.hpp"
 
-namespace Cial {
+namespace cial {
     struct CallFrame {
         Bytecode::Chunk *chunk{};
         FuncMeta *funcMeta{}; // funcMeta != nullptr is function call
@@ -61,6 +61,8 @@ namespace Cial {
             }
         }
 
+        [[nodiscard]] Value *getArgs(const size_t argCount) const { return _pool->ptrAt(_pool->used() - argCount); }
+
         [[nodiscard]] Value &getReg(const Bytecode::Register reg) { return *_pool->ptrAt(_sp + reg.index()); }
 
         [[nodiscard]] const Value &getReg(const Bytecode::Register reg) const {
@@ -72,4 +74,4 @@ namespace Cial {
         Bytecode::FastRegisterPool *_pool{ nullptr };
         std::uint64_t _sp{};
     };
-} // namespace Cial
+} // namespace cial

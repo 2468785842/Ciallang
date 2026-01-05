@@ -18,7 +18,7 @@
 #include "common/Hash.hpp"
 #include "logging/Logger.hpp"
 
-namespace Cial {
+namespace cial {
 
     Atom AtomTable::intern(const String &str) { return intern(nullptr, str.getData(), str.length()); }
 
@@ -63,10 +63,10 @@ namespace Cial {
     }
 
     AtomEntry *AtomTable::get(const Atom a) const {
-        if(a.v == ATOM_INVALID.v || a.v >= _atoms.size()) {
+        if(a.v >= _atoms.size()) {
             CLL_LOG_WARN("Atom str not found in cache");
             return nullptr;
         }
         return _atoms[a.v];
     }
-} // namespace Cial
+} // namespace cial

@@ -4,4 +4,4 @@
 
 #include "NativeRegister.hpp"
 
-namespace Cial {} // namespace Cial
+namespace cial {} // namespace cial

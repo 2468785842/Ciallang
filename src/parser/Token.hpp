@@ -25,7 +25,7 @@
 #include "types/Value.hpp"
 #include "vm/Chunk.hpp"
 
-namespace Cial::Syntax {
+namespace cial::Syntax {
     using namespace Common;
 #define TOKEN_SYMBOL_PAIR_ENUM(X)                                                                                      \
     X(Invalid, "invalid")                                                                                              \
@@ -242,4 +242,4 @@ namespace Cial::Syntax {
             { TokenType::RArithShiftEqual, TokenType::RArithShift } // >>=
         });
     };
-} // namespace Cial::Syntax
+} // namespace cial::Syntax

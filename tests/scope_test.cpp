@@ -17,7 +17,7 @@
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
-using namespace Cial;
+using namespace cial;
 
 TEST_CASE("作用域 - 上层访问") {
     // NOTE: TJS2 doesn't support accessing local variables of parent functions

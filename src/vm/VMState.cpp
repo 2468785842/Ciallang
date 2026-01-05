@@ -17,7 +17,7 @@
 #include "common/Defer.hpp"
 #include "types/Class.hpp"
 
-namespace Cial::Bytecode {
+namespace cial::Bytecode {
 
     void VMState::runFlat() {
         const size_t sourceSP = _currentFrame->_sp;
@@ -121,4 +121,4 @@ namespace Cial::Bytecode {
         // TODO: check is exist
         return global(atom);
     }
-} // namespace Cial::Bytecode
+} // namespace cial::Bytecode

@@ -13,7 +13,7 @@
 #include "parser/ast/ExprNode.hpp"
 #include "parser/ast/StmtNode.hpp"
 
-using namespace Cial;
+using namespace cial;
 
 TEST_CASE("语句 - 变量声明语句") {
     Common::SourceFile sourceFile{};

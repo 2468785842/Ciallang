@@ -24,7 +24,7 @@
 
 #include "vm/Register.hpp"
 
-namespace Cial::Bytecode {
+namespace cial::Bytecode {
     // enum class ContextType {
     //     TopLevel,
     //     Function,
@@ -135,4 +135,4 @@ namespace Cial::Bytecode {
         size_t &_stackTop{ context.stackTop }; // callFrame count
         bool _zf{ false };
     };
-} // namespace Cial::Bytecode
+} // namespace cial::Bytecode

@@ -21,7 +21,7 @@
 #include "logging/Logger.hpp"
 #include "parser/Token.hpp"
 
-namespace Cial {
+namespace cial {
     class AstFormatter final : public Syntax::AstNode::Visitor {
     public:
         explicit AstFormatter() = default;
@@ -324,4 +324,4 @@ namespace Cial {
         }
     };
 
-} // namespace Cial
+} // namespace cial

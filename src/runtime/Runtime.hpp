@@ -20,7 +20,7 @@
 
 #include "gc/GC.hpp"
 
-namespace Cial {
+namespace cial {
     namespace Inter {
         class IRGenerator;
     }
@@ -92,4 +92,4 @@ namespace Cial {
             return allocate<T>(std::forward<Args>(args)...);
         }
     };
-} // namespace Cial
+} // namespace cial

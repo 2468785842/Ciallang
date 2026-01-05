@@ -7,7 +7,7 @@
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
-using namespace Cial;
+using namespace cial;
 
 TEST_CASE("循环 - 执行") {
     Runtime rt{};

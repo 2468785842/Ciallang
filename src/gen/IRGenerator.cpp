@@ -23,7 +23,7 @@
 #include "logging/Logger.hpp"
 #include "vm/Instruction.hpp"
 
-namespace Cial::Inter {
+namespace cial::Inter {
 
     Opt<Bytecode::Chunk> IRGenerator::parseAst(const Common::Result &r, const Syntax::AstNode *node, OptReg &retReg) {
         _r = r;
@@ -603,4 +603,4 @@ namespace Cial::Inter {
         return _empty.value();
     }
 
-} // namespace Cial::Inter
+} // namespace cial::Inter

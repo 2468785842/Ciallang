@@ -17,7 +17,7 @@
 
 #include "Instruction.hpp"
 
-namespace Cial::Bytecode {
+namespace cial::Bytecode {
 
     class Chunk : public MarkSweepHeader {
     public:
@@ -104,4 +104,4 @@ namespace Cial::Bytecode {
         Vec<Constant> _constants{};
         std::uint32_t _registerCount{ 0 };
     };
-} // namespace Cial::Bytecode
+} // namespace cial::Bytecode

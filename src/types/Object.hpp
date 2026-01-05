@@ -15,12 +15,12 @@
 #include "gc/GC.hpp"
 #include "runtime/AtomTable.hpp"
 
-namespace Cial::Bytecode {
+namespace cial::Bytecode {
     class VMState;
     class Register;
-} // namespace Cial::Bytecode
+} // namespace cial::Bytecode
 
-namespace Cial {
+namespace cial {
     class Object : public MarkSweepHeader {
         friend class Context;
 
@@ -50,4 +50,4 @@ namespace Cial {
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
     };
 
-} // namespace Cial
+} // namespace cial

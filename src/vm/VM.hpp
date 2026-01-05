@@ -22,7 +22,7 @@
 
 #include "types/Value.hpp"
 
-namespace Cial {
+namespace cial {
 
     template <typename T>
     struct HandleConvert;
@@ -103,7 +103,7 @@ namespace Cial {
 
             T operator*() const { return get(); }
 
-            T *operator->() {
+            auto operator->() {
                 if constexpr(std::is_same_v<T, Value>) {
                     return &_value;
                 } else if constexpr(std::is_pointer_v<T>) {
@@ -262,4 +262,4 @@ namespace Cial {
         Bytecode::VMState *_vmState;
     };
 
-} // namespace Cial
+} // namespace cial

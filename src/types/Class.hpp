@@ -17,13 +17,13 @@
 #include "Value.hpp"
 #include "vm/VMState.hpp"
 
-namespace Cial {
+namespace cial {
 
     class ClassObject final : public Object {
     public:
         ClassMeta *meta;
 
-        explicit ClassObject(ClassMeta *classMeta) : Object(classMeta->className), meta(classMeta) {}
+        explicit ClassObject(ClassMeta *classMeta) : meta(classMeta) {}
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
@@ -58,4 +58,4 @@ namespace Cial {
         ClassObject *_class{ nullptr };
         Map<Atom, Value> _props{};
     };
-} // namespace Cial
+} // namespace cial

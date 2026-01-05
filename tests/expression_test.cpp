@@ -9,7 +9,7 @@
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
-using namespace Cial;
+using namespace cial;
 
 TEST_CASE("表达式 - 字面量表达式") {
     Runtime rt{};

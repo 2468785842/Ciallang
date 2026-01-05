@@ -22,7 +22,7 @@
 #include "types/String.hpp"
 #include "types/Types.hpp"
 
-namespace Cial {
+namespace cial {
     class Runtime;
 
     struct Atom {
@@ -32,6 +32,7 @@ namespace Cial {
     };
 
     static constexpr Atom ATOM_INVALID{};
+    static constexpr Atom ATOM_OBJECT{};
     static constexpr Atom ATOM_FUNCTION{};
 
     struct AtomEntry : MarkSweepHeader {
@@ -48,7 +49,8 @@ namespace Cial {
     class AtomTable {
     public:
         explicit AtomTable() {
-            _atoms.push_back(nullptr); // Reserve index 0 as invalid
+            _atoms.push_back(new AtomEntry{ 0, 0, new String{} }); // Reserve index 0 as invalid
+            intern("Object"_str); // ATOM_OBJECT
             intern("Function"_str); // ATOM_FUNCTION
         }
 
@@ -73,9 +75,9 @@ namespace Cial {
         Map<std::uint64_t, std::vector<Atom>> _map{}; // key to list of Atoms for collision handling
     };
 
-} // namespace Cial
+} // namespace cial
 
 template <>
-struct std::hash<Cial::Atom> {
-    size_t operator()(const Cial::Atom v) const noexcept { return v.v; }
+struct std::hash<cial::Atom> {
+    size_t operator()(const cial::Atom v) const noexcept { return v.v; }
 };

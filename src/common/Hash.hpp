@@ -16,7 +16,7 @@
 
 #include <cstdint>
 
-namespace Cial {
+namespace cial {
 
     inline std::uint32_t fnv1a(const char *s, const size_t len) {
         std::uint32_t h = 2166136261u;
@@ -26,4 +26,4 @@ namespace Cial {
         }
         return h;
     }
-} // namespace Cial
+} // namespace cial

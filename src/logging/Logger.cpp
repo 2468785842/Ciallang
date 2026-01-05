@@ -20,7 +20,7 @@
 #include <memory>
 #include <mutex>
 
-namespace Cial {
+namespace cial {
 
     namespace {
         std::map<std::string, LoggerFactory> &getRegistry() {
@@ -126,4 +126,4 @@ namespace Cial {
 
         CLL_LOG_FATAL("Assertion failed: (%s), file %s, line %d: %s", expr, file, line, msg.c_str());
     }
-} // namespace Cial
+} // namespace cial

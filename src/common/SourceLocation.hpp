@@ -16,7 +16,7 @@
 
 #include <cstdint>
 
-namespace Cial::Common {
+namespace cial::Common {
 
     struct LocationType {
         uint32_t line = 0;
@@ -46,4 +46,4 @@ namespace Cial::Common {
             return _start == sourceLocation._start && _end == sourceLocation._end;
         }
     };
-} // namespace Cial::Common
+} // namespace cial::Common

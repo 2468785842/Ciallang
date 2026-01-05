@@ -4,7 +4,9 @@
 
 #include "String.hpp"
 
-namespace Cial {
+#include "Value.hpp"
+
+namespace cial {
 
     String::String(const char *str, const std::uint32_t len) : _len(len) {
         char *buf = _shortStr;
@@ -40,4 +42,199 @@ namespace Cial {
         return *this;
     }
 
-} // namespace Cial
+    String formatString(const String &fmt, size_t paramCount, Value *params) {
+        std::string result;
+        const char *f = fmt.getData();
+        size_t in = 0;
+
+        while(*f) {
+            if(*f != '%') {
+                result += *f++;
+                continue;
+            }
+
+            f++; // skip '%'
+            if(!*f)
+                throw std::runtime_error("Invalid format string: ends with '%'");
+
+            // parse flags (only support '-', '+', '#', '0')
+            char flag = 0;
+            if(*f == '-' || *f == '+' || *f == '#' || *f == '0') {
+                flag = *f++;
+            }
+
+            // parse width
+            Integer width = 0;
+            if(*f == '*') {
+                if(in >= paramCount)
+                    throw std::runtime_error("Insufficient format parameters");
+                width = params[in++].toInteger();
+                f++;
+            } else {
+                while(*f >= '0' && *f <= '9') {
+                    width = width * 10 + (*f - '0');
+                    f++;
+                }
+            }
+
+            // parse precision
+            Integer prec = -1;
+            if(*f == '.') {
+                f++;
+                if(*f == '*') {
+                    if(in >= paramCount)
+                        throw std::runtime_error("Insufficient format parameters");
+                    prec = params[in++].toInteger();
+                    f++;
+                } else {
+                    prec = 0;
+                    while(*f >= '0' && *f <= '9') {
+                        prec = prec * 10 + (*f - '0');
+                        f++;
+                    }
+                }
+            }
+
+            // type
+            char type = *f++;
+            char buffer[1024] = {};
+
+            switch(type) {
+                case '%':
+                    result += '%';
+                    break;
+
+                case 'c': {
+                    if(in >= paramCount)
+                        throw std::runtime_error("Insufficient parameters for %c");
+                    char ch = static_cast<char>(params[in++].toInteger());
+                    result += ch;
+                    break;
+                }
+
+                case 's': {
+                    if(in >= paramCount)
+                        throw std::runtime_error("Insufficient parameters for %s");
+                    if(String *str = params[in++].toString()) {
+                        const char *sdata = str->getData();
+                        size_t sLen = str->length();
+
+                        if(size_t len =
+                               prec >= 0 && static_cast<size_t>(prec) < sLen ? static_cast<size_t>(prec) : sLen;
+                           width > 0 && static_cast<int>(len) < width) {
+                            Integer pad = width - static_cast<int>(len);
+                            if(flag == '-') {
+                                result.append(sdata, len);
+                                result.append(pad, ' ');
+                            } else {
+                                result.append(pad, ' ');
+                                result.append(sdata, len);
+                            }
+                        } else {
+                            result.append(sdata, len);
+                        }
+                    }
+                    break;
+                }
+
+                case 'd':
+                case 'i':
+                case 'u':
+                case 'o':
+                case 'x':
+                case 'X': {
+                    if(in >= paramCount)
+                        throw std::runtime_error("Insufficient parameters for integer format");
+                    long long val = params[in++].toInteger();
+                    char fmtBuf[16];
+                    if(prec >= 0)
+                        std::snprintf(fmtBuf, sizeof(fmtBuf), "%%.%lldd", prec);
+                    else
+                        std::snprintf(fmtBuf, sizeof(fmtBuf), "%%d");
+                    std::snprintf(buffer, sizeof(buffer), fmtBuf, val);
+                    result += buffer;
+                    break;
+                }
+
+                case 'f':
+                case 'e':
+                case 'g':
+                case 'F':
+                case 'E':
+                case 'G': {
+                    if(in >= paramCount)
+                        throw std::runtime_error("Insufficient parameters for float format");
+                    double val = params[in++].toReal().value();
+                    char fmtBuf[16];
+                    if(prec >= 0)
+                        std::snprintf(fmtBuf, sizeof(fmtBuf), "%%.%lld%c", prec, type);
+                    else
+                        std::snprintf(fmtBuf, sizeof(fmtBuf), "%%%c", type);
+                    std::snprintf(buffer, sizeof(buffer), fmtBuf, val);
+                    result += buffer;
+                    break;
+                }
+
+                default:
+                    throw std::runtime_error("Unsupported format type");
+            }
+        }
+
+        return String(result.c_str(), static_cast<std::uint32_t>(result.size()));
+    }
+
+    String String::escapeBackSlash() const {
+        std::string ret;
+        ret.reserve(_len * 2); // 预分配，避免频繁扩容
+
+        auto appendHex = [&](const std::uint8_t c) {
+            char buf[5]; // \xHH\0
+            std::snprintf(buf, sizeof(buf), "\\x%02x", c);
+            ret += buf;
+        };
+
+        for(std::uint32_t i = 0; i < _len; ++i) {
+            switch(char c = getData()[i]) {
+                case '\a':
+                    ret += "\\a";
+                    break;
+                case '\b':
+                    ret += "\\b";
+                    break;
+                case '\f':
+                    ret += "\\f";
+                    break;
+                case '\n':
+                    ret += "\\n";
+                    break;
+                case '\r':
+                    ret += "\\r";
+                    break;
+                case '\t':
+                    ret += "\\t";
+                    break;
+                case '\v':
+                    ret += "\\v";
+                    break;
+                case '\\':
+                    ret += "\\\\";
+                    break;
+                case '\'':
+                    ret += "\\'";
+                    break;
+                case '\"':
+                    ret += "\\\"";
+                    break;
+                default:
+                    if(c < 0x20 || c > 0x7E) {
+                        appendHex(c); // 控制字符或不可打印字符
+                    } else {
+                        ret += c; // 普通字符直接添加
+                    }
+                    break;
+            }
+        }
+
+        return String(ret.c_str(), static_cast<std::uint32_t>(ret.size()));
+    }
+} // namespace cial

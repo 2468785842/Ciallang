@@ -8,7 +8,7 @@
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
-using namespace Cial;
+using namespace cial;
 
 TEST_CASE("OOP - 类声明与实例化") {
     Runtime rt{};

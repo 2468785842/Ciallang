@@ -19,7 +19,7 @@
 
 #include "SourceLocation.hpp"
 
-namespace Cial::Common {
+namespace cial::Common {
 
     class ResultMessage {
     public:
@@ -47,4 +47,4 @@ namespace Cial::Common {
     };
 
     using ResultMessageList = std::vector<ResultMessage>;
-} // namespace Cial::Common
+} // namespace cial::Common

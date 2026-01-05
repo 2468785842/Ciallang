@@ -16,7 +16,7 @@
 #include <optional>
 #include <vector>
 
-namespace Cial {
+namespace cial {
 
     enum class ValueType : std::uint8_t {
         Void, // empty
@@ -46,4 +46,4 @@ namespace Cial {
 
     template <typename T>
     using Box = std::unique_ptr<T>;
-} // namespace Cial
+} // namespace cial

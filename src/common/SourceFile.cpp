@@ -21,7 +21,7 @@
 #include "Defer.hpp"
 #include "UTF8.hpp"
 
-namespace Cial::Common {
+namespace cial::Common {
 
     void SourceFile::error(Result &r, const std::string &message, const SourceLocation &location) const {
         std::stringstream stream{ "" };
@@ -250,4 +250,4 @@ namespace Cial::Common {
             return nullptr;
         return &it->second;
     }
-} // namespace Cial::Common
+} // namespace cial::Common

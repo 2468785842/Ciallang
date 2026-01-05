@@ -20,7 +20,7 @@
 
 #include "logging/Logger.hpp"
 
-namespace Cial {
+namespace cial {
 
     void RefCountHeader::incRef() { ++_refCount; }
 
@@ -74,4 +74,4 @@ namespace Cial {
         return { used, total };
     }
 
-} // namespace Cial
+} // namespace cial

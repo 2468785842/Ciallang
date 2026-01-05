@@ -29,8 +29,9 @@
 #include "types/Value.hpp"
 
 #include "stdlib/NativeRegister.hpp"
+#include "stdlib/StringLib.hpp"
 
-namespace Cial {
+namespace cial {
 
     class Context {
     public:
@@ -48,14 +49,29 @@ namespace Cial {
 
         explicit Context(Runtime &rt) noexcept : rt(rt) {}
 
-        template <typename T, typename Callable>
-        void registerMethod(const String &name, Callable &&fn, const bool isStatic) {
-            return nativeRegister.registerMethod<T>(name, std::forward<Callable>(fn), isStatic);
+        void initNativeMethod() {
+            registerMethod<String>("charAt"_str, &StdLib::stringCharAt);
+            registerMethod<String>("indexOf"_str, &StdLib::stringIndexOf);
+            registerMethod<String>("toUpperCase"_str, &StdLib::stringToUpperCase);
+            registerMethod<String>("toLowerCase"_str, &StdLib::stringToLowerCase);
+            registerMethod<String>("substring"_str, &StdLib::stringSubstring);
+            registerMethod<String>("substr"_str, &StdLib::stringSubstring);
+            registerMethod<String>("sprintf"_str, &StdLib::stringSprintf);
+            // registerMethod<String>("replace"_str, &StdLib::stringReplace);
+            registerMethod<String>("escape"_str, &StdLib::stringEscape);
+            // registerMethod<String>("split"_str, &stringSplit);
+            registerMethod<String>("trim"_str, &StdLib::stringTrim);
+            registerMethod<String>("reverse"_str, &StdLib::stringReverse);
+            registerMethod<String>("repeat"_str, &StdLib::stringRepeat);
         }
 
-        template <typename T>
-        [[nodiscard]] NativeFunction *findMethod(const String &name, const bool isStatic) const {
-            return nativeRegister.findMethod<T>(name, isStatic);
+        template <typename T, typename Callable>
+        void registerMethod(const String &name, Callable &&fn) {
+            return nativeRegister.registerMethod<T>(name, std::forward<Callable>(fn));
+        }
+
+        [[nodiscard]] NativeFunction *findMethod(const TypeId typeId, const Atom a) const {
+            return nativeRegister.findMethod(typeId, a);
         }
 
         void registryGlobalFunc(const String &name, NativeFunction *func) noexcept {
@@ -66,10 +82,7 @@ namespace Cial {
         void collectMark() {
             rt.collectMark();
 
-            for(const auto &[staticMethods, instanceMethods] : nativeRegister.tables | std::views::values) {
-                for(const auto &method : staticMethods | std::views::values) {
-                    method->marked();
-                }
+            for(const auto &[instanceMethods] : nativeRegister.tables | std::views::values) {
                 for(const auto &method : instanceMethods | std::views::values) {
                     method->marked();
                 }
@@ -111,4 +124,4 @@ namespace Cial {
             }
         }
     };
-} // namespace Cial
+} // namespace cial

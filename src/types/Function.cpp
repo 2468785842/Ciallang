@@ -21,15 +21,14 @@
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
-namespace Cial {
+namespace cial {
 
     void Function::call(Bytecode::VMState &vmState, Bytecode::Register ret, const size_t argCount) {
-        const auto cnt = meta->arity - argCount;
+        const auto cnt = meta->arity > argCount ? meta->arity - argCount : 0;
         if(cnt > 0)
             vmState.pushVoid(cnt);
 
         vmState.allocCallFrame(meta, ret);
-        // Fast move Reg window ptr, WARING: reverse args
         auto *currentCallFrame = vmState.curFrame();
         currentCallFrame->thisObj = Value{ thisObj };
         vmState.run();
@@ -39,20 +38,18 @@ namespace Cial {
     }
 
     void NativeFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
-        const auto cnt = _arity - argCount;
+        const auto cnt = _arity > argCount ? _arity - argCount : 0;
         if(cnt > 0)
             vmState.pushVoid(cnt);
 
-        const size_t used = vmState.getRegPoolTop();
-        auto *curFrame = vmState.curFrame();
-        Value *args = &curFrame->getReg(Bytecode::Register{ used - argCount });
+        const auto *curFrame = vmState.curFrame();
         VM vm{ &vmState };
 
-        const auto &value = callProc(&vm, args);
+        const auto &value = callProc(&vm, argCount, curFrame->getArgs(cnt != 0 ? _arity : argCount));
 
         vmState.reg(ret, value);
 
         if(cnt > 0)
             vmState.pop(cnt);
     }
-} // namespace Cial
+} // namespace cial

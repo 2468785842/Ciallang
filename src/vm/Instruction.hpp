@@ -23,11 +23,11 @@
 
 #include "types/Value.hpp"
 
-namespace Cial::Bytecode {
+namespace cial::Bytecode {
     class VMState;
 }
 
-namespace Cial::Bytecode::Op {
+namespace cial::Bytecode::Op {
 
 #define OPCODE_ENUMS(O)                                                                                                \
     O(NOP)                                                                                                             \
@@ -572,4 +572,4 @@ namespace Cial::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Ret
 
-}; // namespace Cial::Bytecode::Op
+}; // namespace cial::Bytecode::Op

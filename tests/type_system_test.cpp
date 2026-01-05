@@ -15,12 +15,12 @@
 #include "types/Types.hpp"
 #include "types/Value.hpp"
 
-using namespace Cial;
+using namespace cial;
 
 TEST_CASE("Value - 基本类型创建") {
     SECTION("创建整数类型") {
-        Cial::Value value{ static_cast<Cial::Integer>(42) };
-        REQUIRE(value.type() == Cial::ValueType::Integer);
+        cial::Value value{ static_cast<cial::Integer>(42) };
+        REQUIRE(value.type() == cial::ValueType::Integer);
         REQUIRE(value.toInteger() == 42);
         REQUIRE(value.isInteger());
         REQUIRE_FALSE(value.isReal());
@@ -29,8 +29,8 @@ TEST_CASE("Value - 基本类型创建") {
     }
 
     SECTION("创建浮点数类型") {
-        Cial::Value value{ static_cast<Cial::Real>(3.14) };
-        REQUIRE(value.type() == Cial::ValueType::Real);
+        cial::Value value{ static_cast<cial::Real>(3.14) };
+        REQUIRE(value.type() == cial::ValueType::Real);
         REQUIRE(value.toReal() == Catch::Approx(3.14));
         REQUIRE(value.isReal());
         REQUIRE_FALSE(value.isInteger());
@@ -39,8 +39,8 @@ TEST_CASE("Value - 基本类型创建") {
     }
 
     SECTION("创建字符串类型") {
-        Cial::Value value = String::create("Hello World");
-        REQUIRE(value.type() == Cial::ValueType::String);
+        cial::Value value = String::create("Hello World");
+        REQUIRE(value.type() == cial::ValueType::String);
         REQUIRE(value.toString() != nullptr);
         REQUIRE(value.isString());
         REQUIRE_FALSE(value.isInteger());
@@ -49,8 +49,8 @@ TEST_CASE("Value - 基本类型创建") {
     }
 
     SECTION("创建Void类型") {
-        Cial::Value value;
-        REQUIRE(value.type() == Cial::ValueType::Void);
+        cial::Value value;
+        REQUIRE(value.type() == cial::ValueType::Void);
         REQUIRE(value.isVoid());
         REQUIRE_FALSE(value.isInteger());
         REQUIRE_FALSE(value.isReal());
@@ -61,49 +61,49 @@ TEST_CASE("Value - 基本类型创建") {
 
 TEST_CASE("Value - 类型转换") {
     SECTION("整数到浮点数转换") {
-        Cial::Value intValue{ static_cast<Cial::Integer>(42) };
+        cial::Value intValue{ static_cast<cial::Integer>(42) };
         REQUIRE(intValue.toInteger() == 42);
 
         // 转换为浮点数
-        Cial::Value realValue{ static_cast<Cial::Real>(intValue.toInteger() * 1.0) };
+        cial::Value realValue{ static_cast<cial::Real>(intValue.toInteger() * 1.0) };
         REQUIRE(realValue.toReal() == 42.0);
     }
 
     SECTION("浮点数到整数转换") {
-        Cial::Value realValue{ static_cast<Cial::Real>(3.99) };
+        cial::Value realValue{ static_cast<cial::Real>(3.99) };
         REQUIRE(realValue.toReal() == Catch::Approx(3.99));
 
         // 转换为整数（截断）
-        Cial::Value intValue{ static_cast<Cial::Integer>(realValue.toReal()) };
+        cial::Value intValue{ static_cast<cial::Integer>(realValue.toReal()) };
         REQUIRE(intValue.toInteger() == 3);
     }
 
     SECTION("字符串到整数转换") {
-        Cial::Value strValue = String::create("123");
+        cial::Value strValue = String::create("123");
         REQUIRE(strValue.toString() != nullptr);
 
         // 字符串解析为整数
         long long parsedInt = std::stoll(strValue.toString()->toStdStr());
-        Cial::Value intValue{ static_cast<Cial::Integer>(parsedInt) };
+        cial::Value intValue{ static_cast<cial::Integer>(parsedInt) };
         REQUIRE(intValue.toInteger() == 123);
     }
 
     SECTION("整数到字符串转换") {
-        Cial::Value intValue{ static_cast<Cial::Integer>(456) };
+        cial::Value intValue{ static_cast<cial::Integer>(456) };
         REQUIRE(intValue.toInteger() == 456);
 
         // 整数转换为字符串
         std::string str = std::to_string(intValue.toInteger());
-        Cial::Value strValue = String::create(str.c_str(), str.size());
+        cial::Value strValue = String::create(str.c_str(), str.size());
         REQUIRE(strValue.toString() != nullptr);
     }
 }
 
 TEST_CASE("Value - 比较操作") {
     SECTION("整数比较") {
-        Cial::Value value1{ static_cast<Cial::Integer>(10) };
-        Cial::Value value2{ static_cast<Cial::Integer>(20) };
-        Cial::Value value3{ static_cast<Cial::Integer>(10) };
+        cial::Value value1{ static_cast<cial::Integer>(10) };
+        cial::Value value2{ static_cast<cial::Integer>(20) };
+        cial::Value value3{ static_cast<cial::Integer>(10) };
 
         REQUIRE(value1.toInteger() < value2.toInteger());
         REQUIRE(value2.toInteger() > value1.toInteger());
@@ -111,9 +111,9 @@ TEST_CASE("Value - 比较操作") {
     }
 
     SECTION("浮点数比较") {
-        Cial::Value value1{ static_cast<Cial::Real>(1.5) };
-        Cial::Value value2{ static_cast<Cial::Real>(2.5) };
-        Cial::Value value3{ static_cast<Cial::Real>(1.5) };
+        cial::Value value1{ static_cast<cial::Real>(1.5) };
+        cial::Value value2{ static_cast<cial::Real>(2.5) };
+        cial::Value value3{ static_cast<cial::Real>(1.5) };
 
         REQUIRE(value1.toReal() < value2.toReal());
         REQUIRE(value2.toReal() > value1.toReal());
@@ -121,9 +121,9 @@ TEST_CASE("Value - 比较操作") {
     }
 
     SECTION("字符串比较") {
-        Cial::Value value1 = String::create("apple");
-        Cial::Value value2 = String::create("banana");
-        Cial::Value value3 = String::create("apple");
+        cial::Value value1 = String::create("apple");
+        cial::Value value2 = String::create("banana");
+        cial::Value value3 = String::create("apple");
 
         REQUIRE(value1.toString() != nullptr);
         REQUIRE(value2.toString() != nullptr);
@@ -133,37 +133,37 @@ TEST_CASE("Value - 比较操作") {
 
 TEST_CASE("Value - 算术运算") {
     SECTION("整数算术运算") {
-        Cial::Value a{ static_cast<Cial::Integer>(10) };
-        Cial::Value b{ static_cast<Cial::Integer>(5) };
+        cial::Value a{ static_cast<cial::Integer>(10) };
+        cial::Value b{ static_cast<cial::Integer>(5) };
 
         // 使用TjsValue的运算符
-        Cial::Value addResult = a + b;
+        cial::Value addResult = a + b;
         REQUIRE(addResult.toInteger() == 15);
 
-        Cial::Value subResult = a - b;
+        cial::Value subResult = a - b;
         REQUIRE(subResult.toInteger() == 5);
 
-        Cial::Value mulResult = a * b;
+        cial::Value mulResult = a * b;
         REQUIRE(mulResult.toInteger() == 50);
 
-        Cial::Value divResult = a / b;
+        cial::Value divResult = a / b;
         REQUIRE(divResult.toInteger() == 2);
     }
 
     SECTION("浮点数算术运算") {
-        Cial::Value a{ static_cast<Cial::Real>(10.5) };
-        Cial::Value b{ static_cast<Cial::Real>(2.5) };
+        cial::Value a{ static_cast<cial::Real>(10.5) };
+        cial::Value b{ static_cast<cial::Real>(2.5) };
 
-        Cial::Value addResult = a + b;
+        cial::Value addResult = a + b;
         REQUIRE(addResult.toReal() == Catch::Approx(13.0));
 
-        Cial::Value subResult = a - b;
+        cial::Value subResult = a - b;
         REQUIRE(subResult.toReal() == Catch::Approx(8.0));
 
-        Cial::Value mulResult = a * b;
+        cial::Value mulResult = a * b;
         REQUIRE(mulResult.toReal() == Catch::Approx(26.25));
 
-        Cial::Value divResult = a / b;
+        cial::Value divResult = a / b;
         REQUIRE(divResult.toReal() == Catch::Approx(4.2));
     }
 }

@@ -22,7 +22,7 @@
 #include "Chunk.hpp"
 #include "runtime/Runtime.hpp"
 
-namespace Cial {
+namespace cial {
 
     void FuncMeta::marked() noexcept {
         MarkSweepHeader::marked();
@@ -53,4 +53,4 @@ namespace Cial {
         }
         return Value{};
     }
-} // namespace Cial
+} // namespace cial

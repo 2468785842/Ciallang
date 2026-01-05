@@ -20,7 +20,7 @@
 #include "Value.hpp"
 #include "vm/Constant.hpp"
 
-namespace Cial {
+namespace cial {
     struct FuncMeta;
     class VM;
 
@@ -41,7 +41,7 @@ namespace Cial {
         }
     };
 
-    using NativeFn = std::function<Value(VM *vm, Value thisVal, Value *args)>;
+    using NativeFn = std::function<Value(VM *vm, Value thisVal, size_t argCount, Value *args)>;
 
     class NativeFunction final : public Object {
     public:
@@ -49,15 +49,21 @@ namespace Cial {
 
         NativeFunction(NativeFunction &&) = delete;
 
-        template <typename Callable>
-        explicit NativeFunction(Callable &&callable) :
-            Object(ATOM_FUNCTION),
-            _callback([callable = std::forward<Callable>(callable)](VM *vm, Value thisObj, Value *args) {
-                return NativeFunDetail::invoke_callable(callable, vm, thisObj, args);
-            }),
-            _arity(NativeFunDetail::function_traits<Callable>::arity) {}
+        NativeFunction(const NativeFunction &rhs) noexcept :
+            Object(ATOM_FUNCTION), _callback(rhs._callback), _arity(rhs._arity) {}
 
-        Value callProc(VM *vm, Value *args) const { return _callback(vm, _thisObj, args); }
+        template <typename Callable>
+            requires(!std::same_as<std::decay_t<Callable>, NativeFunction>)
+        explicit NativeFunction(Callable &&callable) :
+            Object(ATOM_FUNCTION), _callback([callable = std::forward<Callable>(callable)](
+                                                 VM *vm, Value thisObj, size_t argCount, Value *args) {
+                return NativeFunDetail::invokeCallable(callable, vm, thisObj, argCount, args);
+            }),
+            _arity(NativeFunDetail::NativeFunTraits<Callable>::arity) {}
+
+        Value callProc(VM *vm, const size_t argCount, Value *args) const {
+            return _callback(vm, _thisObj, argCount, args);
+        }
 
         void setThisObj(const Value &thisObj) { _thisObj = thisObj; }
 
@@ -74,7 +80,7 @@ namespace Cial {
     private:
         const NativeFn _callback;
         const size_t _arity;
-        Value _thisObj;
+        Value _thisObj{};
     };
 
-} // namespace Cial
+} // namespace cial

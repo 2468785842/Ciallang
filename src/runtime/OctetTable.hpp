@@ -18,7 +18,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace Cial {
+namespace cial {
 
     struct OctetIdx {
         std::uint64_t v;
@@ -58,10 +58,10 @@ namespace Cial {
         std::unordered_map<uint64_t, std::vector<OctetIdx>> _map; // key to list for collisions
     };
 
-} // namespace Cial
+} // namespace cial
 
 
 template <>
-struct std::hash<Cial::OctetIdx> {
-    size_t operator()(const Cial::OctetIdx v) const noexcept { return v.v; }
+struct std::hash<cial::OctetIdx> {
+    size_t operator()(const cial::OctetIdx v) const noexcept { return v.v; }
 };

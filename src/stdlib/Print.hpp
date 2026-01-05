@@ -13,8 +13,8 @@
 
 #include "types/Function.hpp"
 
-namespace Cial::StdLib {
-    static NativeFunction S_PrintFunction{ [](VM *, const Value &, Value val) { fmt::print("{}", val); } };
+namespace cial::StdLib {
+    static NativeFunction S_PrintFunction{ [](VM *, const Value &, size_t, Value val) { fmt::print("{}", val); } };
 
-    static NativeFunction S_PrintlnFunction{ [](VM *, const Value &, Value val) { fmt::println("{}", val); } };
-} // namespace Cial::StdLib
+    static NativeFunction S_PrintlnFunction{ [](VM *, const Value &, size_t, Value val) { fmt::println("{}", val); } };
+} // namespace cial::StdLib

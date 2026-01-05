@@ -14,7 +14,7 @@
 
 #include "Runtime.hpp"
 
-namespace Cial {
+namespace cial {
 
     void Runtime::addHandleVal(MarkSweepHeader *ptr) { handles.push_back(ptr); }
 
@@ -27,4 +27,4 @@ namespace Cial {
         }
     }
 
-} // namespace Cial
+} // namespace cial

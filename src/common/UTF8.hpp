@@ -17,7 +17,7 @@
 #include <cstdint>
 #include <string>
 
-namespace Cial::Common {
+namespace cial::Common {
 
     static constexpr int32_t runeInvalid = 0xfffd;
     static constexpr int32_t runeMax = 0x0010ffff;
@@ -75,4 +75,4 @@ namespace Cial::Common {
     int64_t utf8Strlen(const std::string &str);
 
     CodePointType utf8Decode(const char *str, size_t length);
-}; // namespace Cial::Common
+}; // namespace cial::Common
