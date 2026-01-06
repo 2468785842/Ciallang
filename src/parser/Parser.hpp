@@ -103,9 +103,9 @@ namespace cial::Syntax {
 
         DeclNode *parseDeclaration(Result &r);
 
-        ExprNode *parseExpression(Result &r, Precedence pre = Precedence::lowest);
+        ExprNode *parseExpression(Result &r, bool enableCommaExpr, Precedence pre = Precedence::lowest);
 
-        StmtNode *parseStatement(Result &r);
+        StmtNode *parseStatement(Result &r, bool enableCommaExpr);
 
         bool expect(Result &r, TokenType tokenType);
 
@@ -116,13 +116,13 @@ namespace cial::Syntax {
         AstBuilder _astBuilder{};
         SourceFile &_sourceFile;
 
-        Precedence nextInfixPrecedence();
+        Precedence nextInfixPrecedence(bool enableCommaExpr);
 
         static const DeclParser *declParserFor(TokenType type);
 
         static const StmtParser *stmtParserFor(TokenType type);
 
-        static const InfixParser *infixParserFor(TokenType type);
+        static const InfixParser *infixParserFor(TokenType type, bool enableCommaExpr);
 
         static const PrefixParser *prefixParserFor(TokenType type);
 
@@ -353,7 +353,7 @@ namespace cial::Syntax {
     static constinit ConditionalTernaryInfixParser S_ConditionalTernaryBinOpParser{};
 
     static constinit auto S_InfixParsers = frozen::make_unordered_map<TokenType, const InfixParser *>({
-        // { TokenType::Comma, &S_OrderBinOpParser }, // ,
+        { TokenType::Comma, &S_OrderBinOpParser }, // ,
         { TokenType::Swap, &S_AssignBinOpParser }, // <->
         { TokenType::Assignment, &S_AssignBinOpParser }, // =
         { TokenType::Plus, &S_SumSubBinOpInfixParser }, // "+"

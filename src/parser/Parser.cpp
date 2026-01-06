@@ -27,7 +27,7 @@ namespace cial::Syntax {
         if(!parser->expect(r, TokenType::LParenthesis))
             return nullptr;
 
-        const auto node = parser->parseExpression(r);
+        const auto node = parser->parseExpression(r, true);
 
         // expect ")"
         if(!parser->expect(r, TokenType::RParenthesis))
@@ -60,7 +60,7 @@ namespace cial::Syntax {
                     expectArgument = true;
                 } else {
                     // 解析表达式参数
-                    auto *expr = parser->parseExpression(r);
+                    auto *expr = parser->parseExpression(r, false);
                     if(!expr)
                         return false;
                     node->arguments.push_back(expr);
@@ -108,7 +108,7 @@ namespace cial::Syntax {
                 parser->consume();
                 Token assignmentToken{};
                 parser->current(assignmentToken);
-                expr = parser->parseExpression(r);
+                expr = parser->parseExpression(r, false);
                 if(!expr)
                     return false;
             }
@@ -195,10 +195,10 @@ namespace cial::Syntax {
      * 获取下一个Token优先级
      * @return Token优先级
      */
-    Precedence Parser::nextInfixPrecedence() {
+    Precedence Parser::nextInfixPrecedence(const bool enableCommaExpr) {
         if(lookAhead(0)) {
             const auto *token = tokens().front();
-            if(const auto infixParser = infixParserFor(token->type()))
+            if(const auto infixParser = infixParserFor(token->type(), enableCommaExpr))
                 return infixParser->precedence();
         }
         return Precedence::lowest;
@@ -261,14 +261,14 @@ namespace cial::Syntax {
             return declParser->parse(r, this, &token);
         }
 
-        if(const auto *stmt = parseStatement(r)) {
+        if(const auto *stmt = parseStatement(r, true)) {
             return _astBuilder.makeNode<StmtDeclNode>(stmt);
         }
 
         return nullptr;
     }
 
-    ExprNode *Parser::parseExpression(Result &r, const Precedence pre) {
+    ExprNode *Parser::parseExpression(Result &r, const bool enableCommaExpr, const Precedence pre) {
         Token token{};
         if(!consume(token))
             return nullptr;
@@ -288,11 +288,11 @@ namespace cial::Syntax {
         }
 
         // 中缀
-        while(pre < nextInfixPrecedence()) {
+        while(pre < nextInfixPrecedence(enableCommaExpr)) {
             if(!consume(token))
                 break;
 
-            const auto infixParser = infixParserFor(token.type());
+            const auto infixParser = infixParserFor(token.type(), enableCommaExpr);
             if(infixParser == nullptr) {
                 error(r, fmt::format("unable infix parse for token '{}' not found parser.", token.name()),
                       token.location);
@@ -315,7 +315,7 @@ namespace cial::Syntax {
      *      var b = a; <- parseStatement
      * }
      */
-    StmtNode *Parser::parseStatement(Result &r) {
+    StmtNode *Parser::parseStatement(Result &r, const bool enableCommaExpr) {
         Token token{};
 
         // just peek
@@ -329,7 +329,7 @@ namespace cial::Syntax {
 
         // maybe ExpressionStatement
 
-        if(const auto *expr = parseExpression(r)) {
+        if(const auto *expr = parseExpression(r, enableCommaExpr)) {
             auto *statementNode = _astBuilder.makeNode<ExprStmtNode>(expr);
             statementNode->location = expr->location;
 
@@ -368,7 +368,9 @@ namespace cial::Syntax {
      *
      * @return Token解析器
      */
-    const InfixParser *Parser::infixParserFor(const TokenType type) {
+    const InfixParser *Parser::infixParserFor(const TokenType type, const bool enableCommaExpr) {
+        if(!enableCommaExpr && type == TokenType::Comma)
+            return nullptr;
         const auto it = S_InfixParsers.find(type);
         return it != S_InfixParsers.end() ? it->second : nullptr;
     }
@@ -395,7 +397,7 @@ namespace cial::Syntax {
         ExprNode *rhs{};
         if(parser->peek(TokenType::Assignment)) {
             parser->consume();
-            rhs = parser->parseExpression(r);
+            rhs = parser->parseExpression(r, false);
 
             if(!rhs)
                 return nullptr;
@@ -442,8 +444,7 @@ namespace cial::Syntax {
             return nullptr;
         }
 
-        auto *body = dynamic_cast<BlockStmtNode *>(parser->parseStatement(r));
-
+        auto *body = dynamic_cast<BlockStmtNode *>(parser->parseStatement(r, true));
 
         if(!body)
             return nullptr;
@@ -525,7 +526,7 @@ namespace cial::Syntax {
         if(!test)
             return nullptr;
 
-        auto *body = parser->parseStatement(r);
+        auto *body = parser->parseStatement(r, true);
 
         if(!body)
             return nullptr;
@@ -547,7 +548,7 @@ namespace cial::Syntax {
             parser->current(elseToken);
             parser->consume();
 
-            auto *elseBody = parser->parseStatement(r);
+            auto *elseBody = parser->parseStatement(r, true);
 
             if(!elseBody)
                 return nullptr;
@@ -588,7 +589,7 @@ namespace cial::Syntax {
 
         while(parser->peek(TokenType::Case)) {
             parser->consume();
-            auto *node = parser->parseExpression(r);
+            auto *node = parser->parseExpression(r, true);
             if(!node) {
                 parser->error(r, "case expected expression", token->location);
                 return nullptr;
@@ -649,7 +650,7 @@ namespace cial::Syntax {
     }
 
     StmtNode *DoWhileStmtParser::parse(Result &r, Parser *parser, Token *token) const {
-        auto *body = parser->parseStatement(r);
+        auto *body = parser->parseStatement(r, true);
         if(!body)
             return nullptr;
 
@@ -679,7 +680,7 @@ namespace cial::Syntax {
 
         DeclNode *initDecl{ nullptr };
         if(!parser->peek(TokenType::SemiColon)) {
-            auto *expr = parser->parseExpression(r);
+            auto *expr = parser->parseExpression(r, true);
             if(!expr)
                 return nullptr;
             initDecl = parser->astBuilder()->makeNode<StmtDeclNode>(parser->astBuilder()->makeNode<ExprStmtNode>(expr));
@@ -689,7 +690,7 @@ namespace cial::Syntax {
 
         ExprNode *condExpr{ nullptr };
         if(!parser->peek(TokenType::SemiColon)) {
-            condExpr = parser->parseExpression(r);
+            condExpr = parser->parseExpression(r, true);
             if(!condExpr)
                 return nullptr;
         }
@@ -698,14 +699,14 @@ namespace cial::Syntax {
 
         ExprNode *stepExpr{ nullptr };
         if(!parser->peek(TokenType::RParenthesis)) {
-            stepExpr = parser->parseExpression(r);
+            stepExpr = parser->parseExpression(r, true);
             if(!stepExpr)
                 return nullptr;
         }
         if(!parser->expect(r, TokenType::RParenthesis))
             return nullptr;
 
-        auto *body = parser->parseStatement(r);
+        auto *body = parser->parseStatement(r, true);
         if(!body)
             return nullptr;
 
@@ -726,7 +727,7 @@ namespace cial::Syntax {
         if(!test)
             return nullptr;
 
-        auto *body = parser->parseStatement(r);
+        auto *body = parser->parseStatement(r, true);
         if(!body)
             return nullptr;
 
@@ -760,7 +761,7 @@ namespace cial::Syntax {
 
     StmtNode *ReturnStmtParser::parse(Result &r, Parser *parser, Token *token) const {
         if(!parser->peek(TokenType::SemiColon)) {
-            const auto expr = parser->parseExpression(r);
+            const auto expr = parser->parseExpression(r, true);
 
             if(!parser->expect(r, TokenType::SemiColon))
                 return nullptr;
@@ -786,7 +787,7 @@ namespace cial::Syntax {
         const auto associativePrecedence =
             static_cast<Precedence>(static_cast<uint8_t>(_precedence) - (_isRightAssociative ? 1 : 0));
 
-        const auto rhs = parser->parseExpression(r, associativePrecedence);
+        const auto rhs = parser->parseExpression(r, true, associativePrecedence);
         if(!rhs) {
             parser->error(r, "binary operator expects right-hand-side expression", token->location);
             return nullptr;
@@ -834,7 +835,7 @@ namespace cial::Syntax {
     }
 
     ExprNode *UnaryOperatorPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
-        const auto *rhs = parser->parseExpression(r, _precedence);
+        const auto *rhs = parser->parseExpression(r, true, _precedence);
         if(!rhs) {
             parser->error(r, "unary operator expects right-hand-side expression", token->location);
             return nullptr;
@@ -851,7 +852,7 @@ namespace cial::Syntax {
 
     ExprNode *ParenthesizedPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
         // 解析括号内的表达式
-        auto *expr = parser->parseExpression(r);
+        auto *expr = parser->parseExpression(r, true);
         if(!expr) {
             parser->error(r, "expected expression inside parentheses", token->location);
             return nullptr;
@@ -867,7 +868,7 @@ namespace cial::Syntax {
 
     ExprNode *ConditionalTernaryInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
 
-        const auto expr1 = parser->parseExpression(r);
+        const auto expr1 = parser->parseExpression(r, true);
         if(!expr1) {
             parser->error(r, "expected expression left", token->location);
             return nullptr;
@@ -877,7 +878,7 @@ namespace cial::Syntax {
             return nullptr;
         }
 
-        const auto expr2 = parser->parseExpression(r);
+        const auto expr2 = parser->parseExpression(r, true);
 
         if(!expr2) {
             parser->error(r, "expected expression right", token->location);

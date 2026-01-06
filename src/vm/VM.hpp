@@ -213,7 +213,7 @@ namespace cial {
 
             Syntax::Parser parser{ rt, sourceFile };
 
-            Syntax::ExprNode *node = parser.parseExpression(r);
+            Syntax::ExprNode *node = parser.parseExpression(r, true);
             assert(!r.isFailed());
 
             Inter::IRGenerator codeGen{ rt, sourceFile };
