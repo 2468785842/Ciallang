@@ -19,7 +19,7 @@
 
 using namespace cial;
 
-TEST_CASE("作用域 - 上层访问") {
+TEST_CASE("函数作用域 - 上层访问") {
     // NOTE: TJS2 doesn't support accessing local variables of parent functions
     Runtime rt{};
     Context context{ rt };
@@ -41,7 +41,28 @@ TEST_CASE("作用域 - 上层访问") {
     REQUIRE(*r == 5);
 }
 
-TEST_CASE("作用域 - 上下文静态变量访问") {
+TEST_CASE("函数作用域 - 初始化变量") {
+    // NOTE: TJS2 function default param value eval on `call` invoke time
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    const VM vm{ &vmState };
+    const auto r = vm.eval<Integer>(R"(
+        var a = 1;
+        function outer() {
+            var a = 10;
+            function inner(p1 = a) {
+               return p1;
+            }
+            a = 2;
+            return inner();
+        }
+        return outer();
+    )"_str);
+    REQUIRE(*r == 1);
+}
+
+TEST_CASE("类作用域 - 上下文静态变量访问") {
     Runtime rt{};
     Context context{ rt };
     Bytecode::VMState vmState{ context };

@@ -93,6 +93,8 @@ namespace cial::Inter {
 
         void generate(const Syntax::ReturnStmtNode *, OptReg &);
 
+        void generate(const Syntax::ConditionalTernaryExprNode *, OptReg &);
+
     private:
         Box<Bytecode::Chunk> _chunk = std::make_unique<Bytecode::Chunk>();
 

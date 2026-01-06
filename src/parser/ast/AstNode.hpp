@@ -61,6 +61,8 @@ namespace cial::Syntax {
 
     class ReturnStmtNode;
 
+    class ConditionalTernaryExprNode;
+
     class VarDeclNode;
 
     class FunctionDeclNode;
@@ -140,5 +142,7 @@ namespace cial::Syntax {
         virtual void visit(const ContinueStmtNode *) = 0;
 
         virtual void visit(const ReturnStmtNode *) = 0;
+
+        virtual void visit(const ConditionalTernaryExprNode *) = 0;
     };
 } // namespace cial::Syntax

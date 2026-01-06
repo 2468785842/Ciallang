@@ -871,4 +871,31 @@ namespace cial::Syntax {
 
         return expr;
     }
+
+    ExprNode *ConditionalTernaryInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
+
+        const auto expr1 = parser->parseExpression(r);
+        if(!expr1) {
+            parser->error(r, "expected expression left", token->location);
+            return nullptr;
+        }
+
+        if(!parser->expect(r, TokenType::Colon)) {
+            return nullptr;
+        }
+
+        const auto expr2 = parser->parseExpression(r);
+
+        if(!expr2) {
+            parser->error(r, "expected expression right", token->location);
+            return nullptr;
+        }
+
+        const auto ternaryExpr = parser->astBuilder()->makeNode<ConditionalTernaryExprNode>(lhs, expr1, expr2);
+        ternaryExpr->location = token->location;
+        ternaryExpr->location.end(expr2->location.end());
+        return ternaryExpr;
+    }
+
+
 } // namespace cial::Syntax

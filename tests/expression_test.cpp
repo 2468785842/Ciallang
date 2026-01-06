@@ -24,6 +24,28 @@ TEST_CASE("表达式 - 字面量表达式") {
     SECTION("字符串字面量") { REQUIRE(*(*vm.evalExpr<String *>(R"("hello world")"_str)) == "hello world"); }
 }
 
+TEST_CASE("表达式 - 顺序运算符") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval("var a, b, c;"_str);
+    REQUIRE(*vm.evalExpr<Integer>("c = (a = 1, b = 2)"_str) == 2);
+    REQUIRE(*vm.evalExpr<Integer>("c"_str) == 2);
+    REQUIRE(*vm.evalExpr<Integer>("a = 1, b = 2, c = 3"_str) == 3);
+}
+
+TEST_CASE("表达式 - 三元运算符") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval("var a;"_str);
+    REQUIRE(*vm.evalExpr<Integer>("a ? 2 : 4"_str) == 4);
+    REQUIRE(*vm.evalExpr<Integer>("a = 1"_str) == 1);
+    REQUIRE(*vm.evalExpr<Integer>("a ? 2 : 4"_str) == 2);
+}
+
 TEST_CASE("表达式 - 二元运算表达式") {
     Runtime rt{};
     Context context{ rt };

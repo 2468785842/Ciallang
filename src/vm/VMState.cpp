@@ -30,7 +30,7 @@ namespace cial::Bytecode {
         std::uint64_t &pc = _currentFrame->pc;
         const auto &instList = instructions();
         const size_t curStackTop = _stackTop;
-#define CLL_COMPUTED_GOTO
+// #define CLL_COMPUTED_GOTO
 #ifdef CLL_COMPUTED_GOTO
         // 标签数组
         static void *labels[] = {

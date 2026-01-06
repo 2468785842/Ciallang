@@ -330,6 +330,14 @@ namespace cial::Syntax {
         [[nodiscard]] Precedence precedence() const override { return Precedence::postfix; }
     };
 
+    struct ConditionalTernaryInfixParser final : InfixParser {
+        explicit ConditionalTernaryInfixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const override;
+
+        [[nodiscard]] Precedence precedence() const override { return Precedence::postfix; }
+    };
+
     static constinit BinaryOperatorInfixParser S_SumSubBinOpInfixParser{ Precedence::sum_sub, false },
         S_ProductBinOpParser{ Precedence::product, false }, S_AssignBinOpParser{ Precedence::assignment, true, true },
         S_BitwiseShiftOrRollBinOpParser{ Precedence::bitwise_shift_or_roll, false },
@@ -338,52 +346,55 @@ namespace cial::Syntax {
         S_BitwiseXorWithAssignBinOpParser{ Precedence::bitwise_xor, false, true },
         S_EqualityBinOpParser{ Precedence::equality, false }, S_RelationalBinOpParser{ Precedence::relational, false },
         S_LogicalOrBinOpParser{ Precedence::logical_or, false },
-        S_LogicalAndBinOpParser{ Precedence::logical_and, false },
+        S_LogicalAndBinOpParser{ Precedence::logical_and, false }, S_OrderBinOpParser{ Precedence::comma, false },
         S_MemberAccessBinOpParser{ Precedence::postfix, false };
 
     static constinit ProcCallInfixParser S_ProcCallInfixParser{};
+    static constinit ConditionalTernaryInfixParser S_ConditionalTernaryBinOpParser{};
 
-    static constinit auto S_InfixParsers = frozen::make_unordered_map<TokenType, const InfixParser *>(
-        { { TokenType::Swap, &S_AssignBinOpParser }, // <->
-          { TokenType::Assignment, &S_AssignBinOpParser }, // =
-          { TokenType::Plus, &S_SumSubBinOpInfixParser }, // "+"
-          { TokenType::PlusEqual, &S_AssignBinOpParser }, // "+="
-          { TokenType::Minus, &S_SumSubBinOpInfixParser }, // "-"
-          { TokenType::MinusEqual, &S_AssignBinOpParser }, // "-="
-          { TokenType::Slash, &S_ProductBinOpParser }, // "/" 除法结果为浮点数
-          { TokenType::SlashEqual, &S_AssignBinOpParser }, // "/="
-          { TokenType::Backslash, &S_ProductBinOpParser }, // "\" 除法结果直接截断为整数
-          { TokenType::BackslashEqual, &S_AssignBinOpParser }, // "\="
-          { TokenType::Percent, &S_ProductBinOpParser }, // "%"
-          { TokenType::PercentEqual, &S_AssignBinOpParser }, // "%="
-          { TokenType::Asterisk, &S_ProductBinOpParser }, // "*"
-          { TokenType::AsteriskEqual, &S_AssignBinOpParser }, // "*="
-          { TokenType::Exclamation, &S_ProductBinOpParser }, // !
-          { TokenType::LogicalAndEqual, &S_AssignBinOpParser }, // "&&="
-          { TokenType::LogicalOrEqual, &S_AssignBinOpParser }, // "||="
-          { TokenType::LArithShift, &S_BitwiseShiftOrRollBinOpParser }, // "<<"
-          { TokenType::LArithShiftEqual, &S_AssignBinOpParser }, // "<<="
-          { TokenType::RArithShift, &S_BitwiseShiftOrRollBinOpParser }, // ">>"
-          { TokenType::RArithShiftEqual, &S_AssignBinOpParser }, // ">>="
-          { TokenType::RBitShift, &S_BitwiseShiftOrRollBinOpParser }, // ">>>"
-          { TokenType::RBitShiftEqual, &S_AssignBinOpParser }, // ">>>="
-          { TokenType::Equal, &S_EqualityBinOpParser }, // ==
-          { TokenType::NotEqual, &S_EqualityBinOpParser }, // !=
-          { TokenType::DiscEqual, &S_EqualityBinOpParser }, // ===
-          { TokenType::DiscNotEqual, &S_EqualityBinOpParser }, // !==
-          { TokenType::Ampersand, &S_BitwiseAndWithAssignBinOpParser }, // &
-          { TokenType::VertLine, &S_BitwiseOrWithAssignBinOpParser }, // |
-          { TokenType::Chevron, &S_BitwiseXorWithAssignBinOpParser }, // ^
-          { TokenType::AmpersandEqual, &S_AssignBinOpParser }, // "&="
-          { TokenType::VertLineEqual, &S_AssignBinOpParser }, // "|="
-          { TokenType::ChevronEqual, &S_AssignBinOpParser }, // "^="
-          { TokenType::Lt, &S_RelationalBinOpParser }, // <
-          { TokenType::LtOrEqual, &S_RelationalBinOpParser }, // <=
-          { TokenType::Gt, &S_RelationalBinOpParser }, // >=
-          { TokenType::GtOrEqual, &S_RelationalBinOpParser }, // >
-          { TokenType::LogicalAnd, &S_LogicalAndBinOpParser }, // &&
-          { TokenType::LogicalOr, &S_LogicalOrBinOpParser }, // ||
-          //            {TokenType::Question,         &S_ConditionalTernaryBinOpParser}, // cond ? expr : expr
-          { TokenType::Dot, &S_MemberAccessBinOpParser },
-          { TokenType::LParenthesis, &S_ProcCallInfixParser } });
+    static constinit auto S_InfixParsers = frozen::make_unordered_map<TokenType, const InfixParser *>({
+        { TokenType::Comma, &S_OrderBinOpParser }, // ,
+        { TokenType::Swap, &S_AssignBinOpParser }, // <->
+        { TokenType::Assignment, &S_AssignBinOpParser }, // =
+        { TokenType::Plus, &S_SumSubBinOpInfixParser }, // "+"
+        { TokenType::PlusEqual, &S_AssignBinOpParser }, // "+="
+        { TokenType::Minus, &S_SumSubBinOpInfixParser }, // "-"
+        { TokenType::MinusEqual, &S_AssignBinOpParser }, // "-="
+        { TokenType::Slash, &S_ProductBinOpParser }, // "/" 除法结果为浮点数
+        { TokenType::SlashEqual, &S_AssignBinOpParser }, // "/="
+        { TokenType::Backslash, &S_ProductBinOpParser }, // "\" 除法结果直接截断为整数
+        { TokenType::BackslashEqual, &S_AssignBinOpParser }, // "\="
+        { TokenType::Percent, &S_ProductBinOpParser }, // "%"
+        { TokenType::PercentEqual, &S_AssignBinOpParser }, // "%="
+        { TokenType::Asterisk, &S_ProductBinOpParser }, // "*"
+        { TokenType::AsteriskEqual, &S_AssignBinOpParser }, // "*="
+        { TokenType::Exclamation, &S_ProductBinOpParser }, // !
+        { TokenType::LogicalAndEqual, &S_AssignBinOpParser }, // "&&="
+        { TokenType::LogicalOrEqual, &S_AssignBinOpParser }, // "||="
+        { TokenType::LArithShift, &S_BitwiseShiftOrRollBinOpParser }, // "<<"
+        { TokenType::LArithShiftEqual, &S_AssignBinOpParser }, // "<<="
+        { TokenType::RArithShift, &S_BitwiseShiftOrRollBinOpParser }, // ">>"
+        { TokenType::RArithShiftEqual, &S_AssignBinOpParser }, // ">>="
+        { TokenType::RBitShift, &S_BitwiseShiftOrRollBinOpParser }, // ">>>"
+        { TokenType::RBitShiftEqual, &S_AssignBinOpParser }, // ">>>="
+        { TokenType::Equal, &S_EqualityBinOpParser }, // ==
+        { TokenType::NotEqual, &S_EqualityBinOpParser }, // !=
+        { TokenType::DiscEqual, &S_EqualityBinOpParser }, // ===
+        { TokenType::DiscNotEqual, &S_EqualityBinOpParser }, // !==
+        { TokenType::Ampersand, &S_BitwiseAndWithAssignBinOpParser }, // &
+        { TokenType::VertLine, &S_BitwiseOrWithAssignBinOpParser }, // |
+        { TokenType::Chevron, &S_BitwiseXorWithAssignBinOpParser }, // ^
+        { TokenType::AmpersandEqual, &S_AssignBinOpParser }, // "&="
+        { TokenType::VertLineEqual, &S_AssignBinOpParser }, // "|="
+        { TokenType::ChevronEqual, &S_AssignBinOpParser }, // "^="
+        { TokenType::Lt, &S_RelationalBinOpParser }, // <
+        { TokenType::LtOrEqual, &S_RelationalBinOpParser }, // <=
+        { TokenType::Gt, &S_RelationalBinOpParser }, // >=
+        { TokenType::GtOrEqual, &S_RelationalBinOpParser }, // >
+        { TokenType::LogicalAnd, &S_LogicalAndBinOpParser }, // &&
+        { TokenType::LogicalOr, &S_LogicalOrBinOpParser }, // ||
+        { TokenType::Dot, &S_MemberAccessBinOpParser }, // .
+        { TokenType::Question, &S_ConditionalTernaryBinOpParser }, // cond ? expr : expr
+        { TokenType::LParenthesis, &S_ProcCallInfixParser } // ()
+    });
 } // namespace cial::Syntax

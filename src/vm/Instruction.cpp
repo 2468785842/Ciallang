@@ -66,7 +66,6 @@ namespace cial::Bytecode::Op {
         vmState.reg(dst(inst), r1 + r2);
     }
 
-
     void Sub::execute(const Instruction &inst, const VMState &vmState) {
         vmState.reg(dst(inst), vmState.reg(reg1(inst)) - vmState.reg(reg2(inst)));
     }

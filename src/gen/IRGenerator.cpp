@@ -82,6 +82,11 @@ namespace cial::Inter {
         OptReg reg2{};
         node->rhs->generateBytecode(this, reg2);
 
+        if(node->token->type() == Comma) {
+            retReg = reg2.value();
+            return;
+        }
+
         auto dst = allocateRegister();
 
         if(_r.isFailed())
@@ -207,6 +212,7 @@ namespace cial::Inter {
                 return;
 
             retReg = dst;
+            return;
         }
 
         // global maybe
@@ -342,16 +348,17 @@ namespace cial::Inter {
     }
 
     void IRGenerator::generate(const Syntax::IdentifierExprNode *node, OptReg &retReg) {
+        auto dst = allocateRegister();
         const auto identifier = node->token->constVal().value<Atom>();
 
         auto variable = resolveLocalVariable(identifier);
 
         if(variable.has_value()) {
-            retReg = variable.value()->reg;
+            _chunk->emit<Bytecode::Op::OpCode::CP>(dst, variable.value()->reg);
+            retReg = dst;
             return;
         }
 
-        auto dst = allocateRegister();
         if(isTopScope()) {
             _chunk->emit<Bytecode::Op::OpCode::GGlobal>(identifier, dst);
         } else {
@@ -360,9 +367,6 @@ namespace cial::Inter {
             // _chunk->emit<Bytecode::Op::OpCode::GUpval>(identifier, dst);
             _chunk->emit<Bytecode::Op::OpCode::GThis>(identifier, dst);
         }
-
-        if(_r.isFailed())
-            return;
 
         retReg = dst;
     }
@@ -536,6 +540,33 @@ namespace cial::Inter {
             auto *itt = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
             _loopStack.back().continues.push_back(itt);
         }
+    }
+    void IRGenerator::generate(const Syntax::ConditionalTernaryExprNode *node, OptReg &retReg) {
+        Bytecode::Register dst = allocateRegister();
+        OptReg testReg;
+        node->test->generateBytecode(this, testReg);
+        if(!testReg)
+            return;
+
+        _chunk->emit<Bytecode::Op::OpCode::Test>(testReg.value());
+        auto *jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
+        OptReg lhsReg;
+        node->lhsExpr->generateBytecode(this, lhsReg);
+        if(!lhsReg)
+            return;
+        _chunk->emit<Bytecode::Op::OpCode::Mov>(lhsReg.value(), dst);
+
+        auto *jmp = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
+        Bytecode::Op::JmpNE::setTarget(*jmpNE, makeLabel());
+        OptReg rhsReg;
+        node->rhsExpr->generateBytecode(this, rhsReg);
+        if(!rhsReg)
+            return;
+        _chunk->emit<Bytecode::Op::OpCode::Mov>(rhsReg.value(), dst);
+
+        Bytecode::Op::Jmp::setTarget(*jmp, makeLabel());
+        freeRegister(testReg.value());
+        retReg = dst;
     }
 
     void IRGenerator::generate(const Syntax::ReturnStmtNode *node, OptReg &retReg) {

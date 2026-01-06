@@ -129,4 +129,21 @@ namespace cial::Syntax {
             return gen->generate(this, retReg);
         }
     };
+
+
+    class ConditionalTernaryExprNode final : public ExprNode {
+    public:
+        const ExprNode *test;
+        const ExprNode *lhsExpr;
+        const ExprNode *rhsExpr;
+
+        explicit ConditionalTernaryExprNode(const ExprNode *test, const ExprNode *lhsExpr, const ExprNode *rhsExpr) :
+            ExprNode("conditional_ternary"), test(test), lhsExpr(lhsExpr), rhsExpr(rhsExpr) {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
 } // namespace cial::Syntax

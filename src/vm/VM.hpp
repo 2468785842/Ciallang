@@ -167,7 +167,6 @@ namespace cial {
             OptReg ignoreReg{};
             Opt<Bytecode::Chunk> chunk = codeGen.parseAst(r, node, ignoreReg);
 
-
             assert(chunk);
             assert(!r.isFailed());
             assert(chunk->getRegCount() != 0);
