@@ -69,9 +69,29 @@ TEST_CASE("表达式 - 二元运算表达式") {
         REQUIRE((*vm.evalExpr<bool>("3 <= 2"_str)) == false);
     }
 
-    SECTION("逻辑运算") {
+    SECTION("逻辑与运算") {
         REQUIRE((*vm.evalExpr<bool>("true && false"_str)) == false);
         REQUIRE((*vm.evalExpr<bool>("true && true"_str)) == true);
+    }
+
+    SECTION("逻辑或运算") {
+        REQUIRE((*vm.evalExpr<bool>("true || false"_str)) == true);
+        REQUIRE((*vm.evalExpr<bool>("false || true"_str)) == true);
+        REQUIRE((*vm.evalExpr<bool>("false || false"_str)) == false);
+    }
+
+    SECTION("交换运算") {
+        vm.eval("var a = 1, b = 2; a <-> b;"_str);
+        REQUIRE((*vm.evalExpr<Integer>("a"_str)) == 2);
+        REQUIRE((*vm.evalExpr<Integer>("b"_str)) == 1);
+
+        vm.eval("var gA, gB; { var a = 1, b = 2; a <-> b; gA = a, gB = b; }"_str);
+        REQUIRE((*vm.evalExpr<Integer>("gA"_str)) == 2);
+        REQUIRE((*vm.evalExpr<Integer>("gB"_str)) == 1);
+
+        vm.eval("var a = 1, c = 3; { var b = 2; a <-> b; c = b; }"_str);
+        REQUIRE((*vm.evalExpr<Integer>("a"_str)) == 2);
+        REQUIRE((*vm.evalExpr<Integer>("c"_str)) == 1);
     }
 }
 

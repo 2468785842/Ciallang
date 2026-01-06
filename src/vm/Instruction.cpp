@@ -54,7 +54,6 @@ namespace cial::Bytecode::Op {
 
     void PopN::execute(const Instruction &inst, VMState &vmState) { vmState.pop(count(inst)); }
 
-
     void CP::execute(const Instruction &inst, const VMState &vmState) {
         vmState.reg(dst(inst), vmState.reg(src(inst)));
     }
@@ -92,6 +91,7 @@ namespace cial::Bytecode::Op {
         const auto &value = vmState.global(atom(inst));
         vmState.reg(dst(inst), value);
     }
+
     void Test::execute(const Instruction &inst, VMState &vmState) {
         if(vmState.reg(reg(inst)).toBool()) {
             vmState.setZF(true);

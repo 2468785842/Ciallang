@@ -14,6 +14,7 @@
 
 #include <ranges>
 
+#include "common/Defer.hpp"
 #include "parser/ast/DeclNode.hpp"
 #include "parser/ast/ExprNode.hpp"
 #include "parser/ast/StmtNode.hpp"
@@ -77,6 +78,51 @@ namespace cial::Inter {
             return;
         }
 
+        if(node->token->type() == Swap) {
+            const auto lVarExpr = dynamic_cast<const Syntax::IdentifierExprNode *>(node->lhs);
+            if(!lVarExpr)
+                return;
+            const auto rVarExpr = dynamic_cast<const Syntax::IdentifierExprNode *>(node->rhs);
+            if(!rVarExpr)
+                return;
+            const Atom lVarName = lVarExpr->token->constVal().value<Atom>();
+            const Atom rVarName = rVarExpr->token->constVal().value<Atom>();
+            auto *lVar = resolveLocalVariable(lVarName);
+            auto *rVar = resolveLocalVariable(rVarName);
+            auto dst = allocateRegister();
+            OptReg lVarReg{};
+            if(lVar) {
+                lVarReg = lVar->reg;
+            } else {
+                lVarReg = allocateRegister();
+                _chunk->emit<Bytecode::Op::OpCode::GGlobal>(lVarName, *lVarReg);
+            }
+            _chunk->emit<Bytecode::Op::OpCode::CP>(*lVarReg, dst);
+            OptReg rVarReg{};
+
+            if(rVar) {
+                rVarReg = rVar->reg;
+            } else {
+                rVarReg = allocateRegister();
+                _chunk->emit<Bytecode::Op::OpCode::GGlobal>(rVarName, *rVarReg);
+            }
+
+            if(lVar) {
+                _chunk->emit<Bytecode::Op::OpCode::CP>(*rVarReg, *lVarReg);
+            } else {
+                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(lVarName, *rVarReg);
+            }
+
+            if(rVar) {
+                _chunk->emit<Bytecode::Op::OpCode::CP>(dst, rVar->reg);
+            } else {
+                _chunk->emit<Bytecode::Op::OpCode::DGlobal>(rVarName, dst);
+            }
+            // retReg = rVarReg;
+            return;
+            assert(false); // TODO: 类的属性替换需要以后添加
+        }
+
         OptReg reg1{};
         node->lhs->generateBytecode(this, reg1);
         OptReg reg2{};
@@ -89,11 +135,11 @@ namespace cial::Inter {
 
         auto dst = allocateRegister();
 
-        if(_r.isFailed())
+        if(!reg1 || !reg2) {
+            CLL_ASSERT(reg1.has_value(), "reg1 is empty");
+            CLL_ASSERT(reg2.has_value(), "reg2 is empty");
             return;
-
-        CLL_ASSERT(reg1.has_value(), "reg1 is empty");
-        CLL_ASSERT(reg2.has_value(), "reg2 is empty");
+        }
 
         switch(node->token->type()) {
             case Equal:
@@ -137,8 +183,6 @@ namespace cial::Inter {
                 return;
         }
 
-        if(_r.isFailed())
-            return;
         retReg = dst;
     }
 
@@ -197,13 +241,11 @@ namespace cial::Inter {
 
             const auto identifier = expr->token->constVal();
 
-            auto variable = resolveLocalVariable(identifier.value<Atom>());
-
-            if(variable && variable.value()) {
+            if(const auto variable = resolveLocalVariable(identifier.value<Atom>())) {
                 OptReg src{};
                 node->rhs->generateBytecode(this, src);
                 CLL_ASSERT(src.has_value(), "src is not have val");
-                Bytecode::Register dst = variable.value()->reg;
+                Bytecode::Register dst = variable->reg;
 
                 freeRegister(src.value());
                 _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), dst);
@@ -233,6 +275,11 @@ namespace cial::Inter {
     void IRGenerator::generate(const Syntax::VarDeclNode *node, OptReg &retReg) {
         const auto identifier = node->token->constVal().value<Atom>();
 
+        DEFER {
+            if(node->next)
+                node->next->generateBytecode(this, retReg);
+        };
+
         // global
         if(isTopScope()) {
             // can't init
@@ -251,10 +298,8 @@ namespace cial::Inter {
             return;
         }
 
-        auto variable = resolveLocalVariable(identifier);
-
         // already have this variable, in same scope
-        if(variable.has_value() && variable.value()) {
+        if(const auto variable = resolveLocalVariable(identifier)) {
             if(!node->rhs)
                 return;
 
@@ -267,7 +312,7 @@ namespace cial::Inter {
 
             CLL_ASSERT(src.has_value(), "src is not have val");
 
-            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), variable.value()->reg);
+            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), variable->reg);
             return;
         }
 
@@ -282,9 +327,6 @@ namespace cial::Inter {
         }
 
         addLocalVar(LocalVariable{ identifier, dst.value(), getNextInstPos() });
-
-        if(node->next)
-            node->next->generateBytecode(this, retReg);
     }
 
     void IRGenerator::generate(const Syntax::FunctionDeclNode *node, OptReg &retReg) {
@@ -354,10 +396,8 @@ namespace cial::Inter {
         auto dst = allocateRegister();
         const auto identifier = node->token->constVal().value<Atom>();
 
-        auto variable = resolveLocalVariable(identifier);
-
-        if(variable.has_value()) {
-            _chunk->emit<Bytecode::Op::OpCode::CP>(dst, variable.value()->reg);
+        if(const auto variable = resolveLocalVariable(identifier)) {
+            _chunk->emit<Bytecode::Op::OpCode::CP>(variable->reg, dst);
             retReg = dst;
             return;
         }
@@ -583,13 +623,13 @@ namespace cial::Inter {
         _chunk->emit<Bytecode::Op::OpCode::Ret>(loadVoidReg(*_chunk));
     }
 
-    std::optional<LocalVariable *> IRGenerator::resolveLocalVariable(const Atom identifier) {
+    LocalVariable *IRGenerator::resolveLocalVariable(const Atom identifier) {
         for(auto &var : std::ranges::reverse_view(_localVars)) {
             if(var.endPC == 0 && var.identifier.v == identifier.v) {
                 return &var;
             }
         }
-        return {};
+        return nullptr;
     }
 
     FuncMeta *IRGenerator::generateChunk(const Syntax::FunctionDeclNode *node) const {

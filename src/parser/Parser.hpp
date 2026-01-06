@@ -26,6 +26,7 @@ namespace cial::Syntax {
     enum class Precedence : uint8_t {
         lowest = 0,
         comma, // ,
+        swap,
         conditional_ternary, // cond ? expr : expr
         assignment, // 一系列赋值语句
         // key_value,
@@ -345,7 +346,7 @@ namespace cial::Syntax {
         S_BitwiseAndWithAssignBinOpParser{ Precedence::bitwise_and, false, true },
         S_BitwiseXorWithAssignBinOpParser{ Precedence::bitwise_xor, false, true },
         S_EqualityBinOpParser{ Precedence::equality, false }, S_RelationalBinOpParser{ Precedence::relational, false },
-        S_LogicalOrBinOpParser{ Precedence::logical_or, false },
+        S_LogicalOrBinOpParser{ Precedence::logical_or, false }, S_SwapBinOpParser{ Precedence::swap, false },
         S_LogicalAndBinOpParser{ Precedence::logical_and, false }, S_OrderBinOpParser{ Precedence::comma, false },
         S_MemberAccessBinOpParser{ Precedence::postfix, false };
 
@@ -354,7 +355,7 @@ namespace cial::Syntax {
 
     static constinit auto S_InfixParsers = frozen::make_unordered_map<TokenType, const InfixParser *>({
         { TokenType::Comma, &S_OrderBinOpParser }, // ,
-        { TokenType::Swap, &S_AssignBinOpParser }, // <->
+        { TokenType::Swap, &S_SwapBinOpParser }, // <->
         { TokenType::Assignment, &S_AssignBinOpParser }, // =
         { TokenType::Plus, &S_SumSubBinOpInfixParser }, // "+"
         { TokenType::PlusEqual, &S_AssignBinOpParser }, // "+="

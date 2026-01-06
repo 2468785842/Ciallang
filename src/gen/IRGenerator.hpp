@@ -140,7 +140,7 @@ namespace cial::Inter {
             _scopeStartPC.pop_back();
         }
 
-        std::optional<LocalVariable *> resolveLocalVariable(Atom identifier);
+        LocalVariable *resolveLocalVariable(Atom identifier);
 
         Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk);
 

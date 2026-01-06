@@ -252,16 +252,6 @@ namespace cial::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct PushReg
 
-    struct CP {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register src(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct CP
-
     struct Add {
         static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
@@ -319,6 +309,16 @@ namespace cial::Bytecode::Op {
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Mov
+
+    struct CP {
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct CP
 
     struct DGlobal {
         static Atom atom(const Instruction &inst) { return inst.getOperand1<Atom>(); }
