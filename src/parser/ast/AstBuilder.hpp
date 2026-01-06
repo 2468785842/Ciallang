@@ -27,7 +27,6 @@ namespace cial::Syntax {
             for(const auto &val : _nodes) {
                 delete val;
             }
-            _nodes.clear();
         }
 
         template <typename R, typename... Args>

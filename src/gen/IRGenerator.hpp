@@ -146,8 +146,10 @@ namespace cial::Inter {
 
         FuncMeta *generateChunk(const Syntax::FunctionDeclNode *node) const;
 
-        void error(Common::Result &r, const std::string &message, const Common::SourceLocation &location) const {
-            _sourceFile.error(r, message, location);
+        bool expectValue(const Syntax::ExprNode *node, Bytecode::Register &ret);
+
+        void error(const std::string &message, const Common::SourceLocation &location) {
+            _sourceFile.error(_r, message, location);
         }
     };
 } // namespace cial::Inter

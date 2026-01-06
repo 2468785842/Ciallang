@@ -279,7 +279,7 @@ namespace cial::Bytecode::Op {
         return fmt::format("{: <10} {: <4}", "popn", count(inst));
     }
     std::string CP::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "cp", dst(inst), src(inst));
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "cp", src(inst), dst(inst));
 
         if(!vmState)
             return insDump;
