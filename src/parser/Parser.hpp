@@ -353,7 +353,7 @@ namespace cial::Syntax {
     static constinit ConditionalTernaryInfixParser S_ConditionalTernaryBinOpParser{};
 
     static constinit auto S_InfixParsers = frozen::make_unordered_map<TokenType, const InfixParser *>({
-        { TokenType::Comma, &S_OrderBinOpParser }, // ,
+        // { TokenType::Comma, &S_OrderBinOpParser }, // ,
         { TokenType::Swap, &S_AssignBinOpParser }, // <->
         { TokenType::Assignment, &S_AssignBinOpParser }, // =
         { TokenType::Plus, &S_SumSubBinOpInfixParser }, // "+"

@@ -798,18 +798,11 @@ namespace cial::Syntax {
         if(!_withAssignment)
             return binOpNode;
 
-        const IdentifierExprNode *symbolExprNode = dynamic_cast<IdentifierExprNode *>(lhs);
-
-        if(!symbolExprNode) {
-            parser->error(r, "assignment operator left-hand-side expects identifier", lhs->location);
-            return nullptr;
-        }
-
         if(AssignToken::support(token->type())) {
-            return parser->astBuilder()->makeNode<AssignExprNode>(symbolExprNode, binOpNode);
+            return parser->astBuilder()->makeNode<AssignExprNode>(lhs, binOpNode);
         }
 
-        return parser->astBuilder()->makeNode<AssignExprNode>(symbolExprNode, rhs);
+        return parser->astBuilder()->makeNode<AssignExprNode>(lhs, rhs);
     }
 
     ExprNode *ProcCallInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {

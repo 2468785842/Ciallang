@@ -193,38 +193,41 @@ namespace cial::Inter {
 
     void IRGenerator::generate(const Syntax::AssignExprNode *node, OptReg &retReg) {
         // TODO: member access
-        const auto identifier = node->lhs->token->constVal();
+        if(const auto *expr = dynamic_cast<const Syntax::IdentifierExprNode *>(node->lhs)) {
 
-        auto variable = resolveLocalVariable(identifier.value<Atom>());
+            const auto identifier = expr->token->constVal();
 
-        if(variable && variable.value()) {
-            OptReg src{};
+            auto variable = resolveLocalVariable(identifier.value<Atom>());
+
+            if(variable && variable.value()) {
+                OptReg src{};
+                node->rhs->generateBytecode(this, src);
+                CLL_ASSERT(src.has_value(), "src is not have val");
+                Bytecode::Register dst = variable.value()->reg;
+
+                freeRegister(src.value());
+                _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), dst);
+                if(_r.isFailed())
+                    return;
+
+                retReg = dst;
+                return;
+            }
+
+            // global maybe
+            OptReg src;
             node->rhs->generateBytecode(this, src);
-            CLL_ASSERT(src.has_value(), "src is not have val");
+            CLL_ASSERT(src.has_value(), "global src is not have val");
 
-            OptReg dst;
-            node->lhs->generateBytecode(this, dst);
-            CLL_ASSERT(dst.has_value(), "dst is not have val");
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier.value<Atom>(), src.value());
 
-            freeRegister(src.value());
-            _chunk->emit<Bytecode::Op::OpCode::Mov>(src.value(), dst.value());
             if(_r.isFailed())
                 return;
-
-            retReg = dst;
+            retReg = src;
             return;
         }
 
-        // global maybe
-        OptReg src;
-        node->rhs->generateBytecode(this, src);
-        CLL_ASSERT(src.has_value(), "global src is not have val");
-
-        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier.value<Atom>(), src.value());
-
-        if(_r.isFailed())
-            return;
-        retReg = src;
+        assert(false);
     }
 
     void IRGenerator::generate(const Syntax::VarDeclNode *node, OptReg &retReg) {

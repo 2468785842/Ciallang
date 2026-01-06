@@ -112,12 +112,12 @@ namespace cial::Syntax {
 
     class AssignExprNode final : public ExprNode {
     public:
-        const IdentifierExprNode *lhs;
+        const ExprNode *lhs;
         const ExprNode *rhs;
 
         AssignExprNode() = delete;
 
-        explicit AssignExprNode(const IdentifierExprNode *lhs, const ExprNode *rhs) :
+        explicit AssignExprNode(const ExprNode *lhs, const ExprNode *rhs) :
             ExprNode("assignment_expression"), lhs(lhs), rhs(rhs) {
             location.start(lhs->location.start());
             location.end(rhs->location.end());
