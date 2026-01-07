@@ -144,7 +144,7 @@ namespace cial::Inter {
 
         Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk);
 
-        FuncMeta *generateChunk(const Syntax::FunctionDeclNode *node) const;
+        FuncMeta *generateFuncMeta(const Syntax::FunctionDeclNode *node) const;
 
         bool expectValue(const Syntax::ExprNode *node, Bytecode::Register &ret);
 
