@@ -131,7 +131,7 @@ namespace cial::Common {
 
         if(x >= 0xf0) {
             const int32_t mask = (static_cast<int32_t>(x) << 31) >> 31;
-            cp.value = (static_cast<int32_t>(s0) & (~mask)) | (runeInvalid & mask);
+            cp.value = static_cast<int32_t>(s0) & ~mask | runeInvalid & mask;
             cp.width = 1;
             return cp;
         }
@@ -144,7 +144,7 @@ namespace cial::Common {
 
         const auto sz = static_cast<uint8_t>(x & 7);
         const Utf8AcceptRangeType accept = S_Utf8AcceptRanges[x >> 4];
-        if(length < sizeof(sz))
+        if(length < sz)
             return cp;
 
         const auto b1 = static_cast<uint8_t>(str[1]);

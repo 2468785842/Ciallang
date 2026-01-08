@@ -18,9 +18,10 @@ namespace cial {
         explicit String(const char *str) : String(str, std::strlen(str)) {}
 
         template <size_t N>
-        explicit String(const char (&arr)[N]) : String(arr, N) {}
+        explicit String(const char (&arr)[N]) : String(arr, N - 1) {}
 
         explicit String(const char *str, std::uint32_t len);
+        explicit String(const std::string &s) : String(s.data(), static_cast<std::uint32_t>(s.size())) {}
 
         ~String() noexcept override;
 
@@ -31,6 +32,8 @@ namespace cial {
         String(const String &str) : String(str.getData(), str.length()) {}
 
         String &operator=(const String &str) = delete;
+
+        void append(const String &str);
 
         [[nodiscard]] std::uint32_t length() const { return _len; }
 
@@ -56,7 +59,7 @@ namespace cial {
         [[nodiscard]] bool isEmpty() const { return _len == 0; }
 
         //---------------------------------------------------------------------------
-        String escapeBackSlash() const;
+        [[nodiscard]] String escapeBackSlash() const;
 
     private:
         char *_longStr = nullptr;

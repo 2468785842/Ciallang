@@ -15,6 +15,7 @@
 #pragma once
 
 #include <bit>
+#include <complex>
 #include <concepts>
 #include <cstdint>
 #include <limits>
@@ -125,25 +126,19 @@ namespace cial {
 
         [[nodiscard]] constexpr bool isNan() const noexcept { return checkNan(_bits); }
         [[nodiscard]] constexpr bool isInfinity() const noexcept { return checkInf(_bits); }
-        [[nodiscard]] constexpr bool is_finite() const noexcept { return !isNan() && !isInfinity(); }
+        [[nodiscard]] constexpr bool isFinite() const noexcept { return !isNan() && !isInfinity(); }
 
         [[nodiscard]] constexpr double value() const noexcept { return bitsToDouble(_bits); }
         [[nodiscard]] constexpr uint64_t bits() const noexcept { return _bits; }
-
-        const Real &operator-() {
-            this->_bits = doubleToBits(-value());
-            return *this;
-        }
 
         Real operator+(const Real &real) const { return Real(this->value() + real.value()); }
         Real operator-(const Real &real) const { return Real(this->value() - real.value()); }
         Real operator*(const Real &real) const { return Real(this->value() * real.value()); }
         Real operator/(const Real &real) const { return Real(this->value() / real.value()); }
 
-        bool operator==(const Real &real) const = default;
+        bool operator==(const Real &real) const noexcept { return value() == real.value(); }
 
-        // TODO: impl
-        auto operator<=>(const Real &real) const = default;
+        std::partial_ordering operator<=>(const Real &real) const { return value() <=> real.value(); }
 
         // Static factory methods for special values
         [[nodiscard]] static constexpr Real positiveInf() noexcept { return Real(P_INF); }

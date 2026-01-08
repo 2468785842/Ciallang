@@ -90,7 +90,7 @@ namespace cial {
 
             for(const auto &val : gObj | std::views::values) {
                 if(val.isObject()) {
-                    if(auto *msHeader = val.toObject()) {
+                    if(auto *msHeader = val.asObject().value()) {
                         msHeader->marked();
                         if(msHeader->_name != ATOM_INVALID) {
                             rt.atomTable.get(msHeader->_name)->marked();
@@ -103,7 +103,7 @@ namespace cial {
             const std::uint32_t used = regPool.used();
             for(std::uint32_t i = 0; i < used; ++i) {
                 if(const Value *val = regPool.ptrAt(i)) {
-                    if(auto *msHeader = val->toObject()) {
+                    if(auto *msHeader = val->asObject().value()) {
                         msHeader->marked();
                         if(msHeader->_name != ATOM_INVALID) {
                             rt.atomTable.get(msHeader->_name)->marked();
@@ -120,7 +120,7 @@ namespace cial {
                 else
                     callFrame.chunk->marked();
                 if(callFrame.thisObj.isObject())
-                    callFrame.thisObj.toObject()->marked();
+                    callFrame.thisObj.asObject().value()->marked();
             }
         }
     };

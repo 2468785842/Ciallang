@@ -76,7 +76,7 @@ namespace cial::Bytecode {
 
         // current thisObj
         if(_currentFrame->thisObj.isObject()) {
-            if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.toObject())) {
+            if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
                 if(instanceObject->hasProp(atom)) {
                     return instanceObject->getProp(atom);
                 }
@@ -92,7 +92,7 @@ namespace cial::Bytecode {
 
         // current context
         if(_currentFrame->thisObj.isObject()) {
-            if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.toObject())) {
+            if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
                 return instanceObject->getProp(atom);
             }
         }
@@ -111,7 +111,7 @@ namespace cial::Bytecode {
 
             // prev context
             if(callFrame.thisObj.isObject()) {
-                if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.toObject())) {
+                if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
                     return instanceObject->getProp(atom);
                 }
             }

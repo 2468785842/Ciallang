@@ -18,6 +18,8 @@
 
 #include "Real.hpp"
 
+#include "common/Ret.hpp"
+
 namespace cial {
     class Value {
 
@@ -44,53 +46,63 @@ namespace cial {
 
         void type(const ValueType type) noexcept { _type = type; }
 
-        [[nodiscard]] Integer toInteger() const;
+        [[nodiscard]] bool isVoid() const noexcept { return type() == ValueType::Void; }
 
-        [[nodiscard]] Real toReal() const;
+        [[nodiscard]] bool isInteger() const noexcept { return type() == ValueType::Integer; }
 
-        [[nodiscard]] String *toString() const;
+        [[nodiscard]] bool isReal() const noexcept { return type() == ValueType::Real; }
 
-        [[nodiscard]] Octet *toOctet() const;
+        [[nodiscard]] bool isString() const noexcept { return type() == ValueType::String; }
 
-        [[nodiscard]] Object *toObject() const;
+        [[nodiscard]] bool isOctet() const noexcept { return type() == ValueType::Octet; }
 
-        [[nodiscard]] bool toBool() const;
-
-        [[nodiscard]] bool isVoid() const { return type() == ValueType::Void; }
-
-        [[nodiscard]] bool isInteger() const { return type() == ValueType::Integer; }
-
-        [[nodiscard]] bool isReal() const { return type() == ValueType::Real; }
-
-        [[nodiscard]] bool isString() const { return type() == ValueType::String; }
-
-        [[nodiscard]] bool isOctet() const { return type() == ValueType::Octet; }
-
-        [[nodiscard]] bool isObject() const { return type() == ValueType::Object; }
+        [[nodiscard]] bool isObject() const noexcept { return type() == ValueType::Object; }
 
         [[nodiscard]] const char *name() const;
 
-        Value operator+(const Value &value) const;
+        [[nodiscard]] Ret<Integer> asInteger() const noexcept;
 
-        Value operator-(const Value &value) const;
+        [[nodiscard]] Ret<Real> asReal() const noexcept;
 
-        Value operator*(const Value &value) const;
+        [[nodiscard]] Ret<String *> asString() const noexcept;
 
-        Value operator/(const Value &value) const;
+        [[nodiscard]] Ret<Octet *> asOctet() const noexcept;
 
-        Value operator-() const;
+        [[nodiscard]] Ret<Object *> asObject() const noexcept;
 
-        void asLogicalNot();
+        [[nodiscard]] bool asBool() const noexcept;
 
-        void asSignChange();
+        [[nodiscard]] Ret<void> toInteger() noexcept;
 
-        [[nodiscard]] bool discernCompare(const Value &value) const;
+        [[nodiscard]] Ret<void> toReal() noexcept;
 
-        bool operator==(const Value &value) const;
-        bool operator&&(const Value &value) const;
-        bool operator||(const Value &value) const;
+        [[nodiscard]] Ret<void> toString() noexcept;
 
-        std::partial_ordering operator<=>(const Value &rhs) const;
+        [[nodiscard]] Ret<void> toOctet() const noexcept;
+
+        [[nodiscard]] Ret<void> toObject() const noexcept;
+
+        void toLogicalNot() noexcept;
+
+        [[nodiscard]] Ret<void> toSignChange() noexcept;
+
+        [[nodiscard]] Ret<Value> add(const Value &value) const noexcept;
+
+        [[nodiscard]] Ret<Value> sub(const Value &value) const noexcept;
+        [[nodiscard]] Ret<Value> mul(const Value &value) const noexcept;
+        [[nodiscard]] Ret<Value> div(const Value &value) const noexcept;
+
+        [[nodiscard]] bool equals(const Value &value) const noexcept;
+
+        [[nodiscard]] bool discernEquals(const Value &value) const noexcept;
+
+        [[nodiscard]] bool logicalAnd(const Value &value) const noexcept;
+
+        [[nodiscard]] bool logicalOr(const Value &value) const noexcept;
+
+        [[nodiscard]] Ret<bool> littlerThan(const Value &value) const noexcept;
+
+        [[nodiscard]] Ret<bool> greaterThan(const Value &value) const noexcept;
 
     private:
         union {

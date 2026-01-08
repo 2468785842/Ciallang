@@ -39,50 +39,50 @@ namespace cial {
 
     template <>
     struct HandleConvert<bool> : DefaultHandleConvert {
-        static bool fromValue(const Value &v) { return v.toBool(); }
+        static bool fromValue(const Value &v) { return v.asBool(); }
     };
 
     template <>
     struct HandleConvert<Integer> : DefaultHandleConvert {
-        static Integer fromValue(const Value &v) { return v.toInteger(); }
+        static Integer fromValue(const Value &v) { return v.asInteger().unwrap(); }
     };
 
     template <>
     struct HandleConvert<Real> : DefaultHandleConvert {
-        static Real fromValue(const Value &v) { return v.toReal(); }
+        static Real fromValue(const Value &v) { return v.asReal().unwrap(); }
     };
 
     template <>
     struct HandleConvert<String *> : DefaultHandleConvert {
-        static String *fromValue(const Value &v) { return v.toString(); }
+        static String *fromValue(const Value &v) { return v.asString().unwrap(); }
     };
 
     template <>
     struct HandleConvert<Octet *> : DefaultHandleConvert {
-        static Octet *fromValue(const Value &v) { return v.toOctet(); }
+        static Octet *fromValue(const Value &v) { return v.asOctet().unwrap(); }
     };
 
     template <>
     struct HandleConvert<Object *> {
 
-        static Object *fromValue(const Value &v) { return v.toObject(); }
+        static Object *fromValue(const Value &v) { return v.asObject().unwrap(); }
 
         static void handleValue(Runtime *rt, const Value &v) noexcept {
             if(v.isObject()) {
-                rt->addHandleVal(v.toObject());
+                rt->addHandleVal(v.asObject().value());
             }
         }
 
         static void releaseValue(Runtime *rt, const Value &v) noexcept {
             if(v.isObject()) {
-                rt->removeHandleVal(v.toObject());
+                rt->removeHandleVal(v.asObject().value());
             }
         }
     };
 
     template <typename T>
     struct HandleConvert<T *> : HandleConvert<Object *> {
-        static T *fromValue(const Value &v) { return dynamic_cast<T *>(v.toObject()); }
+        static T *fromValue(const Value &v) { return dynamic_cast<T *>(v.asObject().unwrap()); }
     };
 
     class VM {

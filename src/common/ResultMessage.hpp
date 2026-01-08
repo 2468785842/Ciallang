@@ -29,15 +29,15 @@ namespace cial::Common {
                                const Types type = info) :
             _type(type), _message(std::move(message)), _details(std::move(details)), _location(loc) {}
 
-        [[nodiscard]] constexpr Types type() const noexcept { return _type; }
+        [[nodiscard]] Types type() const noexcept { return _type; }
 
-        [[nodiscard]] constexpr bool isError() const noexcept { return _type == error; }
+        [[nodiscard]] bool isError() const noexcept { return _type == error; }
 
-        [[nodiscard]] constexpr const std::string &details() const noexcept { return _details; }
+        [[nodiscard]] const std::string &details() const noexcept { return _details; }
 
-        [[nodiscard]] constexpr const std::string &message() const noexcept { return _message; }
+        [[nodiscard]] const std::string &message() const noexcept { return _message; }
 
-        [[nodiscard]] constexpr const SourceLocation &location() const noexcept { return _location; }
+        [[nodiscard]] const SourceLocation &location() const noexcept { return _location; }
 
     private:
         Types _type;

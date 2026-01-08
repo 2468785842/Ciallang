@@ -23,6 +23,26 @@ namespace cial {
 
         explicit Octet(const Octet &oct1, const Octet &oct2);
 
+        Octet(Octet &&oct) noexcept : _buf(oct._buf), _size(oct._size) { oct._buf = nullptr; }
+
+        Octet &operator=(Octet &&oct) noexcept {
+            if(this != &oct) {
+                this->~Octet();
+                new(this) Octet(std::move(oct));
+            }
+            return *this;
+        }
+
+        Octet(const Octet &oct) noexcept : Octet(oct._buf, oct._size) {}
+
+        Octet &operator=(const Octet &oct) noexcept {
+            if(this != &oct) {
+                this->~Octet();
+                new(this) Octet{ oct };
+            }
+            return *this;
+        }
+
         ~Octet() override { delete[] _buf; }
 
         [[nodiscard]] std::uint32_t getSize() const { return _size; }

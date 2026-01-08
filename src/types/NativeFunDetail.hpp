@@ -59,19 +59,19 @@ namespace cial::NativeFunDetail {
     T extractArg(Value *args, const size_t index) {
         // 根据T类型从args[index]中提取实际值
         if constexpr(std::is_same_v<std::decay_t<T>, Integer>) {
-            return args[index].toInteger();
+            return args[index].asInteger().unwrap();
         } else if constexpr(std::is_same_v<std::decay_t<T>, Real>) {
-            return args[index].toReal();
+            return args[index].asReal().unwrap();
         } else if constexpr(std::is_same_v<std::decay_t<T>, bool>) {
-            return args[index].toBool();
+            return args[index].asBool();
         } else if constexpr(is_value_ptr_v<T, String>) {
-            return args[index].toString();
+            return args[index].asString().unwrap();
         } else if constexpr(is_value_ptr_v<T, Object>) {
-            return args[index].toObject();
+            return args[index].asObject().unwrap();
         } else if constexpr(is_value_ptr_v<T, Octet>) {
-            return args[index].toOctet();
+            return args[index].asOctet().unwrap();
         } else if constexpr(std::is_pointer_v<std::decay_t<T>>) {
-            return dynamic_cast<T *>(args[index].toObject());
+            return dynamic_cast<T *>(args[index].asObject().unwrap());
         } else {
             return args[index];
         }

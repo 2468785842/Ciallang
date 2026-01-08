@@ -37,7 +37,7 @@ namespace cial {
             Object::marked();
             meta->marked();
             if(thisObj.isObject())
-                thisObj.toObject()->marked();
+                thisObj.asObject().value()->marked();
         }
     };
 
@@ -72,7 +72,7 @@ namespace cial {
         void marked() noexcept override {
             Object::marked();
             if(_thisObj.isObject())
-                _thisObj.toObject()->marked();
+                _thisObj.asObject().value()->marked();
         }
 
         ~NativeFunction() noexcept override = default;

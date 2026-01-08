@@ -28,6 +28,7 @@ namespace cial {
     String::String(String &&str) noexcept : _len(str._len) {
         if(this->_len > SHORT_STR_LEN) {
             _longStr = str._longStr;
+            str._longStr = nullptr;
         } else {
             _shortStr[this->_len] = '\0';
             std::memcpy(this->_shortStr, str._shortStr, this->_len);
@@ -38,6 +39,7 @@ namespace cial {
         if(this != &str) {
             this->~String();
             new(this) String(std::move(str));
+            str._longStr = nullptr;
         }
         return *this;
     }
@@ -68,7 +70,7 @@ namespace cial {
             if(*f == '*') {
                 if(in >= paramCount)
                     throw std::runtime_error("Insufficient format parameters");
-                width = params[in++].toInteger();
+                width = params[in++].asInteger().unwrap();
                 f++;
             } else {
                 while(*f >= '0' && *f <= '9') {
@@ -84,7 +86,7 @@ namespace cial {
                 if(*f == '*') {
                     if(in >= paramCount)
                         throw std::runtime_error("Insufficient format parameters");
-                    prec = params[in++].toInteger();
+                    prec = params[in++].asInteger().unwrap();
                     f++;
                 } else {
                     prec = 0;
@@ -107,7 +109,7 @@ namespace cial {
                 case 'c': {
                     if(in >= paramCount)
                         throw std::runtime_error("Insufficient parameters for %c");
-                    char ch = static_cast<char>(params[in++].toInteger());
+                    char ch = static_cast<char>(params[in++].asInteger().unwrap());
                     result += ch;
                     break;
                 }
@@ -115,7 +117,7 @@ namespace cial {
                 case 's': {
                     if(in >= paramCount)
                         throw std::runtime_error("Insufficient parameters for %s");
-                    if(String *str = params[in++].toString()) {
+                    if(String *str = params[in++].asString().unwrap()) {
                         const char *sdata = str->getData();
                         size_t sLen = str->length();
 
@@ -145,7 +147,7 @@ namespace cial {
                 case 'X': {
                     if(in >= paramCount)
                         throw std::runtime_error("Insufficient parameters for integer format");
-                    long long val = params[in++].toInteger();
+                    long long val = params[in++].asInteger().unwrap();
                     char fmtBuf[16];
                     if(prec >= 0)
                         std::snprintf(fmtBuf, sizeof(fmtBuf), "%%.%lldd", prec);
@@ -164,7 +166,7 @@ namespace cial {
                 case 'G': {
                     if(in >= paramCount)
                         throw std::runtime_error("Insufficient parameters for float format");
-                    double val = params[in++].toReal().value();
+                    double val = params[in++].asReal().unwrap().value();
                     char fmtBuf[16];
                     if(prec >= 0)
                         std::snprintf(fmtBuf, sizeof(fmtBuf), "%%.%lld%c", prec, type);
@@ -237,4 +239,28 @@ namespace cial {
 
         return String(ret.c_str(), static_cast<std::uint32_t>(ret.size()));
     }
+
+    void String::append(const String &str) {
+        if(str.isEmpty())
+            return;
+
+        const std::uint32_t newLen = _len + str._len;
+
+        if(newLen < SHORT_STR_LEN) {
+            auto i = this->_len;
+            for(const char c : str) {
+                this->_shortStr[i++] = c;
+            }
+        } else {
+            auto *buf = new char[this->_len + str._len + 1];
+            std::memcpy(buf, this->getData(), this->_len);
+            delete[] this->_longStr;
+            this->_longStr = buf;
+            std::memcpy(this->_longStr + this->_len, str.getData(), str._len);
+        }
+
+        this->getBuffer()[newLen + 1] = '\0';
+        this->_len = newLen;
+    }
+
 } // namespace cial

@@ -48,6 +48,7 @@ set(SOURCE_FILES
         src/types/Octet.cpp
         src/types/Value.cpp
         src/types/String.cpp
+        src/types/TypeConverter.cpp
 
         src/stdlib/NativeRegister.cpp
         src/stdlib/Debug.cpp

@@ -61,20 +61,29 @@ namespace cial::Bytecode::Op {
     void Add::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(reg1(inst));
         const Value r2 = vmState.reg(reg2(inst));
-        VM_ASSERT(r1.isInteger() && r2.isInteger(), &vmState);
-        vmState.reg(dst(inst), r1 + r2);
+        auto r = r1.add(r2);
+        vmState.reg(dst(inst), r.unwrap());
     }
 
     void Sub::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.reg(dst(inst), vmState.reg(reg1(inst)) - vmState.reg(reg2(inst)));
+        const Value r1 = vmState.reg(reg1(inst));
+        const Value r2 = vmState.reg(reg2(inst));
+        auto r = r1.sub(r2);
+        vmState.reg(dst(inst), r.unwrap());
     }
 
     void Mul::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.reg(dst(inst), vmState.reg(reg1(inst)) * vmState.reg(reg2(inst)));
+        const Value r1 = vmState.reg(reg1(inst));
+        const Value r2 = vmState.reg(reg2(inst));
+        auto r = r1.mul(r2);
+        vmState.reg(dst(inst), r.unwrap());
     }
 
     void Div::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.reg(dst(inst), vmState.reg(reg1(inst)) / vmState.reg(reg2(inst)));
+        const Value r1 = vmState.reg(reg1(inst));
+        const Value r2 = vmState.reg(reg2(inst));
+        auto r = r1.div(r2);
+        vmState.reg(dst(inst), r.unwrap());
     }
 
     void Mov::execute(const Instruction &inst, const VMState &vmState) {
@@ -93,7 +102,7 @@ namespace cial::Bytecode::Op {
     }
 
     void Test::execute(const Instruction &inst, VMState &vmState) {
-        if(vmState.reg(reg(inst)).toBool()) {
+        if(vmState.reg(reg(inst)).asBool()) {
             vmState.setZF(true);
         }
     }
@@ -101,16 +110,16 @@ namespace cial::Bytecode::Op {
     void EQ::execute(const Instruction &inst, VMState &vmState) {
         const auto value1 = vmState.reg(reg1(inst));
         const auto value2 = vmState.reg(reg2(inst));
-        const bool result = value1 == value2;
-        vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
+        const bool result = value1.equals(value2);
+        vmState.reg(dst(inst), Value{ result });
         vmState.setZF(result);
     }
 
     void NEQ::execute(const Instruction &inst, VMState &vmState) {
         const auto value1 = vmState.reg(reg1(inst));
         const auto value2 = vmState.reg(reg2(inst));
-        const bool result = value1 != value2;
-        vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
+        const bool result = !value1.equals(value2);
+        vmState.reg(dst(inst), Value{ result });
         vmState.setZF(result);
     }
 
@@ -118,48 +127,48 @@ namespace cial::Bytecode::Op {
         const auto &kIpt = static_cast<const VMState &>(vmState);
         const auto &value1 = kIpt.reg(reg1(inst));
         const auto &value2 = kIpt.reg(reg2(inst));
-        const bool result = value1 < value2;
-        vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
+        const bool result = value1.littlerThan(value2).unwrap();
+        vmState.reg(dst(inst), Value{ result });
         vmState.setZF(result);
     }
 
     void LE::execute(const Instruction &inst, VMState &vmState) {
         const auto value1 = vmState.reg(reg1(inst));
         const auto value2 = vmState.reg(reg2(inst));
-        const bool result = value1 <= value2;
-        vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
+        const bool result = !value1.greaterThan(value2).unwrap();
+        vmState.reg(dst(inst), Value{ result });
         vmState.setZF(result);
     }
 
     void GT::execute(const Instruction &inst, VMState &vmState) {
         const auto value1 = vmState.reg(reg1(inst));
         const auto value2 = vmState.reg(reg2(inst));
-        const bool result = value1 > value2;
-        vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
+        const bool result = value1.greaterThan(value2).unwrap();
+        vmState.reg(dst(inst), Value{ result });
         vmState.setZF(result);
     }
 
     void GE::execute(const Instruction &inst, VMState &vmState) {
         const auto value1 = vmState.reg(reg1(inst));
         const auto value2 = vmState.reg(reg2(inst));
-        const bool result = value1 >= value2;
-        vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
+        const bool result = !value1.littlerThan(value2).unwrap();
+        vmState.reg(dst(inst), Value{ result });
         vmState.setZF(result);
     }
 
     void LAnd::execute(const Instruction &inst, VMState &vmState) {
         const auto value1 = vmState.reg(reg1(inst));
         const auto value2 = vmState.reg(reg2(inst));
-        const bool result = value1 && value2;
-        vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
+        const bool result = value1.logicalAnd(value2);
+        vmState.reg(dst(inst), Value{ result });
         vmState.setZF(result);
     }
 
     void LOr::execute(const Instruction &inst, VMState &vmState) {
         const auto value1 = vmState.reg(reg1(inst));
         const auto value2 = vmState.reg(reg2(inst));
-        const bool result = value1 || value2;
-        vmState.reg(dst(inst), Value{ static_cast<Integer>(result) });
+        const bool result = value1.logicalOr(value2);
+        vmState.reg(dst(inst), Value{ result });
         vmState.setZF(result);
     }
 
@@ -184,16 +193,15 @@ namespace cial::Bytecode::Op {
 
     void Call::execute(const Instruction &inst, VMState &vmState) {
         const auto &object = vmState.reg(memberReg(inst));
-        VM_ASSERT(object.isObject() && "memberReg is not object", &vmState);
-        object.toObject()->call(vmState, dst(inst), argCount(inst));
+        object.asObject().unwrap()->call(vmState, dst(inst), argCount(inst));
     }
 
     void GProp::execute(const Instruction &inst, const VMState &vmState) {
         const auto &val = vmState.reg(obj(inst));
-        const String &name = *vmState.reg(memberReg(inst)).toString();
+        const String &name = *vmState.reg(memberReg(inst)).asString().unwrap();
         const Atom atom = vmState.rt.atomTable.intern(name);
         if(val.isObject()) {
-            if(auto *instObj = dynamic_cast<InstanceObject *>(val.toObject())) {
+            if(auto *instObj = dynamic_cast<InstanceObject *>(val.asObject().value())) {
                 const auto tmp = instObj->getProp(atom);
                 vmState.reg(dst(inst), tmp);
                 return;
@@ -212,7 +220,7 @@ namespace cial::Bytecode::Op {
         if(inst.getOperand2Type() == Operand::Type::Atom)
             return vmState.rt.atomTable.get(inst.getOperand2<Atom>())->str;
         if(inst.getOperand2Type() == Operand::Type::Register)
-            return vmState.reg(inst.getOperand2<Register>()).toString();
+            return vmState.reg(inst.getOperand2<Register>()).asString().unwrap();
         CLL_ASSERT(false, "unknown inst sprop operand2 type");
     }
 
@@ -246,12 +254,13 @@ namespace cial::Bytecode::Op {
 
     void LNot::execute(const Instruction &inst, const VMState &vmState) {
         const Register srcReg = src(inst);
-        vmState.regRef(srcReg).asLogicalNot();
+        vmState.regRef(srcReg).toLogicalNot();
     }
 
     void ChS::execute(const Instruction &inst, const VMState &vmState) {
-        const Register srcReg = src(inst);
-        vmState.regRef(srcReg).asSignChange();
+        auto r = vmState.regRef(src(inst)).toSignChange();
+        if(r.isFailed())
+            throw r.getErr();
     }
 
     void Ret::execute(const Instruction &inst, VMState &vmState) {

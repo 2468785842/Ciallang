@@ -14,6 +14,7 @@
 
 #include "Octet.hpp"
 #include "String.hpp"
+#include "TypeConverter.hpp"
 #include "logging/Logger.hpp"
 
 namespace cial {
@@ -65,36 +66,79 @@ namespace cial {
         return *this;
     }
 
-    Integer Value::toInteger() const {
-        CLL_ASSERT(type() == ValueType::Integer, "not integer type is %s", name());
-        return _value._integer;
-    }
-
-    Real Value::toReal() const {
-        CLL_ASSERT(type() == ValueType::Real, "not real type is %s", name());
-        return _value._real;
-    }
-
-    String *Value::toString() const {
-        CLL_ASSERT(type() == ValueType::String, "not string type is %s", name());
-        return _value._string;
-    }
-
-    Octet *Value::toOctet() const {
-        CLL_ASSERT(type() == ValueType::Octet, "not octet type is %s", name());
-        return _value._octet;
-    }
-
-    Object *Value::toObject() const {
-        CLL_ASSERT(type() == ValueType::Object, "not object type is %s", name());
-        return _value._object;
-    }
-
-    bool Value::toBool() const {
-        if(type() == ValueType::Integer) {
-            return toInteger() != 0;
+    Ret<Integer> Value::asInteger() const noexcept {
+        switch(_type) {
+            case ValueType::Void:
+                return Ret<Integer>::ok(0);
+            case ValueType::Integer:
+                return Ret<Integer>::ok(_value._integer);
+            case ValueType::Real:
+                return Ret<Integer>::ok(static_cast<Integer>(_value._real.value()));
+            case ValueType::String:
+                // TODO:
+                // return String->ToInteger();
+            case ValueType::Object:
+            case ValueType::Octet:
+                break;
         }
-        return type() != ValueType::Void;
+        return Ret<Integer>::err(ErrCode::InvalidCast, "Invalid type cast to Integer"_str);
+    }
+
+    Ret<Real> Value::asReal() const noexcept {
+        switch(_type) {
+            case ValueType::Void:
+                return Ret<Real>::ok(Real{ 0.0 });
+            case ValueType::Integer:
+                return Ret<Real>::ok(Real{ static_cast<double>(_value._integer) });
+            case ValueType::Real:
+                return Ret<Real>::ok(_value._real);
+            case ValueType::String:
+                // TODO:
+                // return String->ToReal();
+            case ValueType::Object:
+            case ValueType::Octet:
+                break;
+        }
+        return Ret<Real>::err(ErrCode::InvalidCast, "Invalid type cast to Real"_str);
+    }
+
+    Ret<String *> Value::asString() const noexcept {
+        if(_type == ValueType::String) {
+            return Ret<String *>::ok(_value._string);
+        }
+        return Ret<String *>::err(ErrCode::TypeError, "Invalid type get as String"_str);
+    }
+
+    Ret<Octet *> Value::asOctet() const noexcept {
+        if(_type == ValueType::Octet) {
+            return Ret<Octet *>::ok(_value._octet);
+        }
+        return Ret<Octet *>::err(ErrCode::TypeError, "Invalid type get as Octet"_str);
+    }
+
+    Ret<Object *> Value::asObject() const noexcept {
+        if(_type == ValueType::Object) {
+            return Ret<Object *>::ok(_value._object);
+        }
+        return Ret<Object *>::err(ErrCode::TypeError, "Invalid type get as Object"_str);
+    }
+
+    bool Value::asBool() const noexcept {
+        switch(this->_type) {
+            case ValueType::Void:
+                return false;
+            case ValueType::Object:
+                return _value._object != nullptr;
+            case ValueType::String:
+                return asInteger().value() != 0;
+            case ValueType::Octet:
+                return _value._octet != nullptr;
+            case ValueType::Integer:
+                return _value._integer != 0;
+            case ValueType::Real:
+                return _value._real.value() != 0;
+        }
+        return false;
     }
 
     const char *Value::name() const {
@@ -116,130 +160,444 @@ namespace cial {
         }
     }
 
-    Value Value::operator+(const Value &value) const {
-        switch(value.type()) {
-            case ValueType::Integer:
-                return Value{ this->toInteger() + value.toInteger() };
-            case ValueType::Real:
-                return Value{ this->toReal() + value.toReal() };
-            default:
-                throw std::logic_error("not support add operator");
-        }
-    }
+    Ret<void> Value::toInteger() noexcept {
+        const auto r = this->asInteger();
+        if(r.isFailed())
+            return Ret<void>::err(r.getErr());
 
-    Value Value::operator-(const Value &value) const {
-        switch(value.type()) {
-            case ValueType::Integer:
-                return Value{ this->toInteger() - value.toInteger() };
-            case ValueType::Real:
-                return Value{ this->toReal() - value.toReal() };
-            default:
-                throw std::logic_error("not support sub operator");
-        }
-    }
-
-    Value Value::operator*(const Value &value) const {
-        switch(value.type()) {
-            case ValueType::Integer:
-                return Value{ this->toInteger() * value.toInteger() };
-            case ValueType::Real:
-                return Value{ this->toReal() * value.toReal() };
-            default:
-                throw std::logic_error("not support mul operator");
-        }
-    }
-
-    Value Value::operator/(const Value &value) const {
-        switch(value.type()) {
-            case ValueType::Integer:
-                return Value{ this->toInteger() / value.toInteger() };
-            case ValueType::Real:
-                return Value{ this->toReal() / value.toReal() };
-            default:
-                throw std::logic_error("not support div operator");
-        }
-    }
-
-    Value Value::operator-() const {
-        switch(type()) {
-            case ValueType::Integer:
-                return Value{ -toInteger() };
-            case ValueType::Real:
-                return Value{ -toReal() };
-            default:
-                throw std::logic_error("not number!! `operator-` can't use");
-        }
-    }
-
-    void Value::asLogicalNot() {
         this->~Value();
-        _value._integer = !toBool();
+        _value._integer = r.value();
         _type = ValueType::Integer;
+        return Ret<void>::ok();
     }
 
-    void Value::asSignChange() {
+    Ret<void> Value::toReal() noexcept {
+        const auto r = this->asReal();
+        if(r.isFailed())
+            return Ret<void>::err(r.getErr());
+
         this->~Value();
-        _value._integer = -toInteger();
-        _type = ValueType::Integer;
+        _value._real = r.value();
+        _type = ValueType::Real;
+        return Ret<void>::ok();
     }
 
-    bool Value::discernCompare(const Value &value) const {
-        if(!this->operator==(value)) {
-            return false;
-        }
-        // TODO: implement
-        return true;
-    }
+    Ret<void> Value::toString() noexcept {
 
-    bool Value::operator==(const Value &value) const {
-        if(type() != value.type())
-            return false;
-        switch(type()) {
-            case ValueType::Integer:
-                return toInteger() == value.toInteger();
-            case ValueType::Real:
-                return toReal() == value.toReal();
+        switch(_type) {
+            case ValueType::Object: {
+                auto *str = new String{ TypeConverter::objectToString(*_value._object) };
+                this->~Value();
+                new(this) Value{ str };
+                return Ret<void>::ok();
+            }
+
             case ValueType::String:
-                return toString() == value.toString();
-            case ValueType::Object:
-                return toObject() == value.toObject();
-            case ValueType::Octet:
-                return toOctet() == value.toOctet();
+                return Ret<void>::ok();
+
+            case ValueType::Integer: {
+                auto *str = new String{ TypeConverter::integerToString(_value._integer) };
+                this->~Value();
+                new(this) Value{ str };
+                return Ret<void>::ok();
+            }
+
+            case ValueType::Real: {
+                auto *str = new String{ TypeConverter::realToString(_value._real) };
+                this->~Value();
+                new(this) Value{ str };
+                return Ret<void>::ok();
+            }
+
             case ValueType::Void:
-                return true;
-            default:;
+            case ValueType::Octet:
+                break;
         }
 
+        return Ret<void>::err(ErrCode::InvalidCast, "Invalid type cast to String"_str);
+    }
+
+    Ret<void> Value::toOctet() const noexcept {
+        if(_type == ValueType::Octet)
+            return Ret<void>::ok();
+        return Ret<void>::err(ErrCode::InvalidCast, "Invalid type cast to Octet"_str);
+    }
+
+    Ret<void> Value::toObject() const noexcept {
+        if(_type == ValueType::Object)
+            return Ret<void>::ok();
+        return Ret<void>::err(ErrCode::InvalidCast, "Invalid type cast to Object"_str);
+    }
+
+    void Value::toLogicalNot() noexcept {
+        const auto r = asBool();
+        this->~Value();
+        _value._integer = !r;
+        _type = ValueType::Integer;
+    }
+
+    Ret<void> Value::toSignChange() noexcept {
+        if(!this->isReal()) {
+            if(const auto r = asInteger(); !r.isFailed()) {
+                this->~Value();
+                _value._integer = -r.value();
+                _type = ValueType::Integer;
+                return Ret<void>::ok();
+            }
+        }
+        const auto r = asReal();
+        if(r.isFailed())
+            return Ret<void>::err(r.getErr());
+        this->~Value();
+        _value._real = Real{ -r.value().value() };
+        _type = ValueType::Real;
+        return Ret<void>::ok();
+    }
+
+    Ret<Value> Value::add(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `+`"_str };
+
+        if(this->isString() || value.isString()) {
+            Value lhs = *this;
+            if(auto lhsR = lhs.toString(); lhsR.isFailed())
+                return Ret<Value>::err(err);
+
+            Value rhs = value;
+            if(auto rhsR = rhs.toString(); rhsR.isFailed())
+                return Ret<Value>::err(err);
+
+            auto s1 = lhs.asString();
+            if(s1.isFailed())
+                return Ret<Value>::err(err);
+
+            auto s2 = rhs.asString();
+            if(s2.isFailed())
+                return Ret<Value>::err(err);
+
+            String result{ *s1.value() };
+            result.append(*s2.value());
+
+            return Ret<Value>::ok(Value{ new String{ std::move(result) } });
+        }
+
+        if(this->_type == value._type) {
+            if(this->_type == ValueType::Octet) {
+                Octet oct{ *this->_value._octet, *value._value._octet };
+                return Ret<Value>::ok(Value{ new Octet{ std::move(oct) } });
+            }
+
+            if(this->isInteger()) {
+
+                const auto lhs = this->asInteger();
+                if(lhs.isFailed())
+                    return Ret<Value>::err(err);
+
+                const auto rhs = value.asInteger();
+                if(rhs.isFailed())
+                    return Ret<Value>::err(err);
+
+                return Ret<Value>::ok(Value{ lhs.value() + rhs.value() });
+            }
+        }
+
+        if(this->isVoid()) {
+            if(value.isInteger() || value.isReal()) {
+                return Ret<Value>::ok(value);
+            }
+        }
+
+        if(value.isVoid()) {
+            if(this->isInteger() || this->isReal()) {
+                return Ret<Value>::ok(*this);
+            }
+        }
+
+        const auto lhs = this->asReal();
+        if(lhs.isFailed())
+            return Ret<Value>::err(err);
+
+        const auto rhs = value.asReal();
+        if(rhs.isFailed())
+            return Ret<Value>::err(err);
+
+        return Ret<Value>::ok(Value{ lhs.value() + rhs.value() });
+    }
+
+    Ret<Value> Value::sub(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `-`"_str };
+        if(!this->isReal() && !value.isReal()) {
+            const auto lhs = this->asInteger();
+            const auto rhs = value.asInteger();
+            if(!lhs.isFailed() && !rhs.isFailed()) {
+                return Ret<Value>::ok(Value{ lhs.value() - rhs.value() });
+            }
+        }
+
+        const auto lhs = this->asReal();
+        if(lhs.isFailed())
+            return Ret<Value>::err(err);
+        const auto rhs = value.asReal();
+        if(rhs.isFailed())
+            return Ret<Value>::err(err);
+        return Ret<Value>::ok(Value{ lhs.value() - rhs.value() });
+    }
+
+    Ret<Value> Value::mul(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `*`"_str };
+        if(!this->isReal() && !value.isReal()) {
+            const auto lhs = this->asInteger();
+            const auto rhs = value.asInteger();
+            if(!lhs.isFailed() && !rhs.isFailed()) {
+                return Ret<Value>::ok(Value{ lhs.value() * rhs.value() });
+            }
+        }
+
+        const auto lhs = this->asReal();
+        if(lhs.isFailed())
+            return Ret<Value>::err(err);
+        const auto rhs = value.asReal();
+        if(rhs.isFailed())
+            return Ret<Value>::err(err);
+        return Ret<Value>::ok(Value{ lhs.value() * rhs.value() });
+    }
+
+    Ret<Value> Value::div(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `/`"_str };
+        const auto lhs = this->asReal();
+        if(lhs.isFailed())
+            return Ret<Value>::err(err);
+        const auto rhs = value.asReal();
+        if(rhs.isFailed())
+            return Ret<Value>::err(err);
+        return Ret<Value>::ok(Value{ lhs.value() / rhs.value() });
+    }
+
+    bool Value::equals(const Value &value) const noexcept {
+        const ValueType t1 = this->type();
+        const ValueType t2 = value.type();
+
+        // 如果类型相同，进行直接比较
+        if(t1 == t2) {
+            switch(t1) {
+                case ValueType::Integer: {
+                    auto v1 = this->asInteger();
+                    auto v2 = value.asInteger();
+                    return !v1.isFailed() && !v2.isFailed() && v1.value() == v2.value();
+                }
+                case ValueType::Real: {
+                    auto v1 = this->asReal();
+                    auto v2 = value.asReal();
+                    if(v1.isFailed() || v2.isFailed())
+                        return false;
+                    Real r1 = v1.value();
+                    Real r2 = v2.value();
+                    if(r1.isNan() || r2.isNan())
+                        return false;
+                    if(r1.isInfinity() && r2.isInfinity())
+                        return r1.sign() == r2.sign();
+                    return r1 == r2;
+                }
+                case ValueType::String: {
+                    auto s1 = this->asString();
+                    auto s2 = value.asString();
+                    if(s1.isFailed() || s2.isFailed())
+                        return false;
+                    if(s1.value() == s2.value())
+                        return true; // 相同指针
+                    if(!s1.value() || !s2.value())
+                        return false;
+                    return *s1.value() == *s2.value();
+                }
+                case ValueType::Octet: {
+                    auto o1 = this->asOctet();
+                    auto o2 = value.asOctet();
+                    if(o1.isFailed() || o2.isFailed())
+                        return false;
+                    if(o1.value() == o2.value())
+                        return true; // 相同指针
+                    if(!o1.value() || !o2.value())
+                        return false;
+                    if(o1.value()->getSize() != o2.value()->getSize())
+                        return false;
+                    return std::memcmp(o1.value()->getData(), o2.value()->getData(), o1.value()->getSize()) == 0;
+                }
+                case ValueType::Object: {
+                    auto obj1 = this->asObject();
+                    auto obj2 = value.asObject();
+                    if(obj1.isFailed() || obj2.isFailed())
+                        return false;
+                    return obj1.value() == obj2.value(); // 指针比较，或根据需要深比较
+                }
+                case ValueType::Void:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        // 如果任一为String，尝试转换为String比较
+        if(t1 == ValueType::String || t2 == ValueType::String) {
+            Value lhs = *this;
+            if(lhs.toString().isFailed())
+                return false;
+            Value rhsCopy = value;
+            if(rhsCopy.toString().isFailed())
+                return false;
+
+            auto s1 = lhs.asString();
+            auto s2 = rhsCopy.asString();
+            if(s1.isFailed() || s2.isFailed())
+                return false;
+            if(!s1.value() && !s2.value())
+                return true;
+            if(!s1.value() || !s2.value())
+                return false;
+            return *s1.value() == *s2.value();
+        }
+
+        // 处理Void与数值/字符串的比较（相当于检查是否为0或空）
+        if(t1 == ValueType::Void) {
+            switch(t2) {
+                case ValueType::Integer: {
+                    auto v = value.asInteger();
+                    return !v.isFailed() && v.value() == 0;
+                }
+                case ValueType::Real: {
+                    auto v = value.asReal();
+                    return !v.isFailed() && v.value().value() == 0.0;
+                }
+                default:
+                    return false;
+            }
+        }
+
+        if(t2 == ValueType::Void) {
+            switch(t1) {
+                case ValueType::Integer: {
+                    auto v = this->asInteger();
+                    return !v.isFailed() && v.value() == 0;
+                }
+                case ValueType::Real: {
+                    auto v = this->asReal();
+                    return !v.isFailed() && v.value().value() == 0.0;
+                }
+                default:
+                    return false;
+            }
+        }
+
+        // 否则，尝试转换为Real进行比较
+        auto r1 = this->asReal();
+        auto r2 = value.asReal();
+        if(r1.isFailed() || r2.isFailed())
+            return false;
+
+        Real val1 = r1.value();
+        Real val2 = r2.value();
+
+        if(val1.isNan() || val2.isNan())
+            return false;
+        if(val1.isInfinity() && val2.isInfinity())
+            return val1.sign() == val2.sign();
+        return val1 == val2;
+    }
+
+    bool Value::discernEquals(const Value &value) const noexcept {
+        if(this->_type == value._type) {
+            switch(this->_type) {
+                case ValueType::Object:
+                    return _value._object == value._value._object;
+                case ValueType::String:
+                case ValueType::Octet:
+                    return equals(value);
+                case ValueType::Void:
+                    return true;
+                case ValueType::Real: {
+                    const Real r1 = _value._real;
+                    const Real r2 = value._value._real;
+
+                    if(r1.isNan() || r2.isNan())
+                        return false;
+                    if(r1.isInfinity() && r2.isInfinity())
+                        return r1.sign() == r2.sign();
+                    return r1 == r2;
+                }
+                case ValueType::Integer:
+                    return _value._integer == value._value._integer;
+            }
+            return false;
+        }
         return false;
     }
 
-    bool Value::operator&&(const Value &value) const { return this->toBool() && value.toBool(); }
+    bool Value::logicalAnd(const Value &value) const noexcept { return this->asBool() && value.asBool(); }
 
-    bool Value::operator||(const Value &value) const { return this->toBool() || value.toBool(); }
+    bool Value::logicalOr(const Value &value) const noexcept { return this->asBool() || value.asBool(); }
 
-    std::partial_ordering Value::operator<=>(const Value &rhs) const {
-        const auto t1 = type();
-        const auto t2 = rhs.type();
-        if(t1 == ValueType::Integer && t2 == ValueType::Integer) {
-            return toInteger() <=> rhs.toInteger();
+    Ret<bool> Value::littlerThan(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `<`"_str };
+
+        if(!this->isString() || !value.isString()) {
+            if(this->isInteger() && value.isInteger()) {
+                return Ret<bool>::ok(this->_value._integer < value._value._integer);
+            }
+            const auto lhs = this->asReal();
+            const auto rhs = value.asReal();
+            if(lhs.isFailed() || rhs.isFailed())
+                return Ret<bool>::err(err);
+            return Ret<bool>::ok(lhs.value() < rhs.value());
         }
-        if(t1 != ValueType::String || t2 != ValueType::String) {
-            return toReal() <=> rhs.toReal();
-        }
+        const auto lhs = this->asString();
+        const auto rhs = value.asString();
+        if(lhs.isFailed() || rhs.isFailed())
+            return Ret<bool>::err(err);
 
-        return toString() <=> rhs.toString();
+        return Ret<bool>::ok(std::strcmp(lhs.value()->getData(), rhs.value()->getData()) < 0);
+    }
+
+    Ret<bool> Value::greaterThan(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `>`"_str };
+
+        if(!this->isString() || !value.isString()) {
+            if(this->isInteger() && value.isInteger()) {
+                return Ret<bool>::ok(this->_value._integer > value._value._integer);
+            }
+            const auto lhs = this->asReal();
+            const auto rhs = value.asReal();
+            if(lhs.isFailed() || rhs.isFailed())
+                return Ret<bool>::err(err);
+            return Ret<bool>::ok(lhs.value() > rhs.value());
+        }
+        const auto lhs = this->asString();
+        const auto rhs = value.asString();
+        if(lhs.isFailed() || rhs.isFailed())
+            return Ret<bool>::err(err);
+
+        return Ret<bool>::ok(std::strcmp(lhs.value()->getData(), rhs.value()->getData()) > 0);
     }
 
     std::ostream &operator<<(std::ostream &os, const Value &d) {
         switch(d.type()) {
-            case ValueType::Integer:
-                return os << d.toInteger();
-            case ValueType::Real:
-                return os << d.toReal();
-            case ValueType::String:
-                return os << "\"" << *d.toString() << "\"";
+            case ValueType::Integer: {
+                const auto r = d.asInteger();
+                if(r.isFailed())
+                    throw std::logic_error("Invalid type cast to Integer");
+                return os << r.value();
+            }
+            case ValueType::Real: {
+                const auto r = d.asReal();
+                if(r.isFailed())
+                    throw std::logic_error("Invalid type cast to Real");
+                return os << r.value();
+            }
+            case ValueType::String: {
+                const auto r = d.asString();
+                if(r.isFailed())
+                    throw std::logic_error("Invalid type cast to String");
+                return os << "\"" << *r.value() << "\"";
+            }
             case ValueType::Octet:
-                throw std::logic_error("not support");
+                return os << "<octet>";
             case ValueType::Object:
                 return os << "<object>";
             case ValueType::Void:
@@ -247,4 +605,5 @@ namespace cial {
         }
         return os << "unknown";
     }
+
 } // namespace cial

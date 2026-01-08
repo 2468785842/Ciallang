@@ -25,9 +25,9 @@ namespace cial::Common {
     public:
         Result() = default;
 
-        constexpr void fail() noexcept { _success = false; }
+        void fail() noexcept { _success = false; }
 
-        constexpr void succeed() noexcept { _success = true; }
+        void succeed() noexcept { _success = true; }
 
         void info(const std::string &message, const SourceLocation &loc = {}, const std::string &details = {}) {
             CLL_LOG_INFO(message.c_str());
@@ -45,9 +45,9 @@ namespace cial::Common {
             _messages.emplace_back(message, loc, details, ResultMessage::Types::warning);
         }
 
-        [[nodiscard]] constexpr bool isFailed() const noexcept { return !_success; }
+        [[nodiscard]] bool isFailed() const noexcept { return !_success; }
 
-        [[nodiscard]] constexpr const ResultMessageList &messages() const noexcept { return _messages; }
+        [[nodiscard]] const ResultMessageList &messages() const noexcept { return _messages; }
 
     private:
         bool _success = true;

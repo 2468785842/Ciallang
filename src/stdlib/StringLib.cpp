@@ -13,17 +13,19 @@
 #include "StringLib.hpp"
 #include "vm/VM.hpp"
 
+// TODO: UTF-8 support
+// TODO: length property support
 namespace cial::StdLib {
 
     String stringCharAt(VM *, const Value &thisObj, size_t, const Integer index) {
-        const String *str = thisObj.toString();
+        const String *str = thisObj.asString().unwrap();
         if(str->isEmpty() || index < 0 || index >= str->length())
             return ""_str;
         return String(str->getData()[index]);
     }
 
     Integer stringIndexOf(VM *, const Value &thisObj, size_t, const String *subStr, const Value &vStart) {
-        const String *str = thisObj.toString();
+        const String *str = thisObj.asString().unwrap();
         if(str->isEmpty())
             return -1;
 
@@ -32,7 +34,7 @@ namespace cial::StdLib {
         if(str->isEmpty() || subStr->isEmpty())
             return -1;
         if(!vStart.isVoid())
-            start = vStart.toInteger();
+            start = vStart.asInteger().unwrap();
 
         if(start >= str->length()) {
             return -1;
@@ -45,7 +47,7 @@ namespace cial::StdLib {
     }
 
     void stringToUpperCase(VM *, const Value &thisObj, size_t) {
-        String *str = thisObj.toString();
+        String *str = thisObj.asString().unwrap();
         if(str->isEmpty())
             return;
         for(char &c : *str) {
@@ -55,7 +57,7 @@ namespace cial::StdLib {
     }
 
     void stringToLowerCase(VM *, const Value &thisObj, size_t) {
-        String *str = thisObj.toString();
+        String *str = thisObj.asString().unwrap();
         if(str->isEmpty())
             return;
         for(char &c : *str) {
@@ -65,7 +67,8 @@ namespace cial::StdLib {
     }
 
     String stringSubstring(VM *, const Value &thisObj, size_t, const Integer start, const Value &vLength) {
-        const String *str = thisObj.toString();
+        // TODO: UTF-8 support
+        const String *str = thisObj.asString().unwrap();
         const Integer sLen = str->length();
 
         if(start < 0 || start >= sLen) {
@@ -73,7 +76,7 @@ namespace cial::StdLib {
         }
 
         if(!vLength.isVoid()) {
-            Integer count = vLength.toInteger();
+            Integer count = vLength.asInteger().unwrap();
             if(count < 0) {
                 return ""_str;
             }
@@ -86,7 +89,7 @@ namespace cial::StdLib {
     }
 
     String stringSprintf(VM *, const Value &thisObj, const size_t argCount, Value *args) {
-        return formatString(*thisObj.toString(), argCount, args);
+        return formatString(*thisObj.asString().unwrap(), argCount, args);
     }
 
     // TODO: need impl RegExp class
@@ -94,7 +97,7 @@ namespace cial::StdLib {
     //     throw std::runtime_error("Not implemented");
     // }
 
-    String stringEscape(VM *, const Value &thisObj, size_t) { return thisObj.toString()->escapeBackSlash(); }
+    String stringEscape(VM *, const Value &thisObj, size_t) { return thisObj.asString().unwrap()->escapeBackSlash(); }
     // TODO: need impl Array class
     // split(pattern, reserved, purgeempty)
     // Array stringSplit(VM *, const Value &thisObj, size_t, const String *pattern, const Value &vReserved, const Value
@@ -140,7 +143,7 @@ namespace cial::StdLib {
 
     // trim()
     String stringTrim(VM *, const Value &thisObj, size_t) {
-        const String *str = thisObj.toString();
+        const String *str = thisObj.asString().unwrap();
         const char *s = str->getData();
         const size_t len = str->length();
 
@@ -157,7 +160,7 @@ namespace cial::StdLib {
 
     // reverse()
     void stringReverse(VM *, const Value &thisObj, size_t) {
-        String *str = thisObj.toString();
+        String *str = thisObj.asString().unwrap();
         if(str->isEmpty())
             return;
 
@@ -172,7 +175,7 @@ namespace cial::StdLib {
 
     // repeat(count)
     String stringRepeat(VM *, const Value &thisObj, size_t, const Integer count) {
-        const String *str = thisObj.toString();
+        const String *str = thisObj.asString().unwrap();
         if(count <= 0 || str->isEmpty())
             return ""_str;
 

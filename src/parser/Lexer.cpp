@@ -102,25 +102,29 @@ bool Lexer::hasNext() const { return _hasNext; }
  * 回溯一个字符
  */
 void Lexer::rewindOneChar() const {
-    const auto pos = _sourceFile.pos();
+    const size_t pos = _sourceFile.pos();
     if(pos == 0)
         return;
-    if(pos > _sourceFile.length()) {
-        _sourceFile.seek(pos - 1);
-        return;
-    }
-    // utf-8
-    for(uint8_t i = 1; i <= 4; ++i) {
-        const auto ch = _sourceFile[pos - i];
-        if(!(ch >> 7)) {
+
+    // 最多回溯 4 个字节
+    for(size_t i = 1; i <= 4 && i <= pos; ++i) {
+        const uint8_t ch = _sourceFile[pos - i];
+
+        // ASCII
+        if((ch & 0x80) == 0) {
             _sourceFile.seek(pos - 1);
             return;
         }
-        if((ch & 0xC0) == 0xC0) {
+
+        // UTF-8 起始字节
+        if((ch & 0xE0) == 0xC0 || (ch & 0xF0) == 0xE0 || (ch & 0xF8) == 0xF0) {
             _sourceFile.seek(pos - i);
             return;
         }
     }
+
+    // fallback
+    _sourceFile.seek(pos - 1);
 }
 
 std::pair<uint32_t, uint32_t> Lexer::getCurrentRowCol() const {
@@ -400,7 +404,7 @@ bool Lexer::numberConstVal(Token *&token) {
 
             if(tCh == 'e' || tCh == 'E') {
                 const auto runeType = utf8Encode(ch);
-                stream << runeType.data;
+                stream.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
                 hasActualDigits = true;
                 ch = tCh;
                 continue;
@@ -434,7 +438,7 @@ bool Lexer::numberConstVal(Token *&token) {
         }
 
         const auto runeType = utf8Encode(ch);
-        stream << runeType.data;
+        stream.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
         if(isdigit(ch)) {
             hasActualDigits = true;
         }
@@ -712,13 +716,13 @@ std::string Lexer::readIdentifier() {
     std::stringstream stream{};
 
     auto runeType = utf8Encode(ch);
-    stream << runeType.data;
+    stream.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
 
     while(true) {
         ch = read(false);
         if(isRuneLetter(ch) || isRuneDigit(ch)) {
             runeType = utf8Encode(ch);
-            stream << runeType.data;
+            stream.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
             continue;
         }
         rewindOneChar();
@@ -1085,7 +1089,7 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
 
                 // 将Unicode转为utf-8, 存储到窄字符序列
                 const auto enRuneType = utf8Encode(code);
-                str << enRuneType.data;
+                str.write(reinterpret_cast<const char *>(enRuneType.data), enRuneType.width);
 
                 continue;
             }
@@ -1114,7 +1118,7 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
                     runeType = utf8Encode(code);
                 else
                     runeType = utf8Encode(ch);
-                str << runeType.data;
+                str.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
                 continue;
             }
             str << unescapeBackSlash(static_cast<char>(ch));
@@ -1172,7 +1176,7 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
         }
 
         const auto runeType = utf8Encode(ch);
-        str << runeType.data;
+        str.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
     }
 
     token = makeToken(TokenType::ConstVal, _rt.atomTable.intern(str.str().c_str(), str.str().size()));
