@@ -36,7 +36,6 @@ set(SOURCE_FILES
 
         src/runtime/Runtime.cpp
         src/runtime/AtomTable.cpp
-        src/runtime/OctetTable.cpp
 
         src/vm/VMState.cpp
         src/vm/Rlc.cpp
@@ -70,11 +69,16 @@ target_link_libraries(
         fmt::fmt utf8proc frozen::frozen argparse::argparse spdlog::spdlog
 )
 
+set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_WARNING_AS_ERROR ON)
+
 if(${BUILD_EXECUTABLE})
     add_executable(cial
             src/main.cpp
             ${SOURCE_FILES}
     )
+
+    set_target_properties(cial PROPERTIES COMPILE_WARNING_AS_ERROR ON)
+
 #    target_precompile_headers(cial PRIVATE "${CMAKE_SOURCE_DIR}/src/pch.h")
     target_link_libraries(
             cial

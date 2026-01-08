@@ -21,7 +21,6 @@
 
 #include "common/SourceLocation.hpp"
 #include "runtime/AtomTable.hpp"
-#include "runtime/OctetTable.hpp"
 #include "types/Value.hpp"
 #include "vm/Chunk.hpp"
 
@@ -70,6 +69,7 @@ namespace cial::Syntax {
     X(Do, "do")                                                                                                        \
     X(If, "if")                                                                                                        \
     X(Else, "else")                                                                                                    \
+    X(Null, "null")                                                                                                    \
     X(Comma, ",")                                                                                                      \
     X(Assignment, "=")                                                                                                 \
     X(AmpersandEqual, "&=")                                                                                            \
@@ -160,7 +160,7 @@ namespace cial::Syntax {
         return "unknown";
     }
 
-    enum class TokenValueType : std::uint8_t { None, Integer, Real, Atom, OctetIdx };
+    enum class TokenValueType : std::uint8_t { None, Integer, Real, Atom };
 
     struct Token {
         SourceLocation location{};
@@ -177,9 +177,6 @@ namespace cial::Syntax {
 
         explicit Token(const TokenType type, const Atom value) :
             _type(type), _constType(ConstantType::Atom), _value(std::bit_cast<std::uint64_t>(value)) {}
-
-        explicit Token(const TokenType type, const OctetIdx value) :
-            _type(type), _constType(ConstantType::OctetIdx), _value(std::bit_cast<std::uint64_t>(value)) {}
 
         Token(const Token &token) noexcept {
             _type = token._type;
@@ -199,7 +196,7 @@ namespace cial::Syntax {
     private:
         TokenType _type = TokenType::Void;
         ConstantType _constType = ConstantType::None;
-        std::uint64_t _value{}; // Integer, Real, Atom(String Index) or OctetIdx
+        std::uint64_t _value{}; // Integer, Real, Atom(String Index)
     };
 
     enum class StringParseState {

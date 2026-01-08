@@ -50,7 +50,7 @@ std::multimap<std::int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
     { '>', std::bind_front(&Lexer::gtSign) },
 
     // "<%" octet literal
-    { '<', std::bind_front(&Lexer::octetLiteral) },
+    // { '<', std::bind_front(&Lexer::octetLiteral) },
 
     // "< operator more..."
     { '<', std::bind_front(&Lexer::ltSign) },
@@ -84,7 +84,7 @@ std::multimap<std::int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
     return nullptr;
 }();
 
-Lexer::Lexer(Runtime &rt, SourceFile &sourceFile) : _rt(rt), _sourceFile(sourceFile) {}
+Lexer::Lexer(SourceFile &sourceFile, Runtime *rt) : _rt(rt), _sourceFile(sourceFile) {}
 
 bool Lexer::boringMatch(Token *&token, const OperatorTokenSet &signMap) {
     for(const auto &[sign, _token] : signMap) {
@@ -377,7 +377,7 @@ bool Lexer::blockComment(Token *&token) {
 bool Lexer::numberConstVal(Token *&token) {
     std::stringstream stream{ std::string{} };
     auto ch = read();
-    const std::string valid = ".0123456789Ee";
+    constexpr std::string valid = ".0123456789Ee";
     int32_t shifting = 0;
     auto hasActualDigits = false;
     auto valueType = ValueType::Integer;
@@ -506,8 +506,7 @@ void Lexer::parseNonDecimalReal(Token *&token, const std::string &decimalStr, st
 
     // scan input
     for(size_t i = 0; i < decimalStr.length(); i++) {
-        const auto decimal = decimalStr[i];
-        if(decimal == '.') {
+        if(const auto decimal = decimalStr[i]; decimal == '.') {
             pointPassed = true;
         } else if(decimal == 'p' || decimal == 'P') {
             // 匹配到p,指针向前移动,如果已经到末尾,退出
@@ -672,6 +671,7 @@ bool Lexer::identifier(Token *&token) {
         { "false", Token{ TokenType::ConstVal, 0 } },
         { "Infinity", Token{ TokenType::ConstVal, Real::negativeInf() } },
         { "NaN", Token{ TokenType::ConstVal, Real::signalingNan() } },
+        { "null", Token{ TokenType::Null } },
 
         { "function", Token{ TokenType::Function } },
         { "class", Token{ TokenType::Class } },
@@ -704,7 +704,12 @@ bool Lexer::identifier(Token *&token) {
         return true;
     }
 
-    token = makeToken(TokenType::Identifier, _rt.atomTable.intern(name.c_str(), name.size()));
+    if(_rt) {
+        token = makeToken(TokenType::Identifier, _rt->atomTable.intern(name.c_str(), name.size()));
+    } else {
+        token = makeToken(TokenType::Identifier);
+    }
+
     return true;
 }
 
@@ -1179,7 +1184,11 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
         str.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
     }
 
-    token = makeToken(TokenType::ConstVal, _rt.atomTable.intern(str.str().c_str(), str.str().size()));
+    if(_rt) {
+        token = makeToken(TokenType::ConstVal, _rt->atomTable.intern(str.str().c_str(), str.str().size()));
+    } else {
+        token = makeToken(TokenType::ConstVal);
+    }
 
     return strPsState;
 }
@@ -1187,50 +1196,50 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
 /**
  * 十六进制,字符序列
  */
-bool Lexer::octetLiteral(Token *&token) {
-    _sourceFile.pushMark();
-    DEFER { _sourceFile.popMark(); };
-    std::stringstream stream{ std::string{} };
-    std::vector<uint8_t> buf{};
-    // parse an octet literal;
-    // syntax is:
-    // <% xx xx xx xx xx xx ... %>
-    // where xx is hexadecimal 8bit(octet) binary representation.
-    if(match("<%")) {
-        auto newSec = true;
-        uint8_t oct = 0;
-
-        for(;;) {
-            skipComment();
-            auto ch = read(false);
-            if(ch == '%') {
-                ch = read(false);
-                if(ch == '>') {
-                    token = makeToken(TokenType::ConstVal, _rt.octetTable.intern(buf.data(), buf.size()));
-                    return true;
-                }
-                _sourceFile.restoreTopMark();
-                return false;
-            }
-
-            ch = static_cast<uint8_t>(getHexNum(static_cast<char>(ch)));
-            if(ch != -1) {
-                if(newSec) {
-                    oct = ch;
-                    newSec = ch == ',';
-
-                    if(newSec)
-                        buf.push_back(oct);
-                } else {
-                    oct <<= 4;
-                    oct += ch;
-
-                    buf.push_back(oct);
-                    newSec = true;
-                }
-            }
-        }
-    }
-    // S_ConstVals;
-    return false;
-}
+// bool Lexer::octetLiteral(Token *&token) {
+//     _sourceFile.pushMark();
+//     DEFER { _sourceFile.popMark(); };
+//     std::stringstream stream{ std::string{} };
+//     std::vector<uint8_t> buf{};
+//     // parse an octet literal;
+//     // syntax is:
+//     // <% xx xx xx xx xx xx ... %>
+//     // where xx is hexadecimal 8bit(octet) binary representation.
+//     if(match("<%")) {
+//         auto newSec = true;
+//         uint8_t oct = 0;
+//
+//         for(;;) {
+//             skipComment();
+//             auto ch = read(false);
+//             if(ch == '%') {
+//                 ch = read(false);
+//                 if(ch == '>') {
+//                     token = makeToken(TokenType::ConstVal, _rt.octetTable.intern(buf.data(), buf.size()));
+//                     return true;
+//                 }
+//                 _sourceFile.restoreTopMark();
+//                 return false;
+//             }
+//
+//             ch = static_cast<uint8_t>(getHexNum(static_cast<char>(ch)));
+//             if(ch != -1) {
+//                 if(newSec) {
+//                     oct = ch;
+//                     newSec = ch == ',';
+//
+//                     if(newSec)
+//                         buf.push_back(oct);
+//                 } else {
+//                     oct <<= 4;
+//                     oct += ch;
+//
+//                     buf.push_back(oct);
+//                     newSec = true;
+//                 }
+//             }
+//         }
+//     }
+//     // S_ConstVals;
+//     return false;
+// }

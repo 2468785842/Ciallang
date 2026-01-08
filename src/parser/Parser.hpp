@@ -80,7 +80,7 @@ namespace cial::Syntax {
 
     class Parser {
     public:
-        Parser(Runtime &rt, SourceFile &sourceFile) : _lexer(Lexer{ rt, sourceFile }), _sourceFile(sourceFile) {}
+        Parser(Runtime &rt, SourceFile &sourceFile) : _lexer(Lexer{ sourceFile, &rt }), _sourceFile(sourceFile) {}
 
         void error(Result &r, const std::string &message, const SourceLocation &location) const {
             _sourceFile.error(r, message, location);
@@ -267,13 +267,22 @@ namespace cial::Syntax {
         ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    struct FunctionPrefixParser final : PrefixParser {
+        FunctionPrefixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
+
     static constinit ConstValPrefixParser S_ConstValPrefixParser{};
     static constinit UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
     static constinit IdentifierPrefixParser S_IdentifierPrefixParser;
     static constinit UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
     static constinit ParenthesizedPrefixParser S_ParenthesizedPrefixParser{};
+    static constinit FunctionPrefixParser S_FunctionPrefixParser;
 
     static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>({
+        { TokenType::Null, &S_ConstValPrefixParser },
         { TokenType::ConstVal, &S_ConstValPrefixParser },
         { TokenType::Minus, &S_NegatePrefixParser }, // "-"
         { TokenType::Identifier, &S_IdentifierPrefixParser },
@@ -293,12 +302,12 @@ namespace cial::Syntax {
         { TokenType::Ampersand, &S_PrefixParser }, // "&" substance accessing (ignores property operation)
         { TokenType::Asterisk, &S_PrefixParser }, // "*" force property access
         { TokenType::LParenthesis, &S_ParenthesizedPrefixParser }, // "(" 括号表达式
+        { TokenType::Function, &S_FunctionPrefixParser }
         // incontextof_expr "instanceof" unary_expr
         // incontextof_expr "in" unary_expr
         // {TokenType::Int,            &S_TypeCastPrefixParser}, // "int" unary_expr
         // {TokenType::Real,           &S_TypeCastPrefixParser}, // "real" unary_expr
         // {TokenType::String,         &S_TypeCastPrefixParser}, // "string" unary_expr
-        // {TokenType::Function,       &S_FunctionPrefixParser}
     });
 
     /**

@@ -45,7 +45,7 @@ namespace cial::Syntax {
     public:
         BlockStmtNode *body{ nullptr };
         // name, default value
-        Vec<std::pair<Token, ExprNode *>> parameters{};
+        Parameters parameters{};
 
         FunctionDeclNode() = delete;
 

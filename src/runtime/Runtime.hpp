@@ -16,7 +16,6 @@
 #include <ranges>
 
 #include "AtomTable.hpp"
-#include "OctetTable.hpp"
 
 #include "gc/GC.hpp"
 
@@ -31,7 +30,6 @@ namespace cial {
     class Runtime {
     public:
         AtomTable atomTable{};
-        OctetTable octetTable{};
 
         MarkSweep markSweep{ 1024 };
 

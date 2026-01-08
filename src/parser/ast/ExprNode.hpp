@@ -130,6 +130,20 @@ namespace cial::Syntax {
         }
     };
 
+    class FunctionExprNode final : public ExprNode {
+    public:
+        BlockStmtNode *body{ nullptr };
+        // name, default value
+        Vec<std::pair<Token, ExprNode *>> parameters{};
+
+        explicit FunctionExprNode() : ExprNode("function_declaration") {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
 
     class ConditionalTernaryExprNode final : public ExprNode {
     public:

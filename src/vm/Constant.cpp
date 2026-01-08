@@ -41,10 +41,6 @@ namespace cial {
                 const auto *str = rt->atomTable.get(value<Atom>())->str;
                 return Value{ new String(str->getData(), str->length()) };
             }
-            case ConstantType::OctetIdx: {
-                const auto *oEntry = rt->octetTable.get(value<OctetIdx>());
-                return Value{ new Octet(oEntry->data, oEntry->size) };
-            }
             case ConstantType::FuncMeta: {
                 return Value{ rt->create<Function>(value<FuncMeta *>()) };
             }

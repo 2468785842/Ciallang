@@ -41,6 +41,8 @@ namespace cial::Syntax {
 
     class AssignExprNode;
 
+    class FunctionExprNode;
+
     class BlockStmtNode;
 
     class ExprStmtNode;
@@ -70,6 +72,8 @@ namespace cial::Syntax {
     class ClassDeclNode;
 
     class StmtDeclNode;
+
+    using Parameters = std::vector<std::pair<Token, ExprNode *>>;
 
     class AstNode {
     protected:
@@ -122,6 +126,8 @@ namespace cial::Syntax {
         virtual void visit(const ProcCallExprNode *) = 0;
 
         virtual void visit(const AssignExprNode *) = 0;
+
+        virtual void visit(const FunctionExprNode *) = 0;
 
         virtual void visit(const BlockStmtNode *) = 0;
 

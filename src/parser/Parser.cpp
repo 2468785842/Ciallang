@@ -83,7 +83,7 @@ namespace cial::Syntax {
         return true;
     }
 
-    static bool parseParameters(Result &r, Parser *parser, FunctionDeclNode *funNode) {
+    static bool parseParameters(Result &r, Parser *parser, Parameters &parameters, const SourceLocation &location) {
         if(!parser->expect(r, TokenType::LParenthesis))
             return false;
 
@@ -94,7 +94,7 @@ namespace cial::Syntax {
 
         for(;;) {
             if(!parser->peek(TokenType::Identifier)) {
-                parser->error(r, "function parameter expect a identifier", funNode->location);
+                parser->error(r, "function parameter expect a identifier", location);
                 return false;
             }
             Token identifier{};
@@ -113,7 +113,7 @@ namespace cial::Syntax {
                     return false;
             }
 
-            funNode->parameters.emplace_back(identifier, expr);
+            parameters.emplace_back(identifier, expr);
 
             if(parser->peek(TokenType::RParenthesis)) {
                 parser->consume();
@@ -434,7 +434,7 @@ namespace cial::Syntax {
         // function a {
         // }
         if(parser->peek(TokenType::LParenthesis)) {
-            if(!parseParameters(r, parser, functionDeclNode)) {
+            if(!parseParameters(r, parser, functionDeclNode->parameters, token->location)) {
                 return nullptr;
             }
         }
@@ -808,13 +808,14 @@ namespace cial::Syntax {
 
     ExprNode *ProcCallInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
         // check
-        if(!dynamic_cast<IdentifierExprNode *>(lhs)) {
+        if(!dynamic_cast<IdentifierExprNode *>(lhs) && !dynamic_cast<FunctionExprNode *>(lhs)) {
             if(const auto binaryExprNode = dynamic_cast<BinaryExprNode *>(lhs);
                !binaryExprNode || *binaryExprNode->token != TokenType::Dot) {
-                parser->error(r, "proc call expect identifier", token->location);
+                parser->error(r, "proc call expect identifier or function expression", token->location);
                 return nullptr;
             }
         }
+
         const auto procCallExprNode = parser->astBuilder()->makeNode<ProcCallExprNode>(lhs);
 
         if(!parser->peek(TokenType::RParenthesis)) {
@@ -828,7 +829,6 @@ namespace cial::Syntax {
 
         return procCallExprNode;
     }
-
 
     ExprNode *ConstValPrefixParser::parse(Result &, Parser *parser, Token *token) const {
         return parser->astBuilder()->makeNode<ValueExprNode>(*token);
@@ -864,6 +864,34 @@ namespace cial::Syntax {
         }
 
         return expr;
+    }
+
+    ExprNode *FunctionPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
+        auto *functionExprNode = parser->astBuilder()->makeNode<FunctionExprNode>();
+
+        // it's ok
+        // function {
+        // }
+        if(parser->peek(TokenType::LParenthesis)) {
+            if(!parseParameters(r, parser, functionExprNode->parameters, token->location)) {
+                return nullptr;
+            }
+        }
+
+        if(!parser->peek(TokenType::LeftCurlyBrace)) {
+            parser->error(r, "function expect {", token->location);
+            return nullptr;
+        }
+
+        auto *body = dynamic_cast<BlockStmtNode *>(parser->parseStatement(r, true));
+
+        if(!body)
+            return nullptr;
+
+        functionExprNode->body = body;
+        functionExprNode->location = body->location;
+
+        return functionExprNode;
     }
 
     ExprNode *ConditionalTernaryInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {

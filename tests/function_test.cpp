@@ -121,6 +121,19 @@ TEST_CASE("函数声明 - 函数体内容") {
 
 TEST_CASE("函数声明 - 函数调用") {
 
+    SECTION("无参数省略括号函数调用") {
+        Runtime rt{};
+        Context context{ rt };
+        Bytecode::VMState vmState{ context };
+        VM vm{ &vmState };
+        vm.eval(R"(
+            function foo { return 1; }
+            var rFoo = foo();
+        )"_str);
+        REQUIRE(*vm.getGlobal<Function *>("foo"_str));
+        REQUIRE(*vm.evalExpr<Integer>("rFoo"_str) == 1);
+    }
+
     SECTION("无参数函数调用") {
         Runtime rt{};
         Context context{ rt };

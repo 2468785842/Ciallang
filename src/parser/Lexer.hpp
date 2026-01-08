@@ -25,7 +25,7 @@ namespace cial::Syntax {
     public:
         using LexerCaseCallable = std::function<bool(Lexer *, Token *&)>;
 
-        explicit Lexer(Runtime &rt, SourceFile &sourceFile);
+        explicit Lexer(SourceFile &sourceFile, Runtime *rt = nullptr);
 
         bool next(Token *&);
 
@@ -49,7 +49,7 @@ namespace cial::Syntax {
 
         [[maybe_unused]] static void *S_LoadCases;
 
-        Runtime &_rt;
+        Runtime *_rt;
         SourceFile &_sourceFile;
 
         std::vector<Token *> _tokens{};
@@ -82,7 +82,7 @@ namespace cial::Syntax {
         // <
         bool gtSign(Token *&);
 
-        bool octetLiteral(Token *&);
+        // bool octetLiteral(Token *&);
 
         // >
         bool ltSign(Token *&);

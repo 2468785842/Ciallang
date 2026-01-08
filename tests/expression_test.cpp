@@ -123,61 +123,53 @@ TEST_CASE("表达式 - 赋值表达式") {
     SECTION("复合赋值") { REQUIRE((*vm.eval<Integer>("var x, y; x = y = 10; return x + y;"_str)) == 20); }
 }
 
-TEST_CASE("表达式 - 函数调用表达式") {
+TEST_CASE("表达式 - 函数表达式") {
     Runtime rt{};
     Context context{ rt };
     Bytecode::VMState vmState{ context };
     VM vm{ &vmState };
 
-    SECTION("无参数调用") { REQUIRE((*vm.eval<bool>("function func() { return true; } return func();"_str)) == true); }
+    SECTION("无参数调用") { REQUIRE((*vm.evalExpr<bool>("function { return true; }()"_str)) == true); }
 
     SECTION("带参数调用") {
-        REQUIRE((*vm.eval<Integer>(R"(
-            function add(a, b, c) { return a + b + c; }
-            return add(1, 2, 3);
+        REQUIRE((*vm.evalExpr<Integer>(R"(
+            function(a, b, c) { return a + b + c; }(1, 2, 3)
         )"_str)) == 6);
     }
 
     SECTION("嵌套调用") {
-        REQUIRE((*vm.eval<Integer>(R"(
-            function max(a, b) { if(a < b) return b; else return a; }
-            function min(a, b) { if(a > b) return b; else return a; }
-            return max(min(2, 1), 3);
+        REQUIRE((*vm.evalExpr<Integer>(R"(
+            function (a, b) { if(a < b) return b; else return a; }(function (a, b) { if(a > b) return b; else return a; }(2, 1), 3);
         )"_str)) == 3);
     }
 
     SECTION("逗号表示隐式void参数 - 两个逗号") {
-        REQUIRE((*vm.eval<bool>(R"(
-            function func(a, b) { return a && b; }
-            return func(,);
+        REQUIRE((*vm.evalExpr<bool>(R"(
+            function (a, b) { return a && b; }(,)
         )"_str)) == false);
     }
 
     SECTION("逗号表示隐式void参数 - 三个逗号") {
-        REQUIRE((*vm.eval<bool>(R"(
-            function func(a, b, c) { return a && b && c; }
-            return func(,,);
+        REQUIRE((*vm.evalExpr<bool>(R"(
+            function (a, b, c) { return a && b && c; }(,,)
         )"_str)) == false);
     }
 
     SECTION("逗号表示隐式void参数 - 参数后跟逗号") {
-        REQUIRE((*vm.eval<bool>(R"(
-            function func(a, b) { return a == 2 && !b; }
-            return func(2,);
+        REQUIRE((*vm.evalExpr<bool>(R"(
+            function (a, b) { return a == 2 && !b; }(2,)
         )"_str)) == true);
     }
 
     SECTION("逗号表示隐式void参数 - 逗号后跟参数") {
-        REQUIRE((*vm.eval<bool>(R"(
-            function func(a, b) { return !a && b == 2; }
-            return func(,2);
+        REQUIRE((*vm.evalExpr<bool>(R"(
+            function (a, b) { return !a && b == 2; }(,2)
         )"_str)) == true);
     }
 
     SECTION("逗号表示隐式void参数 - 混合情况") {
-        REQUIRE((*vm.eval<bool>(R"(
-            function func(a, b, c, d, e) { return a == 1 && !b && c == 2 && !d && e == 3; }
-            return func(1, , 2, , 3);
+        REQUIRE((*vm.evalExpr<bool>(R"(
+            function (a, b, c, d, e) { return a == 1 && !b && c == 2 && !d && e == 3; }(1, , 2, , 3)
         )"_str)) == true);
     }
 }

@@ -55,6 +55,10 @@ namespace cial::Inter {
     }
 
     void IRGenerator::generate(const Syntax::ValueExprNode *node, OptReg &retReg) {
+        if(node->token->type() == Syntax::TokenType::Null) {
+            error("null token current not support", node->location);
+            return;
+        }
         auto dst = allocateRegister();
         _chunk->emit<Bytecode::Op::OpCode::Load>(dst, _chunk->addConstant(node->token->constVal()));
         retReg = dst;
@@ -262,6 +266,20 @@ namespace cial::Inter {
         error("isn't support assign operator", node->location);
     }
 
+    void IRGenerator::generate(const Syntax::FunctionExprNode *node, OptReg &retReg) {
+        auto funReg = allocateRegister();
+        auto *funcMeta = generateFuncMeta(node->parameters, node->body);
+
+        if(!funcMeta) {
+            error("generate chunk failed with function expr", node->location);
+            return;
+        }
+
+        _chunk->emit<Bytecode::Op::OpCode::Load>(funReg, _chunk->addConstant(Constant{ funcMeta }));
+
+        retReg = funReg;
+    }
+
     void IRGenerator::generate(const Syntax::VarDeclNode *node, OptReg &retReg) {
         const auto identifier = node->token->constVal().value<Atom>();
 
@@ -306,10 +324,10 @@ namespace cial::Inter {
 
     void IRGenerator::generate(const Syntax::FunctionDeclNode *node, OptReg &retReg) {
         auto funReg = allocateRegister();
-        auto *funcMeta = generateFuncMeta(node);
+        auto *funcMeta = generateFuncMeta(node->parameters, node->body);
 
         if(!funcMeta) {
-            error("generate function chunk failed", node->location);
+            error("generate chunk failed with function declaration", node->location);
             return;
         }
 
@@ -343,10 +361,10 @@ namespace cial::Inter {
 
             if(const auto *funcDeclNode = dynamic_cast<Syntax::FunctionDeclNode *>(declNode)) {
                 const auto funName = funcDeclNode->token->constVal().value<Atom>();
-                const auto funcMeta = generateFuncMeta(funcDeclNode);
+                const auto funcMeta = generateFuncMeta(funcDeclNode->parameters, funcDeclNode->body);
 
                 if(!funcMeta) {
-                    error("generate function chunk failed", node->location);
+                    error("generate chunk failed with class function declaration", node->location);
                     return;
                 }
                 classMeta->setMember(MemberShapMeta{ funName }, funcMeta);
@@ -618,14 +636,14 @@ namespace cial::Inter {
         return nullptr;
     }
 
-    FuncMeta *IRGenerator::generateFuncMeta(const Syntax::FunctionDeclNode *node) const {
+    FuncMeta *IRGenerator::generateFuncMeta(const Syntax::Parameters &parameters, Syntax::BlockStmtNode *body) const {
 
         auto gen = IRGenerator{ _rt, _sourceFile };
         gen.makeVirtualGlobalScope();
 
         OptReg paramReg{};
 
-        for(auto &[token, exprNode] : node->parameters) {
+        for(auto &[token, exprNode] : parameters) {
             const auto varName = token.constVal().value<Atom>();
 
             if(exprNode) {
@@ -642,7 +660,7 @@ namespace cial::Inter {
         }
 
         OptReg ignoreReg{};
-        auto funChunk = gen.parseAst(_r, node->body, ignoreReg);
+        auto funChunk = gen.parseAst(_r, body, ignoreReg);
         assert(funChunk);
 
         // the last instruction is not ret, patch one ret
@@ -652,7 +670,7 @@ namespace cial::Inter {
         }
 
         auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
-        return _rt.createNoGC<FuncMeta>(static_cast<std::uint32_t>(node->parameters.size()), chunk,
+        return _rt.createNoGC<FuncMeta>(static_cast<std::uint32_t>(parameters.size()), chunk,
                                         std::move(gen._localVars));
     }
 

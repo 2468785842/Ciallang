@@ -65,6 +65,8 @@ namespace cial::Inter {
 
         void generate(const Syntax::AssignExprNode *, OptReg &);
 
+        void generate(const Syntax::FunctionExprNode *, OptReg &);
+
         void generate(const Syntax::BlockStmtNode *, OptReg &);
 
         void generate(const Syntax::ExprStmtNode *, OptReg &);
@@ -144,7 +146,7 @@ namespace cial::Inter {
 
         Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk);
 
-        FuncMeta *generateFuncMeta(const Syntax::FunctionDeclNode *node) const;
+        FuncMeta *generateFuncMeta(const Syntax::Parameters &parameters, Syntax::BlockStmtNode *body) const;
 
         bool expectValue(const Syntax::ExprNode *node, Bytecode::Register &ret);
 

@@ -57,13 +57,14 @@
 * [x] `true` `false`
 * [x] `void`
 * [x] `null`
-* [ ] `Infinity` `-Infinity`
+* [x] `Infinity` `-Infinity`
 * [ ] `super`
 * [ ] `global`
 * [ ] `this`
-* [ ] `function` 函数表达式声明
-* [ ] `[]` Array声明
-* [ ] `%[]` Dictionary声明
+* [x] `function` 函数表达式声明
+* [ ] `[]` Array 声明
+* [ ] `%[]` Dictionary 声明
+* [ ] `<% xx xx ... %>` Octet 声明
 
 #### 表达式
 * [x] `A,B` 顺序表达式

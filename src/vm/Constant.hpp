@@ -21,7 +21,6 @@
 
 #include "logging/Logger.hpp"
 #include "runtime/AtomTable.hpp"
-#include "runtime/OctetTable.hpp"
 #include "types/Value.hpp"
 
 namespace cial {
@@ -160,7 +159,6 @@ namespace cial {
     O(Integer, Integer, integer, ValueF)                                                                               \
     O(Real, Real, real, ValueF)                                                                                        \
     O(Atom, Atom, atom, ValueF)                                                                                        \
-    O(OctetIdx, OctetIdx, octetIdx, ValueF)                                                                            \
     O(FuncMeta, FuncMeta *, funcMeta, PointerF)                                                                        \
     O(ClassMeta, ClassMeta *, classMeta, PointerF)
 
