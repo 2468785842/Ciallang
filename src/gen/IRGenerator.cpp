@@ -104,7 +104,7 @@ namespace cial::Inter {
                 lVarReg = allocateRegister();
                 _chunk->emit<Bytecode::Op::OpCode::GGlobal>(lVarName, *lVarReg);
             }
-            _chunk->emit<Bytecode::Op::OpCode::CP>(*lVarReg, dst);
+            _chunk->emit<Bytecode::Op::OpCode::Mov>(*lVarReg, dst);
             OptReg rVarReg{};
 
             if(rVar) {
@@ -115,13 +115,13 @@ namespace cial::Inter {
             }
 
             if(lVar) {
-                _chunk->emit<Bytecode::Op::OpCode::CP>(*rVarReg, *lVarReg);
+                _chunk->emit<Bytecode::Op::OpCode::Mov>(*rVarReg, *lVarReg);
             } else {
                 _chunk->emit<Bytecode::Op::OpCode::DGlobal>(lVarName, *rVarReg);
             }
 
             if(rVar) {
-                _chunk->emit<Bytecode::Op::OpCode::CP>(dst, rVar->reg);
+                _chunk->emit<Bytecode::Op::OpCode::Mov>(dst, rVar->reg);
             } else {
                 _chunk->emit<Bytecode::Op::OpCode::DGlobal>(rVarName, dst);
             }
@@ -129,57 +129,55 @@ namespace cial::Inter {
             return;
         }
 
-        Bytecode::Register reg1{ 0 };
-        if(!expectValue(node->lhs, reg1))
+        Bytecode::Register src{ 0 };
+        if(!expectValue(node->lhs, src))
             return;
 
-        Bytecode::Register reg2{ 0 };
-        if(!expectValue(node->rhs, reg2))
+        Bytecode::Register dst{ 0 };
+        if(!expectValue(node->rhs, dst))
             return;
 
         if(node->token->type() == Comma) {
-            retReg = reg2;
+            retReg = dst;
             return;
         }
 
-        auto dst = allocateRegister();
-
         switch(node->token->type()) {
             case Equal:
-                _chunk->emit<Bytecode::Op::OpCode::EQ>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::EQ>(src, dst);
                 break;
             case NotEqual:
-                _chunk->emit<Bytecode::Op::OpCode::NEQ>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::NEQ>(src, dst);
                 break;
             case Gt:
-                _chunk->emit<Bytecode::Op::OpCode::GT>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::GT>(src, dst);
                 break;
             case GtOrEqual:
-                _chunk->emit<Bytecode::Op::OpCode::GE>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::GE>(src, dst);
                 break;
             case Lt:
-                _chunk->emit<Bytecode::Op::OpCode::LT>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::LT>(src, dst);
                 break;
             case LtOrEqual:
-                _chunk->emit<Bytecode::Op::OpCode::LE>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::LE>(src, dst);
                 break;
             case LogicalAnd:
-                _chunk->emit<Bytecode::Op::OpCode::LAnd>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::LAnd>(src, dst);
                 break;
             case LogicalOr:
-                _chunk->emit<Bytecode::Op::OpCode::LOr>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::LOr>(src, dst);
                 break;
             case Plus:
-                _chunk->emit<Bytecode::Op::OpCode::Add>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::Add>(src, dst);
                 break;
             case Minus:
-                _chunk->emit<Bytecode::Op::OpCode::Sub>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::Sub>(src, dst);
                 break;
             case Asterisk:
-                _chunk->emit<Bytecode::Op::OpCode::Mul>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::Mul>(src, dst);
                 break;
             case Slash:
-                _chunk->emit<Bytecode::Op::OpCode::Div>(reg1, reg2, dst);
+                _chunk->emit<Bytecode::Op::OpCode::Div>(src, dst);
                 break;
             default:
                 error("unknow binary operator", node->location);

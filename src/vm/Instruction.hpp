@@ -253,11 +253,9 @@ namespace cial::Bytecode::Op {
     }; // struct PushReg
 
     struct Add {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, const VMState &);
 
@@ -265,11 +263,9 @@ namespace cial::Bytecode::Op {
     }; // struct Add
 
     struct Sub {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, const VMState &);
 
@@ -277,11 +273,9 @@ namespace cial::Bytecode::Op {
     }; // struct Sub
 
     struct Mul {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, const VMState &);
 
@@ -289,11 +283,9 @@ namespace cial::Bytecode::Op {
     }; // struct Mul
 
     struct Div {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, const VMState &);
 
@@ -349,11 +341,9 @@ namespace cial::Bytecode::Op {
     }; // struct Test
 
     struct EQ {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, VMState &);
 
@@ -361,11 +351,9 @@ namespace cial::Bytecode::Op {
     }; // struct EQ
 
     struct NEQ {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, VMState &);
 
@@ -373,11 +361,9 @@ namespace cial::Bytecode::Op {
     }; // struct NEQ
 
     struct LT {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, VMState &);
 
@@ -385,11 +371,9 @@ namespace cial::Bytecode::Op {
     }; // struct LT
 
     struct LE {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, VMState &);
 
@@ -397,11 +381,9 @@ namespace cial::Bytecode::Op {
     }; // struct LE
 
     struct GT {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, VMState &);
 
@@ -409,11 +391,9 @@ namespace cial::Bytecode::Op {
     }; // struct GT
 
     struct GE {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, VMState &);
 
@@ -421,16 +401,34 @@ namespace cial::Bytecode::Op {
     }; // struct GE
 
     struct AbsEQ {
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct AbsEQ
+
+    struct LNot {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct LNot
+
+    struct LAnd {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct LAnd
 
     struct Jmp {
 
@@ -520,35 +518,11 @@ namespace cial::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GUpval
 
-    struct LNot {
+    struct LOr {
 
         static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct LNot
-
-    struct LAnd {
-
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
-
-        static void execute(const Instruction &, VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct LAnd
-
-    struct LOr {
-
-        static Register reg1(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register reg2(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
         static void execute(const Instruction &, VMState &);
 
