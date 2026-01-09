@@ -14,12 +14,10 @@
 #pragma once
 
 #include <fmt/ostream.h>
-#include <ranges>
 
 #include "Register.hpp"
 #include "gen/LocalVariable.hpp"
 
-#include "logging/Logger.hpp"
 #include "runtime/AtomTable.hpp"
 #include "types/Value.hpp"
 
@@ -63,7 +61,7 @@ namespace cial {
             arity(arity), chunk(chunk), localVars(localVars) {}
     };
 
-    struct MemberShapMeta {
+    struct MemberShapeMeta {
         Atom name{ ATOM_INVALID };
         bool isMethod{ false };
         bool isStatic{ false };
@@ -92,7 +90,7 @@ namespace cial {
     struct ClassMeta : MarkSweepHeader {
         Atom className;
         std::uint32_t arity;
-        Vec<MemberShapMeta> memberShapMetas;
+        Vec<MemberShapeMeta> memberShapeMetas;
         Vec<MarkSweepHeader *> memberMetas;
 
         explicit ClassMeta(ClassMeta &&classMeta) = delete;
@@ -101,9 +99,9 @@ namespace cial {
         ClassMeta &operator=(const ClassMeta &) noexcept = delete;
 
         [[nodiscard]] bool hasMember(const Atom name) const noexcept {
-            const size_t len = memberShapMetas.size();
+            const size_t len = memberShapeMetas.size();
             for(size_t i = 0; i < len; ++i) {
-                if(memberShapMetas[i].name == name) {
+                if(memberShapeMetas[i].name == name) {
                     return true;
                 }
             }
@@ -112,17 +110,17 @@ namespace cial {
 
         template <typename T>
             requires std::is_same_v<T, PropMeta> || std::is_same_v<T, FuncMeta>
-        void setMember(MemberShapMeta shapMeta, T *memberMeta) noexcept {
-            shapMeta.isMethod = std::is_same_v<T, FuncMeta>;
-            const size_t len = memberShapMetas.size();
+        void setMember(MemberShapeMeta shapeMeta, T *memberMeta) noexcept {
+            shapeMeta.isMethod = std::is_same_v<T, FuncMeta>;
+            const size_t len = memberShapeMetas.size();
             for(size_t i = 0; i < len; ++i) {
-                if(auto &memberShapeMeta = memberShapMetas[i]; memberShapeMeta.name == shapMeta.name) {
-                    memberShapeMeta = shapMeta;
+                if(auto &memberShapeMeta = memberShapeMetas[i]; memberShapeMeta.name == shapeMeta.name) {
+                    memberShapeMeta = shapeMeta;
                     memberMetas[i] = memberMeta;
                     return;
                 }
             }
-            memberShapMetas.push_back(shapMeta);
+            memberShapeMetas.push_back(shapeMeta);
             memberMetas.push_back(memberMeta);
         }
 
@@ -130,9 +128,9 @@ namespace cial {
             requires std::is_same_v<T, PropMeta> || std::is_same_v<T, FuncMeta>
         T *getMember(const Atom &name) noexcept {
             T *memberMeta{};
-            const size_t len = memberShapMetas.size();
+            const size_t len = memberShapeMetas.size();
             for(size_t i = 0; i < len; ++i) {
-                if(memberShapMetas[i].name == name) {
+                if(memberShapeMetas[i].name == name) {
                     memberMeta = static_cast<T *>(memberMetas[i]);
                 }
             }
@@ -153,95 +151,46 @@ namespace cial {
         explicit ClassMeta(const Atom className, const std::uint32_t arity) : className(className), arity(arity) {}
     };
 
-    // Enum, Type, Value
-
-#define CONSTANT_TYPE_ENUM_F(O, PointerF, ValueF)                                                                      \
-    O(Integer, Integer, integer, ValueF)                                                                               \
-    O(Real, Real, real, ValueF)                                                                                        \
-    O(Atom, Atom, atom, ValueF)                                                                                        \
-    O(FuncMeta, FuncMeta *, funcMeta, PointerF)                                                                        \
-    O(ClassMeta, ClassMeta *, classMeta, PointerF)
-
-#define CONSTANT_TYPE_ENUM(O) CONSTANT_TYPE_ENUM_F(O, , )
-
     enum class ConstantType : std::uint8_t {
-#define ENUM(E, T, V, F) E,
         None,
-        CONSTANT_TYPE_ENUM(ENUM)
-#undef ENUM
+        Integer,
+        Real,
+        Atom,
+        FuncMeta,
+        ClassMeta,
     };
 
+    using ConstantValue = std::variant<std::monostate, Integer, Real, Atom, FuncMeta *, ClassMeta *>;
+
     struct Constant {
-        constexpr explicit Constant(const ConstantType type, const std::uint64_t value) : _type(type), _value{} {
-            static_assert(sizeof(_value) == sizeof(value));
-            std::memcpy(&_value, &value, sizeof(value));
-        }
 
-        constexpr explicit Constant() : _type(ConstantType::None), _value{} {}
-#define DEF_CONSTRUCT(E, T, V, F)                                                                                      \
-    constexpr explicit Constant(T value) : _type(ConstantType::E), _value{ .V = value } {}
-        CONSTANT_TYPE_ENUM(DEF_CONSTRUCT)
-#undef DEF_CONSTRUCT
-
-        Constant(const Constant &constant) noexcept = delete;
-
-        Constant &operator=(const Constant &constant) noexcept = delete;
-
-        Constant(Constant &&constant) noexcept : _type(constant._type), _value(constant._value) {
-            constant._type = ConstantType::None;
-        }
-
-        Constant &operator=(Constant &&constant) noexcept {
-            if(this != &constant) {
-                this->~Constant();
-                new(this) Constant{ std::move(constant) };
-            }
-            return *this;
-        }
-
-        [[nodiscard]] constexpr ConstantType type() const noexcept { return _type; }
+        explicit Constant() = default;
 
         template <typename T>
-        [[nodiscard]] constexpr T value() const noexcept {
-            if constexpr(!std::is_same_v<T, T>) {
-                /* hook */
-            }
-#define CHECK_RET_VALUE(E, Type, V, F)                                                                                 \
-    else if constexpr(std::is_same_v<T, Type>) {                                                                       \
-        CLL_ASSERT(_type == ConstantType::E, "value type is not " #V);                                                 \
-        return _value.V;                                                                                               \
-    }
-            CONSTANT_TYPE_ENUM(CHECK_RET_VALUE)
-#undef CHECK_RET_VALUE
-            else {
-                static_assert(!std::is_same_v<T, T> && "value type is not support");
-            }
-            throw std::logic_error("unreachable");
+        explicit Constant(T value) : _value{ value } {}
+
+        Constant(const Constant &constant) noexcept = default;
+
+        Constant &operator=(const Constant &constant) noexcept = default;
+
+        Constant(Constant &&constant) noexcept = default;
+
+        Constant &operator=(Constant &&constant) noexcept = default;
+
+        [[nodiscard]] ConstantType type() const noexcept { return static_cast<ConstantType>(_value.index()); }
+
+        template <typename T>
+        [[nodiscard]] T value() const noexcept {
+            assert(std::holds_alternative<T>(_value));
+            return std::get<T>(_value);
         }
 
-        bool operator==(const Constant &value) const {
-            if(_type != value._type)
-                return false;
-            switch(_type) {
-#define CHECK_EQ(E, T, V, F)                                                                                           \
-    case ConstantType::E:                                                                                              \
-        return F _value.V == F value._value.V;
-                CONSTANT_TYPE_ENUM_F(CHECK_EQ, *, )
-#undef CHECK_EQ
-                default:
-                    return false;
-            }
-        }
+        bool operator==(const Constant &rhs) const { return _value == rhs._value; }
 
         [[nodiscard]] Value createValue(Runtime *rt) const noexcept;
 
     private:
-        ConstantType _type;
-        union {
-#define DEF_VALUE(E, T, V, F) T V;
-            CONSTANT_TYPE_ENUM(DEF_VALUE)
-#undef DEF_VALUE
-        } _value; // Integer, Real or Atom(String Index)
+        ConstantValue _value;
     };
 
 } // namespace cial

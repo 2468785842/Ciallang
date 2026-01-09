@@ -143,12 +143,12 @@ namespace cial::Common {
         }
 
         const auto sz = static_cast<uint8_t>(x & 7);
-        const Utf8AcceptRangeType accept = S_Utf8AcceptRanges[x >> 4];
+        const auto [low, high] = S_Utf8AcceptRanges[x >> 4];
         if(length < sz)
             return cp;
 
         const auto b1 = static_cast<uint8_t>(str[1]);
-        if(b1 < accept.low || accept.high < b1)
+        if(b1 < low || high < b1)
             return cp;
 
         if(sz == 2) {

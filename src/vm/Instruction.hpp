@@ -239,7 +239,7 @@ namespace cial::Bytecode::Op {
     struct PushReg {
         static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct PushReg
@@ -247,7 +247,7 @@ namespace cial::Bytecode::Op {
     struct PopN {
         static size_t count(const Instruction &inst) { return inst.getOperand1<size_t>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct PushReg
@@ -436,7 +436,7 @@ namespace cial::Bytecode::Op {
 
         static void setTarget(Instruction &inst, Label label) { inst.setOperand1(label); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Jmp
@@ -446,7 +446,7 @@ namespace cial::Bytecode::Op {
         static Label label(const Instruction &inst) { return inst.getOperand1<Label>(); }
 
         static void setTarget(Instruction &inst, Label label) { inst.setOperand1(label); }
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct JmpE
@@ -457,7 +457,7 @@ namespace cial::Bytecode::Op {
 
         static void setTarget(Instruction &inst, Label label) { inst.setOperand1(label); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct JmpNE

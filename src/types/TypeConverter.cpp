@@ -3,7 +3,6 @@
 //
 #include "TypeConverter.hpp"
 
-#include <fmt/printf.h>
 #include "Octet.hpp"
 #include "Real.hpp"
 #include "String.hpp"

@@ -92,14 +92,13 @@ namespace cial::Common {
                 rune = next(r);
 
             const auto endOfBuffer = rune == runeEof;
-            const auto unixNewLine = rune == '\n';
 
-            if(unixNewLine || endOfBuffer) {
+            if(const auto unixNewLine = rune == '\n'; unixNewLine || endOfBuffer) {
                 const auto end = endOfBuffer ? _buffer.size() : _index - 1;
-                const auto it = _linesByIndexRange.insert(std::make_pair(
+                const auto [fst, snd] = _linesByIndexRange.insert(std::make_pair(
                     std::make_pair(lineStart, end),
                     SourceFileLineType{ .end = end, .begin = lineStart, .line = line, .columns = columns }));
-                _linesByNumber.insert(std::make_pair(line, &it.first->second));
+                _linesByNumber.insert(std::make_pair(line, &fst->second));
                 lineStart = _index;
                 line++;
                 columns = 0;

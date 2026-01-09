@@ -61,7 +61,7 @@ namespace cial::Bytecode {
                     return ConstIdx{ i };
                 }
             }
-            _constants.emplace_back(std::move(value));
+            _constants.emplace_back(value);
             return ConstIdx{ _constants.size() - 1 };
         }
 

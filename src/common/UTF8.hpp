@@ -75,4 +75,4 @@ namespace cial::Common {
     int64_t utf8Strlen(const std::string &str);
 
     CodePointType utf8Decode(const char *str, size_t length);
-}; // namespace cial::Common
+} // namespace cial::Common

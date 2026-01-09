@@ -75,7 +75,7 @@ namespace cial {
         [[nodiscard]] bool isOk() const noexcept { return _ok; }
         [[nodiscard]] bool isFailed() const noexcept { return !_ok; }
 
-        const T &value() const {
+        [[nodiscard]] const T &value() const {
             assert(_ok);
             return *_value;
         }

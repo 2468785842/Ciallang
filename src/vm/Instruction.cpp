@@ -14,7 +14,6 @@
 #include "Instruction.hpp"
 #include <fmt/format.h>
 
-#include "VMDebug.hpp"
 #include "VMState.hpp"
 #include "logging/Logger.hpp"
 #include "types/Class.hpp"
@@ -50,9 +49,9 @@ namespace cial::Bytecode::Op {
         vmState.reg(reg(inst), vmState.curFrame()->chunk->getConstant(value(inst)).createValue(&vmState.rt));
     }
 
-    void PushReg::execute(const Instruction &inst, VMState &vmState) { vmState.push(vmState.reg(src(inst))); }
+    void PushReg::execute(const Instruction &inst, const VMState &vmState) { vmState.push(vmState.reg(src(inst))); }
 
-    void PopN::execute(const Instruction &inst, VMState &vmState) { vmState.pop(count(inst)); }
+    void PopN::execute(const Instruction &inst, const VMState &vmState) { vmState.pop(count(inst)); }
 
     void CP::execute(const Instruction &inst, const VMState &vmState) {
         vmState.reg(dst(inst), vmState.reg(src(inst)));
@@ -176,15 +175,15 @@ namespace cial::Bytecode::Op {
         assert(false);
     }
 
-    void Jmp::execute(const Instruction &inst, VMState &vmState) { vmState.setPC(label(inst)); }
+    void Jmp::execute(const Instruction &inst, const VMState &vmState) { vmState.setPC(label(inst)); }
 
-    void JmpE::execute(const Instruction &inst, VMState &vmState) {
+    void JmpE::execute(const Instruction &inst, const VMState &vmState) {
         if(vmState.getZF()) {
             vmState.setPC(label(inst));
         }
     }
 
-    void JmpNE::execute(const Instruction &inst, VMState &vmState) {
+    void JmpNE::execute(const Instruction &inst, const VMState &vmState) {
         if(!vmState.getZF()) {
             vmState.setPC(label(inst));
         }

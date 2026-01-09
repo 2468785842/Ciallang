@@ -39,7 +39,6 @@ namespace cial {
         if(this != &str) {
             this->~String();
             new(this) String(std::move(str));
-            str._longStr = nullptr;
         }
         return *this;
     }

@@ -15,7 +15,6 @@
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
 #include "parser/ast/AstNode.hpp"
-#include "types/String.hpp"
 #include "vm/Chunk.hpp"
 #include "vm/Label.hpp"
 #include "vm/Register.hpp"
@@ -154,6 +153,6 @@ namespace cial::Inter {
             _sourceFile.error(_r, message, location);
         }
 
-        Constant constVal(const Syntax::Token &token) const;
+        [[nodiscard]] Constant constVal(const Syntax::Token &token) const;
     };
 } // namespace cial::Inter

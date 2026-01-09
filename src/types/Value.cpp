@@ -63,6 +63,7 @@ namespace cial {
             case ValueType::Void:
                 break;
         }
+        v._type = ValueType::Void;
     }
 
     Value &Value::operator=(Value &&v) noexcept {

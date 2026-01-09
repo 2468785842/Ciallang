@@ -35,7 +35,7 @@ namespace cial {
 
     // Concepts for IEEE floating point operations
     template <typename T>
-    concept IEEE754Double = std::same_as<T, double> && (sizeof(T) == 8) && (std::numeric_limits<T>::is_iec559);
+    concept IEEE754Double = std::same_as<T, double> && sizeof(T) == 8 && std::numeric_limits<T>::is_iec559;
 
     // double related constants
     static constexpr int64_t EXP_MAX = 1023;
@@ -76,10 +76,10 @@ namespace cial {
     [[nodiscard]] constexpr uint64_t makeSign(const bool negative) noexcept { return negative ? SIGN_MASK : 0ull; }
 
     [[nodiscard]] constexpr uint64_t makeExponent(const int32_t exp) noexcept {
-        return static_cast<uint64_t>(exp + EXP_BIAS) << SIGNIFICAND_BITS;
+        return (exp + EXP_BIAS) << SIGNIFICAND_BITS;
     }
 
-    [[nodiscard]] constexpr uint64_t make_significand(uint64_t significand) noexcept {
+    [[nodiscard]] constexpr uint64_t make_significand(const uint64_t significand) noexcept {
         return significand & SIGNIFICAND_MASK;
     }
 

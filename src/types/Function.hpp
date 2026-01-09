@@ -13,8 +13,6 @@
  */
 #pragma once
 
-#include <tuple>
-
 #include "NativeFunDetail.hpp"
 #include "Object.hpp"
 #include "Value.hpp"

@@ -70,8 +70,7 @@ namespace cial::Common {
         term_supports_color = true;
 #else
         // On non-Windows platforms, we rely on the TERM variable.
-        const char *const term = getenv("TERM");
-        if(term != nullptr && term[0] != '\0') {
+        if(const char *const term = getenv("TERM"); term != nullptr && term[0] != '\0') {
             term_supports_color = !strcmp(term, "xterm") || !strcmp(term, "xterm-color") ||
                 !strcmp(term, "xterm-256color") || !strcmp(term, "screen-256color") || !strcmp(term, "konsole") ||
                 !strcmp(term, "konsole-16color") || !strcmp(term, "konsole-256color") || !strcmp(term, "screen") ||

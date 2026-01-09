@@ -16,7 +16,6 @@
 
 #include "types/Class.hpp"
 #include "types/Function.hpp"
-#include "types/Octet.hpp"
 #include "types/String.hpp"
 
 #include "Chunk.hpp"
@@ -30,13 +29,13 @@ namespace cial {
     }
 
     Value Constant::createValue(Runtime *rt) const noexcept {
-        switch(_type) {
+        switch(type()) {
             case ConstantType::None:
                 break;
             case ConstantType::Integer:
                 return Value{ value<Integer>() };
             case ConstantType::Real:
-                return Value{ _value.real };
+                return Value{ value<Real>() };
             case ConstantType::Atom: {
                 const auto *str = rt->atomTable.get(value<Atom>())->str;
                 return Value{ String{ str->getData(), str->length() } };

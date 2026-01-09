@@ -528,7 +528,7 @@ void Lexer::parseNonDecimalReal(Token *&token, const std::string &decimalStr, st
                 // find msb flag bit
                 int32_t b = baseBits - 1;
                 while(b >= 0) {
-                    if((1 << b) & n)
+                    if(1 << b & n)
                         break;
                     b--;
                 }
@@ -540,7 +540,7 @@ void Lexer::parseNonDecimalReal(Token *&token, const std::string &decimalStr, st
                     numSignIf = b;
                     main |= static_cast<uint64_t>(n) << (64 - numSignIf);
                     if(pointPassed)
-                        exp -= (baseBits - b + 1);
+                        exp -= baseBits - b + 1;
                     else
                         exp = b - 1;
                 } else {
@@ -588,7 +588,8 @@ void Lexer::parseNonDecimalReal(Token *&token, const std::string &decimalStr, st
     Real temp{ 0.0 };
 
     // compose IEEE double
-    *reinterpret_cast<Integer *>(&temp) = makeSign(false) | makeExponent(exp) | make_significand(main);
+    *reinterpret_cast<Integer *>(&temp) =
+        static_cast<Integer>(makeSign(false) | makeExponent(exp) | make_significand(main));
 
     token = makeToken(TokenType::ConstVal, temp);
 }

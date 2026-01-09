@@ -18,13 +18,13 @@
 
 using namespace cial;
 
-int main(int argc, char **argv) {
+int main(const int argc, char **argv) {
     if(argc < 2) {
         fmt::println("Usage: cial <script-file>");
         return 0;
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
+    const auto start = std::chrono::high_resolution_clock::now();
     Runtime rt{};
     Context context{ rt };
     context.registryGlobalFunc("print"_str, &StdLib::S_PrintFunction);
@@ -33,8 +33,8 @@ int main(int argc, char **argv) {
     const VM vm{ &vmState };
     vm.eval(String(argv[1]), true);
 
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = duration_cast<std::chrono::nanoseconds>(end - start);
+    const auto end = std::chrono::high_resolution_clock::now();
+    const auto duration = duration_cast<std::chrono::nanoseconds>(end - start);
 
     fmt::println("Time taken by function: {}ns", duration.count());
 

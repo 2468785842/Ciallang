@@ -141,6 +141,7 @@ namespace cial::Syntax {
 
     enum class TokenType {
 #define TOKEN_TYPE_ENUM(NAME, SYMBOL) NAME,
+        None,
         TOKEN_SYMBOL_PAIR_ENUM(TOKEN_TYPE_ENUM)
 #undef TOKEN_TYPE_ENUM
     };
@@ -152,8 +153,7 @@ namespace cial::Syntax {
     });
 
     static constexpr const char *tokenTypeToStr(const TokenType type) {
-        const auto it = S_TypeToName.find(type);
-        if(it != S_TypeToName.end()) {
+        if(const auto it = S_TypeToName.find(type); it != S_TypeToName.end()) {
             return it->second.data();
         }
         return "unknown";
@@ -205,6 +205,8 @@ namespace cial::Syntax {
                     token._octet = nullptr;
                     break;
             }
+            token._type = TokenType::None;
+            token._valueType = TokenValueType::None;
         }
 
         Token &operator=(Token &&token) noexcept {
@@ -272,7 +274,7 @@ namespace cial::Syntax {
         }
 
     private:
-        TokenType _type{ TokenType::Void };
+        TokenType _type{ TokenType::None };
         TokenValueType _valueType{ TokenValueType::None };
 
         union {
@@ -297,8 +299,7 @@ namespace cial::Syntax {
         }
 
         static constexpr TokenType strip(const TokenType tokenType) noexcept {
-            const auto it = _assignToNonAssign.find(tokenType);
-            if(it != _assignToNonAssign.end()) {
+            if(const auto it = _assignToNonAssign.find(tokenType); it != _assignToNonAssign.end()) {
                 return it->second;
             }
 

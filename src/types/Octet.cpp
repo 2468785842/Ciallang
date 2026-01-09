@@ -13,13 +13,14 @@
 #include "Octet.hpp"
 
 namespace cial {
-    Octet::Octet(const std::uint8_t *src, std::uint32_t size) {
+    Octet::Octet(const std::uint8_t *src, const std::uint32_t size) {
         _size = size;
         _buf = new std::uint8_t[_size];
         std::memcpy(_buf, src, _size);
     }
 
-    Octet::Octet(const std::uint8_t *src1, std::uint32_t size1, const std::uint8_t *src2, std::uint32_t size2) {
+    Octet::Octet(const std::uint8_t *src1, const std::uint32_t size1, const std::uint8_t *src2,
+                 const std::uint32_t size2) {
         _size = size1 + size2;
         _buf = new std::uint8_t[_size];
         std::memcpy(_buf, src1, size1);

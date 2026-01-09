@@ -77,19 +77,6 @@ namespace cial::NativeFunDetail {
         }
     }
 
-    template <typename Ret>
-    Value wrapToValue(Ret &&ret) {
-        if constexpr(std::is_same_v<std::decay_t<Ret>, Value>) {
-            return std::forward<Ret>(ret);
-        } else if constexpr(std::is_same_v<std::decay_t<Ret>, String>) {
-            return Value{ std::forward<Ret>(ret) };
-        } else if constexpr(std::is_same_v<std::decay_t<Ret>, Octet>) {
-            return Value{ std::forward<Ret>(ret) };
-        } else {
-            return Value{ std::forward<Ret>(ret) };
-        }
-    }
-
     template <typename Callable, typename Tuple, typename Args, size_t... I>
     Value invokeCallableImpl(Callable &&callable, VM *vm, Value thisObj, size_t argCount, Args args,
                              std::index_sequence<I...>) {
@@ -113,7 +100,7 @@ namespace cial::NativeFunDetail {
             invoke();
             return Value{};
         } else {
-            return wrapToValue(invoke());
+            return Value{ invoke() };
         }
     }
 

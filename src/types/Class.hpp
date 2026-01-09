@@ -13,7 +13,6 @@
  */
 #pragma once
 
-#include "Function.hpp"
 #include "Value.hpp"
 #include "vm/VMState.hpp"
 

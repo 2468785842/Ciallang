@@ -367,7 +367,7 @@ namespace cial::Inter {
                     error("generate chunk failed with class function declaration", node->location);
                     return;
                 }
-                classMeta->setMember(MemberShapMeta{ funName }, funcMeta);
+                classMeta->setMember(MemberShapeMeta{ funName }, funcMeta);
             } else if(const auto *varDeclNode = dynamic_cast<Syntax::VarDeclNode *>(declNode)) {
                 // TODO:
                 // const auto varName = varDeclNode->token.constVal().value<Atom>();

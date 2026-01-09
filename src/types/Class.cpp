@@ -12,8 +12,6 @@
 
 #include "Class.hpp"
 
-#include <ranges>
-
 #include "vm/VMState.hpp"
 
 namespace cial {
@@ -32,7 +30,7 @@ namespace cial {
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         auto *instanceObj = vmState.rt.create<InstanceObject>(this);
-        for(const auto &v : this->meta->memberShapMetas) {
+        for(const auto &v : this->meta->memberShapeMetas) {
             if(v.isMethod) {
                 auto *funcMeta = this->meta->getMember<FuncMeta>(v.name);
                 auto *func = vmState.rt.create<Function>(funcMeta);

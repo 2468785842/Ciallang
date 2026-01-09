@@ -62,7 +62,7 @@ namespace cial::Bytecode {
                     new(this) Block(std::move(rhs));
                 }
                 return *this;
-            };
+            }
 
             ~Block() { delete[] data; }
         };
