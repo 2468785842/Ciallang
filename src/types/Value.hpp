@@ -111,7 +111,7 @@ namespace cial {
             String *_string;
             Octet *_octet;
             Object *_object;
-        } _value{};
+        };
 
         ValueType _type{ ValueType::Void };
 

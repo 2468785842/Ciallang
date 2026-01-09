@@ -16,8 +16,8 @@ namespace cial {
     };
 
     struct Err : std::exception {
-        ErrCode code = ErrCode::None;
-        String msg;
+        ErrCode code{ErrCode::None};
+        String msg{};
 
         Err() = default;
 
@@ -94,7 +94,7 @@ namespace cial {
     private:
         bool _ok = false;
         Opt<T> _value;
-        Err _error;
+        Err _error{};
     };
 
     template <>

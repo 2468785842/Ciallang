@@ -35,7 +35,7 @@ namespace cial::Syntax {
 
         [[nodiscard]] bool hasNext() const;
 
-        [[nodiscard]] constexpr const std::vector<Token *> &tokens() const { return _tokens; }
+        [[nodiscard]] constexpr const Vec<Token *> &tokens() const { return _tokens; }
 
         [[nodiscard]] const Result &result() const;
 
@@ -45,16 +45,14 @@ namespace cial::Syntax {
         }
 
     private:
-        static std::multimap<int32_t, LexerCaseCallable> S_Cases;
-
-        [[maybe_unused]] static void *S_LoadCases;
+        static std::multimap<std::uint8_t, LexerCaseCallable> S_Cases;
 
         Runtime *_rt;
         SourceFile &_sourceFile;
 
-        std::vector<Token *> _tokens{};
-        bool _hasNext = true;
+        Vec<Token *> _tokens{};
         Result _result{};
+        bool _hasNext = true;
 
         template <typename... Args>
         Token *makeToken(Args &&...args) {
@@ -63,7 +61,7 @@ namespace cial::Syntax {
             return token;
         }
 
-        using OperatorTokenSet = std::vector<std::pair<const char *, TokenType>>;
+        using OperatorTokenSet = Vec<std::pair<const char *, TokenType>>;
 
         bool boringMatch(Token *&, const OperatorTokenSet &signMap);
 

@@ -25,63 +25,53 @@
 
 using namespace cial::Syntax;
 
-std::multimap<std::int32_t, Lexer::LexerCaseCallable> Lexer::S_Cases{
+std::multimap<std::uint8_t, Lexer::LexerCaseCallable> Lexer::S_Cases = []() -> auto {
+    std::multimap<std::uint8_t, LexerCaseCallable> map;
+
+    for(char c : "[](){}~?:,#$")
+        map.emplace(c, std::bind_front(&Lexer::singletonSign));
+
+    // number literal
+    for(char c : ".0123456789")
+        map.emplace(c, std::bind_front(&Lexer::numberConstVal));
+
     // block comment, line comment
-    { '/', std::bind_front(&Lexer::lineComment) },
-    { '/', std::bind_front(&Lexer::blockComment) },
-    { '/', std::bind_front(&Lexer::slash) },
-    { '\\', std::bind_front(&Lexer::backslash) },
+    map.emplace('/', std::bind_front(&Lexer::lineComment));
+    map.emplace('/', std::bind_front(&Lexer::blockComment));
+    map.emplace('/', std::bind_front(&Lexer::slash));
+    map.emplace('\\', std::bind_front(&Lexer::backslash));
 
-    { '=', std::bind_front(&Lexer::equalSign) },
-    { '!', std::bind_front(&Lexer::exclamationSign) },
-    { '&', std::bind_front(&Lexer::ampersandSign) },
-    { '|', std::bind_front(&Lexer::vertLineSign) },
+    map.emplace('=', std::bind_front(&Lexer::equalSign));
+    map.emplace('!', std::bind_front(&Lexer::exclamationSign));
+    map.emplace('&', std::bind_front(&Lexer::ampersandSign));
+    map.emplace('|', std::bind_front(&Lexer::vertLineSign));
 
-    { '.', std::bind_front(&Lexer::numberConstVal) },
-    { '.', std::bind_front(&Lexer::dotSign) },
+    map.emplace('.', std::bind_front(&Lexer::dotSign));
 
-    { '-', std::bind_front(&Lexer::minus) },
+    map.emplace('-', std::bind_front(&Lexer::minus));
 
-    { '+', std::bind_front(&Lexer::plus) },
+    map.emplace('+', std::bind_front(&Lexer::plus));
 
-    { '*', std::bind_front(&Lexer::mul) },
+    map.emplace('*', std::bind_front(&Lexer::mul));
 
     // "> operator more..."
-    { '>', std::bind_front(&Lexer::gtSign) },
+    map.emplace('>', std::bind_front(&Lexer::gtSign));
 
     // "<%" octet literal
-    // { '<', std::bind_front(&Lexer::octetLiteral) },
+    // map.emplace( '<', std::bind_front(&Lexer::octetLiteral));
 
     // "< operator more..."
-    { '<', std::bind_front(&Lexer::ltSign) },
-    { '%', std::bind_front(&Lexer::percent) },
-    { '^', std::bind_front(&Lexer::chevron) },
-    { '[', std::bind_front(&Lexer::singletonSign) },
-    { ']', std::bind_front(&Lexer::singletonSign) },
-    { '(', std::bind_front(&Lexer::singletonSign) },
-    { ')', std::bind_front(&Lexer::singletonSign) },
-    { '~', std::bind_front(&Lexer::singletonSign) },
-    { '?', std::bind_front(&Lexer::singletonSign) },
-    { ':', std::bind_front(&Lexer::singletonSign) },
-    { ',', std::bind_front(&Lexer::singletonSign) },
-    { '{', std::bind_front(&Lexer::singletonSign) },
-    { '}', std::bind_front(&Lexer::singletonSign) },
-    { '#', std::bind_front(&Lexer::singletonSign) },
-    { '$', std::bind_front(&Lexer::singletonSign) },
+    map.emplace('<', std::bind_front(&Lexer::ltSign));
+    map.emplace('%', std::bind_front(&Lexer::percent));
+    map.emplace('^', std::bind_front(&Lexer::chevron));
 
     // line terminator
-    { ';', std::bind_front(&Lexer::lineTerminator) },
-    { '\'', std::bind_front(&Lexer::stringConstVal) },
-    { '"', std::bind_front(&Lexer::stringConstVal) },
-    { '@', std::bind_front(&Lexer::templateStringConstVal) },
-};
+    map.emplace(';', std::bind_front(&Lexer::lineTerminator));
+    map.emplace('\'', std::bind_front(&Lexer::stringConstVal));
+    map.emplace('"', std::bind_front(&Lexer::stringConstVal));
+    map.emplace('@', std::bind_front(&Lexer::templateStringConstVal));
 
-[[maybe_unused]] void *Lexer::S_LoadCases = [] {
-    // number literal
-    for(std::string numberMarks = "0123456789"; auto &mark : numberMarks)
-        S_Cases.emplace(mark, std::bind_front(&Lexer::numberConstVal));
-
-    return nullptr;
+    return std::move(map);
 }();
 
 Lexer::Lexer(SourceFile &sourceFile, Runtime *rt) : _rt(rt), _sourceFile(sourceFile) {}
@@ -375,7 +365,7 @@ bool Lexer::blockComment(Token *&token) {
 }
 
 bool Lexer::numberConstVal(Token *&token) {
-    std::stringstream stream{ std::string{} };
+    std::stringstream stream{ "" };
     auto ch = read();
     constexpr std::string valid = ".0123456789Ee";
     int32_t shifting = 0;
@@ -1053,7 +1043,7 @@ bool Lexer::templateStringConstVal(Token *&token) {
 
 StringParseState Lexer::internalStringParser(Token *&token, const char delimiter, bool *templateOver,
                                              const bool templateMode) {
-    std::stringstream str{ std::string{} };
+    std::stringstream str{ "" };
     auto strPsState = StringParseState::None;
     if(templateOver)
         *templateOver = false;
