@@ -17,7 +17,6 @@
 #include "common/Defer.hpp"
 #include "common/UTF8.hpp"
 #include "logging/Logger.hpp"
-#include "types/Value.hpp"
 
 #include "types/Real.hpp"
 
@@ -58,7 +57,7 @@ std::multimap<std::uint8_t, Lexer::LexerCaseCallable> Lexer::S_Cases = []() -> a
     map.emplace('>', std::bind_front(&Lexer::gtSign));
 
     // "<%" octet literal
-    // map.emplace( '<', std::bind_front(&Lexer::octetLiteral));
+    map.emplace('<', std::bind_front(&Lexer::octetLiteral));
 
     // "< operator more..."
     map.emplace('<', std::bind_front(&Lexer::ltSign));
@@ -74,7 +73,7 @@ std::multimap<std::uint8_t, Lexer::LexerCaseCallable> Lexer::S_Cases = []() -> a
     return std::move(map);
 }();
 
-Lexer::Lexer(SourceFile &sourceFile, Runtime *rt) : _rt(rt), _sourceFile(sourceFile) {}
+Lexer::Lexer(SourceFile &sourceFile) : _sourceFile(sourceFile) {}
 
 bool Lexer::boringMatch(Token *&token, const OperatorTokenSet &signMap) {
     for(const auto &[sign, _token] : signMap) {
@@ -244,16 +243,16 @@ void Lexer::skipComment() {
     }
 }
 
-bool Lexer::tackOverToken(Token &token) {
-    CLL_ASSERT(!_tokens.empty(), "tokens vec is empty");
+bool Lexer::takeOverToken(Token &token) {
+    if(_tokens.empty())
+        return false;
 
     token = *_tokens.front();
+    _tokens.pop_front();
 
     if(token.type() == TokenType::EndOfFile)
         return false;
 
-    delete _tokens.front();
-    _tokens.erase(_tokens.begin());
     return true;
 }
 
@@ -286,7 +285,7 @@ int32_t Lexer::read(const bool skipWhitespace) {
  * @return 是否匹配成功? succeed -> true
  *                     failed  -> false
  */
-bool Lexer::match(const std::string &literal) {
+bool Lexer::match(const String &literal) {
     _sourceFile.pushMark();
     DEFER { _sourceFile.popMark(); };
 
@@ -322,7 +321,7 @@ bool Lexer::lineComment(Token *&token) {
  * @return 是否成功
  */
 bool Lexer::blockComment(Token *&token) {
-    if(match("/*")) {
+    if(match("/*"_str)) {
         auto block_count = 1;
         token = makeToken(TokenType::BlockComment);
 
@@ -653,38 +652,38 @@ void Lexer::extractNumber(std::int8_t (*validDigits)(char), const std::string &e
 bool Lexer::identifier(Token *&token) {
     const auto name = readIdentifier();
 
-    if(name.empty())
+    if(name.isEmpty())
         return false;
 
-    static std::unordered_map<std::string, Token> Keywords{
-        { "true", Token{ TokenType::ConstVal, 1 } },
-        { "false", Token{ TokenType::ConstVal, 0 } },
-        { "Infinity", Token{ TokenType::ConstVal, Real::negativeInf() } },
-        { "NaN", Token{ TokenType::ConstVal, Real::signalingNan() } },
-        { "null", Token{ TokenType::Null } },
+    static std::unordered_map<String, Token> Keywords{
+        { "true"_str, Token{ TokenType::ConstVal, 1 } },
+        { "false"_str, Token{ TokenType::ConstVal, 0 } },
+        { "Infinity"_str, Token{ TokenType::ConstVal, Real::negativeInf() } },
+        { "NaN"_str, Token{ TokenType::ConstVal, Real::signalingNan() } },
+        { "null"_str, Token{ TokenType::Null } },
 
-        { "function", Token{ TokenType::Function } },
-        { "class", Token{ TokenType::Class } },
-        { "extends", Token{ TokenType::Extends } },
-        { "return", Token{ TokenType::Return } },
+        { "function"_str, Token{ TokenType::Function } },
+        { "class"_str, Token{ TokenType::Class } },
+        { "extends"_str, Token{ TokenType::Extends } },
+        { "return"_str, Token{ TokenType::Return } },
 
-        { "var", Token{ TokenType::Var } },
-        { "const", Token{ TokenType::Const } },
+        { "var"_str, Token{ TokenType::Var } },
+        { "const"_str, Token{ TokenType::Const } },
 
-        { "if", Token{ TokenType::If } },
-        { "else", Token{ TokenType::Else } },
+        { "if"_str, Token{ TokenType::If } },
+        { "else"_str, Token{ TokenType::Else } },
 
-        { "int", Token{ TokenType::Int } },
-        { "real", Token{ TokenType::Real } },
-        { "string", Token{ TokenType::String } },
+        { "int"_str, Token{ TokenType::Int } },
+        { "real"_str, Token{ TokenType::Real } },
+        { "string"_str, Token{ TokenType::String } },
 
-        { "new", Token{ TokenType::New } },
+        { "new"_str, Token{ TokenType::New } },
 
-        { "do", Token{ TokenType::Do } },
-        { "while", Token{ TokenType::While } },
-        { "for", Token{ TokenType::For } },
-        { "break", Token{ TokenType::Break } },
-        { "continue", Token{ TokenType::Continue } }
+        { "do"_str, Token{ TokenType::Do } },
+        { "while"_str, Token{ TokenType::While } },
+        { "for"_str, Token{ TokenType::For } },
+        { "break"_str, Token{ TokenType::Break } },
+        { "continue"_str, Token{ TokenType::Continue } }
     };
 
     // get keyword
@@ -694,19 +693,15 @@ bool Lexer::identifier(Token *&token) {
         return true;
     }
 
-    if(_rt) {
-        token = makeToken(TokenType::Identifier, _rt->atomTable.intern(name.c_str(), name.size()));
-    } else {
-        token = makeToken(TokenType::Identifier);
-    }
+    token = makeToken(TokenType::Identifier, String{ name });
 
     return true;
 }
 
-std::string Lexer::readIdentifier() {
+cial::String Lexer::readIdentifier() {
     auto ch = read(false);
     if(!isRuneLetter(ch)) {
-        return "";
+        return ""_str;
     }
     std::stringstream stream{};
 
@@ -721,7 +716,7 @@ std::string Lexer::readIdentifier() {
             continue;
         }
         rewindOneChar();
-        return stream.str();
+        return String{ stream.str() };
     }
 }
 
@@ -734,61 +729,63 @@ bool Lexer::lineTerminator(Token *&token) {
 
 bool Lexer::equalSign(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "===", TokenType::DiscEqual },
-        { "==", TokenType::Equal },
-        { ",", TokenType::Comma }, // comma like perl
-        { "=", TokenType::Assignment },
+        { "==="_str, TokenType::DiscEqual },
+        { "=="_str, TokenType::Equal },
+        { ","_str, TokenType::Comma }, // comma like perl
+        { "="_str, TokenType::Assignment },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::plus(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "++", TokenType::Increment },
-        { "+=", TokenType::PlusEqual },
-        { "+", TokenType::Plus },
+        { "++"_str, TokenType::Increment },
+        { "+="_str, TokenType::PlusEqual },
+        { "+"_str, TokenType::Plus },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::minus(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "--", TokenType::Decrement },
-        { "-=", TokenType::MinusEqual },
-        { "-", TokenType::Minus },
+        { "--"_str, TokenType::Decrement },
+        { "-="_str, TokenType::MinusEqual },
+        { "-"_str, TokenType::Minus },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::mul(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "*=", TokenType::AsteriskEqual },
-        { "*", TokenType::Asterisk },
+        { "*="_str, TokenType::AsteriskEqual },
+        { "*"_str, TokenType::Asterisk },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::gtSign(Token *&token) {
-    static const OperatorTokenSet signArr{ { ">>>=", TokenType::RBitShiftEqual },  { ">>>", TokenType::RBitShift },
-                                           { ">>=", TokenType::RArithShiftEqual }, { ">>", TokenType::RArithShift },
-                                           { ">=", TokenType::GtOrEqual },         { ">", TokenType::Gt } };
+    static const OperatorTokenSet signArr{
+        { ">>>="_str, TokenType::RBitShiftEqual },  { ">>>"_str, TokenType::RBitShift },
+        { ">>="_str, TokenType::RArithShiftEqual }, { ">>"_str, TokenType::RArithShift },
+        { ">="_str, TokenType::GtOrEqual },         { ">"_str, TokenType::Gt }
+    };
     return boringMatch(token, signArr);
 }
 
 
 bool Lexer::ltSign(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "<<=", TokenType::LArithShiftEqual }, { "<->", TokenType::Swap }, { "<=", TokenType::LtOrEqual },
-        { "<<", TokenType::LArithShift },       { "<", TokenType::Lt },
+        { "<<="_str, TokenType::LArithShiftEqual }, { "<->"_str, TokenType::Swap }, { "<="_str, TokenType::LtOrEqual },
+        { "<<"_str, TokenType::LArithShift },       { "<"_str, TokenType::Lt },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::exclamationSign(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "!==", TokenType::DiscNotEqual },
-        { "!=", TokenType::NotEqual },
-        { "!", TokenType::Exclamation },
+        { "!=="_str, TokenType::DiscNotEqual },
+        { "!="_str, TokenType::NotEqual },
+        { "!"_str, TokenType::Exclamation },
     };
     return boringMatch(token, signArr);
 }
@@ -796,60 +793,60 @@ bool Lexer::exclamationSign(Token *&token) {
 
 bool Lexer::ampersandSign(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "&&=", TokenType::LogicalAndEqual },
-        { "&&", TokenType::LogicalAnd },
-        { "&=", TokenType::AmpersandEqual },
-        { "&", TokenType::Ampersand },
+        { "&&="_str, TokenType::LogicalAndEqual },
+        { "&&"_str, TokenType::LogicalAnd },
+        { "&="_str, TokenType::AmpersandEqual },
+        { "&"_str, TokenType::Ampersand },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::vertLineSign(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "||=", TokenType::LogicalOrEqual },
-        { "||", TokenType::LogicalOr },
-        { "|=", TokenType::VertLineEqual },
-        { "|", TokenType::VertLine },
+        { "||="_str, TokenType::LogicalOrEqual },
+        { "||"_str, TokenType::LogicalOr },
+        { "|="_str, TokenType::VertLineEqual },
+        { "|"_str, TokenType::VertLine },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::dotSign(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "...", TokenType::Omit },
-        { ".", TokenType::Dot },
+        { "..."_str, TokenType::Omit },
+        { "."_str, TokenType::Dot },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::slash(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "/=", TokenType::SlashEqual },
-        { "/", TokenType::Slash },
+        { "/="_str, TokenType::SlashEqual },
+        { "/"_str, TokenType::Slash },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::backslash(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "\\=", TokenType::BackslashEqual },
-        { "\\", TokenType::Backslash },
+        { "\\="_str, TokenType::BackslashEqual },
+        { "\\"_str, TokenType::Backslash },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::percent(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "%=", TokenType::PercentEqual },
-        { "%", TokenType::Percent },
+        { "%="_str, TokenType::PercentEqual },
+        { "%"_str, TokenType::Percent },
     };
     return boringMatch(token, signArr);
 }
 
 bool Lexer::chevron(Token *&token) {
     static const OperatorTokenSet signArr{
-        { "^=", TokenType::ChevronEqual },
-        { "^", TokenType::Chevron },
+        { "^="_str, TokenType::ChevronEqual },
+        { "^"_str, TokenType::Chevron },
     };
     return boringMatch(token, signArr);
 }
@@ -1174,11 +1171,7 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
         str.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
     }
 
-    if(_rt) {
-        token = makeToken(TokenType::ConstVal, _rt->atomTable.intern(str.str().c_str(), str.str().size()));
-    } else {
-        token = makeToken(TokenType::ConstVal);
-    }
+    token = makeToken(TokenType::ConstVal, String{ str.str() });
 
     return strPsState;
 }
@@ -1186,50 +1179,50 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
 /**
  * 十六进制,字符序列
  */
-// bool Lexer::octetLiteral(Token *&token) {
-//     _sourceFile.pushMark();
-//     DEFER { _sourceFile.popMark(); };
-//     std::stringstream stream{ std::string{} };
-//     std::vector<uint8_t> buf{};
-//     // parse an octet literal;
-//     // syntax is:
-//     // <% xx xx xx xx xx xx ... %>
-//     // where xx is hexadecimal 8bit(octet) binary representation.
-//     if(match("<%")) {
-//         auto newSec = true;
-//         uint8_t oct = 0;
-//
-//         for(;;) {
-//             skipComment();
-//             auto ch = read(false);
-//             if(ch == '%') {
-//                 ch = read(false);
-//                 if(ch == '>') {
-//                     token = makeToken(TokenType::ConstVal, _rt.octetTable.intern(buf.data(), buf.size()));
-//                     return true;
-//                 }
-//                 _sourceFile.restoreTopMark();
-//                 return false;
-//             }
-//
-//             ch = static_cast<uint8_t>(getHexNum(static_cast<char>(ch)));
-//             if(ch != -1) {
-//                 if(newSec) {
-//                     oct = ch;
-//                     newSec = ch == ',';
-//
-//                     if(newSec)
-//                         buf.push_back(oct);
-//                 } else {
-//                     oct <<= 4;
-//                     oct += ch;
-//
-//                     buf.push_back(oct);
-//                     newSec = true;
-//                 }
-//             }
-//         }
-//     }
-//     // S_ConstVals;
-//     return false;
-// }
+bool Lexer::octetLiteral(Token *&token) {
+    _sourceFile.pushMark();
+    DEFER { _sourceFile.popMark(); };
+    std::stringstream stream{ "" };
+    std::vector<uint8_t> buf{};
+    // parse an octet literal;
+    // syntax is:
+    // <% xx xx xx xx xx xx ... %>
+    // where xx is hexadecimal 8bit(octet) binary representation.
+    if(match("<%"_str)) {
+        auto newSec = true;
+        uint8_t oct = 0;
+
+        for(;;) {
+            skipComment();
+            auto ch = read(false);
+            if(ch == '%') {
+                ch = read(false);
+                if(ch == '>') {
+                    token = makeToken(TokenType::ConstVal, Octet{ buf.data(), static_cast<std::uint32_t>(buf.size()) });
+                    return true;
+                    return true;
+                }
+                _sourceFile.restoreTopMark();
+                return false;
+            }
+
+            ch = static_cast<uint8_t>(getHexNum(static_cast<char>(ch)));
+            if(ch != -1) {
+                if(newSec) {
+                    oct = ch;
+                    newSec = ch == ',';
+
+                    if(newSec)
+                        buf.push_back(oct);
+                } else {
+                    oct <<= 4;
+                    oct += ch;
+
+                    buf.push_back(oct);
+                    newSec = true;
+                }
+            }
+        }
+    }
+    return false;
+}

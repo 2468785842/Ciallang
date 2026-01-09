@@ -98,15 +98,13 @@ namespace cial::Syntax {
                 return false;
             }
             Token identifier{};
-            parser->current(identifier);
-            parser->consume();
-
+            parser->consume(identifier);
 
             // default value
             ExprNode *expr = nullptr;
             if(parser->peek(TokenType::Assignment)) {
                 parser->consume();
-                Token assignmentToken{};
+                Token *assignmentToken{};
                 parser->current(assignmentToken);
                 expr = parser->parseExpression(r, false);
                 if(!expr)
@@ -128,24 +126,25 @@ namespace cial::Syntax {
     }
 
     bool Parser::lookAhead(const size_t count) {
-        while(count >= tokens().size() && _lexer.hasNext()) {
+        while(count >= _lexer.tokenSize() && _lexer.hasNext()) {
             Token *token{ nullptr };
             if(!_lexer.next(token))
                 break;
 
             if(token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment) {
-                _lexer.tackOverToken(*token);
+                _lexer.takeOverToken(*token);
             }
 
             CLL_ASSERT(token != nullptr, "token is null");
         }
-        return !tokens().empty();
+        return _lexer.tokenSize() != 0;
     }
 
     bool Parser::peek(const TokenType tokenType) {
         if(!lookAhead(0))
             return false;
-        const auto &token = tokens().front();
+        Token *token;
+        _lexer.peekToken(token);
         return token->type() == tokenType;
     }
 
@@ -158,17 +157,16 @@ namespace cial::Syntax {
         if(!lookAhead(0))
             return false;
 
-        return _lexer.tackOverToken(token);
+        return _lexer.takeOverToken(token);
     }
 
-    bool Parser::current(Token &token) {
-        // just check tokens is empty? current tokens is empty we lex,
+    bool Parser::current(Token *&token) {
         if(!lookAhead(0))
             return false;
 
-        token = *tokens().front();
+        _lexer.peekToken(token);
 
-        return token.type() != TokenType::EndOfFile;
+        return token->type() != TokenType::EndOfFile;
     }
 
     bool Parser::expect(Result &r, const TokenType tokenType) {
@@ -178,7 +176,7 @@ namespace cial::Syntax {
         std::string expectedName = tokenTypeToStr(tokenType);
         Token tToken{};
 
-        if(!_lexer.tackOverToken(tToken)) {
+        if(!_lexer.takeOverToken(tToken)) {
             error(r, fmt::format("expected token '{}' but end of file.", expectedName, tToken.name()), tToken.location);
             return false;
         }
@@ -197,7 +195,8 @@ namespace cial::Syntax {
      */
     Precedence Parser::nextInfixPrecedence(const bool enableCommaExpr) {
         if(lookAhead(0)) {
-            const auto *token = tokens().front();
+            Token *token;
+            _lexer.peekToken(token);
             if(const auto infixParser = infixParserFor(token->type(), enableCommaExpr))
                 return infixParser->precedence();
         }
@@ -206,13 +205,13 @@ namespace cial::Syntax {
 
     void Parser::synchronize() {
         while(!peek(TokenType::EndOfFile)) {
-            Token token{};
+            Token *token{};
             if(!current(token))
                 return;
-            if(token.type() == TokenType::Invalid)
+            if(token->type() == TokenType::Invalid)
                 return;
 
-            switch(token.type()) {
+            switch(token->type()) {
                 case TokenType::Function:
                 case TokenType::Class:
                 case TokenType::Var:
@@ -252,13 +251,14 @@ namespace cial::Syntax {
     }
 
     DeclNode *Parser::parseDeclaration(Result &r) {
-        Token token{};
+        Token *token{};
         if(!current(token))
             return nullptr;
 
-        if(const auto *declParser = declParserFor(token.type())) {
-            consume();
-            return declParser->parse(r, this, &token);
+        if(const auto *declParser = declParserFor(token->type())) {
+            Token t{};
+            consume(t);
+            return declParser->parse(r, this, &t);
         }
 
         if(const auto *stmt = parseStatement(r, true)) {
@@ -316,15 +316,16 @@ namespace cial::Syntax {
      * }
      */
     StmtNode *Parser::parseStatement(Result &r, const bool enableCommaExpr) {
-        Token token{};
+        Token *token{};
 
         // just peek
         if(!current(token))
             return nullptr;
 
-        if(const auto stmtParser = stmtParserFor(token.type())) {
-            consume();
-            return stmtParser->parse(r, this, &token);
+        if(const auto stmtParser = stmtParserFor(token->type())) {
+            Token t{};
+            consume(t);
+            return stmtParser->parse(r, this, token);
         }
 
         // maybe ExpressionStatement
@@ -383,9 +384,8 @@ namespace cial::Syntax {
             return nullptr;
 
         Token identifier;
+        parser->consume(identifier);
         const auto line = identifier.location;
-        parser->current(identifier);
-        parser->consume();
 
         if(parser->peek(TokenType::SemiColon)) {
             parser->consume();
@@ -513,8 +513,7 @@ namespace cial::Syntax {
         }
 
         Token terminatorToken{};
-        parser->current(terminatorToken);
-        parser->consume();
+        parser->consume(terminatorToken);
 
         scope->location.end(terminatorToken.location.end());
         return scope;
@@ -545,8 +544,7 @@ namespace cial::Syntax {
 
         if(parser->peek(TokenType::Else)) {
             Token elseToken{};
-            parser->current(elseToken);
-            parser->consume();
+            parser->consume(elseToken);
 
             auto *elseBody = parser->parseStatement(r, true);
 

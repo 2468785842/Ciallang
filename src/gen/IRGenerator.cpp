@@ -60,7 +60,8 @@ namespace cial::Inter {
             return;
         }
         auto dst = allocateRegister();
-        _chunk->emit<Bytecode::Op::OpCode::Load>(dst, _chunk->addConstant(node->token->constVal()));
+        assert(node->token != nullptr);
+        _chunk->emit<Bytecode::Op::OpCode::Load>(dst, _chunk->addConstant(constVal(*node->token)));
         retReg = dst;
     }
 
@@ -75,7 +76,8 @@ namespace cial::Inter {
             Bytecode::Register dst = allocateRegister();
 
             if(auto *identifier = dynamic_cast<const Syntax::IdentifierExprNode *>(node->rhs); identifier) {
-                _chunk->emit<Bytecode::Op::OpCode::Load>(dst, _chunk->addConstant(identifier->token->constVal()));
+                assert(identifier->token != nullptr);
+                _chunk->emit<Bytecode::Op::OpCode::Load>(dst, _chunk->addConstant(constVal(*identifier->token)));
                 _chunk->emit<Bytecode::Op::OpCode::GProp>(reg1, dst, dst);
             } else {
                 Bytecode::Register reg2{ 0 };
@@ -96,8 +98,9 @@ namespace cial::Inter {
                 error("isn't support operator", node->location);
                 return;
             }
-            const Atom lVarName = lVarExpr->token->constVal().value<Atom>();
-            const Atom rVarName = rVarExpr->token->constVal().value<Atom>();
+            assert(lVarExpr->token != nullptr && rVarExpr->token != nullptr);
+            const Atom lVarName = constVal(*lVarExpr->token).value<Atom>();
+            const Atom rVarName = constVal(*rVarExpr->token).value<Atom>();
             auto *lVar = resolveLocalVariable(lVarName);
             auto *rVar = resolveLocalVariable(rVarName);
             auto dst = allocateRegister();
@@ -242,7 +245,8 @@ namespace cial::Inter {
     void IRGenerator::generate(const Syntax::AssignExprNode *node, OptReg &retReg) {
         if(const auto *expr = dynamic_cast<const Syntax::IdentifierExprNode *>(node->lhs)) {
 
-            const auto identifier = expr->token->constVal();
+            assert(expr->token != nullptr);
+            const auto identifier = constVal(*expr->token);
 
             Bytecode::Register src{ 0 };
             if(!expectValue(node->rhs, src))
@@ -281,7 +285,8 @@ namespace cial::Inter {
     }
 
     void IRGenerator::generate(const Syntax::VarDeclNode *node, OptReg &retReg) {
-        const auto identifier = node->token->constVal().value<Atom>();
+        assert(node->token != nullptr);
+        const auto identifier = constVal(*node->token).value<Atom>();
 
         DEFER {
             if(node->next)
@@ -331,7 +336,8 @@ namespace cial::Inter {
             return;
         }
 
-        const auto identifier = node->token->constVal().value<Atom>();
+        assert(node->token != nullptr);
+        const auto identifier = constVal(*node->token).value<Atom>();
 
         _chunk->emit<Bytecode::Op::OpCode::Load>(funReg, _chunk->addConstant(Constant{ funcMeta }));
 
@@ -347,7 +353,8 @@ namespace cial::Inter {
 
     void IRGenerator::generate(const Syntax::ClassDeclNode *node, OptReg &retReg) {
         // TODO:
-        const auto identifier = node->token->constVal().value<Atom>();
+        assert(node->token != nullptr);
+        const auto identifier = constVal(*node->token).value<Atom>();
 
         auto classReg = allocateRegister();
         auto *classMeta = _rt.createNoGC<ClassMeta>(identifier, 0);
@@ -360,7 +367,8 @@ namespace cial::Inter {
         for(const auto &declNode : node->body->childrens) {
 
             if(const auto *funcDeclNode = dynamic_cast<Syntax::FunctionDeclNode *>(declNode)) {
-                const auto funName = funcDeclNode->token->constVal().value<Atom>();
+                assert(funcDeclNode->token != nullptr);
+                const auto funName = constVal(*funcDeclNode->token).value<Atom>();
                 const auto funcMeta = generateFuncMeta(funcDeclNode->parameters, funcDeclNode->body);
 
                 if(!funcMeta) {
@@ -397,7 +405,8 @@ namespace cial::Inter {
 
     void IRGenerator::generate(const Syntax::IdentifierExprNode *node, OptReg &retReg) {
         auto dst = allocateRegister();
-        const auto identifier = node->token->constVal().value<Atom>();
+        assert(node->token != nullptr);
+        const auto identifier = constVal(*node->token).value<Atom>();
 
         if(const auto variable = resolveLocalVariable(identifier)) {
             _chunk->emit<Bytecode::Op::OpCode::CP>(variable->reg, dst);
@@ -644,7 +653,7 @@ namespace cial::Inter {
         OptReg paramReg{};
 
         for(auto &[token, exprNode] : parameters) {
-            const auto varName = token.constVal().value<Atom>();
+            const auto varName = constVal(token).value<Atom>();
 
             if(exprNode) {
                 Bytecode::Register defaultParamReg{ 0 };
@@ -680,6 +689,26 @@ namespace cial::Inter {
             chunk.emit<Bytecode::Op::OpCode::Load>(_empty.value(), ConstIdx{ 0 });
         }
         return _empty.value();
+    }
+
+    Constant IRGenerator::constVal(const Syntax::Token &token) const {
+        switch(token.valueType()) {
+            case Syntax::TokenValueType::Integer:
+                return Constant{ token.getInteger() };
+            case Syntax::TokenValueType::Real:
+                return Constant{ token.getReal() };
+            case Syntax::TokenValueType::String: {
+                const Atom a = _rt.atomTable.intern(token.getString());
+                return Constant{ a };
+            }
+            case Syntax::TokenValueType::Octet:
+                throw std::runtime_error("Unsupported token type octet");
+                // return Constant { token.getOctet() };
+                break;
+            case Syntax::TokenValueType::None:
+                break;
+        }
+        return Constant{};
     }
 
 } // namespace cial::Inter

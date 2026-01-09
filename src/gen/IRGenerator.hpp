@@ -153,5 +153,7 @@ namespace cial::Inter {
         void error(const std::string &message, const Common::SourceLocation &location) {
             _sourceFile.error(_r, message, location);
         }
+
+        Constant constVal(const Syntax::Token &token) const;
     };
 } // namespace cial::Inter

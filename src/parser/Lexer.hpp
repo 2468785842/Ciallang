@@ -25,19 +25,21 @@ namespace cial::Syntax {
     public:
         using LexerCaseCallable = std::function<bool(Lexer *, Token *&)>;
 
-        explicit Lexer(SourceFile &sourceFile, Runtime *rt = nullptr);
+        explicit Lexer(SourceFile &sourceFile);
 
-        bool next(Token *&);
+        bool next(Token *&token);
 
         void skipComment();
 
-        bool tackOverToken(Token &token);
+        bool takeOverToken(Token &token);
 
         [[nodiscard]] bool hasNext() const;
 
-        [[nodiscard]] constexpr const Vec<Token *> &tokens() const { return _tokens; }
-
         [[nodiscard]] const Result &result() const;
+
+        [[nodiscard]] size_t tokenSize() const { return _tokens.size(); }
+
+        void peekToken(Token *&token) const { token = _tokens.front(); }
 
         ~Lexer() noexcept {
             for(const auto &item : _tokens)
@@ -47,10 +49,9 @@ namespace cial::Syntax {
     private:
         static std::multimap<std::uint8_t, LexerCaseCallable> S_Cases;
 
-        Runtime *_rt;
         SourceFile &_sourceFile;
 
-        Vec<Token *> _tokens{};
+        std::deque<Token *> _tokens{};
         Result _result{};
         bool _hasNext = true;
 
@@ -61,13 +62,13 @@ namespace cial::Syntax {
             return token;
         }
 
-        using OperatorTokenSet = Vec<std::pair<const char *, TokenType>>;
+        using OperatorTokenSet = Vec<std::pair<String, TokenType>>;
 
         bool boringMatch(Token *&, const OperatorTokenSet &signMap);
 
         void rewindOneChar() const;
 
-        std::string readIdentifier();
+        String readIdentifier();
 
         bool lineTerminator(Token *&);
 
@@ -75,12 +76,12 @@ namespace cial::Syntax {
 
         [[nodiscard]] std::pair<uint32_t, uint32_t> getCurrentRowCol() const;
 
-        bool match(const std::string &literal);
+        bool match(const String &literal);
 
         // <
         bool gtSign(Token *&);
 
-        // bool octetLiteral(Token *&);
+        bool octetLiteral(Token *&);
 
         // >
         bool ltSign(Token *&);

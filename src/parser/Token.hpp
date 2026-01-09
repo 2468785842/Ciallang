@@ -20,9 +20,8 @@
 #include <utility>
 
 #include "common/SourceLocation.hpp"
-#include "runtime/AtomTable.hpp"
+#include "types/Octet.hpp"
 #include "types/Value.hpp"
-#include "vm/Chunk.hpp"
 
 namespace cial::Syntax {
     using namespace Common;
@@ -160,7 +159,7 @@ namespace cial::Syntax {
         return "unknown";
     }
 
-    enum class TokenValueType : std::uint8_t { None, Integer, Real, Atom };
+    enum class TokenValueType : std::uint8_t { None, Integer, Real, String, Octet };
 
     struct Token {
         SourceLocation location{};
@@ -170,33 +169,75 @@ namespace cial::Syntax {
         constexpr explicit Token(const TokenType type) : _type(type) {}
 
         explicit Token(const TokenType type, const Integer value) :
-            _type(type), _constType(ConstantType::Integer), _value(std::bit_cast<std::uint64_t>(value)) {}
+            _type(type), _valueType(TokenValueType::Integer), _integer(value) {}
 
         explicit Token(const TokenType type, const Real value) :
-            _type(type), _constType(ConstantType::Real), _value(std::bit_cast<std::uint64_t>(value)) {}
+            _type(type), _valueType(TokenValueType::Real), _real(value) {}
 
-        explicit Token(const TokenType type, const Atom value) :
-            _type(type), _constType(ConstantType::Atom), _value(std::bit_cast<std::uint64_t>(value)) {}
+        explicit Token(const TokenType type, String &&string) : _type(type), _valueType(TokenValueType::String) {
+            _string = new String{ std::move(string) };
+        }
+
+        explicit Token(const TokenType type, Octet &&octet) : _type(type), _valueType(TokenValueType::Octet) {
+            _octet = new Octet{ std::move(octet) };
+        }
 
         Token(const Token &token) noexcept {
             _type = token._type;
-            _constType = token._constType;
-            _value = token._value;
+            _valueType = token._valueType;
             location = token.location;
+            switch(_valueType) {
+                case TokenValueType::Integer:
+                    _integer = token._integer;
+                    break;
+                case TokenValueType::Real:
+                    _real = token._real;
+                    break;
+                case TokenValueType::String:
+                    _string = new String{ *token._string };
+                    break;
+                case TokenValueType::Octet:
+                    _octet = new Octet{ *token._octet };
+                    break;
+                case TokenValueType::None:
+                    break;
+            }
         }
 
         bool operator==(const TokenType tokenType) const { return _type == tokenType; }
 
         [[nodiscard]] constexpr TokenType type() const noexcept { return _type; }
 
-        [[nodiscard]] Constant constVal() const noexcept { return Constant{ _constType, _value }; }
+        [[nodiscard]] constexpr TokenValueType valueType() const noexcept { return _valueType; }
+
+        [[nodiscard]] constexpr Integer getInteger() const noexcept { return _integer; }
+
+        [[nodiscard]] constexpr Real getReal() const noexcept { return _real; }
+
+        [[nodiscard]] String getString() const noexcept { return *_string; }
+
+        [[nodiscard]] Octet getOctet() const noexcept { return *_octet; }
 
         [[nodiscard]] constexpr const char *name() const noexcept { return tokenTypeToStr(_type); }
 
+        ~Token() noexcept {
+            if(_valueType == TokenValueType::String) {
+                delete _string;
+            } else if(_valueType == TokenValueType::Octet) {
+                delete _octet;
+            }
+        }
+
     private:
-        TokenType _type = TokenType::Void;
-        ConstantType _constType = ConstantType::None;
-        std::uint64_t _value{}; // Integer, Real, Atom(String Index)
+        TokenType _type{ TokenType::Void };
+        TokenValueType _valueType{ TokenValueType::None };
+
+        union {
+            Integer _integer{};
+            Real _real;
+            String *_string;
+            Octet *_octet;
+        };
     };
 
     enum class StringParseState {

@@ -80,17 +80,36 @@ namespace cial::Syntax {
 
     class Parser {
     public:
-        Parser(Runtime &rt, SourceFile &sourceFile) : _lexer(Lexer{ sourceFile, &rt }), _sourceFile(sourceFile) {}
+        Parser(Runtime &rt, SourceFile &sourceFile) : _lexer(Lexer{ sourceFile }), _sourceFile(sourceFile) {}
 
         void error(Result &r, const std::string &message, const SourceLocation &location) const {
             _sourceFile.error(r, message, location);
         }
 
+        /**
+         * Consume a token and remove it from the lexer.
+         * Typically used with the `peek` method.
+         *
+         * @see peek
+         * @return have token? if not return false, otherwise return true
+         */
         bool consume();
 
+        /**
+         * consume a token, will get token from lexer then pop from deque
+         *
+         * @return have token? if not return false, otherwise return true
+         */
         bool consume(Token &token);
 
-        bool current(Token &token);
+        /**
+         * Gets the current token at the top of the lexer's deque, returning a pointer.
+         * WARN: Do not use this with the `consume` method!
+         * WARN: Because the `consume` method removes the token.
+         *
+         * @return have token? if not return false, otherwise return true
+         */
+        bool current(Token *&token);
 
         bool lookAhead(size_t count);
 
@@ -126,8 +145,6 @@ namespace cial::Syntax {
         static const InfixParser *infixParserFor(TokenType type, bool enableCommaExpr);
 
         static const PrefixParser *prefixParserFor(TokenType type);
-
-        [[nodiscard]] const std::vector<Token *> &tokens() const { return _lexer.tokens(); }
     };
 
     /**

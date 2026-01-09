@@ -16,7 +16,7 @@ namespace cial {
     };
 
     struct Err : std::exception {
-        ErrCode code{ErrCode::None};
+        ErrCode code{ ErrCode::None };
         String msg{};
 
         Err() = default;

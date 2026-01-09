@@ -5,6 +5,7 @@
 
 #include <fmt/ostream.h>
 
+#include "common/Hash.hpp"
 #include "gc/GC.hpp"
 
 namespace cial {
@@ -89,3 +90,12 @@ namespace cial {
 // support fmt::format
 template <>
 struct fmt::formatter<cial::String> : ostream_formatter {};
+
+template <>
+struct std::hash<cial::String> {
+    size_t operator()(const cial::String &v) const noexcept {
+        const uint32_t h = cial::fnv1a(v.getData(), v.length());
+        const uint64_t key = static_cast<uint64_t>(h) << 32 | static_cast<uint64_t>(v.length());
+        return key;
+    }
+};
