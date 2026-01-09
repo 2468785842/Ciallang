@@ -19,6 +19,7 @@
 #include "Real.hpp"
 
 #include "common/Ret.hpp"
+#include "gc/gc.hpp"
 
 namespace cial {
     class Value {
@@ -30,13 +31,17 @@ namespace cial {
 
         explicit Value(Real value);
 
-        explicit Value(String *value);
+        explicit Value(String value);
 
-        explicit Value(Octet *value);
+        explicit Value(Octet value);
 
         explicit Value(Object *value);
 
         ~Value();
+
+        Value(Value &&v) noexcept;
+
+        Value &operator=(Value &&v) noexcept;
 
         Value(const Value &v) noexcept;
 
@@ -108,8 +113,8 @@ namespace cial {
         union {
             Integer _integer{};
             Real _real;
-            String *_string;
-            Octet *_octet;
+            RefCountPointer<String> *_string;
+            RefCountPointer<Octet> *_octet;
             Object *_object;
         };
 

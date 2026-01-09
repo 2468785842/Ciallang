@@ -53,7 +53,7 @@ set(SOURCE_FILES
         src/stdlib/Debug.cpp
         src/stdlib/StringLib.cpp
 
-        src/gc/GC.cpp
+        src/gc/gc.cpp
 
         src/logging/Logger.cpp
 )

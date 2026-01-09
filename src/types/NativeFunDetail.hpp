@@ -82,9 +82,9 @@ namespace cial::NativeFunDetail {
         if constexpr(std::is_same_v<std::decay_t<Ret>, Value>) {
             return std::forward<Ret>(ret);
         } else if constexpr(std::is_same_v<std::decay_t<Ret>, String>) {
-            return Value{ new String{ std::forward<Ret>(ret) } };
+            return Value{ std::forward<Ret>(ret) };
         } else if constexpr(std::is_same_v<std::decay_t<Ret>, Octet>) {
-            return Value{ new Octet{ std::forward<Ret>(ret) } };
+            return Value{ std::forward<Ret>(ret) };
         } else {
             return Value{ std::forward<Ret>(ret) };
         }

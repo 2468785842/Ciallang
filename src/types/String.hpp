@@ -6,11 +6,10 @@
 #include <fmt/ostream.h>
 
 #include "common/Hash.hpp"
-#include "gc/GC.hpp"
 
 namespace cial {
     class Value;
-    class String final : public RefCountHeader {
+    class String final {
         static constexpr int SHORT_STR_LEN = 21;
 
     public:
@@ -24,7 +23,7 @@ namespace cial {
         explicit String(const char *str, std::uint32_t len);
         explicit String(const std::string &s) : String(s.data(), static_cast<std::uint32_t>(s.size())) {}
 
-        ~String() noexcept override;
+        ~String() noexcept;
 
         String(String &&str) noexcept;
 

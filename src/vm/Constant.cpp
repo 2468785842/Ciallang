@@ -39,7 +39,7 @@ namespace cial {
                 return Value{ _value.real };
             case ConstantType::Atom: {
                 const auto *str = rt->atomTable.get(value<Atom>())->str;
-                return Value{ new String(str->getData(), str->length()) };
+                return Value{ String{ str->getData(), str->length() } };
             }
             case ConstantType::FuncMeta: {
                 return Value{ rt->create<Function>(value<FuncMeta *>()) };

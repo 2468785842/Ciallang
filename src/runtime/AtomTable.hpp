@@ -18,7 +18,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "gc/GC.hpp"
+#include "gc/gc.hpp"
 #include "types/String.hpp"
 #include "types/Types.hpp"
 

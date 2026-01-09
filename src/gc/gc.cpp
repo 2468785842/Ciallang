@@ -14,22 +14,11 @@
 // Created by LiDon on 2025/9/29.
 //
 
-#include "GC.hpp"
-
-#include <cassert>
+#include "gc.hpp"
 
 #include "logging/Logger.hpp"
 
 namespace cial {
-
-    void RefCountHeader::incRef() { ++_refCount; }
-
-    void RefCountHeader::decRef() {
-        assert(_refCount != 0);
-        if(--_refCount == 0) {
-            delete this;
-        }
-    }
 
     MarkSweepHeader *MarkSweep::findIdleNode(const MarkFunc &mark) {
         find();

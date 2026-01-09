@@ -174,11 +174,11 @@ namespace cial::Syntax {
         explicit Token(const TokenType type, const Real value) :
             _type(type), _valueType(TokenValueType::Real), _real(value) {}
 
-        explicit Token(const TokenType type, String &&string) : _type(type), _valueType(TokenValueType::String) {
+        explicit Token(const TokenType type, String string) : _type(type), _valueType(TokenValueType::String) {
             _string = new String{ std::move(string) };
         }
 
-        explicit Token(const TokenType type, Octet &&octet) : _type(type), _valueType(TokenValueType::Octet) {
+        explicit Token(const TokenType type, Octet octet) : _type(type), _valueType(TokenValueType::Octet) {
             _octet = new Octet{ std::move(octet) };
         }
 

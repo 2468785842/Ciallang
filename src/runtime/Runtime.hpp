@@ -17,7 +17,7 @@
 
 #include "AtomTable.hpp"
 
-#include "gc/GC.hpp"
+#include "gc/gc.hpp"
 
 namespace cial {
     namespace Inter {

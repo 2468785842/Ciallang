@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "gc/GC.hpp"
+#include "gc/gc.hpp"
 #include "runtime/AtomTable.hpp"
 
 namespace cial::Bytecode {

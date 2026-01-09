@@ -17,17 +17,48 @@
 
 namespace cial {
 
-    class RefCountHeader {
-
+    template <typename T>
+    class RefCountPointer {
     public:
-        RefCountHeader() = default;
-        virtual ~RefCountHeader() = default;
+        template <typename... Args>
+        explicit RefCountPointer(Args... args) : _box(new RefCountBox{ std::forward<Args>(args)... }) {}
 
-        void incRef();
-        void decRef();
+        RefCountPointer(RefCountPointer &&) = delete;
+        RefCountPointer &operator=(RefCountPointer &&) = delete;
+
+        RefCountPointer(const RefCountPointer &other) : _box(other._box) { ++_box->_ref; }
+
+        RefCountPointer &operator=(const RefCountPointer &other) {
+            if(this != &other) {
+                release();
+                _box = other._box;
+                ++_box->_ref;
+            }
+            return *this;
+        }
+
+        T *getValue() noexcept { return _box->_data; }
+        const T *getValue() const noexcept { return _box->_data; }
+
+        ~RefCountPointer() noexcept { release(); }
 
     private:
-        std::uint32_t _refCount{ 0 };
+        struct RefCountBox {
+            T *_data{ nullptr };
+            std::uint32_t _ref{ 1 };
+
+            template <typename... Args>
+            explicit RefCountBox(Args... args) : _data(new T{ std::forward<Args>(args)... }) {}
+
+            ~RefCountBox() noexcept { delete _data; }
+        };
+
+        RefCountBox *_box;
+
+        void release() noexcept {
+            if(--_box->_ref == 0)
+                delete _box;
+        }
     };
 
     class MarkSweepHeader {

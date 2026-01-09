@@ -80,7 +80,7 @@ namespace cial::Syntax {
 
     class Parser {
     public:
-        Parser(Runtime &rt, SourceFile &sourceFile) : _lexer(Lexer{ sourceFile }), _sourceFile(sourceFile) {}
+        explicit Parser(SourceFile &sourceFile) : _lexer(Lexer{ sourceFile }), _sourceFile(sourceFile) {}
 
         void error(Result &r, const std::string &message, const SourceLocation &location) const {
             _sourceFile.error(r, message, location);

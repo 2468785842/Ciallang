@@ -23,7 +23,7 @@
 #include "vm/Chunk.hpp"
 #include "vm/FastRegisterPool.hpp"
 
-#include "gc/GC.hpp"
+#include "gc/gc.hpp"
 
 #include "types/Object.hpp"
 #include "types/Value.hpp"

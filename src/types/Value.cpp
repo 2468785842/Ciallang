@@ -22,28 +22,55 @@ namespace cial {
 
     Value::Value(const Real value) : _real(value), _type(ValueType::Real) {}
 
-    Value::Value(String *value) : _type(ValueType::String) {
-        _string = value;
-        _string->incRef();
-    }
+    Value::Value(String value) : _type(ValueType::String) { _string = new RefCountPointer<String>{ std::move(value) }; }
 
-    Value::Value(Octet *value) : _type(ValueType::Octet) {
-        _octet = value;
-        _octet->incRef();
-    }
+    Value::Value(Octet value) : _type(ValueType::Octet) { _octet = new RefCountPointer<Octet>{ std::move(value) }; }
 
     Value::Value(Object *value) : _object(value), _type(ValueType::Object) {}
 
     Value::~Value() {
         switch(_type) {
             case ValueType::String:
-                _string->decRef();
+                delete _string;
                 break;
             case ValueType::Octet:
-                _octet->decRef();
+                delete _octet;
                 break;
             default:;
         }
+    }
+
+    Value::Value(Value &&v) noexcept : _type(v._type) {
+        switch(_type) {
+            case ValueType::Integer:
+                _integer = v._integer;
+                break;
+            case ValueType::Real:
+                _real = v._real;
+                break;
+            case ValueType::String:
+                _string = v._string;
+                v._string = nullptr;
+                break;
+            case ValueType::Octet:
+                _octet = v._octet;
+                v._octet = nullptr;
+                break;
+            case ValueType::Object:
+                _object = v._object;
+                v._object = nullptr;
+                break;
+            case ValueType::Void:
+                break;
+        }
+    }
+
+    Value &Value::operator=(Value &&v) noexcept {
+        if(this != &v) {
+            this->~Value();
+            new(this) Value(std::move(v));
+        }
+        return *this;
     }
 
     Value::Value(const Value &v) noexcept {
@@ -51,15 +78,22 @@ namespace cial {
 
         switch(v._type) {
             case ValueType::String:
-                _string = v._string;
-                _string->incRef();
+                _string = new RefCountPointer{ *v._string };
                 break;
             case ValueType::Octet:
-                _octet = v._octet;
-                _octet->incRef();
+                _octet = new RefCountPointer{ *v._octet };
                 break;
-            default:
+            case ValueType::Integer:
                 _integer = v._integer;
+                break;
+            case ValueType::Real:
+                _real = v._real;
+                break;
+            case ValueType::Object:
+                _object = v._object;
+                break;
+            case ValueType::Void:
+                break;
         }
     }
 
@@ -109,14 +143,14 @@ namespace cial {
 
     Ret<String *> Value::asString() const noexcept {
         if(_type == ValueType::String) {
-            return Ret<String *>::ok(_string);
+            return Ret<String *>::ok(_string->getValue());
         }
         return Ret<String *>::err(ErrCode::TypeError, "Invalid type get as String"_str);
     }
 
     Ret<Octet *> Value::asOctet() const noexcept {
         if(_type == ValueType::Octet) {
-            return Ret<Octet *>::ok(_octet);
+            return Ret<Octet *>::ok(_octet->getValue());
         }
         return Ret<Octet *>::err(ErrCode::TypeError, "Invalid type get as Octet"_str);
     }
@@ -191,9 +225,8 @@ namespace cial {
 
         switch(_type) {
             case ValueType::Object: {
-                auto *str = new String{ TypeConverter::objectToString(*_object) };
                 this->~Value();
-                new(this) Value{ str };
+                new(this) Value{ TypeConverter::objectToString(*_object) };
                 return Ret<void>::ok();
             }
 
@@ -201,16 +234,14 @@ namespace cial {
                 return Ret<void>::ok();
 
             case ValueType::Integer: {
-                auto *str = new String{ TypeConverter::integerToString(_integer) };
                 this->~Value();
-                new(this) Value{ str };
+                new(this) Value{ TypeConverter::integerToString(_integer) };
                 return Ret<void>::ok();
             }
 
             case ValueType::Real: {
-                auto *str = new String{ TypeConverter::realToString(_real) };
                 this->~Value();
-                new(this) Value{ str };
+                new(this) Value{ TypeConverter::realToString(_real) };
                 return Ret<void>::ok();
             }
 
@@ -282,13 +313,13 @@ namespace cial {
             String result{ *s1.value() };
             result.append(*s2.value());
 
-            return Ret<Value>::ok(Value{ new String{ std::move(result) } });
+            return Ret<Value>::ok(Value{ std::move(result) });
         }
 
         if(this->_type == value._type) {
             if(this->_type == ValueType::Octet) {
-                Octet oct{ *this->_octet, *value._octet };
-                return Ret<Value>::ok(Value{ new Octet{ std::move(oct) } });
+                Octet oct{ *this->_octet->getValue(), *value._octet->getValue() };
+                return Ret<Value>::ok(Value{ std::move(oct) });
             }
 
             if(this->isInteger()) {

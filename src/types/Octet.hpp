@@ -12,10 +12,10 @@
 
 #pragma once
 
-#include "gc/GC.hpp"
+#include "gc/gc.hpp"
 
 namespace cial {
-    class Octet final : public RefCountHeader {
+    class Octet final {
     public:
         explicit Octet(const std::uint8_t *src, std::uint32_t size);
 
@@ -43,7 +43,7 @@ namespace cial {
             return *this;
         }
 
-        ~Octet() override { delete[] _buf; }
+        ~Octet() noexcept { delete[] _buf; }
 
         [[nodiscard]] std::uint32_t getSize() const { return _size; }
 

@@ -687,8 +687,7 @@ bool Lexer::identifier(Token *&token) {
     };
 
     // get keyword
-    auto it = Keywords.find(name);
-    if(it != Keywords.end()) {
+    if(const auto it = Keywords.find(name); it != Keywords.end()) {
         token = makeToken(it->second);
         return true;
     }

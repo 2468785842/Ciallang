@@ -197,7 +197,8 @@ namespace cial::Bytecode::Op {
 
     void GProp::execute(const Instruction &inst, const VMState &vmState) {
         const auto &val = vmState.reg(obj(inst));
-        const String &name = *vmState.reg(memberReg(inst)).asString().unwrap();
+        const auto &nameVal = vmState.reg(memberReg(inst));
+        const String &name = *nameVal.asString().unwrap();
         const Atom atom = vmState.rt.atomTable.intern(name);
         if(val.isObject()) {
             if(auto *instObj = dynamic_cast<InstanceObject *>(val.asObject().value())) {
