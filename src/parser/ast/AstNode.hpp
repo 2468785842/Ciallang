@@ -79,14 +79,14 @@ namespace cial::Syntax {
     protected:
         explicit AstNode(const char *name) : _name(name) {}
 
-        explicit AstNode(const Token &token, const char *name) : token(std::make_unique<Token>(token)), _name(name) {
-            location = this->token->location;
+        explicit AstNode(Token token, const char *name) : token(std::move(token)), _name(name) {
+            location = this->token.location;
         }
 
     public:
         struct Visitor;
 
-        const std::unique_ptr<Token> token{ nullptr };
+        const Token token{};
 
         AstNode() = delete;
 

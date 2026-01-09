@@ -57,9 +57,8 @@ namespace cial::Syntax {
 
         template <typename... Args>
         Token *makeToken(Args &&...args) {
-            auto *token = new Token{ std::forward<Args>(args)... };
-            _tokens.push_back(token);
-            return token;
+            _tokens.emplace_back(new Token{ std::forward<Args>(args)... });
+            return _tokens.back();
         }
 
         using OperatorTokenSet = Vec<std::pair<String, TokenType>>;

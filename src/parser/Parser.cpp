@@ -111,7 +111,7 @@ namespace cial::Syntax {
                     return false;
             }
 
-            parameters.emplace_back(identifier, expr);
+            parameters.emplace_back(std::move(identifier), expr);
 
             if(parser->peek(TokenType::RParenthesis)) {
                 parser->consume();
@@ -808,7 +808,7 @@ namespace cial::Syntax {
         // check
         if(!dynamic_cast<IdentifierExprNode *>(lhs) && !dynamic_cast<FunctionExprNode *>(lhs)) {
             if(const auto binaryExprNode = dynamic_cast<BinaryExprNode *>(lhs);
-               !binaryExprNode || *binaryExprNode->token != TokenType::Dot) {
+               !binaryExprNode || binaryExprNode->token != TokenType::Dot) {
                 parser->error(r, "proc call expect identifier or function expression", token->location);
                 return nullptr;
             }

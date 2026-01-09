@@ -182,11 +182,48 @@ namespace cial::Syntax {
             _octet = new Octet{ std::move(octet) };
         }
 
+        Token(Token &&token) noexcept {
+            _type = token._type;
+            _valueType = token._valueType;
+            location = token.location;
+
+            switch(_valueType) {
+                case TokenValueType::None:
+                    break;
+                case TokenValueType::Integer:
+                    _integer = token._integer;
+                    break;
+                case TokenValueType::Real:
+                    _real = token._real;
+                    break;
+                case TokenValueType::String:
+                    _string = token._string;
+                    token._string = nullptr;
+                    break;
+                case TokenValueType::Octet:
+                    _octet = token._octet;
+                    token._octet = nullptr;
+                    break;
+            }
+        }
+
+        Token &operator=(Token &&token) noexcept {
+            if(this != &token) {
+                this->~Token();
+                new(this) Token(std::move(token));
+            }
+            return *this;
+        }
+
+
         Token(const Token &token) noexcept {
             _type = token._type;
             _valueType = token._valueType;
             location = token.location;
+
             switch(_valueType) {
+                case TokenValueType::None:
+                    break;
                 case TokenValueType::Integer:
                     _integer = token._integer;
                     break;
@@ -199,9 +236,15 @@ namespace cial::Syntax {
                 case TokenValueType::Octet:
                     _octet = new Octet{ *token._octet };
                     break;
-                case TokenValueType::None:
-                    break;
             }
+        }
+
+        Token &operator=(const Token &token) noexcept {
+            if(this != &token) {
+                this->~Token();
+                new(this) Token(token);
+            }
+            return *this;
         }
 
         bool operator==(const TokenType tokenType) const { return _type == tokenType; }

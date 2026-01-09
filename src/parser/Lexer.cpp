@@ -247,7 +247,7 @@ bool Lexer::takeOverToken(Token &token) {
     if(_tokens.empty())
         return false;
 
-    token = *_tokens.front();
+    token = std::move(*_tokens.front());
     _tokens.pop_front();
 
     if(token.type() == TokenType::EndOfFile)
@@ -655,36 +655,39 @@ bool Lexer::identifier(Token *&token) {
     if(name.isEmpty())
         return false;
 
-    static std::unordered_map<String, Token> Keywords{
-        { "true"_str, Token{ TokenType::ConstVal, 1 } },
-        { "false"_str, Token{ TokenType::ConstVal, 0 } },
-        { "Infinity"_str, Token{ TokenType::ConstVal, Real::negativeInf() } },
-        { "NaN"_str, Token{ TokenType::ConstVal, Real::signalingNan() } },
-        { "null"_str, Token{ TokenType::Null } },
+    static auto Keywords = []() -> auto {
+        std::unordered_map<String, Token> keywords{};
+        keywords.emplace("true"_str, Token{ TokenType::ConstVal, 1 });
+        keywords.emplace("false"_str, Token{ TokenType::ConstVal, 0 });
+        keywords.emplace("Infinity"_str, Token{ TokenType::ConstVal, Real::negativeInf() });
+        keywords.emplace("NaN"_str, Token{ TokenType::ConstVal, Real::signalingNan() });
+        keywords.emplace("null"_str, Token{ TokenType::Null });
 
-        { "function"_str, Token{ TokenType::Function } },
-        { "class"_str, Token{ TokenType::Class } },
-        { "extends"_str, Token{ TokenType::Extends } },
-        { "return"_str, Token{ TokenType::Return } },
+        keywords.emplace("function"_str, Token{ TokenType::Function });
+        keywords.emplace("class"_str, Token{ TokenType::Class });
+        keywords.emplace("extends"_str, Token{ TokenType::Extends });
+        keywords.emplace("return"_str, Token{ TokenType::Return });
 
-        { "var"_str, Token{ TokenType::Var } },
-        { "const"_str, Token{ TokenType::Const } },
+        keywords.emplace("var"_str, Token{ TokenType::Var });
+        keywords.emplace("const"_str, Token{ TokenType::Const });
 
-        { "if"_str, Token{ TokenType::If } },
-        { "else"_str, Token{ TokenType::Else } },
+        keywords.emplace("if"_str, Token{ TokenType::If });
+        keywords.emplace("else"_str, Token{ TokenType::Else });
 
-        { "int"_str, Token{ TokenType::Int } },
-        { "real"_str, Token{ TokenType::Real } },
-        { "string"_str, Token{ TokenType::String } },
+        keywords.emplace("int"_str, Token{ TokenType::Int });
+        keywords.emplace("real"_str, Token{ TokenType::Real });
+        keywords.emplace("string"_str, Token{ TokenType::String });
 
-        { "new"_str, Token{ TokenType::New } },
+        keywords.emplace("new"_str, Token{ TokenType::New });
 
-        { "do"_str, Token{ TokenType::Do } },
-        { "while"_str, Token{ TokenType::While } },
-        { "for"_str, Token{ TokenType::For } },
-        { "break"_str, Token{ TokenType::Break } },
-        { "continue"_str, Token{ TokenType::Continue } }
-    };
+        keywords.emplace("do"_str, Token{ TokenType::Do });
+        keywords.emplace("while"_str, Token{ TokenType::While });
+        keywords.emplace("for"_str, Token{ TokenType::For });
+        keywords.emplace("break"_str, Token{ TokenType::Break });
+
+        keywords.emplace("continue"_str, Token{ TokenType::Continue });
+        return std::move(keywords);
+    }();
 
     // get keyword
     if(const auto it = Keywords.find(name); it != Keywords.end()) {
