@@ -39,6 +39,8 @@ namespace cial::Bytecode::Op {
     O(Sub)                                                                                                             \
     O(Mul)                                                                                                             \
     O(Div)                                                                                                             \
+    O(Idiv)                                                                                                            \
+    O(Mod)                                                                                                             \
     O(Mov)                                                                                                             \
     O(DGlobal)                                                                                                         \
     O(GGlobal)                                                                                                         \
@@ -61,6 +63,12 @@ namespace cial::Bytecode::Op {
     O(LNot)                                                                                                            \
     O(LAnd)                                                                                                            \
     O(LOr)                                                                                                             \
+    O(BXor)                                                                                                            \
+    O(BOr)                                                                                                             \
+    O(BAnd)                                                                                                            \
+    O(BLShift)                                                                                                         \
+    O(BRShift)                                                                                                         \
+    O(BURShift)                                                                                                        \
     O(ChS)                                                                                                             \
     O(Ret)
 
@@ -291,6 +299,26 @@ namespace cial::Bytecode::Op {
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Div
+
+    struct Idiv {
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct Idiv
+
+    struct Mod {
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct Mod
 
     struct Mov {
         static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
@@ -529,6 +557,72 @@ namespace cial::Bytecode::Op {
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct LOr
+
+    struct BXor {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct BXor
+
+    struct BOr {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct BOr
+
+    struct BAnd {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct BAnd
+
+    struct BLShift {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct BLShift
+
+    struct BRShift {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct BRShift
+
+    struct BURShift {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct BURShift
 
     struct ChS {
 

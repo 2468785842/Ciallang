@@ -184,6 +184,30 @@ namespace cial::Inter {
             case Slash:
                 _chunk->emit<Bytecode::Op::OpCode::Div>(src, dst);
                 break;
+            case Backslash:
+                _chunk->emit<Bytecode::Op::OpCode::Idiv>(src, dst);
+                break;
+            case Percent:
+                _chunk->emit<Bytecode::Op::OpCode::Mod>(src, dst);
+                break;
+            case Chevron:
+                _chunk->emit<Bytecode::Op::OpCode::BXor>(src, dst);
+                break;
+            case VertLine:
+                _chunk->emit<Bytecode::Op::OpCode::BOr>(src, dst);
+                break;
+            case Ampersand:
+                _chunk->emit<Bytecode::Op::OpCode::BAnd>(src, dst);
+                break;
+            case LArithShift:
+                _chunk->emit<Bytecode::Op::OpCode::BLShift>(src, dst);
+                break;
+            case RArithShift:
+                _chunk->emit<Bytecode::Op::OpCode::BRShift>(src, dst);
+                break;
+            case RBitShift:
+                _chunk->emit<Bytecode::Op::OpCode::BURShift>(src, dst);
+                break;
             default:
                 error("unknow binary operator", node->location);
                 return;
@@ -238,7 +262,6 @@ namespace cial::Inter {
         retReg = dst;
     }
 
-
     void IRGenerator::generate(const Syntax::AssignExprNode *node, OptReg &retReg) {
         if(const auto *expr = dynamic_cast<const Syntax::IdentifierExprNode *>(node->lhs)) {
             const auto identifier = constVal(expr->token);
@@ -247,10 +270,10 @@ namespace cial::Inter {
             if(!expectValue(node->rhs, src))
                 return;
 
-            freeRegister(src);
             if(const auto variable = resolveLocalVariable(identifier.value<Atom>())) {
                 Bytecode::Register dst = variable->reg;
-                _chunk->emit<Bytecode::Op::OpCode::Mov>(src, dst);
+                _chunk->emit<Bytecode::Op::OpCode::CP>(src, dst);
+                freeRegister(src);
                 retReg = dst;
                 return;
             }

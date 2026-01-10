@@ -401,12 +401,88 @@ namespace cial {
     Ret<Value> Value::div(const Value &value) const noexcept {
         const Err err{ ErrCode::TypeError, "unsupported operand types for `/`"_str };
         const auto lhs = this->asReal();
-        if(lhs.isFailed())
-            return Ret<Value>::err(err);
         const auto rhs = value.asReal();
-        if(rhs.isFailed())
+        if(rhs.isFailed() || lhs.isFailed())
             return Ret<Value>::err(err);
+        if(rhs.value().value() == 0)
+            return Ret<Value>::err(ErrCode::DivideByZero, "Divide by zero"_str);
         return Ret<Value>::ok(Value{ lhs.value() / rhs.value() });
+    }
+
+    Ret<Value> Value::idiv(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `\\`"_str };
+        const auto lhs = this->asInteger();
+        const auto rhs = value.asInteger();
+        if(rhs.isFailed() || lhs.isFailed())
+            return Ret<Value>::err(err);
+        if(rhs.value() == 0)
+            return Ret<Value>::err(ErrCode::DivideByZero, "Divide by zero"_str);
+        return Ret<Value>::ok(Value{ lhs.value() / rhs.value() });
+    }
+
+    Ret<Value> Value::mod(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `%`"_str };
+        const auto lhs = this->asInteger();
+        const auto rhs = value.asInteger();
+        if(rhs.isFailed() || lhs.isFailed())
+            return Ret<Value>::err(err);
+        if(rhs.value() == 0)
+            return Ret<Value>::err(ErrCode::DivideByZero, "Divide by zero"_str);
+        return Ret<Value>::ok(Value{ lhs.value() % rhs.value() });
+    }
+
+    Ret<Value> Value::bitwiseXor(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `^`"_str };
+        const auto lhs = this->asInteger();
+        const auto rhs = value.asInteger();
+        if(lhs.isFailed() || rhs.isFailed())
+            return Ret<Value>::err(err);
+        return Ret<Value>::ok(Value{ lhs.value() ^ rhs.value() });
+    }
+
+    Ret<Value> Value::bitwiseAnd(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `&`"_str };
+        const auto lhs = this->asInteger();
+        const auto rhs = value.asInteger();
+        if(lhs.isFailed() || rhs.isFailed())
+            return Ret<Value>::err(err);
+        return Ret<Value>::ok(Value{ lhs.value() & rhs.value() });
+    }
+
+    Ret<Value> Value::bitwiseOr(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `|`"_str };
+        const auto lhs = this->asInteger();
+        const auto rhs = value.asInteger();
+        if(lhs.isFailed() || rhs.isFailed())
+            return Ret<Value>::err(err);
+        return Ret<Value>::ok(Value{ lhs.value() | rhs.value() });
+    }
+
+    Ret<Value> Value::bitwiseLeftShift(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for `<<`"_str };
+        const auto lhs = this->asInteger();
+        const auto rhs = value.asInteger();
+        if(lhs.isFailed() || rhs.isFailed())
+            return Ret<Value>::err(err);
+        return Ret<Value>::ok(Value{ lhs.value() << rhs.value() });
+    }
+
+    Ret<Value> Value::bitwiseRightShift(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for >>`"_str };
+        const auto lhs = this->asInteger();
+        const auto rhs = value.asInteger();
+        if(lhs.isFailed() || rhs.isFailed())
+            return Ret<Value>::err(err);
+        return Ret<Value>::ok(Value{ lhs.value() >> rhs.value() });
+    }
+
+    Ret<Value> Value::bitwiseUnsignedRightShift(const Value &value) const noexcept {
+        const Err err{ ErrCode::TypeError, "unsupported operand types for >>>`"_str };
+        const auto lhs = this->asInteger();
+        const auto rhs = value.asInteger();
+        if(lhs.isFailed() || rhs.isFailed())
+            return Ret<Value>::err(err);
+        return Ret<Value>::ok(Value{ static_cast<Integer>(static_cast<UInteger>(lhs.value()) >> rhs.value()) });
     }
 
     bool Value::equals(const Value &value) const noexcept {

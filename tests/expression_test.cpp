@@ -111,7 +111,6 @@ TEST_CASE("表达式 - 一元运算表达式") {
         REQUIRE((*vm.evalExpr<Integer>("-(-1)"_str)) == 1);
     }
 }
-
 TEST_CASE("表达式 - 赋值表达式") {
     Runtime rt{};
     Context context{ rt };
@@ -120,8 +119,53 @@ TEST_CASE("表达式 - 赋值表达式") {
 
     SECTION("简单赋值") { REQUIRE((*vm.eval<Integer>("var a; a = 42; return a;"_str)) == 42); }
 
-    SECTION("复合赋值") { REQUIRE((*vm.eval<Integer>("var x, y; x = y = 10; return x + y;"_str)) == 20); }
+    SECTION("链式赋值") { REQUIRE((*vm.eval<Integer>("var a, b, c; a = b = c = 7; return a + b + c;"_str)) == 21); }
+
+    SECTION("算术复合赋值") {
+        REQUIRE((*vm.eval<Integer>("var x = 10; x += 5; return x;"_str)) == 15);
+        REQUIRE((*vm.eval<Integer>("var x = 10; x -= 3; return x;"_str)) == 7);
+        REQUIRE((*vm.eval<Integer>("var x = 6; x *= 7; return x;"_str)) == 42);
+        REQUIRE((*vm.eval<Integer>("var x = 20; x /= 4; return x;"_str)) == 5);
+        REQUIRE((*vm.eval<Integer>("var x = 17; x %= 5; return x;"_str)) == 2);
+    }
+
+    SECTION("位运算复合赋值") {
+        REQUIRE((*vm.eval<Integer>("var x = 6; x &= 3; return x;"_str)) == (6 & 3));
+        REQUIRE((*vm.eval<Integer>("var x = 6; x |= 3; return x;"_str)) == (6 | 3));
+        REQUIRE((*vm.eval<Integer>("var x = 6; x ^= 3; return x;"_str)) == (6 ^ 3));
+    }
+
+    SECTION("逻辑复合赋值") {
+        // NOTE: tjs2 will convert value types to booleans and perform || and && operations.
+        // is not bug!
+        // a ||= b  ≡  a = (bool(a) || bool(b))
+        // a &&= b  ≡  a = (bool(a) && bool(b))
+        REQUIRE((*vm.eval<bool>("var x = 0; x ||= 42; return x;"_str)) == true);
+
+        REQUIRE((*vm.eval<bool>("var x = 1; x ||= 0; return x;"_str)) == true);
+
+        REQUIRE((*vm.eval<bool>("var x = false; x ||= false; return x;"_str)) == false);
+    }
+
+    SECTION("移位复合赋值") {
+        REQUIRE((*vm.eval<Integer>("var x = 1; x <<= 3; return x;"_str)) == 8);
+        REQUIRE((*vm.eval<Integer>("var x = 8; x >>= 2; return x;"_str)) == 2);
+        REQUIRE((*vm.eval<Integer>("var x = -1; x >>>= 1; return x;"_str)) >= 0);
+    }
+
+    SECTION("赋值表达式的值") {
+        REQUIRE((*vm.eval<Integer>("var a = 1; var b; b = (a += 2); return a * 10 + b;"_str)) == 33);
+    }
+
+    SECTION("左值只求值一次") {
+        REQUIRE((*vm.eval<Integer>("var i = 0; "
+                                   "function f { i += 1; return i; } "
+                                   "var a = 0; "
+                                   "a += f(); "
+                                   "return i;"_str)) == 1);
+    }
 }
+
 
 TEST_CASE("表达式 - 函数表达式") {
     Runtime rt{};

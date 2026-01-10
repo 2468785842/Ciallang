@@ -85,6 +85,20 @@ namespace cial::Bytecode::Op {
         r2 = r.unwrap();
     }
 
+    void Idiv::execute(const Instruction &inst, const VMState &vmState) {
+        const Value r1 = vmState.reg(src(inst));
+        Value &r2 = vmState.regRef(dst(inst));
+        auto r = r1.idiv(r2);
+        r2 = r.unwrap();
+    }
+
+    void Mod::execute(const Instruction &inst, const VMState &vmState) {
+        const Value r1 = vmState.reg(src(inst));
+        Value &r2 = vmState.regRef(dst(inst));
+        auto r = r1.mod(r2);
+        r2 = r.unwrap();
+    }
+
     void Mov::execute(const Instruction &inst, const VMState &vmState) {
         const Value &srcVal = vmState.reg(src(inst));
         vmState.reg(dst(inst), srcVal);
@@ -168,6 +182,42 @@ namespace cial::Bytecode::Op {
         const bool r = r1.logicalOr(r2);
         r2 = Value{ r };
         vmState.setZF(r);
+    }
+
+    void BXor::execute(const Instruction &inst, const VMState &vmState) {
+        const Value r1 = vmState.reg(src(inst));
+        Value &r2 = vmState.regRef(dst(inst));
+        r2 = r1.bitwiseXor(r2).unwrap();
+    }
+
+    void BOr::execute(const Instruction &inst, const VMState &vmState) {
+        const Value r1 = vmState.reg(src(inst));
+        Value &r2 = vmState.regRef(dst(inst));
+        r2 = r1.bitwiseOr(r2).unwrap();
+    }
+
+    void BAnd::execute(const Instruction &inst, const VMState &vmState) {
+        const Value r1 = vmState.reg(src(inst));
+        Value &r2 = vmState.regRef(dst(inst));
+        r2 = r1.bitwiseAnd(r2).unwrap();
+    }
+
+    void BLShift::execute(const Instruction &inst, const VMState &vmState) {
+        const Value r1 = vmState.reg(src(inst));
+        Value &r2 = vmState.regRef(dst(inst));
+        r2 = r1.bitwiseLeftShift(r2).unwrap();
+    }
+
+    void BRShift::execute(const Instruction &inst, const VMState &vmState) {
+        const Value r1 = vmState.reg(src(inst));
+        Value &r2 = vmState.regRef(dst(inst));
+        r2 = r1.bitwiseRightShift(r2).unwrap();
+    }
+
+    void BURShift::execute(const Instruction &inst, const VMState &vmState) {
+        const Value r1 = vmState.reg(src(inst));
+        Value &r2 = vmState.regRef(dst(inst));
+        r2 = r1.bitwiseUnsignedRightShift(r2).unwrap();
     }
 
     void AbsEQ::execute(const Instruction &, VMState &) {
@@ -286,6 +336,7 @@ namespace cial::Bytecode::Op {
     std::string PopN::dump(const Instruction &inst, const VMState *vmState) {
         return fmt::format("{: <10} {: <4}", "popn", count(inst));
     }
+
     std::string CP::dump(const Instruction &inst, const VMState *vmState) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "cp", src(inst), dst(inst));
 
@@ -326,6 +377,26 @@ namespace cial::Bytecode::Op {
 
     std::string Div::dump(const Instruction &inst, const VMState *vmState) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "div", src(inst), dst(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
+                           vmState->reg(dst(inst)));
+    }
+
+    std::string Idiv::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "idiv", src(inst), dst(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
+                           vmState->reg(dst(inst)));
+    }
+
+    std::string Mod::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "mod", src(inst), dst(inst));
 
         if(!vmState)
             return insDump;
@@ -386,6 +457,7 @@ namespace cial::Bytecode::Op {
         return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
                            vmState->reg(dst(inst)));
     }
+
     std::string LE::dump(const Instruction &inst, const VMState *vmState) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "le", src(inst), dst(inst));
 
@@ -427,6 +499,66 @@ namespace cial::Bytecode::Op {
 
     std::string LOr::dump(const Instruction &inst, const VMState *vmState) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "lor", src(inst), dst(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
+                           vmState->reg(dst(inst)));
+    }
+
+    std::string BXor::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "bxor", src(inst), dst(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
+                           vmState->reg(dst(inst)));
+    }
+
+    std::string BOr::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "bor", src(inst), dst(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
+                           vmState->reg(dst(inst)));
+    }
+
+    std::string BAnd::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "band", src(inst), dst(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
+                           vmState->reg(dst(inst)));
+    }
+
+    std::string BLShift::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "blshift", src(inst), dst(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
+                           vmState->reg(dst(inst)));
+    }
+
+    std::string BRShift::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "brshift", src(inst), dst(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
+                           vmState->reg(dst(inst)));
+    }
+
+    std::string BURShift::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "burshift", src(inst), dst(inst));
 
         if(!vmState)
             return insDump;

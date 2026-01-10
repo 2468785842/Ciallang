@@ -68,20 +68,23 @@
 
 #### 表达式
 * [x] `A,B` 顺序表达式
-* [x] `A operator B` 赋值表达式 `=  <->  &=  |=  ^=  -=  +=  %=  /=  \=  *=  ||=  &&=  >>=  <<=  >>>=`
+* [x] `A <-> B` 交换表达式
+* [x] `A operator B` 赋值表达式 `=  &=  |=  ^=  -=  +=  %=  /=  \=  *=  ||=  &&=  >>=  <<=  >>>=`
 * [x] `A ? B : C` 条件运算符
 * [x] `A || B` 逻辑或
 * [x] `A && B` 逻辑与
-* [ ] `A | B` 按位或
-* [ ] `A & B` 按位与
-* [ ] `^A` 按位异或
+* [x] `A | B` 按位或
+* [x] `A & B` 按位与
+* [x] `A ^ B` 按位异或
 * [x] `A operator B` 相等判断运算符 `== != === !==`
 * [x] `A operator B` 比较运算符 `< > <= >=`
-* [ ] `A operator B` 位移运算符 `>> << >>>`
+* [x] `A operator B` 位移运算符 `>> << >>>`
 * [x] `A operator B` 加减运算符 `+ -`
-* [ ] `A operator B` 乘除运算符 `% / \ *`
-* [ ] `operator A` 前缀单目运算符 `! ~ -- ++ new invalidate isvalid delete typeof # $ + - & * int real string`
-* [ ] `A operator` 后缀单目运算符 `() [] . -- ++ ! `
+* [x] `A operator B` 乘除运算符 `% / \ *`
+* [x] `operator A` 实现的前缀单目运算符 `! new -`
+* [ ] `operator A` 前缀单目运算符 `~ -- ++ invalidate isvalid delete typeof # $ + & *`
+* [ ] `operator A` 类型转换运算符 `int real string`
+* [ ] `A operator` 后缀单目运算符 `() [] . -- ++ !`
 * [ ] `A instanceof B` 实例判断运算符
 * [ ] `A incontextof B` 上下文替换运算符
 

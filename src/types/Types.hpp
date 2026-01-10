@@ -29,6 +29,7 @@ namespace cial {
     };
 
     using Integer = std::int64_t;
+    using UInteger = std::uint64_t;
     class Real;
     class String;
     class Octet;

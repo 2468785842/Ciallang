@@ -96,6 +96,16 @@ namespace cial {
         [[nodiscard]] Ret<Value> sub(const Value &value) const noexcept;
         [[nodiscard]] Ret<Value> mul(const Value &value) const noexcept;
         [[nodiscard]] Ret<Value> div(const Value &value) const noexcept;
+        [[nodiscard]] Ret<Value> idiv(const Value &value) const noexcept;
+        [[nodiscard]] Ret<Value> mod(const Value &value) const noexcept;
+
+        [[nodiscard]] Ret<Value> bitwiseXor(const Value &value) const noexcept;
+        [[nodiscard]] Ret<Value> bitwiseAnd(const Value &value) const noexcept;
+        [[nodiscard]] Ret<Value> bitwiseOr(const Value &value) const noexcept;
+
+        [[nodiscard]] Ret<Value> bitwiseLeftShift(const Value &value) const noexcept;
+        [[nodiscard]] Ret<Value> bitwiseRightShift(const Value &value) const noexcept;
+        [[nodiscard]] Ret<Value> bitwiseUnsignedRightShift(const Value &value) const noexcept;
 
         [[nodiscard]] bool equals(const Value &value) const noexcept;
 
