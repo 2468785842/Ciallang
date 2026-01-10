@@ -19,6 +19,7 @@ set(SOURCES
         interpreter_test.cpp
         #        integration_test.cpp
         loop_test.cpp
+        judgment_test.cpp
         oop_test.cpp
         scope_test.cpp
 #        statement_test.cpp

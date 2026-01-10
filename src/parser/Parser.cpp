@@ -566,7 +566,6 @@ namespace cial::Syntax {
     }
 
     StmtNode *SwitchStmtParser::parse(Result &r, Parser *parser, Token *token) const {
-        // TODO:
         const auto *test = createExpressionNode(r, parser);
 
         if(!test)
@@ -585,6 +584,8 @@ namespace cial::Syntax {
 
         parser->consume();
 
+        Vec<ExprNode *> matchCases;
+
         while(parser->peek(TokenType::Case)) {
             parser->consume();
             auto *node = parser->parseExpression(r, true);
@@ -593,7 +594,7 @@ namespace cial::Syntax {
                 return nullptr;
             }
 
-            switchNode->matchCases.push_back(node);
+            matchCases.push_back(node);
 
             if(!parser->peek(TokenType::Colon)) {
                 parser->error(r, "case expected ':'", token->location);
@@ -606,40 +607,51 @@ namespace cial::Syntax {
             auto *caseScope = parser->astBuilder()->makeNode<BlockStmtNode>();
             caseScope->location.start(colonToken.location.start());
 
-            while(DeclNode *declNode = parser->parseDeclaration(r)) {
+            while(!parser->peek(TokenType::Case) && !parser->peek(TokenType::Default) &&
+                  !parser->peek(TokenType::RightCurlyBrace)) {
+                DeclNode *declNode = parser->parseDeclaration(r);
+                if(!declNode)
+                    return nullptr;
                 caseScope->childrens.push_back(declNode);
             }
 
             if(caseScope->childrens.empty()) {
-                switchNode->matchBodies.push_back(nullptr);
                 continue;
             }
 
             caseScope->location.end(caseScope->childrens.back()->location.end());
 
-            switchNode->matchBodies.push_back(caseScope);
+            switchNode->matches.emplace_back(std::move(matchCases), caseScope);
+            matchCases = {};
         }
 
         if(parser->peek(TokenType::Default)) {
+            Token defaultToken{};
+            parser->consume(defaultToken);
+
             if(!parser->peek(TokenType::Colon)) {
-                parser->error(r, "switch default branch expected ':'", token->location);
+                parser->error(r, "switch default branch expected ':'", defaultToken.location);
                 return nullptr;
             }
+            parser->consume();
 
             auto *defaultScope = parser->astBuilder()->makeNode<BlockStmtNode>();
 
-            while(DeclNode *declNode = parser->parseDeclaration(r)) {
+            while(!parser->peek(TokenType::RightCurlyBrace)) {
+                DeclNode *declNode = parser->parseDeclaration(r);
+                if(!declNode)
+                    return nullptr;
                 defaultScope->childrens.push_back(declNode);
             }
             switchNode->defaultBody = defaultScope;
         }
 
-        if(!parser->expect(r, TokenType::RightCurlyBrace)) {
-            return nullptr;
-        }
-
         Token closeToken{};
         parser->consume(closeToken);
+
+        if(closeToken != TokenType::RightCurlyBrace) {
+            return nullptr;
+        }
 
         scope->location.end(closeToken.location.end());
         switchNode->location.end(scope->location.end());

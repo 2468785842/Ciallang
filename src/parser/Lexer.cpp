@@ -684,9 +684,12 @@ bool Lexer::identifier(Token *&token) {
         keywords.emplace("do"_str, Token{ TokenType::Do });
         keywords.emplace("while"_str, Token{ TokenType::While });
         keywords.emplace("for"_str, Token{ TokenType::For });
+        keywords.emplace("continue"_str, Token{ TokenType::Continue });
         keywords.emplace("break"_str, Token{ TokenType::Break });
 
-        keywords.emplace("continue"_str, Token{ TokenType::Continue });
+        keywords.emplace("switch"_str, Token{ TokenType::Switch });
+        keywords.emplace("case"_str, Token{ TokenType::Case });
+        keywords.emplace("default"_str, Token{ TokenType::Default });
         return std::move(keywords);
     }();
 

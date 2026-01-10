@@ -75,8 +75,8 @@ namespace cial::Syntax {
     public:
         const ExprNode *test;
         BlockStmtNode *defaultBody{};
-        Vec<ExprNode *> matchCases;
-        Vec<BlockStmtNode *> matchBodies;
+        // Vec<case> body
+        Vec<std::pair<Vec<ExprNode *>, BlockStmtNode *>> matches;
 
         SwitchStmtNode() = delete;
 

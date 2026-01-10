@@ -446,6 +446,7 @@ namespace cial::Bytecode::Op {
         static Label label(const Instruction &inst) { return inst.getOperand1<Label>(); }
 
         static void setTarget(Instruction &inst, Label label) { inst.setOperand1(label); }
+
         static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);

@@ -279,12 +279,13 @@ namespace cial::Inter {
         retReg = funReg;
     }
 
-    void IRGenerator::generate(const Syntax::VarDeclNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const Syntax::VarDeclNode *node, OptReg &) {
         const auto identifier = constVal(node->token).value<Atom>();
 
         DEFER {
+            OptReg reg;
             if(node->next)
-                node->next->generateBytecode(this, retReg);
+                node->next->generateBytecode(this, reg);
         };
 
         // can init
@@ -321,7 +322,7 @@ namespace cial::Inter {
         addLocalVar(LocalVariable{ identifier, loadVoidReg(*_chunk), getNextInstPos() });
     }
 
-    void IRGenerator::generate(const Syntax::FunctionDeclNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const Syntax::FunctionDeclNode *node, OptReg &) {
         auto funReg = allocateRegister();
         auto *funcMeta = generateFuncMeta(node->parameters, node->body);
 
@@ -345,7 +346,7 @@ namespace cial::Inter {
     }
 
 
-    void IRGenerator::generate(const Syntax::ClassDeclNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const Syntax::ClassDeclNode *node, OptReg &) {
         // TODO:
         const auto identifier = constVal(node->token).value<Atom>();
 
@@ -368,27 +369,28 @@ namespace cial::Inter {
                     return;
                 }
                 classMeta->setMember(MemberShapeMeta{ funName }, funcMeta);
-            } else if(const auto *varDeclNode = dynamic_cast<Syntax::VarDeclNode *>(declNode)) {
-                // TODO:
-                // const auto varName = varDeclNode->token.constVal().value<Atom>();
-                //
-                // Bytecode::Register ret = allocateRegister();
-                //
-                // // can init
-                // if(varDeclNode->rhs) {
-                //     auto gen = IRGenerator{ _rt, _sourceFile };
-                //     gen.makeVirtualGlobalScope();
-                //     OptReg src;
-                //     auto chunk = gen.parseAst(_r, varDeclNode->rhs, src);
-                //     chunk->emit<Bytecode::Op::OpCode::Ret>(src.value());
-                //     if(_r.isFailed())
-                //         return;
-                // }
-                //
-                // classMeta->setMember(MemberShapMeta{ varName }, _rt.createNoGC<PropMeta>(
-                // _rt.createNoGC<FuncMeta>()
-                // ));
             }
+            // else if(const auto *varDeclNode = dynamic_cast<Syntax::VarDeclNode *>(declNode)) {
+            // TODO:
+            // const auto varName = varDeclNode->token.constVal().value<Atom>();
+            //
+            // Bytecode::Register ret = allocateRegister();
+            //
+            // // can init
+            // if(varDeclNode->rhs) {
+            //     auto gen = IRGenerator{ _rt, _sourceFile };
+            //     gen.makeVirtualGlobalScope();
+            //     OptReg src;
+            //     auto chunk = gen.parseAst(_r, varDeclNode->rhs, src);
+            //     chunk->emit<Bytecode::Op::OpCode::Ret>(src.value());
+            //     if(_r.isFailed())
+            //         return;
+            // }
+            //
+            // classMeta->setMember(MemberShapMeta{ varName }, _rt.createNoGC<PropMeta>(
+            // _rt.createNoGC<FuncMeta>()
+            // ));
+            // }
         }
 
         endScope();
@@ -421,7 +423,7 @@ namespace cial::Inter {
         return node->statement->generateBytecode(this, retReg);
     }
 
-    void IRGenerator::generate(const Syntax::BlockStmtNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const Syntax::BlockStmtNode *node, OptReg &) {
         // block statement never return value
         beginScope();
         OptReg ignore{};
@@ -431,7 +433,8 @@ namespace cial::Inter {
         endScope();
     }
 
-    void IRGenerator::generate(const Syntax::IfStmtNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const Syntax::IfStmtNode *node, OptReg &) {
+        OptReg ignore{};
         Bytecode::Register testReg{ 0 };
         if(!expectValue(node->test, testReg)) {
             return;
@@ -440,7 +443,7 @@ namespace cial::Inter {
         _chunk->emit<Bytecode::Op::OpCode::Test>(testReg);
 
         auto *jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
-        node->body->generateBytecode(this, retReg);
+        node->body->generateBytecode(this, ignore);
         Bytecode::Op::Instruction *jmp = nullptr;
 
         if(node->elseBody) {
@@ -450,24 +453,81 @@ namespace cial::Inter {
         Bytecode::Op::JmpNE::setTarget(*jmpNE, makeLabel());
 
         if(node->elseBody) {
-            node->elseBody->generateBytecode(this, retReg);
+            node->elseBody->generateBytecode(this, ignore);
             Bytecode::Op::Jmp::setTarget(*jmp, makeLabel());
         }
 
         freeRegister(testReg);
     }
 
-    void IRGenerator::generate(const Syntax::SwitchStmtNode *node, OptReg &retReg) {}
+    void IRGenerator::generate(const Syntax::SwitchStmtNode *node, OptReg &) {
+        using namespace Bytecode;
 
-    void IRGenerator::generate(const Syntax::DoWhileStmtNode *node, OptReg &retReg) {
+        _breakStack.emplace_back();
+
+        DEFER { _breakStack.pop_back(); };
+
+        OptReg ignore{ 0 };
+
+        Register testReg{ 0 };
+        if(!expectValue(node->test, testReg)) {
+            return;
+        }
+        Op::Instruction *prevCaseJmp{};
+        for(auto &[matchExprVec, body] : node->matches) {
+            Vec<Op::Instruction *> jmpEVec{};
+            for(const auto *matchExpr : matchExprVec) {
+                Register matchReg{ 0 };
+
+                if(!expectValue(matchExpr, matchReg)) {
+                    return;
+                }
+                _chunk->emit<Op::OpCode::EQ>(testReg, matchReg);
+                jmpEVec.push_back(_chunk->emit<Op::OpCode::JmpE>());
+            }
+            auto *jmp = _chunk->emit<Op::OpCode::Jmp>();
+            for(auto *jmpE : jmpEVec) {
+                Op::JmpE::setTarget(*jmpE, makeLabel());
+            }
+
+            if(prevCaseJmp)
+                Op::Jmp::setTarget(*prevCaseJmp, makeLabel());
+
+            body->generateBytecode(this, ignore);
+
+            if(body != node->matches.back().second)
+                prevCaseJmp = _chunk->emit<Op::OpCode::Jmp>();
+
+            Op::Jmp::setTarget(*jmp, makeLabel());
+        }
+
+        if(node->defaultBody)
+            node->defaultBody->generateBytecode(this, ignore);
+
+        const auto exitLabel = makeLabel();
+
+        for(auto *br : _breakStack.back()) {
+            Op::Jmp::setTarget(*br, exitLabel);
+        }
+    }
+
+    void IRGenerator::generate(const Syntax::DoWhileStmtNode *node, OptReg &) {
+        _breakStack.emplace_back();
+        _continueStack.emplace_back();
+
+        DEFER {
+            _breakStack.pop_back();
+            _continueStack.pop_back();
+        };
+
+        OptReg ignore{};
         const auto bodyLabel = makeLabel();
-        _loopStack.push_back(LoopContext{});
 
-        node->body->generateBytecode(this, retReg);
+        node->body->generateBytecode(this, ignore);
 
         const auto testLabel = makeLabel();
-        _loopStack.back().continueLabel = testLabel;
-        for(auto *ct : _loopStack.back().continues) {
+        _continueStack.back().continueLabel = testLabel;
+        for(auto *ct : _continueStack.back().continues) {
             Bytecode::Op::Jmp::setTarget(*ct, testLabel);
         }
 
@@ -482,20 +542,26 @@ namespace cial::Inter {
 
         const auto exitLabel = makeLabel();
         Bytecode::Op::JmpNE::setTarget(*jmpNE, exitLabel);
-        for(auto *br : _loopStack.back().breaks) {
+        for(auto *br : _breakStack.back()) {
             Bytecode::Op::Jmp::setTarget(*br, exitLabel);
         }
 
         freeRegister(testReg);
-        _loopStack.pop_back();
     }
 
-    void IRGenerator::generate(const Syntax::ForStmtNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const Syntax::ForStmtNode *node, OptReg &) {
+        _breakStack.emplace_back();
+        _continueStack.emplace_back();
+
+        DEFER {
+            _breakStack.pop_back();
+            _continueStack.pop_back();
+        };
+        OptReg ignore{};
         if(node->init)
-            node->init->generateBytecode(this, retReg);
+            node->init->generateBytecode(this, ignore);
 
         const auto testLabel = makeLabel();
-        _loopStack.push_back(LoopContext{});
 
         Bytecode::Op::Instruction *jmpNE{ nullptr };
         Bytecode::Register testReg{ 0 };
@@ -507,11 +573,11 @@ namespace cial::Inter {
             jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
         }
 
-        node->body->generateBytecode(this, retReg);
+        node->body->generateBytecode(this, ignore);
 
         const auto stepLabel = makeLabel();
-        _loopStack.back().continueLabel = stepLabel;
-        for(auto *ct : _loopStack.back().continues) {
+        _continueStack.back().continueLabel = stepLabel;
+        for(auto *ct : _continueStack.back().continues) {
             Bytecode::Op::Jmp::setTarget(*ct, stepLabel);
         }
 
@@ -528,20 +594,25 @@ namespace cial::Inter {
         const auto exitLabel = makeLabel();
         if(jmpNE)
             Bytecode::Op::JmpNE::setTarget(*jmpNE, exitLabel);
-        for(auto *br : _loopStack.back().breaks) {
+        for(auto *br : _breakStack.back()) {
             Bytecode::Op::Jmp::setTarget(*br, exitLabel);
         }
 
         if(node->test)
             freeRegister(testReg);
-        _loopStack.pop_back();
     }
 
-    void IRGenerator::generate(const Syntax::WhileStmtNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const Syntax::WhileStmtNode *node, OptReg &) {
+        _breakStack.emplace_back();
+        _continueStack.emplace_back();
 
+        DEFER {
+            _breakStack.pop_back();
+            _continueStack.pop_back();
+        };
+
+        OptReg ignore{};
         const auto loopLabel = makeLabel();
-
-        _loopStack.push_back(LoopContext{ .continueLabel = loopLabel });
 
         Bytecode::Register testReg{ 0 };
         if(!expectValue(node->test, testReg)) {
@@ -551,38 +622,44 @@ namespace cial::Inter {
         _chunk->emit<Bytecode::Op::OpCode::Test>(testReg);
         auto *jmpNE = _chunk->emit<Bytecode::Op::OpCode::JmpNE>();
 
-        node->body->generateBytecode(this, retReg);
+        node->body->generateBytecode(this, ignore);
+
+        const auto testLabel = makeLabel();
+        _continueStack.back().continueLabel = testLabel;
+        for(auto *ct : _continueStack.back().continues) {
+            Bytecode::Op::Jmp::setTarget(*ct, testLabel);
+        }
+
         Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(), loopLabel);
         const auto exitLabel = makeLabel();
         Bytecode::Op::JmpNE::setTarget(*jmpNE, exitLabel);
 
-        for(auto *br : _loopStack.back().breaks) {
+        for(auto *br : _breakStack.back()) {
             Bytecode::Op::Jmp::setTarget(*br, exitLabel);
         }
 
         freeRegister(testReg);
-
-        _loopStack.pop_back();
     }
 
-    void IRGenerator::generate([[maybe_unused]] const Syntax::BreakStmtNode *node, [[maybe_unused]] OptReg &retReg) {
-        if(_loopStack.empty())
+    void IRGenerator::generate(const Syntax::BreakStmtNode *, OptReg &) {
+        if(_breakStack.empty())
             return;
         auto *itt = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
-        _loopStack.back().breaks.push_back(itt);
+        _breakStack.back().push_back(itt);
     }
 
-    void IRGenerator::generate([[maybe_unused]] const Syntax::ContinueStmtNode *node, [[maybe_unused]] OptReg &retReg) {
-        if(_loopStack.empty())
+    void IRGenerator::generate(const Syntax::ContinueStmtNode *, OptReg &) {
+        if(_continueStack.empty())
             return;
-        if(_loopStack.back().continueLabel.has_value()) {
+        if(_continueStack.back().continueLabel.has_value()) {
             Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(),
-                                         _loopStack.back().continueLabel.value());
+                                         _continueStack.back().continueLabel.value());
         } else {
             auto *itt = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
-            _loopStack.back().continues.push_back(itt);
+            _continueStack.back().continues.push_back(itt);
         }
     }
+
     void IRGenerator::generate(const Syntax::ConditionalTernaryExprNode *node, OptReg &retReg) {
         Bytecode::Register dst = allocateRegister();
         Bytecode::Register testReg{ 0 };
@@ -615,7 +692,7 @@ namespace cial::Inter {
         retReg = dst;
     }
 
-    void IRGenerator::generate(const Syntax::ReturnStmtNode *node, [[maybe_unused]] OptReg &retReg) {
+    void IRGenerator::generate(const Syntax::ReturnStmtNode *node, OptReg &) {
         if(node->expr) {
             Bytecode::Register reg{ 0 };
             if(!expectValue(node->expr, reg)) {
@@ -636,7 +713,8 @@ namespace cial::Inter {
         return nullptr;
     }
 
-    FuncMeta *IRGenerator::generateFuncMeta(const Syntax::Parameters &parameters, Syntax::BlockStmtNode *body) const {
+    FuncMeta *IRGenerator::generateFuncMeta(const Syntax::Parameters &parameters,
+                                            const Syntax::BlockStmtNode *body) const {
 
         auto gen = IRGenerator{ _rt, _sourceFile };
         gen.makeVirtualGlobalScope();

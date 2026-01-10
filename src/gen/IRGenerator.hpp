@@ -107,14 +107,15 @@ namespace cial::Inter {
 
         Vec<Bytecode::Register> _freeRegisters{};
 
-        struct LoopContext {
+        using BreakContext = Vec<Bytecode::Op::Instruction *>;
+        Vec<BreakContext> _breakStack{};
+
+        struct ContinueContext {
             Opt<Bytecode::Label> continueLabel;
-            Opt<Bytecode::Label> breakLabel;
             Vec<Bytecode::Op::Instruction *> continues;
-            Vec<Bytecode::Op::Instruction *> breaks;
         };
 
-        Vec<LoopContext> _loopStack{};
+        Vec<ContinueContext> _continueStack{};
 
         Vec<std::uint32_t> _scopeStartPC{};
         Vec<LocalVariable> _localVars{};
@@ -145,7 +146,7 @@ namespace cial::Inter {
 
         Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk);
 
-        FuncMeta *generateFuncMeta(const Syntax::Parameters &parameters, Syntax::BlockStmtNode *body) const;
+        FuncMeta *generateFuncMeta(const Syntax::Parameters &parameters, const Syntax::BlockStmtNode *body) const;
 
         bool expectValue(const Syntax::ExprNode *node, Bytecode::Register &ret);
 
