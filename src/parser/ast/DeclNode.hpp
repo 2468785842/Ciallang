@@ -60,7 +60,14 @@ namespace cial::Syntax {
 
     class ClassDeclNode final : public DeclNode {
     public:
-        BlockStmtNode *body{ nullptr };
+        Vec<IdentifierExprNode *> extends{};
+        FunctionDeclNode *constructor{};
+        Vec<VarDeclNode *> varDeclVec{};
+        Vec<FunctionDeclNode *> funcDeclVec{};
+
+        // TODO:
+        // Vec<ProperyDeclNode *> propertyDeclVec{};
+
         ClassDeclNode() = delete;
 
         explicit ClassDeclNode(const Token &token) : DeclNode(token, "class_declaration") {}

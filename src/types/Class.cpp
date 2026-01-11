@@ -12,6 +12,7 @@
 
 #include "Class.hpp"
 
+#include "Property.hpp"
 #include "vm/VMState.hpp"
 
 namespace cial {
@@ -30,22 +31,24 @@ namespace cial {
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         auto *instanceObj = vmState.rt.create<InstanceObject>(this);
+
         for(const auto &v : this->meta->memberShapeMetas) {
             if(v.isMethod) {
                 auto *funcMeta = this->meta->getMember<FuncMeta>(v.name);
                 auto *func = vmState.rt.create<Function>(funcMeta);
-                func->thisObj = Value{ instanceObj };
+                func->thisObj = instanceObj;
                 instanceObj->setProp(v.name, Value{ func });
                 continue;
             }
 
-            // TODO:
-            // Value propVal{};
-            // if(const auto *propMeta = this->meta->getMember<PropMeta>(v.name); propMeta->defValReg) {
-            //     propVal = vmState.reg(propMeta->defValReg.value());
-            // }
-            // instanceObj->setProp(v.name, propVal);
+            auto *propMeta = this->meta->getMember<PropMeta>(v.name);
+            auto *propVal = vmState.rt.create<Property>(instanceObj, propMeta);
+            instanceObj->setProp(v.name, Value{ propVal });
         }
+
+        Function constructor{ this->meta->constructor };
+        constructor.thisObj = instanceObj;
+        constructor.call(vmState, ret, argCount);
 
         vmState.reg(ret, Value{ instanceObj });
     }

@@ -70,6 +70,10 @@ namespace cial::Bytecode {
             context.gObj[atom] = value;
         }
 
+        [[nodiscard]] Value getThis(Atom atom);
+        void setThis(Atom atom, const Value &v);
+        [[nodiscard]] Value getUpVal(Atom atom) const;
+
         void setZF(const bool zf) { _zf = zf; }
 
         [[nodiscard]] bool getZF() const { return _zf; }
@@ -77,6 +81,17 @@ namespace cial::Bytecode {
         void setPC(const Label &label) const { _currentFrame->pc = label.address(); }
 
         [[nodiscard]] size_t getPC() const { return _currentFrame->pc; }
+
+        void pushVoid(const size_t n) const {
+            const size_t base = context.regPool.allocFrame(n);
+            for(size_t i = 0; i < n; i++) {
+                *context.regPool.ptrAt(base + i) = Value{};
+            }
+        }
+
+        void push(const Value &v) const { *context.regPool.ptrAt(context.regPool.allocFrame(1)) = v; }
+
+        void pop(const size_t count) const { context.regPool.freeFrame(count); }
 
         template <typename T>
         void allocCallFrame(T *arg, const OptReg &ret = {}) {
@@ -92,6 +107,8 @@ namespace cial::Bytecode {
             _callStack[_stackTop].~CallFrame();
         }
 
+        [[nodiscard]] size_t getRegPoolTop() const { return context.regPool.used(); }
+
         [[nodiscard]] const Vec<Op::Instruction *> &instructions() const noexcept {
             return _currentFrame->chunk->getInstVec();
         }
@@ -101,9 +118,6 @@ namespace cial::Bytecode {
 
         [[nodiscard]] CallFrame *prev() noexcept { return _currentFrame - 1; }
         [[nodiscard]] const CallFrame *prev() const noexcept { return _currentFrame - 1; }
-
-        [[nodiscard]] Value getThis(Atom atom) const;
-        [[nodiscard]] Value getUpVal(Atom atom) const;
 
         [[nodiscard]] std::string dumpRegisters() const {
             std::stringstream ss{};
@@ -115,19 +129,6 @@ namespace cial::Bytecode {
             }
             return ss.str();
         }
-
-        void pushVoid(const size_t n) const {
-            const size_t base = context.regPool.allocFrame(n);
-            for(std::size_t i = 0; i < n; i++) {
-                *context.regPool.ptrAt(base) = Value{};
-            }
-        }
-
-        void push(const Value &v) const { *context.regPool.ptrAt(context.regPool.allocFrame(1)) = v; }
-
-        void pop(const size_t count) const { context.regPool.freeFrame(count); }
-
-        [[nodiscard]] size_t getRegPoolTop() const { return context.regPool.used(); }
 
     private:
         CallFrame *_currentFrame{ context.callStack };

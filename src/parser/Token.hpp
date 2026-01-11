@@ -259,9 +259,9 @@ namespace cial::Syntax {
 
         [[nodiscard]] constexpr Real getReal() const noexcept { return _real; }
 
-        [[nodiscard]] String getString() const noexcept { return *_string; }
+        [[nodiscard]] const String &getString() const noexcept { return *_string; }
 
-        [[nodiscard]] Octet getOctet() const noexcept { return *_octet; }
+        [[nodiscard]] const Octet &getOctet() const noexcept { return *_octet; }
 
         [[nodiscard]] constexpr const char *name() const noexcept { return tokenTypeToStr(_type); }
 

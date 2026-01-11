@@ -45,6 +45,11 @@ namespace cial {
         void marked() noexcept override {
             Object::marked();
             _class->marked();
+            for(auto &v : _props | std::views::values) {
+                if(v.isObject()) {
+                    v.asObject().value()->marked();
+                }
+            }
         }
 
         void setProp(Atom a, const Value &v);

@@ -144,7 +144,7 @@ namespace cial::Inter {
 
         LocalVariable *resolveLocalVariable(Atom identifier);
 
-        Bytecode::Register loadVoidReg(Bytecode::Chunk &chunk);
+        Bytecode::Register loadVoidReg();
 
         FuncMeta *generateFuncMeta(const Syntax::Parameters &parameters, const Syntax::BlockStmtNode *body) const;
 

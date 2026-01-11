@@ -154,8 +154,9 @@ namespace cial {
 
             bool isSub = _vmState->context.stackTop != 0;
 
-            if(isSub) {
-                for(auto localVar : _vmState->prev()->funcMeta->localVars) {
+            if(isSub && _vmState->curFrame()->funcMeta) {
+                // FIXME:
+                for(auto localVar : _vmState->curFrame()->funcMeta->localVars) {
                     if(localVar.startPC > _vmState->curFrame()->pc && _vmState->curFrame()->pc <= localVar.endPC) {
                         localVar.startPC = 0;
                         localVar.endPC = 0;
@@ -220,8 +221,9 @@ namespace cial {
 
             bool isSub = _vmState->context.stackTop != 0;
 
-            if(isSub) {
-                for(auto localVar : _vmState->prev()->funcMeta->localVars) {
+            if(isSub && _vmState->curFrame()->funcMeta) {
+                // FIXME:
+                for(auto localVar : _vmState->curFrame()->funcMeta->localVars) {
                     if(localVar.startPC > _vmState->curFrame()->pc && _vmState->curFrame()->pc <= localVar.endPC) {
                         localVar.startPC = 0;
                         localVar.endPC = 0;

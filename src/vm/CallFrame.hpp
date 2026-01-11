@@ -38,6 +38,7 @@ namespace cial {
         CallFrame(CallFrame &&callFrame) noexcept :
             chunk(callFrame.chunk), funcMeta(callFrame.funcMeta), thisObj(std::move(callFrame.thisObj)),
             ret(callFrame.ret), pc(callFrame.pc), _pool(callFrame._pool), _sp(callFrame._sp) {
+            callFrame.chunk = nullptr;
             callFrame.funcMeta = nullptr;
             callFrame.thisObj = Value{};
             callFrame._pool = nullptr;
@@ -60,6 +61,8 @@ namespace cial {
                 _pool = nullptr;
             }
         }
+
+        [[nodiscard]] std::uint64_t getSP() const noexcept { return _sp; }
 
         [[nodiscard]] Value *getArgs(const size_t argCount) const { return _pool->ptrAt(_pool->used() - argCount); }
 

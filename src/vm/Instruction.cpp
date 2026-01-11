@@ -19,6 +19,7 @@
 #include "types/Class.hpp"
 #include "types/Function.hpp"
 #include "types/Object.hpp"
+#include "types/Property.hpp"
 #include "vm/Register.hpp"
 
 namespace cial::Bytecode::Op {
@@ -136,6 +137,22 @@ namespace cial::Bytecode::Op {
         vmState.setZF(r);
     }
 
+    void AbsEQ::execute(const Instruction &inst, VMState &vmState) {
+        const Value r1 = vmState.reg(src(inst));
+        Value &r2 = vmState.regRef(dst(inst));
+        const bool r = r1.discernEquals(r2);
+        r2 = Value{ r };
+        vmState.setZF(r);
+    }
+
+    void AbsNEQ::execute(const Instruction &inst, VMState &vmState) {
+        const Value r1 = vmState.reg(src(inst));
+        Value &r2 = vmState.regRef(dst(inst));
+        const bool r = !r1.discernEquals(r2);
+        r2 = Value{ r };
+        vmState.setZF(r);
+    }
+
     void LT::execute(const Instruction &inst, VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
@@ -220,11 +237,6 @@ namespace cial::Bytecode::Op {
         r2 = r1.bitwiseUnsignedRightShift(r2).unwrap();
     }
 
-    void AbsEQ::execute(const Instruction &, VMState &) {
-        // TODO:
-        assert(false);
-    }
-
     void Jmp::execute(const Instruction &inst, const VMState &vmState) { vmState.setPC(label(inst)); }
 
     void JmpE::execute(const Instruction &inst, const VMState &vmState) {
@@ -244,7 +256,7 @@ namespace cial::Bytecode::Op {
         object.asObject().unwrap()->call(vmState, dst(inst), argCount(inst));
     }
 
-    void GProp::execute(const Instruction &inst, const VMState &vmState) {
+    void GProp::execute(const Instruction &inst, VMState &vmState) {
         const auto &val = vmState.reg(obj(inst));
         const auto &nameVal = vmState.reg(memberReg(inst));
         const String &name = *nameVal.asString().unwrap();
@@ -252,6 +264,23 @@ namespace cial::Bytecode::Op {
         if(val.isObject()) {
             if(auto *instObj = dynamic_cast<InstanceObject *>(val.asObject().value())) {
                 const auto tmp = instObj->getProp(atom);
+                if(const auto *prop = dynamic_cast<Property *>(tmp.asObject().unwrap())) {
+
+                    const size_t absSP{ vmState.getRegPoolTop() - vmState.curFrame()->getSP() };
+                    // ret reg
+                    vmState.pushVoid(1);
+                    const Register ret{ absSP };
+
+                    vmState.push(prop->value); // absSP + 1
+
+                    Function getFunc{ prop->propMeta->getFunc };
+                    // getFunc.thisObj = prop->thisObj;
+                    getFunc.call(vmState, ret, 1);
+
+                    vmState.reg(dst(inst), vmState.reg(ret));
+                    return;
+                }
+
                 vmState.reg(dst(inst), tmp);
                 return;
             }
@@ -265,7 +294,7 @@ namespace cial::Bytecode::Op {
         vmState.reg(dst(inst), Value{ nativeFn });
     }
 
-    const String *SProp::name(const Instruction &inst, const VMState &vmState) {
+    const String *DProp::name(const Instruction &inst, const VMState &vmState) {
         if(inst.getOperand2Type() == Operand::Type::Atom)
             return vmState.rt.atomTable.get(inst.getOperand2<Atom>())->str;
         if(inst.getOperand2Type() == Operand::Type::Register)
@@ -273,7 +302,7 @@ namespace cial::Bytecode::Op {
         CLL_ASSERT(false, "unknown inst sprop operand2 type");
     }
 
-    Value SProp::value(const Instruction &inst, const VMState &vmState) {
+    Value DProp::value(const Instruction &inst, const VMState &vmState) {
         if(inst.getOperand3Type() == Operand::Type::ConstIndex)
             return vmState.curFrame()->chunk->getConstant(inst.getOperand3<ConstIdx>()).createValue(&vmState.rt);
         if(inst.getOperand3Type() == Operand::Type::Register)
@@ -281,7 +310,7 @@ namespace cial::Bytecode::Op {
         CLL_ASSERT(false, "unknown inst sprop operand3 type");
     }
 
-    void SProp::execute(const Instruction &inst, VMState &vmState) {
+    void DProp::execute(const Instruction &inst, VMState &vmState) {
         // TODO:
         // const auto &instObj = vmState.reg(obj(inst));
         // CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
@@ -292,9 +321,12 @@ namespace cial::Bytecode::Op {
         throw std::runtime_error("not implemented");
     }
 
-
-    void GThis::execute(const Instruction &inst, const VMState &vmState) {
+    void GThis::execute(const Instruction &inst, VMState &vmState) {
         vmState.reg(dst(inst), vmState.getThis(atom(inst)));
+    }
+
+    void DThis::execute(const Instruction &inst, VMState &vmState) {
+        vmState.setThis(atom(inst), vmState.regRef(src(inst)));
     }
 
     void GUpval::execute(const Instruction &inst, const VMState &vmState) {
@@ -467,6 +499,27 @@ namespace cial::Bytecode::Op {
         return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
                            vmState->reg(dst(inst)));
     }
+
+    std::string AbsEQ::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "abseq", src(inst), dst(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
+                           vmState->reg(dst(inst)));
+    }
+
+    std::string AbsNEQ::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "absneq", src(inst), dst(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
+                           vmState->reg(dst(inst)));
+    }
+
     std::string GT::dump(const Instruction &inst, const VMState *vmState) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gt", src(inst), dst(inst));
 
@@ -567,16 +620,6 @@ namespace cial::Bytecode::Op {
                            vmState->reg(dst(inst)));
     }
 
-    std::string AbsEQ::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "abseq", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
     std::string Jmp::dump(const Instruction &inst, const VMState *vmState) {
         return fmt::format("{: <10} {: <4}", "jmp", label(inst));
     }
@@ -612,13 +655,17 @@ namespace cial::Bytecode::Op {
         return fmt::format("{: <10} {: <4} {: <4} {: <4}", "gprop", obj(inst), memberReg(inst), dst(inst));
     }
 
-    std::string SProp::dump(const Instruction &inst, const VMState *vmState) {
+    std::string DProp::dump(const Instruction &inst, const VMState *vmState) {
         // TODO:
         throw std::runtime_error("not implemented");
     }
 
     std::string GThis::dump(const Instruction &inst, const VMState *vmState) {
         return fmt::format("{: <10} atom_{} {: <4}", "gthis", atom(inst).v, dst(inst));
+    }
+
+    std::string DThis::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} atom_{} {: <4}", "dthis", atom(inst).v, src(inst));
     }
 
     std::string GUpval::dump(const Instruction &inst, const VMState *vmState) {

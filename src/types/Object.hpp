@@ -40,14 +40,4 @@ namespace cial {
         Atom _name = ATOM_INVALID;
     };
 
-    class Function;
-    class Property final : public Object {
-    public:
-        Object *thisObj;
-        Function *setFunc{};
-        Function *getFunc{};
-
-        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
-    };
-
 } // namespace cial

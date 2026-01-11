@@ -16,6 +16,7 @@
 #include "Instruction.hpp"
 #include "common/Defer.hpp"
 #include "types/Class.hpp"
+#include "types/Property.hpp"
 
 namespace cial::Bytecode {
 
@@ -72,12 +73,28 @@ namespace cial::Bytecode {
 
     Value &VMState::regRef(const Register reg) const { return _currentFrame->getReg(reg); }
 
-    Value VMState::getThis(const Atom atom) const {
+    Value VMState::getThis(const Atom atom) {
 
         // current thisObj
         if(_currentFrame->thisObj.isObject()) {
             if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
                 if(instanceObject->hasProp(atom)) {
+                    const auto tmp = instanceObject->getProp(atom);
+                    if(const auto *prop = dynamic_cast<Property *>(tmp.asObject().unwrap())) {
+
+                        const size_t absSP{ getRegPoolTop() - curFrame()->getSP() };
+                        // ret reg
+                        pushVoid(1);
+                        const Register ret{ absSP };
+
+                        push(prop->value); // absSP + 1
+
+                        Function getFunc{ prop->propMeta->getFunc };
+                        // getFunc.thisObj = prop->thisObj;
+                        getFunc.call(*this, ret, 1);
+                        return reg(ret);
+                    }
+
                     return instanceObject->getProp(atom);
                 }
             }
@@ -86,6 +103,38 @@ namespace cial::Bytecode {
         // global
         // TODO: check is exist
         return global(atom);
+    }
+
+    void VMState::setThis(const Atom atom, const Value &v) {
+        // current thisObj
+        if(_currentFrame->thisObj.isObject()) {
+            if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
+                if(instanceObject->hasProp(atom)) {
+                    const auto tmp = instanceObject->getProp(atom);
+                    if(auto *prop = dynamic_cast<Property *>(tmp.asObject().unwrap())) {
+                        const size_t absSP{ getRegPoolTop() - curFrame()->getSP() };
+                        // ret reg
+                        pushVoid(1);
+                        const Register ret{ absSP };
+
+                        push(prop->value); // absSP + 1
+                        push(v); // absSP + 2
+
+                        Function setFunc{ prop->propMeta->setFunc };
+                        // setFunc.thisObj = prop->thisObj;
+                        setFunc.call(*this, ret, 2);
+                        prop->value = reg(Register{ absSP + 1 });
+                        return;
+                    }
+
+                    instanceObject->setProp(atom, v);
+                    return;
+                }
+            }
+        }
+
+        // global
+        return global(atom, v);
     }
 
     Value VMState::getUpVal(const Atom atom) const {

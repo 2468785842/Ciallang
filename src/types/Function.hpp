@@ -25,7 +25,7 @@ namespace cial {
     class Function final : public Object {
     public:
         FuncMeta *meta;
-        Value thisObj;
+        Object *thisObj{};
 
         explicit Function(FuncMeta *funcMeta) : Object(ATOM_FUNCTION), meta(funcMeta) {}
 
@@ -34,8 +34,8 @@ namespace cial {
         void marked() noexcept override {
             Object::marked();
             meta->marked();
-            if(thisObj.isObject())
-                thisObj.asObject().value()->marked();
+            if(thisObj)
+                thisObj->marked();
         }
     };
 

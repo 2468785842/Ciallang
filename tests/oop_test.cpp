@@ -37,56 +37,53 @@ TEST_CASE("OOP - 类方法定义与调用") {
         )"_str);
         REQUIRE(*vm.evalExpr<Integer>("res"_str) == 3);
     }
-    // TODO:
-    // SECTION("实例成员访问") {
-    //     vm.eval(R"(
-    //         class A { var a = 1; }
-    //         var o = new A();
-    //         var res = o.a;
-    //         return o.a;
-    //     )"_str);
-    //     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
-    // }
+
+    SECTION("实例成员访问") {
+        vm.eval(R"(
+            class A { var a = 1; }
+            var o = new A();
+            var res = o.a;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
+    }
 }
 
+TEST_CASE("OOP - 类访问变量") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
 
-// TODO:
-// TEST_CASE("OOP - 类访问变量") {
-//     Runtime rt{};
-//     Context context{ rt };
-//     Bytecode::VMState vmState{ context };
-//     VM vm{ &vmState };
-//
-//     SECTION("实例成员初始化变量访问") {
-//         vm.eval(R"(
-//             var a = 1;
-//             class A {
-//                 var b = a;
-//             }
-//             var o = new A().b;
-//         )"_str);
-//         REQUIRE(*vm.evalExpr<Integer>("o"_str) == 1);
-//     }
-//
-//     SECTION("实例成员方法初始化变量访问") {
-//         vm.eval(R"(
-//             var a = 1;
-//             class A {
-//                 function b() { return a; }
-//             }
-//             var o = new A().b();
-//         )"_str);
-//         REQUIRE(*vm.evalExpr<Integer>("o"_str) == 1);
-//     }
-//
-//     SECTION("实例成员函数访问成员变量") {
-//         vm.eval(R"(
-//             class A {
-//                 var a = 1;
-//                 function b() { return a; }
-//             }
-//             var o = new A().b();
-//         )"_str);
-//         REQUIRE(*vm.evalExpr<Integer>("o"_str) == 1);
-//     }
-// }
+    SECTION("实例成员初始化变量访问") {
+        vm.eval(R"(
+            var a = 1;
+            class A {
+                var b = a;
+            }
+            var o = new A().b;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("o"_str) == 1);
+    }
+
+    SECTION("实例成员方法初始化变量访问") {
+        vm.eval(R"(
+            var a = 1;
+            class A {
+                function b() { return a; }
+            }
+            var o = new A().b();
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("o"_str) == 1);
+    }
+
+    SECTION("实例成员函数访问成员变量") {
+        vm.eval(R"(
+            class A {
+                var a = 1;
+                function b() { return a; }
+            }
+            var o = new A().b();
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("o"_str) == 1);
+    }
+}

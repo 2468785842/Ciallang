@@ -52,14 +52,16 @@ namespace cial::Bytecode::Op {
     O(GT)                                                                                                              \
     O(GE)                                                                                                              \
     O(AbsEQ)                                                                                                           \
+    O(AbsNEQ)                                                                                                          \
     O(Jmp)                                                                                                             \
     O(JmpE)                                                                                                            \
     O(JmpNE)                                                                                                           \
     O(Call)                                                                                                            \
     O(GProp)                                                                                                           \
-    O(SProp)                                                                                                           \
+    O(DProp)                                                                                                           \
     O(GUpval)                                                                                                          \
     O(GThis)                                                                                                           \
+    O(DThis)                                                                                                           \
     O(LNot)                                                                                                            \
     O(LAnd)                                                                                                            \
     O(LOr)                                                                                                             \
@@ -438,6 +440,16 @@ namespace cial::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct AbsEQ
 
+    struct AbsNEQ {
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct AbsNEQ
+
     struct LNot {
 
         static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
@@ -510,12 +522,12 @@ namespace cial::Bytecode::Op {
 
         static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, const VMState &);
+        static void execute(const Instruction &, VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GProp
 
-    struct SProp {
+    struct DProp {
         static Register obj(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
         static const String *name(const Instruction &inst, const VMState &vmState);
@@ -525,17 +537,27 @@ namespace cial::Bytecode::Op {
         static void execute(const Instruction &, VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct SProp                                                                                          \
+    }; // struct DProp                                                                                          \
 
     struct GThis {
         static Atom atom(const Instruction &inst) { return inst.getOperand1<Atom>(); }
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, const VMState &);
+        static void execute(const Instruction &, VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GThis
+
+    struct DThis {
+        static Atom atom(const Instruction &inst) { return inst.getOperand1<Atom>(); }
+
+        static Register src(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct DThis
 
     struct GUpval {
         static Atom atom(const Instruction &inst) { return inst.getOperand1<Atom>(); }

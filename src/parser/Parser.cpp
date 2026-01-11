@@ -462,6 +462,22 @@ namespace cial::Syntax {
 
         auto *classDeclNode = parser->astBuilder()->makeNode<ClassDeclNode>(identifier);
 
+        Vec<IdentifierExprNode *> extends{};
+        if(parser->peek(TokenType::Extends)) {
+            parser->consume();
+
+            while(!parser->peek(TokenType::LeftCurlyBrace)) {
+                auto *exprNode = dynamic_cast<IdentifierExprNode *>(parser->parseExpression(r, false));
+                if(!exprNode) {
+                    parser->error(r, "class extends must be identifier", identifier.location);
+                    return nullptr;
+                }
+                extends.push_back(exprNode);
+            }
+
+            classDeclNode->extends = std::move(extends);
+        }
+
         if(!parser->peek(TokenType::LeftCurlyBrace)) {
             parser->error(r, "class expect {", token->location);
             return nullptr;
@@ -469,31 +485,51 @@ namespace cial::Syntax {
 
         parser->consume();
 
-        auto *body = parser->astBuilder()->makeNode<BlockStmtNode>();
+        FunctionDeclNode *constructor{};
+        Vec<VarDeclNode *> varDeclVec{};
+        Vec<FunctionDeclNode *> funcDeclVec{};
 
         while(!parser->peek(TokenType::RightCurlyBrace) && !parser->peek(TokenType::EndOfFile)) {
             auto *stmt = parser->parseDeclaration(r);
             if(!stmt)
                 return nullptr;
 
-            if(!dynamic_cast<FunctionDeclNode *>(stmt) && !dynamic_cast<VarDeclNode *>(stmt)) {
-                parser->error(r, "class expect function or var", stmt->location);
-                return nullptr;
+            if(auto *varDecl = dynamic_cast<VarDeclNode *>(stmt)) {
+                varDeclVec.push_back(varDecl);
+                continue;
             }
 
-            body->childrens.push_back(stmt);
+            if(auto *funcDecl = dynamic_cast<FunctionDeclNode *>(stmt)) {
+                if(funcDecl->token.getString() == identifier.getString()) {
+                    if(constructor) {
+                        parser->error(r, "class already have constructor function", funcDecl->location);
+                        return nullptr;
+                    }
+                    constructor = funcDecl;
+                } else {
+                    funcDeclVec.push_back(funcDecl);
+                }
+                continue;
+            }
+
+            parser->error(r, "class member expect function or var", stmt->location);
+            return nullptr;
         }
 
+        Token end;
         if(parser->peek(TokenType::RightCurlyBrace)) {
-            parser->consume();
+            parser->consume(end);
         } else {
             parser->error(r, "class expect }", token->location);
             return nullptr;
         }
 
-        classDeclNode->body = body;
+        classDeclNode->constructor = constructor;
+        classDeclNode->varDeclVec = std::move(varDeclVec);
+        classDeclNode->funcDeclVec = std::move(funcDeclVec);
+
         classDeclNode->location.start(token->location.start());
-        classDeclNode->location.end(body->location.end());
+        classDeclNode->location.end(end.location.end());
 
         return classDeclNode;
     }

@@ -57,8 +57,8 @@ namespace cial {
 
     private:
         friend class Runtime;
-        explicit FuncMeta(const std::uint32_t arity, Bytecode::Chunk *chunk, Vec<LocalVariable> &&localVars) :
-            arity(arity), chunk(chunk), localVars(localVars) {}
+        explicit FuncMeta(const std::uint32_t arity, Bytecode::Chunk *chunk, Vec<LocalVariable> localVars) :
+            arity(arity), chunk(chunk), localVars(std::move(localVars)) {}
     };
 
     struct MemberShapeMeta {
@@ -90,6 +90,7 @@ namespace cial {
     struct ClassMeta : MarkSweepHeader {
         Atom className;
         std::uint32_t arity;
+        FuncMeta *constructor;
         Vec<MemberShapeMeta> memberShapeMetas;
         Vec<MarkSweepHeader *> memberMetas;
 
@@ -136,6 +137,8 @@ namespace cial {
             }
             return memberMeta;
         }
+
+        void setConstructor(FuncMeta *funcMeta) { this->constructor = funcMeta; }
 
         void marked() noexcept override {
             MarkSweepHeader::marked();
