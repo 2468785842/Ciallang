@@ -20,6 +20,7 @@
 
 namespace cial {
     struct CallFrame {
+        CallFrame *closure{};
         Bytecode::Chunk *chunk{};
         FuncMeta *funcMeta{}; // funcMeta != nullptr is function call
         Value thisObj{};
@@ -36,8 +37,10 @@ namespace cial {
             _sp(pool.allocFrame(funcMeta->chunk->getRegCount()) - funcMeta->arity) {}
 
         CallFrame(CallFrame &&callFrame) noexcept :
-            chunk(callFrame.chunk), funcMeta(callFrame.funcMeta), thisObj(std::move(callFrame.thisObj)),
-            ret(callFrame.ret), pc(callFrame.pc), _pool(callFrame._pool), _sp(callFrame._sp) {
+            closure(callFrame.closure), chunk(callFrame.chunk), funcMeta(callFrame.funcMeta),
+            thisObj(std::move(callFrame.thisObj)), ret(callFrame.ret), pc(callFrame.pc), _pool(callFrame._pool),
+            _sp(callFrame._sp) {
+            callFrame.closure = nullptr;
             callFrame.chunk = nullptr;
             callFrame.funcMeta = nullptr;
             callFrame.thisObj = Value{};

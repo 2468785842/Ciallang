@@ -664,9 +664,18 @@ bool Lexer::identifier(Token *&token) {
         keywords.emplace("NaN"_str, Token{ TokenType::ConstVal, Real::signalingNan() });
         keywords.emplace("null"_str, Token{ TokenType::Null });
 
+        keywords.emplace("import"_str, Token{ TokenType::Import });
+        keywords.emplace("export"_str, Token{ TokenType::Export });
+
+        keywords.emplace("debugger"_str, Token{ TokenType::Debugger });
+        keywords.emplace("property"_str, Token{ TokenType::Property });
+        keywords.emplace("setter"_str, Token{ TokenType::Getter });
+        keywords.emplace("getter"_str, Token{ TokenType::Setter });
+
         keywords.emplace("function"_str, Token{ TokenType::Function });
         keywords.emplace("class"_str, Token{ TokenType::Class });
         keywords.emplace("extends"_str, Token{ TokenType::Extends });
+        keywords.emplace("with"_str, Token{ TokenType::With });
         keywords.emplace("return"_str, Token{ TokenType::Return });
 
         keywords.emplace("var"_str, Token{ TokenType::Var });

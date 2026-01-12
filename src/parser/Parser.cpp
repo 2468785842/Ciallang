@@ -234,20 +234,23 @@ namespace cial::Syntax {
         return global;
     }
 
-    void Parser::parseScope(Result &r, BlockStmtNode *blockStmtNode, const TokenType terminatorToken) {
+    bool Parser::parseScope(Result &r, BlockStmtNode *blockStmtNode, const TokenType terminatorToken) {
+        bool success = true;
         while(_lexer.hasNext()) {
             if(peek(terminatorToken))
-                return;
+                break;
             auto *statement = parseDeclaration(r);
 
             // error sync
             if(!statement) {
+                success = false;
                 synchronize();
                 continue;
             }
 
             blockStmtNode->childrens.push_back(statement);
         }
+        return success;
     }
 
     DeclNode *Parser::parseDeclaration(Result &r) {
@@ -377,6 +380,107 @@ namespace cial::Syntax {
     }
 
     /////////////////////////////////////////////////////////////////
+
+    DeclNode *PropertyDeclParser::parse(Result &r, Parser *parser, Token *token) const {
+        Token identifier{};
+        if(!parser->consume(identifier))
+            return nullptr;
+
+        auto *propertyDeclNode = parser->astBuilder()->makeNode<PropertyDeclNode>(identifier);
+
+        if(!parser->peek(TokenType::LeftCurlyBrace)) {
+            parser->error(r, "property expect {", token->location);
+            return nullptr;
+        }
+        parser->consume();
+
+        FunctionDeclNode *setter{ nullptr };
+        FunctionDeclNode *getter{ nullptr };
+
+        while(setter == nullptr || getter == nullptr) {
+
+            if(parser->peek(TokenType::Setter)) {
+                if(setter) {
+                    parser->error(r, "setter already defined", setter->location);
+                    return nullptr;
+                }
+
+                Token setterToken;
+                parser->consume(setterToken);
+
+                Parameters params;
+                if(!parseParameters(r, parser, params, setterToken.location)) {
+                    return nullptr;
+                }
+
+                if(params.empty()) {
+                    parser->error(r, "setter params too few", setterToken.location);
+                    return nullptr;
+                }
+
+                if(params.size() > 1) {
+                    parser->error(r, "setter params too many", setterToken.location);
+                    return nullptr;
+                }
+
+                if(!parser->peek(TokenType::LeftCurlyBrace)) {
+                    parser->error(r, "setter expect {", setterToken.location);
+                    return nullptr;
+                }
+                parser->consume();
+
+                setter = parser->astBuilder()->makeNode<FunctionDeclNode>(setterToken);
+                setter->parameters = std::move(params);
+                setter->body = parser->astBuilder()->makeNode<BlockStmtNode>();
+
+                if(!parser->parseScope(r, setter->body, TokenType::RightCurlyBrace)) {
+                    return nullptr;
+                }
+                continue;
+            }
+
+            if(parser->peek(TokenType::Getter)) {
+                if(getter) {
+                    parser->error(r, "getter already defined", getter->location);
+                    return nullptr;
+                }
+                Token getterToken;
+                parser->consume(getterToken);
+
+                if(!parser->peek(TokenType::LeftCurlyBrace)) {
+                    parser->error(r, "getter expect {", getterToken.location);
+                    return nullptr;
+                }
+                parser->consume();
+
+                getter = parser->astBuilder()->makeNode<FunctionDeclNode>(getterToken);
+                getter->body = parser->astBuilder()->makeNode<BlockStmtNode>();
+
+                if(!parser->parseScope(r, getter->body, TokenType::RightCurlyBrace)) {
+                    return nullptr;
+                }
+                continue;
+            }
+
+            Token t{};
+            parser->consume(t);
+            parser->error(r, "expect getter or setter", t.location);
+            return nullptr;
+        }
+
+        Token end;
+        if(!parser->consume(end) || end != TokenType::RightCurlyBrace) {
+            parser->error(r, "property expect }", token->location);
+            return nullptr;
+        }
+
+        propertyDeclNode->setter = setter;
+        propertyDeclNode->getter = getter;
+        propertyDeclNode->location.start(token->location.start());
+        propertyDeclNode->location.end(end.location.end());
+
+        return propertyDeclNode;
+    }
 
     DeclNode *VarDeclParser::parse(Result &r, Parser *parser, Token *token) const {
         VarDeclNode *varDeclNode{ nullptr };
@@ -540,7 +644,9 @@ namespace cial::Syntax {
 
         scope->location.start(token->location.start());
 
-        parser->parseScope(r, scope, TokenType::RightCurlyBrace);
+        if(!parser->parseScope(r, scope, TokenType::RightCurlyBrace)) {
+            return nullptr;
+        }
 
         if(!parser->peek(TokenType::RightCurlyBrace)) {
             parser->error(r, "scope expected token '}'", token->location);

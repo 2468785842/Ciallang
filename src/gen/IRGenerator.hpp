@@ -74,6 +74,8 @@ namespace cial::Inter {
 
         void generate(const Syntax::SwitchStmtNode *, OptReg &);
 
+        void generate(const Syntax::PropertyDeclNode *, OptReg &);
+
         void generate(const Syntax::VarDeclNode *, OptReg &);
 
         void generate(const Syntax::FunctionDeclNode *, OptReg &);

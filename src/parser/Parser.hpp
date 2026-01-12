@@ -67,7 +67,6 @@ namespace cial::Syntax {
 
         virtual ExprNode *parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const = 0;
 
-        // 优先级
         [[nodiscard]] virtual Precedence precedence() const = 0;
     };
 
@@ -119,7 +118,7 @@ namespace cial::Syntax {
 
         AstNode *parse(Result &r);
 
-        void parseScope(Result &r, BlockStmtNode *blockStmtNode, TokenType terminatorToken = TokenType::EndOfFile);
+        bool parseScope(Result &r, BlockStmtNode *blockStmtNode, TokenType terminatorToken = TokenType::EndOfFile);
 
         DeclNode *parseDeclaration(Result &r);
 
@@ -152,6 +151,12 @@ namespace cial::Syntax {
      * |                                declParser                                  |
      * +----------------------------------------------------------------------------+
      */
+    struct PropertyDeclParser final : DeclParser {
+        PropertyDeclParser() = default;
+
+        DeclNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     struct VarDeclParser final : DeclParser {
         VarDeclParser() = default;
 
@@ -170,12 +175,14 @@ namespace cial::Syntax {
         DeclNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    static constinit PropertyDeclParser S_PropertyDeclParser{};
     static constinit VarDeclParser S_VarDeclParser{};
     static constinit FunctionDeclParser S_FunctionDeclParser{};
     static constinit ClassDeclParser S_ClassDeclParser{};
 
     static constinit auto S_DeclParsers =
-        frozen::make_unordered_map<TokenType, const DeclParser *>({ { TokenType::Var, &S_VarDeclParser },
+        frozen::make_unordered_map<TokenType, const DeclParser *>({ { TokenType::Property, &S_PropertyDeclParser },
+                                                                    { TokenType::Var, &S_VarDeclParser },
                                                                     { TokenType::Function, &S_FunctionDeclParser },
                                                                     { TokenType::Class, &S_ClassDeclParser } });
 

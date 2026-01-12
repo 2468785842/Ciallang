@@ -46,6 +46,26 @@ namespace cial::Bytecode::Op {
         return "";
     }
 
+    static bool propObjectSet(VMState &vmState, const Value &src, const Value &dst) {
+        if(dst.isObject()) {
+            if(const auto *prop = dynamic_cast<Property *>(dst.asObject().value())) {
+                prop->invokeSet(vmState, src);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool propObjectGet(VMState &vmState, const Value &src, Value &dst) {
+        if(src.isObject()) {
+            if(const auto *prop = dynamic_cast<Property *>(src.asObject().value())) {
+                dst = prop->invokeGet(vmState);
+                return true;
+            }
+        }
+        return false;
+    }
+
     void Load::execute(const Instruction &inst, const VMState &vmState) {
         vmState.reg(reg(inst), vmState.curFrame()->chunk->getConstant(value(inst)).createValue(&vmState.rt));
     }
@@ -54,8 +74,12 @@ namespace cial::Bytecode::Op {
 
     void PopN::execute(const Instruction &inst, const VMState &vmState) { vmState.pop(count(inst)); }
 
-    void CP::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.reg(dst(inst), vmState.reg(src(inst)));
+    void CP::execute(const Instruction &inst, VMState &vmState) {
+        Value srcVal = vmState.reg(src(inst));
+        if(propObjectGet(vmState, srcVal, srcVal)) {
+            return;
+        }
+        vmState.reg(dst(inst), srcVal);
     }
 
     void Add::execute(const Instruction &inst, const VMState &vmState) {
@@ -100,19 +124,29 @@ namespace cial::Bytecode::Op {
         r2 = r.unwrap();
     }
 
-    void Mov::execute(const Instruction &inst, const VMState &vmState) {
+    void Mov::execute(const Instruction &inst, VMState &vmState) {
         const Value &srcVal = vmState.reg(src(inst));
+        if(propObjectSet(vmState, srcVal, vmState.regRef(dst(inst)))) {
+            return;
+        }
         vmState.reg(dst(inst), srcVal);
     }
 
-    void DGlobal::execute(const Instruction &inst, const VMState &vmState) {
-        const auto &value = vmState.reg(src(inst));
-        vmState.global(atom(inst), Value{ value });
+    void DGlobal::execute(const Instruction &inst, VMState &vmState) {
+        const Value &srcVal = vmState.regRef(src(inst));
+        if(propObjectSet(vmState, srcVal, vmState.global(atom(inst)))) {
+            return;
+        }
+
+        vmState.global(atom(inst), Value{ srcVal });
     }
 
-    void GGlobal::execute(const Instruction &inst, const VMState &vmState) {
-        const auto &value = vmState.global(atom(inst));
-        vmState.reg(dst(inst), value);
+    void GGlobal::execute(const Instruction &inst, VMState &vmState) {
+        Value srcVal = vmState.global(atom(inst));
+        if(propObjectGet(vmState, srcVal, srcVal)) {
+            return;
+        }
+        vmState.reg(dst(inst), srcVal);
     }
 
     void Test::execute(const Instruction &inst, VMState &vmState) {
@@ -261,30 +295,21 @@ namespace cial::Bytecode::Op {
         const auto &nameVal = vmState.reg(memberReg(inst));
         const String &name = *nameVal.asString().unwrap();
         const Atom atom = vmState.rt.atomTable.intern(name);
+
         if(val.isObject()) {
             if(auto *instObj = dynamic_cast<InstanceObject *>(val.asObject().value())) {
-                const auto tmp = instObj->getProp(atom);
-                if(const auto *prop = dynamic_cast<Property *>(tmp.asObject().unwrap())) {
+                auto tmp = instObj->getProp(atom);
 
-                    const size_t absSP{ vmState.getRegPoolTop() - vmState.curFrame()->getSP() };
-                    // ret reg
-                    vmState.pushVoid(1);
-                    const Register ret{ absSP };
-
-                    vmState.push(prop->value); // absSP + 1
-
-                    Function getFunc{ prop->propMeta->getFunc };
-                    // getFunc.thisObj = prop->thisObj;
-                    getFunc.call(vmState, ret, 1);
-
-                    vmState.reg(dst(inst), vmState.reg(ret));
+                if(propObjectGet(vmState, tmp, tmp)) {
                     return;
                 }
 
                 vmState.reg(dst(inst), tmp);
-                return;
             }
+            return;
         }
+
+        // Native method
         const TypeId tId = ValueToTypeId::getId(val);
         assert(tId != TypeId::None);
         NativeFunction *nativeFn = vmState.context.findMethod(tId, atom);
@@ -299,7 +324,7 @@ namespace cial::Bytecode::Op {
             return vmState.rt.atomTable.get(inst.getOperand2<Atom>())->str;
         if(inst.getOperand2Type() == Operand::Type::Register)
             return vmState.reg(inst.getOperand2<Register>()).asString().unwrap();
-        CLL_ASSERT(false, "unknown inst sprop operand2 type");
+        CLL_ASSERT(false, "unknown inst dprop operand2 type");
     }
 
     Value DProp::value(const Instruction &inst, const VMState &vmState) {
@@ -307,7 +332,7 @@ namespace cial::Bytecode::Op {
             return vmState.curFrame()->chunk->getConstant(inst.getOperand3<ConstIdx>()).createValue(&vmState.rt);
         if(inst.getOperand3Type() == Operand::Type::Register)
             return vmState.reg(inst.getOperand3<Register>());
-        CLL_ASSERT(false, "unknown inst sprop operand3 type");
+        CLL_ASSERT(false, "unknown inst dprop operand3 type");
     }
 
     void DProp::execute(const Instruction &inst, VMState &vmState) {
@@ -322,11 +347,21 @@ namespace cial::Bytecode::Op {
     }
 
     void GThis::execute(const Instruction &inst, VMState &vmState) {
-        vmState.reg(dst(inst), vmState.getThis(atom(inst)));
+        Value srcVal = vmState.getThis(atom(inst));
+        if(propObjectGet(vmState, srcVal, srcVal)) {
+            return;
+        }
+        vmState.reg(dst(inst), srcVal);
     }
 
     void DThis::execute(const Instruction &inst, VMState &vmState) {
-        vmState.setThis(atom(inst), vmState.regRef(src(inst)));
+        const Value &srcVal = vmState.regRef(src(inst));
+
+        if(propObjectSet(vmState, srcVal, vmState.getThis(atom(inst)))) {
+            return;
+        }
+
+        vmState.setThis(atom(inst), srcVal);
     }
 
     void GUpval::execute(const Instruction &inst, const VMState &vmState) {
@@ -348,7 +383,7 @@ namespace cial::Bytecode::Op {
         const auto &value = vmState.reg(retReg(inst));
         const auto frame = vmState.curFrame();
         CLL_ASSERT(frame->ret, "frame.ret val is empty");
-        vmState.prev()->getReg(*frame->ret) = value;
+        vmState.prevFrame()->getReg(*frame->ret) = value;
         vmState.freeCallFrame();
     }
 

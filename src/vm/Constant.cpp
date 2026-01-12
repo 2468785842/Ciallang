@@ -20,6 +20,7 @@
 
 #include "Chunk.hpp"
 #include "runtime/Runtime.hpp"
+#include "types/Property.hpp"
 
 namespace cial {
 
@@ -45,6 +46,8 @@ namespace cial {
             }
             case ConstantType::ClassMeta:
                 return Value{ rt->create<ClassObject>(value<ClassMeta *>()) };
+            case ConstantType::PropMeta:
+                return Value{ rt->create<Property>(nullptr, value<PropMeta *>()) };
         }
         return Value{};
     }

@@ -14,18 +14,10 @@
 #include "VMState.hpp"
 
 #include "Instruction.hpp"
-#include "common/Defer.hpp"
 #include "types/Class.hpp"
 #include "types/Property.hpp"
 
 namespace cial::Bytecode {
-
-    void VMState::runFlat() {
-        const size_t sourceSP = _currentFrame->_sp;
-        DEFER { _currentFrame->_sp = sourceSP; };
-        _currentFrame->_sp = prev()->_sp;
-        run();
-    }
 
     void VMState::run() {
         std::uint64_t &pc = _currentFrame->pc;
@@ -73,31 +65,34 @@ namespace cial::Bytecode {
 
     Value &VMState::regRef(const Register reg) const { return _currentFrame->getReg(reg); }
 
-    Value VMState::getThis(const Atom atom) {
+    Value VMState::getThis(const Atom atom) const {
 
         // current thisObj
         if(_currentFrame->thisObj.isObject()) {
             if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
                 if(instanceObject->hasProp(atom)) {
-                    const auto tmp = instanceObject->getProp(atom);
-                    if(const auto *prop = dynamic_cast<Property *>(tmp.asObject().unwrap())) {
-
-                        const size_t absSP{ getRegPoolTop() - curFrame()->getSP() };
-                        // ret reg
-                        pushVoid(1);
-                        const Register ret{ absSP };
-
-                        push(prop->value); // absSP + 1
-
-                        Function getFunc{ prop->propMeta->getFunc };
-                        // getFunc.thisObj = prop->thisObj;
-                        getFunc.call(*this, ret, 1);
-                        return reg(ret);
-                    }
-
                     return instanceObject->getProp(atom);
                 }
             }
+        }
+
+        if(auto *callFrame = _currentFrame->closure; callFrame) {
+            if(callFrame->funcMeta) {
+                for(const auto &localVar : callFrame->funcMeta->localVars) {
+                    if(localVar.endPC > callFrame->pc)
+                        continue;
+                    if(localVar.identifier == atom)
+                        return callFrame->getReg(localVar.reg);
+                }
+            }
+
+            // prev context
+            // if(callFrame->thisObj.isObject()) {
+            //     if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value()))
+            //     {
+            //         return instanceObject->getProp(atom);
+            //     }
+            // }
         }
 
         // global
@@ -105,30 +100,24 @@ namespace cial::Bytecode {
         return global(atom);
     }
 
-    void VMState::setThis(const Atom atom, const Value &v) {
+    void VMState::setThis(const Atom atom, const Value &v) const {
         // current thisObj
         if(_currentFrame->thisObj.isObject()) {
             if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
                 if(instanceObject->hasProp(atom)) {
-                    const auto tmp = instanceObject->getProp(atom);
-                    if(auto *prop = dynamic_cast<Property *>(tmp.asObject().unwrap())) {
-                        const size_t absSP{ getRegPoolTop() - curFrame()->getSP() };
-                        // ret reg
-                        pushVoid(1);
-                        const Register ret{ absSP };
-
-                        push(prop->value); // absSP + 1
-                        push(v); // absSP + 2
-
-                        Function setFunc{ prop->propMeta->setFunc };
-                        // setFunc.thisObj = prop->thisObj;
-                        setFunc.call(*this, ret, 2);
-                        prop->value = reg(Register{ absSP + 1 });
-                        return;
-                    }
-
                     instanceObject->setProp(atom, v);
                     return;
+                }
+            }
+        }
+
+        if(auto *callFrame = _currentFrame->closure; callFrame) {
+            if(callFrame->funcMeta) {
+                for(const auto &localVar : callFrame->funcMeta->localVars) {
+                    if(localVar.endPC > callFrame->pc)
+                        continue;
+                    if(localVar.identifier == atom)
+                        callFrame->getReg(localVar.reg) = v;
                 }
             }
         }

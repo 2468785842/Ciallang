@@ -327,7 +327,7 @@ namespace cial::Bytecode::Op {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, const VMState &);
+        static void execute(const Instruction &, VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Mov
@@ -337,7 +337,7 @@ namespace cial::Bytecode::Op {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, const VMState &);
+        static void execute(const Instruction &, VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct CP
@@ -347,7 +347,7 @@ namespace cial::Bytecode::Op {
 
         static Register src(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, const VMState &);
+        static void execute(const Instruction &, VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct DGlobal
@@ -357,7 +357,7 @@ namespace cial::Bytecode::Op {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, const VMState &);
+        static void execute(const Instruction &, VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GGlobal

@@ -45,8 +45,6 @@ namespace cial::Bytecode {
 
         void run();
 
-        void runFlat();
-
         void reg(const Register &reg, const Value &value) const;
 
         [[nodiscard]] Value reg(Register reg) const;
@@ -70,8 +68,8 @@ namespace cial::Bytecode {
             context.gObj[atom] = value;
         }
 
-        [[nodiscard]] Value getThis(Atom atom);
-        void setThis(Atom atom, const Value &v);
+        [[nodiscard]] Value getThis(Atom atom) const;
+        void setThis(Atom atom, const Value &v) const;
         [[nodiscard]] Value getUpVal(Atom atom) const;
 
         void setZF(const bool zf) { _zf = zf; }
@@ -92,6 +90,8 @@ namespace cial::Bytecode {
         void push(const Value &v) const { *context.regPool.ptrAt(context.regPool.allocFrame(1)) = v; }
 
         void pop(const size_t count) const { context.regPool.freeFrame(count); }
+
+        void makeClosure() { _currentFrame->closure = _stackTop > 0 ? prevFrame() : nullptr; }
 
         template <typename T>
         void allocCallFrame(T *arg, const OptReg &ret = {}) {
@@ -116,8 +116,8 @@ namespace cial::Bytecode {
         [[nodiscard]] CallFrame *curFrame() noexcept { return _currentFrame; }
         [[nodiscard]] const CallFrame *curFrame() const noexcept { return _currentFrame; }
 
-        [[nodiscard]] CallFrame *prev() noexcept { return _currentFrame - 1; }
-        [[nodiscard]] const CallFrame *prev() const noexcept { return _currentFrame - 1; }
+        [[nodiscard]] CallFrame *prevFrame() noexcept { return _currentFrame - 1; }
+        [[nodiscard]] const CallFrame *prevFrame() const noexcept { return _currentFrame - 1; }
 
         [[nodiscard]] std::string dumpRegisters() const {
             std::stringstream ss{};

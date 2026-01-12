@@ -62,11 +62,10 @@ namespace cial::Syntax {
     public:
         Vec<IdentifierExprNode *> extends{};
         FunctionDeclNode *constructor{};
-        Vec<VarDeclNode *> varDeclVec{};
-        Vec<FunctionDeclNode *> funcDeclVec{};
 
-        // TODO:
-        // Vec<ProperyDeclNode *> propertyDeclVec{};
+        Vec<VarDeclNode *> varDeclVec{};
+        Vec<PropertyDeclNode *> propertyDeclVec{};
+        Vec<FunctionDeclNode *> funcDeclVec{};
 
         ClassDeclNode() = delete;
 
@@ -79,20 +78,21 @@ namespace cial::Syntax {
         }
     };
 
-    // class PropertyDeclNode final : public DeclNode {
-    // public:
-    //     BlockStmtNode *getBody{ nullptr };
-    //     BlockStmtNode *setBody{ nullptr };
-    //     PropertyDeclNode() = delete;
-    //
-    //     explicit PropertyDeclNode(const Token &token) : DeclNode(token, "property_declaration") {}
-    //
-    //     void accept(Visitor *visitor) const override { visitor->visit(this); }
-    //
-    //     void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
-    //         return gen->generate(this, retReg);
-    //     }
-    // };
+    class PropertyDeclNode final : public DeclNode {
+    public:
+        FunctionDeclNode *setter{ nullptr };
+        FunctionDeclNode *getter{ nullptr };
+
+        PropertyDeclNode() = delete;
+
+        explicit PropertyDeclNode(const Token &token) : DeclNode(token, "property_declaration") {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
 
     class StmtDeclNode final : public DeclNode {
     public:

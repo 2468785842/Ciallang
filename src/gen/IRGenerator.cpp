@@ -279,7 +279,7 @@ namespace cial::Inter {
 
             if(const auto variable = resolveLocalVariable(identifier)) {
                 Bytecode::Register dst = variable->reg;
-                _chunk->emit<Bytecode::Op::OpCode::CP>(src, dst);
+                _chunk->emit<Bytecode::Op::OpCode::Mov>(src, dst);
                 freeRegister(src);
                 retReg = dst;
                 return;
@@ -313,6 +313,26 @@ namespace cial::Inter {
         _chunk->emit<Bytecode::Op::OpCode::Load>(funReg, _chunk->addConstant(Constant{ funcMeta }));
 
         retReg = funReg;
+    }
+
+    void IRGenerator::generate(const Syntax::PropertyDeclNode *node, OptReg &) {
+        auto *setFuncMeta = generateFuncMeta(node->setter->parameters, node->setter->body);
+        auto *getFuncMeta = generateFuncMeta(node->getter->parameters, node->getter->body);
+
+        auto *propMeta = _rt.createNoGC<PropMeta>(setFuncMeta, getFuncMeta);
+
+        const auto identifier = constVal(node->token).value<Atom>();
+
+        auto propReg = allocateRegister();
+        _chunk->emit<Bytecode::Op::OpCode::Load>(propReg, _chunk->addConstant(Constant{ propMeta }));
+
+        if(isTopScope()) {
+            freeRegister(propReg);
+            _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, propReg);
+            return;
+        }
+
+        addLocalVar(LocalVariable{ identifier, propReg, getNextInstPos() });
     }
 
     void IRGenerator::generate(const Syntax::VarDeclNode *node, OptReg &) {
@@ -403,14 +423,13 @@ namespace cial::Inter {
                 error("generate chunk failed with class function declaration", node->location);
                 return;
             }
-            classMeta->setMember(MemberShapeMeta{ funName }, funcMeta);
+            classMeta->setMember(MemberShapeMeta{ .name = funName, .isMethod = true }, ClassFieldMeta{ funcMeta });
         }
 
         auto gen = IRGenerator{ _rt, _sourceFile };
         gen.makeVirtualGlobalScope();
         auto voidReg = gen.loadVoidReg();
 
-        Vec<std::pair<Atom, Bytecode::Register>> vars;
         for(const auto *varDeclNode : node->varDeclVec) {
             const auto varName = constVal(varDeclNode->token).value<Atom>();
 
@@ -420,8 +439,9 @@ namespace cial::Inter {
                 if(!gen.expectValue(varDeclNode->rhs, defaultVarReg)) {
                     return;
                 }
-                vars.emplace_back(varName, defaultVarReg);
+                gen._chunk->emit<Bytecode::Op::OpCode::DThis>(varName, defaultVarReg);
             }
+            classMeta->setMember(MemberShapeMeta{ .name = varName, .isVar = true }, ClassFieldMeta{});
         }
 
         Opt<Bytecode::Chunk> funChunk{};
@@ -452,33 +472,11 @@ namespace cial::Inter {
         if(!funChunk)
             funChunk = gen.parseAst(_r, nullptr, ignoreReg);
 
-        for(auto &[n, r] : vars) {
-            funChunk->emit<Bytecode::Op::OpCode::DThis>(n, r);
-
-            // first arg is `value`
-            // second arg is `set value`
-            auto *setFuncChunk = _rt.createNoGC<Bytecode::Chunk>();
-            setFuncChunk->emit<Bytecode::Op::OpCode::Mov>(Bytecode::Register{ 1 }, Bytecode::Register{ 0 });
-            // return void
-            setFuncChunk->emit<Bytecode::Op::OpCode::Load>(Bytecode::Register{ 1 }, ConstIdx{ 0 });
-            setFuncChunk->emit<Bytecode::Op::OpCode::Ret>(Bytecode::Register{ 0 });
-
-            // first arg is `value`
-            auto *getFuncChunk = _rt.createNoGC<Bytecode::Chunk>();
-            getFuncChunk->emit<Bytecode::Op::OpCode::Ret>(Bytecode::Register{ 0 });
-
-            auto *setFuncMeta = _rt.createNoGC<FuncMeta>(2, setFuncChunk, Vec<LocalVariable>{});
-            auto *getFuncMeta = _rt.createNoGC<FuncMeta>(1, getFuncChunk, Vec<LocalVariable>{});
-
-            classMeta->setMember(MemberShapeMeta{ n, false, false, false },
-                                 _rt.createNoGC<PropMeta>(setFuncMeta, getFuncMeta));
-        }
-
-        // the last instruction is not ret, patch one ret
+        // the last patch one ret
         funChunk->emit<Bytecode::Op::OpCode::Ret>(voidReg);
 
         auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
-        size_t paramCount = node->constructor ? node->constructor->parameters.size() : 0;
+        const size_t paramCount = node->constructor ? node->constructor->parameters.size() : 0;
         auto *initFuncMeta =
             _rt.createNoGC<FuncMeta>(static_cast<std::uint32_t>(paramCount), chunk, std::move(gen._localVars));
         classMeta->setConstructor(initFuncMeta);
@@ -808,7 +806,6 @@ namespace cial::Inter {
 
         auto gen = IRGenerator{ _rt, _sourceFile };
         gen.makeVirtualGlobalScope();
-
 
         for(auto &[token, exprNode] : parameters) {
             const auto varName = constVal(token).value<Atom>();

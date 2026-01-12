@@ -65,6 +65,8 @@ namespace cial::Syntax {
 
     class ConditionalTernaryExprNode;
 
+    class PropertyDeclNode;
+
     class VarDeclNode;
 
     class FunctionDeclNode;
@@ -108,6 +110,8 @@ namespace cial::Syntax {
         virtual ~Visitor() = default;
 
         virtual void visit(const StmtDeclNode *) = 0;
+
+        virtual void visit(const PropertyDeclNode *) = 0;
 
         virtual void visit(const VarDeclNode *) = 0;
 

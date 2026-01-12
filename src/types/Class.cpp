@@ -16,34 +16,31 @@
 #include "vm/VMState.hpp"
 
 namespace cial {
-    void InstanceObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
-
-    Value InstanceObject::getProp(const Atom a) {
-        const auto it = _props.find(a);
-        return it != _props.end() ? it->second : Value{};
-    }
-
-    bool InstanceObject::hasProp(const Atom a) const { return _class->meta->hasMember(a); }
-    // void ClassFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
-    //     getFunction()->call(vmState, ret, argCount);
-    //     // vmState.curFrame()->thisObj = _thisValue;
-    // }
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         auto *instanceObj = vmState.rt.create<InstanceObject>(this);
 
         for(const auto &v : this->meta->memberShapeMetas) {
+            const ClassFieldMeta fieldMeta = this->meta->getMember(v.name);
             if(v.isMethod) {
-                auto *funcMeta = this->meta->getMember<FuncMeta>(v.name);
+                auto *funcMeta = fieldMeta.funcMeta;
                 auto *func = vmState.rt.create<Function>(funcMeta);
                 func->thisObj = instanceObj;
                 instanceObj->setProp(v.name, Value{ func });
                 continue;
             }
 
-            auto *propMeta = this->meta->getMember<PropMeta>(v.name);
-            auto *propVal = vmState.rt.create<Property>(instanceObj, propMeta);
-            instanceObj->setProp(v.name, Value{ propVal });
+            if(v.isProp) {
+                auto *propMeta = fieldMeta.propMeta;
+                auto *propVal = vmState.rt.create<Property>(instanceObj, propMeta);
+                propVal->thisObj = instanceObj;
+                instanceObj->setProp(v.name, Value{ propVal });
+                continue;
+            }
+
+            if(v.isVar) {
+                instanceObj->setProp(v.name, Value{});
+            }
         }
 
         Function constructor{ this->meta->constructor };
@@ -52,6 +49,15 @@ namespace cial {
 
         vmState.reg(ret, Value{ instanceObj });
     }
+
+    void InstanceObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
+
+    Value InstanceObject::getProp(const Atom a) {
+        const auto it = _props.find(a);
+        return it != _props.end() ? it->second : Value{};
+    }
+
+    bool InstanceObject::hasProp(const Atom a) const { return _class->meta->hasMember(a); }
 
     void InstanceObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         throw std::runtime_error("Not implemented InstanceObject call");

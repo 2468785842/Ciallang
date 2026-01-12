@@ -63,6 +63,8 @@ namespace cial {
 
     struct MemberShapeMeta {
         Atom name{ ATOM_INVALID };
+        bool isVar{ false };
+        bool isProp{ false };
         bool isMethod{ false };
         bool isStatic{ false };
         bool isConst{ false };
@@ -87,12 +89,24 @@ namespace cial {
         explicit PropMeta(FuncMeta *setFunc, FuncMeta *getFunc) : setFunc(setFunc), getFunc(getFunc) {}
     };
 
+    struct ClassFieldMeta {
+        union {
+            PropMeta *propMeta{};
+            FuncMeta *funcMeta;
+        };
+
+        explicit ClassFieldMeta() = default;
+
+        explicit ClassFieldMeta(PropMeta *propMeta) : propMeta(propMeta) {}
+        explicit ClassFieldMeta(FuncMeta *funcMeta) : funcMeta(funcMeta) {}
+    };
+
     struct ClassMeta : MarkSweepHeader {
         Atom className;
         std::uint32_t arity;
-        FuncMeta *constructor;
+        FuncMeta *constructor{};
         Vec<MemberShapeMeta> memberShapeMetas;
-        Vec<MarkSweepHeader *> memberMetas;
+        Vec<ClassFieldMeta> memberMetas;
 
         explicit ClassMeta(ClassMeta &&classMeta) = delete;
         ClassMeta &operator=(ClassMeta &&classMeta) = delete;
@@ -109,10 +123,7 @@ namespace cial {
             return false;
         }
 
-        template <typename T>
-            requires std::is_same_v<T, PropMeta> || std::is_same_v<T, FuncMeta>
-        void setMember(MemberShapeMeta shapeMeta, T *memberMeta) noexcept {
-            shapeMeta.isMethod = std::is_same_v<T, FuncMeta>;
+        void setMember(const MemberShapeMeta shapeMeta, const ClassFieldMeta memberMeta) noexcept {
             const size_t len = memberShapeMetas.size();
             for(size_t i = 0; i < len; ++i) {
                 if(auto &memberShapeMeta = memberShapeMetas[i]; memberShapeMeta.name == shapeMeta.name) {
@@ -125,14 +136,12 @@ namespace cial {
             memberMetas.push_back(memberMeta);
         }
 
-        template <typename T>
-            requires std::is_same_v<T, PropMeta> || std::is_same_v<T, FuncMeta>
-        T *getMember(const Atom &name) noexcept {
-            T *memberMeta{};
+        [[nodiscard]] ClassFieldMeta getMember(const Atom &name) const noexcept {
+            ClassFieldMeta memberMeta{};
             const size_t len = memberShapeMetas.size();
             for(size_t i = 0; i < len; ++i) {
                 if(memberShapeMetas[i].name == name) {
-                    memberMeta = static_cast<T *>(memberMetas[i]);
+                    memberMeta = memberMetas[i];
                 }
             }
             return memberMeta;
@@ -142,8 +151,13 @@ namespace cial {
 
         void marked() noexcept override {
             MarkSweepHeader::marked();
-            for(const auto &v : memberMetas) {
-                v->marked();
+            const size_t len = memberShapeMetas.size();
+            for(size_t i = 0; i < len; ++i) {
+                if(memberShapeMetas[i].isMethod) {
+                    memberMetas[i].funcMeta->marked();
+                } else if(memberShapeMetas[i].isProp) {
+                    memberMetas[i].propMeta->marked();
+                }
             }
         }
 
@@ -161,9 +175,10 @@ namespace cial {
         Atom,
         FuncMeta,
         ClassMeta,
+        PropMeta,
     };
 
-    using ConstantValue = std::variant<std::monostate, Integer, Real, Atom, FuncMeta *, ClassMeta *>;
+    using ConstantValue = std::variant<std::monostate, Integer, Real, Atom, FuncMeta *, ClassMeta *, PropMeta *>;
 
     struct Constant {
 

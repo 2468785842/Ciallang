@@ -152,24 +152,11 @@ namespace cial {
 
             Inter::IRGenerator codeGen{ rt, sourceFile };
 
-            bool isSub = _vmState->context.stackTop != 0;
-
-            if(isSub && _vmState->curFrame()->funcMeta) {
-                // FIXME:
-                for(auto localVar : _vmState->curFrame()->funcMeta->localVars) {
-                    if(localVar.startPC > _vmState->curFrame()->pc && _vmState->curFrame()->pc <= localVar.endPC) {
-                        localVar.startPC = 0;
-                        localVar.endPC = 0;
-                        codeGen.addLocalVar(LocalVariable{ localVar });
-                    }
-                }
-            }
-
             OptReg ignoreReg{};
             Opt<Bytecode::Chunk> chunk = codeGen.parseAst(r, node, ignoreReg);
 
-            assert(chunk);
             assert(!r.isFailed());
+            assert(chunk);
             assert(chunk->getRegCount() != 0);
             assert(!chunk->getInstVec().empty());
 
@@ -180,14 +167,11 @@ namespace cial {
             tmpChunk.setRegCount(1); // accept ret val
 
             _vmState->allocCallFrame(&tmpChunk);
+            _vmState->makeClosure();
             _vmState->allocCallFrame(evalChunk, retReg);
+            _vmState->makeClosure();
             std::uint32_t stackTop = _vmState->context.stackTop;
-
-            if(isSub) {
-                _vmState->runFlat();
-            } else {
-                _vmState->run();
-            }
+            _vmState->run();
             Value ret = _vmState->reg(retReg);
 
             // when evalChunk include `ret` inst, `ret` will call freeCallFrame, so we need check
@@ -219,35 +203,19 @@ namespace cial {
 
             Inter::IRGenerator codeGen{ rt, sourceFile };
 
-            bool isSub = _vmState->context.stackTop != 0;
-
-            if(isSub && _vmState->curFrame()->funcMeta) {
-                // FIXME:
-                for(auto localVar : _vmState->curFrame()->funcMeta->localVars) {
-                    if(localVar.startPC > _vmState->curFrame()->pc && _vmState->curFrame()->pc <= localVar.endPC) {
-                        localVar.startPC = 0;
-                        localVar.endPC = 0;
-                        codeGen.addLocalVar(LocalVariable{ localVar });
-                    }
-                }
-            }
-
             OptReg retReg{};
             Opt<Bytecode::Chunk> chunk = codeGen.parseAst(r, node, retReg);
 
-            assert(chunk);
             assert(!r.isFailed());
+            assert(chunk);
             assert(retReg);
             assert(chunk->getRegCount() != 0);
             assert(!chunk->getInstVec().empty());
 
             _vmState->allocCallFrame(&*chunk);
+            _vmState->makeClosure();
+            _vmState->run();
 
-            if(isSub) {
-                _vmState->runFlat();
-            } else {
-                _vmState->run();
-            }
             Value ret = _vmState->reg(*retReg);
             _vmState->freeCallFrame();
 
