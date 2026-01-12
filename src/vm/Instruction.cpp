@@ -76,9 +76,7 @@ namespace cial::Bytecode::Op {
 
     void CP::execute(const Instruction &inst, VMState &vmState) {
         Value srcVal = vmState.reg(src(inst));
-        if(propObjectGet(vmState, srcVal, srcVal)) {
-            return;
-        }
+        propObjectGet(vmState, srcVal, srcVal);
         vmState.reg(dst(inst), srcVal);
     }
 
@@ -134,7 +132,7 @@ namespace cial::Bytecode::Op {
 
     void DGlobal::execute(const Instruction &inst, VMState &vmState) {
         const Value &srcVal = vmState.regRef(src(inst));
-        if(propObjectSet(vmState, srcVal, vmState.global(atom(inst)))) {
+        if(vmState.globalHas(atom(inst)) && propObjectSet(vmState, srcVal, vmState.global(atom(inst)))) {
             return;
         }
 
@@ -143,9 +141,7 @@ namespace cial::Bytecode::Op {
 
     void GGlobal::execute(const Instruction &inst, VMState &vmState) {
         Value srcVal = vmState.global(atom(inst));
-        if(propObjectGet(vmState, srcVal, srcVal)) {
-            return;
-        }
+        propObjectGet(vmState, srcVal, srcVal);
         vmState.reg(dst(inst), srcVal);
     }
 
@@ -299,11 +295,7 @@ namespace cial::Bytecode::Op {
         if(val.isObject()) {
             if(auto *instObj = dynamic_cast<InstanceObject *>(val.asObject().value())) {
                 auto tmp = instObj->getProp(atom);
-
-                if(propObjectGet(vmState, tmp, tmp)) {
-                    return;
-                }
-
+                propObjectGet(vmState, tmp, tmp);
                 vmState.reg(dst(inst), tmp);
             }
             return;
@@ -348,9 +340,7 @@ namespace cial::Bytecode::Op {
 
     void GThis::execute(const Instruction &inst, VMState &vmState) {
         Value srcVal = vmState.getThis(atom(inst));
-        if(propObjectGet(vmState, srcVal, srcVal)) {
-            return;
-        }
+        propObjectGet(vmState, srcVal, srcVal);
         vmState.reg(dst(inst), srcVal);
     }
 

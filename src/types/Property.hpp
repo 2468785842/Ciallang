@@ -14,7 +14,9 @@
 
 #include "Object.hpp"
 #include "Value.hpp"
+#include "vm/Constant.hpp"
 #include "vm/Register.hpp"
+#include "vm/VMState.hpp"
 
 namespace cial {
 
@@ -47,6 +49,9 @@ namespace cial {
         explicit Property(Object *thisObj, PropMeta *propMeta) : thisObj{ thisObj }, propMeta{ propMeta } {}
 
         void invokeSet(Bytecode::VMState &vmState, const Value &v) const {
+            if(!propMeta->setFunc)
+                throw std::runtime_error("property no have setter");
+
             const size_t absSP{ vmState.getRegPoolTop() - vmState.curFrame()->getSP() };
 
             const Bytecode::Register ret{ absSP };
@@ -59,6 +64,9 @@ namespace cial {
         }
 
         Value invokeGet(Bytecode::VMState &vmState) const {
+            if(!propMeta->getFunc)
+                throw std::runtime_error("property no have getter");
+
             const size_t absSP{ vmState.getRegPoolTop() - vmState.curFrame()->getSP() };
 
             const Bytecode::Register ret{ absSP };

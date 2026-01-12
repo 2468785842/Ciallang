@@ -316,8 +316,13 @@ namespace cial::Inter {
     }
 
     void IRGenerator::generate(const Syntax::PropertyDeclNode *node, OptReg &) {
-        auto *setFuncMeta = generateFuncMeta(node->setter->parameters, node->setter->body);
-        auto *getFuncMeta = generateFuncMeta(node->getter->parameters, node->getter->body);
+        FuncMeta *setFuncMeta{};
+        if(node->setter)
+            setFuncMeta = generateFuncMeta(node->setter->parameters, node->setter->body);
+
+        FuncMeta *getFuncMeta;
+        if(node->getter)
+            getFuncMeta = generateFuncMeta(node->getter->parameters, node->getter->body);
 
         auto *propMeta = _rt.createNoGC<PropMeta>(setFuncMeta, getFuncMeta);
 

@@ -51,16 +51,20 @@ namespace cial::Bytecode {
 
         [[nodiscard]] Value &regRef(Register reg) const;
 
-        [[nodiscard]] Value global(const Atom atom) const {
-            return context.gObj.contains(atom) ? context.gObj[atom] : Value{};
+        [[nodiscard]] bool globalHas(const Atom atom) const { return context.gObj.contains(atom); }
+
+        [[nodiscard]] bool globalHas(const std::string &name) const {
+            const auto atom = rt.atomTable.intern(name.c_str(), name.length());
+            return context.gObj.contains(atom);
         }
+
+        [[nodiscard]] Value global(const Atom atom) const { return context.gObj[atom]; }
 
         void global(const Atom atom, const Value &value) const { context.gObj[atom] = value; }
 
         [[nodiscard]] Value global(const std::string &name) const {
             const auto atom = rt.atomTable.intern(name.c_str(), name.length());
-            Value v = context.gObj.contains(atom) ? context.gObj[atom] : Value{};
-            return v;
+            return context.gObj[atom];
         }
 
         void global(const std::string &name, const Value &value) const {

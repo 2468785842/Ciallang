@@ -397,7 +397,7 @@ namespace cial::Syntax {
         FunctionDeclNode *setter{ nullptr };
         FunctionDeclNode *getter{ nullptr };
 
-        while(setter == nullptr || getter == nullptr) {
+        while(!parser->peek(TokenType::RightCurlyBrace)) {
 
             if(parser->peek(TokenType::Setter)) {
                 if(setter) {
@@ -424,7 +424,7 @@ namespace cial::Syntax {
                 }
 
                 if(!parser->peek(TokenType::LeftCurlyBrace)) {
-                    parser->error(r, "setter expect {", setterToken.location);
+                    parser->error(r, "setter expect token '{'", setterToken.location);
                     return nullptr;
                 }
                 parser->consume();
@@ -436,6 +436,12 @@ namespace cial::Syntax {
                 if(!parser->parseScope(r, setter->body, TokenType::RightCurlyBrace)) {
                     return nullptr;
                 }
+
+                if(!parser->peek(TokenType::RightCurlyBrace)) {
+                    parser->error(r, "setter expected token '}'", token->location);
+                    return nullptr;
+                }
+                parser->consume();
                 continue;
             }
 
@@ -447,10 +453,17 @@ namespace cial::Syntax {
                 Token getterToken;
                 parser->consume(getterToken);
 
+                if(parser->peek(TokenType::LParenthesis)) {
+                    parser->consume();
+                    if(!parser->expect(r, TokenType::RParenthesis))
+                        return nullptr;
+                }
+
                 if(!parser->peek(TokenType::LeftCurlyBrace)) {
-                    parser->error(r, "getter expect {", getterToken.location);
+                    parser->error(r, "getter expect token '{'", getterToken.location);
                     return nullptr;
                 }
+
                 parser->consume();
 
                 getter = parser->astBuilder()->makeNode<FunctionDeclNode>(getterToken);
@@ -459,12 +472,19 @@ namespace cial::Syntax {
                 if(!parser->parseScope(r, getter->body, TokenType::RightCurlyBrace)) {
                     return nullptr;
                 }
+
+                if(!parser->peek(TokenType::RightCurlyBrace)) {
+                    parser->error(r, "getter expected token '}'", token->location);
+                    return nullptr;
+                }
+                parser->consume();
+
                 continue;
             }
 
-            Token t{};
-            parser->consume(t);
-            parser->error(r, "expect getter or setter", t.location);
+            Token *t{};
+            parser->current(t);
+            parser->error(r, "expect getter or setter", t->location);
             return nullptr;
         }
 

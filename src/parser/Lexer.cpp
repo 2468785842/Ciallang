@@ -669,8 +669,8 @@ bool Lexer::identifier(Token *&token) {
 
         keywords.emplace("debugger"_str, Token{ TokenType::Debugger });
         keywords.emplace("property"_str, Token{ TokenType::Property });
-        keywords.emplace("setter"_str, Token{ TokenType::Getter });
-        keywords.emplace("getter"_str, Token{ TokenType::Setter });
+        keywords.emplace("setter"_str, Token{ TokenType::Setter });
+        keywords.emplace("getter"_str, Token{ TokenType::Getter });
 
         keywords.emplace("function"_str, Token{ TokenType::Function });
         keywords.emplace("class"_str, Token{ TokenType::Class });
