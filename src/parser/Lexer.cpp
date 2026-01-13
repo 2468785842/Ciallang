@@ -60,16 +60,6 @@ std::multimap<std::uint8_t, Lexer::LexerCaseCallable> Lexer::S_Cases = []() -> a
 
 Lexer::Lexer(SourceFile &sourceFile) : _sourceFile(sourceFile) {}
 
-bool Lexer::boringMatch(Token *&token, const OperatorTokenSet &signMap) {
-    for(const auto &[sign, _token] : signMap) {
-        if(match(sign)) {
-            token = makeToken(_token);
-            return true;
-        }
-    }
-    return false;
-}
-
 bool Lexer::hasNext() const { return _hasNext; }
 
 /**
@@ -135,9 +125,8 @@ bool Lexer::next(Token *&token) {
     const auto rune = read();
 
     DEFER {
-        _sourceFile.popMark();
-        _hasNext = rune != runeEof && token->type() != TokenType::Invalid;
-        if(*token == TokenType::Invalid) {
+        _hasNext = rune != runeEof;
+        if(rune == runeInvalid) {
             _result.error(fmt::format("unknown char: {}", static_cast<char>(rune)));
         }
     };
@@ -179,6 +168,7 @@ bool Lexer::next(Token *&token) {
             // save lexeme info
             token->location.start(startLine, startColumn);
             token->location.end(endLine, endColumn);
+            _sourceFile.popMark();
             return true;
         }
 
@@ -195,15 +185,16 @@ bool Lexer::next(Token *&token) {
 
             token->location.start(startLine, startColumn);
             token->location.end(endLine, endColumn);
+            _sourceFile.popMark();
             return true;
         }
 
-        // no match restore mark, match the next
         _sourceFile.restoreTopMark();
     }
 
     token = makeToken(TokenType::Invalid);
     setTokenLocation(token);
+    read();
 
     return false;
 }
@@ -218,16 +209,12 @@ void Lexer::skipComment() {
     while(true) {
         _sourceFile.pushMark();
         next(token);
-
-        CLL_ASSERT(token != nullptr, "token is null");
-
         const auto isComment = token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment;
 
         _tokens.pop_back();
 
         if(!isComment) {
             _sourceFile.restoreTopMark();
-            _sourceFile.popMark();
             _hasNext = true;
             return;
         }
@@ -260,10 +247,8 @@ const Result &Lexer::result() const { return _result; }
 int32_t Lexer::read(const bool skipWhitespace) {
     while(true) {
         const auto ch = _sourceFile.next(_result);
-        if(_result.isFailed())
-            return runeInvalid;
 
-        if(skipWhitespace && isRuneWhitespace(ch))
+        if(ch != runeInvalid && skipWhitespace && isRuneWhitespace(ch))
             continue;
 
         return ch;
@@ -280,7 +265,6 @@ int32_t Lexer::read(const bool skipWhitespace) {
  */
 bool Lexer::match(const String &literal) {
     _sourceFile.pushMark();
-    DEFER { _sourceFile.popMark(); };
 
     // 实际可以少循环一次, 因为 ch 一定和 literal[0] 匹配
     return std::ranges::all_of(literal, [&](const auto targetCh) {
@@ -288,6 +272,7 @@ bool Lexer::match(const String &literal) {
             _sourceFile.restoreTopMark();
             return false;
         }
+        _sourceFile.popMark();
         return true;
     });
 }
@@ -362,11 +347,8 @@ bool Lexer::blockComment(Token *&token) {
         // std::stringstream stream{};
         while(true) {
             auto ch = read(false);
-            if(ch == runeEof) {
-                token = makeToken(TokenType::EndOfFile);
-                setTokenLocation(token);
-                return true;
-            }
+            if(ch == runeEof)
+                break;
 
             if(ch == '/') {
                 ch = read(false);
@@ -1023,7 +1005,6 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
  */
 bool Lexer::octetLiteral(Token *&token) {
     _sourceFile.pushMark();
-    DEFER { _sourceFile.popMark(); };
     std::stringstream stream{ "" };
     std::vector<uint8_t> buf{};
     // parse an octet literal;
@@ -1041,7 +1022,7 @@ bool Lexer::octetLiteral(Token *&token) {
                 ch = read(false);
                 if(ch == '>') {
                     token = makeToken(TokenType::ConstVal, Octet{ buf.data(), static_cast<std::uint32_t>(buf.size()) });
-                    return true;
+                    _sourceFile.popMark();
                     return true;
                 }
                 _sourceFile.restoreTopMark();

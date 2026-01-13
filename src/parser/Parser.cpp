@@ -126,7 +126,7 @@ namespace cial::Syntax {
     }
 
     bool Parser::lookAhead(const size_t count) {
-        while(count >= _lexer.tokenSize() && _lexer.hasNext()) {
+        while(count > _lexer.tokenSize() && _lexer.hasNext()) {
             Token *token{ nullptr };
             if(!_lexer.next(token))
                 break;
@@ -134,14 +134,12 @@ namespace cial::Syntax {
             if(token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment) {
                 _lexer.takeOverToken(*token);
             }
-
-            CLL_ASSERT(token != nullptr, "token is null");
         }
         return _lexer.tokenSize() != 0;
     }
 
     bool Parser::peek(const TokenType tokenType) {
-        if(!lookAhead(0))
+        if(!lookAhead(1))
             return false;
         Token *token;
         _lexer.peekToken(token);
@@ -154,23 +152,23 @@ namespace cial::Syntax {
     }
 
     bool Parser::consume(Token &token) {
-        if(!lookAhead(0))
+        if(!lookAhead(1))
             return false;
 
         return _lexer.takeOverToken(token);
     }
 
     bool Parser::current(Token *&token) {
-        if(!lookAhead(0))
+        if(!lookAhead(1))
             return false;
 
         _lexer.peekToken(token);
 
-        return token->type() != TokenType::EndOfFile;
+        return true;
     }
 
     bool Parser::expect(Result &r, const TokenType tokenType) {
-        if(!lookAhead(0))
+        if(!lookAhead(1))
             return false;
 
         std::string expectedName = tokenTypeToStr(tokenType);
@@ -194,7 +192,7 @@ namespace cial::Syntax {
      * @return Token优先级
      */
     Precedence Parser::nextInfixPrecedence(const bool enableCommaExpr) {
-        if(lookAhead(0)) {
+        if(lookAhead(1)) {
             Token *token;
             _lexer.peekToken(token);
             if(const auto infixParser = infixParserFor(token->type(), enableCommaExpr))
@@ -204,11 +202,9 @@ namespace cial::Syntax {
     }
 
     void Parser::synchronize() {
-        while(!peek(TokenType::EndOfFile)) {
+        while(lookAhead(1)) {
             Token *token{};
             if(!current(token))
-                return;
-            if(token->type() == TokenType::Invalid)
                 return;
 
             switch(token->type()) {
@@ -613,7 +609,7 @@ namespace cial::Syntax {
         Vec<VarDeclNode *> varDeclVec{};
         Vec<FunctionDeclNode *> funcDeclVec{};
 
-        while(!parser->peek(TokenType::RightCurlyBrace) && !parser->peek(TokenType::EndOfFile)) {
+        while(!parser->peek(TokenType::RightCurlyBrace)) {
             auto *stmt = parser->parseDeclaration(r);
             if(!stmt)
                 return nullptr;

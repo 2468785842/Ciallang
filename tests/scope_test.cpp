@@ -73,11 +73,12 @@ TEST_CASE("类作用域 - 上下文静态变量访问") {
 
         class Derived {
             function getX() {
-                // If x is in the local scope, use x;
-                // Else dynamically look it up in `this`, `super`, or the global scope.
-                // NOTE: So how would a context mechanism like `incontextof` change classes?
-                // NOTE: Perhaps nothing would happen;
-                // NOTE: maybe context mechanisms are not applicable to class scenarios.
+                /* If x is in the local scope, use x;
+                 * Else dynamically look it up in `this`, `super`, or the global scope.
+                 * NOTE: So how would a context mechanism like `incontextof` change classes?
+                 * NOTE: Perhaps nothing would happen;
+                 * NOTE: maybe context mechanisms are not applicable to class scenarios.
+                 */
                 return x;
             }
         }

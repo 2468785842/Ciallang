@@ -61,10 +61,6 @@ namespace cial::Syntax {
             return _tokens.back();
         }
 
-        using OperatorTokenSet = Vec<std::pair<String, TokenType>>;
-
-        bool boringMatch(Token *&, const OperatorTokenSet &signMap);
-
         void rewindOneChar() const;
 
         String readIdentifier();
