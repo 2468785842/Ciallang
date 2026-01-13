@@ -14,13 +14,15 @@
 
 #include "Lexer.hpp"
 
+#include <fmt/format.h>
+
+#include "OperatorTrie.hpp"
+
 #include "common/Defer.hpp"
 #include "common/UTF8.hpp"
 #include "logging/Logger.hpp"
 
 #include "types/Real.hpp"
-
-#include <fmt/format.h>
 
 using namespace cial::Syntax;
 
@@ -28,7 +30,7 @@ std::multimap<std::uint8_t, Lexer::LexerCaseCallable> Lexer::S_Cases = []() -> a
     std::multimap<std::uint8_t, LexerCaseCallable> map;
 
     for(char c : "[](){}~?:,#$")
-        map.emplace(c, std::bind_front(&Lexer::singletonSign));
+        map.emplace(c, std::bind_front(&Lexer::matchOperator));
 
     // number literal
     for(char c : ".0123456789")
@@ -37,32 +39,15 @@ std::multimap<std::uint8_t, Lexer::LexerCaseCallable> Lexer::S_Cases = []() -> a
     // block comment, line comment
     map.emplace('/', std::bind_front(&Lexer::lineComment));
     map.emplace('/', std::bind_front(&Lexer::blockComment));
-    map.emplace('/', std::bind_front(&Lexer::slash));
-    map.emplace('\\', std::bind_front(&Lexer::backslash));
 
-    map.emplace('=', std::bind_front(&Lexer::equalSign));
-    map.emplace('!', std::bind_front(&Lexer::exclamationSign));
-    map.emplace('&', std::bind_front(&Lexer::ampersandSign));
-    map.emplace('|', std::bind_front(&Lexer::vertLineSign));
-
-    map.emplace('.', std::bind_front(&Lexer::dotSign));
-
-    map.emplace('-', std::bind_front(&Lexer::minus));
-
-    map.emplace('+', std::bind_front(&Lexer::plus));
-
-    map.emplace('*', std::bind_front(&Lexer::mul));
-
-    // "> operator more..."
-    map.emplace('>', std::bind_front(&Lexer::gtSign));
+    for(char c : "/\\=!&|.-+*>")
+        map.emplace(c, std::bind_front(&Lexer::matchOperator));
 
     // "<%" octet literal
     map.emplace('<', std::bind_front(&Lexer::octetLiteral));
 
-    // "< operator more..."
-    map.emplace('<', std::bind_front(&Lexer::ltSign));
-    map.emplace('%', std::bind_front(&Lexer::percent));
-    map.emplace('^', std::bind_front(&Lexer::chevron));
+    for(char c : "<%^")
+        map.emplace(c, std::bind_front(&Lexer::matchOperator));
 
     // line terminator
     map.emplace(';', std::bind_front(&Lexer::lineTerminator));
@@ -99,17 +84,27 @@ void Lexer::rewindOneChar() const {
     for(size_t i = 1; i <= 4 && i <= pos; ++i) {
         const uint8_t ch = _sourceFile[pos - i];
 
-        // ASCII
+        // ASCII 0xxx_xxxx 0x00 - 0x7F
         if((ch & 0x80) == 0) {
             _sourceFile.seek(pos - 1);
             return;
         }
 
+        if((ch & 0xC0) == 0x80) {
+            continue;
+        }
+
         // UTF-8 起始字节
+        // 2 bytes 110x_xxxx 10xx_xxxx 0xC0 - 0xDF
+        // 3 bytes 1110_xxxx 10xx_xxxx 10xx_xxxx 0xE0 - 0xEF
+        // 4 bytes 1111_0xxx 10xx_xxxx 10xx_xxxx 10xx_xxxx 0xF0 - 0xF7
         if((ch & 0xE0) == 0xC0 || (ch & 0xF0) == 0xE0 || (ch & 0xF8) == 0xF0) {
             _sourceFile.seek(pos - i);
             return;
         }
+
+        // bad char
+        break;
     }
 
     // fallback
@@ -164,8 +159,6 @@ bool Lexer::next(Token *&token) {
         token->location.start(line, column);
         return true;
     }
-    // 区分大小写
-    // rune = rune > 0x80 ? rune : tolower(rune);
 
     // 指针rollback
     rewindOneChar();
@@ -297,6 +290,47 @@ bool Lexer::match(const String &literal) {
         }
         return true;
     });
+}
+
+bool Lexer::matchOperator(Token *&token) {
+    static const OperatorTrie OpTrie{
+#define LIST_TO_TOKEN_TYPE_PAIR(SYMBOL, NAME) { NAME##_str, TokenType::SYMBOL },
+        SYMBOL_LIST(LIST_TO_TOKEN_TYPE_PAIR)
+#undef LIST_TO_TOKEN_TYPE_PAIR
+    };
+
+    const size_t start = _sourceFile.pos();
+    size_t i = start;
+
+    int node = OpTrie.getRoot();
+    int lastAccept = -1;
+    size_t lastPos = start;
+
+    while(i < _sourceFile.length()) {
+        const std::uint8_t byte = _sourceFile[i];
+        // not ASCII
+        if(byte >= 0x80)
+            return false;
+        const int next = OpTrie.getNode(node).next[byte];
+        if(next == -1)
+            break;
+
+        node = next;
+        ++i;
+
+        if(OpTrie.getNode(node).token != TokenType::Invalid) {
+            lastAccept = node;
+            lastPos = i;
+        }
+    }
+
+    if(lastAccept != -1) {
+        _sourceFile.seek(lastPos);
+        token = makeToken(OpTrie.getNode(lastAccept).token);
+        return true;
+    }
+
+    return false;
 }
 
 bool Lexer::lineComment(Token *&token) {
@@ -702,176 +736,6 @@ bool Lexer::lineTerminator(Token *&token) {
     const auto r = read() == ';';
     if(r)
         token = makeToken(TokenType::SemiColon);
-    return r;
-}
-
-bool Lexer::equalSign(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "==="_str, TokenType::DiscEqual },
-        { "=="_str, TokenType::Equal },
-        { ","_str, TokenType::Comma }, // comma like perl
-        { "="_str, TokenType::Assignment },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::plus(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "++"_str, TokenType::Increment },
-        { "+="_str, TokenType::PlusEqual },
-        { "+"_str, TokenType::Plus },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::minus(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "--"_str, TokenType::Decrement },
-        { "-="_str, TokenType::MinusEqual },
-        { "-"_str, TokenType::Minus },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::mul(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "*="_str, TokenType::AsteriskEqual },
-        { "*"_str, TokenType::Asterisk },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::gtSign(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { ">>>="_str, TokenType::RBitShiftEqual },  { ">>>"_str, TokenType::RBitShift },
-        { ">>="_str, TokenType::RArithShiftEqual }, { ">>"_str, TokenType::RArithShift },
-        { ">="_str, TokenType::GtOrEqual },         { ">"_str, TokenType::Gt }
-    };
-    return boringMatch(token, signArr);
-}
-
-
-bool Lexer::ltSign(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "<<="_str, TokenType::LArithShiftEqual }, { "<->"_str, TokenType::Swap }, { "<="_str, TokenType::LtOrEqual },
-        { "<<"_str, TokenType::LArithShift },       { "<"_str, TokenType::Lt },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::exclamationSign(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "!=="_str, TokenType::DiscNotEqual },
-        { "!="_str, TokenType::NotEqual },
-        { "!"_str, TokenType::Exclamation },
-    };
-    return boringMatch(token, signArr);
-}
-
-
-bool Lexer::ampersandSign(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "&&="_str, TokenType::LogicalAndEqual },
-        { "&&"_str, TokenType::LogicalAnd },
-        { "&="_str, TokenType::AmpersandEqual },
-        { "&"_str, TokenType::Ampersand },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::vertLineSign(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "||="_str, TokenType::LogicalOrEqual },
-        { "||"_str, TokenType::LogicalOr },
-        { "|="_str, TokenType::VertLineEqual },
-        { "|"_str, TokenType::VertLine },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::dotSign(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "..."_str, TokenType::Omit },
-        { "."_str, TokenType::Dot },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::slash(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "/="_str, TokenType::SlashEqual },
-        { "/"_str, TokenType::Slash },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::backslash(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "\\="_str, TokenType::BackslashEqual },
-        { "\\"_str, TokenType::Backslash },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::percent(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "%="_str, TokenType::PercentEqual },
-        { "%"_str, TokenType::Percent },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::chevron(Token *&token) {
-    static const OperatorTokenSet signArr{
-        { "^="_str, TokenType::ChevronEqual },
-        { "^"_str, TokenType::Chevron },
-    };
-    return boringMatch(token, signArr);
-}
-
-bool Lexer::singletonSign(Token *&token) {
-    auto r = true;
-    switch(const auto ch = read(); ch) {
-        case '[':
-            token = makeToken(TokenType::LBracket);
-            break;
-        case ']':
-            token = makeToken(TokenType::RBracket);
-            break;
-        case '(':
-            token = makeToken(TokenType::LParenthesis);
-            break;
-        case ')':
-            token = makeToken(TokenType::RParenthesis);
-            break;
-        case '~':
-            token = makeToken(TokenType::Tilde);
-            break;
-        case '?':
-            token = makeToken(TokenType::Question);
-            break;
-        case ':':
-            token = makeToken(TokenType::Colon);
-            break;
-        case ',':
-            token = makeToken(TokenType::Comma);
-            break;
-        case '{':
-            token = makeToken(TokenType::LeftCurlyBrace);
-            break;
-        case '}':
-            token = makeToken(TokenType::RightCurlyBrace);
-            break;
-        case '#':
-            token = makeToken(TokenType::Sharp);
-            break;
-        case '$':
-            token = makeToken(TokenType::Dollar);
-            break;
-        default:
-            rewindOneChar();
-            r = false;
-    }
     return r;
 }
 

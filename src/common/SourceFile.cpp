@@ -93,7 +93,7 @@ namespace cial::Common {
 
             const auto endOfBuffer = rune == runeEof;
 
-            if(const auto unixNewLine = rune == '\n'; unixNewLine || endOfBuffer) {
+            if(const bool unixNewLine = rune == '\n'; unixNewLine || endOfBuffer) {
                 const auto end = endOfBuffer ? _buffer.size() : _index - 1;
                 const auto [fst, snd] = _linesByIndexRange.insert(std::make_pair(
                     std::make_pair(lineStart, end),
@@ -159,7 +159,6 @@ namespace cial::Common {
         _linesByIndexRange.clear();
 
         if(std::ifstream file{ _path.string(), std::ios::in | std::ios::binary }; file.is_open()) {
-
             file.unsetf(std::ios::skipws);
             file.seekg(0, std::ios::end);
             const auto file_size = file.tellg();

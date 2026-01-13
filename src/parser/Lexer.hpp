@@ -77,34 +77,9 @@ namespace cial::Syntax {
 
         bool match(const String &literal);
 
-        // <
-        bool gtSign(Token *&);
+        bool matchOperator(Token *&token);
 
         bool octetLiteral(Token *&);
-
-        // >
-        bool ltSign(Token *&);
-
-        bool exclamationSign(Token *&);
-
-        bool ampersandSign(Token *&);
-
-        bool vertLineSign(Token *&);
-
-        bool dotSign(Token *&);
-
-        bool slash(Token *&);
-
-        bool backslash(Token *&);
-
-        bool percent(Token *&);
-
-        bool chevron(Token *&);
-
-        bool singletonSign(Token *&);
-
-        // =
-        bool equalSign(Token *&);
 
         bool lineComment(Token *&);
 
@@ -125,12 +100,6 @@ namespace cial::Syntax {
         void extractNumber(std::int8_t (*)(char), const std::string &expMark, std::stringstream &, bool &);
 
         bool identifier(Token *&);
-
-        bool plus(Token *&);
-
-        bool minus(Token *&);
-
-        bool mul(Token *&);
 
         int32_t read(bool skipWhitespace = true);
 

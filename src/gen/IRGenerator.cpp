@@ -15,11 +15,11 @@
 #include <ranges>
 
 #include "common/Defer.hpp"
+#include "runtime/Runtime.hpp"
+
 #include "parser/ast/DeclNode.hpp"
 #include "parser/ast/ExprNode.hpp"
 #include "parser/ast/StmtNode.hpp"
-#include "types/Class.hpp"
-#include "types/Function.hpp"
 
 #include "logging/Logger.hpp"
 #include "vm/Instruction.hpp"
@@ -734,16 +734,20 @@ namespace cial::Inter {
         freeRegister(testReg);
     }
 
-    void IRGenerator::generate(const Syntax::BreakStmtNode *, OptReg &) {
-        if(_breakStack.empty())
+    void IRGenerator::generate(const Syntax::BreakStmtNode *node, OptReg &) {
+        if(_breakStack.empty()) {
+            error("break keyword must in loop or switch scope", node->location);
             return;
+        }
         auto *itt = _chunk->emit<Bytecode::Op::OpCode::Jmp>();
         _breakStack.back().push_back(itt);
     }
 
-    void IRGenerator::generate(const Syntax::ContinueStmtNode *, OptReg &) {
-        if(_continueStack.empty())
+    void IRGenerator::generate(const Syntax::ContinueStmtNode *node, OptReg &) {
+        if(_continueStack.empty()) {
+            error("continue keyword must in loop or switch scope", node->location);
             return;
+        }
         if(_continueStack.back().continueLabel.has_value()) {
             Bytecode::Op::Jmp::setTarget(*_chunk->emit<Bytecode::Op::OpCode::Jmp>(),
                                          _continueStack.back().continueLabel.value());
