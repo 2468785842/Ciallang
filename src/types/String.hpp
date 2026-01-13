@@ -13,13 +13,13 @@ namespace cial {
         static constexpr int SHORT_STR_LEN = 21;
 
     public:
-        explicit String() : _len(0) {}
-        explicit String(const char c) : _shortStr{ c, '\0' }, _len(1) {}
-        explicit String(const char *str) : String(str, std::strlen(str)) {}
+        constexpr explicit String() : _len(0) {}
+        constexpr explicit String(const char c) : _shortStr{ c, '\0' }, _len(1) {}
 
         template <size_t N>
-        explicit String(const char (&arr)[N]) : String(arr, N - 1) {}
+        constexpr explicit String(const char (&arr)[N]) : String(arr, N - 1) {}
 
+        explicit String(const char *str) : String(str, std::strlen(str)) {}
         explicit String(const char *str, std::uint32_t len);
         explicit String(const std::string &s) : String(s.data(), static_cast<std::uint32_t>(s.size())) {}
 

@@ -30,6 +30,12 @@ namespace cial {
             Object::marked();
             meta->marked();
         }
+
+        void setProp(Atom a, const Value &v);
+
+        Value getProp(Atom a);
+
+        [[nodiscard]] bool hasProp(Atom a) const;
     };
 
     class InstanceObject final : public Object {

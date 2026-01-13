@@ -22,7 +22,7 @@ namespace cial {
 
         for(const auto &v : this->meta->memberShapeMetas) {
             const ClassFieldMeta fieldMeta = this->meta->getMember(v.name);
-            if(v.isMethod) {
+            if(v.isMethod && !v.isStatic) {
                 auto *funcMeta = fieldMeta.funcMeta;
                 auto *func = vmState.rt.create<Function>(funcMeta);
                 func->thisObj = instanceObj;
@@ -49,6 +49,14 @@ namespace cial {
 
         vmState.reg(ret, Value{ instanceObj });
     }
+
+    void ClassObject::setProp(const Atom a, const Value &v) {
+        throw std::runtime_error("Not implemented ClassObject setProp");
+    }
+
+    Value ClassObject::getProp(const Atom a) { throw std::runtime_error("Not implemented ClassObject getProp"); }
+
+    bool ClassObject::hasProp(const Atom a) const { throw std::runtime_error("Not implemented ClassObject hasProp"); }
 
     void InstanceObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
 

@@ -25,50 +25,61 @@
 
 namespace cial::Syntax {
     using namespace Common;
-#define TOKEN_SYMBOL_PAIR_ENUM(X)                                                                                      \
-    X(Invalid, "invalid")                                                                                              \
-    X(EndOfFile, "end_of_file")                                                                                        \
+#define KEYWORD_LIST(X)                                                                                                \
     X(Void, "void")                                                                                                    \
     X(Synchronized, "synchronized")                                                                                    \
-    X(With, "with")                                                                                                    \
-    X(Var, "var")                                                                                                      \
-    X(Const, "const")                                                                                                  \
-    X(Enum, "enum")                                                                                                    \
     X(Goto, "goto")                                                                                                    \
+    X(With, "with")                                                                                                    \
+    X(Null, "null")                                                                                                    \
+    X(Import, "import")                                                                                                \
+    X(Export, "export")                                                                                                \
     X(Throw, "throw")                                                                                                  \
     X(Try, "try")                                                                                                      \
+    X(Catch, "catch")                                                                                                  \
+    X(Finally, "finally")                                                                                              \
+    X(Debugger, "debugger")                                                                                            \
+    X(Property, "property")                                                                                            \
     X(Setter, "setter")                                                                                                \
     X(Getter, "getter")                                                                                                \
-    X(Catch, "catch")                                                                                                  \
-    X(Omit, "...")                                                                                                     \
-    X(Continue, "continue")                                                                                            \
     X(Function, "function")                                                                                            \
+    X(Enum, "enum")                                                                                                    \
     X(Class, "class")                                                                                                  \
-    X(Extends, "extends")                                                                                              \
     X(This, "this")                                                                                                    \
     X(Super, "super")                                                                                                  \
-    X(Debugger, "debugger")                                                                                            \
-    X(Default, "default")                                                                                              \
-    X(Case, "case")                                                                                                    \
-    X(Finally, "finally")                                                                                              \
-    X(Property, "property")                                                                                            \
+    X(Extends, "extends")                                                                                              \
     X(Private, "private")                                                                                              \
     X(Public, "public")                                                                                                \
     X(Protected, "protected")                                                                                          \
     X(Static, "static")                                                                                                \
     X(Return, "return")                                                                                                \
-    X(Break, "break")                                                                                                  \
-    X(Export, "export")                                                                                                \
-    X(Import, "import")                                                                                                \
-    X(Switch, "switch")                                                                                                \
-    X(In, "in")                                                                                                        \
-    X(InContextOf, "incontextof")                                                                                      \
-    X(For, "for")                                                                                                      \
-    X(While, "while")                                                                                                  \
-    X(Do, "do")                                                                                                        \
+    X(Var, "var")                                                                                                      \
+    X(Const, "const")                                                                                                  \
     X(If, "if")                                                                                                        \
     X(Else, "else")                                                                                                    \
-    X(Null, "null")                                                                                                    \
+    X(Int, "int")                                                                                                      \
+    X(Real, "real")                                                                                                    \
+    X(String, "string")                                                                                                \
+    X(Octet, "octet")                                                                                                  \
+    X(New, "new")                                                                                                      \
+    X(Do, "do")                                                                                                        \
+    X(While, "while")                                                                                                  \
+    X(For, "for")                                                                                                      \
+    X(Continue, "continue")                                                                                            \
+    X(Break, "break")                                                                                                  \
+    X(Switch, "switch")                                                                                                \
+    X(Case, "case")                                                                                                    \
+    X(Default, "default")                                                                                              \
+    X(Delete, "delete")                                                                                                \
+    X(In, "in")                                                                                                        \
+    X(InContextOf, "incontextof")                                                                                      \
+    X(Typeof, "typeof")                                                                                                \
+    X(Isvalid, "isvalid")                                                                                              \
+    X(Invalidate, "invalidate")                                                                                        \
+    X(Instanceof, "instanceof")                                                                                        \
+    X(Global, "global")
+
+#define SYMBOL_LIST(X)                                                                                                 \
+    X(Omit, "...")                                                                                                     \
     X(Comma, ",")                                                                                                      \
     X(Assignment, "=")                                                                                                 \
     X(AmpersandEqual, "&=")                                                                                            \
@@ -111,45 +122,45 @@ namespace cial::Syntax {
     X(Tilde, "~")                                                                                                      \
     X(Decrement, "--")                                                                                                 \
     X(Increment, "++")                                                                                                 \
-    X(New, "new")                                                                                                      \
-    X(Delete, "delete")                                                                                                \
-    X(Typeof, "typeof")                                                                                                \
     X(Plus, "+")                                                                                                       \
     X(Minus, "-")                                                                                                      \
     X(Sharp, "#")                                                                                                      \
     X(Dollar, "$")                                                                                                     \
-    X(Isvalid, "isvalid")                                                                                              \
-    X(Invalidate, "invalidate")                                                                                        \
-    X(Instanceof, "instanceof")                                                                                        \
     X(LParenthesis, "(")                                                                                               \
     X(Dot, ".")                                                                                                        \
     X(LBracket, "[")                                                                                                   \
-    X(Global, "global")                                                                                                \
     X(RBracket, "]")                                                                                                   \
     X(RParenthesis, ")")                                                                                               \
     X(Colon, ":")                                                                                                      \
     X(SemiColon, ";")                                                                                                  \
     X(LeftCurlyBrace, "{")                                                                                             \
-    X(RightCurlyBrace, "}")                                                                                            \
+    X(RightCurlyBrace, "}")
+
+#define TOKEN_SYMBOL_LIST(X)                                                                                           \
+    X(Invalid, "invalid")                                                                                              \
+    X(EndOfFile, "end_of_file")                                                                                        \
     X(LineComment, "line_comment")                                                                                     \
     X(BlockComment, "block_comment")                                                                                   \
     X(Identifier, "identifier")                                                                                        \
-    X(ConstVal, "const_val")                                                                                           \
-    X(Int, "int")                                                                                                      \
-    X(Real, "real")                                                                                                    \
-    X(String, "string")
+    X(ConstVal, "const_val")
+
+#define CONSTANT_VAL_LIST(X)                                                                                           \
+    X(ConstVal, "true", 1)                                                                                             \
+    X(ConstVal, "false", 0)                                                                                            \
+    X(ConstVal, "Infinity", Real::negativeInf())                                                                       \
+    X(ConstVal, "NaN", Real::signalingNan())
 
     enum class TokenType {
-#define TOKEN_TYPE_ENUM(NAME, SYMBOL) NAME,
         None,
-        TOKEN_SYMBOL_PAIR_ENUM(TOKEN_TYPE_ENUM)
-#undef TOKEN_TYPE_ENUM
+#define LIST_TO_ENUM(NAME, IGNORE) NAME,
+        SYMBOL_LIST(LIST_TO_ENUM) KEYWORD_LIST(LIST_TO_ENUM) TOKEN_SYMBOL_LIST(LIST_TO_ENUM)
+#undef LIST_TO_ENUM
     };
 
     static constexpr auto S_TypeToName = frozen::make_unordered_map<TokenType, frozen::string>({
-#define TYPE_TO_NAME_PAIR(NAME, SYMBOL) { TokenType::NAME, SYMBOL },
-        TOKEN_SYMBOL_PAIR_ENUM(TYPE_TO_NAME_PAIR)
-#undef TYPE_TO_NAME_PAIR
+#define LIST_TO_NAME_PAIR(NAME, SYMBOL) { TokenType::NAME, SYMBOL },
+        SYMBOL_LIST(LIST_TO_NAME_PAIR) KEYWORD_LIST(LIST_TO_NAME_PAIR) TOKEN_SYMBOL_LIST(LIST_TO_NAME_PAIR)
+#undef LIST_TO_NAME_PAIR
     });
 
     static constexpr const char *tokenTypeToStr(const TokenType type) {
@@ -164,7 +175,7 @@ namespace cial::Syntax {
     struct Token {
         SourceLocation location{};
 
-        explicit Token() = default;
+        constexpr explicit Token() = default;
 
         constexpr explicit Token(const TokenType type) : _type(type) {}
 

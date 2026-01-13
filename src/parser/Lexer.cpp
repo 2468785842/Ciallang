@@ -656,51 +656,14 @@ bool Lexer::identifier(Token *&token) {
     if(name.isEmpty())
         return false;
 
-    static auto Keywords = []() -> auto {
-        std::unordered_map<String, Token> keywords{};
-        keywords.emplace("true"_str, Token{ TokenType::ConstVal, 1 });
-        keywords.emplace("false"_str, Token{ TokenType::ConstVal, 0 });
-        keywords.emplace("Infinity"_str, Token{ TokenType::ConstVal, Real::negativeInf() });
-        keywords.emplace("NaN"_str, Token{ TokenType::ConstVal, Real::signalingNan() });
-        keywords.emplace("null"_str, Token{ TokenType::Null });
-
-        keywords.emplace("import"_str, Token{ TokenType::Import });
-        keywords.emplace("export"_str, Token{ TokenType::Export });
-
-        keywords.emplace("debugger"_str, Token{ TokenType::Debugger });
-        keywords.emplace("property"_str, Token{ TokenType::Property });
-        keywords.emplace("setter"_str, Token{ TokenType::Setter });
-        keywords.emplace("getter"_str, Token{ TokenType::Getter });
-
-        keywords.emplace("function"_str, Token{ TokenType::Function });
-        keywords.emplace("class"_str, Token{ TokenType::Class });
-        keywords.emplace("extends"_str, Token{ TokenType::Extends });
-        keywords.emplace("with"_str, Token{ TokenType::With });
-        keywords.emplace("return"_str, Token{ TokenType::Return });
-
-        keywords.emplace("var"_str, Token{ TokenType::Var });
-        keywords.emplace("const"_str, Token{ TokenType::Const });
-
-        keywords.emplace("if"_str, Token{ TokenType::If });
-        keywords.emplace("else"_str, Token{ TokenType::Else });
-
-        keywords.emplace("int"_str, Token{ TokenType::Int });
-        keywords.emplace("real"_str, Token{ TokenType::Real });
-        keywords.emplace("string"_str, Token{ TokenType::String });
-
-        keywords.emplace("new"_str, Token{ TokenType::New });
-
-        keywords.emplace("do"_str, Token{ TokenType::Do });
-        keywords.emplace("while"_str, Token{ TokenType::While });
-        keywords.emplace("for"_str, Token{ TokenType::For });
-        keywords.emplace("continue"_str, Token{ TokenType::Continue });
-        keywords.emplace("break"_str, Token{ TokenType::Break });
-
-        keywords.emplace("switch"_str, Token{ TokenType::Switch });
-        keywords.emplace("case"_str, Token{ TokenType::Case });
-        keywords.emplace("default"_str, Token{ TokenType::Default });
-        return std::move(keywords);
-    }();
+    static std::unordered_map<String, Token> Keywords{
+#define LIST_TO_TOKEN_PAIR(SYMBOL, NAME, VALUE) { NAME##_str, Token{ TokenType::SYMBOL, VALUE } },
+        CONSTANT_VAL_LIST(LIST_TO_TOKEN_PAIR)
+#undef LIST_TO_TOKEN_PAIR
+#define LIST_TO_TOKEN_PAIR(SYMBOL, NAME) { NAME##_str, Token{ TokenType::SYMBOL } },
+            KEYWORD_LIST(LIST_TO_TOKEN_PAIR)
+#undef LIST_TO_TOKEN_PAIR
+    };
 
     // get keyword
     if(const auto it = Keywords.find(name); it != Keywords.end()) {
