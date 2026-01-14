@@ -20,6 +20,35 @@
 #include "runtime/Runtime.hpp"
 
 namespace cial::Syntax {
+    class LexemeGuard {
+    public:
+        explicit LexemeGuard(SourceFile &src) : _src(src) {
+            // save mark
+            _src.pushMark();
+            const auto [startColumn, startLine] = getCurrentRowCol();
+            _startCol = startColumn;
+            _startLine = startLine;
+        }
+
+        bool commit(Token &tok, const bool ok = true) const {
+            const auto [endCol, endLine] = getCurrentRowCol();
+            tok.location.start(_startLine, _startCol);
+            tok.location.end(endLine, endCol);
+            return ok;
+        }
+
+        void restoreMark() const { _src.restoreTopMark(); }
+
+        ~LexemeGuard() { _src.popMark(); }
+
+    private:
+        SourceFile &_src;
+        uint32_t _startLine, _startCol;
+
+        [[nodiscard]] std::pair<uint32_t, uint32_t> getCurrentRowCol() const {
+            return std::make_pair(_src.columnByIndex(_src.pos()), _src.lineByIndex(_src.pos())->line);
+        }
+    };
 
     class Lexer {
     public:
@@ -27,15 +56,13 @@ namespace cial::Syntax {
 
         explicit Lexer(SourceFile &sourceFile);
 
-        bool next(Token *&token);
+        bool next(Result &r, Token *&token);
 
-        void skipComment();
+        void skipComment(Result &r);
 
         bool takeOverToken(Token &token);
 
         [[nodiscard]] bool hasNext() const;
-
-        [[nodiscard]] const Result &result() const;
 
         [[nodiscard]] size_t tokenSize() const { return _tokens.size(); }
 
@@ -47,12 +74,9 @@ namespace cial::Syntax {
         }
 
     private:
-        static std::multimap<std::uint8_t, LexerCaseCallable> S_Cases;
-
         SourceFile &_sourceFile;
 
         std::deque<Token *> _tokens{};
-        Result _result{};
         bool _hasNext = true;
 
         template <typename... Args>
@@ -63,43 +87,40 @@ namespace cial::Syntax {
 
         void rewindOneChar() const;
 
-        String readIdentifier();
+        String readIdentifier(Result &r) const;
 
-        bool lineTerminator(Token *&);
+        bool match(Result &r, const String &literal) const;
 
-        void setTokenLocation(Token *&) const;
+        int32_t read(Result &r, bool skipWhitespace = true) const;
 
-        [[nodiscard]] std::pair<uint32_t, uint32_t> getCurrentRowCol() const;
-
-        bool match(const String &literal);
+        bool lineTerminator(Result &r, Token *&token);
 
         bool matchOperator(Token *&token);
 
-        bool octetLiteral(Token *&);
+        bool octetLiteral(Result &r, Token *&token);
 
-        bool lineComment(Token *&);
+        bool lineComment(Result &r, Token *&token);
 
-        bool blockComment(Token *&);
+        bool blockComment(Result &r, Token *&token);
 
-        bool numberConstVal(Token *&);
+        bool numberConstVal(Result &r, Token *&token);
 
-        bool stringConstVal(Token *&);
+        bool stringConstVal(Result &r, Token *&token);
 
-        bool templateStringConstVal(Token *&);
+        bool templateStringConstVal(Result &r, Token *&token);
 
-        bool parseNonDecimalNumber(Token *&, std::stringstream &, std::int8_t (*)(char), std::int8_t);
+        bool parseNonDecimalNumber(Result &r, Token *&token, std::stringstream &, std::int8_t (*)(char), std::int8_t);
 
-        bool parseNonDecimalInteger(Token *&, const std::string &, std::int8_t (*)(char), std::int8_t);
+        bool parseNonDecimalInteger(Result &r, Token *&token, const std::string &, std::int8_t (*)(char), std::int8_t);
 
-        void parseNonDecimalReal(Token *&, const std::string &, std::int8_t (*)(char), std::int8_t);
+        void parseNonDecimalReal(Result &r, Token *&token, const std::string &, std::int8_t (*)(char), std::int8_t);
 
-        void extractNumber(std::int8_t (*)(char), const std::string &expMark, std::stringstream &, bool &);
+        void extractNumber(Result &r, std::int8_t (*)(char), const std::string &expMark, std::stringstream &,
+                           bool &) const;
 
-        bool identifier(Token *&);
+        bool identifier(Result &r, Token *&);
 
-        int32_t read(bool skipWhitespace = true);
-
-        StringParseState internalStringParser(Token *&token, char delimiter, bool *templateOver = nullptr,
+        StringParseState internalStringParser(Result &r, Token *&token, char delimiter, bool *templateOver = nullptr,
                                               bool templateMode = false);
 
 

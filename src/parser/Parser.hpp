@@ -92,14 +92,14 @@ namespace cial::Syntax {
          * @see peek
          * @return have token? if not return false, otherwise return true
          */
-        bool consume();
+        bool consume(Result &r);
 
         /**
          * consume a token, will get token from lexer then pop from deque
          *
          * @return have token? if not return false, otherwise return true
          */
-        bool consume(Token &token);
+        bool consume(Result &r, Token &token);
 
         /**
          * Gets the current token at the top of the lexer's deque, returning a pointer.
@@ -108,13 +108,13 @@ namespace cial::Syntax {
          *
          * @return have token? if not return false, otherwise return true
          */
-        bool current(Token *&token);
+        bool current(Result &r, Token *&token);
 
-        bool lookAhead(size_t count);
+        bool lookAhead(Result &r, size_t count);
 
-        bool peek(TokenType tokenType);
+        bool peek(Result &r, TokenType tokenType);
 
-        void synchronize();
+        void synchronize(Result &r);
 
         AstNode *parse(Result &r);
 
@@ -135,7 +135,7 @@ namespace cial::Syntax {
         AstBuilder _astBuilder{};
         SourceFile &_sourceFile;
 
-        Precedence nextInfixPrecedence(bool enableCommaExpr);
+        Precedence nextInfixPrecedence(Result &r, bool enableCommaExpr);
 
         static const DeclParser *declParserFor(TokenType type);
 

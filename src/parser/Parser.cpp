@@ -14,7 +14,6 @@
 
 #include "Parser.hpp"
 
-#include "logging/Logger.hpp"
 #include "parser/ast/DeclNode.hpp"
 #include "parser/ast/ExprNode.hpp"
 #include "parser/ast/StmtNode.hpp"
@@ -46,10 +45,10 @@ namespace cial::Syntax {
     static bool parseArguments(Result &r, Parser *parser, ProcCallExprNode *node) {
         bool expectArgument = true;
 
-        while(!parser->peek(TokenType::RParenthesis)) {
+        while(!parser->peek(r, TokenType::RParenthesis)) {
             if(expectArgument) {
                 // 检查当前token是否为逗号
-                if(parser->peek(TokenType::Comma)) {
+                if(parser->peek(r, TokenType::Comma)) {
                     // 遇到逗号，添加隐式void参数
                     node->arguments.push_back(parser->astBuilder()->makeNode<ValueExprNode>(Token{}));
 
@@ -87,25 +86,25 @@ namespace cial::Syntax {
         if(!parser->expect(r, TokenType::LParenthesis))
             return false;
 
-        if(parser->peek(TokenType::RParenthesis)) {
-            parser->consume();
+        if(parser->peek(r, TokenType::RParenthesis)) {
+            parser->consume(r);
             return true;
         }
 
         for(;;) {
-            if(!parser->peek(TokenType::Identifier)) {
+            if(!parser->peek(r, TokenType::Identifier)) {
                 parser->error(r, "function parameter expect a identifier", location);
                 return false;
             }
             Token identifier{};
-            parser->consume(identifier);
+            parser->consume(r, identifier);
 
             // default value
             ExprNode *expr = nullptr;
-            if(parser->peek(TokenType::Assignment)) {
-                parser->consume();
+            if(parser->peek(r, TokenType::Assignment)) {
+                parser->consume(r);
                 Token *assignmentToken{};
-                parser->current(assignmentToken);
+                parser->current(r, assignmentToken);
                 expr = parser->parseExpression(r, false);
                 if(!expr)
                     return false;
@@ -113,8 +112,8 @@ namespace cial::Syntax {
 
             parameters.emplace_back(std::move(identifier), expr);
 
-            if(parser->peek(TokenType::RParenthesis)) {
-                parser->consume();
+            if(parser->peek(r, TokenType::RParenthesis)) {
+                parser->consume(r);
                 break;
             }
 
@@ -125,10 +124,10 @@ namespace cial::Syntax {
         return true;
     }
 
-    bool Parser::lookAhead(const size_t count) {
+    bool Parser::lookAhead(Result &r, const size_t count) {
         while(count > _lexer.tokenSize() && _lexer.hasNext()) {
             Token *token{ nullptr };
-            if(!_lexer.next(token))
+            if(!_lexer.next(r, token))
                 break;
 
             if(token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment) {
@@ -138,28 +137,28 @@ namespace cial::Syntax {
         return _lexer.tokenSize() != 0;
     }
 
-    bool Parser::peek(const TokenType tokenType) {
-        if(!lookAhead(1))
+    bool Parser::peek(Result &r, const TokenType tokenType) {
+        if(!lookAhead(r, 1))
             return false;
         Token *token;
         _lexer.peekToken(token);
         return token->type() == tokenType;
     }
 
-    bool Parser::consume() {
+    bool Parser::consume(Result &r) {
         Token token{};
-        return consume(token);
+        return consume(r, token);
     }
 
-    bool Parser::consume(Token &token) {
-        if(!lookAhead(1))
+    bool Parser::consume(Result &r, Token &token) {
+        if(!lookAhead(r, 1))
             return false;
 
         return _lexer.takeOverToken(token);
     }
 
-    bool Parser::current(Token *&token) {
-        if(!lookAhead(1))
+    bool Parser::current(Result &r, Token *&token) {
+        if(!lookAhead(r, 1))
             return false;
 
         _lexer.peekToken(token);
@@ -168,7 +167,7 @@ namespace cial::Syntax {
     }
 
     bool Parser::expect(Result &r, const TokenType tokenType) {
-        if(!lookAhead(1))
+        if(!lookAhead(r, 1))
             return false;
 
         std::string expectedName = tokenTypeToStr(tokenType);
@@ -191,8 +190,8 @@ namespace cial::Syntax {
      * 获取下一个Token优先级
      * @return Token优先级
      */
-    Precedence Parser::nextInfixPrecedence(const bool enableCommaExpr) {
-        if(lookAhead(1)) {
+    Precedence Parser::nextInfixPrecedence(Result &r, const bool enableCommaExpr) {
+        if(lookAhead(r, 1)) {
             Token *token;
             _lexer.peekToken(token);
             if(const auto infixParser = infixParserFor(token->type(), enableCommaExpr))
@@ -201,10 +200,10 @@ namespace cial::Syntax {
         return Precedence::lowest;
     }
 
-    void Parser::synchronize() {
-        while(lookAhead(1)) {
+    void Parser::synchronize(Result &r) {
+        while(lookAhead(r, 1)) {
             Token *token{};
-            if(!current(token))
+            if(!current(r, token))
                 return;
 
             switch(token->type()) {
@@ -218,7 +217,7 @@ namespace cial::Syntax {
                 case TokenType::Return:
                     return;
                 default:
-                    if(!consume())
+                    if(!consume(r))
                         return;
             }
         }
@@ -233,14 +232,15 @@ namespace cial::Syntax {
     bool Parser::parseScope(Result &r, BlockStmtNode *blockStmtNode, const TokenType terminatorToken) {
         bool success = true;
         while(_lexer.hasNext()) {
-            if(peek(terminatorToken))
+            if(peek(r, terminatorToken))
                 break;
             auto *statement = parseDeclaration(r);
 
             // error sync
             if(!statement) {
                 success = false;
-                synchronize();
+                consume(r);
+                synchronize(r);
                 continue;
             }
 
@@ -251,12 +251,12 @@ namespace cial::Syntax {
 
     DeclNode *Parser::parseDeclaration(Result &r) {
         Token *token{};
-        if(!current(token))
+        if(!current(r, token))
             return nullptr;
 
         if(const auto *declParser = declParserFor(token->type())) {
             Token t{};
-            consume(t);
+            consume(r, t);
             return declParser->parse(r, this, &t);
         }
 
@@ -269,7 +269,7 @@ namespace cial::Syntax {
 
     ExprNode *Parser::parseExpression(Result &r, const bool enableCommaExpr, const Precedence pre) {
         Token token{};
-        if(!consume(token))
+        if(!consume(r, token))
             return nullptr;
 
         // 前缀
@@ -287,8 +287,8 @@ namespace cial::Syntax {
         }
 
         // 中缀
-        while(pre < nextInfixPrecedence(enableCommaExpr)) {
-            if(!consume(token))
+        while(pre < nextInfixPrecedence(r, enableCommaExpr)) {
+            if(!consume(r, token))
                 break;
 
             const auto infixParser = infixParserFor(token.type(), enableCommaExpr);
@@ -318,12 +318,12 @@ namespace cial::Syntax {
         Token *token{};
 
         // just peek
-        if(!current(token))
+        if(!current(r, token))
             return nullptr;
 
         if(const auto stmtParser = stmtParserFor(token->type())) {
             Token t{};
-            consume(t);
+            consume(r, t);
             return stmtParser->parse(r, this, token);
         }
 
@@ -379,30 +379,30 @@ namespace cial::Syntax {
 
     DeclNode *PropertyDeclParser::parse(Result &r, Parser *parser, Token *token) const {
         Token identifier{};
-        if(!parser->consume(identifier))
+        if(!parser->consume(r, identifier))
             return nullptr;
 
         auto *propertyDeclNode = parser->astBuilder()->makeNode<PropertyDeclNode>(identifier);
 
-        if(!parser->peek(TokenType::LeftCurlyBrace)) {
+        if(!parser->peek(r, TokenType::LeftCurlyBrace)) {
             parser->error(r, "property expect {", token->location);
             return nullptr;
         }
-        parser->consume();
+        parser->consume(r);
 
         FunctionDeclNode *setter{ nullptr };
         FunctionDeclNode *getter{ nullptr };
 
-        while(!parser->peek(TokenType::RightCurlyBrace)) {
+        while(!parser->peek(r, TokenType::RightCurlyBrace)) {
 
-            if(parser->peek(TokenType::Setter)) {
+            if(parser->peek(r, TokenType::Setter)) {
                 if(setter) {
                     parser->error(r, "setter already defined", setter->location);
                     return nullptr;
                 }
 
                 Token setterToken;
-                parser->consume(setterToken);
+                parser->consume(r, setterToken);
 
                 Parameters params;
                 if(!parseParameters(r, parser, params, setterToken.location)) {
@@ -419,11 +419,11 @@ namespace cial::Syntax {
                     return nullptr;
                 }
 
-                if(!parser->peek(TokenType::LeftCurlyBrace)) {
+                if(!parser->peek(r, TokenType::LeftCurlyBrace)) {
                     parser->error(r, "setter expect token '{'", setterToken.location);
                     return nullptr;
                 }
-                parser->consume();
+                parser->consume(r);
 
                 setter = parser->astBuilder()->makeNode<FunctionDeclNode>(setterToken);
                 setter->parameters = std::move(params);
@@ -433,34 +433,34 @@ namespace cial::Syntax {
                     return nullptr;
                 }
 
-                if(!parser->peek(TokenType::RightCurlyBrace)) {
+                if(!parser->peek(r, TokenType::RightCurlyBrace)) {
                     parser->error(r, "setter expected token '}'", token->location);
                     return nullptr;
                 }
-                parser->consume();
+                parser->consume(r);
                 continue;
             }
 
-            if(parser->peek(TokenType::Getter)) {
+            if(parser->peek(r, TokenType::Getter)) {
                 if(getter) {
                     parser->error(r, "getter already defined", getter->location);
                     return nullptr;
                 }
                 Token getterToken;
-                parser->consume(getterToken);
+                parser->consume(r, getterToken);
 
-                if(parser->peek(TokenType::LParenthesis)) {
-                    parser->consume();
+                if(parser->peek(r, TokenType::LParenthesis)) {
+                    parser->consume(r);
                     if(!parser->expect(r, TokenType::RParenthesis))
                         return nullptr;
                 }
 
-                if(!parser->peek(TokenType::LeftCurlyBrace)) {
+                if(!parser->peek(r, TokenType::LeftCurlyBrace)) {
                     parser->error(r, "getter expect token '{'", getterToken.location);
                     return nullptr;
                 }
 
-                parser->consume();
+                parser->consume(r);
 
                 getter = parser->astBuilder()->makeNode<FunctionDeclNode>(getterToken);
                 getter->body = parser->astBuilder()->makeNode<BlockStmtNode>();
@@ -469,23 +469,23 @@ namespace cial::Syntax {
                     return nullptr;
                 }
 
-                if(!parser->peek(TokenType::RightCurlyBrace)) {
+                if(!parser->peek(r, TokenType::RightCurlyBrace)) {
                     parser->error(r, "getter expected token '}'", token->location);
                     return nullptr;
                 }
-                parser->consume();
+                parser->consume(r);
 
                 continue;
             }
 
             Token *t{};
-            parser->current(t);
+            parser->current(r, t);
             parser->error(r, "expect getter or setter", t->location);
             return nullptr;
         }
 
         Token end;
-        if(!parser->consume(end) || end != TokenType::RightCurlyBrace) {
+        if(!parser->consume(r, end) || end != TokenType::RightCurlyBrace) {
             parser->error(r, "property expect }", token->location);
             return nullptr;
         }
@@ -500,23 +500,23 @@ namespace cial::Syntax {
 
     DeclNode *VarDeclParser::parse(Result &r, Parser *parser, Token *token) const {
         VarDeclNode *varDeclNode{ nullptr };
-        if(!parser->peek(TokenType::Identifier))
+        if(!parser->peek(r, TokenType::Identifier))
             return nullptr;
 
         Token identifier;
-        parser->consume(identifier);
+        parser->consume(r, identifier);
         const auto line = identifier.location;
 
-        if(parser->peek(TokenType::SemiColon)) {
-            parser->consume();
+        if(parser->peek(r, TokenType::SemiColon)) {
+            parser->consume(r);
             varDeclNode = parser->astBuilder()->makeNode<VarDeclNode>(identifier, nullptr, nullptr);
             varDeclNode->location = line;
             return varDeclNode;
         }
 
         ExprNode *rhs{};
-        if(parser->peek(TokenType::Assignment)) {
-            parser->consume();
+        if(parser->peek(r, TokenType::Assignment)) {
+            parser->consume(r);
             rhs = parser->parseExpression(r, false);
 
             if(!rhs)
@@ -524,8 +524,8 @@ namespace cial::Syntax {
         }
 
         VarDeclNode *varDecl{};
-        if(parser->peek(TokenType::Comma)) {
-            parser->consume();
+        if(parser->peek(r, TokenType::Comma)) {
+            parser->consume(r);
             varDecl = dynamic_cast<VarDeclNode *>(parse(r, parser, token));
             if(!varDecl)
                 return nullptr;
@@ -545,7 +545,7 @@ namespace cial::Syntax {
 
     DeclNode *FunctionDeclParser::parse(Result &r, Parser *parser, Token *token) const {
         Token identifier{};
-        if(!parser->consume(identifier))
+        if(!parser->consume(r, identifier))
             return nullptr;
 
         auto *functionDeclNode = parser->astBuilder()->makeNode<FunctionDeclNode>(identifier);
@@ -553,13 +553,13 @@ namespace cial::Syntax {
         // it's ok
         // function a {
         // }
-        if(parser->peek(TokenType::LParenthesis)) {
+        if(parser->peek(r, TokenType::LParenthesis)) {
             if(!parseParameters(r, parser, functionDeclNode->parameters, token->location)) {
                 return nullptr;
             }
         }
 
-        if(!parser->peek(TokenType::LeftCurlyBrace)) {
+        if(!parser->peek(r, TokenType::LeftCurlyBrace)) {
             parser->error(r, "function expect {", token->location);
             return nullptr;
         }
@@ -577,16 +577,16 @@ namespace cial::Syntax {
 
     DeclNode *ClassDeclParser::parse(Result &r, Parser *parser, Token *token) const {
         Token identifier{};
-        if(!parser->consume(identifier))
+        if(!parser->consume(r, identifier))
             return nullptr;
 
         auto *classDeclNode = parser->astBuilder()->makeNode<ClassDeclNode>(identifier);
 
         Vec<IdentifierExprNode *> extends{};
-        if(parser->peek(TokenType::Extends)) {
-            parser->consume();
+        if(parser->peek(r, TokenType::Extends)) {
+            parser->consume(r);
 
-            while(!parser->peek(TokenType::LeftCurlyBrace)) {
+            while(!parser->peek(r, TokenType::LeftCurlyBrace)) {
                 auto *exprNode = dynamic_cast<IdentifierExprNode *>(parser->parseExpression(r, false));
                 if(!exprNode) {
                     parser->error(r, "class extends must be identifier", identifier.location);
@@ -598,18 +598,18 @@ namespace cial::Syntax {
             classDeclNode->extends = std::move(extends);
         }
 
-        if(!parser->peek(TokenType::LeftCurlyBrace)) {
+        if(!parser->peek(r, TokenType::LeftCurlyBrace)) {
             parser->error(r, "class expect {", token->location);
             return nullptr;
         }
 
-        parser->consume();
+        parser->consume(r);
 
         FunctionDeclNode *constructor{};
         Vec<VarDeclNode *> varDeclVec{};
         Vec<FunctionDeclNode *> funcDeclVec{};
 
-        while(!parser->peek(TokenType::RightCurlyBrace)) {
+        while(!parser->peek(r, TokenType::RightCurlyBrace)) {
             auto *stmt = parser->parseDeclaration(r);
             if(!stmt)
                 return nullptr;
@@ -637,8 +637,8 @@ namespace cial::Syntax {
         }
 
         Token end;
-        if(parser->peek(TokenType::RightCurlyBrace)) {
-            parser->consume(end);
+        if(parser->peek(r, TokenType::RightCurlyBrace)) {
+            parser->consume(r, end);
         } else {
             parser->error(r, "class expect }", token->location);
             return nullptr;
@@ -664,14 +664,14 @@ namespace cial::Syntax {
             return nullptr;
         }
 
-        if(!parser->peek(TokenType::RightCurlyBrace)) {
+        if(!parser->peek(r, TokenType::RightCurlyBrace)) {
             parser->error(r, "scope expected token '}'", token->location);
 
             return nullptr;
         }
 
         Token terminatorToken{};
-        parser->consume(terminatorToken);
+        parser->consume(r, terminatorToken);
 
         scope->location.end(terminatorToken.location.end());
         return scope;
@@ -700,9 +700,9 @@ namespace cial::Syntax {
         ifNode->location.start(token->location.start());
         ifNode->location.end(ifNode->body->location.end());
 
-        if(parser->peek(TokenType::Else)) {
+        if(parser->peek(r, TokenType::Else)) {
             Token elseToken{};
-            parser->consume(elseToken);
+            parser->consume(r, elseToken);
 
             auto *elseBody = parser->parseStatement(r, true);
 
@@ -735,17 +735,17 @@ namespace cial::Syntax {
         auto *scope = parser->astBuilder()->makeNode<BlockStmtNode>();
         scope->location.start(test->location.end());
 
-        if(!parser->peek(TokenType::LeftCurlyBrace)) {
+        if(!parser->peek(r, TokenType::LeftCurlyBrace)) {
             parser->error(r, "switch expected token '{'", token->location);
             return nullptr;
         }
 
-        parser->consume();
+        parser->consume(r);
 
         Vec<ExprNode *> matchCases;
 
-        while(parser->peek(TokenType::Case)) {
-            parser->consume();
+        while(parser->peek(r, TokenType::Case)) {
+            parser->consume(r);
             auto *node = parser->parseExpression(r, true);
             if(!node) {
                 parser->error(r, "case expected expression", token->location);
@@ -754,19 +754,19 @@ namespace cial::Syntax {
 
             matchCases.push_back(node);
 
-            if(!parser->peek(TokenType::Colon)) {
+            if(!parser->peek(r, TokenType::Colon)) {
                 parser->error(r, "case expected ':'", token->location);
                 return nullptr;
             }
 
             Token colonToken{};
-            parser->consume(colonToken);
+            parser->consume(r, colonToken);
 
             auto *caseScope = parser->astBuilder()->makeNode<BlockStmtNode>();
             caseScope->location.start(colonToken.location.start());
 
-            while(!parser->peek(TokenType::Case) && !parser->peek(TokenType::Default) &&
-                  !parser->peek(TokenType::RightCurlyBrace)) {
+            while(!parser->peek(r, TokenType::Case) && !parser->peek(r, TokenType::Default) &&
+                  !parser->peek(r, TokenType::RightCurlyBrace)) {
                 DeclNode *declNode = parser->parseDeclaration(r);
                 if(!declNode)
                     return nullptr;
@@ -783,19 +783,19 @@ namespace cial::Syntax {
             matchCases = {};
         }
 
-        if(parser->peek(TokenType::Default)) {
+        if(parser->peek(r, TokenType::Default)) {
             Token defaultToken{};
-            parser->consume(defaultToken);
+            parser->consume(r, defaultToken);
 
-            if(!parser->peek(TokenType::Colon)) {
+            if(!parser->peek(r, TokenType::Colon)) {
                 parser->error(r, "switch default branch expected ':'", defaultToken.location);
                 return nullptr;
             }
-            parser->consume();
+            parser->consume(r);
 
             auto *defaultScope = parser->astBuilder()->makeNode<BlockStmtNode>();
 
-            while(!parser->peek(TokenType::RightCurlyBrace)) {
+            while(!parser->peek(r, TokenType::RightCurlyBrace)) {
                 DeclNode *declNode = parser->parseDeclaration(r);
                 if(!declNode)
                     return nullptr;
@@ -805,7 +805,7 @@ namespace cial::Syntax {
         }
 
         Token closeToken{};
-        parser->consume(closeToken);
+        parser->consume(r, closeToken);
 
         if(closeToken != TokenType::RightCurlyBrace) {
             return nullptr;
@@ -847,7 +847,7 @@ namespace cial::Syntax {
             return nullptr;
 
         DeclNode *initDecl{ nullptr };
-        if(!parser->peek(TokenType::SemiColon)) {
+        if(!parser->peek(r, TokenType::SemiColon)) {
             auto *expr = parser->parseExpression(r, true);
             if(!expr)
                 return nullptr;
@@ -857,7 +857,7 @@ namespace cial::Syntax {
             return nullptr;
 
         ExprNode *condExpr{ nullptr };
-        if(!parser->peek(TokenType::SemiColon)) {
+        if(!parser->peek(r, TokenType::SemiColon)) {
             condExpr = parser->parseExpression(r, true);
             if(!condExpr)
                 return nullptr;
@@ -866,7 +866,7 @@ namespace cial::Syntax {
             return nullptr;
 
         ExprNode *stepExpr{ nullptr };
-        if(!parser->peek(TokenType::RParenthesis)) {
+        if(!parser->peek(r, TokenType::RParenthesis)) {
             stepExpr = parser->parseExpression(r, true);
             if(!stepExpr)
                 return nullptr;
@@ -928,7 +928,7 @@ namespace cial::Syntax {
     }
 
     StmtNode *ReturnStmtParser::parse(Result &r, Parser *parser, Token *token) const {
-        if(!parser->peek(TokenType::SemiColon)) {
+        if(!parser->peek(r, TokenType::SemiColon)) {
             const auto expr = parser->parseExpression(r, true);
 
             if(!parser->expect(r, TokenType::SemiColon))
@@ -986,7 +986,7 @@ namespace cial::Syntax {
 
         const auto procCallExprNode = parser->astBuilder()->makeNode<ProcCallExprNode>(lhs);
 
-        if(!parser->peek(TokenType::RParenthesis)) {
+        if(!parser->peek(r, TokenType::RParenthesis)) {
             if(!parseArguments(r, parser, procCallExprNode)) {
                 return nullptr;
             }
@@ -1040,13 +1040,13 @@ namespace cial::Syntax {
         // it's ok
         // function {
         // }
-        if(parser->peek(TokenType::LParenthesis)) {
+        if(parser->peek(r, TokenType::LParenthesis)) {
             if(!parseParameters(r, parser, functionExprNode->parameters, token->location)) {
                 return nullptr;
             }
         }
 
-        if(!parser->peek(TokenType::LeftCurlyBrace)) {
+        if(!parser->peek(r, TokenType::LeftCurlyBrace)) {
             parser->error(r, "function expect {", token->location);
             return nullptr;
         }
