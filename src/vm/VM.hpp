@@ -145,7 +145,7 @@ namespace cial {
             }
             assert(!r.isFailed());
 
-            Syntax::Parser parser{ sourceFile };
+            Syntax::Parser parser{ sourceFile, _vmState->context.pp };
 
             Syntax::AstNode *node = parser.parse(r);
             assert(!r.isFailed());
@@ -196,7 +196,7 @@ namespace cial {
             sourceFile.load(r, expr.toStdStr());
             assert(!r.isFailed());
 
-            Syntax::Parser parser{ sourceFile };
+            Syntax::Parser parser{ sourceFile, _vmState->context.pp };
 
             Syntax::ExprNode *node = parser.parseExpression(r, true);
             assert(!r.isFailed());

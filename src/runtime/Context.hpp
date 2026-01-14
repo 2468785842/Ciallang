@@ -24,6 +24,7 @@
 #include "vm/FastRegisterPool.hpp"
 
 #include "gc/gc.hpp"
+#include "parser/PreProcessor.hpp"
 
 #include "types/Object.hpp"
 #include "types/Value.hpp"
@@ -36,6 +37,7 @@ namespace cial {
     class Context {
     public:
         Runtime &rt;
+        PreProcessor pp{};
         Map<Atom, Value> gObj{};
         NativeRegister nativeRegister{ rt };
 

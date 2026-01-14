@@ -31,7 +31,13 @@ namespace cial {
 
         String(const String &str) : String(str.getData(), str.length()) {}
 
-        String &operator=(const String &str) = delete;
+        String &operator=(const String &str) {
+            if(this != &str) {
+                this->~String();
+                new(this) String(str);
+            }
+            return *this;
+        }
 
         void append(const String &str);
 
@@ -53,6 +59,8 @@ namespace cial {
                 return false;
             return std::memcmp(getData(), str.getData(), _len) == 0;
         }
+
+        char operator[](const std::uint32_t index) const { return getData()[index]; }
 
         friend std::ostream &operator<<(std::ostream &os, const String &d) { return os.write(d.getData(), d.length()); }
 

@@ -15,6 +15,7 @@ set(SOURCES
         expression_test.cpp
         function_test.cpp
         native_function_test.cpp
+        preprocessor_test.cpp
         #        ieee_test.cpp
         interpreter_test.cpp
         #        integration_test.cpp

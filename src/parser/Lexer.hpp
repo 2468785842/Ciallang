@@ -14,10 +14,12 @@
 
 #pragma once
 
+#include "PreProcessor.hpp"
 #include "Token.hpp"
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
 #include "runtime/Runtime.hpp"
+// #include "PreProcessor.hpp"
 
 namespace cial::Syntax {
     class LexemeGuard {
@@ -54,7 +56,7 @@ namespace cial::Syntax {
     public:
         using LexerCaseCallable = std::function<bool(Lexer *, Token *&)>;
 
-        explicit Lexer(SourceFile &sourceFile);
+        explicit Lexer(SourceFile &sourceFile, PreProcessor &preProcessor);
 
         bool next(Result &r, Token *&token);
 
@@ -75,9 +77,11 @@ namespace cial::Syntax {
 
     private:
         SourceFile &_sourceFile;
+        PreProcessor &_preProcessor;
 
         std::deque<Token *> _tokens{};
-        bool _hasNext = true;
+        bool _hasNext{ true };
+        bool _disablePreProcess{ false };
 
         template <typename... Args>
         Token *makeToken(Args &&...args) {
@@ -92,6 +96,10 @@ namespace cial::Syntax {
         bool match(Result &r, const String &literal) const;
 
         int32_t read(Result &r, bool skipWhitespace = true) const;
+
+        bool readParenExpr(Result &r, std::string &out) const;
+
+        bool processor(Result &r) const;
 
         bool lineTerminator(Result &r, Token *&token);
 

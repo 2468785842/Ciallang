@@ -23,7 +23,8 @@
 
 using namespace cial::Syntax;
 
-Lexer::Lexer(SourceFile &sourceFile) : _sourceFile(sourceFile) {}
+Lexer::Lexer(SourceFile &sourceFile, PreProcessor &preProcessor) :
+    _sourceFile(sourceFile), _preProcessor(preProcessor) {}
 
 bool Lexer::hasNext() const { return _hasNext; }
 
@@ -75,10 +76,24 @@ void Lexer::rewindOneChar() const {
  *                     failed  -> false
  */
 bool Lexer::next(Result &r, Token *&token) {
-    // 向前看一个字符
-    const auto rune = read(r);
 
-    DEFER { _hasNext = rune != runeEof; };
+    DEFER { _hasNext = !_sourceFile.eof(); };
+
+    // peek an unicode
+    int32_t rune = read(r);
+    rewindOneChar();
+
+    // preprocessor
+    if(rune == '@') {
+        while(!_sourceFile.eof()) {
+            if(!_disablePreProcess && processor(r)) {
+                continue;
+            }
+            break;
+        }
+    }
+
+    rune = read(r);
 
     if(rune == runeInvalid) {
         const LexemeGuard guard{ _sourceFile };
@@ -98,7 +113,6 @@ bool Lexer::next(Result &r, Token *&token) {
         return true;
     }
 
-    // 指针rollback
     rewindOneChar();
 
     if(isRuneLetter(rune)) {
@@ -155,11 +169,17 @@ bool Lexer::next(Result &r, Token *&token) {
                 break;
             // block comment, line comment
             case '/':
-                if(lineComment(r, token))
+                _disablePreProcess = true;
+                if(lineComment(r, token)) {
+                    _disablePreProcess = false;
                     return guard.commit(*token);
+                }
                 guard.restoreMark();
-                if(blockComment(r, token))
+                if(blockComment(r, token)) {
+                    _disablePreProcess = false;
                     return guard.commit(*token);
+                }
+                _disablePreProcess = false;
                 guard.restoreMark();
                 if(matchOperator(token))
                     return guard.commit(*token);
@@ -177,12 +197,20 @@ bool Lexer::next(Result &r, Token *&token) {
                 break;
             case '\'':
             case '"':
-                if(stringConstVal(r, token))
+                _disablePreProcess = true;
+                if(stringConstVal(r, token)) {
+                    _disablePreProcess = false;
                     return guard.commit(*token);
+                }
+                _disablePreProcess = false;
                 break;
             case '@':
-                if(templateStringConstVal(r, token))
+                _disablePreProcess = true;
+                if(templateStringConstVal(r, token)) {
+                    _disablePreProcess = false;
                     return guard.commit(*token);
+                }
+                _disablePreProcess = false;
                 break;
             default:;
         }
@@ -193,12 +221,83 @@ bool Lexer::next(Result &r, Token *&token) {
     return guard.commit(*token, false);
 }
 
+bool Lexer::readParenExpr(Result &r, std::string &out) const {
+    int depth = 1;
+
+    while(!_sourceFile.eof()) {
+        const uint32_t c = read(r);
+        if(c >= 0x80)
+            return false;
+
+        if(c == '(')
+            depth++;
+        else if(c == ')') {
+            if(--depth == 0)
+                return true;
+        }
+
+        out.push_back(static_cast<char>(c));
+    }
+    return false; // EOF before ')'
+}
+
+bool Lexer::processor(Result &r) const {
+
+    if(read(r) == '@') {
+
+        // ---------- @set ----------
+        if(match(r, "set"_str)) {
+            if(read(r) != '(')
+                return false;
+
+            std::string expr;
+            if(!readParenExpr(r, expr))
+                return false;
+
+            _preProcessor.onSet(String{ expr });
+            return true;
+        }
+
+        // ---------- @if ----------
+        if(match(r, "if"_str)) {
+            if(read(r) != '(')
+                return false;
+
+            std::string expr;
+            if(!readParenExpr(r, expr))
+                return false;
+
+            _preProcessor.onIf(String{ expr });
+            return true;
+        }
+
+        // ---------- @endif ----------
+        if(match(r, "endif"_str)) {
+            _preProcessor.onEndIf();
+            return true;
+        }
+    } else {
+        rewindOneChar();
+    }
+
+    // ---------- 普通脚本 ----------
+    if(!_preProcessor.isEnabled()) {
+        read(r);
+        return true;
+    }
+
+    return false;
+}
+
 void Lexer::skipComment(Result &r) {
-    Token *token{ nullptr };
+    Token *token{};
+    const LexemeGuard guard{ _sourceFile };
 
     while(hasNext()) {
-        if(!next(r, token))
+        if(!next(r, token)) {
+            guard.restoreMark();
             break;
+        }
 
         if(token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment) {
             takeOverToken(*token);
@@ -323,17 +422,17 @@ bool Lexer::lineComment(Result &r, Token *&token) {
  */
 bool Lexer::blockComment(Result &r, Token *&token) {
     if(match(r, "/*"_str)) {
-        auto block_count = 1;
+        auto blockCount = 1;
 
         while(!_sourceFile.eof()) {
             const int32_t ch = read(r);
             if(ch == '/' && read(r, false) == '*') {
-                block_count++;
+                blockCount++;
                 continue;
             }
 
             if(ch == '*' && read(r, false) == '/') {
-                if(--block_count == 0)
+                if(--blockCount == 0)
                     break;
             }
         }

@@ -24,6 +24,7 @@ find_package(fmt CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 set(SOURCE_FILES
+        src/parser/PreProcessor.cpp
         src/parser/Lexer.cpp
         src/parser/Parser.cpp
 
