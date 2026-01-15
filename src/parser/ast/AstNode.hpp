@@ -33,9 +33,13 @@ namespace cial::Syntax {
 
     class IdentifierExprNode;
 
+    class InternalIdentifierExprNode;
+
     class BinaryExprNode;
 
-    class UnaryExprNode;
+    class PrefixUnaryExprNode;
+
+    class SuffixUnaryExprNode;
 
     class ProcCallExprNode;
 
@@ -63,7 +67,7 @@ namespace cial::Syntax {
 
     class ReturnStmtNode;
 
-    class ConditionalTernaryExprNode;
+    class TernaryExprNode;
 
     class PropertyDeclNode;
 
@@ -123,9 +127,13 @@ namespace cial::Syntax {
 
         virtual void visit(const IdentifierExprNode *) = 0;
 
+        virtual void visit(const InternalIdentifierExprNode *) = 0;
+
         virtual void visit(const BinaryExprNode *) = 0;
 
-        virtual void visit(const UnaryExprNode *) = 0;
+        virtual void visit(const PrefixUnaryExprNode *) = 0;
+
+        virtual void visit(const SuffixUnaryExprNode *) = 0;
 
         virtual void visit(const ProcCallExprNode *) = 0;
 
@@ -153,6 +161,6 @@ namespace cial::Syntax {
 
         virtual void visit(const ReturnStmtNode *) = 0;
 
-        virtual void visit(const ConditionalTernaryExprNode *) = 0;
+        virtual void visit(const TernaryExprNode *) = 0;
     };
 } // namespace cial::Syntax

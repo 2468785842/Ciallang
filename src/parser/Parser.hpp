@@ -286,6 +286,12 @@ namespace cial::Syntax {
         ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    struct InternalIdentifierPrefixParser final : PrefixParser {
+        InternalIdentifierPrefixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     struct ParenthesizedPrefixParser final : PrefixParser {
         ParenthesizedPrefixParser() = default;
 
@@ -298,11 +304,11 @@ namespace cial::Syntax {
         ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
-
     static constinit ConstValPrefixParser S_ConstValPrefixParser{};
     static constinit UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
     static constinit IdentifierPrefixParser S_IdentifierPrefixParser;
     static constinit UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
+    static constinit InternalIdentifierPrefixParser S_InternalIdentifierPrefixParser;
     static constinit ParenthesizedPrefixParser S_ParenthesizedPrefixParser{};
     static constinit FunctionPrefixParser S_FunctionPrefixParser;
 
@@ -316,6 +322,9 @@ namespace cial::Syntax {
         { TokenType::Decrement, &S_PrefixParser }, // "--"
         { TokenType::Increment, &S_PrefixParser }, // "++"
         { TokenType::New, &S_PrefixParser }, // "new" 函数调用, 或创建新对象
+        { TokenType::Global, &S_InternalIdentifierPrefixParser },
+        { TokenType::Super, &S_InternalIdentifierPrefixParser },
+        { TokenType::This, &S_InternalIdentifierPrefixParser },
         { TokenType::Invalidate, &S_PrefixParser }, // "invalidate"
         { TokenType::Isvalid, &S_PrefixParser }, // "isvalid" todo: 注意还有中缀表示
         // incontextof_expr "isvalid"
@@ -365,8 +374,16 @@ namespace cial::Syntax {
         [[nodiscard]] Precedence precedence() const override { return Precedence::postfix; }
     };
 
-    struct ConditionalTernaryInfixParser final : InfixParser {
-        explicit ConditionalTernaryInfixParser() = default;
+    struct TernaryInfixParser final : InfixParser {
+        explicit TernaryInfixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const override;
+
+        [[nodiscard]] Precedence precedence() const override { return Precedence::postfix; }
+    };
+
+    struct UnaryInfixParser final : InfixParser {
+        explicit UnaryInfixParser() = default;
 
         ExprNode *parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const override;
 
@@ -385,7 +402,8 @@ namespace cial::Syntax {
         S_MemberAccessBinOpParser{ Precedence::postfix, false };
 
     static constinit ProcCallInfixParser S_ProcCallInfixParser{};
-    static constinit ConditionalTernaryInfixParser S_ConditionalTernaryBinOpParser{};
+    static constinit TernaryInfixParser S_ConditionalTernaryBinOpParser{};
+    static constinit UnaryInfixParser S_UnaryInfixParser{};
 
     static constinit auto S_InfixParsers = frozen::make_unordered_map<TokenType, const InfixParser *>({
         { TokenType::Comma, &S_OrderBinOpParser }, // ,
@@ -429,6 +447,8 @@ namespace cial::Syntax {
         { TokenType::LogicalAnd, &S_LogicalAndBinOpParser }, // &&
         { TokenType::LogicalOr, &S_LogicalOrBinOpParser }, // ||
         { TokenType::Dot, &S_MemberAccessBinOpParser }, // .
+        { TokenType::Decrement, &S_UnaryInfixParser }, // "--"
+        { TokenType::Increment, &S_UnaryInfixParser }, // "++"
         { TokenType::Question, &S_ConditionalTernaryBinOpParser }, // cond ? expr : expr
         { TokenType::LParenthesis, &S_ProcCallInfixParser } // ()
     });

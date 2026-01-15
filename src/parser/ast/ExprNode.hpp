@@ -49,6 +49,19 @@ namespace cial::Syntax {
         }
     };
 
+    class InternalIdentifierExprNode final : public ExprNode {
+    public:
+        InternalIdentifierExprNode() = delete;
+
+        explicit InternalIdentifierExprNode(const Token &token) : ExprNode(token, "internal_identifier") {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
+
     class BinaryExprNode final : public ExprNode {
     public:
         const ExprNode *lhs;
@@ -93,14 +106,33 @@ namespace cial::Syntax {
         }
     };
 
-    class UnaryExprNode final : public ExprNode {
+    class PrefixUnaryExprNode final : public ExprNode {
     public:
         const ExprNode *rhs;
 
-        UnaryExprNode() = delete;
+        PrefixUnaryExprNode() = delete;
 
-        explicit UnaryExprNode(const Token &token, const ExprNode *rhs) : ExprNode(token, "unary_operator"), rhs(rhs) {
+        explicit PrefixUnaryExprNode(const Token &token, const ExprNode *rhs) :
+            ExprNode(token, "prefix_unary_operator"), rhs(rhs) {
             location.end(rhs->location.end());
+        }
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
+
+    class SuffixUnaryExprNode final : public ExprNode {
+    public:
+        const ExprNode *lhs;
+
+        SuffixUnaryExprNode() = delete;
+
+        explicit SuffixUnaryExprNode(const Token &token, const ExprNode *lhs) :
+            ExprNode(token, "suffix_unary_operator"), lhs(lhs) {
+            location.end(lhs->location.end());
         }
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
@@ -145,13 +177,13 @@ namespace cial::Syntax {
         }
     };
 
-    class ConditionalTernaryExprNode final : public ExprNode {
+    class TernaryExprNode final : public ExprNode {
     public:
         const ExprNode *test;
         const ExprNode *lhsExpr;
         const ExprNode *rhsExpr;
 
-        explicit ConditionalTernaryExprNode(const ExprNode *test, const ExprNode *lhsExpr, const ExprNode *rhsExpr) :
+        explicit TernaryExprNode(const ExprNode *test, const ExprNode *lhsExpr, const ExprNode *rhsExpr) :
             ExprNode("conditional_ternary"), test(test), lhsExpr(lhsExpr), rhsExpr(rhsExpr) {}
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }

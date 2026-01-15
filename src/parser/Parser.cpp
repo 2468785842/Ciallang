@@ -584,16 +584,15 @@ namespace cial::Syntax {
 
         Vec<IdentifierExprNode *> extends{};
         if(parser->peek(r, TokenType::Extends)) {
-            parser->consume(r);
-
-            while(!parser->peek(r, TokenType::LeftCurlyBrace)) {
+            do {
+                parser->consume(r);
                 auto *exprNode = dynamic_cast<IdentifierExprNode *>(parser->parseExpression(r, false));
                 if(!exprNode) {
                     parser->error(r, "class extends must be identifier", identifier.location);
                     return nullptr;
                 }
                 extends.push_back(exprNode);
-            }
+            } while(parser->peek(r, TokenType::Comma));
 
             classDeclNode->extends = std::move(extends);
         }
@@ -1005,6 +1004,31 @@ namespace cial::Syntax {
         return procCallExprNode;
     }
 
+    ExprNode *TernaryInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
+
+        const auto expr1 = parser->parseExpression(r, true);
+        if(!expr1) {
+            parser->error(r, "expected expression left", token->location);
+            return nullptr;
+        }
+
+        if(!parser->expect(r, TokenType::Colon)) {
+            return nullptr;
+        }
+
+        const auto expr2 = parser->parseExpression(r, true);
+
+        if(!expr2) {
+            parser->error(r, "expected expression right", token->location);
+            return nullptr;
+        }
+
+        const auto ternaryExpr = parser->astBuilder()->makeNode<TernaryExprNode>(lhs, expr1, expr2);
+        ternaryExpr->location = token->location;
+        ternaryExpr->location.end(expr2->location.end());
+        return ternaryExpr;
+    }
+
     ExprNode *ConstValPrefixParser::parse(Result &, Parser *parser, Token *token) const {
         return parser->astBuilder()->makeNode<ValueExprNode>(*token);
     }
@@ -1016,13 +1040,17 @@ namespace cial::Syntax {
             return nullptr;
         }
 
-        const auto node = parser->astBuilder()->makeNode<UnaryExprNode>(*token, rhs);
+        const auto node = parser->astBuilder()->makeNode<PrefixUnaryExprNode>(*token, rhs);
 
         return node;
     }
 
     ExprNode *IdentifierPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
         return parser->astBuilder()->makeNode<IdentifierExprNode>(*token);
+    }
+
+    ExprNode *InternalIdentifierPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
+        return parser->astBuilder()->makeNode<InternalIdentifierExprNode>(*token);
     }
 
     ExprNode *ParenthesizedPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
@@ -1069,29 +1097,18 @@ namespace cial::Syntax {
         return functionExprNode;
     }
 
-    ExprNode *ConditionalTernaryInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
-
-        const auto expr1 = parser->parseExpression(r, true);
-        if(!expr1) {
-            parser->error(r, "expected expression left", token->location);
-            return nullptr;
+    ExprNode *UnaryInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
+        // check
+        if(!dynamic_cast<IdentifierExprNode *>(lhs)) {
+            if(const auto binaryExprNode = dynamic_cast<BinaryExprNode *>(lhs);
+               !binaryExprNode || binaryExprNode->token != TokenType::Dot) {
+                parser->error(r, "suffix unary expect identifier", token->location);
+                return nullptr;
+            }
         }
 
-        if(!parser->expect(r, TokenType::Colon)) {
-            return nullptr;
-        }
-
-        const auto expr2 = parser->parseExpression(r, true);
-
-        if(!expr2) {
-            parser->error(r, "expected expression right", token->location);
-            return nullptr;
-        }
-
-        const auto ternaryExpr = parser->astBuilder()->makeNode<ConditionalTernaryExprNode>(lhs, expr1, expr2);
-        ternaryExpr->location = token->location;
-        ternaryExpr->location.end(expr2->location.end());
-        return ternaryExpr;
+        auto *suffixUnaryExprNode = parser->astBuilder()->makeNode<SuffixUnaryExprNode>(*token, lhs);
+        return suffixUnaryExprNode;
     }
 
 

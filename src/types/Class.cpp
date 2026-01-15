@@ -67,6 +67,26 @@ namespace cial {
         constructor.thisObj = dataObject;
         constructor.call(vmState, ret, argCount);
 
+        for(Atom extName : this->meta->extends) {
+            if(dataObject->superClass().contains(extName))
+                continue;
+            // try auto call super class constructor
+
+            // call super class constructor function?
+            auto *clazz = dynamic_cast<ClassObject *>(vmState.global(extName).asObject().unwrap());
+            if(!clazz)
+                throw std::runtime_error("Not found class");
+            if(clazz->meta->constructor->arity == 0) {
+                if(extName == clazz->meta->constructor->name) {
+                    clazz->call(vmState, ret, argCount);
+                    dataObject->setSuperDataClass(extName,
+                                                  dynamic_cast<DataObject *>(vmState.reg(ret).asObject().unwrap()));
+                }
+            } else {
+                throw std::runtime_error("constructor args count not zero can't auto call");
+            }
+        }
+
         vmState.reg(ret, Value{ dataObject });
     }
 
@@ -85,10 +105,22 @@ namespace cial {
     Value DataObject::getProp(const Atom a) {
         if(const auto it = _props.find(a); it != _props.end())
             return it->second;
+
+        if(!_superClass.empty())
+            return _superClass.begin(_superClass.size() - 1)->second->getProp(a);
+
         throw std::runtime_error("Not found property");
     }
 
-    bool DataObject::hasProp(const Atom a) const { return _props.contains(a); }
+    bool DataObject::hasProp(const Atom a) const {
+        if(_props.contains(a))
+            return true;
+
+        if(!_superClass.empty())
+            return _superClass.begin(_superClass.size() - 1)->second->hasProp(a);
+
+        return false;
+    }
 
     void DataObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
         throw std::runtime_error("Not implemented DataObject call");

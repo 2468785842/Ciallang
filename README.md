@@ -81,10 +81,11 @@
 * [x] `A operator B` 位移运算符 `>> << >>>`
 * [x] `A operator B` 加减运算符 `+ -`
 * [x] `A operator B` 乘除运算符 `% / \ *`
-* [x] `operator A` 实现的前缀单目运算符 `! new -`
+* [x] `operator A` 前缀单目运算符 `! new -`
 * [ ] `operator A` 前缀单目运算符 `~ -- ++ invalidate isvalid delete typeof # $ + & *`
 * [ ] `operator A` 类型转换运算符 `int real string`
-* [ ] `A operator` 后缀单目运算符 `() [] . -- ++ !`
+* [x] `A operator` 后缀单目运算符 `() . -- ++`
+* [ ] `A operator` 后缀单目运算符 `[] !`
 * [ ] `A instanceof B` 实例判断运算符
 * [ ] `A incontextof B` 上下文替换运算符
 

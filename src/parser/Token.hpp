@@ -329,7 +329,7 @@ namespace cial::Syntax {
             { TokenType::ChevronEqual, TokenType::Chevron }, // ^=
             { TokenType::BackslashEqual, TokenType::Backslash }, // \=
             { TokenType::LogicalOrEqual, TokenType::LogicalOr }, // ||=
-            { TokenType::LogicalAnd, TokenType::LogicalAnd }, // &&=
+            { TokenType::LogicalAndEqual, TokenType::LogicalAnd }, // &&=
             { TokenType::RBitShiftEqual, TokenType::RBitShift }, // >>>=
             { TokenType::LArithShiftEqual, TokenType::LArithShift }, // <<=
             { TokenType::RArithShiftEqual, TokenType::RArithShift } // >>=

@@ -223,7 +223,7 @@ namespace cial::Inter {
         retReg = dst;
     }
 
-    void IRGenerator::generate(const Syntax::UnaryExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const Syntax::PrefixUnaryExprNode *node, OptReg &retReg) {
         using enum Syntax::TokenType;
         switch(node->token.type()) {
             case New:
@@ -237,26 +237,93 @@ namespace cial::Inter {
                 node->rhs->generateBytecode(this, retReg);
                 _chunk->emit<Bytecode::Op::OpCode::ChS>(*retReg);
                 break;
-            case Global: {
-                auto dst = allocateRegister();
-                _chunk->emit<Bytecode::Op::OpCode::Global>(dst);
-                retReg = dst;
-                break;
+            default:
+                error("unknow prefix unary operator", node->location);
+        }
+    }
+
+
+    void IRGenerator::generate(const Syntax::SuffixUnaryExprNode *node, OptReg &retReg) {
+        // TODO:
+        using enum Syntax::TokenType;
+        switch(node->token.type()) {
+            case Increment: {
+                if(const auto *expr = dynamic_cast<const Syntax::IdentifierExprNode *>(node->lhs)) {
+                    const Atom identifier = constVal(expr->token).value<Atom>();
+
+                    if(const auto variable = resolveLocalVariable(identifier)) {
+                        Bytecode::Register dst = variable->reg;
+                        auto tmpR = allocateRegister();
+                        _chunk->emit<Bytecode::Op::OpCode::Load>(tmpR, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::Op::OpCode::Add>(tmpR, dst);
+                        freeRegister(tmpR);
+                        retReg = dst;
+                        return;
+                    }
+
+                    auto tmpR2 = allocateRegister();
+                    auto tmpR1 = allocateRegister();
+                    if(isTopScope()) {
+                        // global maybe
+                        _chunk->emit<Bytecode::Op::OpCode::Load>(tmpR1, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::Op::OpCode::GGlobal>(identifier, tmpR2);
+                        _chunk->emit<Bytecode::Op::OpCode::Add>(tmpR1, tmpR2);
+                        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, tmpR2);
+                        retReg = tmpR2;
+                    } else {
+                        // find on context
+                        _chunk->emit<Bytecode::Op::OpCode::Load>(tmpR1, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::Op::OpCode::GThis>(identifier, tmpR2);
+                        _chunk->emit<Bytecode::Op::OpCode::Add>(tmpR1, tmpR2);
+                        _chunk->emit<Bytecode::Op::OpCode::DThis>(identifier, tmpR2);
+                    }
+                    freeRegister(tmpR1);
+
+                    retReg = tmpR2;
+                    return;
+                }
+                throw std::runtime_error("current not support dot chain call");
             }
-            case Super: {
-                auto dst = allocateRegister();
-                _chunk->emit<Bytecode::Op::OpCode::Super>(dst);
-                retReg = dst;
-                break;
-            }
-            case This: {
-                auto dst = allocateRegister();
-                _chunk->emit<Bytecode::Op::OpCode::This>(dst);
-                retReg = dst;
-                break;
+            case Decrement: {
+
+                if(const auto *expr = dynamic_cast<const Syntax::IdentifierExprNode *>(node->lhs)) {
+                    const Atom identifier = constVal(expr->token).value<Atom>();
+
+                    if(const auto variable = resolveLocalVariable(identifier)) {
+                        Bytecode::Register dst = variable->reg;
+                        auto tmpR = allocateRegister();
+                        _chunk->emit<Bytecode::Op::OpCode::Load>(tmpR, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::Op::OpCode::Sub>(tmpR, dst);
+                        freeRegister(tmpR);
+                        retReg = dst;
+                        return;
+                    }
+
+                    auto tmpR2 = allocateRegister();
+                    auto tmpR1 = allocateRegister();
+                    if(isTopScope()) {
+                        // global maybe
+                        _chunk->emit<Bytecode::Op::OpCode::Load>(tmpR1, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::Op::OpCode::GGlobal>(identifier, tmpR2);
+                        _chunk->emit<Bytecode::Op::OpCode::Sub>(tmpR1, tmpR2);
+                        _chunk->emit<Bytecode::Op::OpCode::DGlobal>(identifier, tmpR2);
+                        retReg = tmpR2;
+                    } else {
+                        // find on context
+                        _chunk->emit<Bytecode::Op::OpCode::Load>(tmpR1, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::Op::OpCode::GThis>(identifier, tmpR2);
+                        _chunk->emit<Bytecode::Op::OpCode::Sub>(tmpR1, tmpR2);
+                        _chunk->emit<Bytecode::Op::OpCode::DThis>(identifier, tmpR2);
+                    }
+                    freeRegister(tmpR1);
+
+                    retReg = tmpR2;
+                    return;
+                }
+                throw std::runtime_error("current not support dot chain call");
             }
             default:
-                error("unknow unary operator", node->location);
+                error("unknow suffix unary operator", node->location);
         }
     }
 
@@ -553,6 +620,27 @@ namespace cial::Inter {
         retReg = dst;
     }
 
+    void IRGenerator::generate(const Syntax::InternalIdentifierExprNode *node, OptReg &retReg) {
+        auto dst = allocateRegister();
+
+        switch(node->token.type()) {
+            case Syntax::TokenType::Global:
+                _chunk->emit<Bytecode::Op::OpCode::Global>(dst);
+                break;
+            case Syntax::TokenType::Super:
+                _chunk->emit<Bytecode::Op::OpCode::Super>(dst);
+                break;
+            case Syntax::TokenType::This:
+                _chunk->emit<Bytecode::Op::OpCode::This>(dst);
+                break;
+            default:
+                error("not support", node->location);
+                return;
+        }
+
+        retReg = dst;
+    }
+
     void IRGenerator::generate(const Syntax::StmtDeclNode *node, OptReg &retReg) {
         return node->statement->generateBytecode(this, retReg);
     }
@@ -798,7 +886,7 @@ namespace cial::Inter {
         }
     }
 
-    void IRGenerator::generate(const Syntax::ConditionalTernaryExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const Syntax::TernaryExprNode *node, OptReg &retReg) {
         Bytecode::Register dst = allocateRegister();
         Bytecode::Register testReg{ 0 };
         if(!expectValue(node->test, testReg)) {

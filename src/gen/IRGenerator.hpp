@@ -56,9 +56,13 @@ namespace cial::Inter {
 
         void generate(const Syntax::IdentifierExprNode *, OptReg &);
 
+        void generate(const Syntax::InternalIdentifierExprNode *, OptReg &);
+
         void generate(const Syntax::BinaryExprNode *, OptReg &);
 
-        void generate(const Syntax::UnaryExprNode *, OptReg &);
+        void generate(const Syntax::PrefixUnaryExprNode *, OptReg &);
+
+        void generate(const Syntax::SuffixUnaryExprNode *, OptReg &);
 
         void generate(const Syntax::ProcCallExprNode *, OptReg &);
 
@@ -96,7 +100,7 @@ namespace cial::Inter {
 
         void generate(const Syntax::ReturnStmtNode *, OptReg &);
 
-        void generate(const Syntax::ConditionalTernaryExprNode *, OptReg &);
+        void generate(const Syntax::TernaryExprNode *, OptReg &);
 
     private:
         Box<Bytecode::Chunk> _chunk = std::make_unique<Bytecode::Chunk>();
