@@ -15,7 +15,6 @@
 
 #include "Instruction.hpp"
 #include "types/Class.hpp"
-#include "types/Property.hpp"
 
 namespace cial::Bytecode {
 
@@ -59,6 +58,27 @@ namespace cial::Bytecode {
 #endif
     }
 
+    [[nodiscard]] bool VMState::globalHas(const Atom atom) const { return context.global()->hasProp(atom); }
+
+    [[nodiscard]] bool VMState::globalHas(const std::string &name) const {
+        const auto atom = rt.atomTable.intern(name.c_str(), name.length());
+        return context.global()->hasProp(atom);
+    }
+
+    [[nodiscard]] Value VMState::global(const Atom atom) const { return context.global()->getProp(atom); }
+
+    void VMState::global(const Atom atom, const Value &value) const { context.global()->setProp(atom, value); }
+
+    [[nodiscard]] Value VMState::global(const std::string &name) const {
+        const auto atom = rt.atomTable.intern(name.c_str(), name.length());
+        return context.global()->getProp(atom);
+    }
+
+    void VMState::global(const std::string &name, const Value &value) const {
+        const auto atom = rt.atomTable.intern(name.c_str(), name.length());
+        context.global()->setProp(atom, value);
+    }
+
     void VMState::reg(const Register &reg, const Value &value) const { _currentFrame->getReg(reg) = value; }
 
     Value VMState::reg(const Register reg) const { return _currentFrame->getReg(reg); }
@@ -69,7 +89,7 @@ namespace cial::Bytecode {
 
         // current thisObj
         if(_currentFrame->thisObj.isObject()) {
-            if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
+            if(auto *instanceObject = dynamic_cast<DataObject *>(_currentFrame->thisObj.asObject().value())) {
                 if(instanceObject->hasProp(atom)) {
                     return instanceObject->getProp(atom);
                 }
@@ -103,7 +123,7 @@ namespace cial::Bytecode {
     void VMState::setThis(const Atom atom, const Value &v) const {
         // current thisObj
         if(_currentFrame->thisObj.isObject()) {
-            if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
+            if(auto *instanceObject = dynamic_cast<DataObject *>(_currentFrame->thisObj.asObject().value())) {
                 if(instanceObject->hasProp(atom)) {
                     instanceObject->setProp(atom, v);
                     return;
@@ -130,7 +150,7 @@ namespace cial::Bytecode {
 
         // current context
         if(_currentFrame->thisObj.isObject()) {
-            if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
+            if(auto *instanceObject = dynamic_cast<DataObject *>(_currentFrame->thisObj.asObject().value())) {
                 return instanceObject->getProp(atom);
             }
         }
@@ -149,7 +169,7 @@ namespace cial::Bytecode {
 
             // prev context
             if(callFrame.thisObj.isObject()) {
-                if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value())) {
+                if(auto *instanceObject = dynamic_cast<DataObject *>(_currentFrame->thisObj.asObject().value())) {
                     return instanceObject->getProp(atom);
                 }
             }

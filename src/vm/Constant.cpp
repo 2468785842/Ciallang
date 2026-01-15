@@ -45,7 +45,7 @@ namespace cial {
                 return Value{ rt->create<Function>(value<FuncMeta *>()) };
             }
             case ConstantType::ClassMeta:
-                return Value{ rt->create<ClassObject>(value<ClassMeta *>()) };
+                return Value{ rt->create<ClassObject>(value<ClassMeta *>(), *rt) };
             case ConstantType::PropMeta:
                 return Value{ rt->create<Property>(nullptr, value<PropMeta *>()) };
         }

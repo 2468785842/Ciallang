@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "Value.hpp"
 #include "gc/gc.hpp"
 #include "runtime/AtomTable.hpp"
 
@@ -35,6 +36,12 @@ namespace cial {
         void setName(const Atom atom) noexcept { _name = atom; }
 
         virtual void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) = 0;
+
+        virtual void setProp(Atom a, const Value &v) { throw std::runtime_error("Not support"); }
+
+        virtual Value getProp(Atom a) { throw std::runtime_error("Not support"); }
+
+        [[nodiscard]] virtual bool hasProp(Atom a) const { throw std::runtime_error("Not support"); }
 
     private:
         Atom _name = ATOM_INVALID;

@@ -15,6 +15,7 @@
 
 #include <fmt/format.h>
 
+#include "CallFrame.hpp"
 #include "Chunk.hpp"
 #include "FastRegisterPool.hpp"
 #include "runtime/Context.hpp"
@@ -25,23 +26,13 @@
 #include "vm/Register.hpp"
 
 namespace cial::Bytecode {
-    // enum class ContextType {
-    //     TopLevel,
-    //     Function,
-    //     ExprFunction,
-    //     Property,
-    //     PropertySetter,
-    //     PropertyGetter,
-    //     Class,
-    //     SuperClassGetter,
-    // };
 
     class VMState {
     public:
         Runtime &rt;
         Context &context;
 
-        explicit VMState(Context &context) : rt(context.rt), context(context) {}
+        explicit VMState(Context &context) : rt(context.rt()), context(context) {}
 
         void run();
 
@@ -51,27 +42,15 @@ namespace cial::Bytecode {
 
         [[nodiscard]] Value &regRef(Register reg) const;
 
-        [[nodiscard]] bool globalHas(const Atom atom) const { return context.gObj.contains(atom); }
+        [[nodiscard]] bool globalHas(Atom atom) const;
+        [[nodiscard]] bool globalHas(const std::string &name) const;
+        [[nodiscard]] Value global(Atom atom) const;
 
-        [[nodiscard]] bool globalHas(const std::string &name) const {
-            const auto atom = rt.atomTable.intern(name.c_str(), name.length());
-            return context.gObj.contains(atom);
-        }
+        void global(Atom atom, const Value &value) const;
 
-        [[nodiscard]] Value global(const Atom atom) const { return context.gObj[atom]; }
+        [[nodiscard]] Value global(const std::string &name) const;
 
-        void global(const Atom atom, const Value &value) const { context.gObj[atom] = value; }
-
-        [[nodiscard]] Value global(const std::string &name) const {
-            const auto atom = rt.atomTable.intern(name.c_str(), name.length());
-            return context.gObj[atom];
-        }
-
-        void global(const std::string &name, const Value &value) const {
-            const auto atom = rt.atomTable.intern(name.c_str(), name.length());
-            context.gObj[atom] = value;
-        }
-
+        void global(const std::string &name, const Value &value) const;
         [[nodiscard]] Value getThis(Atom atom) const;
         void setThis(Atom atom, const Value &v) const;
         [[nodiscard]] Value getUpVal(Atom atom) const;
@@ -85,15 +64,15 @@ namespace cial::Bytecode {
         [[nodiscard]] size_t getPC() const { return _currentFrame->pc; }
 
         void pushVoid(const size_t n) const {
-            const size_t base = context.regPool.allocFrame(n);
+            const size_t base = context.regPool().allocFrame(n);
             for(size_t i = 0; i < n; i++) {
-                *context.regPool.ptrAt(base + i) = Value{};
+                *context.regPool().ptrAt(base + i) = Value{};
             }
         }
 
-        void push(const Value &v) const { *context.regPool.ptrAt(context.regPool.allocFrame(1)) = v; }
+        void push(const Value &v) const { *context.regPool().ptrAt(context.regPool().allocFrame(1)) = v; }
 
-        void pop(const size_t count) const { context.regPool.freeFrame(count); }
+        void pop(const size_t count) const { context.regPool().freeFrame(count); }
 
         void makeClosure() { _currentFrame->closure = _stackTop > 0 ? prevFrame() : nullptr; }
 
@@ -101,7 +80,7 @@ namespace cial::Bytecode {
         void allocCallFrame(T *arg, const OptReg &ret = {}) {
             if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
-            _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, context.regPool };
+            _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, context.regPool() };
         }
 
         void freeCallFrame() {
@@ -111,7 +90,7 @@ namespace cial::Bytecode {
             _callStack[_stackTop].~CallFrame();
         }
 
-        [[nodiscard]] size_t getRegPoolTop() const { return context.regPool.used(); }
+        [[nodiscard]] size_t getRegPoolTop() const { return context.regPool().used(); }
 
         [[nodiscard]] const Vec<Op::Instruction *> &instructions() const noexcept {
             return _currentFrame->chunk->getInstVec();
@@ -135,9 +114,9 @@ namespace cial::Bytecode {
         }
 
     private:
-        CallFrame *_currentFrame{ context.callStack };
-        CallFrame *_callStack{ context.callStack };
-        size_t &_stackTop{ context.stackTop }; // callFrame count
+        CallFrame *_currentFrame{ context.callStack() };
+        CallFrame *_callStack{ context.callStack() };
+        size_t &_stackTop{ context.stackTop() }; // callFrame count
         bool _zf{ false };
     };
 } // namespace cial::Bytecode

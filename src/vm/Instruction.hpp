@@ -44,6 +44,9 @@ namespace cial::Bytecode::Op {
     O(Mov)                                                                                                             \
     O(DGlobal)                                                                                                         \
     O(GGlobal)                                                                                                         \
+    O(Global)                                                                                                          \
+    O(Super)                                                                                                           \
+    O(This)                                                                                                            \
     O(Test)                                                                                                            \
     O(EQ)                                                                                                              \
     O(NEQ)                                                                                                             \
@@ -361,6 +364,30 @@ namespace cial::Bytecode::Op {
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GGlobal
+
+    struct Global {
+        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct Global
+
+    struct Super {
+        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct Super
+
+    struct This {
+        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct This
 
     struct Test {
         static Register reg(const Instruction &inst) { return inst.getOperand1<Register>(); }

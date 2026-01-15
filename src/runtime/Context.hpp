@@ -14,116 +14,55 @@
 #pragma once
 
 #include <ranges>
-#include <unordered_map>
 
-#include "AtomTable.hpp"
-#include "Runtime.hpp"
-
-#include "vm/CallFrame.hpp"
-#include "vm/Chunk.hpp"
+#include "parser/PreProcessor.hpp"
+#include "stdlib/NativeRegister.hpp"
 #include "vm/FastRegisterPool.hpp"
 
-#include "gc/gc.hpp"
-#include "parser/PreProcessor.hpp"
-
-#include "types/Object.hpp"
-#include "types/Value.hpp"
-
-#include "stdlib/NativeRegister.hpp"
-#include "stdlib/StringLib.hpp"
-
 namespace cial {
+    class GlobalObject;
+    struct CallFrame;
 
     class Context {
     public:
-        Runtime &rt;
-        PreProcessor pp{};
-        Map<Atom, Value> gObj{};
-        NativeRegister nativeRegister{ rt };
-
-        Bytecode::FastRegisterPool regPool{};
-
         // Stack Max Depth Is 1024
         static constexpr auto maxCallDepth = 1024;
-        CallFrame callStack[maxCallDepth];
 
-        size_t stackTop{ 0 }; // callFrame count
+        explicit Context(Runtime &rt) noexcept;
+        ~Context() noexcept;
 
-        explicit Context(Runtime &rt) noexcept : rt(rt) {}
-
-        void initNativeMethod() {
-            registerMethod<String>("charAt"_str, &StdLib::stringCharAt);
-            registerMethod<String>("indexOf"_str, &StdLib::stringIndexOf);
-            registerMethod<String>("toUpperCase"_str, &StdLib::stringToUpperCase);
-            registerMethod<String>("toLowerCase"_str, &StdLib::stringToLowerCase);
-            registerMethod<String>("substring"_str, &StdLib::stringSubstring);
-            registerMethod<String>("substr"_str, &StdLib::stringSubstring);
-            registerMethod<String>("sprintf"_str, &StdLib::stringSprintf);
-            // registerMethod<String>("replace"_str, &StdLib::stringReplace);
-            registerMethod<String>("escape"_str, &StdLib::stringEscape);
-            // registerMethod<String>("split"_str, &stringSplit);
-            registerMethod<String>("trim"_str, &StdLib::stringTrim);
-            registerMethod<String>("reverse"_str, &StdLib::stringReverse);
-            registerMethod<String>("repeat"_str, &StdLib::stringRepeat);
-        }
+        void initNativeMethod();
 
         template <typename T, typename Callable>
         void registerMethod(const String &name, Callable &&fn) {
-            return nativeRegister.registerMethod<T>(name, std::forward<Callable>(fn));
+            return nativeRegister().registerMethod<T>(name, std::forward<Callable>(fn));
         }
 
         [[nodiscard]] NativeFunction *findMethod(const TypeId typeId, const Atom a) const {
-            return nativeRegister.findMethod(typeId, a);
+            return nativeRegister().findMethod(typeId, a);
         }
 
-        void registryGlobalFunc(const String &name, NativeFunction *func) noexcept {
-            const Atom a = rt.atomTable.intern(name);
-            gObj[a] = Value{ func };
-        }
+        void registryGlobalFunc(const String &name, NativeFunction *func) const noexcept;
 
-        void collectMark() {
-            rt.collectMark();
+        void collectMark() const;
 
-            for(const auto &[instanceMethods] : nativeRegister.tables | std::views::values) {
-                for(const auto &method : instanceMethods | std::views::values) {
-                    method->marked();
-                }
-            }
+        CallFrame *callStack() const;
 
-            for(const auto &val : gObj | std::views::values) {
-                if(val.isObject()) {
-                    if(auto *msHeader = val.asObject().value()) {
-                        msHeader->marked();
-                        if(msHeader->_name != ATOM_INVALID) {
-                            rt.atomTable.get(msHeader->_name)->marked();
-                        }
-                    }
-                }
-            }
+        size_t &stackTop() const;
 
-            // scan stack
-            const std::uint32_t used = regPool.used();
-            for(std::uint32_t i = 0; i < used; ++i) {
-                if(const Value *val = regPool.ptrAt(i)) {
-                    if(auto *msHeader = val->asObject().value()) {
-                        msHeader->marked();
-                        if(msHeader->_name != ATOM_INVALID) {
-                            rt.atomTable.get(msHeader->_name)->marked();
-                        }
-                    }
-                }
-            }
+        Runtime &rt() const;
 
-            // call frame
-            for(std::uint32_t i = 0; i < stackTop; ++i) {
-                const CallFrame &callFrame = callStack[i];
-                if(callFrame.funcMeta)
-                    callFrame.funcMeta->marked();
-                else
-                    callFrame.chunk->marked();
-                if(callFrame.thisObj.isObject())
-                    callFrame.thisObj.asObject().value()->marked();
-            }
-        }
+        Bytecode::FastRegisterPool &regPool() const;
+
+        GlobalObject *global() const;
+
+        PreProcessor &pp() const;
+
+    private:
+        struct Impl;
+        Impl *_impl{};
+
+        NativeRegister &nativeRegister();
+        const NativeRegister &nativeRegister() const;
     };
 } // namespace cial

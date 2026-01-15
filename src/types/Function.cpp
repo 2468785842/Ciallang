@@ -16,6 +16,7 @@
 
 #include "Function.hpp"
 
+#include "Class.hpp"
 #include "vm/CallFrame.hpp"
 #include "vm/Constant.hpp"
 #include "vm/VM.hpp"

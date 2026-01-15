@@ -608,6 +608,7 @@ namespace cial::Syntax {
         FunctionDeclNode *constructor{};
         Vec<VarDeclNode *> varDeclVec{};
         Vec<FunctionDeclNode *> funcDeclVec{};
+        Vec<PropertyDeclNode *> propertyDeclVec{};
 
         while(!parser->peek(r, TokenType::RightCurlyBrace)) {
             auto *stmt = parser->parseDeclaration(r);
@@ -616,6 +617,11 @@ namespace cial::Syntax {
 
             if(auto *varDecl = dynamic_cast<VarDeclNode *>(stmt)) {
                 varDeclVec.push_back(varDecl);
+                continue;
+            }
+
+            if(auto *propertyDecl = dynamic_cast<PropertyDeclNode *>(stmt)) {
+                propertyDeclVec.push_back(propertyDecl);
                 continue;
             }
 
@@ -645,6 +651,7 @@ namespace cial::Syntax {
         }
 
         classDeclNode->constructor = constructor;
+        classDeclNode->propertyDeclVec = std::move(propertyDeclVec);
         classDeclNode->varDeclVec = std::move(varDeclVec);
         classDeclNode->funcDeclVec = std::move(funcDeclVec);
 

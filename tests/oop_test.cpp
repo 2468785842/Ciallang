@@ -15,7 +15,7 @@ TEST_CASE("OOP - 类声明与实例化") {
     Context context{ rt };
     Bytecode::VMState vmState{ context };
     VM vm{ &vmState };
-    const auto r = vm.eval<InstanceObject *>(R"(
+    const auto r = vm.eval<DataObject *>(R"(
         class A { }
         var o = new A();
         return o;

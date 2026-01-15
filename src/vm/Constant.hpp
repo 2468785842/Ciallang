@@ -42,6 +42,7 @@ namespace cial {
     };
 
     struct FuncMeta : MarkSweepHeader {
+        Atom name = ATOM_INVALID;
         std::uint32_t arity;
         Bytecode::Chunk *chunk; // manager for gc
         Vec<LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
@@ -67,7 +68,7 @@ namespace cial {
         bool isProp{ false };
         bool isMethod{ false };
         bool isStatic{ false };
-        bool isConst{ false };
+        // bool isConst{ false };
     };
 
     struct PropMeta : MarkSweepHeader {
@@ -105,6 +106,7 @@ namespace cial {
         Atom className;
         std::uint32_t arity;
         FuncMeta *constructor{};
+        Vec<Atom> extends;
         Vec<MemberShapeMeta> memberShapeMetas;
         Vec<ClassFieldMeta> memberMetas;
 
@@ -123,6 +125,11 @@ namespace cial {
             return false;
         }
 
+        /**
+         * support shadow
+         * @param shapeMeta
+         * @param memberMeta
+         */
         void setMember(const MemberShapeMeta shapeMeta, const ClassFieldMeta memberMeta) noexcept {
             const size_t len = memberShapeMetas.size();
             for(size_t i = 0; i < len; ++i) {

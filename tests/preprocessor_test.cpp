@@ -12,7 +12,7 @@ using namespace cial;
 TEST_CASE("preprocessor basic @if/@endif") {
     Runtime rt{};
     Context context{ rt };
-    context.pp.setVar("version"_str, 0x02040009);
+    context.pp().setVar("version"_str, 0x02040009);
     Bytecode::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -44,7 +44,7 @@ TEST_CASE("preprocessor @set and variable usage") {
 TEST_CASE("preprocessor nested @if") {
     Runtime rt{};
     Context context{ rt };
-    context.pp.setVar("version"_str, 0x02040009);
+    context.pp().setVar("version"_str, 0x02040009);
     Bytecode::VMState vmState{ context };
     VM vm{ &vmState };
 

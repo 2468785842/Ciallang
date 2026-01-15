@@ -145,6 +145,22 @@ namespace cial::Bytecode::Op {
         vmState.reg(dst(inst), srcVal);
     }
 
+    void Global::execute(const Instruction &inst, const VMState &vmState) {
+        vmState.reg(dst(inst), Value{ vmState.context.global() });
+    }
+
+    void Super::execute(const Instruction &inst, const VMState &vmState) {
+        vmState.reg(dst(inst),
+                    Value{ dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().unwrap())
+                               ->superClass()
+                               .begin()
+                               ->second });
+    }
+
+    void This::execute(const Instruction &inst, const VMState &vmState) {
+        vmState.reg(dst(inst), Value{ vmState.curFrame()->thisObj });
+    }
+
     void Test::execute(const Instruction &inst, VMState &vmState) {
         if(vmState.reg(reg(inst)).asBool()) {
             vmState.setZF(true);
@@ -282,22 +298,52 @@ namespace cial::Bytecode::Op {
     }
 
     void Call::execute(const Instruction &inst, VMState &vmState) {
-        const auto &object = vmState.reg(memberReg(inst));
-        object.asObject().unwrap()->call(vmState, dst(inst), argCount(inst));
+        const auto &object = vmState.reg(memberReg(inst)).asObject().unwrap();
+
+        // call super class constructor function?
+        if(vmState.curFrame()->thisObj.isObject()) {
+            if(auto *dataObject = dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().value())) {
+                for(const auto &extName : dataObject->klass()->meta->extends) {
+                    auto *clazz = dynamic_cast<ClassObject *>(object);
+                    if(!clazz)
+                        break;
+
+                    if(extName == clazz->meta->constructor->name) {
+                        clazz->call(vmState, dst(inst), argCount(inst));
+                        dataObject->setSuperDataClass(
+                            extName, dynamic_cast<DataObject *>(vmState.reg(dst(inst)).asObject().unwrap()));
+                        return;
+                    }
+                }
+            }
+        }
+
+        object->call(vmState, dst(inst), argCount(inst));
     }
 
     void GProp::execute(const Instruction &inst, VMState &vmState) {
         const auto &val = vmState.reg(obj(inst));
-        const auto &nameVal = vmState.reg(memberReg(inst));
-        const String &name = *nameVal.asString().unwrap();
+        const String &name = *vmState.reg(memberReg(inst)).asString().unwrap();
         const Atom atom = vmState.rt.atomTable.intern(name);
 
         if(val.isObject()) {
-            if(auto *instObj = dynamic_cast<InstanceObject *>(val.asObject().value())) {
+            auto *obj = val.asObject().value();
+
+            if(const auto *global = dynamic_cast<GlobalObject *>(obj)) {
+                // for global, proxy object, maybe get extends object in dataObject?
+                if(global->proxy) {
+                    global->proxy->getSuperDataClass(atom);
+                    return;
+                }
+            }
+
+            if(auto *instObj = dynamic_cast<DataObject *>(obj)) {
                 auto tmp = instObj->getProp(atom);
                 propObjectGet(vmState, tmp, tmp);
                 vmState.reg(dst(inst), tmp);
+                return;
             }
+
             return;
         }
 
@@ -479,6 +525,18 @@ namespace cial::Bytecode::Op {
 
     std::string GGlobal::dump(const Instruction &inst, const VMState *vmState) {
         return fmt::format("{: <10} atom_{} {: <4}", "gglobal", atom(inst).v, dst(inst));
+    }
+
+    std::string Global::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "global", dst(inst));
+    }
+
+    std::string Super::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "super", dst(inst));
+    }
+
+    std::string This::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "this", dst(inst));
     }
 
     std::string Test::dump(const Instruction &inst, const VMState *vmState) {

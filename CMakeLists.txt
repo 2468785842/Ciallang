@@ -36,6 +36,7 @@ set(SOURCE_FILES
         src/gen/IRGenerator.cpp
 
         src/runtime/Runtime.cpp
+        src/runtime/Context.cpp
         src/runtime/AtomTable.cpp
 
         src/vm/VMState.cpp

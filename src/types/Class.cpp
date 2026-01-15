@@ -16,59 +16,82 @@
 #include "vm/VMState.hpp"
 
 namespace cial {
+    namespace {
+        void initField(Runtime &rt, Object *thisObj, const MemberShapeMeta &memberShapeMeta,
+                       const ClassFieldMeta &fieldMeta) {
+            if(memberShapeMeta.isMethod) {
+                auto *funcMeta = fieldMeta.funcMeta;
+                auto *func = rt.create<Function>(funcMeta);
+                func->thisObj = thisObj;
+                thisObj->setProp(memberShapeMeta.name, Value{ func });
+                return;
+            }
+
+            if(memberShapeMeta.isProp) {
+                auto *propMeta = fieldMeta.propMeta;
+                auto *propVal = rt.create<Property>(thisObj, propMeta);
+                propVal->thisObj = thisObj;
+                thisObj->setProp(memberShapeMeta.name, Value{ propVal });
+                return;
+            }
+
+            if(memberShapeMeta.isVar) {
+                thisObj->setProp(memberShapeMeta.name, Value{});
+            }
+        }
+    } // namespace
+
+    ClassObject::ClassObject(ClassMeta *classMeta, Runtime &rt) : meta(classMeta) {
+        for(auto &v : classMeta->memberShapeMetas) {
+            if(!v.isStatic)
+                continue;
+            const ClassFieldMeta fieldMeta = this->meta->getMember(v.name);
+            initField(rt, this, v, fieldMeta);
+        }
+    }
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
-        auto *instanceObj = vmState.rt.create<InstanceObject>(this);
+        if(!meta)
+            throw std::runtime_error("can't new");
+
+        auto *dataObject = vmState.rt.create<DataObject>(this);
 
         for(const auto &v : this->meta->memberShapeMetas) {
+            if(v.isStatic)
+                continue;
             const ClassFieldMeta fieldMeta = this->meta->getMember(v.name);
-            if(v.isMethod && !v.isStatic) {
-                auto *funcMeta = fieldMeta.funcMeta;
-                auto *func = vmState.rt.create<Function>(funcMeta);
-                func->thisObj = instanceObj;
-                instanceObj->setProp(v.name, Value{ func });
-                continue;
-            }
-
-            if(v.isProp) {
-                auto *propMeta = fieldMeta.propMeta;
-                auto *propVal = vmState.rt.create<Property>(instanceObj, propMeta);
-                propVal->thisObj = instanceObj;
-                instanceObj->setProp(v.name, Value{ propVal });
-                continue;
-            }
-
-            if(v.isVar) {
-                instanceObj->setProp(v.name, Value{});
-            }
+            initField(vmState.rt, dataObject, v, fieldMeta);
         }
 
         Function constructor{ this->meta->constructor };
-        constructor.thisObj = instanceObj;
+        constructor.thisObj = dataObject;
         constructor.call(vmState, ret, argCount);
 
-        vmState.reg(ret, Value{ instanceObj });
+        vmState.reg(ret, Value{ dataObject });
     }
 
-    void ClassObject::setProp(const Atom a, const Value &v) {
-        throw std::runtime_error("Not implemented ClassObject setProp");
+    void ClassObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
+
+    Value ClassObject::getProp(const Atom a) {
+        if(const auto it = _props.find(a); it != _props.end())
+            return it->second;
+        throw std::runtime_error("Not found property");
     }
 
-    Value ClassObject::getProp(const Atom a) { throw std::runtime_error("Not implemented ClassObject getProp"); }
+    bool ClassObject::hasProp(const Atom a) const { return _props.contains(a); }
 
-    bool ClassObject::hasProp(const Atom a) const { throw std::runtime_error("Not implemented ClassObject hasProp"); }
+    void DataObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
 
-    void InstanceObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
-
-    Value InstanceObject::getProp(const Atom a) {
-        const auto it = _props.find(a);
-        return it != _props.end() ? it->second : Value{};
+    Value DataObject::getProp(const Atom a) {
+        if(const auto it = _props.find(a); it != _props.end())
+            return it->second;
+        throw std::runtime_error("Not found property");
     }
 
-    bool InstanceObject::hasProp(const Atom a) const { return _class->meta->hasMember(a); }
+    bool DataObject::hasProp(const Atom a) const { return _props.contains(a); }
 
-    void InstanceObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
-        throw std::runtime_error("Not implemented InstanceObject call");
+    void DataObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
+        throw std::runtime_error("Not implemented DataObject call");
     }
 
 } // namespace cial

@@ -237,6 +237,24 @@ namespace cial::Inter {
                 node->rhs->generateBytecode(this, retReg);
                 _chunk->emit<Bytecode::Op::OpCode::ChS>(*retReg);
                 break;
+            case Global: {
+                auto dst = allocateRegister();
+                _chunk->emit<Bytecode::Op::OpCode::Global>(dst);
+                retReg = dst;
+                break;
+            }
+            case Super: {
+                auto dst = allocateRegister();
+                _chunk->emit<Bytecode::Op::OpCode::Super>(dst);
+                retReg = dst;
+                break;
+            }
+            case This: {
+                auto dst = allocateRegister();
+                _chunk->emit<Bytecode::Op::OpCode::This>(dst);
+                retReg = dst;
+                break;
+            }
             default:
                 error("unknow unary operator", node->location);
         }
@@ -392,9 +410,8 @@ namespace cial::Inter {
             return;
         }
 
-
         const auto identifier = constVal(node->token).value<Atom>();
-
+        funcMeta->name = identifier;
         _chunk->emit<Bytecode::Op::OpCode::Load>(funReg, _chunk->addConstant(Constant{ funcMeta }));
 
         if(isTopScope()) {
@@ -408,7 +425,6 @@ namespace cial::Inter {
 
 
     void IRGenerator::generate(const Syntax::ClassDeclNode *node, OptReg &) {
-        // TODO:
         const auto identifier = constVal(node->token).value<Atom>();
 
         auto classReg = allocateRegister();
@@ -433,7 +449,48 @@ namespace cial::Inter {
 
         auto gen = IRGenerator{ _rt, _sourceFile };
         gen.makeVirtualGlobalScope();
+
+        // must init var in begin state
+        if(node->constructor) {
+            for(auto &[token, exprNode] : node->constructor->parameters) {
+                const auto varName = constVal(token).value<Atom>();
+                OptReg paramReg{};
+
+                if(exprNode) {
+                    Bytecode::Register defaultParamReg{ 0 };
+                    if(!gen.expectValue(exprNode, defaultParamReg)) {
+                        return;
+                    }
+                    paramReg = defaultParamReg;
+                } else {
+                    paramReg = gen.allocateRegister();
+                }
+                const auto startPC = gen.getNextInstPos();
+                gen.addLocalVar(LocalVariable{ varName, paramReg.value(), startPC });
+            }
+        }
+
         auto voidReg = gen.loadVoidReg();
+
+        for(const auto *ext : node->extends) {
+            classMeta->extends.push_back(constVal(ext->token).value<Atom>());
+        }
+
+        for(const auto *propertyDeclNode : node->propertyDeclVec) {
+            FuncMeta *setFuncMeta{};
+            if(propertyDeclNode->setter)
+                setFuncMeta = generateFuncMeta(propertyDeclNode->setter->parameters, propertyDeclNode->setter->body);
+
+            FuncMeta *getFuncMeta;
+            if(propertyDeclNode->getter)
+                getFuncMeta = generateFuncMeta(propertyDeclNode->getter->parameters, propertyDeclNode->getter->body);
+
+            auto *propMeta = _rt.createNoGC<PropMeta>(setFuncMeta, getFuncMeta);
+
+            const auto varName = constVal(propertyDeclNode->token).value<Atom>();
+
+            classMeta->setMember(MemberShapeMeta{ .name = varName, .isProp = true }, ClassFieldMeta{ propMeta });
+        }
 
         for(const auto *varDeclNode : node->varDeclVec) {
             const auto varName = constVal(varDeclNode->token).value<Atom>();
@@ -453,23 +510,6 @@ namespace cial::Inter {
 
         OptReg ignoreReg{};
         if(node->constructor) {
-            for(auto &[token, exprNode] : node->constructor->parameters) {
-                const auto varName = constVal(token).value<Atom>();
-                OptReg paramReg{};
-
-                if(exprNode) {
-                    Bytecode::Register defaultParamReg{ 0 };
-                    if(!gen.expectValue(exprNode, defaultParamReg)) {
-                        return;
-                    }
-                    paramReg = defaultParamReg;
-                } else {
-                    paramReg = gen.allocateRegister();
-                }
-                const auto startPC = gen.getNextInstPos();
-                gen.addLocalVar(LocalVariable{ varName, paramReg.value(), startPC });
-            }
-
             funChunk = gen.parseAst(_r, node->constructor->body, ignoreReg);
             assert(funChunk);
         }
@@ -484,6 +524,7 @@ namespace cial::Inter {
         const size_t paramCount = node->constructor ? node->constructor->parameters.size() : 0;
         auto *initFuncMeta =
             _rt.createNoGC<FuncMeta>(static_cast<std::uint32_t>(paramCount), chunk, std::move(gen._localVars));
+        initFuncMeta->name = identifier;
         classMeta->setConstructor(initFuncMeta);
         endScope();
         freeRegister(classReg);

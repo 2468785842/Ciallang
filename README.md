@@ -42,7 +42,7 @@
 * [ ] `try-catch`
 * [x] `function` 函数定义与调用
 * [x] `property`
-* [x] `class` // 继承未实现
+* [x] `class`
 * [ ] `with`
 
 #### 数据类型
@@ -58,9 +58,9 @@
 * [x] `void`
 * [x] `null`
 * [x] `Infinity` `-Infinity`
-* [ ] `super`
-* [ ] `global`
-* [ ] `this`
+* [x] `super`
+* [x] `global`
+* [x] `this`
 * [x] `function` 函数表达式声明
 * [ ] `[]` Array 声明
 * [ ] `%[]` Dictionary 声明

@@ -145,7 +145,7 @@ namespace cial {
             }
             assert(!r.isFailed());
 
-            Syntax::Parser parser{ sourceFile, _vmState->context.pp };
+            Syntax::Parser parser{ sourceFile, _vmState->context.pp() };
 
             Syntax::AstNode *node = parser.parse(r);
             assert(!r.isFailed());
@@ -170,13 +170,13 @@ namespace cial {
             _vmState->makeClosure();
             _vmState->allocCallFrame(evalChunk, retReg);
             _vmState->makeClosure();
-            std::uint32_t stackTop = _vmState->context.stackTop;
+            std::uint32_t stackTop = _vmState->context.stackTop();
             _vmState->run();
             Value ret = _vmState->reg(retReg);
 
             // when evalChunk include `ret` inst, `ret` will call freeCallFrame, so we need check
             // keep Stack balancing
-            if(stackTop - 1 != _vmState->context.stackTop) {
+            if(stackTop - 1 != _vmState->context.stackTop()) {
                 _vmState->freeCallFrame();
             }
             _vmState->freeCallFrame();
@@ -196,7 +196,7 @@ namespace cial {
             sourceFile.load(r, expr.toStdStr());
             assert(!r.isFailed());
 
-            Syntax::Parser parser{ sourceFile, _vmState->context.pp };
+            Syntax::Parser parser{ sourceFile, _vmState->context.pp() };
 
             Syntax::ExprNode *node = parser.parseExpression(r, true);
             assert(!r.isFailed());
