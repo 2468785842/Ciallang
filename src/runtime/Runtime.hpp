@@ -54,6 +54,9 @@ namespace cial {
         template <typename T, typename... Args>
             requires std::is_base_of_v<MarkSweepHeader, T>
         T *allocate(Args &&...args) {
+
+            static_assert(sizeof(T) <= NODE_SIZE, "GC NODE_SIZE too small for object type");
+
             MarkSweepHeader *next = markSweep._nextFree->_next;
             T *newObj = new(markSweep._nextFree) T(std::forward<Args>(args)...);
             newObj->_next = next;

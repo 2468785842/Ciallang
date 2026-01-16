@@ -83,7 +83,7 @@ namespace cial {
     // template <typename T>
     // static constexpr bool is_gc_object_v = std::is_base_of_v<RefCountHeader, T>;
 
-    static constexpr size_t NODE_SIZE = 128; // Byte
+    static constexpr size_t NODE_SIZE = 512; // Byte
 
     class MarkSweep {
         friend class Runtime;

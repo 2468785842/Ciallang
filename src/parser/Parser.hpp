@@ -42,7 +42,6 @@ namespace cial::Syntax {
         product, // * / \ %
         prefix, // - ~ ++ -- new
         postfix, // [] () .
-        cast, //
         type,
         variable,
     };
@@ -326,7 +325,7 @@ namespace cial::Syntax {
         { TokenType::Super, &S_InternalIdentifierPrefixParser },
         { TokenType::This, &S_InternalIdentifierPrefixParser },
         { TokenType::Invalidate, &S_PrefixParser }, // "invalidate"
-        { TokenType::Isvalid, &S_PrefixParser }, // "isvalid" todo: 注意还有中缀表示
+        { TokenType::Isvalid, &S_PrefixParser }, // "isvalid"
         // incontextof_expr "isvalid"
         { TokenType::Delete, &S_PrefixParser }, //"delete"
         { TokenType::Typeof, &S_PrefixParser }, //"typeof
@@ -399,7 +398,7 @@ namespace cial::Syntax {
         S_EqualityBinOpParser{ Precedence::equality, false }, S_RelationalBinOpParser{ Precedence::relational, false },
         S_LogicalOrBinOpParser{ Precedence::logical_or, false }, S_SwapBinOpParser{ Precedence::swap, false },
         S_LogicalAndBinOpParser{ Precedence::logical_and, false }, S_OrderBinOpParser{ Precedence::comma, false },
-        S_MemberAccessBinOpParser{ Precedence::postfix, false };
+        S_PostfixBinOpParser{ Precedence::postfix, false };
 
     static constinit ProcCallInfixParser S_ProcCallInfixParser{};
     static constinit TernaryInfixParser S_ConditionalTernaryBinOpParser{};
@@ -446,7 +445,9 @@ namespace cial::Syntax {
         { TokenType::GtOrEqual, &S_RelationalBinOpParser }, // >
         { TokenType::LogicalAnd, &S_LogicalAndBinOpParser }, // &&
         { TokenType::LogicalOr, &S_LogicalOrBinOpParser }, // ||
-        { TokenType::Dot, &S_MemberAccessBinOpParser }, // .
+        { TokenType::Dot, &S_PostfixBinOpParser }, // .
+        { TokenType::InContextOf, &S_PostfixBinOpParser }, // "incontextof"
+        { TokenType::Isvalid, &S_UnaryInfixParser }, // "isvalid"
         { TokenType::Decrement, &S_UnaryInfixParser }, // "--"
         { TokenType::Increment, &S_UnaryInfixParser }, // "++"
         { TokenType::Question, &S_ConditionalTernaryBinOpParser }, // cond ? expr : expr

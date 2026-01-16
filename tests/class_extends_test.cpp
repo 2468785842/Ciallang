@@ -107,27 +107,26 @@ TEST_CASE("OOP - 成员属性 getter 行为") {
 //     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
 // }
 
-// TODO:
-// TEST_CASE("OOP - invalidate 调用 finalize") {
-//     Runtime rt{};
-//     Context context{ rt };
-//     Bytecode::VMState vmState{ context };
-//     VM vm{ &vmState };
-//
-//     vm.eval(R"(
-//         var flag = 0;
-//         class A {
-//             function finalize() {
-//                 flag = 1;
-//             }
-//         }
-//         var o = new A();
-//         invalidate o;
-//     )"_str);
-//
-//     // finalize 应在 invalidate 时被调用
-//     REQUIRE(*vm.evalExpr<Integer>("flag"_str) == 1);
-// }
+TEST_CASE("OOP - invalidate 调用 finalize") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    vm.eval(R"(
+        var flag = 0;
+        class A {
+            function finalize() {
+                flag = 1;
+            }
+        }
+        var o = new A();
+        invalidate o;
+    )"_str);
+
+    // finalize 应在 invalidate 时被调用
+    REQUIRE(*vm.evalExpr<Integer>("flag"_str) == 1);
+}
 
 // TODO:
 // TEST_CASE("OOP - isvalid 在 invalidate 前后行为") {
@@ -169,29 +168,28 @@ TEST_CASE("OOP - 方法闭包保持对象上下文") {
     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 2);
 }
 
-// TODO:
-// TEST_CASE("OOP - incontextof 修改闭包上下文") {
-//     Runtime rt{};
-//     Context context{ rt };
-//     Bytecode::VMState vmState{ context };
-//     VM vm{ &vmState };
-//
-//     vm.eval(R"(
-//         class A {
-//             var x = 0;
-//             function inc() { x++; }
-//         }
-//         var a1 = new A();
-//         var a2 = new A();
-//         var f = a1.inc;
-//         (f incontextof a2)();
-//         var res1 = a1.x;
-//         var res2 = a2.x;
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res1"_str) == 0);
-//     REQUIRE(*vm.evalExpr<Integer>("res2"_str) == 1);
-// }
+TEST_CASE("OOP - incontextof 修改闭包上下文") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    vm.eval(R"(
+        class A {
+            var x = 0;
+            function inc() { x++; }
+        }
+        var a1 = new A();
+        var a2 = new A();
+        var f = a1.inc;
+        (f incontextof a2)();
+        var res1 = a1.x;
+        var res2 = a2.x;
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res1"_str) == 0);
+    REQUIRE(*vm.evalExpr<Integer>("res2"_str) == 1);
+}
 
 TEST_CASE("OOP - 单继承与 super 方法调用") {
     Runtime rt{};

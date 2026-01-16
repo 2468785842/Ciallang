@@ -18,6 +18,7 @@
 #include "Object.hpp"
 #include "Value.hpp"
 #include "vm/Constant.hpp"
+#include "vm/VMState.hpp"
 
 namespace cial {
 
@@ -65,7 +66,9 @@ namespace cial {
         DataObject *fallbackDataObject{}; // 当前实例是从那个对象构造的?指向子类实例
         DataObject() = delete;
 
-        explicit DataObject(ClassObject *klass) : _class(klass) {}
+        explicit DataObject(Bytecode::VMState *vmState, ClassObject *klass) : _vmState(vmState), _class(klass) {}
+
+        // ~DataObject() noexcept override { invalidate(); }
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
@@ -76,6 +79,7 @@ namespace cial {
             _class->marked();
             if(fallbackDataObject)
                 fallbackDataObject->marked();
+
             for(auto &v : _props | std::views::values) {
                 if(v.isObject()) {
                     v.asObject().value()->marked();
@@ -99,7 +103,24 @@ namespace cial {
 
         [[nodiscard]] const Map<Atom, DataObject *> &superClass() const noexcept { return _superClass; }
 
+        void invalidate() {
+            if(!_isValid) {
+                static const auto finalizeAtom = _vmState->context.rt().atomTable.intern("finalize"_str);
+                if(_props.contains(finalizeAtom)) {
+                    const size_t abs = _vmState->getRegPoolTop() - _vmState->curFrame()->getSP();
+                    _vmState->pushVoid(1);
+                    _props[finalizeAtom].asObject().unwrap()->call(*_vmState, Bytecode::Register{ abs }, 0);
+                    _vmState->pop(1);
+                }
+            }
+            _isValid = true;
+        }
+
+        bool isValid() const noexcept { return _isValid; }
+
     private:
+        bool _isValid{ false }; // 保留这个字段只是为了兼容性,我们不需要使用它, 主要是配合invalidate
+        Bytecode::VMState *_vmState; // 保留vm以便析构函数调用finalize方法, 兼容性
         ClassObject *_class{};
         Map<Atom, Value> _props{};
         Map<Atom, DataObject *> _superClass{};

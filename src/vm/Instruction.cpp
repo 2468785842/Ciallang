@@ -58,9 +58,11 @@ namespace cial::Bytecode::Op {
 
     static bool propObjectGet(VMState &vmState, const Value &src, Value &dst) {
         if(src.isObject()) {
-            if(const auto *prop = dynamic_cast<Property *>(src.asObject().value())) {
-                dst = prop->invokeGet(vmState);
-                return true;
+            if(const auto object = src.asObject().unwrap()) {
+                if(const auto *prop = dynamic_cast<Property *>(object)) {
+                    dst = prop->invokeGet(vmState);
+                    return true;
+                }
             }
         }
         return false;
@@ -159,6 +161,23 @@ namespace cial::Bytecode::Op {
 
     void This::execute(const Instruction &inst, const VMState &vmState) {
         vmState.reg(dst(inst), Value{ vmState.curFrame()->thisObj });
+    }
+
+    void ChgThis::execute(const Instruction &inst, const VMState &vmState) {
+        const auto &srcVal = vmState.reg(src(inst));
+        const auto &dstVal = vmState.reg(dst(inst));
+        dynamic_cast<Function *>(dstVal.asObject().unwrap())->thisObj = srcVal.asObject().unwrap();
+    }
+
+    void Inv::execute(const Instruction &inst, const VMState &vmState) {
+        const auto &dstVal = vmState.reg(dst(inst));
+        dynamic_cast<DataObject *>(dstVal.asObject().unwrap())->invalidate();
+    }
+
+    void ChkInv::execute(const Instruction &inst, const VMState &vmState) {
+        const auto &srcVal = vmState.reg(src(inst));
+        Value &dstVal = vmState.regRef(dst(inst));
+        dstVal = Value{ dynamic_cast<DataObject *>(srcVal.asObject().unwrap())->isValid() };
     }
 
     void Test::execute(const Instruction &inst, VMState &vmState) {
@@ -390,7 +409,7 @@ namespace cial::Bytecode::Op {
         vmState.regRef(srcReg).toLogicalNot();
     }
 
-    void ChS::execute(const Instruction &inst, const VMState &vmState) {
+    void ChgSign::execute(const Instruction &inst, const VMState &vmState) {
         auto r = vmState.regRef(src(inst)).toSignChange();
         if(r.isFailed())
             throw r.getErr();
@@ -518,6 +537,18 @@ namespace cial::Bytecode::Op {
 
     std::string This::dump(const Instruction &inst, const VMState *vmState) {
         return fmt::format("{: <10} {: <4}", "this", dst(inst));
+    }
+
+    std::string ChgThis::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4} {: <4}", "chgthis", dst(inst), src(inst));
+    }
+
+    std::string Inv::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "inv", dst(inst));
+    }
+
+    std::string ChkInv::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4} {: <4}", "chkinv", dst(inst), src(inst));
     }
 
     std::string Test::dump(const Instruction &inst, const VMState *vmState) {
@@ -740,8 +771,8 @@ namespace cial::Bytecode::Op {
         return fmt::format("{: <10} {: <4}", "lnot", src(inst));
     }
 
-    std::string ChS::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "chs", src(inst));
+    std::string ChgSign::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "chgsign", src(inst));
     }
 
     std::string Ret::dump(const Instruction &inst, const VMState *vmState) {

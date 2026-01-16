@@ -982,10 +982,11 @@ namespace cial::Syntax {
 
     ExprNode *ProcCallInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
         // check
-        if(!dynamic_cast<IdentifierExprNode *>(lhs) && !dynamic_cast<FunctionExprNode *>(lhs)) {
+        if(!dynamic_cast<IdentifierExprNode *>(lhs) && !dynamic_cast<FunctionExprNode *>(lhs) &&
+           !dynamic_cast<BinaryExprNode *>(lhs)) {
             if(const auto binaryExprNode = dynamic_cast<BinaryExprNode *>(lhs);
                !binaryExprNode || binaryExprNode->token != TokenType::Dot) {
-                parser->error(r, "proc call expect identifier or function expression", token->location);
+                parser->error(r, "proc call expect identifier, binary or function expression", token->location);
                 return nullptr;
             }
         }

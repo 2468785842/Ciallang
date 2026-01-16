@@ -49,19 +49,19 @@ namespace cial {
         }
     }
 
+    /**
+     * WARN: This runtime prioritizes behavioral compatibility over architectural elegance.
+     */
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
 
         // call super class constructor function?
-        if(vmState.curFrame()->isConstructor && vmState.curFrame()->thisObj.isObject()) {
-            vmState.curFrame()->isConstructor = false;
-            if(auto *dataObject = dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().value())) {
+        if(CallFrame *curFrame = vmState.curFrame(); curFrame->isConstructor && curFrame->thisObj.isObject()) {
+            curFrame->isConstructor = false;
+            if(auto *dataObject = dynamic_cast<DataObject *>(curFrame->thisObj.asObject().value())) {
                 for(const auto &extName : dataObject->klass()->meta->extends) {
-                    auto *clazz = this;
-                    if(!clazz)
-                        break;
 
-                    if(extName == clazz->meta->constructor->name) {
-                        clazz->call(vmState, ret, argCount);
+                    if(extName == meta->constructor->name) {
+                        call(vmState, ret, argCount);
                         auto *superDataObject = dynamic_cast<DataObject *>(vmState.reg(ret).asObject().unwrap());
                         superDataObject->fallbackDataObject = dataObject;
                         dataObject->setSuperDataClass(extName, superDataObject);
@@ -74,7 +74,7 @@ namespace cial {
         if(!meta)
             throw std::runtime_error("can't new");
 
-        auto *dataObject = vmState.rt.create<DataObject>(this);
+        auto *dataObject = vmState.rt.create<DataObject>(&vmState, this);
 
         for(const auto &v : this->meta->memberShapeMetas) {
             if(v.isStatic)

@@ -47,6 +47,9 @@ namespace cial::Bytecode::Op {
     O(Global)                                                                                                          \
     O(Super)                                                                                                           \
     O(This)                                                                                                            \
+    O(ChgThis)                                                                                                         \
+    O(Inv)                                                                                                             \
+    O(ChkInv)                                                                                                          \
     O(Test)                                                                                                            \
     O(EQ)                                                                                                              \
     O(NEQ)                                                                                                             \
@@ -74,7 +77,7 @@ namespace cial::Bytecode::Op {
     O(BLShift)                                                                                                         \
     O(BRShift)                                                                                                         \
     O(BURShift)                                                                                                        \
-    O(ChS)                                                                                                             \
+    O(ChgSign)                                                                                                         \
     O(Ret)
 
     enum class OpCode : std::uint16_t {
@@ -389,6 +392,33 @@ namespace cial::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct This
 
+    struct ChgThis {
+        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct ChgThis
+
+    struct Inv {
+        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct Inv
+
+
+    struct ChkInv {
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct ChkInv
+
     struct Test {
         static Register reg(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
@@ -673,14 +703,14 @@ namespace cial::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct BURShift
 
-    struct ChS {
+    struct ChgSign {
 
         static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
         static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct ChS
+    }; // struct ChgSign
 
     struct Ret {
         static Register retReg(const Instruction &inst) { return inst.getOperand1<Register>(); }

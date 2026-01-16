@@ -3,8 +3,6 @@
 //
 #pragma once
 
-#include <functional>
-
 #include "runtime/Runtime.hpp"
 #include "types/Function.hpp"
 
