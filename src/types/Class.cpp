@@ -52,7 +52,8 @@ namespace cial {
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
 
         // call super class constructor function?
-        if(vmState.curFrame()->thisObj.isObject()) {
+        if(vmState.curFrame()->isConstructor && vmState.curFrame()->thisObj.isObject()) {
+            vmState.curFrame()->isConstructor = false;
             if(auto *dataObject = dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().value())) {
                 for(const auto &extName : dataObject->klass()->meta->extends) {
                     auto *clazz = this;
@@ -84,7 +85,20 @@ namespace cial {
 
         Function constructor{ this->meta->constructor };
         constructor.thisObj = dataObject;
-        constructor.call(vmState, ret, argCount);
+
+        const auto cnt = meta->arity > argCount ? meta->arity - argCount : 0;
+        if(cnt > 0)
+            vmState.pushVoid(cnt);
+
+        vmState.allocCallFrame(constructor.meta, ret);
+        auto *currentCallFrame = vmState.curFrame();
+        currentCallFrame->isConstructor = true;
+        currentCallFrame->thisObj = Value{ constructor.thisObj };
+        vmState.run();
+
+        if(cnt > 0)
+            vmState.pop(cnt);
+        assert(constructor.meta->chunk->getInstVec().back()->opcode == Bytecode::Op::OpCode::Ret);
 
         for(Atom extName : this->meta->extends) {
             if(dataObject->superClass().contains(extName))
@@ -151,7 +165,7 @@ namespace cial {
         if(const auto it = _props.find(a); it != _props.end())
             return it->second;
 
-        if(!_class->meta->extends.empty()) {
+        if(!_superClass.empty() && !_class->meta->extends.empty()) {
             for(const auto &ext : _class->meta->extends | std::views::reverse) {
                 if(_superClass.at(ext)->hasProp(a)) {
                     return _superClass.at(ext)->getProp(a);
@@ -171,7 +185,7 @@ namespace cial {
         if(_props.contains(a))
             return true;
 
-        if(!_class->meta->extends.empty()) {
+        if(!_superClass.empty() && !_class->meta->extends.empty()) {
             for(const auto &ext : _class->meta->extends | std::views::reverse) {
                 if(_superClass.at(ext)->hasProp(a)) {
                     return true;

@@ -593,6 +593,16 @@ namespace cial::Inter {
             _rt.createNoGC<FuncMeta>(static_cast<std::uint32_t>(paramCount), chunk, std::move(gen._localVars));
         initFuncMeta->name = identifier;
         classMeta->setConstructor(initFuncMeta);
+
+        // finalize function placeholder
+        if(Atom finalizeAtom = _rt.atomTable.intern("finalize"_str); !classMeta->hasMember(finalizeAtom)) {
+            IRGenerator genFinalize{ _rt, _sourceFile };
+            genFinalize.makeVirtualGlobalScope();
+            classMeta->setMember(
+                MemberShapeMeta{ .name = finalizeAtom, .isMethod = true },
+                ClassFieldMeta{ _rt.createNoGC<FuncMeta>(
+                    0, _rt.createNoGC<Bytecode::Chunk>(*gen.parseAst(_r, nullptr, ignoreReg)), Vec<LocalVariable>{}) });
+        }
         endScope();
         freeRegister(classReg);
     }

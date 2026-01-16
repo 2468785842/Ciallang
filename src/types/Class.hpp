@@ -76,7 +76,6 @@ namespace cial {
             _class->marked();
             if(fallbackDataObject)
                 fallbackDataObject->marked();
-
             for(auto &v : _props | std::views::values) {
                 if(v.isObject()) {
                     v.asObject().value()->marked();

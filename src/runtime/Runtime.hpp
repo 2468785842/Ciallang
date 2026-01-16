@@ -65,6 +65,16 @@ namespace cial {
         }
 
     public:
+        /**
+         * Refactoring is needed because if `create2` is called again after calling the new `create1`,
+         * it will trigger garbage collection, and `create1` might be garbage collected.
+         * Should the new `create` object be added to the root object?
+         *
+         * 1. Handle<T> a = create(xxx); // RAII
+         *    xxx = move(a);
+         * 2. a = create(xxx);
+         *    if !a gc(); // self check?
+         */
         template <typename T, typename... Args>
             requires std::is_base_of_v<MarkSweepHeader, T>
         T *create(Args &&...args) {
