@@ -268,3 +268,64 @@ TEST_CASE("OOP - 子类成员变量覆盖父类成员变量") {
     // 成员变量不是 override，而是直接覆盖
     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 2);
 }
+
+TEST_CASE("OOP - 父类构造函数初始化字段对子类可见") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A {
+            var x;
+            function A() { x = 10; }
+        }
+        class B extends A {
+            // NOTE: TJS2 need call this, but in our interpreter, it's not needed
+            // NOTE: our interpreter will call super() automatically
+            // function B() { A(); }
+        }
+        var o = new B();
+        var res = o.x;
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 10);
+}
+
+TEST_CASE("OOP - super 方法应作用于子类对象") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A {
+            function set() { x = 5; }
+        }
+        class B extends A {
+            var x = 1;
+            function f() { super.set(); }
+        }
+        var o = new B();
+        o.f();
+        var res = o.x;
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 5);
+}
+
+TEST_CASE("OOP - 父子字段应共享同一 this") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A { var x = 1; }
+        class B extends A {
+            function inc() { x++; }
+        }
+        var o = new B();
+        o.inc();
+        var res = o.x;
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 2);
+}

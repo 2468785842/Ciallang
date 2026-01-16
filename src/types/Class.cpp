@@ -30,7 +30,6 @@ namespace cial {
             if(memberShapeMeta.isProp) {
                 auto *propMeta = fieldMeta.propMeta;
                 auto *propVal = rt.create<Property>(thisObj, propMeta);
-                propVal->thisObj = thisObj;
                 thisObj->setProp(memberShapeMeta.name, Value{ propVal });
                 return;
             }
@@ -51,6 +50,26 @@ namespace cial {
     }
 
     void ClassObject::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
+
+        // call super class constructor function?
+        if(vmState.curFrame()->thisObj.isObject()) {
+            if(auto *dataObject = dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().value())) {
+                for(const auto &extName : dataObject->klass()->meta->extends) {
+                    auto *clazz = this;
+                    if(!clazz)
+                        break;
+
+                    if(extName == clazz->meta->constructor->name) {
+                        clazz->call(vmState, ret, argCount);
+                        auto *superDataObject = dynamic_cast<DataObject *>(vmState.reg(ret).asObject().unwrap());
+                        superDataObject->fallbackDataObject = dataObject;
+                        dataObject->setSuperDataClass(extName, superDataObject);
+                        return;
+                    }
+                }
+            }
+        }
+
         if(!meta)
             throw std::runtime_error("can't new");
 
@@ -79,8 +98,9 @@ namespace cial {
             if(clazz->meta->constructor->arity == 0) {
                 if(extName == clazz->meta->constructor->name) {
                     clazz->call(vmState, ret, argCount);
-                    dataObject->setSuperDataClass(extName,
-                                                  dynamic_cast<DataObject *>(vmState.reg(ret).asObject().unwrap()));
+                    auto *superDataObject = dynamic_cast<DataObject *>(vmState.reg(ret).asObject().unwrap());
+                    superDataObject->fallbackDataObject = dataObject;
+                    dataObject->setSuperDataClass(extName, superDataObject);
                 }
             } else {
                 throw std::runtime_error("constructor args count not zero can't auto call");
@@ -95,29 +115,74 @@ namespace cial {
     Value ClassObject::getProp(const Atom a) {
         if(const auto it = _props.find(a); it != _props.end())
             return it->second;
-        throw std::runtime_error("Not found property");
+        throw std::runtime_error("in class object Not found property");
     }
 
     bool ClassObject::hasProp(const Atom a) const { return _props.contains(a); }
 
-    void DataObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
+    void DataObject::setProp(const Atom a, const Value &v) {
+        if(const auto it = _props.find(a); it != _props.end()) {
+            _props[a] = v;
+            return;
+        }
+
+        // when _superClass is empty
+        // it may indicate that the object is in a newly created state.
+        if(!_superClass.empty() && !_class->meta->extends.empty()) {
+            for(const auto &ext : _class->meta->extends | std::views::reverse) {
+                if(_superClass[ext]->hasProp(a)) {
+                    _superClass[ext]->setProp(a, v);
+                    return;
+                }
+            }
+        }
+
+        if(fallbackDataObject) {
+            if(const auto it = fallbackDataObject->_props.find(a); it != fallbackDataObject->_props.end()) {
+                fallbackDataObject->_props[a] = v;
+                return;
+            }
+        }
+
+        _props[a] = v;
+    }
 
     Value DataObject::getProp(const Atom a) {
         if(const auto it = _props.find(a); it != _props.end())
             return it->second;
 
-        if(!_superClass.empty())
-            return _superClass.begin(_superClass.size() - 1)->second->getProp(a);
+        if(!_class->meta->extends.empty()) {
+            for(const auto &ext : _class->meta->extends | std::views::reverse) {
+                if(_superClass.at(ext)->hasProp(a)) {
+                    return _superClass.at(ext)->getProp(a);
+                }
+            }
+        }
 
-        throw std::runtime_error("Not found property");
+        if(fallbackDataObject) {
+            if(const auto it = fallbackDataObject->_props.find(a); it != fallbackDataObject->_props.end())
+                return it->second;
+        }
+
+        throw std::runtime_error("in data object Not found property");
     }
 
     bool DataObject::hasProp(const Atom a) const {
         if(_props.contains(a))
             return true;
 
-        if(!_superClass.empty())
-            return _superClass.begin(_superClass.size() - 1)->second->hasProp(a);
+        if(!_class->meta->extends.empty()) {
+            for(const auto &ext : _class->meta->extends | std::views::reverse) {
+                if(_superClass.at(ext)->hasProp(a)) {
+                    return true;
+                }
+            }
+        }
+
+        if(fallbackDataObject) {
+            if(fallbackDataObject->_props.contains(a))
+                return true;
+        }
 
         return false;
     }

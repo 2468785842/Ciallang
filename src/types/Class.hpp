@@ -18,7 +18,6 @@
 #include "Object.hpp"
 #include "Value.hpp"
 #include "vm/Constant.hpp"
-#include "vm/VMState.hpp"
 
 namespace cial {
 
@@ -52,12 +51,18 @@ namespace cial {
 
         [[nodiscard]] const Map<Atom, Value> &props() const noexcept { return _props; }
 
-    private:
+    protected:
         Map<Atom, Value> _props{}; // static
     };
 
+    /**
+     * NOTE: First, it's worth mentioning that inheritance in TJS2 is not true inheritance
+     * NOTE: but rather more like composition;
+     * NOTE: each super class instance has its own fields.
+     */
     class DataObject final : public Object {
     public:
+        DataObject *fallbackDataObject{}; // 当前实例是从那个对象构造的?指向子类实例
         DataObject() = delete;
 
         explicit DataObject(ClassObject *klass) : _class(klass) {}
@@ -69,6 +74,9 @@ namespace cial {
         void marked() noexcept override {
             Object::marked();
             _class->marked();
+            if(fallbackDataObject)
+                fallbackDataObject->marked();
+
             for(auto &v : _props | std::views::values) {
                 if(v.isObject()) {
                     v.asObject().value()->marked();
@@ -93,7 +101,7 @@ namespace cial {
         [[nodiscard]] const Map<Atom, DataObject *> &superClass() const noexcept { return _superClass; }
 
     private:
-        ClassObject *_class{ nullptr };
+        ClassObject *_class{};
         Map<Atom, Value> _props{};
         Map<Atom, DataObject *> _superClass{};
     };
@@ -108,6 +116,12 @@ namespace cial {
             ClassObject::marked();
             if(proxy)
                 proxy->marked();
+        }
+
+        Value getProp(const Atom a) override {
+            if(const auto it = _props.find(a); it != _props.end())
+                return it->second;
+            throw std::runtime_error("in global object Not found property");
         }
     };
 } // namespace cial

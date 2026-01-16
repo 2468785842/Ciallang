@@ -299,25 +299,6 @@ namespace cial::Bytecode::Op {
 
     void Call::execute(const Instruction &inst, VMState &vmState) {
         const auto &object = vmState.reg(memberReg(inst)).asObject().unwrap();
-
-        // call super class constructor function?
-        if(vmState.curFrame()->thisObj.isObject()) {
-            if(auto *dataObject = dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().value())) {
-                for(const auto &extName : dataObject->klass()->meta->extends) {
-                    auto *clazz = dynamic_cast<ClassObject *>(object);
-                    if(!clazz)
-                        break;
-
-                    if(extName == clazz->meta->constructor->name) {
-                        clazz->call(vmState, dst(inst), argCount(inst));
-                        dataObject->setSuperDataClass(
-                            extName, dynamic_cast<DataObject *>(vmState.reg(dst(inst)).asObject().unwrap()));
-                        return;
-                    }
-                }
-            }
-        }
-
         object->call(vmState, dst(inst), argCount(inst));
     }
 
