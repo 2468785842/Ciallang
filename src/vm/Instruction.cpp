@@ -153,10 +153,9 @@ namespace cial::Bytecode::Op {
 
     void Super::execute(const Instruction &inst, const VMState &vmState) {
         vmState.reg(dst(inst),
-                    Value{ dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().unwrap())
-                               ->superClass()
-                               .begin()
-                               ->second });
+                    vmState.global(dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().unwrap())
+                                       ->klass()
+                                       ->meta->extends.back()));
     }
 
     void This::execute(const Instruction &inst, const VMState &vmState) {
@@ -178,6 +177,16 @@ namespace cial::Bytecode::Op {
         const auto &srcVal = vmState.reg(src(inst));
         Value &dstVal = vmState.regRef(dst(inst));
         dstVal = Value{ dynamic_cast<DataObject *>(srcVal.asObject().unwrap())->isValid() };
+    }
+
+    void ChkIns::execute(const Instruction &inst, const VMState &vmState) {
+        Value &dstVal = vmState.regRef(dst(inst));
+        if(const Value &srcVal = vmState.reg(src(inst)); srcVal.isString()) {
+            const Atom atom = vmState.context.rt().atomTable.intern(*srcVal.asString().value());
+            dstVal = Value{ dstVal.asObject().unwrap()->instanceOf(atom) };
+            return;
+        }
+        dstVal = Value{ false };
     }
 
     void Test::execute(const Instruction &inst, VMState &vmState) {
@@ -329,21 +338,33 @@ namespace cial::Bytecode::Op {
         if(val.isObject()) {
             auto *obj = val.asObject().value();
 
-            if(const auto *global = dynamic_cast<GlobalObject *>(obj)) {
+            if(auto *global = dynamic_cast<GlobalObject *>(obj)) {
                 // for global, proxy object, maybe get extends object in dataObject?
                 if(global->proxy) {
-                    global->proxy->getSuperDataClass(atom);
-                    return;
+                    // TODO:
+                    // global->proxy->getSuperDataClass(atom);
+                    // return;
+                    throw std::runtime_error("Not implemented");
                 }
+                vmState.reg(dst(inst), global->getProp(atom));
+                return;
             }
 
-            if(auto *instObj = dynamic_cast<DataObject *>(obj)) {
-                auto tmp = instObj->getProp(atom);
+            if(const auto *classObject = dynamic_cast<ClassObject *>(obj)) {
+                // TODO:
+                auto tmp = obj->getProp(atom);
                 propObjectGet(vmState, tmp, tmp);
+                if(tmp.isObject()) {
+                    auto *fun = dynamic_cast<Function *>(tmp.asObject().value());
+                    fun->thisObj = vmState.curFrame()->thisObj.asObject().value();
+                }
                 vmState.reg(dst(inst), tmp);
                 return;
             }
 
+            auto tmp = obj->getProp(atom);
+            propObjectGet(vmState, tmp, tmp);
+            vmState.reg(dst(inst), tmp);
             return;
         }
 
@@ -352,7 +373,7 @@ namespace cial::Bytecode::Op {
         assert(tId != TypeId::None);
         NativeFunction *nativeFn = vmState.context.findMethod(tId, atom);
         assert(nativeFn != nullptr);
-        nativeFn = vmState.rt.create<NativeFunction>(*nativeFn);
+        nativeFn = vmState.rt.create<NativeFunction>(*nativeFn).get();
         nativeFn->setThisObj(val);
         vmState.reg(dst(inst), Value{ nativeFn });
     }
@@ -393,8 +414,10 @@ namespace cial::Bytecode::Op {
     void DThis::execute(const Instruction &inst, VMState &vmState) {
         const Value &srcVal = vmState.regRef(src(inst));
 
-        if(propObjectSet(vmState, srcVal, vmState.getThis(atom(inst)))) {
-            return;
+        if(vmState.hasThis(atom(inst))) {
+            if(propObjectSet(vmState, srcVal, vmState.getThis(atom(inst)))) {
+                return;
+            }
         }
 
         vmState.setThis(atom(inst), srcVal);
@@ -549,6 +572,10 @@ namespace cial::Bytecode::Op {
 
     std::string ChkInv::dump(const Instruction &inst, const VMState *vmState) {
         return fmt::format("{: <10} {: <4} {: <4}", "chkinv", dst(inst), src(inst));
+    }
+
+    std::string ChkIns::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4} {: <4}", "chkins", dst(inst), src(inst));
     }
 
     std::string Test::dump(const Instruction &inst, const VMState *vmState) {

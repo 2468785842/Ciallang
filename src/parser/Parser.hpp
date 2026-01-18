@@ -29,6 +29,7 @@ namespace cial::Syntax {
         swap,
         conditional_ternary, // cond ? expr : expr
         assignment, // 一系列赋值语句
+        keyword,
         // key_value,
         logical_or, // ||
         logical_and, // &&
@@ -326,7 +327,6 @@ namespace cial::Syntax {
         { TokenType::This, &S_InternalIdentifierPrefixParser },
         { TokenType::Invalidate, &S_PrefixParser }, // "invalidate"
         { TokenType::Isvalid, &S_PrefixParser }, // "isvalid"
-        // incontextof_expr "isvalid"
         { TokenType::Delete, &S_PrefixParser }, //"delete"
         { TokenType::Typeof, &S_PrefixParser }, //"typeof
         { TokenType::Sharp, &S_PrefixParser }, //"#" 获取字符串第一个字符,转为int
@@ -336,8 +336,6 @@ namespace cial::Syntax {
         { TokenType::Asterisk, &S_PrefixParser }, // "*" force property access
         { TokenType::LParenthesis, &S_ParenthesizedPrefixParser }, // "(" 括号表达式
         { TokenType::Function, &S_FunctionPrefixParser }
-        // incontextof_expr "instanceof" unary_expr
-        // incontextof_expr "in" unary_expr
         // {TokenType::Int,            &S_TypeCastPrefixParser}, // "int" unary_expr
         // {TokenType::Real,           &S_TypeCastPrefixParser}, // "real" unary_expr
         // {TokenType::String,         &S_TypeCastPrefixParser}, // "string" unary_expr
@@ -398,7 +396,7 @@ namespace cial::Syntax {
         S_EqualityBinOpParser{ Precedence::equality, false }, S_RelationalBinOpParser{ Precedence::relational, false },
         S_LogicalOrBinOpParser{ Precedence::logical_or, false }, S_SwapBinOpParser{ Precedence::swap, false },
         S_LogicalAndBinOpParser{ Precedence::logical_and, false }, S_OrderBinOpParser{ Precedence::comma, false },
-        S_PostfixBinOpParser{ Precedence::postfix, false };
+        S_PostfixBinOpParser{ Precedence::postfix, false }, S_KeywordInfixBinOpParser{ Precedence::keyword, false };
 
     static constinit ProcCallInfixParser S_ProcCallInfixParser{};
     static constinit TernaryInfixParser S_ConditionalTernaryBinOpParser{};
@@ -446,7 +444,8 @@ namespace cial::Syntax {
         { TokenType::LogicalAnd, &S_LogicalAndBinOpParser }, // &&
         { TokenType::LogicalOr, &S_LogicalOrBinOpParser }, // ||
         { TokenType::Dot, &S_PostfixBinOpParser }, // .
-        { TokenType::InContextOf, &S_PostfixBinOpParser }, // "incontextof"
+        { TokenType::InContextOf, &S_KeywordInfixBinOpParser }, // "incontextof"
+        { TokenType::Instanceof, &S_KeywordInfixBinOpParser }, // "instanceof"
         { TokenType::Isvalid, &S_UnaryInfixParser }, // "isvalid"
         { TokenType::Decrement, &S_UnaryInfixParser }, // "--"
         { TokenType::Increment, &S_UnaryInfixParser }, // "++"

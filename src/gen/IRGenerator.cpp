@@ -219,6 +219,10 @@ namespace cial::Inter {
                 _chunk->emit<Bytecode::Op::OpCode::ChgThis>(src, dst);
                 retReg = src;
                 return;
+            case Instanceof:
+                _chunk->emit<Bytecode::Op::OpCode::ChkIns>(src, dst);
+                retReg = src;
+                return;
             default:
                 error("unknow binary operator", node->location);
                 return;
@@ -246,12 +250,13 @@ namespace cial::Inter {
                 _chunk->emit<Bytecode::Op::OpCode::Inv>(*retReg);
                 break;
             case Isvalid: {
-                auto src = allocateRegister();
-                if(!expectValue(node->rhs, src)) {
+                Bytecode::Register reg{};
+                auto dst = allocateRegister();
+                if(!expectValue(node->rhs, reg)) {
                     return;
                 }
-                _chunk->emit<Bytecode::Op::OpCode::ChkInv>(src, *retReg);
-                freeRegister(src);
+                _chunk->emit<Bytecode::Op::OpCode::ChkInv>(reg, dst);
+                retReg = dst;
                 break;
             }
             default:
@@ -541,6 +546,54 @@ namespace cial::Inter {
             }
             classMeta->setMember(MemberShapeMeta{ .name = funName, .isMethod = true }, ClassFieldMeta{ funcMeta });
         }
+
+        for(const auto *ext : node->extends) {
+            classMeta->extends.push_back(constVal(ext->token).value<Atom>());
+        }
+
+        for(const auto *propertyDeclNode : node->propertyDeclVec) {
+            FuncMeta *setFuncMeta{};
+            if(propertyDeclNode->setter)
+                setFuncMeta = generateFuncMeta(propertyDeclNode->setter->parameters, propertyDeclNode->setter->body);
+
+            FuncMeta *getFuncMeta;
+            if(propertyDeclNode->getter)
+                getFuncMeta = generateFuncMeta(propertyDeclNode->getter->parameters, propertyDeclNode->getter->body);
+
+            auto *propMeta = _rt.createNoGC<PropMeta>(setFuncMeta, getFuncMeta);
+
+            const auto varName = constVal(propertyDeclNode->token).value<Atom>();
+
+            classMeta->setMember(MemberShapeMeta{ .name = varName, .isProp = true }, ClassFieldMeta{ propMeta });
+        }
+
+        {
+            auto gen = IRGenerator{ _rt, _sourceFile };
+            gen.makeVirtualGlobalScope();
+
+            for(const auto *varDeclNode : node->varDeclVec) {
+                const auto varName = constVal(varDeclNode->token).value<Atom>();
+
+                // can init
+                if(varDeclNode->rhs) {
+                    Bytecode::Register defaultVarReg{ 0 };
+                    if(!gen.expectValue(varDeclNode->rhs, defaultVarReg)) {
+                        return;
+                    }
+                    gen._chunk->emit<Bytecode::Op::OpCode::DThis>(varName, defaultVarReg);
+                }
+
+                classMeta->setMember(MemberShapeMeta{ .name = varName, .isVar = true }, ClassFieldMeta{});
+            }
+            OptReg ignoreReg{};
+            auto funChunk = gen.parseAst(_r, nullptr, ignoreReg);
+            assert(funChunk);
+
+            auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
+            auto *initFuncMeta = _rt.createNoGC<FuncMeta>(0, chunk, std::move(gen._localVars));
+            classMeta->initDefaultVal = initFuncMeta;
+        }
+
         {
             auto gen = IRGenerator{ _rt, _sourceFile };
             gen.makeVirtualGlobalScope();
@@ -565,75 +618,37 @@ namespace cial::Inter {
                 }
             }
 
-            auto voidReg = gen.loadVoidReg();
 
-            for(const auto *ext : node->extends) {
-                classMeta->extends.push_back(constVal(ext->token).value<Atom>());
-            }
-
-            for(const auto *propertyDeclNode : node->propertyDeclVec) {
-                FuncMeta *setFuncMeta{};
-                if(propertyDeclNode->setter)
-                    setFuncMeta =
-                        generateFuncMeta(propertyDeclNode->setter->parameters, propertyDeclNode->setter->body);
-
-                FuncMeta *getFuncMeta;
-                if(propertyDeclNode->getter)
-                    getFuncMeta =
-                        generateFuncMeta(propertyDeclNode->getter->parameters, propertyDeclNode->getter->body);
-
-                auto *propMeta = _rt.createNoGC<PropMeta>(setFuncMeta, getFuncMeta);
-
-                const auto varName = constVal(propertyDeclNode->token).value<Atom>();
-
-                classMeta->setMember(MemberShapeMeta{ .name = varName, .isProp = true }, ClassFieldMeta{ propMeta });
-            }
-
-            for(const auto *varDeclNode : node->varDeclVec) {
-                const auto varName = constVal(varDeclNode->token).value<Atom>();
-
-                // can init
-                if(varDeclNode->rhs) {
-                    Bytecode::Register defaultVarReg{ 0 };
-                    if(!gen.expectValue(varDeclNode->rhs, defaultVarReg)) {
-                        return;
-                    }
-                    gen._chunk->emit<Bytecode::Op::OpCode::DThis>(varName, defaultVarReg);
-                }
-                classMeta->setMember(MemberShapeMeta{ .name = varName, .isVar = true }, ClassFieldMeta{});
-            }
-
-            Opt<Bytecode::Chunk> funChunk{};
-
-            OptReg ignoreReg{};
             if(node->constructor) {
-                funChunk = gen.parseAst(_r, node->constructor->body, ignoreReg);
+                OptReg ignoreReg{};
+                auto funChunk = gen.parseAst(_r, node->constructor->body, ignoreReg);
                 assert(funChunk);
+
+                // the last patch one ret
+                auto voidReg = gen.loadVoidReg();
+                funChunk->emit<Bytecode::Op::OpCode::Ret>(voidReg);
+
+                auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
+                const size_t paramCount = node->constructor->parameters.size();
+                auto *initFuncMeta =
+                    _rt.createNoGC<FuncMeta>(static_cast<std::uint32_t>(paramCount), chunk, std::move(gen._localVars));
+                initFuncMeta->name = identifier;
+                classMeta->setConstructor(initFuncMeta);
             }
-
-            if(!funChunk)
-                funChunk = gen.parseAst(_r, nullptr, ignoreReg);
-
-            // the last patch one ret
-            funChunk->emit<Bytecode::Op::OpCode::Ret>(voidReg);
-
-            auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
-            const size_t paramCount = node->constructor ? node->constructor->parameters.size() : 0;
-            auto *initFuncMeta =
-                _rt.createNoGC<FuncMeta>(static_cast<std::uint32_t>(paramCount), chunk, std::move(gen._localVars));
-            initFuncMeta->name = identifier;
-            classMeta->setConstructor(initFuncMeta);
         }
 
         // finalize function placeholder
-        if(Atom finalizeAtom = _rt.atomTable.intern("finalize"_str); !classMeta->hasMember(finalizeAtom)) {
+        if(Atom finalizeAtom = _rt.atomTable.intern("finalize"_str); classMeta->hasMember(finalizeAtom) < 0) {
             OptReg ignoreReg{};
             IRGenerator genFinalize{ _rt, _sourceFile };
             genFinalize.makeVirtualGlobalScope();
+            auto funChunk = _rt.createNoGC<Bytecode::Chunk>(*genFinalize.parseAst(_r, nullptr, ignoreReg));
+
+            auto voidReg = genFinalize.loadVoidReg();
+            funChunk->emit<Bytecode::Op::OpCode::Ret>(voidReg);
+
             classMeta->setMember(MemberShapeMeta{ .name = finalizeAtom, .isMethod = true },
-                                 ClassFieldMeta{ _rt.createNoGC<FuncMeta>(
-                                     0, _rt.createNoGC<Bytecode::Chunk>(*genFinalize.parseAst(_r, nullptr, ignoreReg)),
-                                     Vec<LocalVariable>{}) });
+                                 ClassFieldMeta{ _rt.createNoGC<FuncMeta>(0, funChunk, Vec<LocalVariable>{}) });
         }
         endScope();
         freeRegister(classReg);

@@ -16,6 +16,7 @@
 #include "NativeFunDetail.hpp"
 #include "Object.hpp"
 #include "Value.hpp"
+#include "runtime/Runtime.hpp"
 #include "vm/Constant.hpp"
 
 namespace cial {
@@ -27,7 +28,7 @@ namespace cial {
         FuncMeta *meta;
         Object *thisObj{};
 
-        explicit Function(FuncMeta *funcMeta) : Object(ATOM_FUNCTION), meta(funcMeta) {}
+        explicit Function(FuncMeta *funcMeta) : Object(Runtime::ATOM_FUNCTION), meta(funcMeta) {}
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
@@ -48,13 +49,13 @@ namespace cial {
         NativeFunction(NativeFunction &&) = delete;
 
         NativeFunction(const NativeFunction &rhs) noexcept :
-            Object(ATOM_FUNCTION), _callback(rhs._callback), _arity(rhs._arity) {}
+            Object(Runtime::ATOM_FUNCTION), _callback(rhs._callback), _arity(rhs._arity) {}
 
         template <typename Callable>
             requires(!std::same_as<std::decay_t<Callable>, NativeFunction>)
         explicit NativeFunction(Callable &&callable) :
-            Object(ATOM_FUNCTION), _callback([callable = std::forward<Callable>(callable)](
-                                                 VM *vm, Value thisObj, size_t argCount, Value *args) {
+            Object(Runtime::ATOM_FUNCTION), _callback([callable = std::forward<Callable>(callable)](
+                                                          VM *vm, Value thisObj, size_t argCount, Value *args) {
                 return NativeFunDetail::invokeCallable(callable, vm, thisObj, argCount, args);
             }),
             _arity(NativeFunDetail::NativeFunTraits<Callable>::arity) {}

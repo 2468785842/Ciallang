@@ -51,6 +51,7 @@ namespace cial::Bytecode {
         [[nodiscard]] Value global(const std::string &name) const;
 
         void global(const std::string &name, const Value &value) const;
+        [[nodiscard]] bool hasThis(Atom atom) const;
         [[nodiscard]] Value getThis(Atom atom) const;
         void setThis(Atom atom, const Value &v) const;
         [[nodiscard]] Value getUpVal(Atom atom) const;

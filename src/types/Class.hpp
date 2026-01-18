@@ -23,13 +23,10 @@
 namespace cial {
 
     class ClassObject : public Object {
-    protected:
-        explicit ClassObject() : meta(nullptr) {}
-
     public:
         ClassMeta *meta;
 
-        explicit ClassObject(ClassMeta *classMeta, Runtime &rt);
+        explicit ClassObject(ClassMeta *classMeta, Runtime *rt);
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
@@ -44,6 +41,21 @@ namespace cial {
             }
         }
 
+        bool instanceOf(const Atom a) override { return a == Runtime::ATOM_CLASS; }
+
+        [[nodiscard]] FuncMeta *getFunc(const Atom a) const {
+            const std::int64_t i = this->meta->hasMember(a);
+            if(i < 0)
+                return nullptr;
+            const auto v = this->meta->getMemberShape(i);
+            const ClassFieldMeta fieldMeta = this->meta->getMember(i);
+
+            if(v.isMethod) {
+                return fieldMeta.funcMeta;
+            }
+            return nullptr;
+        }
+
         void setProp(Atom a, const Value &v) override;
 
         Value getProp(Atom a) override;
@@ -53,6 +65,7 @@ namespace cial {
         [[nodiscard]] const Map<Atom, Value> &props() const noexcept { return _props; }
 
     protected:
+        Runtime *_rt;
         Map<Atom, Value> _props{}; // static
     };
 
@@ -63,12 +76,11 @@ namespace cial {
      */
     class DataObject final : public Object {
     public:
-        DataObject *fallbackDataObject{}; // 当前实例是从那个对象构造的?指向子类实例
         DataObject() = delete;
 
         explicit DataObject(Bytecode::VMState *vmState, ClassObject *klass) : _vmState(vmState), _class(klass) {}
 
-        // ~DataObject() noexcept override { invalidate(); }
+        ~DataObject() noexcept override { invalidate(); }
 
         void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
 
@@ -77,19 +89,15 @@ namespace cial {
         void marked() noexcept override {
             Object::marked();
             _class->marked();
-            if(fallbackDataObject)
-                fallbackDataObject->marked();
 
             for(auto &v : _props | std::views::values) {
                 if(v.isObject()) {
                     v.asObject().value()->marked();
                 }
             }
-
-            for(const auto &v : _superClass | std::views::values) {
-                v->marked();
-            }
         }
+
+        bool instanceOf(const Atom a) override { return a == _class->meta->className; }
 
         void setProp(Atom a, const Value &v) override;
 
@@ -97,40 +105,45 @@ namespace cial {
 
         [[nodiscard]] bool hasProp(Atom a) const override;
 
-        void setSuperDataClass(const Atom a, DataObject *superClass) { _superClass[a] = superClass; }
+        void setSuperDataClass(const Atom a) { _superClass[a] = true; }
 
-        DataObject *getSuperDataClass(const Atom a) { return _superClass[a]; }
-
-        [[nodiscard]] const Map<Atom, DataObject *> &superClass() const noexcept { return _superClass; }
+        bool getSuperDataClass(const Atom a) {
+            if(!_superClass.contains(a))
+                return false;
+            return _superClass[a];
+        }
 
         void invalidate() {
-            if(!_isValid) {
-                static const auto finalizeAtom = _vmState->context.rt().atomTable.intern("finalize"_str);
-                if(_props.contains(finalizeAtom)) {
-                    const size_t abs = _vmState->getRegPoolTop() - _vmState->curFrame()->getSP();
-                    _vmState->pushVoid(1);
-                    _props[finalizeAtom].asObject().unwrap()->call(*_vmState, Bytecode::Register{ abs }, 0);
+            if(_isValid) {
+                static const Atom finalizeAtom = _vmState->context.rt().atomTable.intern("finalize"_str);
+                const size_t abs = _vmState->getRegPoolTop() - _vmState->curFrame()->getSP();
+                _vmState->pushVoid(1);
+                // if not found finalize, may ignore??
+                if(const std::int64_t idx = _class->meta->hasMember(finalizeAtom); idx > -1) {
+                    Function finalizeFun{ _class->meta->getMember(idx).funcMeta };
+                    finalizeFun.thisObj = this;
+                    finalizeFun.call(*_vmState, Bytecode::Register{ abs }, 0);
                     _vmState->pop(1);
                 }
             }
-            _isValid = true;
+            _isValid = false;
         }
 
-        bool isValid() const noexcept { return _isValid; }
+        [[nodiscard]] bool isValid() const noexcept { return _isValid; }
 
     private:
-        bool _isValid{ false }; // 保留这个字段只是为了兼容性,我们不需要使用它, 主要是配合invalidate
+        bool _isValid{ true }; // 保留这个字段只是为了兼容性,我们不需要使用它, 主要是配合invalidate
         Bytecode::VMState *_vmState; // 保留vm以便析构函数调用finalize方法, 兼容性
         ClassObject *_class{};
         Map<Atom, Value> _props{};
-        Map<Atom, DataObject *> _superClass{};
+        Map<Atom, bool> _superClass{};
     };
 
     class GlobalObject : public ClassObject {
     public:
         DataObject *proxy{};
 
-        explicit GlobalObject() = default;
+        explicit GlobalObject(Runtime *rt) : ClassObject(nullptr, rt) {}
 
         void marked() noexcept override {
             ClassObject::marked();

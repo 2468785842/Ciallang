@@ -85,6 +85,40 @@ namespace cial::Bytecode {
 
     Value &VMState::regRef(const Register reg) const { return _currentFrame->getReg(reg); }
 
+    bool VMState::hasThis(const Atom atom) const {
+
+        // current thisObj
+        if(_currentFrame->thisObj.isObject()) {
+            if(auto *instanceObject = dynamic_cast<DataObject *>(_currentFrame->thisObj.asObject().value())) {
+                if(instanceObject->hasProp(atom)) {
+                    return true;
+                }
+            }
+        }
+
+        if(auto *callFrame = _currentFrame->closure; callFrame) {
+            if(callFrame->funcMeta) {
+                for(const auto &localVar : callFrame->funcMeta->localVars) {
+                    if(localVar.endPC > callFrame->pc)
+                        continue;
+                    if(localVar.identifier == atom)
+                        return true;
+                }
+            }
+
+            // prev context
+            // if(callFrame->thisObj.isObject()) {
+            //     if(auto *instanceObject = dynamic_cast<InstanceObject *>(_currentFrame->thisObj.asObject().value()))
+            //     {
+            //         return instanceObject->getProp(atom);
+            //     }
+            // }
+        }
+
+        // global
+        return globalHas(atom);
+    }
+
     Value VMState::getThis(const Atom atom) const {
 
         // current thisObj

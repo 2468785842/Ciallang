@@ -13,7 +13,7 @@ namespace cial {
     struct Context::Impl {
         Runtime &rt;
         PreProcessor pp{};
-        GlobalObject globalObject{};
+        GlobalObject globalObject{ &rt };
         NativeRegister nativeRegister{ rt };
 
         Bytecode::FastRegisterPool regPool{};

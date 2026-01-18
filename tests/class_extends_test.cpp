@@ -56,6 +56,7 @@ TEST_CASE("OOP - 成员属性 getter 行为") {
     vm.eval(R"(
         class A {
             var x = 3;
+            function A() {}
             property p {
                 getter() { return x * 2; }
             }
@@ -68,44 +69,43 @@ TEST_CASE("OOP - 成员属性 getter 行为") {
     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 6);
 }
 
-// TODO:
-// TEST_CASE("OOP - instanceof Class 判断") {
-//     Runtime rt{};
-//     Context context{ rt };
-//     Bytecode::VMState vmState{ context };
-//     VM vm{ &vmState };
-//
-//     vm.eval(R"(
-//         class A { }
-//         var o = new A();
-//         var res = (A instanceof "Class") && (o instanceof A);
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
-// }
+TEST_CASE("OOP - instanceof Class 判断") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
 
-// TODO:
-// TEST_CASE("OOP - 类方法内 new 必须使用 global.ClassName") {
-//     Runtime rt{};
-//     Context context{ rt };
-//     Bytecode::VMState vmState{ context };
-//     VM vm{ &vmState };
-//
-//     vm.eval(R"(
-//         class A {
-//             function A() {}
-//             function create() {
-//                 return new global.A();
-//             }
-//         }
-//         var o = new A();
-//         var obj2 = o.create();
-//         var res = (obj2 instanceof A);
-//     )"_str);
-//
-//     // 若未使用 global.A()，这里应失败
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
-// }
+    vm.eval(R"(
+        class A { function A() {} }
+        var o = new A();
+        var res = (A instanceof "Class") && (o instanceof "A");
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
+}
+
+TEST_CASE("OOP - 类方法内 new 必须使用 global.ClassName") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    vm.eval(R"(
+        class A {
+            function A() {}
+            function create() {
+                // We can use A() instead of global.A()
+                // return new A(); // ok
+                return new global.A();
+            }
+        }
+        var o = new A();
+        var obj2 = o.create();
+        var res = (obj2 instanceof "A");
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
+}
 
 TEST_CASE("OOP - invalidate 调用 finalize") {
     Runtime rt{};
@@ -116,6 +116,7 @@ TEST_CASE("OOP - invalidate 调用 finalize") {
     vm.eval(R"(
         var flag = 0;
         class A {
+            function A() {}
             function finalize() {
                 flag = 1;
             }
@@ -128,24 +129,23 @@ TEST_CASE("OOP - invalidate 调用 finalize") {
     REQUIRE(*vm.evalExpr<Integer>("flag"_str) == 1);
 }
 
-// TODO:
-// TEST_CASE("OOP - isvalid 在 invalidate 前后行为") {
-//     Runtime rt{};
-//     Context context{ rt };
-//     Bytecode::VMState vmState{ context };
-//     VM vm{ &vmState };
-//
-//     vm.eval(R"(
-//         class A {}
-//         var o = new A();
-//         var before = isvalid o;
-//         invalidate o;
-//         var after = isvalid o;
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("before"_str) == 1);
-//     REQUIRE(*vm.evalExpr<Integer>("after"_str) == 0);
-// }
+TEST_CASE("OOP - isvalid 在 invalidate 前后行为") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    vm.eval(R"(
+        class A { function A() {} }
+        var o = new A();
+        var before = isvalid o;
+        invalidate o;
+        var after = isvalid o;
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("before"_str) == 1);
+    REQUIRE(*vm.evalExpr<Integer>("after"_str) == 0);
+}
 
 TEST_CASE("OOP - 方法闭包保持对象上下文") {
     Runtime rt{};
@@ -156,6 +156,7 @@ TEST_CASE("OOP - 方法闭包保持对象上下文") {
     vm.eval(R"(
         class A {
             var x = 1;
+            function A() {}
             function inc() { x++; }
         }
         var o = new A();
@@ -177,6 +178,7 @@ TEST_CASE("OOP - incontextof 修改闭包上下文") {
     vm.eval(R"(
         class A {
             var x = 0;
+            function A() {}
             function inc() { x++; }
         }
         var a1 = new A();
@@ -199,9 +201,11 @@ TEST_CASE("OOP - 单继承与 super 方法调用") {
 
     vm.eval(R"(
         class A {
+            function A() {}
             function foo() { return 1; }
         }
         class B extends A {
+            function B() { A(); }
             function foo() { return super.foo() + 1; }
         }
         var o = new B();
@@ -219,9 +223,11 @@ TEST_CASE("OOP - override 隐藏父类方法") {
 
     vm.eval(R"(
         class A {
+            function A() {}
             function foo() { return 1; }
         }
         class B extends A {
+            function B() { A(); }
             function foo() { return 2; }
         }
         var o = new B();
@@ -239,9 +245,9 @@ TEST_CASE("OOP - 多重继承方法覆盖顺序") {
     VM vm{ &vmState };
 
     vm.eval(R"(
-        class A { function foo() { return 1; } }
-        class B { function foo() { return 2; } }
-        class C extends A, B { }
+        class A { function A() {} function foo() { return 1; } }
+        class B { function B() {} function foo() { return 2; } }
+        class C extends A, B { function C() { A(); B(); } }
         var o = new C();
         var res = o.foo();
     )"_str);
@@ -257,8 +263,8 @@ TEST_CASE("OOP - 子类成员变量覆盖父类成员变量") {
     VM vm{ &vmState };
 
     vm.eval(R"(
-        class A { var x = 1; }
-        class B extends A { var x = 2; }
+        class A { var x = 1; function A() {} }
+        class B extends A { var x = 2; function B() { A(); } }
         var o = new B();
         var res = o.x;
     )"_str);
@@ -278,9 +284,7 @@ TEST_CASE("OOP - 父类构造函数初始化字段对子类可见") {
             function A() { x = 10; }
         }
         class B extends A {
-            // NOTE: TJS2 need call this, but in our interpreter, it's not needed
-            // NOTE: our interpreter will call super() automatically
-            // function B() { A(); }
+            function B() { A(); }
         }
         var o = new B();
         var res = o.x;
@@ -296,10 +300,12 @@ TEST_CASE("OOP - super 方法应作用于子类对象") {
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
+            function A() {}
             function set() { x = 5; }
         }
         class B extends A {
             var x = 1;
+            function B() { A(); }
             function f() { super.set(); }
         }
         var o = new B();
@@ -316,8 +322,12 @@ TEST_CASE("OOP - 父子字段应共享同一 this") {
     Bytecode::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
-        class A { var x = 1; }
+        class A {
+            var x = 1;
+            function A() {}
+        }
         class B extends A {
+            function B() { A(); }
             function inc() { x++; }
         }
         var o = new B();
@@ -336,6 +346,7 @@ TEST_CASE("TJS2 - 方法字段解析优先使用定义 class 的 slot") {
     vm.eval(R"(
         class A {
             var x = 1;
+            function A() {}
             function getX() { return x; }
         }
         class B extends A {
@@ -346,7 +357,7 @@ TEST_CASE("TJS2 - 方法字段解析优先使用定义 class 的 slot") {
         var res = o.getX();
     )"_str);
 
-    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 2);
 }
 
 TEST_CASE("TJS2 - 字段仅在 slot 链不存在时 fallback 到 instance") {
@@ -356,6 +367,7 @@ TEST_CASE("TJS2 - 字段仅在 slot 链不存在时 fallback 到 instance") {
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
+            function A() {}
             function getX() { return x; }
         }
         class B extends A {
@@ -375,7 +387,7 @@ TEST_CASE("TJS2 - super slot 优先于 instance 字段") {
     Bytecode::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
-        class C { var x = 4; }
+        class C { var x = 4; function C() {} }
         class A extends C {
             function A() { C(); }
             function getX() { return x; }
@@ -390,25 +402,29 @@ TEST_CASE("TJS2 - super slot 优先于 instance 字段") {
         var res = o.getX();
     )"_str);
 
-    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 4);
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 2);
 }
-//
-// TEST_CASE("TJS2 - 构造函数调用不会覆盖子类字段") {
-//     vm.eval(R"(
-//         class A {
-//             var x = 1;
-//             function A() { x = 10; }
-//         }
-//         class B extends A {
-//             var x = 2;
-//             function B() { A(); }
-//         }
-//         var o = new B();
-//         var res = o.x;
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 2);
-// }
+
+TEST_CASE("TJS2 - 构造函数调用会覆盖子类字段") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A {
+            var x = 1;
+            function A() { x = 10; }
+        }
+        class B extends A {
+            var x = 2;
+            function B() { A(); }
+        }
+        var o = new B();
+        var res = o.x;
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 10);
+}
 //
 // TEST_CASE("TJS2 - 父构造函数仅初始化父 slot") {
 //     vm.eval(R"(
@@ -532,3 +548,143 @@ TEST_CASE("TJS2 - super slot 优先于 instance 字段") {
 //
 //     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 9);
 // }
+
+TEST_CASE("OOP - Legacy TJS2 Class/Slot/Constructor/Lookup 行为全集") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    vm.eval(R"(
+        // --- 构造函数参数传递 ---
+        class A1 {
+            var x;
+            function A1(v) { x = v; }
+        }
+        var o1 = new A1(42);
+        var r1 = o1.x;
+
+        // --- 成员初始化先于构造 ---
+        class A2 {
+            var x = 10;
+            function A2() { x += 5; }
+        }
+        var o2 = new A2();
+        var r2 = o2.x;
+
+        // --- getter 行为 ---
+        class A3 {
+            var x = 3;
+            property p {
+                getter() { return x * 2; }
+            }
+            function A3() {}
+        }
+        var o3 = new A3();
+        var r3 = o3.p;
+
+        // --- instanceof ---
+        class A4 { function A4(){} }
+        var o4 = new A4();
+        var r4 = (A4 instanceof "Class") && (o4 instanceof "A4");
+
+        // --- 方法闭包绑定 this ---
+        class A5 {
+            var x = 1;
+            function A5() {}
+            function inc() { x++; }
+        }
+        var o5 = new A5();
+        var f5 = o5.inc;
+        f5();
+        var r5 = o5.x;
+
+        // --- incontextof ---
+        class A6 {
+            var x = 0;
+            function A6() {}
+            function inc() { x++; }
+        }
+        var a6_1 = new A6();
+        var a6_2 = new A6();
+        var f6 = a6_1.inc;
+        (f6 incontextof a6_2)();
+        var r6_1 = a6_1.x;
+        var r6_2 = a6_2.x;
+
+        // --- override ---
+        class A7 {
+            function A7() {}
+            function foo() { return 1; }
+        }
+        class B7 extends A7 {
+            function B7() { A7(); }
+            function foo() { return 2; }
+        }
+        var o7 = new B7();
+        var r7 = o7.foo();
+
+        // --- slot 查找优先定义类 ---
+        class A8 {
+            var x = 1;
+            function A8() { }
+            function getX() { return x; }
+        }
+        class B8 extends A8 {
+            var x = 2;
+            function B8() { A8(); }
+        }
+        var o8 = new B8();
+        var r8 = o8.getX(); // == 2
+
+        // --- fallback 到 instance ---
+        class A9 {
+            function A9() {}
+            function getX() { return x; }
+        }
+        class B9 extends A9 {
+            var x = 2;
+            function B9() { A9(); }
+        }
+        var o9 = new B9();
+        var r9 = o9.getX(); // == 2
+
+        // --- super slot 优先于 instance ---
+        class C10 { var x = 4; function C10() {} }
+        class A10 extends C10 {
+            function A10() { C10(); }
+            function getX() { return x; }
+        }
+        class B10 extends A10 {
+            var x = 2;
+            function B10() { A10(); }
+        }
+        var o10 = new B10();
+        var r10 = o10.getX(); // == 2
+
+        // --- 构造函数不会覆盖子类字段 ---
+        class A11 {
+            var x = 1;
+            function A11() { x = 10; }
+        }
+        class B11 extends A11 {
+            var x = 2;
+            function B11() { A11(); }
+        }
+        var o11 = new B11();
+        var r11 = o11.x;
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("r1"_str) == 42);
+    REQUIRE(*vm.evalExpr<Integer>("r2"_str) == 15);
+    REQUIRE(*vm.evalExpr<Integer>("r3"_str) == 6);
+    REQUIRE(*vm.evalExpr<Integer>("r4"_str) == 1);
+    REQUIRE(*vm.evalExpr<Integer>("r5"_str) == 2);
+    REQUIRE(*vm.evalExpr<Integer>("r6_1"_str) == 0);
+    REQUIRE(*vm.evalExpr<Integer>("r6_2"_str) == 1);
+    REQUIRE(*vm.evalExpr<Integer>("r7"_str) == 2);
+    REQUIRE(*vm.evalExpr<Integer>("r8"_str) == 2);
+    REQUIRE(*vm.evalExpr<Integer>("r9"_str) == 2);
+    REQUIRE(*vm.evalExpr<Integer>("r10"_str) == 2);
+    REQUIRE(*vm.evalExpr<Integer>("r11"_str) == 10);
+}

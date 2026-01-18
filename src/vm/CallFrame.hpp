@@ -26,7 +26,6 @@ namespace cial {
         Value thisObj{};
         OptReg ret{};
         std::uint64_t pc{};
-        bool isConstructor{ false };
 
         explicit CallFrame() = default;
 

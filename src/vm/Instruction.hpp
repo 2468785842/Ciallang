@@ -50,6 +50,7 @@ namespace cial::Bytecode::Op {
     O(ChgThis)                                                                                                         \
     O(Inv)                                                                                                             \
     O(ChkInv)                                                                                                          \
+    O(ChkIns)                                                                                                          \
     O(Test)                                                                                                            \
     O(EQ)                                                                                                              \
     O(NEQ)                                                                                                             \
@@ -409,7 +410,6 @@ namespace cial::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Inv
 
-
     struct ChkInv {
         static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
@@ -418,6 +418,15 @@ namespace cial::Bytecode::Op {
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct ChkInv
+
+    struct ChkIns {
+        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+        static Register src(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct ChkIns
 
     struct Test {
         static Register reg(const Instruction &inst) { return inst.getOperand1<Register>(); }

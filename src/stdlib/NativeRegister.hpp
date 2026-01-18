@@ -64,7 +64,7 @@ namespace cial {
         template <typename Callable>
         void registerMethod(const TypeId typeId, const Atom name, Callable &&fn) {
             auto &[instanceMethods] = tables[typeId];
-            auto *nativeFn = _rt.create<NativeFunction>(std::forward<Callable>(fn));
+            auto *nativeFn = _rt.create<NativeFunction>(std::forward<Callable>(fn)).get();
             instanceMethods[name] = nativeFn;
         }
 

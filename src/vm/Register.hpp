@@ -18,6 +18,7 @@
 namespace cial::Bytecode {
     class [[nodiscard]] Register {
     public:
+        explicit Register() = default;
         explicit Register(const size_t index) : _index(index) {}
 
         [[nodiscard]] size_t index() const noexcept { return _index; }

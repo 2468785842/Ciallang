@@ -37,6 +37,8 @@ namespace cial {
 
         virtual void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) = 0;
 
+        virtual bool instanceOf(Atom a) { return false; }
+
         virtual void setProp(Atom a, const Value &v) { throw std::runtime_error("Not support"); }
 
         virtual Value getProp(Atom a) { throw std::runtime_error("Not support"); }

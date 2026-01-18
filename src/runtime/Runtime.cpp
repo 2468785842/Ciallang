@@ -19,9 +19,10 @@ namespace cial {
     void Runtime::addHandleVal(MarkSweepHeader *ptr) { handles.push_back(ptr); }
 
     void Runtime::removeHandleVal(const MarkSweepHeader *ptr) {
-        for(auto it = handles.begin(); it != handles.end(); ++it) {
+        for(auto it = handles.rbegin(); it != handles.rend(); ++it) {
             if(*it == ptr) {
-                handles.erase(it);
+                *it = handles.back();
+                handles.pop_back();
                 return;
             }
         }

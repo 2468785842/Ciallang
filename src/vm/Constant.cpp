@@ -42,12 +42,12 @@ namespace cial {
                 return Value{ String{ str->getData(), str->length() } };
             }
             case ConstantType::FuncMeta: {
-                return Value{ rt->create<Function>(value<FuncMeta *>()) };
+                return Value{ rt->create<Function>(value<FuncMeta *>()).get() };
             }
             case ConstantType::ClassMeta:
-                return Value{ rt->create<ClassObject>(value<ClassMeta *>(), *rt) };
+                return Value{ rt->create<ClassObject>(value<ClassMeta *>(), rt).get() };
             case ConstantType::PropMeta:
-                return Value{ rt->create<Property>(nullptr, value<PropMeta *>()) };
+                return Value{ rt->create<Property>(nullptr, value<PropMeta *>()).get() };
         }
         return Value{};
     }

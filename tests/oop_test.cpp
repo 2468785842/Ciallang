@@ -16,7 +16,7 @@ TEST_CASE("OOP - 类声明与实例化") {
     Bytecode::VMState vmState{ context };
     VM vm{ &vmState };
     const auto r = vm.eval<DataObject *>(R"(
-        class A { }
+        class A { function A() {} }
         var o = new A();
         return o;
     )"_str);
@@ -31,7 +31,7 @@ TEST_CASE("OOP - 类方法定义与调用") {
 
     SECTION("实例方法调用") {
         vm.eval(R"(
-            class A { function add(x, y) { return x + y; } }
+            class A { function A() {} function add(x, y) { return x + y; } }
             var o = new A();
             var res = o.add(1, 2);
         )"_str);
@@ -40,7 +40,7 @@ TEST_CASE("OOP - 类方法定义与调用") {
 
     SECTION("实例成员访问") {
         vm.eval(R"(
-            class A { var a = 1; }
+            class A { var a = 1; function A() {} }
             var o = new A();
             var res = o.a;
         )"_str);
@@ -59,6 +59,7 @@ TEST_CASE("OOP - 类访问变量") {
             var a = 1;
             class A {
                 var b = a;
+                function A() {}
             }
             var o = new A().b;
         )"_str);
@@ -69,6 +70,7 @@ TEST_CASE("OOP - 类访问变量") {
         vm.eval(R"(
             var a = 1;
             class A {
+                function A() {}
                 function b() { return a; }
             }
             var o = new A().b();
@@ -80,6 +82,7 @@ TEST_CASE("OOP - 类访问变量") {
         vm.eval(R"(
             class A {
                 var a = 1;
+                function A() {}
                 function b() { return a; }
             }
             var o = new A().b();

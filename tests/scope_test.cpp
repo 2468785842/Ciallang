@@ -72,6 +72,9 @@ TEST_CASE("类作用域 - 上下文静态变量访问") {
         var x = 1;
 
         class Derived {
+
+            function Derived() { }
+
             function getX() {
                 /* If x is in the local scope, use x;
                  * Else dynamically look it up in `this`, `super`, or the global scope.

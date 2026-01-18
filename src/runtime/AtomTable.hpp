@@ -32,8 +32,6 @@ namespace cial {
     };
 
     static constexpr Atom ATOM_INVALID{};
-    static constexpr Atom ATOM_OBJECT{};
-    static constexpr Atom ATOM_FUNCTION{};
 
     struct AtomEntry : MarkSweepHeader {
         std::uint32_t hash;
@@ -50,8 +48,6 @@ namespace cial {
     public:
         explicit AtomTable() {
             _atoms.push_back(new AtomEntry{ 0, 0, new String{} }); // Reserve index 0 as invalid
-            intern("Object"_str); // ATOM_OBJECT
-            intern("Function"_str); // ATOM_FUNCTION
         }
 
         ~AtomTable() {
@@ -62,6 +58,18 @@ namespace cial {
 
         AtomTable(const AtomTable &) = delete;
         AtomTable &operator=(const AtomTable &) = delete;
+
+        AtomTable(AtomTable &&rhs) noexcept :
+            _handleAtoms(std::move(rhs._handleAtoms)), _atoms(std::move(rhs._atoms)), _map(std::move(rhs._map)) {}
+
+        AtomTable &operator=(AtomTable &&rhs) noexcept {
+            if(this != &rhs) {
+                _handleAtoms = std::move(rhs._handleAtoms);
+                _atoms = std::move(rhs._atoms);
+                _map = std::move(rhs._map);
+            }
+            return *this;
+        }
 
         Atom intern(const String &str);
         Atom intern(const char *s, std::uint32_t len);

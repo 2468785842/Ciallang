@@ -47,7 +47,7 @@ namespace cial {
         // Create new atom
         AtomEntry *e{};
         if(rt) {
-            e = rt->create<AtomEntry>(h, len, new String{ s, len });
+            e = rt->create<AtomEntry>(h, len, new String{ s, len }).get();
         } else {
             e = new AtomEntry{ h, len, new String{ s, len } };
             _handleAtoms.push_back(a);

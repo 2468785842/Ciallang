@@ -160,7 +160,7 @@ namespace cial {
             assert(chunk->getRegCount() != 0);
             assert(!chunk->getInstVec().empty());
 
-            auto *evalChunk = _vmState->rt.create<Bytecode::Chunk>(std::move(*chunk));
+            auto *evalChunk = _vmState->rt.create<Bytecode::Chunk>(std::move(*chunk)).get();
 
             Bytecode::Register retReg{ 0 };
             Bytecode::Chunk tmpChunk{};

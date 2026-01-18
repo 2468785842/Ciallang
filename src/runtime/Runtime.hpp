@@ -27,9 +27,22 @@ namespace cial {
 
     class MarkSweepHeader;
 
+    template <typename T>
+    class RootGuard;
+
     class Runtime {
     public:
-        AtomTable atomTable{};
+        static constexpr Atom ATOM_OBJECT{ 1 };
+        static constexpr Atom ATOM_FUNCTION{ 2 };
+        static constexpr Atom ATOM_CLASS{ 3 };
+
+        AtomTable atomTable = [] {
+            AtomTable at{};
+            at.intern("Object"_str); // ATOM_OBJECT
+            at.intern("Function"_str); // ATOM_FUNCTION
+            at.intern("Class"_str); // ATOM_CLASS
+            return std::move(at);
+        }();
 
         MarkSweep markSweep{ 1024 };
 
@@ -68,24 +81,14 @@ namespace cial {
         }
 
     public:
-        /**
-         * Refactoring is needed because if `create2` is called again after calling the new `create1`,
-         * it will trigger garbage collection, and `create1` might be garbage collected.
-         * Should the new `create` object be added to the root object?
-         *
-         * 1. Handle<T> a = create(xxx); // RAII
-         *    xxx = move(a);
-         * 2. a = create(xxx);
-         *    if !a gc(); // self check?
-         */
         template <typename T, typename... Args>
             requires std::is_base_of_v<MarkSweepHeader, T>
-        T *create(Args &&...args) {
+        RootGuard<T> create(Args &&...args) {
             if(!markSweep._nextFree || !markSweep._nextFree->_isFree) {
                 markSweep.findIdleNode([this] { collectMark(); });
             }
 
-            return allocate<T>(std::forward<Args>(args)...);
+            return RootGuard<T>{ this, allocate<T>(std::forward<Args>(args)...) };
         }
 
     private:
@@ -103,4 +106,25 @@ namespace cial {
             return allocate<T>(std::forward<Args>(args)...);
         }
     };
+
+    template <typename T>
+    class RootGuard {
+        Runtime *_rt;
+        T *_ptr;
+
+    public:
+        RootGuard(Runtime *rt, T *ptr) : _rt(rt), _ptr(ptr) {
+            if(_ptr)
+                _rt->addHandleVal(_ptr);
+        }
+
+        ~RootGuard() {
+            if(_ptr)
+                _rt->removeHandleVal(_ptr);
+        }
+
+        T *get() const { return _ptr; }
+        T *operator->() const { return _ptr; }
+    };
+
 } // namespace cial

@@ -105,6 +105,7 @@ namespace cial {
     struct ClassMeta : MarkSweepHeader {
         Atom className;
         std::uint32_t arity;
+        FuncMeta *initDefaultVal{};
         FuncMeta *constructor{};
         Vec<Atom> extends;
         Vec<MemberShapeMeta> memberShapeMetas;
@@ -115,14 +116,14 @@ namespace cial {
         explicit ClassMeta(const ClassMeta &) noexcept = delete;
         ClassMeta &operator=(const ClassMeta &) noexcept = delete;
 
-        [[nodiscard]] bool hasMember(const Atom name) const noexcept {
+        [[nodiscard]] std::int64_t hasMember(const Atom name) const noexcept {
             const size_t len = memberShapeMetas.size();
-            for(size_t i = 0; i < len; ++i) {
+            for(std::int64_t i = 0; i < len; ++i) {
                 if(memberShapeMetas[i].name == name) {
-                    return true;
+                    return i;
                 }
             }
-            return false;
+            return -1;
         }
 
         /**
@@ -143,16 +144,9 @@ namespace cial {
             memberMetas.push_back(memberMeta);
         }
 
-        [[nodiscard]] ClassFieldMeta getMember(const Atom &name) const noexcept {
-            ClassFieldMeta memberMeta{};
-            const size_t len = memberShapeMetas.size();
-            for(size_t i = 0; i < len; ++i) {
-                if(memberShapeMetas[i].name == name) {
-                    memberMeta = memberMetas[i];
-                }
-            }
-            return memberMeta;
-        }
+        [[nodiscard]] MemberShapeMeta getMemberShape(const size_t idx) const noexcept { return memberShapeMetas[idx]; }
+
+        [[nodiscard]] ClassFieldMeta getMember(const size_t idx) const noexcept { return memberMetas[idx]; }
 
         void setConstructor(FuncMeta *funcMeta) { this->constructor = funcMeta; }
 

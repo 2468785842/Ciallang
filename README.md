@@ -86,7 +86,7 @@
 * [ ] `operator A` 类型转换运算符 `int real string`
 * [x] `A operator` 后缀单目运算符 `() . -- ++`
 * [ ] `A operator` 后缀单目运算符 `[] !`
-* [ ] `A instanceof B` 实例判断运算符
+* [x] `A instanceof B` 实例判断运算符
 * [x] `A incontextof B` 上下文替换运算符
 
 ---
