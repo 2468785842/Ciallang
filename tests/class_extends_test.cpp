@@ -425,121 +425,164 @@ TEST_CASE("TJS2 - 构造函数调用会覆盖子类字段") {
 
     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 10);
 }
-//
-// TEST_CASE("TJS2 - 父构造函数仅初始化父 slot") {
+
+TEST_CASE("TJS2 - 父构造函数仅初始化父 slot") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A {
+            var x = 0;
+            function A() { x = 5; }
+        }
+        class B extends A {
+            function B() { A(); }
+            function getX() { return x; }
+        }
+        var o = new B();
+        var res = o.getX();
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 5);
+}
+
+TEST_CASE("TJS2 - 多继承 slot 查找顺序") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A { var x = 1; function A() {} }
+        class B { var x = 2; function B() {} }
+        class C extends A, B {
+            function C() { A(); B(); }
+            function getX() { return x; }
+        }
+        var o = new C();
+        var res = o.getX();
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 2);
+}
+
+TEST_CASE("TJS2 - 多继承 slot 不存在时 fallback 到 instance") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A { function A() {} }
+        class B { function B() {} }
+        class C extends A, B {
+            var x = 3;
+            function C() { A(); B(); }
+            function getX() { return x; }
+        }
+        var o = new C();
+        var res = o.getX();
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 3);
+}
+
+TEST_CASE("TJS2 - 方法不是闭包而是绑定 slot 的函数") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A {
+            var x = 1;
+            function A() {}
+            function getX() { return x; }
+        }
+        var o = new A();
+        var f = o.getX;
+        var res = f();
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
+}
+
+TEST_CASE("TJS2 - 方法不绑定 slot 而不是调用者") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A {
+            var x = 1;
+            function A() {}
+            function getX() { return x; }
+        }
+        class B extends A {
+            var x = 2;
+            function B() { A(); }
+        }
+        var o = new B();
+        var f = o.getX;
+        var res = f();
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 2);
+}
+
+TEST_CASE("TJS2 - 子类字段不 override 父类字段") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A {
+            var x = 1;
+            function A() {}
+            function getX() { return x; }
+        }
+        class B extends A {
+            var x = 100;
+            function B() { A(); }
+        }
+        var o = new B();
+        var res = o.getX();
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 100);
+}
+
+TEST_CASE("TJS2 - 多层 slot 同名字段解析") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class C { var x = 3; function C() {} }
+        class B extends C { var x = 2; function B() { C(); } }
+        class A extends B {
+            var x = 1;
+            function A() { B(); }
+            function getX() { return x; }
+        }
+        var o = new A();
+        var res = o.getX();
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
+}
+
+// TODO: o.x assign operator
+// TEST_CASE("TJS2 - 仅当 slot 链完全无字段才访问 proxy") {
+//     Runtime rt{};
+//     Context context{ rt };
+//     Bytecode::VMState vmState{ context };
+//     VM vm{ &vmState };
 //     vm.eval(R"(
 //         class A {
-//             var x = 0;
-//             function A() { x = 5; }
+//             function A(){}
+//             function getX() { return x; }
 //         }
 //         class B extends A {
 //             function B() { A(); }
-//         }
-//         var o = new B();
-//         var res = o.getX();
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 5);
-// }
-//
-// TEST_CASE("TJS2 - 多继承 slot 查找顺序") {
-//     vm.eval(R"(
-//         class A { var x = 1; }
-//         class B { var x = 2; }
-//         class C extends A, B {
-//             function getX() { return x; }
-//         }
-//         var o = new C();
-//         var res = o.getX();
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 2);
-// }
-//
-// TEST_CASE("TJS2 - 多继承 slot 不存在时 fallback 到 instance") {
-//     vm.eval(R"(
-//         class A { }
-//         class B { }
-//         class C extends A, B {
-//             var x = 3;
-//             function getX() { return x; }
-//         }
-//         var o = new C();
-//         var res = o.getX();
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 3);
-// }
-//
-// TEST_CASE("TJS2 - 方法不是闭包而是绑定 slot 的函数") {
-//     vm.eval(R"(
-//         class A {
-//             var x = 1;
-//             function getX() { return x; }
-//         }
-//         var o = new A();
-//         var f = o.getX;
-//         var res = f();
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
-// }
-//
-// TEST_CASE("TJS2 - 方法绑定 slot 而不是调用者") {
-//     vm.eval(R"(
-//         class A {
-//             var x = 1;
-//             function getX() { return x; }
-//         }
-//         class B extends A {
-//             var x = 2;
-//         }
-//         var o = new B();
-//         var f = o.getX;
-//         var res = f();
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
-// }
-//
-// TEST_CASE("TJS2 - 子类字段不 override 父类字段") {
-//     vm.eval(R"(
-//         class A {
-//             var x = 1;
-//             function getX() { return x; }
-//         }
-//         class B extends A {
-//             var x = 100;
-//         }
-//         var o = new B();
-//         var res = o.getX();
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
-// }
-//
-// TEST_CASE("TJS2 - 多层 slot 同名字段解析") {
-//     vm.eval(R"(
-//         class C { var x = 3; }
-//         class B extends C { var x = 2; }
-//         class A extends B {
-//             var x = 1;
-//             function getX() { return x; }
-//         }
-//         var o = new A();
-//         var res = o.getX();
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
-// }
-//
-// TEST_CASE("TJS2 - 仅当 slot 链完全无字段才访问 proxy") {
-//     vm.eval(R"(
-//         class A {
-//             function getX() { return x; }
-//         }
-//         class B extends A {
-//             function B() { }
 //         }
 //         var o = new B();
 //         o.x = 9;
