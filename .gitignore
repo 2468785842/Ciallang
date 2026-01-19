@@ -12,3 +12,5 @@
 **/.cache
 
 .DS_Store
+
+CMakeUserPresets.json

@@ -131,7 +131,8 @@ namespace cial::Syntax {
                 break;
 
             if(token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment) {
-                _lexer.takeOverToken(*token);
+                Token ignoreToken;
+                _lexer.takeOverToken(ignoreToken);
             }
         }
         return _lexer.tokenSize() != 0;
@@ -151,8 +152,10 @@ namespace cial::Syntax {
     }
 
     bool Parser::consume(Result &r, Token &token) {
-        if(!lookAhead(r, 1))
+        if(!lookAhead(r, 1)) {
+            _lexer.takeOverToken(token);
             return false;
+        }
 
         return _lexer.takeOverToken(token);
     }

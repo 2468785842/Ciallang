@@ -81,6 +81,25 @@ bool Lexer::next(Result &r, Token *&token) {
 
     // peek an unicode
     int32_t rune = read(r);
+
+    if(rune == runeInvalid) {
+        const LexemeGuard guard{ _sourceFile };
+        token = makeToken(TokenType::Invalid);
+        return guard.commit(*token, false);
+    }
+
+    if(rune == runeEof) {
+        token = makeToken(TokenType::EndOfFile);
+
+        const auto column = _sourceFile.columnByIndex(_sourceFile.length());
+
+        const auto line = _sourceFile.lineByIndex(_sourceFile.length())->line;
+
+        token->location.end(line, column);
+        token->location.start(line, column);
+        return true;
+    }
+
     rewindOneChar();
 
     // preprocessor
@@ -93,6 +112,7 @@ bool Lexer::next(Result &r, Token *&token) {
         }
     }
 
+    // peek an unicode
     rune = read(r);
 
     if(rune == runeInvalid) {
@@ -156,10 +176,13 @@ bool Lexer::next(Result &r, Token *&token) {
             case '*':
             case '>':
             case '%':
-            case '^':
+            case '^': {
                 if(matchOperator(token))
                     return guard.commit(*token);
+                // token = makeToken(TokenType::Error, String{});
+                // return guard.commit(*token, false);
                 break;
+            }
             case '.':
                 if(numberConstVal(r, token))
                     return guard.commit(*token);
@@ -218,6 +241,7 @@ bool Lexer::next(Result &r, Token *&token) {
 
     const LexemeGuard guard{ _sourceFile };
     token = makeToken(TokenType::Invalid);
+    read(r);
     return guard.commit(*token, false);
 }
 
@@ -378,8 +402,7 @@ bool Lexer::matchOperator(Token *&token) {
     while(i < _sourceFile.length()) {
         const std::uint8_t byte = _sourceFile[i];
         // not ASCII
-        if(byte >= 0x80)
-            break;
+        assert(byte < 0x80);
         const int next = OpTrie.getNode(node).next[byte];
         if(next == -1)
             break;

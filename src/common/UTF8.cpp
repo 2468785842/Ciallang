@@ -55,49 +55,39 @@ namespace cial::Common {
         }
     }
 
-    EncodedRuneType utf8Encode(const int32_t r) {
+    EncodedRuneType utf8Encode(int32_t r) {
         EncodedRuneType e{};
+        e.value = r;
 
-        const auto i = static_cast<uint32_t>(r);
-        constexpr uint8_t mask = 0x3f;
-        if(i <= (1 << 7) - 1) {
+        // 非法码点 -> 使用 replacement character
+        if(r < 0 || r > runeMax || (r >= 0xD800 && r <= 0xDFFF)) {
+            r = runeInvalid;
+            e.value = runeInvalid;
+        }
+
+        if(r <= 0x7F) { // 1 字节
             e.data[0] = static_cast<uint8_t>(r);
             e.width = 1;
-            return e;
-        }
-
-        if(i <= (1 << 11) - 1) {
-            e.data[0] = static_cast<uint8_t>(r >> 6) | 0xc0;
-            e.data[1] = static_cast<uint8_t>(r & mask) | 0x80;
+        } else if(r <= 0x7FF) { // 2 字节
+            e.data[0] = 0xC0 | ((r >> 6) & 0x1F);
+            e.data[1] = 0x80 | (r & 0x3F);
             e.width = 2;
-            return e;
-        }
-
-        if(i > runeMax || (i >= 0xd800 && i <= 0xdfff)) {
-            e.data[0] = static_cast<uint8_t>(r >> 12) | 0xe0;
-            e.data[1] = static_cast<uint8_t>(r >> 6) & mask | 0x80;
-            e.data[2] = static_cast<uint8_t>(r) & mask | 0x80;
-            e.value = runeInvalid;
+        } else if(r <= 0xFFFF) { // 3 字节
+            e.data[0] = 0xE0 | ((r >> 12) & 0x0F);
+            e.data[1] = 0x80 | ((r >> 6) & 0x3F);
+            e.data[2] = 0x80 | (r & 0x3F);
             e.width = 3;
-            return e;
+        } else { // 4 字节
+            e.data[0] = 0xF0 | ((r >> 18) & 0x07);
+            e.data[1] = 0x80 | ((r >> 12) & 0x3F);
+            e.data[2] = 0x80 | ((r >> 6) & 0x3F);
+            e.data[3] = 0x80 | (r & 0x3F);
+            e.width = 4;
         }
-
-        if(i <= (1 << 16) - 1) {
-            e.data[0] = static_cast<uint8_t>(r >> 12) | 0xe0;
-            e.data[1] = static_cast<uint8_t>(r >> 6) & mask | 0x80;
-            e.data[2] = static_cast<uint8_t>(r) & mask | 0x80;
-            e.width = 3;
-            return e;
-        }
-
-        e.data[0] = static_cast<uint8_t>(r >> 18) | 0xf0;
-        e.data[1] = static_cast<uint8_t>(r >> 12) & mask | 0x80;
-        e.data[2] = static_cast<uint8_t>(r >> 6) & mask | 0x80;
-        e.data[3] = static_cast<uint8_t>(r) & mask | 0x80;
-        e.width = 4;
 
         return e;
     }
+
 
     int64_t utf8Strlen(const std::string &str) {
         int64_t len = 0;
@@ -120,62 +110,58 @@ namespace cial::Common {
         }
         return len;
     }
-
-    CodePointType utf8Decode(const char *str, const size_t length) {
-        CodePointType cp{};
+    CodePointType utf8Decode(const char *str, size_t length) {
+        CodePointType cp;
         if(length == 0)
             return cp;
 
-        const auto s0 = static_cast<uint8_t>(str[0]);
-        const uint8_t x = S_Utf8_First[s0];
+        uint8_t b0 = static_cast<uint8_t>(str[0]);
 
-        if(x >= 0xf0) {
-            const int32_t mask = (static_cast<int32_t>(x) << 31) >> 31;
-            cp.value = static_cast<int32_t>(s0) & ~mask | runeInvalid & mask;
+        if(b0 <= 0x7F) { // 1 字节 ASCII
+            cp.value = b0;
             cp.width = 1;
-            return cp;
-        }
+        } else if((b0 & 0xE0) == 0xC0) { // 2 字节
+            if(length < 2)
+                return cp;
+            uint8_t b1 = static_cast<uint8_t>(str[1]);
+            if((b1 & 0xC0) != 0x80)
+                return cp;
 
-        if(s0 < 0x80) {
-            cp.value = s0;
-            cp.width = 1;
-            return cp;
-        }
-
-        const auto sz = static_cast<uint8_t>(x & 7);
-        const auto [low, high] = S_Utf8AcceptRanges[x >> 4];
-        if(length < sz)
-            return cp;
-
-        const auto b1 = static_cast<uint8_t>(str[1]);
-        if(b1 < low || high < b1)
-            return cp;
-
-        if(sz == 2) {
-            cp.value = (static_cast<int32_t>(s0) & 0x1f) << 6 | (static_cast<int32_t>(b1) & 0x3f);
+            int32_t r = ((b0 & 0x1F) << 6) | (b1 & 0x3F);
+            if(r < 0x80)
+                r = runeInvalid; // 避免过长编码
+            cp.value = r;
             cp.width = 2;
-            return cp;
-        }
+        } else if((b0 & 0xF0) == 0xE0) { // 3 字节
+            if(length < 3)
+                return cp;
+            uint8_t b1 = static_cast<uint8_t>(str[1]);
+            uint8_t b2 = static_cast<uint8_t>(str[2]);
+            if((b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80)
+                return cp;
 
-        const auto b2 = static_cast<uint8_t>(str[2]);
-        if(!(b2 >= 0x80 && b2 <= 0xbf))
-            return cp;
-
-        if(sz == 3) {
-            cp.value = (static_cast<int32_t>(s0) & 0x1f) << 12 | (static_cast<int32_t>(b1) & 0x3f) << 6 |
-                (static_cast<int32_t>(b2) & 0x3f);
+            int32_t r = ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F);
+            if(r < 0x800 || (r >= 0xD800 && r <= 0xDFFF))
+                r = runeInvalid;
+            cp.value = r;
             cp.width = 3;
-            return cp;
+        } else if((b0 & 0xF8) == 0xF0) { // 4 字节
+            if(length < 4)
+                return cp;
+            uint8_t b1 = static_cast<uint8_t>(str[1]);
+            uint8_t b2 = static_cast<uint8_t>(str[2]);
+            uint8_t b3 = static_cast<uint8_t>(str[3]);
+            if((b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
+                return cp;
+
+            int32_t r = ((b0 & 0x07) << 18) | ((b1 & 0x3F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+            if(r < 0x10000 || r > runeMax)
+                r = runeInvalid;
+            cp.value = r;
+            cp.width = 4;
         }
-
-        const auto b3 = static_cast<uint8_t>(str[3]);
-        if(!(b3 >= 0x80 && b3 <= 0xbf))
-            return cp;
-
-        cp.value = (static_cast<int32_t>(s0) & 0x07) << 18 | (static_cast<int32_t>(b1) & 0x3f) << 12 |
-            (static_cast<int32_t>(b2) & 0x3f) << 6 | (static_cast<int32_t>(b3) & 0x3f);
-        cp.width = 4;
 
         return cp;
     }
+
 } // namespace cial::Common

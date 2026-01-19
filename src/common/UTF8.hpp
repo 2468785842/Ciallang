@@ -54,12 +54,12 @@ namespace cial::Common {
     };
 
     struct CodePointType {
-        int32_t width = 4;
+        int32_t width = 0;
         int32_t value = runeInvalid;
     };
 
     struct EncodedRuneType {
-        int32_t width = 4;
+        int32_t width = 0;
         int32_t value = runeInvalid;
         uint8_t data[4]{};
     };

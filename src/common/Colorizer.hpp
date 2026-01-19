@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <cstdlib>
 #include <fmt/color.h>
 #include <string>
 

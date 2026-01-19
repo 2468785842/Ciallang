@@ -9,9 +9,12 @@ find_package(Catch2 3 REQUIRED)
 set(TEST_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 set(TEST_FILES_PATH ${CMAKE_CURRENT_SOURCE_DIR}/test_files)
+set(TEST_FUZZ_REGRESS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/fuzz_regress)
+
 configure_file(test_config.h.in test_config.h)
 
 set(SOURCES
+        fuzz_regress_test.cpp
         expression_test.cpp
         function_test.cpp
         native_function_test.cpp

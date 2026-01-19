@@ -1,0 +1,8 @@
+# libFuzzer artifacts
+crash-*
+leak-*
+timeout-*
+oom-*
+fuzz-*.log
+
+bin/

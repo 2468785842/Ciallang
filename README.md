@@ -140,13 +140,13 @@
 - clang-format格式化:
     - windows
         ```powershell
-            Get-ChildItem -Path ./src, ./tests -Recurse -File |  
+            Get-ChildItem -Path ./src, ./fuzz, ./tests -Recurse -File |  
             Where-Object { $_.Name -match '\.(cpp|cc|h|hpp|inc)$' } | 
             ForEach-Object { clang-format -i --verbose $_.FullName }
         ```
     - macos
         ```bash
-            find ./src ./tests \( -name "*.cpp" -o -name "*.cc" -o -name "*.h" -o -name "*.hpp" -o -name "*.inc" \) \
+            find ./src ./fuzz ./tests \( -name "*.cpp" -o -name "*.cc" -o -name "*.h" -o -name "*.hpp" -o -name "*.inc" \) \
             -type f -print0 | xargs -0 clang-format -i --verbose
         ```
 

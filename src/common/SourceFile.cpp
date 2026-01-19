@@ -64,7 +64,7 @@ namespace cial::Common {
 
     void SourceFile::pushMark() { _markStack.push(_index); }
 
-    bool SourceFile::eof() const { return _index > _buffer.size() - 1; }
+    bool SourceFile::eof() const { return _index >= _buffer.size(); }
 
     size_t SourceFile::popMark() {
         if(_markStack.empty())
@@ -179,7 +179,7 @@ namespace cial::Common {
 
         DEFER { _index += width; };
 
-        if(_buffer.empty() || _index > _buffer.size() - 1)
+        if(_buffer.empty() || _index >= _buffer.size())
             return runeEof;
 
         const auto ch = _buffer[_index];
@@ -195,7 +195,7 @@ namespace cial::Common {
             width = cp.width;
             rune = cp.value;
 
-            if(rune == runeInvalid && width == 1) {
+            if(rune == runeInvalid) {
                 r.error("illegal utf-8 encoding");
                 return runeInvalid;
             }

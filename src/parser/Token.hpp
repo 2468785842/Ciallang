@@ -137,6 +137,7 @@ namespace cial::Syntax {
     X(RightCurlyBrace, "}")
 
 #define TOKEN_SYMBOL_LIST(X)                                                                                           \
+    X(Error, "error")                                                                                                  \
     X(Invalid, "invalid")                                                                                              \
     X(EndOfFile, "end_of_file")                                                                                        \
     X(LineComment, "line_comment")                                                                                     \
@@ -229,7 +230,7 @@ namespace cial::Syntax {
         }
 
 
-        Token(const Token &token) noexcept {
+        Token(const Token &token) {
             _type = token._type;
             _valueType = token._valueType;
             location = token.location;
@@ -252,7 +253,7 @@ namespace cial::Syntax {
             }
         }
 
-        Token &operator=(const Token &token) noexcept {
+        Token &operator=(const Token &token) {
             if(this != &token) {
                 this->~Token();
                 new(this) Token(token);
