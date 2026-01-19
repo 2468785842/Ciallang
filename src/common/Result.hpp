@@ -17,8 +17,6 @@
 #include "ResultMessage.hpp"
 #include "SourceLocation.hpp"
 
-#include "logging/Logger.hpp"
-
 namespace cial::Common {
 
     class [[nodiscard]] Result {
@@ -30,18 +28,15 @@ namespace cial::Common {
         void succeed() noexcept { _success = true; }
 
         void info(const std::string &message, const SourceLocation &loc = {}, const std::string &details = {}) {
-            CLL_LOG_INFO(message.c_str());
             _messages.emplace_back(message, loc, details, ResultMessage::Types::info);
         }
 
         void error(const std::string &message, const SourceLocation &loc = {}, const std::string &details = {}) {
-            CLL_LOG_ERROR(message.c_str());
             _messages.emplace_back(message, loc, details, ResultMessage::Types::error);
             fail();
         }
 
         void warning(const std::string &message, const SourceLocation &loc = {}, const std::string &details = {}) {
-            CLL_LOG_WARN(message.c_str());
             _messages.emplace_back(message, loc, details, ResultMessage::Types::warning);
         }
 

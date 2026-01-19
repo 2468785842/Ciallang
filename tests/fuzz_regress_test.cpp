@@ -29,7 +29,7 @@ void run_lexer(const std::string &input) {
         Syntax::Lexer lexer{ sourceFile, context.pp() };
         while(lexer.hasNext()) {
             Syntax::Token *t;
-            lexer.next(r, t);
+            lexer.next(t);
             if(r.isFailed())
                 break;
             Syntax::Token take;

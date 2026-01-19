@@ -384,6 +384,7 @@ namespace cial::Bytecode::Op {
         if(inst.getOperand2Type() == Operand::Type::Register)
             return vmState.reg(inst.getOperand2<Register>()).asString().unwrap();
         CLL_ASSERT(false, "unknown inst dprop operand2 type");
+        return {};
     }
 
     Value DProp::value(const Instruction &inst, const VMState &vmState) {
@@ -392,6 +393,7 @@ namespace cial::Bytecode::Op {
         if(inst.getOperand3Type() == Operand::Type::Register)
             return vmState.reg(inst.getOperand3<Register>());
         CLL_ASSERT(false, "unknown inst dprop operand3 type");
+        return {};
     }
 
     void DProp::execute(const Instruction &inst, VMState &vmState) {

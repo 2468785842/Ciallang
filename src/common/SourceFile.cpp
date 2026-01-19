@@ -220,13 +220,6 @@ namespace cial::Common {
 
     const std::filesystem::path &SourceFile::path() const { return _path; }
 
-    uint32_t SourceFile::columnByIndex(const size_t index) const {
-        const auto line = lineByIndex(index);
-        if(line == nullptr)
-            return 0;
-        return static_cast<const uint32_t>(index - line->begin);
-    }
-
     std::string SourceFile::substring(const size_t start, const size_t end) const {
         const auto length = end - start;
         std::string value;
@@ -248,4 +241,12 @@ namespace cial::Common {
             return nullptr;
         return &it->second;
     }
+
+    uint32_t SourceFile::columnByIndex(const size_t index) const {
+        const auto line = lineByIndex(index);
+        if(line == nullptr)
+            return 0;
+        return static_cast<const uint32_t>(index - line->begin);
+    }
+
 } // namespace cial::Common

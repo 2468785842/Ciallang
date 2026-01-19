@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.12)
 project(CialFuzz C CXX)
 
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    message(FATAL_ERROR "libFuzzer requires Clang compiler")
+endif()
+
 add_executable(fuzz_lexer fuzz_lexer.cc)
 
 target_link_libraries(fuzz_lexer

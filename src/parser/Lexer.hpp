@@ -16,41 +16,10 @@
 
 #include "PreProcessor.hpp"
 #include "Token.hpp"
-#include "common/Result.hpp"
 #include "common/SourceFile.hpp"
 #include "runtime/Runtime.hpp"
-// #include "PreProcessor.hpp"
 
 namespace cial::Syntax {
-    class LexemeGuard {
-    public:
-        explicit LexemeGuard(SourceFile &src) : _src(src) {
-            // save mark
-            _src.pushMark();
-            const auto [startColumn, startLine] = getCurrentRowCol();
-            _startCol = startColumn;
-            _startLine = startLine;
-        }
-
-        bool commit(Token &tok, const bool ok = true) const {
-            const auto [endCol, endLine] = getCurrentRowCol();
-            tok.location.start(_startLine, _startCol);
-            tok.location.end(endLine, endCol);
-            return ok;
-        }
-
-        void restoreMark() const { _src.restoreTopMark(); }
-
-        ~LexemeGuard() { _src.popMark(); }
-
-    private:
-        SourceFile &_src;
-        uint32_t _startLine, _startCol;
-
-        [[nodiscard]] std::pair<uint32_t, uint32_t> getCurrentRowCol() const {
-            return std::make_pair(_src.columnByIndex(_src.pos()), _src.lineByIndex(_src.pos())->line);
-        }
-    };
 
     class Lexer {
     public:
@@ -58,9 +27,9 @@ namespace cial::Syntax {
 
         explicit Lexer(SourceFile &sourceFile, PreProcessor &preProcessor);
 
-        bool next(Result &r, Token *&token);
+        bool next(Token *&token, bool enablePreProcessor = true);
 
-        void skipComment(Result &r);
+        void skipComment();
 
         bool takeOverToken(Token &token);
 
@@ -76,12 +45,14 @@ namespace cial::Syntax {
         }
 
     private:
+        // We don't need result return error; just for source file
+        // We use Token to report error
+        Result _r{};
         SourceFile &_sourceFile;
         PreProcessor &_preProcessor;
 
         std::deque<Token *> _tokens{};
         bool _hasNext{ true };
-        bool _disablePreProcess{ false };
 
         template <typename... Args>
         Token *makeToken(Args &&...args) {
@@ -91,44 +62,51 @@ namespace cial::Syntax {
 
         void rewindOneChar() const;
 
-        String readIdentifier(Result &r) const;
+        String readIdentifier();
 
-        bool match(Result &r, const String &literal) const;
+        bool match(const String &literal);
 
-        int32_t read(Result &r, bool skipWhitespace = true) const;
+        int32_t read(bool skipWhitespace = true);
 
-        bool readParenExpr(Result &r, std::string &out) const;
+        static void patchTokenLoc(Token &token, const std::pair<uint32_t, uint32_t> &start,
+                                  const std::pair<uint32_t, uint32_t> &end) {
+            token.location.start(start.first, start.second);
+            token.location.start(end.first, end.second);
+        }
 
-        bool processor(Result &r) const;
+        [[nodiscard]] std::pair<uint32_t, uint32_t> getRowCol(const size_t pos) const {
+            return std::make_pair(_sourceFile.columnByIndex(pos), _sourceFile.lineByIndex(pos)->line);
+        }
 
-        bool lineTerminator(Result &r, Token *&token);
+        bool readPreProcessorExpr(std::string &out);
+
+        bool processor();
 
         bool matchOperator(Token *&token);
 
-        bool octetLiteral(Result &r, Token *&token);
+        bool octetLiteral(Token *&token);
 
-        bool lineComment(Result &r, Token *&token);
+        bool lineComment(Token *&token);
 
-        bool blockComment(Result &r, Token *&token);
+        bool blockComment(Token *&token);
 
-        bool numberConstVal(Result &r, Token *&token);
+        bool numberConstVal(Token *&token);
 
-        bool stringConstVal(Result &r, Token *&token);
+        bool stringConstVal(Token *&token);
 
-        bool templateStringConstVal(Result &r, Token *&token);
+        bool templateStringConstVal(Token *&token);
 
-        bool parseNonDecimalNumber(Result &r, Token *&token, std::stringstream &, std::int8_t (*)(char), std::int8_t);
+        bool parseNonDecimalNumber(Token *&token, std::stringstream &, std::int8_t (*)(char), std::int8_t);
 
-        bool parseNonDecimalInteger(Result &r, Token *&token, const std::string &, std::int8_t (*)(char), std::int8_t);
+        bool parseNonDecimalInteger(Token *&token, const std::string &, std::int8_t (*)(char), std::int8_t);
 
-        void parseNonDecimalReal(Result &r, Token *&token, const std::string &, std::int8_t (*)(char), std::int8_t);
+        void parseNonDecimalReal(Token *&token, const std::string &, std::int8_t (*)(char), std::int8_t);
 
-        void extractNumber(Result &r, std::int8_t (*)(char), const std::string &expMark, std::stringstream &,
-                           bool &) const;
+        void extractNumber(std::int8_t (*)(char), const std::string &expMark, std::stringstream &, bool &);
 
-        bool identifier(Result &r, Token *&);
+        void identifier(Token *&);
 
-        StringParseState internalStringParser(Result &r, Token *&token, char delimiter, bool *templateOver = nullptr,
+        StringParseState internalStringParser(Token *&token, char delimiter, bool *templateOver = nullptr,
                                               bool templateMode = false);
 
 

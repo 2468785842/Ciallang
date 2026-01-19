@@ -70,31 +70,28 @@ void Lexer::rewindOneChar() const {
 /**
  * 尝试从流, 读取一个Token
  *
- * @param r result
  * @param token 返回的Token, 会将数据填充
+ * @param enablePreProcessor 是否启用预处理?
  * @return 是否匹配成功? succeed -> true
  *                     failed  -> false
  */
-bool Lexer::next(Result &r, Token *&token) {
+bool Lexer::next(Token *&token, const bool enablePreProcessor) {
 
     DEFER { _hasNext = !_sourceFile.eof(); };
 
-    // peek an unicode
-    int32_t rune = read(r);
+    int32_t rune = read();
 
     if(rune == runeInvalid) {
-        const LexemeGuard guard{ _sourceFile };
         token = makeToken(TokenType::Invalid);
-        return guard.commit(*token, false);
+        const auto [line, column] = getRowCol(_sourceFile.pos());
+        token->location.end(line, column);
+        token->location.start(line, column);
+        return false;
     }
 
     if(rune == runeEof) {
         token = makeToken(TokenType::EndOfFile);
-
-        const auto column = _sourceFile.columnByIndex(_sourceFile.length());
-
-        const auto line = _sourceFile.lineByIndex(_sourceFile.length())->line;
-
+        const auto [line, column] = getRowCol(_sourceFile.length());
         token->location.end(line, column);
         token->location.start(line, column);
         return true;
@@ -105,29 +102,26 @@ bool Lexer::next(Result &r, Token *&token) {
     // preprocessor
     if(rune == '@') {
         while(!_sourceFile.eof()) {
-            if(!_disablePreProcess && processor(r)) {
+            if(enablePreProcessor && processor()) {
                 continue;
             }
             break;
         }
     }
 
-    // peek an unicode
-    rune = read(r);
+    rune = read();
 
     if(rune == runeInvalid) {
-        const LexemeGuard guard{ _sourceFile };
         token = makeToken(TokenType::Invalid);
-        return guard.commit(*token, false);
+        const auto [line, column] = getRowCol(_sourceFile.pos());
+        token->location.end(line, column);
+        token->location.start(line, column);
+        return false;
     }
 
     if(rune == runeEof) {
         token = makeToken(TokenType::EndOfFile);
-
-        const auto column = _sourceFile.columnByIndex(_sourceFile.length());
-
-        const auto line = _sourceFile.lineByIndex(_sourceFile.length())->line;
-
+        const auto [line, column] = getRowCol(_sourceFile.length());
         token->location.end(line, column);
         token->location.start(line, column);
         return true;
@@ -135,22 +129,22 @@ bool Lexer::next(Result &r, Token *&token) {
 
     rewindOneChar();
 
+    // identifier
     if(isRuneLetter(rune)) {
-        // identifier
-        const LexemeGuard guard{ _sourceFile };
-
-        if(identifier(r, token))
-            return guard.commit(*token);
+        const auto start = getRowCol(_sourceFile.pos());
+        identifier(token);
+        const auto end = getRowCol(_sourceFile.pos());
+        patchTokenLoc(*token, start, end);
+        return true;
     }
 
     if(rune < 0x80) {
-        // this lexeme start row, col
-        const LexemeGuard guard{ _sourceFile };
-
         if(rune >= '0' && rune <= '9') {
-            if(numberConstVal(r, token))
-                return guard.commit(*token);
-            guard.restoreMark();
+            const auto start = getRowCol(_sourceFile.pos());
+            const bool r = numberConstVal(token);
+            const auto end = getRowCol(_sourceFile.pos());
+            patchTokenLoc(*token, start, end);
+            return r;
         }
 
         switch(static_cast<char>(rune)) {
@@ -177,79 +171,116 @@ bool Lexer::next(Result &r, Token *&token) {
             case '>':
             case '%':
             case '^': {
-                if(matchOperator(token))
-                    return guard.commit(*token);
-                // token = makeToken(TokenType::Error, String{});
-                // return guard.commit(*token, false);
-                break;
+                const auto start = getRowCol(_sourceFile.pos());
+                const bool r = matchOperator(token);
+                const auto end = getRowCol(_sourceFile.pos());
+                patchTokenLoc(*token, start, end);
+                return r;
             }
-            case '.':
-                if(numberConstVal(r, token))
-                    return guard.commit(*token);
-                guard.restoreMark();
-                if(matchOperator(token))
-                    return guard.commit(*token);
-                break;
+            case '.': {
+                const auto start = getRowCol(_sourceFile.pos());
+                read(false); // '.'
+                const uint32_t peek = read(false);
+                rewindOneChar();
+                rewindOneChar();
+
+                bool r;
+                if(isRuneDigit(peek)) {
+                    r = numberConstVal(token);
+                } else {
+                    r = matchOperator(token);
+                }
+                const auto end = getRowCol(_sourceFile.pos());
+                patchTokenLoc(*token, start, end);
+                return r;
+            }
             // block comment, line comment
-            case '/':
-                _disablePreProcess = true;
-                if(lineComment(r, token)) {
-                    _disablePreProcess = false;
-                    return guard.commit(*token);
+            case '/': {
+                const auto start = getRowCol(_sourceFile.pos());
+                read(false); // '/'
+                const uint32_t peek = read(false);
+
+                rewindOneChar();
+                rewindOneChar();
+
+                bool r;
+                if(peek == '/') {
+                    r = lineComment(token);
+                } else if(peek == '*') {
+                    r = blockComment(token);
+                } else {
+                    r = matchOperator(token);
                 }
-                guard.restoreMark();
-                if(blockComment(r, token)) {
-                    _disablePreProcess = false;
-                    return guard.commit(*token);
+                const auto end = getRowCol(_sourceFile.pos());
+                patchTokenLoc(*token, start, end);
+                return r;
+            }
+            case '<': {
+                const auto start = getRowCol(_sourceFile.pos());
+                read(false); // '<'
+                const uint32_t peek = read(false);
+
+                rewindOneChar();
+                rewindOneChar();
+
+                bool r;
+                if(peek == '%') {
+                    r = octetLiteral(token);
+                } else {
+                    r = matchOperator(token);
                 }
-                _disablePreProcess = false;
-                guard.restoreMark();
-                if(matchOperator(token))
-                    return guard.commit(*token);
-                break;
-            case '<':
-                if(octetLiteral(r, token))
-                    return guard.commit(*token);
-                guard.restoreMark();
-                if(matchOperator(token))
-                    return guard.commit(*token);
-                break;
-            case ';':
-                if(lineTerminator(r, token))
-                    return guard.commit(*token);
-                break;
+                const auto end = getRowCol(_sourceFile.pos());
+                patchTokenLoc(*token, start, end);
+                return r;
+            }
+            case ';': {
+                const auto start = getRowCol(_sourceFile.pos());
+                read();
+                token = makeToken(TokenType::SemiColon);
+                const auto end = getRowCol(_sourceFile.pos());
+                patchTokenLoc(*token, start, end);
+                return true;
+            }
             case '\'':
-            case '"':
-                _disablePreProcess = true;
-                if(stringConstVal(r, token)) {
-                    _disablePreProcess = false;
-                    return guard.commit(*token);
-                }
-                _disablePreProcess = false;
-                break;
-            case '@':
-                _disablePreProcess = true;
-                if(templateStringConstVal(r, token)) {
-                    _disablePreProcess = false;
-                    return guard.commit(*token);
-                }
-                _disablePreProcess = false;
-                break;
-            default:;
+            case '"': {
+                const auto start = getRowCol(_sourceFile.pos());
+                const bool r = stringConstVal(token);
+                const auto end = getRowCol(_sourceFile.pos());
+                patchTokenLoc(*token, start, end);
+                return r;
+            }
+            case '@': {
+                const auto start = getRowCol(_sourceFile.pos());
+                const bool r = templateStringConstVal(token);
+                const auto end = getRowCol(_sourceFile.pos());
+                patchTokenLoc(*token, start, end);
+                return r;
+            }
+            default: {
+                const auto start = getRowCol(_sourceFile.pos());
+                read();
+                token = makeToken(TokenType::Error,
+                                  String{ fmt::format("unexpected character '{}'", static_cast<char>(rune)) });
+                const auto end = getRowCol(_sourceFile.pos());
+                patchTokenLoc(*token, start, end);
+                return false;
+            }
         }
     }
 
-    const LexemeGuard guard{ _sourceFile };
+    const auto start = getRowCol(_sourceFile.pos());
+    read();
     token = makeToken(TokenType::Invalid);
-    read(r);
-    return guard.commit(*token, false);
+    const auto end = getRowCol(_sourceFile.pos());
+    patchTokenLoc(*token, start, end);
+    return false;
 }
 
-bool Lexer::readParenExpr(Result &r, std::string &out) const {
+bool Lexer::readPreProcessorExpr(std::string &out) {
     int depth = 1;
 
     while(!_sourceFile.eof()) {
-        const uint32_t c = read(r);
+        const uint32_t c = read();
         if(c >= 0x80)
             return false;
 
@@ -265,17 +296,17 @@ bool Lexer::readParenExpr(Result &r, std::string &out) const {
     return false; // EOF before ')'
 }
 
-bool Lexer::processor(Result &r) const {
+bool Lexer::processor() {
 
-    if(read(r) == '@') {
+    if(read() == '@') {
 
         // ---------- @set ----------
-        if(match(r, "set"_str)) {
-            if(read(r) != '(')
+        if(match("set"_str)) {
+            if(read() != '(')
                 return false;
 
             std::string expr;
-            if(!readParenExpr(r, expr))
+            if(!readPreProcessorExpr(expr))
                 return false;
 
             _preProcessor.onSet(String{ expr });
@@ -283,12 +314,12 @@ bool Lexer::processor(Result &r) const {
         }
 
         // ---------- @if ----------
-        if(match(r, "if"_str)) {
-            if(read(r) != '(')
+        if(match("if"_str)) {
+            if(read() != '(')
                 return false;
 
             std::string expr;
-            if(!readParenExpr(r, expr))
+            if(!readPreProcessorExpr(expr))
                 return false;
 
             _preProcessor.onIf(String{ expr });
@@ -296,7 +327,7 @@ bool Lexer::processor(Result &r) const {
         }
 
         // ---------- @endif ----------
-        if(match(r, "endif"_str)) {
+        if(match("endif"_str)) {
             _preProcessor.onEndIf();
             return true;
         }
@@ -306,25 +337,24 @@ bool Lexer::processor(Result &r) const {
 
     // ---------- 普通脚本 ----------
     if(!_preProcessor.isEnabled()) {
-        read(r);
+        read();
         return true;
     }
 
     return false;
 }
 
-void Lexer::skipComment(Result &r) {
+void Lexer::skipComment() {
     Token *token{};
-    const LexemeGuard guard{ _sourceFile };
 
     while(hasNext()) {
-        if(!next(r, token)) {
-            guard.restoreMark();
+        if(!next(token)) {
             break;
         }
 
         if(token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment) {
-            takeOverToken(*token);
+            Token ignoreToken;
+            takeOverToken(ignoreToken);
             continue;
         }
 
@@ -333,8 +363,7 @@ void Lexer::skipComment(Result &r) {
 }
 
 bool Lexer::takeOverToken(Token &token) {
-    if(_tokens.empty())
-        return false;
+    assert(!_tokens.empty());
 
     token = std::move(*_tokens.front());
     _tokens.pop_front();
@@ -348,13 +377,12 @@ bool Lexer::takeOverToken(Token &token) {
 /**
  * 从流中读取一个字符
  *
- * @param r result
  * @param skipWhitespace 是否跳过空格
  * @return 读取的字符
  */
-int32_t Lexer::read(Result &r, const bool skipWhitespace) const {
+int32_t Lexer::read(const bool skipWhitespace) {
     while(true) {
-        const auto ch = _sourceFile.next(r);
+        const auto ch = _sourceFile.next(_r);
 
         if(skipWhitespace && isRuneWhitespace(ch))
             continue;
@@ -367,17 +395,16 @@ int32_t Lexer::read(Result &r, const bool skipWhitespace) const {
  * 匹配一段文字,
  * N.B. the first char is definite: literal[0] == ch
  *
- * @param r result
  * @param literal 需要匹配的文字
  * @return 是否匹配成功? succeed -> true
  *                     failed  -> false
  */
-bool Lexer::match(Result &r, const String &literal) const {
+bool Lexer::match(const String &literal) {
     _sourceFile.pushMark();
     DEFER { _sourceFile.popMark(); };
 
     return std::ranges::all_of(literal, [&](const char targetCh) {
-        if(targetCh != read(r, false)) {
+        if(targetCh != read(false)) {
             _sourceFile.restoreTopMark();
             return false;
         }
@@ -416,21 +443,23 @@ bool Lexer::matchOperator(Token *&token) {
         }
     }
 
+    _sourceFile.seek(lastPos);
+
     if(lastAccept != -1) {
-        _sourceFile.seek(lastPos);
         token = makeToken(OpTrie.getNode(lastAccept).token);
         return true;
     }
 
+    token = makeToken(TokenType::Error, "expected a operator character"_str);
     return false;
 }
 
-bool Lexer::lineComment(Result &r, Token *&token) {
-    if(match(r, "//"_str)) {
+bool Lexer::lineComment(Token *&token) {
+    if(match("//"_str)) {
         token = makeToken(TokenType::LineComment);
         int32_t ch;
         do {
-            ch = read(r, false);
+            ch = read(false);
         } while(ch != '\n' && !_sourceFile.eof());
         return true;
     }
@@ -439,22 +468,21 @@ bool Lexer::lineComment(Result &r, Token *&token) {
 
 /**
  * 匹配块注释, 支持嵌套
- * @param r result msg
  * @param token 返回的token
  * @return 是否成功
  */
-bool Lexer::blockComment(Result &r, Token *&token) {
-    if(match(r, "/*"_str)) {
+bool Lexer::blockComment(Token *&token) {
+    if(match("/*"_str)) {
         auto blockCount = 1;
 
         while(!_sourceFile.eof()) {
-            const int32_t ch = read(r);
-            if(ch == '/' && read(r, false) == '*') {
+            const int32_t ch = read();
+            if(ch == '/' && read(false) == '*') {
                 blockCount++;
                 continue;
             }
 
-            if(ch == '*' && read(r, false) == '/') {
+            if(ch == '*' && read(false) == '/') {
                 if(--blockCount == 0)
                     break;
             }
@@ -466,9 +494,9 @@ bool Lexer::blockComment(Result &r, Token *&token) {
     return false;
 }
 
-bool Lexer::numberConstVal(Result &r, Token *&token) {
+bool Lexer::numberConstVal(Token *&token) {
     std::stringstream stream{ "" };
-    auto ch = read(r);
+    auto ch = read();
     constexpr std::string valid = ".0123456789Ee";
     int32_t shifting = 0;
     auto hasActualDigits = false;
@@ -477,8 +505,7 @@ bool Lexer::numberConstVal(Result &r, Token *&token) {
     while(valid.find_first_of(static_cast<char>(ch)) != std::string::npos) {
         if(ch == '.') {
             if(valueType == ValueType::Real) {
-                token = makeToken(TokenType::Invalid);
-                rewindOneChar();
+                token = makeToken(TokenType::Error, "unexpected second decimal point"_str);
                 return false;
             }
             valueType = ValueType::Real;
@@ -486,13 +513,13 @@ bool Lexer::numberConstVal(Result &r, Token *&token) {
 
         // 进制检查
         if(!hasActualDigits && ch == '0') {
-            const auto tCh = read(r, false);
+            const auto tCh = read(false);
             if(tCh == 'x' || tCh == 'X')
                 // 十六进制
-                return parseNonDecimalNumber(r, token, stream, getHexNum, 4);
+                return parseNonDecimalNumber(token, stream, getHexNum, 4);
             if(tCh == 'b' || tCh == 'B')
                 // 二进制
-                return parseNonDecimalNumber(r, token, stream, getBinNum, 1);
+                return parseNonDecimalNumber(token, stream, getBinNum, 1);
 
             if(tCh == 'e' || tCh == 'E') {
                 const auto runeType = utf8Encode(ch);
@@ -503,24 +530,26 @@ bool Lexer::numberConstVal(Result &r, Token *&token) {
             }
             if(isdigit(tCh) && tCh >= '0' && tCh <= '7')
                 // octal, 八进制
-                return parseNonDecimalNumber(r, token, stream, getOctNum, 3);
+                return parseNonDecimalNumber(token, stream, getOctNum, 3);
 
             rewindOneChar();
         }
 
         // 科学计数法
         if(ch == 'e' || ch == 'E') {
-            const auto flag = read(r, false);
+            const auto flag = read(false);
 
-            if(flag != '-' && flag != '+')
+            if(flag != '-' && flag != '+') {
+                token = makeToken(TokenType::Error, "scientific notation expected character '-' or '+'"_str);
                 return false;
+            }
 
             int32_t bit = 0;
-            auto num = read(r, false);
+            auto num = read(false);
             while(isdigit(num)) {
                 bit *= 10;
                 bit += num - '0';
-                num = read(r, false);
+                num = read(false);
             }
             if(flag == '-')
                 shifting = -bit;
@@ -534,15 +563,15 @@ bool Lexer::numberConstVal(Result &r, Token *&token) {
         if(isdigit(ch)) {
             hasActualDigits = true;
         }
-        ch = read(r, false);
-    }
-
-    if(!hasActualDigits) {
-        rewindOneChar();
-        return false;
+        ch = read(false);
     }
 
     rewindOneChar();
+
+    if(!hasActualDigits) {
+        token = makeToken(TokenType::Error, "number value expected digits"_str);
+        return false;
+    }
 
     const auto fixValue = [&](const double &val) {
         double ret = val;
@@ -567,28 +596,30 @@ bool Lexer::numberConstVal(Result &r, Token *&token) {
         }
         return true;
     }
+
+    token = makeToken(TokenType::Error, "expected a number value"_str);
     return false;
 }
 
 // regex expr : 0x\\d*\.?\\d+[pP]\\d*
-bool Lexer::parseNonDecimalNumber(Result &r, Token *&token, std::stringstream &ss, std::int8_t (*validDigits)(char),
+bool Lexer::parseNonDecimalNumber(Token *&token, std::stringstream &ss, std::int8_t (*validDigits)(char),
                                   const std::int8_t base) {
     bool isReal = false;
-    extractNumber(r, validDigits, "Pp", ss, isReal);
+    extractNumber(validDigits, "Pp", ss, isReal);
 
     const auto &str = ss.str();
     if(str.empty())
         return false;
 
     if(isReal) {
-        parseNonDecimalReal(r, token, str, validDigits, base);
+        parseNonDecimalReal(token, str, validDigits, base);
         return true;
     }
-    return parseNonDecimalInteger(r, token, str, validDigits, base);
+    return parseNonDecimalInteger(token, str, validDigits, base);
 }
 
-void Lexer::parseNonDecimalReal(Result &r, Token *&token, const std::string &decimalStr,
-                                std::int8_t (*validDigits)(char), const std::int8_t baseBits) {
+void Lexer::parseNonDecimalReal(Token *&token, const std::string &decimalStr, std::int8_t (*validDigits)(char),
+                                const std::int8_t baseBits) {
     // parse non-decimal(hex decimal, octal or binary) floating-point number.
     // this routine heavily depends on IEEE double floating-point number expression.
     uint64_t main = 0ull; // significand
@@ -697,7 +728,7 @@ void Lexer::parseNonDecimalReal(Result &r, Token *&token, const std::string &dec
     token = makeToken(TokenType::ConstVal, temp);
 }
 
-bool Lexer::parseNonDecimalInteger(Result &r, Token *&token, const std::string &decimalStr, int8_t (*validDigits)(char),
+bool Lexer::parseNonDecimalInteger(Token *&token, const std::string &decimalStr, int8_t (*validDigits)(char),
                                    const int8_t baseBits) {
     Integer v = 0;
     for(const auto decimal : decimalStr) {
@@ -709,15 +740,15 @@ bool Lexer::parseNonDecimalInteger(Result &r, Token *&token, const std::string &
 }
 
 // 如果是 . | p | P 那么isReal = true
-void Lexer::extractNumber(Result &r, std::int8_t (*validDigits)(char), const std::string &expMark,
-                          std::stringstream &ss, bool &isReal) const {
+void Lexer::extractNumber(std::int8_t (*validDigits)(char), const std::string &expMark, std::stringstream &ss,
+                          bool &isReal) {
     // 小数点
     bool pointFound = false;
     // 指数
     bool expFound = false;
 
     const std::string valid = "+-.0123456789" + expMark;
-    auto ch = static_cast<char>(read(r, false));
+    auto ch = static_cast<char>(read(false));
     do {
         if(!expFound) {
             if(validDigits(ch) != -1) {
@@ -728,13 +759,13 @@ void Lexer::extractNumber(Result &r, std::int8_t (*validDigits)(char), const std
             } else if(ch == expMark[0] || ch == expMark[1]) {
                 expFound = true;
                 ss << ch;
-                ch = static_cast<char>(read(r));
+                ch = static_cast<char>(read());
                 if(valid.find_first_of(ch) == std::string::npos)
                     break;
                 if(ch == '+' || ch == '-') {
                     ss << ch;
                     // 跳过操作符,后面的所有空格
-                    while(isRuneWhitespace(read(r))) {
+                    while(isRuneWhitespace(read())) {
                     }
                     // 多读一个,回溯
                     rewindOneChar();
@@ -747,17 +778,17 @@ void Lexer::extractNumber(Result &r, std::int8_t (*validDigits)(char), const std
         } else {
             break;
         }
-        ch = static_cast<char>(read(r, false));
+        ch = static_cast<char>(read(false));
     } while(valid.find_first_of(ch) != std::string::npos);
 
     isReal = pointFound || expFound;
 }
 
-bool Lexer::identifier(Result &r, Token *&token) {
-    const auto name = readIdentifier(r);
+void Lexer::identifier(Token *&token) {
+    const String name = readIdentifier();
 
-    if(name.isEmpty())
-        return false;
+    // if(name.isEmpty())
+    //     return false;
 
     static std::unordered_map<String, Token> Keywords{
 #define LIST_TO_TOKEN_PAIR(SYMBOL, NAME, VALUE) { NAME##_str, Token{ TokenType::SYMBOL, VALUE } },
@@ -771,26 +802,24 @@ bool Lexer::identifier(Result &r, Token *&token) {
     // get keyword
     if(const auto it = Keywords.find(name); it != Keywords.end()) {
         token = makeToken(it->second);
-        return true;
+        return;
     }
 
     token = makeToken(TokenType::Identifier, String{ name });
-
-    return true;
 }
 
-cial::String Lexer::readIdentifier(Result &r) const {
-    auto ch = read(r, false);
-    if(!isRuneLetter(ch)) {
-        return ""_str;
-    }
-    std::stringstream stream{};
+cial::String Lexer::readIdentifier() {
+    auto ch = read(false);
+    // if(!isRuneLetter(ch)) {
+    //     return ""_str;
+    // }
+    std::stringstream stream{ "" };
 
     auto runeType = utf8Encode(ch);
     stream.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
 
     while(true) {
-        ch = read(r, false);
+        ch = read(false);
         if(isRuneLetter(ch) || isRuneDigit(ch)) {
             runeType = utf8Encode(ch);
             stream.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
@@ -801,38 +830,31 @@ cial::String Lexer::readIdentifier(Result &r) const {
     }
 }
 
-bool Lexer::lineTerminator(Result &r, Token *&token) {
-    const auto result = read(r) == ';';
-    if(result)
-        token = makeToken(TokenType::SemiColon);
-    return result;
-}
-
-bool Lexer::stringConstVal(Result &r, Token *&token) {
-    const int32_t delimiter = read(r, false);
-    if(delimiter != '"' && delimiter != '\'') {
-        rewindOneChar();
-        return false;
-    }
-    return internalStringParser(r, token, static_cast<char>(delimiter)) == StringParseState::Delimiter;
+bool Lexer::stringConstVal(Token *&token) {
+    const int32_t delimiter = read(false);
+    // if(delimiter != '"' && delimiter != '\'') {
+    //     rewindOneChar();
+    //     return false;
+    // }
+    return internalStringParser(token, static_cast<char>(delimiter)) == StringParseState::Delimiter;
 }
 
 /**
  * 需要多次匹配
  * such as @"this can be embeddable like &variable;"
  */
-bool Lexer::templateStringConstVal(Result &r, Token *&token) {
+bool Lexer::templateStringConstVal(Token *&token) {
     _sourceFile.pushMark();
 
     DEFER { _sourceFile.popMark(); };
 
     // read '@'
-    auto ch = read(r);
+    auto ch = read();
     if(ch != '@') {
         rewindOneChar();
         return false;
     }
-    ch = read(r);
+    ch = read();
 
     if(ch == '\'' || ch == '"') {
         static size_t parseIndex = -1;
@@ -887,7 +909,7 @@ bool Lexer::templateStringConstVal(Result &r, Token *&token) {
 
         // & 和 ${
         if(strPsState == StringParseState::Dollar || strPsState == StringParseState::Ampersand) {
-            const auto result = next(r, token);
+            const auto result = next(token, false);
             // ${}替换符号结束
             if(strPsState == StringParseState::Dollar)
                 dollarRepl = true;
@@ -915,14 +937,14 @@ bool Lexer::templateStringConstVal(Result &r, Token *&token) {
         }
 
         if(dollarRepl) {
-            const auto result = next(r, token);
+            const auto result = next(token, false);
             parseIndex = _sourceFile.pos();
             return result;
         }
 
         plusNeed = true;
         bool over;
-        strPsState = internalStringParser(r, token, delimiter, &over, true);
+        strPsState = internalStringParser(token, delimiter, &over, true);
 
         parseIndex = _sourceFile.pos() - 1;
 
@@ -949,26 +971,26 @@ bool Lexer::templateStringConstVal(Result &r, Token *&token) {
     return false;
 }
 
-StringParseState Lexer::internalStringParser(Result &r, Token *&token, const char delimiter, bool *templateOver,
+StringParseState Lexer::internalStringParser(Token *&token, const char delimiter, bool *templateOver,
                                              const bool templateMode) {
     std::stringstream str{ "" };
     auto strPsState = StringParseState::None;
     if(templateOver)
         *templateOver = false;
     for(;;) {
-        int32_t ch = read(r, false);
+        int32_t ch = read(false);
         if(ch == runeEof) {
             rewindOneChar();
             break;
         }
         if(ch == '\\') {
-            ch = read(r, false);
+            ch = read(false);
             if(ch == 'x' || ch == 'X') {
                 // hex
                 // starts with a "\x", be parsed while characters are
                 // recognized as hex-characters, but limited of size of tjs_char.
                 // on Windows, regex: \\x\d{5} ; will be parsed to UNICODE 16bit characters.        }
-                ch = read(r, false);
+                ch = read(false);
                 if(ch == runeEof) {
                     rewindOneChar();
                     break;
@@ -981,7 +1003,7 @@ StringParseState Lexer::internalStringParser(Result &r, Token *&token, const cha
                     code <<= 4;
                     code += hex;
                     count++;
-                    ch = read(r, false);
+                    ch = read(false);
                     hex = getHexNum(static_cast<char>(ch));
                 }
                 rewindOneChar();
@@ -998,7 +1020,7 @@ StringParseState Lexer::internalStringParser(Result &r, Token *&token, const cha
             }
             if(ch == '0') {
                 // octal
-                ch = read(r, false);
+                ch = read(false);
                 if(ch == runeEof) {
                     rewindOneChar();
                     break;
@@ -1009,7 +1031,7 @@ StringParseState Lexer::internalStringParser(Result &r, Token *&token, const cha
                     // code * 8
                     code <<= 3;
                     code += oct;
-                    ch = read(r, false);
+                    ch = read(false);
                     if(ch == runeEof) {
                         rewindOneChar();
                         break;
@@ -1029,7 +1051,7 @@ StringParseState Lexer::internalStringParser(Result &r, Token *&token, const cha
         }
         if(ch == delimiter) {
             // string
-            ch = read(r, false);
+            ch = read(false);
             if(ch == runeEof) {
                 rewindOneChar();
                 strPsState = StringParseState::Delimiter;
@@ -1048,7 +1070,7 @@ StringParseState Lexer::internalStringParser(Result &r, Token *&token, const cha
             break;
         }
         if(templateMode && ch == '&') {
-            ch = read(r, false);
+            ch = read(false);
             if(ch == runeEof) {
                 rewindOneChar();
                 break;
@@ -1059,14 +1081,14 @@ StringParseState Lexer::internalStringParser(Result &r, Token *&token, const cha
         if(templateMode && ch == '$') {
             // '$'
             // '{' must be placed immediately after '$'
-            ch = read(r, false);
+            ch = read(false);
             if(ch == runeEof) {
                 rewindOneChar();
                 break;
             }
 
             if(ch == '{') {
-                ch = read(r, false);
+                ch = read(false);
                 if(ch == runeEof) {
                     rewindOneChar();
                     break;
@@ -1090,7 +1112,7 @@ StringParseState Lexer::internalStringParser(Result &r, Token *&token, const cha
 /**
  * 十六进制,字符序列
  */
-bool Lexer::octetLiteral(Result &r, Token *&token) {
+bool Lexer::octetLiteral(Token *&token) {
     _sourceFile.pushMark();
     std::stringstream stream{ "" };
     std::vector<uint8_t> buf{};
@@ -1098,15 +1120,15 @@ bool Lexer::octetLiteral(Result &r, Token *&token) {
     // syntax is:
     // <% xx xx xx xx xx xx ... %>
     // where xx is hexadecimal 8bit(octet) binary representation.
-    if(match(r, "<%"_str)) {
+    if(match("<%"_str)) {
         auto newSec = true;
         uint8_t oct = 0;
 
         for(;;) {
-            skipComment(r);
-            auto ch = read(r, false);
+            skipComment();
+            auto ch = read(false);
             if(ch == '%') {
-                ch = read(r, false);
+                ch = read(false);
                 if(ch == '>') {
                     token = makeToken(TokenType::ConstVal, Octet{ buf.data(), static_cast<std::uint32_t>(buf.size()) });
                     _sourceFile.popMark();

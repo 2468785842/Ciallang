@@ -19,22 +19,12 @@
 #include <memory>
 #include <string>
 
-#if _DEBUG
-#define CLL_LOG_TRACE(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kTrace, fmt, ##__VA_ARGS__)
-#define CLL_LOG_DEBUG(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kDebug, fmt, ##__VA_ARGS__)
-#else
-#define CLL_LOG_TRACE(fmt, ...)
-#define CLL_LOG_DEBUG(fmt, ...)
-#endif
-
 #define CLL_LOG_INFO(fmt, ...) ::cial::logFmt(::cial::Level::kInfo, fmt, ##__VA_ARGS__)
 #define CLL_LOG_WARN(fmt, ...) ::cial::logFmt(::cial::Level::kWarn, fmt, ##__VA_ARGS__)
 #define CLL_LOG_ERROR(fmt, ...) ::cial::logFmt(::cial::Level::kError, fmt, ##__VA_ARGS__)
 #define CLL_LOG_FATAL(fmt, ...) ::cial::logFmt(::cial::Level::kFatal, fmt, ##__VA_ARGS__)
 
 #if _DEBUG
-#define CLL_ASSERT(cond, fmt, ...)
-#else
 #define CLL_ASSERT(cond, fmt, ...)                                                                                     \
     do {                                                                                                               \
         if(!(cond)) {                                                                                                  \
@@ -42,6 +32,12 @@
             std::abort();                                                                                              \
         }                                                                                                              \
     } while(false)
+#define CLL_LOG_TRACE(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kTrace, fmt, ##__VA_ARGS__)
+#define CLL_LOG_DEBUG(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kDebug, fmt, ##__VA_ARGS__)
+#else
+#define CLL_ASSERT(cond, fmt, ...)
+#define CLL_LOG_TRACE(fmt, ...)
+#define CLL_LOG_DEBUG(fmt, ...)
 #endif
 
 namespace cial {

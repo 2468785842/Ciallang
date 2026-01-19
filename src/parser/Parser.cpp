@@ -127,7 +127,7 @@ namespace cial::Syntax {
     bool Parser::lookAhead(Result &r, const size_t count) {
         while(count > _lexer.tokenSize() && _lexer.hasNext()) {
             Token *token{ nullptr };
-            if(!_lexer.next(r, token))
+            if(!_lexer.next(token))
                 break;
 
             if(token->type() == TokenType::LineComment || token->type() == TokenType::BlockComment) {
@@ -153,7 +153,6 @@ namespace cial::Syntax {
 
     bool Parser::consume(Result &r, Token &token) {
         if(!lookAhead(r, 1)) {
-            _lexer.takeOverToken(token);
             return false;
         }
 
@@ -182,7 +181,11 @@ namespace cial::Syntax {
         }
 
         if(tToken.type() != tokenType) {
-            error(r, fmt::format("expected token '{}' but found '{}'.", expectedName, tToken.name()), tToken.location);
+            std::string str{ fmt::format("expected token '{}' but found '{}'.", expectedName, tToken.name()) };
+            if(tToken.type() == TokenType::Error) {
+                str = tToken.getString().toStdStr();
+            }
+            error(r, str, tToken.location);
             return false;
         }
 
