@@ -133,7 +133,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
     if(isRuneLetter(rune)) {
         const auto start = getRowCol(_sourceFile.pos());
         identifier(token);
-        const auto end = getRowCol(_sourceFile.pos());
+        const auto end = getRowCol(_sourceFile.pos() - 1);
         patchTokenLoc(*token, start, end);
         return true;
     }
@@ -142,7 +142,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
         if(rune >= '0' && rune <= '9') {
             const auto start = getRowCol(_sourceFile.pos());
             const bool r = numberConstVal(token);
-            const auto end = getRowCol(_sourceFile.pos());
+            const auto end = getRowCol(_sourceFile.pos() - 1);
             patchTokenLoc(*token, start, end);
             return r;
         }
@@ -173,7 +173,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
             case '^': {
                 const auto start = getRowCol(_sourceFile.pos());
                 const bool r = matchOperator(token);
-                const auto end = getRowCol(_sourceFile.pos());
+                const auto end = getRowCol(_sourceFile.pos() - 1);
                 patchTokenLoc(*token, start, end);
                 return r;
             }
@@ -190,7 +190,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
                 } else {
                     r = matchOperator(token);
                 }
-                const auto end = getRowCol(_sourceFile.pos());
+                const auto end = getRowCol(_sourceFile.pos() - 1);
                 patchTokenLoc(*token, start, end);
                 return r;
             }
@@ -211,7 +211,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
                 } else {
                     r = matchOperator(token);
                 }
-                const auto end = getRowCol(_sourceFile.pos());
+                const auto end = getRowCol(_sourceFile.pos() - 1);
                 patchTokenLoc(*token, start, end);
                 return r;
             }
@@ -229,7 +229,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
                 } else {
                     r = matchOperator(token);
                 }
-                const auto end = getRowCol(_sourceFile.pos());
+                const auto end = getRowCol(_sourceFile.pos() - 1);
                 patchTokenLoc(*token, start, end);
                 return r;
             }
@@ -237,7 +237,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
                 const auto start = getRowCol(_sourceFile.pos());
                 read();
                 token = makeToken(TokenType::SemiColon);
-                const auto end = getRowCol(_sourceFile.pos());
+                const auto end = getRowCol(_sourceFile.pos() - 1);
                 patchTokenLoc(*token, start, end);
                 return true;
             }
@@ -245,14 +245,14 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
             case '"': {
                 const auto start = getRowCol(_sourceFile.pos());
                 const bool r = stringConstVal(token);
-                const auto end = getRowCol(_sourceFile.pos());
+                const auto end = getRowCol(_sourceFile.pos() - 1);
                 patchTokenLoc(*token, start, end);
                 return r;
             }
             case '@': {
                 const auto start = getRowCol(_sourceFile.pos());
                 const bool r = templateStringConstVal(token);
-                const auto end = getRowCol(_sourceFile.pos());
+                const auto end = getRowCol(_sourceFile.pos() - 1);
                 patchTokenLoc(*token, start, end);
                 return r;
             }
@@ -261,7 +261,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
                 read();
                 token = makeToken(TokenType::Error,
                                   String{ fmt::format("unexpected character '{}'", static_cast<char>(rune)) });
-                const auto end = getRowCol(_sourceFile.pos());
+                const auto end = getRowCol(_sourceFile.pos() - 1);
                 patchTokenLoc(*token, start, end);
                 return false;
             }
@@ -271,7 +271,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
     const auto start = getRowCol(_sourceFile.pos());
     read();
     token = makeToken(TokenType::Invalid);
-    const auto end = getRowCol(_sourceFile.pos());
+    const auto end = getRowCol(_sourceFile.pos() - 1);
     patchTokenLoc(*token, start, end);
     return false;
 }
@@ -460,7 +460,11 @@ bool Lexer::lineComment(Token *&token) {
         int32_t ch;
         do {
             ch = read(false);
-        } while(ch != '\n' && !_sourceFile.eof());
+            if(ch == runeEof) {
+                rewindOneChar();
+                break;
+            }
+        } while(ch != '\n');
         return true;
     }
     return false;

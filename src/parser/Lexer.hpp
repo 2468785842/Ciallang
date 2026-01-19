@@ -75,7 +75,7 @@ namespace cial::Syntax {
         }
 
         [[nodiscard]] std::pair<uint32_t, uint32_t> getRowCol(const size_t pos) const {
-            return std::make_pair(_sourceFile.columnByIndex(pos), _sourceFile.lineByIndex(pos)->line);
+            return std::make_pair(_sourceFile.lineByIndex(pos)->line, _sourceFile.columnByIndex(pos));
         }
 
         bool readPreProcessorExpr(std::string &out);
