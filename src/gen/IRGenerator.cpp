@@ -21,13 +21,11 @@
 #include "parser/ast/ExprNode.hpp"
 #include "parser/ast/StmtNode.hpp"
 
-#include "logging/Logger.hpp"
 #include "vm/Instruction.hpp"
 
 namespace cial::Inter {
 
-    Opt<Bytecode::Chunk> IRGenerator::parseAst(const Common::Result &r, const Syntax::AstNode *node, OptReg &retReg) {
-        _r = r;
+    Opt<Bytecode::Chunk> IRGenerator::parseAst(const Syntax::AstNode *node, OptReg &retReg) {
         if(node)
             node->generateBytecode(this, retReg);
         if(_r.isFailed())
@@ -568,7 +566,7 @@ namespace cial::Inter {
         }
 
         {
-            auto gen = IRGenerator{ _rt, _sourceFile };
+            auto gen = IRGenerator{ _r, _rt, _sourceFile };
             gen.makeVirtualGlobalScope();
 
             for(const auto *varDeclNode : node->varDeclVec) {
@@ -586,7 +584,7 @@ namespace cial::Inter {
                 classMeta->setMember(MemberShapeMeta{ .name = varName, .isVar = true }, ClassFieldMeta{});
             }
             OptReg ignoreReg{};
-            auto funChunk = gen.parseAst(_r, nullptr, ignoreReg);
+            auto funChunk = gen.parseAst(nullptr, ignoreReg);
             assert(funChunk);
 
             auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
@@ -595,7 +593,7 @@ namespace cial::Inter {
         }
 
         {
-            auto gen = IRGenerator{ _rt, _sourceFile };
+            auto gen = IRGenerator{ _r, _rt, _sourceFile };
             gen.makeVirtualGlobalScope();
 
             // must init var in begin state
@@ -621,7 +619,7 @@ namespace cial::Inter {
 
             if(node->constructor) {
                 OptReg ignoreReg{};
-                auto funChunk = gen.parseAst(_r, node->constructor->body, ignoreReg);
+                auto funChunk = gen.parseAst(node->constructor->body, ignoreReg);
                 assert(funChunk);
 
                 // the last patch one ret
@@ -640,9 +638,9 @@ namespace cial::Inter {
         // finalize function placeholder
         if(Atom finalizeAtom = _rt.atomTable.intern("finalize"_str); classMeta->hasMember(finalizeAtom) < 0) {
             OptReg ignoreReg{};
-            IRGenerator genFinalize{ _rt, _sourceFile };
+            IRGenerator genFinalize{ _r, _rt, _sourceFile };
             genFinalize.makeVirtualGlobalScope();
-            auto funChunk = _rt.createNoGC<Bytecode::Chunk>(*genFinalize.parseAst(_r, nullptr, ignoreReg));
+            auto funChunk = _rt.createNoGC<Bytecode::Chunk>(*genFinalize.parseAst(nullptr, ignoreReg));
 
             auto voidReg = genFinalize.loadVoidReg();
             funChunk->emit<Bytecode::Op::OpCode::Ret>(voidReg);
@@ -999,7 +997,7 @@ namespace cial::Inter {
     FuncMeta *IRGenerator::generateFuncMeta(const Syntax::Parameters &parameters,
                                             const Syntax::BlockStmtNode *body) const {
 
-        auto gen = IRGenerator{ _rt, _sourceFile };
+        auto gen = IRGenerator{ _r, _rt, _sourceFile };
         gen.makeVirtualGlobalScope();
 
         for(auto &[token, exprNode] : parameters) {
@@ -1020,7 +1018,7 @@ namespace cial::Inter {
         }
 
         OptReg ignoreReg{};
-        auto funChunk = gen.parseAst(_r, body, ignoreReg);
+        auto funChunk = gen.parseAst(body, ignoreReg);
         assert(funChunk);
 
         // the last instruction is not ret, patch one ret

@@ -150,10 +150,10 @@ namespace cial {
             Syntax::AstNode *node = parser.parse(r);
             assert(!r.isFailed());
 
-            Inter::IRGenerator codeGen{ rt, sourceFile };
+            Inter::IRGenerator codeGen{ r, rt, sourceFile };
 
             OptReg ignoreReg{};
-            Opt<Bytecode::Chunk> chunk = codeGen.parseAst(r, node, ignoreReg);
+            Opt<Bytecode::Chunk> chunk = codeGen.parseAst(node, ignoreReg);
 
             assert(!r.isFailed());
             assert(chunk);
@@ -201,10 +201,10 @@ namespace cial {
             Syntax::ExprNode *node = parser.parseExpression(r, true);
             assert(!r.isFailed());
 
-            Inter::IRGenerator codeGen{ rt, sourceFile };
+            Inter::IRGenerator codeGen{ r, rt, sourceFile };
 
             OptReg retReg{};
-            Opt<Bytecode::Chunk> chunk = codeGen.parseAst(r, node, retReg);
+            Opt<Bytecode::Chunk> chunk = codeGen.parseAst(node, retReg);
 
             assert(!r.isFailed());
             assert(chunk);

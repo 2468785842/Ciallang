@@ -230,3 +230,28 @@ TEST_CASE("表达式 - 复杂表达式组合") {
 
     SECTION("逻辑表达式组合") { REQUIRE((*vm.evalExpr<bool>("1 > 0 && 5 < 10 || 6 == 5"_str)) == true); }
 }
+
+TEST_CASE("模版字符串") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("混合表达式（模板字符串）") {
+        // @"1 + &2 * 3; - &4 / 4;"
+        // 展开后: "1 + 6 - 1"
+        REQUIRE((**vm.evalExpr<String *>(R"(@"1 + &2 * 3; - &4 / 4;")"_str)) == "1 + 6 - 1"_str);
+    }
+
+    SECTION("带括号的表达式（模板字符串）") {
+        // @"(&1 + 2;) * (&1 - 2;)"
+        // 展开后: "(3) * (-1)"
+        REQUIRE((**vm.evalExpr<String *>(R"#(@"(&1 + 2;) * (&1 - 2;)")#"_str)) == "(3) * (-1)"_str);
+    }
+
+    SECTION("逻辑表达式组合（模板字符串）") {
+        // @"&1 > 0; && &5 < 10; || &6 == 5;"
+        // 展开后: "1 && 1 || 0"
+        REQUIRE((**vm.evalExpr<String *>(R"#(@"&1 > 0; \&\& &5 < 10; || &6 == 5;")#"_str)) == "1 && 1 || 0"_str);
+    }
+}

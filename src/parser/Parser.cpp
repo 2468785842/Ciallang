@@ -306,7 +306,7 @@ namespace cial::Syntax {
 
             lhs = infixParser->parse(r, this, lhs, &token);
 
-            if(lhs == nullptr || r.isFailed())
+            if(lhs == nullptr)
                 break;
         }
         return lhs;

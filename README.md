@@ -62,6 +62,7 @@
 * [x] `global`
 * [x] `this`
 * [x] `function` 函数表达式声明
+* [x] `@"xx"` 模版字符串声明
 * [ ] `[]` Array 声明
 * [ ] `%[]` Dictionary 声明
 * [ ] `<% xx xx ... %>` Octet 声明

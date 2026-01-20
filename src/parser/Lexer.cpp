@@ -79,7 +79,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
 
     DEFER { _hasNext = !_sourceFile.eof(); };
 
-    int32_t rune = read();
+    int32_t rune = read(!tmplStrCtx.active);
 
     if(rune == runeInvalid) {
         token = makeToken(TokenType::Invalid);
@@ -99,35 +99,43 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
 
     rewindOneChar();
 
+    if(tmplStrCtx.active) {
+        const auto start = getRowCol(_sourceFile.pos());
+        const bool r = templateStringConstVal(token);
+        const auto end = getRowCol(_sourceFile.pos() - 1);
+        patchTokenLoc(*token, start, end);
+        return r;
+    }
+
     // preprocessor
-    if(rune == '@') {
+    if(enablePreProcessor && rune == '@') {
         while(!_sourceFile.eof()) {
-            if(enablePreProcessor && processor()) {
+            if(processor()) {
                 continue;
             }
             break;
         }
+
+        rune = read();
+
+        if(rune == runeInvalid) {
+            token = makeToken(TokenType::Invalid);
+            const auto [line, column] = getRowCol(_sourceFile.pos());
+            token->location.end(line, column);
+            token->location.start(line, column);
+            return false;
+        }
+
+        if(rune == runeEof) {
+            token = makeToken(TokenType::EndOfFile);
+            const auto [line, column] = getRowCol(_sourceFile.length());
+            token->location.end(line, column);
+            token->location.start(line, column);
+            return true;
+        }
+
+        rewindOneChar();
     }
-
-    rune = read();
-
-    if(rune == runeInvalid) {
-        token = makeToken(TokenType::Invalid);
-        const auto [line, column] = getRowCol(_sourceFile.pos());
-        token->location.end(line, column);
-        token->location.start(line, column);
-        return false;
-    }
-
-    if(rune == runeEof) {
-        token = makeToken(TokenType::EndOfFile);
-        const auto [line, column] = getRowCol(_sourceFile.length());
-        token->location.end(line, column);
-        token->location.start(line, column);
-        return true;
-    }
-
-    rewindOneChar();
 
     // identifier
     if(isRuneLetter(rune)) {
@@ -147,7 +155,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
             return r;
         }
 
-        switch(static_cast<char>(rune)) {
+        switch(rune) {
             case '[':
             case ']':
             case '(':
@@ -180,7 +188,7 @@ bool Lexer::next(Token *&token, const bool enablePreProcessor) {
             case '.': {
                 const auto start = getRowCol(_sourceFile.pos());
                 read(false); // '.'
-                const uint32_t peek = read(false);
+                const int32_t peek = read(false);
                 rewindOneChar();
                 rewindOneChar();
 
@@ -331,9 +339,9 @@ bool Lexer::processor() {
             _preProcessor.onEndIf();
             return true;
         }
-    } else {
-        rewindOneChar();
     }
+    rewindOneChar();
+
 
     // ---------- 普通脚本 ----------
     if(!_preProcessor.isEnabled()) {
@@ -840,7 +848,7 @@ bool Lexer::stringConstVal(Token *&token) {
     //     rewindOneChar();
     //     return false;
     // }
-    return internalStringParser(token, static_cast<char>(delimiter)) == StringParseState::Delimiter;
+    return parseStringConstVal(token, static_cast<char>(delimiter)) == TemplateStringContext::State::Delimiter;
 }
 
 /**
@@ -848,139 +856,101 @@ bool Lexer::stringConstVal(Token *&token) {
  * such as @"this can be embeddable like &variable;"
  */
 bool Lexer::templateStringConstVal(Token *&token) {
-    _sourceFile.pushMark();
-
-    DEFER { _sourceFile.popMark(); };
-
-    // read '@'
-    auto ch = read();
-    if(ch != '@') {
-        rewindOneChar();
-        return false;
+    // 第一次进入时初始化
+    if(!tmplStrCtx.active) {
+        /*int32_t at =*/read(); // read '@'
+        const int32_t delim = read(); // read '"' or '\''
+        tmplStrCtx.active = true;
+        tmplStrCtx.delimiter = static_cast<char>(delim);
+        tmplStrCtx.stage = TemplateStringContext::Stage::Init;
     }
-    ch = read();
 
-    if(ch == '\'' || ch == '"') {
-        static size_t parseIndex = -1;
-        static int32_t bracketPairCount = 0;
-        static char delimiter = -1;
-        static bool dollarRepl = false;
-        static bool bracketPairNeed = true;
-        static bool bracketPairNeedClose = false;
-        static bool plusNeed = false;
-        static auto strPsState = StringParseState::None;
-
-        if(delimiter == -1) {
-            parseIndex = _sourceFile.pos();
-            delimiter = static_cast<char>(ch);
-        }
-        _sourceFile.seek(parseIndex);
-
-        // )
-        if(bracketPairCount != 0 && bracketPairNeedClose) {
-            token = makeToken(TokenType::RParenthesis);
-            bracketPairNeedClose = false;
-            --bracketPairCount;
-
-            if(bracketPairCount != 0) {
-                _sourceFile.restoreTopMark();
-            } else {
-                // 结束匹配
-                _sourceFile.seek(parseIndex);
-                parseIndex = -1;
-                delimiter = -1;
-                dollarRepl = false;
-                bracketPairNeed = true;
-                plusNeed = false;
-            }
-            return true;
-        }
-        if(plusNeed) {
-            token = makeToken(TokenType::Plus);
-            plusNeed = false;
-            _sourceFile.restoreTopMark();
-            return true;
-        }
-
-        // (
-        if(bracketPairNeed) {
+    switch(tmplStrCtx.stage) {
+        case TemplateStringContext::Stage::Init:
             token = makeToken(TokenType::LParenthesis);
-            bracketPairNeed = false;
-            ++bracketPairCount;
-            _sourceFile.restoreTopMark();
+            tmplStrCtx.stage = TemplateStringContext::Stage::Text;
+            return true;
+
+        case TemplateStringContext::Stage::Text: {
+            tmplStrCtx.parseState = parseStringConstVal(token, tmplStrCtx.delimiter);
+
+            switch(tmplStrCtx.parseState) {
+                case TemplateStringContext::State::Delimiter: {
+                    rewindOneChar();
+                    tmplStrCtx.stage = TemplateStringContext::Stage::Terminator;
+                    break;
+                }
+                case TemplateStringContext::State::Ampersand:
+                case TemplateStringContext::State::Dollar: {
+                    tmplStrCtx.stage = TemplateStringContext::Stage::PlusAfterText;
+                    break;
+                }
+                case TemplateStringContext::State::None: {
+                    return false;
+                }
+            }
             return true;
         }
 
-        // & 和 ${
-        if(strPsState == StringParseState::Dollar || strPsState == StringParseState::Ampersand) {
-            const auto result = next(token, false);
-            // ${}替换符号结束
-            if(strPsState == StringParseState::Dollar)
-                dollarRepl = true;
+        case TemplateStringContext::Stage::PlusAfterText:
+            token = makeToken(TokenType::Plus);
+            tmplStrCtx.stage = TemplateStringContext::Stage::ExprOpener;
+            break;
 
-            parseIndex = _sourceFile.pos();
-            _sourceFile.restoreTopMark();
+        case TemplateStringContext::Stage::PlusAfterExpr:
+            token = makeToken(TokenType::Plus);
+            tmplStrCtx.stage = TemplateStringContext::Stage::Text;
+            break;
 
-            if(strPsState == StringParseState::Ampersand) {
-                bracketPairNeedClose = true;
-                plusNeed = true;
-                strPsState = StringParseState::None;
-            }
-
-            if(token->type() == TokenType::RightCurlyBrace && dollarRepl) {
-                dollarRepl = false;
-                token = makeToken(TokenType::RParenthesis);
-                bracketPairNeedClose = false;
-                --bracketPairCount;
-                strPsState = StringParseState::None;
-                plusNeed = true;
-                return true;
-            }
-
-            return result;
-        }
-
-        if(dollarRepl) {
-            const auto result = next(token, false);
-            parseIndex = _sourceFile.pos();
-            return result;
-        }
-
-        plusNeed = true;
-        bool over;
-        strPsState = internalStringParser(token, delimiter, &over, true);
-
-        parseIndex = _sourceFile.pos() - 1;
-
-        // str
-        if(strPsState == StringParseState::Delimiter) {
-            if(over) {
-                // 模板字符串匹配完成
-                bracketPairNeedClose = true;
-                _sourceFile.restoreTopMark();
-                return true;
-            }
-            _sourceFile.restoreTopMark();
+        case TemplateStringContext::Stage::ExprOpener: {
+            token = makeToken(TokenType::LParenthesis);
+            tmplStrCtx.stage = TemplateStringContext::Stage::Expression;
             return true;
         }
 
-        if(strPsState == StringParseState::None) {
-            return false;
+        case TemplateStringContext::Stage::Expression: {
+            // 调用常规 next 解析表达式内容
+            // 注意：此处需要防止 next 再次进入 templateStringConstVal
+            tmplStrCtx.active = false;
+            const bool res = next(token, false);
+            tmplStrCtx.active = true;
+
+            // 检查表达式是否结束, 这里检查下一个character是否是';'或'}'
+            const int32_t nextCodePoint = read();
+            rewindOneChar();
+
+            if(tmplStrCtx.parseState == TemplateStringContext::State::Ampersand && nextCodePoint == ';') {
+                tmplStrCtx.stage = TemplateStringContext::Stage::ExprCloser;
+            } else if(tmplStrCtx.parseState == TemplateStringContext::State::Dollar && nextCodePoint == '}') {
+                tmplStrCtx.stage = TemplateStringContext::Stage::ExprCloser;
+            } else if(nextCodePoint == tmplStrCtx.delimiter) {
+                tmplStrCtx.stage = TemplateStringContext::Stage::Terminator;
+            }
+
+            return res;
         }
 
-        bracketPairNeed = true;
-        _sourceFile.restoreTopMark();
-        return true;
+        case TemplateStringContext::Stage::ExprCloser: {
+            read();
+            token = makeToken(TokenType::RParenthesis);
+            tmplStrCtx.stage = TemplateStringContext::Stage::PlusAfterExpr;
+            return true;
+        }
+
+        case TemplateStringContext::Stage::Terminator: {
+            read(false);
+            token = makeToken(TokenType::RParenthesis);
+            tmplStrCtx.reset(); // 清理状态
+            return true;
+        }
     }
+
     return false;
 }
 
-StringParseState Lexer::internalStringParser(Token *&token, const char delimiter, bool *templateOver,
-                                             const bool templateMode) {
+Lexer::TemplateStringContext::State Lexer::parseStringConstVal(Token *&token, const char delimiter) {
     std::stringstream str{ "" };
-    auto strPsState = StringParseState::None;
-    if(templateOver)
-        *templateOver = false;
+    auto strPsState = TemplateStringContext::State::None;
     for(;;) {
         int32_t ch = read(false);
         if(ch == runeEof) {
@@ -989,6 +959,13 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
         }
         if(ch == '\\') {
             ch = read(false);
+
+            // 模板模式下，\& 和 \$ 直接转义为普通字符
+            if(tmplStrCtx.active && (ch == '&' || ch == '$')) {
+                str << static_cast<char>(ch);
+                continue;
+            }
+
             if(ch == 'x' || ch == 'X') {
                 // hex
                 // starts with a "\x", be parsed while characters are
@@ -1053,55 +1030,26 @@ StringParseState Lexer::internalStringParser(Token *&token, const char delimiter
             str << unescapeBackSlash(static_cast<char>(ch));
             continue;
         }
+
         if(ch == delimiter) {
-            // string
-            ch = read(false);
-            if(ch == runeEof) {
-                rewindOneChar();
-                strPsState = StringParseState::Delimiter;
-                if(templateOver)
-                    *templateOver = true;
-                break;
-            }
-            // sequence of 'A' 'B' will be combined as 'AB'
-            if(ch == delimiter)
-                continue;
-            strPsState = StringParseState::Delimiter;
-            if(templateOver)
-                *templateOver = true;
-
-            rewindOneChar();
+            strPsState = TemplateStringContext::State::Delimiter;
             break;
         }
-        if(templateMode && ch == '&') {
-            ch = read(false);
-            if(ch == runeEof) {
-                rewindOneChar();
-                break;
-            }
-            strPsState = StringParseState::Ampersand;
-            break;
-        }
-        if(templateMode && ch == '$') {
-            // '$'
-            // '{' must be placed immediately after '$'
-            ch = read(false);
-            if(ch == runeEof) {
-                rewindOneChar();
-                break;
-            }
 
-            if(ch == '{') {
-                ch = read(false);
-                if(ch == runeEof) {
-                    rewindOneChar();
+        // 模板触发检查
+        if(tmplStrCtx.active) {
+            if(ch == '&') {
+                strPsState = TemplateStringContext::State::Ampersand;
+                break;
+            }
+            if(ch == '$') {
+                int32_t nextCh = read(false);
+                if(nextCh == '{') {
+                    strPsState = TemplateStringContext::State::Dollar;
                     break;
                 }
-
-                strPsState = StringParseState::Dollar;
-                break;
+                rewindOneChar();
             }
-            break;
         }
 
         const auto runeType = utf8Encode(ch);

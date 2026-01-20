@@ -30,8 +30,6 @@ void run_lexer(const std::string &input) {
         while(lexer.hasNext()) {
             Syntax::Token *t;
             lexer.next(t);
-            if(r.isFailed())
-                break;
             Syntax::Token take;
             lexer.takeOverToken(take);
         }

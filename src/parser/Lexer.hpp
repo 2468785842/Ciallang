@@ -106,8 +106,36 @@ namespace cial::Syntax {
 
         void identifier(Token *&);
 
-        StringParseState internalStringParser(Token *&token, char delimiter, bool *templateOver = nullptr,
-                                              bool templateMode = false);
+        struct TemplateStringContext {
+            enum class Stage {
+                Init, // 刚开始，准备吐出第一个 '('
+                Text, // 解析普通文字部分
+                ExprOpener, // 准备吐出表达式开始的 '('
+                Expression, // 正在解析表达式内部的 Token
+                ExprCloser, // 准备吐出表达式结束的 ')'
+                PlusAfterText,
+                PlusAfterExpr,
+                Terminator, // 准备吐出最后一个 ')'
+            };
+
+            enum class State { None, Delimiter, Ampersand, Dollar };
+
+            bool active = false;
+            Stage stage = Stage::Init;
+            State parseState = State::None;
+            char delimiter = -1;
+
+            void reset() {
+                active = false;
+                stage = Stage::Init;
+                parseState = State::None;
+                delimiter = -1;
+            }
+        };
+
+        TemplateStringContext tmplStrCtx;
+
+        TemplateStringContext::State parseStringConstVal(Token *&token, char delimiter);
 
 
         static std::int8_t getHexNum(const char c) noexcept {

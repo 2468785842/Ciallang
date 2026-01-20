@@ -297,13 +297,6 @@ namespace cial::Syntax {
         };
     };
 
-    enum class StringParseState {
-        None,
-        Delimiter, //' "
-        Ampersand, //&
-        Dollar //${}
-    };
-
     class AssignToken {
     public:
         static constexpr bool support(const TokenType tokenType) noexcept {

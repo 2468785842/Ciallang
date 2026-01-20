@@ -26,8 +26,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         while(lexer.hasNext()) {
             Syntax::Token *t;
             lexer.next(t);
-            if(r.isFailed())
-                break;
             Syntax::Token take;
             lexer.takeOverToken(take);
         }

@@ -24,9 +24,10 @@ namespace cial::Inter {
     class IRGenerator {
 
     public:
-        explicit IRGenerator(Runtime &rt, Common::SourceFile &sourceFile) : _rt(rt), _sourceFile(sourceFile) {}
+        explicit IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile) :
+            _rt(rt), _sourceFile(sourceFile), _r(r) {}
 
-        Opt<Bytecode::Chunk> parseAst(const Common::Result &r, const Syntax::AstNode *node, OptReg &retReg);
+        Opt<Bytecode::Chunk> parseAst(const Syntax::AstNode *node, OptReg &retReg);
 
         void addLocalVar(LocalVariable &&variable) { _localVars.emplace_back(variable); }
 
@@ -107,7 +108,7 @@ namespace cial::Inter {
 
         Runtime &_rt;
         Common::SourceFile &_sourceFile;
-        Common::Result _r{};
+        Common::Result &_r;
 
         OptReg _empty{};
 
