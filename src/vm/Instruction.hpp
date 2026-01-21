@@ -620,11 +620,11 @@ namespace cial::Bytecode {
     struct DProp {
         static Register obj(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
-        static const String *name(const Instruction &inst, const VMState &vmState);
+        static Register memberReg(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static Value value(const Instruction &inst, const VMState &vmState);
+        static Register src(const Instruction &inst) { return inst.getOperand3<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct DProp                                                                                          \

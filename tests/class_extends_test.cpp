@@ -570,27 +570,27 @@ TEST_CASE("TJS2 - 多层 slot 同名字段解析") {
     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 1);
 }
 
-// TODO: o.x assign operator
-// TEST_CASE("TJS2 - 仅当 slot 链完全无字段才访问 proxy") {
-//     Runtime rt{};
-//     Context context{ rt };
-//     Bytecode::VMState vmState{ context };
-//     VM vm{ &vmState };
-//     vm.eval(R"(
-//         class A {
-//             function A(){}
-//             function getX() { return x; }
-//         }
-//         class B extends A {
-//             function B() { A(); }
-//         }
-//         var o = new B();
-//         o.x = 9;
-//         var res = o.getX();
-//     )"_str);
-//
-//     REQUIRE(*vm.evalExpr<Integer>("res"_str) == 9);
-// }
+TEST_CASE("TJS2 - 仅当 slot 链完全无字段才访问 proxy") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+    vm.eval(R"(
+        class A {
+            function A(){}
+            function getX() { return x; }
+        }
+        class B extends A {
+            var x;
+            function B() { A(); }
+        }
+        var o = new B();
+        o.x = 9;
+        var res = o.getX();
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("res"_str) == 9);
+}
 
 TEST_CASE("OOP - Legacy TJS2 Class/Slot/Constructor/Lookup 行为全集") {
     Runtime rt{};

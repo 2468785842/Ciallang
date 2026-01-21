@@ -440,7 +440,30 @@ namespace cial::Inter {
             return;
         }
 
-        // TODO: member access
+        if(const auto *expr = dynamic_cast<const Syntax::BinaryExprNode *>(node->lhs)) {
+
+            Bytecode::Register src{ 0 };
+            if(!expectValue(node->rhs, src))
+                return;
+
+            if(expr->token.type() == Syntax::TokenType::Dot) {
+
+                Bytecode::Register lhsR{ 0 };
+                if(!expectValue(expr->lhs, lhsR))
+                    return;
+
+                if(const auto *identifierExpr = dynamic_cast<const Syntax::IdentifierExprNode *>(expr->rhs)) {
+                    auto tmpR = allocateRegister();
+                    _chunk->emit<Bytecode::OpCode::Load>(tmpR, _chunk->addConstant(constVal(identifierExpr->token)));
+                    _chunk->emit<Bytecode::OpCode::DProp>(lhsR, tmpR, src);
+                    freeRegister(tmpR);
+
+                    retReg = src;
+                    return;
+                }
+            }
+        }
+
         error("isn't support assign operator", node->location);
     }
 

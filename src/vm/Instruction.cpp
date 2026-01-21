@@ -395,33 +395,12 @@ namespace cial::Bytecode {
         vmState.reg(dst(inst), Value{ nativeFn });
     }
 
-    const String *DProp::name(const Instruction &inst, const VMState &vmState) {
-        if(inst.getOperand2Type() == Operand::Type::Atom)
-            return vmState.rt.atomTable.get(inst.getOperand2<Atom>())->str;
-        if(inst.getOperand2Type() == Operand::Type::Register)
-            return vmState.reg(inst.getOperand2<Register>()).asString().unwrap();
-        CLL_ASSERT(false, "unknown inst dprop operand2 type");
-        return {};
-    }
-
-    Value DProp::value(const Instruction &inst, const VMState &vmState) {
-        if(inst.getOperand3Type() == Operand::Type::ConstIndex)
-            return vmState.curFrame()->chunk->getConstant(inst.getOperand3<ConstIdx>()).createValue(&vmState.rt);
-        if(inst.getOperand3Type() == Operand::Type::Register)
-            return vmState.reg(inst.getOperand3<Register>());
-        CLL_ASSERT(false, "unknown inst dprop operand3 type");
-        return {};
-    }
-
-    void DProp::execute(const Instruction &inst, VMState &vmState) {
-        // TODO:
-        // const auto &instObj = vmState.reg(obj(inst));
-        // CLL_ASSERT(instObj.isObject(), "gprop obj is not object");
-        //
-        // if(auto *inst = dynamic_cast<ClassObject *>(instObj.toObject())) {
-        //     inst->set(name(inst, vmState), value(inst, vmState));
-        // }
-        throw std::runtime_error("not implemented");
+    void DProp::execute(const Instruction &inst, const VMState &vmState) {
+        const auto &r = vmState.reg(obj(inst));
+        CLL_ASSERT(r.isObject(), "gprop obj is not object");
+        const String &name = *vmState.reg(memberReg(inst)).asString().unwrap();
+        const Atom atom = vmState.rt.atomTable.intern(name);
+        r.asObject().unwrap()->setProp(atom, vmState.reg(src(inst)));
     }
 
     void GThis::execute(const Instruction &inst, VMState &vmState) {
@@ -809,8 +788,7 @@ namespace cial::Bytecode {
     }
 
     std::string DProp::dump(const Instruction &inst, const VMState *vmState) {
-        // TODO:
-        throw std::runtime_error("not implemented");
+        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "gprop", obj(inst), memberReg(inst), src(inst));
     }
 
     std::string GThis::dump(const Instruction &inst, const VMState *vmState) {
