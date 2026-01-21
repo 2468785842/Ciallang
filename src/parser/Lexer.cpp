@@ -373,8 +373,10 @@ void Lexer::skipComment() {
 bool Lexer::takeOverToken(Token &token) {
     assert(!_tokens.empty());
 
-    token = std::move(*_tokens.front());
+    Token *tmp = _tokens.front();
+    token = std::move(*tmp);
     _tokens.pop_front();
+    delete tmp;
 
     if(token.type() == TokenType::EndOfFile)
         return false;
@@ -437,7 +439,8 @@ bool Lexer::matchOperator(Token *&token) {
     while(i < _sourceFile.length()) {
         const std::uint8_t byte = _sourceFile[i];
         // not ASCII
-        assert(byte < 0x80);
+        if(byte >= 0x80)
+            break;
         const int next = OpTrie.getNode(node).next[byte];
         if(next == -1)
             break;
@@ -617,11 +620,16 @@ bool Lexer::numberConstVal(Token *&token) {
 bool Lexer::parseNonDecimalNumber(Token *&token, std::stringstream &ss, std::int8_t (*validDigits)(char),
                                   const std::int8_t base) {
     bool isReal = false;
+    _sourceFile.pushMark();
+    DEFER { _sourceFile.popMark(); };
     extractNumber(validDigits, "Pp", ss, isReal);
 
     const auto &str = ss.str();
-    if(str.empty())
+    if(str.empty()) {
+        _sourceFile.restoreTopMark();
+        token = makeToken(TokenType::Error, "unexcepted exponent"_str);
         return false;
+    }
 
     if(isReal) {
         parseNonDecimalReal(token, str, validDigits, base);
@@ -735,7 +743,7 @@ void Lexer::parseNonDecimalReal(Token *&token, const std::string &decimalStr, st
 
     // compose IEEE double
     *reinterpret_cast<Integer *>(&temp) =
-        static_cast<Integer>(makeSign(false) | makeExponent(exp) | make_significand(main));
+        static_cast<Integer>(makeSign(false) | makeExponent(exp) | makeSignificand(main));
 
     token = makeToken(TokenType::ConstVal, temp);
 }
@@ -860,6 +868,10 @@ bool Lexer::templateStringConstVal(Token *&token) {
     if(!tmplStrCtx.active) {
         /*int32_t at =*/read(); // read '@'
         const int32_t delim = read(); // read '"' or '\''
+        if(delim != '"' && delim != '\'') {
+            token = makeToken(TokenType::Error, "template string expected '@\"' start"_str);
+            return false;
+        }
         tmplStrCtx.active = true;
         tmplStrCtx.delimiter = static_cast<char>(delim);
         tmplStrCtx.stage = TemplateStringContext::Stage::Init;
@@ -938,7 +950,7 @@ bool Lexer::templateStringConstVal(Token *&token) {
         }
 
         case TemplateStringContext::Stage::Terminator: {
-            read(false);
+            read();
             token = makeToken(TokenType::RParenthesis);
             tmplStrCtx.reset(); // 清理状态
             return true;
@@ -948,7 +960,7 @@ bool Lexer::templateStringConstVal(Token *&token) {
     return false;
 }
 
-Lexer::TemplateStringContext::State Lexer::parseStringConstVal(Token *&token, const char delimiter) {
+TemplateStringContext::State Lexer::parseStringConstVal(Token *&token, const char delimiter) {
     std::stringstream str{ "" };
     auto strPsState = TemplateStringContext::State::None;
     for(;;) {
@@ -1027,7 +1039,7 @@ Lexer::TemplateStringContext::State Lexer::parseStringConstVal(Token *&token, co
                 str.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
                 continue;
             }
-            str << unescapeBackSlash(static_cast<char>(ch));
+            str << TemplateStringContext::unescapeBackSlash(static_cast<char>(ch));
             continue;
         }
 
@@ -1056,7 +1068,11 @@ Lexer::TemplateStringContext::State Lexer::parseStringConstVal(Token *&token, co
         str.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
     }
 
-    token = makeToken(TokenType::ConstVal, String{ str.str() });
+    if(strPsState == TemplateStringContext::State::None) {
+        token = makeToken(TokenType::Error, "string value need close"_str);
+    } else {
+        token = makeToken(TokenType::ConstVal, String{ str.str() });
+    }
 
     return strPsState;
 }
@@ -1065,7 +1081,6 @@ Lexer::TemplateStringContext::State Lexer::parseStringConstVal(Token *&token, co
  * 十六进制,字符序列
  */
 bool Lexer::octetLiteral(Token *&token) {
-    _sourceFile.pushMark();
     std::stringstream stream{ "" };
     std::vector<uint8_t> buf{};
     // parse an octet literal;
@@ -1078,20 +1093,19 @@ bool Lexer::octetLiteral(Token *&token) {
 
         for(;;) {
             skipComment();
-            auto ch = read(false);
+            int32_t ch = read(false);
             if(ch == '%') {
                 ch = read(false);
                 if(ch == '>') {
                     token = makeToken(TokenType::ConstVal, Octet{ buf.data(), static_cast<std::uint32_t>(buf.size()) });
-                    _sourceFile.popMark();
                     return true;
                 }
-                _sourceFile.restoreTopMark();
-                return false;
+                break;
             }
 
-            ch = static_cast<uint8_t>(getHexNum(static_cast<char>(ch)));
-            if(ch != -1) {
+            const int8_t n = getHexNum(static_cast<char>(ch));
+            ch = static_cast<uint8_t>(n);
+            if(n != -1) {
                 if(newSec) {
                     oct = ch;
                     newSec = ch == ',';
@@ -1105,8 +1119,11 @@ bool Lexer::octetLiteral(Token *&token) {
                     buf.push_back(oct);
                     newSec = true;
                 }
+            } else {
+                break;
             }
         }
     }
+    token = makeToken(TokenType::Error, "unexcepted character in octet literal"_str);
     return false;
 }

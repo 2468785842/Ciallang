@@ -46,23 +46,23 @@ namespace cial {
 
         void collectMark() const;
 
-        CallFrame *callStack() const;
+        [[nodiscard]] CallFrame *callStack() const;
 
-        size_t &stackTop() const;
+        [[nodiscard]] size_t &stackTop() const;
 
-        Runtime &rt() const;
+        [[nodiscard]] Runtime &rt() const;
 
-        Bytecode::FastRegisterPool &regPool() const;
+        [[nodiscard]] Bytecode::FastRegisterPool &regPool() const;
 
-        GlobalObject *global() const;
+        [[nodiscard]] GlobalObject *global() const;
 
-        PreProcessor &pp() const;
+        [[nodiscard]] PreProcessor &pp() const;
 
     private:
         struct Impl;
         Impl *_impl{};
 
         NativeRegister &nativeRegister();
-        const NativeRegister &nativeRegister() const;
+        [[nodiscard]] const NativeRegister &nativeRegister() const;
     };
 } // namespace cial

@@ -44,7 +44,7 @@ namespace cial {
             return std::move(at);
         }();
 
-        MarkSweep markSweep{ 1024 };
+        MarkSweep markSweep{ 512 };
 
         std::vector<MarkSweepHeader *> handles{};
 

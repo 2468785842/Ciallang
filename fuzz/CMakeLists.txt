@@ -32,11 +32,11 @@ target_link_libraries(fuzz_parser
 )
 
 target_compile_options(fuzz_parser PRIVATE
-        -fsanitize=fuzzer,address,undefined
+        -fsanitize=fuzzer,address,leak,undefined
         -g
         -O1)
 
-target_link_options(fuzz_parser PRIVATE -fsanitize=fuzzer,address,undefined)
+target_link_options(fuzz_parser PRIVATE -fsanitize=fuzzer,address,leak,undefined)
 
 set_target_properties(fuzz_lexer fuzz_parser PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")

@@ -16,58 +16,62 @@
 
 #include <bit>
 #include <complex>
-#include <concepts>
 #include <cstdint>
-#include <limits>
-#include <type_traits>
 
-/* IEEE double manipulation support
- * (TJS requires IEEE double(64-bit float) native support on machine or C++ compiler)
- */
-
-// 63 62       52 51                         0
-// +-+-----------+---------------------------+
-// |s|    exp    |         significand       |
-// +-+-----------+---------------------------+
-// s = sign,  negative if this is 1, otherwise positive.
+// 单精度（32位）：  S EEEEEEEE MMMMMMMMMMMMMMMMMMMMMMM
+//                31  30-23            22-0
+//
+// 双精度（64位）：  S EEEEEEEEEEE MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+//                63    62-52                 51-0
+// S = 符号位（0=正，1=负）
+// E = 指数（偏置编码，不是原码或补码）
+// M = 尾数（fraction），也叫有效数（significand）
 
 namespace cial {
 
-    // Concepts for IEEE floating point operations
-    template <typename T>
-    concept IEEE754Double = std::same_as<T, double> && sizeof(T) == 8 && std::numeric_limits<T>::is_iec559;
-
     // double related constants
-    static constexpr int64_t EXP_MAX = 1023;
-    static constexpr int64_t EXP_MIN = -1022;
+    static constexpr int32_t EXP_MAX = 1023;
+    static constexpr int32_t EXP_MIN = -1022;
     static constexpr int64_t SIGNIFICAND_BITS = 52;
     static constexpr uint64_t EXP_BIAS = 1023;
 
     // component extraction bit masks
-    static constexpr uint64_t SIGN_MASK = 0x8000000000000000ull;
-    static constexpr uint64_t EXP_MASK = 0x7ff0000000000000ull;
-    static constexpr uint64_t SIGNIFICAND_MASK = 0x000fffffffffffffull;
-    static constexpr uint64_t SIGNIFICAND_MSB_MASK = 0x0008000000000000ull;
+    static constexpr uint64_t SIGN_MASK = 0x8000'0000'0000'0000ull;
+    static constexpr uint64_t EXP_MASK = 0x7ff0'0000'0000'0000ull;
+    static constexpr uint64_t SIGNIFICAND_MASK = 0x000f'ffff'ffff'ffffull;
+    static constexpr uint64_t SIGNIFICAND_MSB_MASK = 0x0008'0000'0000'0000ull;
 
-    // Type-safe bit manipulation utilities
-    template <typename T>
-    [[nodiscard]] constexpr std::enable_if_t<std::is_unsigned_v<T>, T> bitExtract(T value, int start,
-                                                                                  int width) noexcept {
-        return (value >> start) & ((T{ 1 } << width) - 1);
+    // Special values
+    static constexpr uint64_t P_NaN = EXP_MASK | SIGNIFICAND_MSB_MASK;
+    static constexpr uint64_t N_NaN = SIGN_MASK | P_NaN;
+    static constexpr uint64_t P_INF = EXP_MASK;
+    static constexpr uint64_t N_INF = SIGN_MASK | P_INF;
+
+    // Special value check functions (replacing macros)
+    [[nodiscard]] constexpr bool checkNan(const uint64_t bits) noexcept {
+        return (bits & EXP_MASK) == EXP_MASK && (bits & SIGNIFICAND_MASK) != 0;
     }
 
-    template <typename T>
-    [[nodiscard]] constexpr std::enable_if_t<std::is_unsigned_v<T>, T> bit_insert(T value, int start, int width,
-                                                                                  T insert) noexcept {
-        T mask = ((T{ 1 } << width) - 1) << start;
-        return (value & ~mask) | ((insert << start) & mask);
+    [[nodiscard]] constexpr bool checkInf(const uint64_t bits) noexcept {
+        return (bits & EXP_MASK) == EXP_MASK && (bits & SIGNIFICAND_MASK) == 0;
     }
+
+    [[nodiscard]] constexpr uint64_t doubleToBits(double value) noexcept { return std::bit_cast<uint64_t>(value); }
+
+    [[nodiscard]] constexpr double bitsToDouble(const uint64_t bits) noexcept { return std::bit_cast<double>(bits); }
 
     // Component extraction functions
-    [[nodiscard]] constexpr bool getSign(const uint64_t bits) noexcept { return (bits & SIGN_MASK) != 0; }
+    [[nodiscard]] constexpr bool hasSign(const uint64_t bits) noexcept { return (bits & SIGN_MASK) != 0; }
 
     [[nodiscard]] constexpr int32_t getExponent(const uint64_t bits) noexcept {
-        return static_cast<int32_t>(bitExtract(bits, SIGNIFICAND_BITS, 11) - EXP_BIAS);
+        const uint32_t raw = bits >> SIGNIFICAND_BITS & (1 << 11) - 1;
+        if(raw == 0) {
+            return EXP_MIN;
+        }
+        if(raw == 0x7FF) {
+            return checkNan(bits) ? 0 : 9999;
+        }
+        return static_cast<int32_t>(raw) - EXP_MAX;
     }
 
     [[nodiscard]] constexpr uint64_t getSignificand(const uint64_t bits) noexcept { return bits & SIGNIFICAND_MASK; }
@@ -79,38 +83,8 @@ namespace cial {
         return (exp + EXP_BIAS) << SIGNIFICAND_BITS;
     }
 
-    [[nodiscard]] constexpr uint64_t make_significand(const uint64_t significand) noexcept {
+    [[nodiscard]] constexpr uint64_t makeSignificand(const uint64_t significand) noexcept {
         return significand & SIGNIFICAND_MASK;
-    }
-
-    // Special values
-    static constexpr uint64_t P_NaN = EXP_MASK | SIGNIFICAND_MSB_MASK;
-    static constexpr uint64_t N_NaN = SIGN_MASK | P_NaN;
-    static constexpr uint64_t P_INF = EXP_MASK;
-    static constexpr uint64_t N_INF = SIGN_MASK | P_INF;
-
-    // Special value check functions (replacing macros)
-    [[nodiscard]] constexpr bool checkNan(const uint64_t bits) noexcept {
-        const bool exp_all_set = (bits & EXP_MASK) == EXP_MASK;
-        const bool significand_nonzero = (bits & SIGNIFICAND_MASK) != 0;
-        return exp_all_set && significand_nonzero;
-    }
-
-    [[nodiscard]] constexpr bool checkInf(const uint64_t bits) noexcept {
-        const bool exp_all_set = (bits & EXP_MASK) == EXP_MASK;
-        const bool significand_zero = (bits & SIGNIFICAND_MASK) == 0;
-        return exp_all_set && significand_zero;
-    }
-
-    // Modern C++20 bit cast support for double <-> uint64_t conversion
-    template <IEEE754Double T = double>
-    [[nodiscard]] constexpr uint64_t doubleToBits(T value) noexcept {
-        return std::bit_cast<uint64_t>(value);
-    }
-
-    template <IEEE754Double T = double>
-    [[nodiscard]] constexpr T bitsToDouble(const uint64_t bits) noexcept {
-        return std::bit_cast<T>(bits);
     }
 
     // High-level IEEE 754 double precision utilities
@@ -120,7 +94,7 @@ namespace cial {
         constexpr explicit Real(const uint64_t bits) noexcept : _bits(bits) {}
         constexpr explicit Real(const double value) noexcept : _bits(doubleToBits(value)) {}
 
-        [[nodiscard]] constexpr bool sign() const noexcept { return getSign(_bits); }
+        [[nodiscard]] constexpr bool sign() const noexcept { return hasSign(_bits); }
         [[nodiscard]] constexpr int32_t exponent() const noexcept { return getExponent(_bits); }
         [[nodiscard]] constexpr uint64_t significand() const noexcept { return getSignificand(_bits); }
 
@@ -132,8 +106,11 @@ namespace cial {
         [[nodiscard]] constexpr uint64_t bits() const noexcept { return _bits; }
 
         Real operator+(const Real &real) const { return Real(this->value() + real.value()); }
+
         Real operator-(const Real &real) const { return Real(this->value() - real.value()); }
+
         Real operator*(const Real &real) const { return Real(this->value() * real.value()); }
+
         Real operator/(const Real &real) const { return Real(this->value() / real.value()); }
 
         bool operator==(const Real &real) const noexcept { return value() == real.value(); }

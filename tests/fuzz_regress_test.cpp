@@ -20,7 +20,7 @@ static std::string read_file(const fs::path &p) {
 }
 
 void run_lexer(const std::string &input) {
-    Runtime rt{};
+    Runtime rt{ 0 };
     Context context{ rt };
     Common::SourceFile sourceFile;
     Common::Result r{};

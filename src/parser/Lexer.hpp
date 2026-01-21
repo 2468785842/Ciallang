@@ -21,6 +21,57 @@
 
 namespace cial::Syntax {
 
+    struct TemplateStringContext {
+        enum class Stage {
+            Init, // 刚开始，准备吐出第一个 '('
+            Text, // 解析普通文字部分
+            ExprOpener, // 准备吐出表达式开始的 '('
+            Expression, // 正在解析表达式内部的 Token
+            ExprCloser, // 准备吐出表达式结束的 ')'
+            PlusAfterText,
+            PlusAfterExpr,
+            Terminator, // 准备吐出最后一个 ')'
+        };
+
+        enum class State { None, Delimiter, Ampersand, Dollar };
+
+        bool active = false;
+        Stage stage = Stage::Init;
+        State parseState = State::None;
+        char delimiter = -1;
+
+        void reset() {
+            active = false;
+            stage = Stage::Init;
+            parseState = State::None;
+            delimiter = -1;
+        }
+
+        // 将转义符替换为ASCII
+        static char unescapeBackSlash(const char c) noexcept {
+            // convert "\?"
+            // c must indicate "?"
+            switch(c) {
+                case 'a':
+                    return 0x7;
+                case 'b':
+                    return 0x8;
+                case 'f':
+                    return 0xc;
+                case 'n':
+                    return 0xa;
+                case 'r':
+                    return 0xd;
+                case 't':
+                    return 0x9;
+                case 'v':
+                    return 0xb;
+                default:
+                    return c;
+            }
+        }
+    };
+
     class Lexer {
     public:
         using LexerCaseCallable = std::function<bool(Lexer *, Token *&)>;
@@ -71,7 +122,7 @@ namespace cial::Syntax {
         static void patchTokenLoc(Token &token, const std::pair<uint32_t, uint32_t> &start,
                                   const std::pair<uint32_t, uint32_t> &end) {
             token.location.start(start.first, start.second);
-            token.location.start(end.first, end.second);
+            token.location.end(end.first, end.second);
         }
 
         [[nodiscard]] std::pair<uint32_t, uint32_t> getRowCol(const size_t pos) const {
@@ -106,33 +157,6 @@ namespace cial::Syntax {
 
         void identifier(Token *&);
 
-        struct TemplateStringContext {
-            enum class Stage {
-                Init, // 刚开始，准备吐出第一个 '('
-                Text, // 解析普通文字部分
-                ExprOpener, // 准备吐出表达式开始的 '('
-                Expression, // 正在解析表达式内部的 Token
-                ExprCloser, // 准备吐出表达式结束的 ')'
-                PlusAfterText,
-                PlusAfterExpr,
-                Terminator, // 准备吐出最后一个 ')'
-            };
-
-            enum class State { None, Delimiter, Ampersand, Dollar };
-
-            bool active = false;
-            Stage stage = Stage::Init;
-            State parseState = State::None;
-            char delimiter = -1;
-
-            void reset() {
-                active = false;
-                stage = Stage::Init;
-                parseState = State::None;
-                delimiter = -1;
-            }
-        };
-
         TemplateStringContext tmplStrCtx;
 
         TemplateStringContext::State parseStringConstVal(Token *&token, char delimiter);
@@ -158,30 +182,6 @@ namespace cial::Syntax {
             if(c == '0' || c == '1')
                 return static_cast<std::int8_t>(c - '0');
             return -1;
-        }
-
-        // 将转义符替换为ASCII
-        static char unescapeBackSlash(const char c) noexcept {
-            // convert "\?"
-            // c must indicate "?"
-            switch(c) {
-                case 'a':
-                    return 0x7;
-                case 'b':
-                    return 0x8;
-                case 'f':
-                    return 0xc;
-                case 'n':
-                    return 0xa;
-                case 'r':
-                    return 0xd;
-                case 't':
-                    return 0x9;
-                case 'v':
-                    return 0xb;
-                default:
-                    return c;
-            }
         }
     };
 } // namespace cial::Syntax
