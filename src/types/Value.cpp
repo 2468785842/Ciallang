@@ -115,8 +115,7 @@ namespace cial {
             case ValueType::Real:
                 return Ret<Integer>::ok(static_cast<Integer>(_real.value()));
             case ValueType::String:
-                // TODO:
-                // return String->ToInteger();
+                return TypeConverter::stringToInteger(*_string->getValue());
             case ValueType::Object:
             case ValueType::Octet:
                 break;
@@ -133,8 +132,7 @@ namespace cial {
             case ValueType::Real:
                 return Ret<Real>::ok(_real);
             case ValueType::String:
-                // TODO:
-                // return String->ToReal();
+                return TypeConverter::stringToReal(*_string->getValue());
             case ValueType::Object:
             case ValueType::Octet:
                 break;

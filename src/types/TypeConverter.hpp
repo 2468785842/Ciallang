@@ -4,6 +4,7 @@
 #pragma once
 
 #include "Types.hpp"
+#include "common/Ret.hpp"
 
 namespace cial::TypeConverter {
     String octetToString(const Octet &oct);
@@ -11,4 +12,8 @@ namespace cial::TypeConverter {
     String integerToString(Integer integer);
     String realToString(Real real);
     String realToHexString(Real real);
+
+    Ret<Integer> stringToInteger(const String &str);
+    Ret<Real> stringToReal(const String &str);
+
 } // namespace cial::TypeConverter

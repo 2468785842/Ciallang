@@ -42,7 +42,7 @@ namespace cial::Bytecode {
 
 #define HANDLE_OPCODE(OP)                                                                                              \
     label_##OP : {                                                                                                     \
-        Op::OP::execute(*instList[pc++], *this);                                                                       \
+        OP::execute(*instList[pc++], *this);                                                                           \
         goto label_Dispatch;                                                                                           \
     }
 
@@ -52,8 +52,8 @@ namespace cial::Bytecode {
 
         while(pc < instList.size() && _stackTop != 0 && curStackTop == _stackTop) {
             const auto *instruction = instList[pc++];
-            // fmt::println("{}\n", Op::Instruction::dump(*instruction, *this, true));
-            Op::Instruction::execute(*instruction, *this);
+            // fmt::println("{}\n", Instruction::dump(*instruction, *this, true));
+            Instruction::execute(*instruction, *this);
         }
 #endif
     }

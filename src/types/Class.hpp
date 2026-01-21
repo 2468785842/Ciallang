@@ -69,11 +69,6 @@ namespace cial {
         Map<Atom, Value> _props{}; // static
     };
 
-    /**
-     * NOTE: First, it's worth mentioning that inheritance in TJS2 is not true inheritance
-     * NOTE: but rather more like composition;
-     * NOTE: each super class instance has its own fields.
-     */
     class DataObject final : public Object {
     public:
         DataObject() = delete;

@@ -255,3 +255,16 @@ TEST_CASE("模版字符串") {
         REQUIRE((**vm.evalExpr<String *>(R"#(@"&1 > 0; \&\& &5 < 10; || &6 == 5;")#"_str)) == "1 && 1 || 0"_str);
     }
 }
+
+TEST_CASE("类型转换") {
+    Runtime rt{};
+    Context context{ rt };
+    Bytecode::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("convert int") { REQUIRE((*vm.evalExpr<Integer>(R"(int "1")"_str)) == 1); }
+
+    SECTION("convert real") { REQUIRE((*vm.evalExpr<Real>(R"(real "1.1")"_str)).value() == Catch::Approx(1.1)); }
+
+    SECTION("convert string") { REQUIRE((**vm.evalExpr<String *>(R"(string 1)"_str)) == "1"_str); }
+}

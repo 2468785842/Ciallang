@@ -25,9 +25,6 @@
 
 namespace cial::Bytecode {
     class VMState;
-}
-
-namespace cial::Bytecode::Op {
 
 #define OPCODE_ENUMS(O)                                                                                                \
     O(NOP)                                                                                                             \
@@ -47,6 +44,9 @@ namespace cial::Bytecode::Op {
     O(Global)                                                                                                          \
     O(Super)                                                                                                           \
     O(This)                                                                                                            \
+    O(ToInt)                                                                                                           \
+    O(ToReal)                                                                                                          \
+    O(ToString)                                                                                                        \
     O(ChgThis)                                                                                                         \
     O(Inv)                                                                                                             \
     O(ChkInv)                                                                                                          \
@@ -393,6 +393,30 @@ namespace cial::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct This
 
+    struct ToInt {
+        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct ToInt
+
+    struct ToReal {
+        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct Real
+
+    struct ToString {
+        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct String
+
     struct ChgThis {
         static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
         static Register src(const Instruction &inst) { return inst.getOperand2<Register>(); }
@@ -729,4 +753,4 @@ namespace cial::Bytecode::Op {
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct Ret
 
-}; // namespace cial::Bytecode::Op
+}; // namespace cial::Bytecode

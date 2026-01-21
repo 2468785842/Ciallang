@@ -33,9 +33,9 @@ namespace cial::Bytecode {
          * @param args 值数组
          * @return 指令在内存的索引
          */
-        template <Op::OpCode OP, typename... Args>
-        Op::Instruction *emit(Args &&...args) {
-            auto *inst = new Op::Instruction(OP, Op::Operand(std::forward<Args>(args))...);
+        template <OpCode OP, typename... Args>
+        Instruction *emit(Args &&...args) {
+            auto *inst = new Instruction(OP, Operand(std::forward<Args>(args))...);
             _instructions.push_back(inst);
             return inst;
         }
@@ -89,7 +89,7 @@ namespace cial::Bytecode {
             size_t pc{};
             while(pc < _instructions.size()) {
                 const auto &instruction = _instructions[pc];
-                ss << fmt::format("{: <6}: {}", Label{ pc }, Op::Instruction::dump(*instruction, nullptr));
+                ss << fmt::format("{: <6}: {}", Label{ pc }, Instruction::dump(*instruction, nullptr));
                 if(pc != _instructions.size() - 1) {
                     ss << '\n';
                 }
@@ -100,7 +100,7 @@ namespace cial::Bytecode {
         }
 
     private:
-        Vec<Op::Instruction *> _instructions{};
+        Vec<Instruction *> _instructions{};
         Vec<Constant> _constants{};
         std::uint32_t _registerCount{ 0 };
     };

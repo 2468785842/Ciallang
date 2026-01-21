@@ -7,6 +7,7 @@
 #include "Real.hpp"
 #include "String.hpp"
 #include "common/Defer.hpp"
+#include "parser/Lexer.hpp"
 
 namespace cial::TypeConverter {
 
@@ -110,30 +111,42 @@ namespace cial::TypeConverter {
         return result;
     }
 
-    Integer stringToInteger(const String &str) {
-        // TODO: use Lexer
-        const char *p = str.getData();
-        Integer result = 0;
-        bool neg = false;
+    Ret<Integer> stringToInteger(const String &str) {
+        auto retErr = Ret<Integer>::err(ErrCode::InvalidCast, String{ str.toStdStr() + " can't covert to integer" });
+        Common::SourceFile sf{};
+        Common::Result r{};
+        sf.load(r, str.getData());
+        if(r.isFailed())
+            return retErr;
+        PreProcessor pp{};
+        Syntax::Lexer lexer{ sf, pp };
 
-        if(*p == '-') {
-            neg = true;
-            ++p;
-        }
+        Syntax::Token *t;
+        lexer.next(t, false);
 
-        while(p < str.getData() + str.length()) {
-            const char c = *p++;
-            if(c < '0' || c > '9')
-                break;
-            result = result * 10 + (c - '0');
-        }
+        if(t->type() != Syntax::TokenType::ConstVal || t->valueType() != Syntax::TokenValueType::Integer)
+            return retErr;
 
-        return neg ? -result : result;
+        return Ret<Integer>::ok(t->getInteger());
     }
 
-    Real stringToReal(const String &str) {
-        // TODO: use Lexer
-        return Real{ std::strtod(str.getData(), nullptr) };
+    Ret<Real> stringToReal(const String &str) {
+        auto retErr = Ret<Real>::err(ErrCode::InvalidCast, String{ str.toStdStr() + " can't covert to real" });
+        Common::SourceFile sf{};
+        Common::Result r{};
+        sf.load(r, str.getData());
+        if(r.isFailed())
+            return retErr;
+        PreProcessor pp{};
+        Syntax::Lexer lexer{ sf, pp };
+
+        Syntax::Token *t;
+        lexer.next(t, false);
+
+        if(t->type() != Syntax::TokenType::ConstVal || t->valueType() != Syntax::TokenValueType::Real)
+            return retErr;
+
+        return Ret<Real>::ok(t->getReal());
     }
 
 } // namespace cial::TypeConverter

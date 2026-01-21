@@ -22,7 +22,7 @@
 #include "types/Property.hpp"
 #include "vm/Register.hpp"
 
-namespace cial::Bytecode::Op {
+namespace cial::Bytecode {
 
     void Instruction::execute(const Instruction &inst, VMState &vmState) {
 #define HANDLE_OPCODE(OP)                                                                                              \
@@ -160,6 +160,23 @@ namespace cial::Bytecode::Op {
 
     void This::execute(const Instruction &inst, const VMState &vmState) {
         vmState.reg(dst(inst), Value{ vmState.curFrame()->thisObj });
+    }
+
+    void ToInt::execute(const Instruction &inst, const VMState &vmState) {
+        Value &r = vmState.regRef(dst(inst));
+        r = Value{ r.asInteger().unwrap() };
+    }
+
+    void ToReal::execute(const Instruction &inst, const VMState &vmState) {
+        Value &r = vmState.regRef(dst(inst));
+        r = Value{ r.asReal().unwrap() };
+    }
+
+    void ToString::execute(const Instruction &inst, const VMState &vmState) {
+        Value &r = vmState.regRef(dst(inst));
+        Value s = r;
+        assert(s.toString().isOk());
+        r = s;
     }
 
     void ChgThis::execute(const Instruction &inst, const VMState &vmState) {
@@ -564,6 +581,18 @@ namespace cial::Bytecode::Op {
         return fmt::format("{: <10} {: <4}", "this", dst(inst));
     }
 
+    std::string ToInt::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "int", dst(inst));
+    }
+
+    std::string ToReal::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "real", dst(inst));
+    }
+
+    std::string ToString::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "string", dst(inst));
+    }
+
     std::string ChgThis::dump(const Instruction &inst, const VMState *vmState) {
         return fmt::format("{: <10} {: <4} {: <4}", "chgthis", dst(inst), src(inst));
     }
@@ -808,4 +837,4 @@ namespace cial::Bytecode::Op {
         return fmt::format("{: <10} {}", "ret", retReg(inst));
     }
 
-} // namespace cial::Bytecode::Op
+} // namespace cial::Bytecode

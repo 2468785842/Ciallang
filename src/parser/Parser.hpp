@@ -311,6 +311,7 @@ namespace cial::Syntax {
     static constinit InternalIdentifierPrefixParser S_InternalIdentifierPrefixParser;
     static constinit ParenthesizedPrefixParser S_ParenthesizedPrefixParser{};
     static constinit FunctionPrefixParser S_FunctionPrefixParser;
+    static constinit UnaryOperatorPrefixParser S_TypeCastPrefixParser{ Precedence::type };
 
     static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>({
         { TokenType::Null, &S_ConstValPrefixParser },
@@ -335,10 +336,10 @@ namespace cial::Syntax {
         { TokenType::Ampersand, &S_PrefixParser }, // "&" substance accessing (ignores property operation)
         { TokenType::Asterisk, &S_PrefixParser }, // "*" force property access
         { TokenType::LParenthesis, &S_ParenthesizedPrefixParser }, // "(" 括号表达式
-        { TokenType::Function, &S_FunctionPrefixParser }
-        // {TokenType::Int,            &S_TypeCastPrefixParser}, // "int" unary_expr
-        // {TokenType::Real,           &S_TypeCastPrefixParser}, // "real" unary_expr
-        // {TokenType::String,         &S_TypeCastPrefixParser}, // "string" unary_expr
+        { TokenType::Function, &S_FunctionPrefixParser },
+        { TokenType::Int, &S_TypeCastPrefixParser }, // "int" unary_expr
+        { TokenType::Real, &S_TypeCastPrefixParser }, // "real" unary_expr
+        { TokenType::String, &S_TypeCastPrefixParser }, // "string" unary_expr
     });
 
     /**
