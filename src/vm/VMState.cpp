@@ -51,9 +51,9 @@ namespace cial::Bytecode {
 #else
 
         while(pc < instList.size() && _stackTop != 0 && curStackTop == _stackTop) {
-            const auto *instruction = instList[pc];
+            const auto &instruction = instList[pc];
             // fmt::println("{}\n", Instruction::dump(*instruction, this));
-            Instruction::execute(*instruction, *this);
+            Instruction::execute(instruction, *this);
             switch(_pending) {
                 case PendingCF::Throw:
                     unwind();

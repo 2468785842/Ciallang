@@ -123,7 +123,7 @@ namespace cial {
 
             if(cnt > 0)
                 vmState.pop(cnt);
-            assert(constructor.meta->chunk->getInstVec().back()->opcode == Bytecode::OpCode::Ret);
+            assert(constructor.meta->chunk->getInstVec().back().opcode == Bytecode::OpCode::Ret);
         }
     } // namespace
 
@@ -160,8 +160,11 @@ namespace cial {
 
                         if(cnt > 0)
                             vmState.pop(cnt);
-                        assert(constructor.meta->chunk->getInstVec().back()->opcode == Bytecode::OpCode::Ret);
-                        dataObject->setSuperDataClass(extName);
+                        assert(constructor.meta->chunk->getInstVec().back().opcode == Bytecode::OpCode::Ret);
+                        const Value extVal = vmState.global(extName);
+                        assert(extVal.isObject());
+                        auto *clazzObject = dynamic_cast<ClassObject *>(extVal.asObject().unwrap());
+                        dataObject->setSuperClass(extName, clazzObject);
                         vmState.reg(ret, Value{ dataObject });
                         return;
                     }
@@ -173,7 +176,7 @@ namespace cial {
         newClass(dataObject.get(), this, vmState, ret, argCount);
 
         for(const Atom extName : meta->extends) {
-            if(!dataObject->getSuperDataClass(extName)) {
+            if(!dataObject->getSuperClass(extName)) {
                 throw std::runtime_error("super class not init in Derived class constructor");
             }
         }

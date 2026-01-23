@@ -57,7 +57,7 @@ namespace cial::Inter {
         const auto tryStartIp = makeLabel(); // closed interval
         node->tryBlock->generateBytecode(this, retReg);
 
-        Bytecode::Instruction *jmp = _chunk->emit<Bytecode::OpCode::Jmp>();
+        size_t jmpIdx = _chunk->emit<Bytecode::OpCode::Jmp>();
 
         const auto tryEndIp = makeLabel(); // open interval (same as catch start ip closed interval)
 
@@ -69,13 +69,13 @@ namespace cial::Inter {
             addLocalVar(LocalVariable{ varName, exValue, static_cast<std::uint32_t>(tryEndIp.address()) });
 
             node->catchBlock->generateBytecode(this, retReg);
-            Bytecode::JmpNE::setTarget(*jmp, makeLabel());
+            Bytecode::JmpNE::setTarget(_chunk->inst(jmpIdx), makeLabel());
 
             _chunk->addThrowHandler({ tryStartIp, tryEndIp, exValue });
             endScope();
         } else {
             node->catchBlock->generateBytecode(this, retReg);
-            Bytecode::JmpNE::setTarget(*jmp, makeLabel());
+            Bytecode::JmpNE::setTarget(_chunk->inst(jmpIdx), makeLabel());
             _chunk->addThrowHandler({ tryStartIp, tryEndIp });
         }
 
@@ -444,9 +444,9 @@ namespace cial::Inter {
         }
         freeRegister(memberReg);
         _chunk->emit<Bytecode::OpCode::Call>(dst, memberReg, node->arguments.size());
-        if(!node->arguments.empty()) {
-            _chunk->emit<Bytecode::OpCode::PopN>(node->arguments.size());
-        }
+        // if(!node->arguments.empty()) {
+        //     _chunk->emit<Bytecode::OpCode::PopN>(node->arguments.size());
+        // }
         retReg = dst;
     }
 
@@ -807,19 +807,19 @@ namespace cial::Inter {
 
         _chunk->emit<Bytecode::OpCode::Test>(testReg);
 
-        auto *jmpNE = _chunk->emit<Bytecode::OpCode::JmpNE>();
+        const size_t jmpNeIdx = _chunk->emit<Bytecode::OpCode::JmpNE>();
         node->body->generateBytecode(this, ignore);
-        Bytecode::Instruction *jmp = nullptr;
+        size_t jmpIdx{};
 
         if(node->elseBody) {
-            jmp = _chunk->emit<Bytecode::OpCode::Jmp>();
+            jmpIdx = _chunk->emit<Bytecode::OpCode::Jmp>();
         }
 
-        Bytecode::JmpNE::setTarget(*jmpNE, makeLabel());
+        Bytecode::JmpNE::setTarget(_chunk->inst(jmpNeIdx), makeLabel());
 
         if(node->elseBody) {
             node->elseBody->generateBytecode(this, ignore);
-            Bytecode::Jmp::setTarget(*jmp, makeLabel());
+            Bytecode::Jmp::setTarget(_chunk->inst(jmpIdx), makeLabel());
         }
 
         freeRegister(testReg);
@@ -839,34 +839,36 @@ namespace cial::Inter {
             return;
         }
 
-        Instruction *prevCaseJmp{};
-        for(auto &[matchExprVec, body] : node->matches) {
-            Vec<Instruction *> jmpEVec{};
+        size_t prevCaseJmpIdx{};
+        const size_t matchLen = node->matches.size();
+        for(size_t i = 0; i < matchLen; ++i) {
+            auto &[matchExprVec, body] = node->matches[i];
+            Vec<size_t> jmpEIdxVec{};
             for(const auto *matchExpr : matchExprVec) {
                 Register matchReg{ 0 };
 
-                if(!expectValue(matchExpr, matchReg)) {
+                if(!expectValue(matchExpr, matchReg))
                     return;
-                }
+
                 _chunk->emit<OpCode::EQ>(testReg, matchReg);
                 _chunk->emit<OpCode::Test>(matchReg);
-                jmpEVec.push_back(_chunk->emit<OpCode::JmpE>());
+                jmpEIdxVec.push_back(_chunk->emit<OpCode::JmpE>());
             }
 
-            auto *jmp = _chunk->emit<OpCode::Jmp>();
-            for(auto *jmpE : jmpEVec) {
-                JmpE::setTarget(*jmpE, makeLabel());
+            const size_t jmpIdx = _chunk->emit<OpCode::Jmp>();
+            for(const size_t jmpEIdx : jmpEIdxVec) {
+                JmpE::setTarget(_chunk->inst(jmpEIdx), makeLabel());
             }
 
-            if(prevCaseJmp)
-                Jmp::setTarget(*prevCaseJmp, makeLabel());
+            if(i != 0)
+                Jmp::setTarget(_chunk->inst(prevCaseJmpIdx), makeLabel());
 
             body->generateBytecode(this, ignore);
 
             if(body != node->matches.back().second)
-                prevCaseJmp = _chunk->emit<OpCode::Jmp>();
+                prevCaseJmpIdx = _chunk->emit<OpCode::Jmp>();
 
-            Jmp::setTarget(*jmp, makeLabel());
+            Jmp::setTarget(_chunk->inst(jmpIdx), makeLabel());
         }
 
         if(node->defaultBody)
@@ -874,8 +876,8 @@ namespace cial::Inter {
 
         const auto exitLabel = makeLabel();
 
-        for(auto *br : _breakStack.back()) {
-            Jmp::setTarget(*br, exitLabel);
+        for(const size_t br : _breakStack.back()) {
+            Jmp::setTarget(_chunk->inst(br), exitLabel);
         }
     }
 
@@ -895,8 +897,8 @@ namespace cial::Inter {
 
         const auto testLabel = makeLabel();
         _continueStack.back().continueLabel = testLabel;
-        for(auto *ct : _continueStack.back().continues) {
-            Bytecode::Jmp::setTarget(*ct, testLabel);
+        for(const size_t idx : _continueStack.back().continues) {
+            Bytecode::Jmp::setTarget(_chunk->inst(idx), testLabel);
         }
 
         Bytecode::Register testReg{ 0 };
@@ -905,13 +907,13 @@ namespace cial::Inter {
         }
 
         _chunk->emit<Bytecode::OpCode::Test>(testReg);
-        auto *jmpNE = _chunk->emit<Bytecode::OpCode::JmpNE>();
-        Bytecode::Jmp::setTarget(*_chunk->emit<Bytecode::OpCode::Jmp>(), bodyLabel);
+        const size_t jmpNEIdx = _chunk->emit<Bytecode::OpCode::JmpNE>();
+        Bytecode::Jmp::setTarget(_chunk->inst(_chunk->emit<Bytecode::OpCode::Jmp>()), bodyLabel);
 
         const auto exitLabel = makeLabel();
-        Bytecode::JmpNE::setTarget(*jmpNE, exitLabel);
-        for(auto *br : _breakStack.back()) {
-            Bytecode::Jmp::setTarget(*br, exitLabel);
+        Bytecode::JmpNE::setTarget(_chunk->inst(jmpNEIdx), exitLabel);
+        for(const size_t idx : _breakStack.back()) {
+            Bytecode::Jmp::setTarget(_chunk->inst(idx), exitLabel);
         }
 
         freeRegister(testReg);
@@ -931,22 +933,21 @@ namespace cial::Inter {
 
         const auto testLabel = makeLabel();
 
-        Bytecode::Instruction *jmpNE{ nullptr };
+        size_t jmpNeIdx{};
         Bytecode::Register testReg{ 0 };
         if(node->test) {
-            if(!expectValue(node->test, testReg)) {
+            if(!expectValue(node->test, testReg))
                 return;
-            }
             _chunk->emit<Bytecode::OpCode::Test>(testReg);
-            jmpNE = _chunk->emit<Bytecode::OpCode::JmpNE>();
+            jmpNeIdx = _chunk->emit<Bytecode::OpCode::JmpNE>();
         }
 
         node->body->generateBytecode(this, ignore);
 
         const auto stepLabel = makeLabel();
         _continueStack.back().continueLabel = stepLabel;
-        for(auto *ct : _continueStack.back().continues) {
-            Bytecode::Jmp::setTarget(*ct, stepLabel);
+        for(const size_t idx : _continueStack.back().continues) {
+            Bytecode::Jmp::setTarget(_chunk->inst(idx), stepLabel);
         }
 
         if(node->step) {
@@ -957,13 +958,13 @@ namespace cial::Inter {
             freeRegister(stepReg);
         }
 
-        Bytecode::Jmp::setTarget(*_chunk->emit<Bytecode::OpCode::Jmp>(), testLabel);
+        Bytecode::Jmp::setTarget(_chunk->inst(_chunk->emit<Bytecode::OpCode::Jmp>()), testLabel);
 
         const auto exitLabel = makeLabel();
-        if(jmpNE)
-            Bytecode::JmpNE::setTarget(*jmpNE, exitLabel);
-        for(auto *br : _breakStack.back()) {
-            Bytecode::Jmp::setTarget(*br, exitLabel);
+        if(node->test)
+            Bytecode::JmpNE::setTarget(_chunk->inst(jmpNeIdx), exitLabel);
+        for(const size_t idx : _breakStack.back()) {
+            Bytecode::Jmp::setTarget(_chunk->inst(idx), exitLabel);
         }
 
         if(node->test)
@@ -988,22 +989,22 @@ namespace cial::Inter {
         }
 
         _chunk->emit<Bytecode::OpCode::Test>(testReg);
-        auto *jmpNE = _chunk->emit<Bytecode::OpCode::JmpNE>();
+        const size_t jmpNeIdx = _chunk->emit<Bytecode::OpCode::JmpNE>();
 
         node->body->generateBytecode(this, ignore);
 
         const auto testLabel = makeLabel();
         _continueStack.back().continueLabel = testLabel;
-        for(auto *ct : _continueStack.back().continues) {
-            Bytecode::Jmp::setTarget(*ct, testLabel);
+        for(const size_t idx : _continueStack.back().continues) {
+            Bytecode::Jmp::setTarget(_chunk->inst(idx), testLabel);
         }
 
-        Bytecode::Jmp::setTarget(*_chunk->emit<Bytecode::OpCode::Jmp>(), loopLabel);
+        Bytecode::Jmp::setTarget(_chunk->inst(_chunk->emit<Bytecode::OpCode::Jmp>()), loopLabel);
         const auto exitLabel = makeLabel();
-        Bytecode::JmpNE::setTarget(*jmpNE, exitLabel);
+        Bytecode::JmpNE::setTarget(_chunk->inst(jmpNeIdx), exitLabel);
 
-        for(auto *br : _breakStack.back()) {
-            Bytecode::Jmp::setTarget(*br, exitLabel);
+        for(const size_t idx : _breakStack.back()) {
+            Bytecode::Jmp::setTarget(_chunk->inst(idx), exitLabel);
         }
 
         freeRegister(testReg);
@@ -1014,8 +1015,8 @@ namespace cial::Inter {
             error("break keyword must in loop or switch scope", node->location);
             return;
         }
-        auto *itt = _chunk->emit<Bytecode::OpCode::Jmp>();
-        _breakStack.back().push_back(itt);
+        const size_t idx = _chunk->emit<Bytecode::OpCode::Jmp>();
+        _breakStack.back().push_back(idx);
     }
 
     void IRGenerator::generate(const Syntax::ContinueStmtNode *node, OptReg &) {
@@ -1024,11 +1025,11 @@ namespace cial::Inter {
             return;
         }
         if(_continueStack.back().continueLabel.has_value()) {
-            Bytecode::Jmp::setTarget(*_chunk->emit<Bytecode::OpCode::Jmp>(),
+            Bytecode::Jmp::setTarget(_chunk->inst(_chunk->emit<Bytecode::OpCode::Jmp>()),
                                      _continueStack.back().continueLabel.value());
         } else {
-            auto *itt = _chunk->emit<Bytecode::OpCode::Jmp>();
-            _continueStack.back().continues.push_back(itt);
+            const size_t idx = _chunk->emit<Bytecode::OpCode::Jmp>();
+            _continueStack.back().continues.push_back(idx);
         }
     }
 
@@ -1040,7 +1041,7 @@ namespace cial::Inter {
         }
 
         _chunk->emit<Bytecode::OpCode::Test>(testReg);
-        auto *jmpNE = _chunk->emit<Bytecode::OpCode::JmpNE>();
+        const size_t jmpNeIdx = _chunk->emit<Bytecode::OpCode::JmpNE>();
 
         Bytecode::Register lhsReg{ 0 };
         if(!expectValue(node->lhsExpr, lhsReg)) {
@@ -1049,8 +1050,8 @@ namespace cial::Inter {
 
         _chunk->emit<Bytecode::OpCode::Mov>(lhsReg, dst);
 
-        auto *jmp = _chunk->emit<Bytecode::OpCode::Jmp>();
-        Bytecode::JmpNE::setTarget(*jmpNE, makeLabel());
+        const size_t jmpIdx = _chunk->emit<Bytecode::OpCode::Jmp>();
+        Bytecode::JmpNE::setTarget(_chunk->inst(jmpNeIdx), makeLabel());
 
         Bytecode::Register rhsReg{ 0 };
         if(!expectValue(node->rhsExpr, rhsReg)) {
@@ -1059,7 +1060,7 @@ namespace cial::Inter {
 
         _chunk->emit<Bytecode::OpCode::Mov>(rhsReg, dst);
 
-        Bytecode::Jmp::setTarget(*jmp, makeLabel());
+        Bytecode::Jmp::setTarget(_chunk->inst(jmpIdx), makeLabel());
         freeRegister(testReg);
         retReg = dst;
     }
@@ -1117,7 +1118,7 @@ namespace cial::Inter {
         assert(funChunk);
 
         // the last instruction is not ret, patch one ret
-        if(auto &instVec = funChunk->getInstVec(); instVec.empty() || instVec.back()->opcode != Bytecode::OpCode::Ret) {
+        if(auto &instVec = funChunk->getInstVec(); instVec.empty() || instVec.back().opcode != Bytecode::OpCode::Ret) {
             funChunk->emit<Bytecode::OpCode::Ret>(gen.loadVoidReg());
         }
 

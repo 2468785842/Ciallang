@@ -36,7 +36,21 @@ namespace cial::Bytecode {
         void freeFrame(const size_t n) {
             assert(_sp >= n);
             _sp -= n;
-            maybeShrink();
+            maybeShrink(_sp);
+        }
+
+        void maybeShrink(const size_t sp) {
+            _sp = sp;
+            const size_t totalUsed = _sp;
+            size_t totalCapacity = (_blocks.size() - 1) * _blockSize;
+
+            // 至少保留 minBlocks 个块
+            constexpr size_t minBlocks = 2;
+
+            while(_blocks.size() > minBlocks && totalUsed <= totalCapacity - _blockSize) {
+                _blocks.pop_back();
+                totalCapacity -= _blockSize;
+            }
         }
 
         [[nodiscard]] Value *ptrAt(const size_t globalIndex) const {
@@ -79,19 +93,6 @@ namespace cial::Bytecode {
             while(need > totalCapacity) {
                 allocateBlock();
                 totalCapacity += _blockSize;
-            }
-        }
-
-        void maybeShrink() {
-            const size_t totalUsed = _sp;
-            size_t totalCapacity = (_blocks.size() - 1) * _blockSize;
-
-            // 至少保留 minBlocks 个块
-            constexpr size_t minBlocks = 2;
-
-            while(_blocks.size() > minBlocks && totalUsed <= totalCapacity - _blockSize) {
-                _blocks.pop_back();
-                totalCapacity -= _blockSize;
             }
         }
     };

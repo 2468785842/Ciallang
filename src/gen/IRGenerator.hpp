@@ -118,12 +118,12 @@ namespace cial::Inter {
 
         Vec<Bytecode::Register> _freeRegisters{};
 
-        using BreakContext = Vec<Bytecode::Instruction *>;
+        using BreakContext = Vec<size_t>;
         Vec<BreakContext> _breakStack{};
 
         struct ContinueContext {
             Opt<Bytecode::Label> continueLabel;
-            Vec<Bytecode::Instruction *> continues;
+            Vec<size_t> continues;
         };
 
         Vec<ContinueContext> _continueStack{};

@@ -107,7 +107,8 @@ namespace cial {
         std::uint32_t arity;
         FuncMeta *initDefaultVal{};
         FuncMeta *constructor{};
-        Vec<Atom> extends;
+        Vec<Atom> extends; // 因为动态语言无法在生成bytecode时决定class所以,只有new
+                           // object是通过名字去查找继承父类,和TJS2一致的行为
         Vec<MemberShapeMeta> memberShapeMetas;
         Vec<ClassFieldMeta> memberMetas;
 

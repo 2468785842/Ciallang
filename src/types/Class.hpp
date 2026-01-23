@@ -13,6 +13,7 @@
  */
 #pragma once
 
+#include <map>
 #include <ranges>
 
 #include "Object.hpp"
@@ -90,6 +91,10 @@ namespace cial {
                     v.asObject().value()->marked();
                 }
             }
+
+            for(const auto &clazz : _superClass | std::views::values) {
+                clazz->marked();
+            }
         }
 
         bool instanceOf(const Atom a) override { return a == _class->meta->className; }
@@ -100,13 +105,19 @@ namespace cial {
 
         [[nodiscard]] bool hasProp(Atom a) const override;
 
-        void setSuperDataClass(const Atom a) { _superClass[a] = true; }
-
-        bool getSuperDataClass(const Atom a) {
+        void setSuperClass(const Atom a, ClassObject *clazz) {
             if(!_superClass.contains(a))
-                return false;
-            return _superClass[a];
+                _lastSuperClass = clazz;
+            _superClass[a] = clazz;
         }
+
+        ClassObject *getSuperClass(const Atom a) {
+            if(const auto it = _superClass.find(a); it != _superClass.cend())
+                return it->second;
+            return nullptr;
+        }
+
+        [[nodiscard]] ClassObject *getSuperClass() const { return _lastSuperClass; }
 
         void invalidate() {
             if(_isValid) {
@@ -131,7 +142,8 @@ namespace cial {
         Bytecode::VMState *_vmState; // 保留vm以便析构函数调用finalize方法, 兼容性
         ClassObject *_class{};
         Map<Atom, Value> _props{};
-        Map<Atom, bool> _superClass{};
+        Map<Atom, ClassObject *> _superClass{};
+        ClassObject *_lastSuperClass{};
     };
 
     class GlobalObject : public ClassObject {

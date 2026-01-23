@@ -465,7 +465,7 @@ namespace cial::Bytecode {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct EQ
@@ -475,7 +475,7 @@ namespace cial::Bytecode {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct NEQ
@@ -485,7 +485,7 @@ namespace cial::Bytecode {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct LT
@@ -495,7 +495,7 @@ namespace cial::Bytecode {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct LE
@@ -505,7 +505,7 @@ namespace cial::Bytecode {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GT
@@ -515,7 +515,7 @@ namespace cial::Bytecode {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct GE
@@ -525,7 +525,7 @@ namespace cial::Bytecode {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct AbsEQ
@@ -535,7 +535,7 @@ namespace cial::Bytecode {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct AbsNEQ
@@ -555,7 +555,7 @@ namespace cial::Bytecode {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct LAnd
@@ -665,7 +665,7 @@ namespace cial::Bytecode {
 
         static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
 
-        static void execute(const Instruction &, VMState &);
+        static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct LOr

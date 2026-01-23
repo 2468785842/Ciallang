@@ -60,7 +60,7 @@ namespace cial {
 
         ~CallFrame() {
             if(_pool) {
-                _pool->freeFrame(chunk->getRegCount());
+                _pool->maybeShrink(_sp);
                 _pool = nullptr;
             }
         }

@@ -55,7 +55,7 @@ namespace cial::Bytecode {
         size_t pc{};
         while(pc < _instructions.size()) {
             const auto &instruction = _instructions[pc];
-            ss << fmt::format("{: <6}: {}", Label{ pc }, Instruction::dump(*instruction));
+            ss << fmt::format("{: <6}: {}", Label{ pc }, Instruction::dump(instruction));
             if(pc != _instructions.size() - 1) {
                 ss << '\n';
             }

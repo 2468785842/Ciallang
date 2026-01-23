@@ -36,7 +36,7 @@ namespace cial {
 
         if(cnt > 0)
             vmState.pop(cnt);
-        assert(meta->chunk->getInstVec().back()->opcode == Bytecode::OpCode::Ret);
+        assert(meta->chunk->getInstVec().back().opcode == Bytecode::OpCode::Ret);
     }
 
     void NativeFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {

@@ -152,10 +152,9 @@ namespace cial::Bytecode {
     }
 
     void Super::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.reg(dst(inst),
-                    vmState.global(dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().unwrap())
-                                       ->klass()
-                                       ->meta->extends.back()));
+        vmState.reg(
+            dst(inst),
+            Value{ dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().unwrap())->getSuperClass() });
     }
 
     void This::execute(const Instruction &inst, const VMState &vmState) {
@@ -208,70 +207,70 @@ namespace cial::Bytecode {
 
     void Test::execute(const Instruction &inst, VMState &vmState) { vmState.setZF(vmState.reg(reg(inst)).asBool()); }
 
-    void EQ::execute(const Instruction &inst, VMState &vmState) {
+    void EQ::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.equals(r2);
         r2 = Value{ r };
     }
 
-    void NEQ::execute(const Instruction &inst, VMState &vmState) {
+    void NEQ::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = !r1.equals(r2);
         r2 = Value{ r };
     }
 
-    void AbsEQ::execute(const Instruction &inst, VMState &vmState) {
+    void AbsEQ::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.discernEquals(r2);
         r2 = Value{ r };
     }
 
-    void AbsNEQ::execute(const Instruction &inst, VMState &vmState) {
+    void AbsNEQ::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = !r1.discernEquals(r2);
         r2 = Value{ r };
     }
 
-    void LT::execute(const Instruction &inst, VMState &vmState) {
+    void LT::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.littlerThan(r2).unwrap();
         r2 = Value{ r };
     }
 
-    void LE::execute(const Instruction &inst, VMState &vmState) {
+    void LE::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = !r1.greaterThan(r2).unwrap();
         r2 = Value{ r };
     }
 
-    void GT::execute(const Instruction &inst, VMState &vmState) {
+    void GT::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.greaterThan(r2).unwrap();
         r2 = Value{ r };
     }
 
-    void GE::execute(const Instruction &inst, VMState &vmState) {
+    void GE::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = !r1.littlerThan(r2).unwrap();
         r2 = Value{ r };
     }
 
-    void LAnd::execute(const Instruction &inst, VMState &vmState) {
+    void LAnd::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.logicalAnd(r2);
         r2 = Value{ r };
     }
 
-    void LOr::execute(const Instruction &inst, VMState &vmState) {
+    void LOr::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.logicalOr(r2);

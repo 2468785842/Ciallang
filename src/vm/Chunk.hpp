@@ -34,13 +34,6 @@ namespace cial::Bytecode {
             _constants.emplace_back(); // Void
         }
 
-        ~Chunk() override {
-            for(const auto &inst : _instructions) {
-                delete inst;
-            }
-            _instructions.clear();
-        }
-
         void addThrowHandler(const ThrowHandler &tHandler) { _throwHandlers.push_back(tHandler); }
 
         [[nodiscard]] Opt<ThrowHandler> findThrowHandler(const Label pc) const {
@@ -59,11 +52,13 @@ namespace cial::Bytecode {
          * @return 指令在内存的索引
          */
         template <OpCode OP, typename... Args>
-        Instruction *emit(Args &&...args) {
-            auto *inst = new Instruction(OP, Operand(std::forward<Args>(args))...);
-            _instructions.push_back(inst);
-            return inst;
+        size_t emit(Args &&...args) {
+            const size_t index = _instructions.size();
+            _instructions.emplace_back(OP, Operand(std::forward<Args>(args))...);
+            return index;
         }
+
+        Instruction &inst(const size_t index) { return _instructions[index]; }
 
         Chunk(const Chunk &) = delete;
         Chunk &operator=(const Chunk &) = delete;
@@ -118,7 +113,7 @@ namespace cial::Bytecode {
         }
 
     private:
-        Vec<Instruction *> _instructions{};
+        Vec<Instruction> _instructions{};
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
         std::uint32_t _registerCount{};
