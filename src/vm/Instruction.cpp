@@ -69,7 +69,7 @@ namespace cial::Bytecode {
     }
 
     void Load::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.reg(reg(inst), vmState.curFrame()->chunk->getConstant(value(inst)).createValue(&vmState.rt));
+        vmState.regRef(reg(inst)) = vmState.curFrame()->chunk->getConstant(value(inst)).createValue(&vmState.rt);
     }
 
     void PushReg::execute(const Instruction &inst, const VMState &vmState) { vmState.push(vmState.reg(src(inst))); }
@@ -206,18 +206,13 @@ namespace cial::Bytecode {
         dstVal = Value{ false };
     }
 
-    void Test::execute(const Instruction &inst, VMState &vmState) {
-        if(vmState.reg(reg(inst)).asBool()) {
-            vmState.setZF(true);
-        }
-    }
+    void Test::execute(const Instruction &inst, VMState &vmState) { vmState.setZF(vmState.reg(reg(inst)).asBool()); }
 
     void EQ::execute(const Instruction &inst, VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.equals(r2);
         r2 = Value{ r };
-        vmState.setZF(r);
     }
 
     void NEQ::execute(const Instruction &inst, VMState &vmState) {
@@ -225,7 +220,6 @@ namespace cial::Bytecode {
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = !r1.equals(r2);
         r2 = Value{ r };
-        vmState.setZF(r);
     }
 
     void AbsEQ::execute(const Instruction &inst, VMState &vmState) {
@@ -233,7 +227,6 @@ namespace cial::Bytecode {
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.discernEquals(r2);
         r2 = Value{ r };
-        vmState.setZF(r);
     }
 
     void AbsNEQ::execute(const Instruction &inst, VMState &vmState) {
@@ -241,7 +234,6 @@ namespace cial::Bytecode {
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = !r1.discernEquals(r2);
         r2 = Value{ r };
-        vmState.setZF(r);
     }
 
     void LT::execute(const Instruction &inst, VMState &vmState) {
@@ -249,7 +241,6 @@ namespace cial::Bytecode {
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.littlerThan(r2).unwrap();
         r2 = Value{ r };
-        vmState.setZF(r);
     }
 
     void LE::execute(const Instruction &inst, VMState &vmState) {
@@ -257,7 +248,6 @@ namespace cial::Bytecode {
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = !r1.greaterThan(r2).unwrap();
         r2 = Value{ r };
-        vmState.setZF(r);
     }
 
     void GT::execute(const Instruction &inst, VMState &vmState) {
@@ -265,7 +255,6 @@ namespace cial::Bytecode {
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.greaterThan(r2).unwrap();
         r2 = Value{ r };
-        vmState.setZF(r);
     }
 
     void GE::execute(const Instruction &inst, VMState &vmState) {
@@ -273,7 +262,6 @@ namespace cial::Bytecode {
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = !r1.littlerThan(r2).unwrap();
         r2 = Value{ r };
-        vmState.setZF(r);
     }
 
     void LAnd::execute(const Instruction &inst, VMState &vmState) {
@@ -281,7 +269,6 @@ namespace cial::Bytecode {
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.logicalAnd(r2);
         r2 = Value{ r };
-        vmState.setZF(r);
     }
 
     void LOr::execute(const Instruction &inst, VMState &vmState) {
@@ -289,7 +276,6 @@ namespace cial::Bytecode {
         Value &r2 = vmState.regRef(dst(inst));
         const bool r = r1.logicalOr(r2);
         r2 = Value{ r };
-        vmState.setZF(r);
     }
 
     void BXor::execute(const Instruction &inst, const VMState &vmState) {
@@ -310,19 +296,19 @@ namespace cial::Bytecode {
         r2 = r1.bitwiseAnd(r2).unwrap();
     }
 
-    void BLShift::execute(const Instruction &inst, const VMState &vmState) {
+    void BlShift::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         r2 = r1.bitwiseLeftShift(r2).unwrap();
     }
 
-    void BRShift::execute(const Instruction &inst, const VMState &vmState) {
+    void BrShift::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         r2 = r1.bitwiseRightShift(r2).unwrap();
     }
 
-    void BURShift::execute(const Instruction &inst, const VMState &vmState) {
+    void BurShift::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
         r2 = r1.bitwiseUnsignedRightShift(r2).unwrap();
@@ -436,6 +422,23 @@ namespace cial::Bytecode {
             throw r.getErr();
     }
 
+    void Throw::execute(const Instruction &inst, VMState &vmState) { vmState.throwException(vmState.reg(src(inst))); }
+
+    void Debugger::execute(const Instruction &inst, const VMState &vmState) {
+        std::string regs = vmState.dumpCurRegisters();
+        std::string localVarInfo = vmState.dumpCurLocalVars();
+        std::string chunk = vmState.dumpCurChunk();
+        std::string constants = vmState.dumpCurConstants();
+
+        fmt::println("{}", regs);
+        fmt::println("====================");
+        fmt::println("{}", localVarInfo);
+        fmt::println("====================");
+        fmt::println("{}", constants);
+        fmt::println("====================");
+        fmt::println("{}", chunk);
+    }
+
     void Ret::execute(const Instruction &inst, VMState &vmState) {
         const auto &value = vmState.reg(retReg(inst));
         const auto frame = vmState.curFrame();
@@ -445,11 +448,18 @@ namespace cial::Bytecode {
     }
 
     std::string Load::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4}", "load", reg(inst), value(inst));
+
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "load", reg(inst), value(inst));
+
+        if(!vmState)
+            return insDump;
+
+        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, reg(inst), vmState->reg(reg(inst)), value(inst),
+                           vmState->curFrame()->chunk->dumpConstant(&vmState->context.rt(), value(inst)));
     }
 
     std::string PushReg::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4}", "pushreg", src(inst));
+        auto insDump = fmt::format("{: <10} {: <4}", "push_reg", src(inst));
 
         if(!vmState)
             return insDump;
@@ -534,7 +544,7 @@ namespace cial::Bytecode {
     }
 
     std::string DGlobal::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} atom_{}", "dglobal", src(inst), atom(inst).v);
+        auto insDump = fmt::format("{: <10} {: <4} atom_{}", "d_global", src(inst), atom(inst).v);
 
         if(!vmState)
             return insDump;
@@ -545,7 +555,7 @@ namespace cial::Bytecode {
     }
 
     std::string GGlobal::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{} {: <4}", "gglobal", atom(inst).v, dst(inst));
+        return fmt::format("{: <10} atom_{} {: <4}", "g_global", atom(inst).v, dst(inst));
     }
 
     std::string Global::dump(const Instruction &inst, const VMState *vmState) {
@@ -573,7 +583,7 @@ namespace cial::Bytecode {
     }
 
     std::string ChgThis::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4}", "chgthis", dst(inst), src(inst));
+        return fmt::format("{: <10} {: <4} {: <4}", "chg_this", dst(inst), src(inst));
     }
 
     std::string Inv::dump(const Instruction &inst, const VMState *vmState) {
@@ -581,11 +591,11 @@ namespace cial::Bytecode {
     }
 
     std::string ChkInv::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4}", "chkinv", dst(inst), src(inst));
+        return fmt::format("{: <10} {: <4} {: <4}", "chk_inv", dst(inst), src(inst));
     }
 
     std::string ChkIns::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4}", "chkins", dst(inst), src(inst));
+        return fmt::format("{: <10} {: <4} {: <4}", "chk_ins", dst(inst), src(inst));
     }
 
     std::string Test::dump(const Instruction &inst, const VMState *vmState) {
@@ -683,7 +693,7 @@ namespace cial::Bytecode {
     }
 
     std::string LOr::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "lor", src(inst), dst(inst));
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "l_or", src(inst), dst(inst));
 
         if(!vmState)
             return insDump;
@@ -693,7 +703,7 @@ namespace cial::Bytecode {
     }
 
     std::string BXor::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "bxor", src(inst), dst(inst));
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "b_xor", src(inst), dst(inst));
 
         if(!vmState)
             return insDump;
@@ -703,7 +713,7 @@ namespace cial::Bytecode {
     }
 
     std::string BOr::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "bor", src(inst), dst(inst));
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "b_or", src(inst), dst(inst));
 
         if(!vmState)
             return insDump;
@@ -713,7 +723,7 @@ namespace cial::Bytecode {
     }
 
     std::string BAnd::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "band", src(inst), dst(inst));
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "b_and", src(inst), dst(inst));
 
         if(!vmState)
             return insDump;
@@ -722,8 +732,8 @@ namespace cial::Bytecode {
                            vmState->reg(dst(inst)));
     }
 
-    std::string BLShift::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "blshift", src(inst), dst(inst));
+    std::string BlShift::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "bl_shift", src(inst), dst(inst));
 
         if(!vmState)
             return insDump;
@@ -732,8 +742,8 @@ namespace cial::Bytecode {
                            vmState->reg(dst(inst)));
     }
 
-    std::string BRShift::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "brshift", src(inst), dst(inst));
+    std::string BrShift::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "br_shift", src(inst), dst(inst));
 
         if(!vmState)
             return insDump;
@@ -742,8 +752,8 @@ namespace cial::Bytecode {
                            vmState->reg(dst(inst)));
     }
 
-    std::string BURShift::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "burshift", src(inst), dst(inst));
+    std::string BurShift::dump(const Instruction &inst, const VMState *vmState) {
+        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "bur_shift", src(inst), dst(inst));
 
         if(!vmState)
             return insDump;
@@ -757,7 +767,7 @@ namespace cial::Bytecode {
     }
 
     std::string JmpE::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4}", "jmpe", label(inst));
+        auto insDump = fmt::format("{: <10} {: <4}", "jmp_e", label(inst));
 
         if(!vmState)
             return insDump;
@@ -766,7 +776,7 @@ namespace cial::Bytecode {
     }
 
     std::string JmpNE::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4}", "jmpne", label(inst));
+        auto insDump = fmt::format("{: <10} {: <4}", "jmp_ne", label(inst));
 
         if(!vmState)
             return insDump;
@@ -784,31 +794,39 @@ namespace cial::Bytecode {
     }
 
     std::string GProp::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "gprop", obj(inst), memberReg(inst), dst(inst));
+        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "g_prop", obj(inst), memberReg(inst), dst(inst));
     }
 
     std::string DProp::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "gprop", obj(inst), memberReg(inst), src(inst));
+        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "g_prop", obj(inst), memberReg(inst), src(inst));
     }
 
     std::string GThis::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{} {: <4}", "gthis", atom(inst).v, dst(inst));
+        return fmt::format("{: <10} atom_{} {: <4}", "g_this", atom(inst).v, dst(inst));
     }
 
     std::string DThis::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{} {: <4}", "dthis", atom(inst).v, src(inst));
+        return fmt::format("{: <10} atom_{} {: <4}", "d_this", atom(inst).v, src(inst));
     }
 
     std::string GUpval::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{} {: <4}", "gupval", atom(inst).v, dst(inst));
+        return fmt::format("{: <10} atom_{} {: <4}", "g_upval", atom(inst).v, dst(inst));
     }
 
     std::string LNot::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "lnot", src(inst));
+        return fmt::format("{: <10} {: <4}", "l_not", src(inst));
     }
 
     std::string ChgSign::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "chgsign", src(inst));
+        return fmt::format("{: <10} {: <4}", "chg_sign", src(inst));
+    }
+
+    std::string Throw::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4}", "throw", src(inst));
+    }
+
+    std::string Debugger::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10}", "debugger");
     }
 
     std::string Ret::dump(const Instruction &inst, const VMState *vmState) {

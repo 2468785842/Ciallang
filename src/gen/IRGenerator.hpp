@@ -75,6 +75,8 @@ namespace cial::Inter {
 
         void generate(const Syntax::ExprStmtNode *, OptReg &);
 
+        void generate(const Syntax::TryStmtNode *, OptReg &);
+
         void generate(const Syntax::IfStmtNode *, OptReg &);
 
         void generate(const Syntax::SwitchStmtNode *, OptReg &);
@@ -100,6 +102,8 @@ namespace cial::Inter {
         void generate(const Syntax::ContinueStmtNode *, OptReg &);
 
         void generate(const Syntax::ReturnStmtNode *, OptReg &);
+
+        void generate(const Syntax::DebuggerStmtNode *, OptReg &) const;
 
         void generate(const Syntax::TernaryExprNode *, OptReg &);
 
@@ -157,7 +161,7 @@ namespace cial::Inter {
 
         bool expectValue(const Syntax::ExprNode *node, Bytecode::Register &ret);
 
-        void error(const std::string &message, const Common::SourceLocation &location) {
+        void error(const std::string &message, const Common::SourceLocation &location) const {
             _sourceFile.error(_r, message, location);
         }
 

@@ -28,6 +28,7 @@ set(SOURCES
         oop_test.cpp
         property_test.cpp
         scope_test.cpp
+        try_catch_test.cpp
 #        statement_test.cpp
 #        type_system_test.cpp
 )

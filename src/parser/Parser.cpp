@@ -689,6 +689,64 @@ namespace cial::Syntax {
         return scope;
     }
 
+    StmtNode *TryStmtParser::parse(Result &r, Parser *parser, Token *token) const {
+        auto *tryBlock = parser->astBuilder()->makeNode<BlockStmtNode>();
+
+        if(!parser->expect(r, TokenType::LeftCurlyBrace)) {
+            return nullptr;
+        }
+
+        if(!parser->parseScope(r, tryBlock, TokenType::RightCurlyBrace)) {
+            return nullptr;
+        }
+
+        if(!parser->expect(r, TokenType::RightCurlyBrace)) {
+            return nullptr;
+        }
+
+        if(!parser->expect(r, TokenType::Catch)) {
+            return nullptr;
+        }
+
+        IdentifierExprNode *catchErr{};
+        if(parser->peek(r, TokenType::LParenthesis)) {
+            parser->consume(r);
+            auto *exprNode = parser->parseExpression(r, false);
+            if(!exprNode)
+                return nullptr;
+
+            catchErr = dynamic_cast<IdentifierExprNode *>(exprNode);
+
+            if(!catchErr) {
+                parser->error(r, "catch() only is identifier", exprNode->location);
+                return nullptr;
+            }
+
+            if(!parser->expect(r, TokenType::RParenthesis)) {
+                return nullptr;
+            }
+        }
+
+        if(!parser->expect(r, TokenType::LeftCurlyBrace)) {
+            return nullptr;
+        }
+
+        auto *catchBlock = parser->astBuilder()->makeNode<BlockStmtNode>();
+        if(!parser->parseScope(r, catchBlock, TokenType::RightCurlyBrace)) {
+            return nullptr;
+        }
+
+        if(!parser->expect(r, TokenType::RightCurlyBrace)) {
+            return nullptr;
+        }
+
+        auto *tryStmtNode = parser->astBuilder()->makeNode<TryStmtNode>(catchErr, tryBlock, catchBlock);
+        tryStmtNode->location.start(token->location.start());
+        tryStmtNode->location.end(catchBlock->location.end());
+
+        return tryStmtNode;
+    }
+
     StmtNode *IfStmtParser::parse(Result &r, Parser *parser, Token *token) const {
         const auto *test = createExpressionNode(r, parser);
 
@@ -952,6 +1010,14 @@ namespace cial::Syntax {
             return nullptr;
 
         return parser->astBuilder()->makeNode<ReturnStmtNode>(nullptr);
+    }
+
+    StmtNode *DebuggerStmtParser::parse(Result &r, Parser *parser, Token *token) const {
+
+        if(!parser->expect(r, TokenType::SemiColon))
+            return nullptr;
+
+        return parser->astBuilder()->makeNode<DebuggerStmtNode>();
     }
 
     /**

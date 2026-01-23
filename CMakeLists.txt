@@ -40,6 +40,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/Context.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/AtomTable.cpp
 
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Chunk.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/VMState.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Rlc.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Instruction.cpp

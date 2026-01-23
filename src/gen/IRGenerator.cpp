@@ -53,6 +53,35 @@ namespace cial::Inter {
         return node->expression->generateBytecode(this, retReg);
     }
 
+    void IRGenerator::generate(const Syntax::TryStmtNode *node, OptReg &retReg) {
+        const auto tryStartIp = makeLabel(); // closed interval
+        node->tryBlock->generateBytecode(this, retReg);
+
+        Bytecode::Instruction *jmp = _chunk->emit<Bytecode::OpCode::Jmp>();
+
+        const auto tryEndIp = makeLabel(); // open interval (same as catch start ip closed interval)
+
+        if(node->catchErr) {
+            beginScope();
+
+            const Atom varName = constVal(node->catchErr->token).value<Atom>();
+            const Bytecode::Register exValue = allocateRegister();
+            addLocalVar(LocalVariable{ varName, exValue, static_cast<std::uint32_t>(tryEndIp.address()) });
+
+            node->catchBlock->generateBytecode(this, retReg);
+            Bytecode::JmpNE::setTarget(*jmp, makeLabel());
+
+            _chunk->addThrowHandler({ tryStartIp, tryEndIp, exValue });
+            endScope();
+        } else {
+            node->catchBlock->generateBytecode(this, retReg);
+            Bytecode::JmpNE::setTarget(*jmp, makeLabel());
+            _chunk->addThrowHandler({ tryStartIp, tryEndIp });
+        }
+
+        retReg = {};
+    }
+
     void IRGenerator::generate(const Syntax::ValueExprNode *node, OptReg &retReg) {
         if(node->token.type() == Syntax::TokenType::Null) {
             error("null token current not support", node->location);
@@ -205,13 +234,13 @@ namespace cial::Inter {
                 _chunk->emit<Bytecode::OpCode::BAnd>(src, dst);
                 break;
             case LArithShift:
-                _chunk->emit<Bytecode::OpCode::BLShift>(src, dst);
+                _chunk->emit<Bytecode::OpCode::BlShift>(src, dst);
                 break;
             case RArithShift:
-                _chunk->emit<Bytecode::OpCode::BRShift>(src, dst);
+                _chunk->emit<Bytecode::OpCode::BrShift>(src, dst);
                 break;
             case RBitShift:
-                _chunk->emit<Bytecode::OpCode::BURShift>(src, dst);
+                _chunk->emit<Bytecode::OpCode::BurShift>(src, dst);
                 break;
             case InContextOf:
                 _chunk->emit<Bytecode::OpCode::ChgThis>(src, dst);
@@ -232,6 +261,15 @@ namespace cial::Inter {
     void IRGenerator::generate(const Syntax::PrefixUnaryExprNode *node, OptReg &retReg) {
         using enum Syntax::TokenType;
         switch(node->token.type()) {
+            case Throw: {
+                Bytecode::Register reg{};
+                if(!expectValue(node->rhs, reg)) {
+                    return;
+                }
+                _chunk->emit<Bytecode::OpCode::Throw>(reg);
+                // retReg = reg;
+                break;
+            }
             case New:
                 node->rhs->generateBytecode(this, retReg);
                 break;
@@ -310,7 +348,7 @@ namespace cial::Inter {
                     if(const auto variable = resolveLocalVariable(identifier)) {
                         Bytecode::Register dst = variable->reg;
                         auto tmpR = allocateRegister();
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::OpCode::Load>(tmpR, _chunk->addConstant(1));
                         _chunk->emit<Bytecode::OpCode::Add>(tmpR, dst);
                         freeRegister(tmpR);
                         retReg = dst;
@@ -321,14 +359,14 @@ namespace cial::Inter {
                     auto tmpR1 = allocateRegister();
                     if(isTopScope()) {
                         // global maybe
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(1));
                         _chunk->emit<Bytecode::OpCode::GGlobal>(identifier, tmpR2);
                         _chunk->emit<Bytecode::OpCode::Add>(tmpR1, tmpR2);
                         _chunk->emit<Bytecode::OpCode::DGlobal>(identifier, tmpR2);
                         retReg = tmpR2;
                     } else {
                         // find on context
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(1));
                         _chunk->emit<Bytecode::OpCode::GThis>(identifier, tmpR2);
                         _chunk->emit<Bytecode::OpCode::Add>(tmpR1, tmpR2);
                         _chunk->emit<Bytecode::OpCode::DThis>(identifier, tmpR2);
@@ -349,7 +387,7 @@ namespace cial::Inter {
                     if(const auto variable = resolveLocalVariable(identifier)) {
                         Bytecode::Register dst = variable->reg;
                         auto tmpR = allocateRegister();
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::OpCode::Load>(tmpR, _chunk->addConstant(1));
                         _chunk->emit<Bytecode::OpCode::Sub>(tmpR, dst);
                         freeRegister(tmpR);
                         retReg = dst;
@@ -360,14 +398,14 @@ namespace cial::Inter {
                     auto tmpR1 = allocateRegister();
                     if(isTopScope()) {
                         // global maybe
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(1));
                         _chunk->emit<Bytecode::OpCode::GGlobal>(identifier, tmpR2);
                         _chunk->emit<Bytecode::OpCode::Sub>(tmpR1, tmpR2);
                         _chunk->emit<Bytecode::OpCode::DGlobal>(identifier, tmpR2);
                         retReg = tmpR2;
                     } else {
                         // find on context
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(Constant{ 1 }));
+                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(1));
                         _chunk->emit<Bytecode::OpCode::GThis>(identifier, tmpR2);
                         _chunk->emit<Bytecode::OpCode::Sub>(tmpR1, tmpR2);
                         _chunk->emit<Bytecode::OpCode::DThis>(identifier, tmpR2);
@@ -476,7 +514,7 @@ namespace cial::Inter {
             return;
         }
 
-        _chunk->emit<Bytecode::OpCode::Load>(funReg, _chunk->addConstant(Constant{ funcMeta }));
+        _chunk->emit<Bytecode::OpCode::Load>(funReg, _chunk->addConstant(funcMeta));
 
         retReg = funReg;
     }
@@ -495,7 +533,7 @@ namespace cial::Inter {
         const auto identifier = constVal(node->token).value<Atom>();
 
         auto propReg = allocateRegister();
-        _chunk->emit<Bytecode::OpCode::Load>(propReg, _chunk->addConstant(Constant{ propMeta }));
+        _chunk->emit<Bytecode::OpCode::Load>(propReg, _chunk->addConstant(propMeta));
 
         if(isTopScope()) {
             freeRegister(propReg);
@@ -560,7 +598,7 @@ namespace cial::Inter {
 
         const auto identifier = constVal(node->token).value<Atom>();
         funcMeta->name = identifier;
-        _chunk->emit<Bytecode::OpCode::Load>(funReg, _chunk->addConstant(Constant{ funcMeta }));
+        _chunk->emit<Bytecode::OpCode::Load>(funReg, _chunk->addConstant(funcMeta));
 
         if(isTopScope()) {
             freeRegister(funReg);
@@ -577,7 +615,7 @@ namespace cial::Inter {
 
         auto classReg = allocateRegister();
         auto *classMeta = _rt.createNoGC<ClassMeta>(identifier, 0);
-        _chunk->emit<Bytecode::OpCode::Load>(classReg, _chunk->addConstant(Constant{ classMeta }));
+        _chunk->emit<Bytecode::OpCode::Load>(classReg, _chunk->addConstant(classMeta));
 
         // class is always global in current design
         _chunk->emit<Bytecode::OpCode::DGlobal>(identifier, classReg);
@@ -800,6 +838,7 @@ namespace cial::Inter {
         if(!expectValue(node->test, testReg)) {
             return;
         }
+
         Instruction *prevCaseJmp{};
         for(auto &[matchExprVec, body] : node->matches) {
             Vec<Instruction *> jmpEVec{};
@@ -810,8 +849,10 @@ namespace cial::Inter {
                     return;
                 }
                 _chunk->emit<OpCode::EQ>(testReg, matchReg);
+                _chunk->emit<OpCode::Test>(matchReg);
                 jmpEVec.push_back(_chunk->emit<OpCode::JmpE>());
             }
+
             auto *jmp = _chunk->emit<OpCode::Jmp>();
             for(auto *jmpE : jmpEVec) {
                 JmpE::setTarget(*jmpE, makeLabel());
@@ -1033,6 +1074,10 @@ namespace cial::Inter {
             return;
         }
         _chunk->emit<Bytecode::OpCode::Ret>(loadVoidReg());
+    }
+
+    void IRGenerator::generate(const Syntax::DebuggerStmtNode *, OptReg &) const {
+        _chunk->emit<Bytecode::OpCode::Debugger>();
     }
 
     LocalVariable *IRGenerator::resolveLocalVariable(const Atom identifier) {

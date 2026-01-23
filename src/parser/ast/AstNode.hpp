@@ -51,6 +51,8 @@ namespace cial::Syntax {
 
     class ExprStmtNode;
 
+    class TryStmtNode;
+
     class IfStmtNode;
 
     class SwitchStmtNode;
@@ -66,6 +68,8 @@ namespace cial::Syntax {
     class ContinueStmtNode;
 
     class ReturnStmtNode;
+
+    class DebuggerStmtNode;
 
     class TernaryExprNode;
 
@@ -145,6 +149,8 @@ namespace cial::Syntax {
 
         virtual void visit(const ExprStmtNode *) = 0;
 
+        virtual void visit(const TryStmtNode *) = 0;
+
         virtual void visit(const IfStmtNode *) = 0;
 
         virtual void visit(const SwitchStmtNode *) = 0;
@@ -160,6 +166,8 @@ namespace cial::Syntax {
         virtual void visit(const ContinueStmtNode *) = 0;
 
         virtual void visit(const ReturnStmtNode *) = 0;
+
+        virtual void visit(const DebuggerStmtNode *) = 0;
 
         virtual void visit(const TernaryExprNode *) = 0;
     };

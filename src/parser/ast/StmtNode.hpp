@@ -53,6 +53,24 @@ namespace cial::Syntax {
         }
     };
 
+    class TryStmtNode final : public StmtNode {
+    public:
+        const IdentifierExprNode *catchErr;
+
+        const BlockStmtNode *tryBlock;
+        const BlockStmtNode *catchBlock;
+
+        explicit TryStmtNode(const IdentifierExprNode *catchErr, const BlockStmtNode *tryBlock,
+                             const BlockStmtNode *catchBlock) :
+            StmtNode("try_statement"), catchErr(catchErr), tryBlock(tryBlock), catchBlock(catchBlock) {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
+
     class IfStmtNode final : public StmtNode {
     public:
         const ExprNode *test;
@@ -170,6 +188,17 @@ namespace cial::Syntax {
         const ExprNode *expr;
 
         explicit ReturnStmtNode(const ExprNode *expr) : StmtNode("return_statement"), expr(expr) {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
+
+    class DebuggerStmtNode final : public StmtNode {
+    public:
+        explicit DebuggerStmtNode() : StmtNode("debugger_statement") {}
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 

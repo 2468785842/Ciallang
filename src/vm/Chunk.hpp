@@ -13,20 +13,45 @@
  */
 #pragma once
 
+#include <ranges>
+
 #include "Constant.hpp"
 
 #include "Instruction.hpp"
 
 namespace cial::Bytecode {
+    class VMState;
+
+    struct ThrowHandler {
+        Label tryStart;
+        Label tryEnd;
+        OptReg exValueReg;
+    };
 
     class Chunk : public MarkSweepHeader {
     public:
+        explicit Chunk() {
+            _constants.emplace_back(); // Void
+        }
+
         ~Chunk() override {
             for(const auto &inst : _instructions) {
                 delete inst;
             }
             _instructions.clear();
         }
+
+        void addThrowHandler(const ThrowHandler &tHandler) { _throwHandlers.push_back(tHandler); }
+
+        [[nodiscard]] Opt<ThrowHandler> findThrowHandler(const Label pc) const {
+            for(const auto &h : _throwHandlers) {
+                if(h.tryStart.address() <= pc.address() && pc.address() < h.tryEnd.address()) {
+                    return h;
+                }
+            }
+            return {};
+        }
+
         /**
          * @tparam OP 操作码
          * @tparam Args 指令的值类型
@@ -40,10 +65,6 @@ namespace cial::Bytecode {
             return inst;
         }
 
-        explicit Chunk() {
-            _constants.emplace_back(); // Void
-        }
-
         Chunk(const Chunk &) = delete;
         Chunk &operator=(const Chunk &) = delete;
 
@@ -55,7 +76,13 @@ namespace cial::Bytecode {
         void setRegCount(const std::uint32_t count) noexcept { _registerCount = count; }
         [[nodiscard]] std::uint32_t getRegCount() const noexcept { return _registerCount; }
 
-        ConstIdx addConstant(Constant &&value) {
+        template <typename... Args>
+        ConstIdx addConstant(Args &&...args) {
+            const Constant value{ std::forward<Args>(args)... };
+            return addConstant(value);
+        }
+
+        ConstIdx addConstant(Constant value) {
             for(size_t i = 1; i < _constants.size(); ++i) {
                 if(_constants[i] == value) {
                     return ConstIdx{ i };
@@ -67,11 +94,17 @@ namespace cial::Bytecode {
 
         [[nodiscard]] const Constant &getConstant(const ConstIdx index) const {
             CLL_ASSERT(index.index() < _constants.size() && "constant index out of range",
-                       this->dumpInstruction().getData());
+                       this->dumpInstructions().getData());
             return _constants[index.index()];
         }
 
         Vec<Constant> &getConstants() noexcept { return _constants; }
+
+        [[nodiscard]] String dumpConstant(const Runtime *rt, ConstIdx idx) const;
+
+        [[nodiscard]] String dumpConstants(const Runtime *rt) const;
+
+        [[nodiscard]] String dumpInstructions() const;
 
         void marked() noexcept override {
             MarkSweepHeader::marked();
@@ -84,24 +117,10 @@ namespace cial::Bytecode {
             }
         }
 
-        [[nodiscard]] String dumpInstruction() const {
-            std::stringstream ss{};
-            size_t pc{};
-            while(pc < _instructions.size()) {
-                const auto &instruction = _instructions[pc];
-                ss << fmt::format("{: <6}: {}", Label{ pc }, Instruction::dump(*instruction, nullptr));
-                if(pc != _instructions.size() - 1) {
-                    ss << '\n';
-                }
-                ++pc;
-            }
-            const std::string_view &sv = ss.view();
-            return String{ sv.data(), static_cast<std::uint32_t>(sv.length()) };
-        }
-
     private:
         Vec<Instruction *> _instructions{};
         Vec<Constant> _constants{};
-        std::uint32_t _registerCount{ 0 };
+        Vec<ThrowHandler> _throwHandlers{};
+        std::uint32_t _registerCount{};
     };
 } // namespace cial::Bytecode

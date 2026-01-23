@@ -53,6 +53,7 @@ namespace cial {
                 method->marked();
             }
         }
+
         for(const auto &val : _impl->globalObject.props() | std::views::values) {
             if(val.isObject()) {
                 if(auto *msHeader = val.asObject().value()) {

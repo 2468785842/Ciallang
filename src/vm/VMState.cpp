@@ -51,9 +51,17 @@ namespace cial::Bytecode {
 #else
 
         while(pc < instList.size() && _stackTop != 0 && curStackTop == _stackTop) {
-            const auto *instruction = instList[pc++];
-            // fmt::println("{}\n", Instruction::dump(*instruction, *this, true));
+            const auto *instruction = instList[pc];
+            // fmt::println("{}\n", Instruction::dump(*instruction, this));
             Instruction::execute(*instruction, *this);
+            switch(_pending) {
+                case PendingCF::Throw:
+                    unwind();
+                    break;
+                case PendingCF::None:
+                    break;
+            }
+            ++pc;
         }
 #endif
     }
@@ -213,4 +221,28 @@ namespace cial::Bytecode {
         // TODO: check is exist
         return global(atom);
     }
+
+    void VMState::unwind() {
+        while(true) {
+            const CallFrame *cFrame = _currentFrame;
+            const Opt<ThrowHandler> th = cFrame->chunk->findThrowHandler(getPC());
+            if(!th) {
+                if(cFrame->ret)
+                    prevFrame()->getReg(*cFrame->ret) = Value{};
+                freeCallFrame();
+                if(_stackTop == 0) {
+                    throw std::runtime_error(fmt::format("{}", _exValue));
+                }
+                continue;
+            }
+
+            if(th->exValueReg)
+                regRef(th->exValueReg.value()) = _exValue;
+
+            setPC(th->tryEnd);
+            clearException();
+            return;
+        }
+    }
+
 } // namespace cial::Bytecode

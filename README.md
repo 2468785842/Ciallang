@@ -39,7 +39,7 @@
 * [x] `do while`
 * [x] `for`
 * [x] `switch`
-* [ ] `try-catch`
+* [x] `try-catch`
 * [x] `function` 函数定义与调用
 * [x] `property`
 * [x] `class`

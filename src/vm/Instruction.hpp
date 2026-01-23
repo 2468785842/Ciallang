@@ -21,8 +21,6 @@
 #include "logging/Logger.hpp"
 #include "runtime/AtomTable.hpp"
 
-#include "types/Value.hpp"
-
 namespace cial::Bytecode {
     class VMState;
 
@@ -75,10 +73,12 @@ namespace cial::Bytecode {
     O(BXor)                                                                                                            \
     O(BOr)                                                                                                             \
     O(BAnd)                                                                                                            \
-    O(BLShift)                                                                                                         \
-    O(BRShift)                                                                                                         \
-    O(BURShift)                                                                                                        \
+    O(BlShift)                                                                                                         \
+    O(BrShift)                                                                                                         \
+    O(BurShift)                                                                                                        \
     O(ChgSign)                                                                                                         \
+    O(Debugger)                                                                                                        \
+    O(Throw)                                                                                                           \
     O(Ret)
 
     enum class OpCode : std::uint16_t {
@@ -703,7 +703,7 @@ namespace cial::Bytecode {
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct BAnd
 
-    struct BLShift {
+    struct BlShift {
 
         static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
@@ -712,20 +712,9 @@ namespace cial::Bytecode {
         static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct BLShift
+    }; // struct BlShift
 
-    struct BRShift {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct BRShift
-
-    struct BURShift {
+    struct BrShift {
 
         static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
 
@@ -734,7 +723,18 @@ namespace cial::Bytecode {
         static void execute(const Instruction &, const VMState &);
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct BURShift
+    }; // struct BrShift
+
+    struct BurShift {
+
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct BurShift
 
     struct ChgSign {
 
@@ -744,6 +744,22 @@ namespace cial::Bytecode {
 
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
     }; // struct ChgSign
+
+    struct Debugger {
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, const VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct Debugger
+
+    struct Throw {
+        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+
+        static void execute(const Instruction &, VMState &);
+
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
+    }; // struct Throw
 
     struct Ret {
         static Register retReg(const Instruction &inst) { return inst.getOperand1<Register>(); }

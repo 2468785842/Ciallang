@@ -679,6 +679,7 @@ namespace cial {
                 return Ret<bool>::err(err);
             return Ret<bool>::ok(lhs.value() > rhs.value());
         }
+
         const auto lhs = this->asString();
         const auto rhs = value.asString();
         if(lhs.isFailed() || rhs.isFailed())

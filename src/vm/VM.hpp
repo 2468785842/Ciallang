@@ -225,7 +225,7 @@ namespace cial {
         void eval(const String &str, const bool filepath = false) const { auto h = eval<Value>(str, filepath); }
         void evalExpr(const String &expr) const { auto h = evalExpr<Value>(expr); }
 
-        [[nodiscard]] String dumpCurCallFrameInst() const { return _vmState->curFrame()->chunk->dumpInstruction(); }
+        [[nodiscard]] String dumpCurCallFrameInst() const { return _vmState->curFrame()->chunk->dumpInstructions(); }
 
     private:
         Bytecode::VMState *_vmState;

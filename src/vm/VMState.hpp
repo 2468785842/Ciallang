@@ -28,6 +28,8 @@
 
 namespace cial::Bytecode {
 
+    enum class PendingCF { None, Throw };
+
     class VMState {
     public:
         Runtime &rt;
@@ -61,9 +63,12 @@ namespace cial::Bytecode {
 
         [[nodiscard]] bool getZF() const { return _zf; }
 
-        void setPC(const Label &label) const { _currentFrame->pc = label.address(); }
+        void setPC(const Label &label) const {
+            // because run() pc will auto plus one so - 1
+            _currentFrame->pc = label.address() - 1;
+        }
 
-        [[nodiscard]] size_t getPC() const { return _currentFrame->pc; }
+        [[nodiscard]] Label getPC() const { return Label{ _currentFrame->pc }; }
 
         void pushVoid(const size_t n) const {
             const size_t base = context.regPool().allocFrame(n);
@@ -104,13 +109,52 @@ namespace cial::Bytecode {
         [[nodiscard]] CallFrame *prevFrame() noexcept { return _currentFrame - 1; }
         [[nodiscard]] const CallFrame *prevFrame() const noexcept { return _currentFrame - 1; }
 
-        [[nodiscard]] std::string dumpRegisters() const {
+        void unwind();
+
+        void throwException(const Value &v) {
+            _pending = PendingCF::Throw;
+            _exValue = v;
+            if(_exValue.isObject()) {
+                context.rt().addHandleVal(_exValue.asObject().value());
+            }
+        }
+
+        void clearException() {
+            if(_exValue.isObject()) {
+                context.rt().removeHandleVal(_exValue.asObject().value());
+            }
+            _pending = PendingCF::None;
+            _exValue = Value{};
+        }
+
+        [[nodiscard]] std::string dumpCurConstants() const {
+            return _currentFrame->chunk->dumpConstants(&context.rt()).toStdStr();
+        }
+
+        [[nodiscard]] std::string dumpCurChunk() const { return _currentFrame->chunk->dumpInstructions().toStdStr(); }
+
+        [[nodiscard]] std::string dumpCurLocalVars() const {
             std::stringstream ss{};
             for(size_t i = 0; i < _stackTop; i++) {
                 const auto &call = _callStack[i];
-                for(size_t j = 0; j < call.chunk->getRegCount(); j++) {
-                    ss << fmt::format("(%{}): {}\n", j, call.getReg(Register{ j }));
+                if(!call.funcMeta)
+                    continue;
+
+                for(const auto localeVar : call.funcMeta->localVars) {
+                    const auto *entry = context.rt().atomTable.get(localeVar.identifier);
+                    auto varName = "?unknow_var_name?"_str;
+                    if(entry)
+                        varName = *entry->str;
+                    ss << fmt::format("{} = {}\n", varName, call.getReg(localeVar.reg));
                 }
+            }
+            return ss.str();
+        }
+
+        [[nodiscard]] std::string dumpCurRegisters() const {
+            std::stringstream ss{};
+            for(size_t j = 0; j < _currentFrame->chunk->getRegCount(); j++) {
+                ss << fmt::format("(%{}): {}\n", j, _currentFrame->getReg(Register{ j }));
             }
             return ss.str();
         }
@@ -120,5 +164,7 @@ namespace cial::Bytecode {
         CallFrame *_callStack{ context.callStack() };
         size_t &_stackTop{ context.stackTop() }; // callFrame count
         bool _zf{ false };
+        PendingCF _pending{};
+        Value _exValue{};
     };
 } // namespace cial::Bytecode

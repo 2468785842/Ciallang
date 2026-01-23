@@ -197,6 +197,11 @@ namespace cial::Syntax {
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    struct TryStmtParser final : StmtParser {
+        TryStmtParser() = default;
+        StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     struct IfStmtParser final : StmtParser {
         IfStmtParser() = default;
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
@@ -237,7 +242,13 @@ namespace cial::Syntax {
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    struct DebuggerStmtParser final : StmtParser {
+        DebuggerStmtParser() = default;
+        StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     static constinit BlockStmtParser S_BlockStmtParser{};
+    static constinit TryStmtParser S_TryStmtParser{};
     static constinit IfStmtParser S_IfStmtParser{};
     static constinit SwitchStmtParser S_SwitchStmtParser{};
     static constinit DoWhileStmtParser S_DoWhileStmtParser{};
@@ -246,18 +257,20 @@ namespace cial::Syntax {
     static constinit BreakStmtParser S_BreakStmtParser{};
     static constinit ContinueStmtParser S_ContinueStmtParser{};
     static constinit ReturnStmtParser S_ReturnStmtParser{};
+    static constinit DebuggerStmtParser S_DebuggerStmtParser{};
 
-    static constinit auto S_StmtParsers = frozen::make_unordered_map<TokenType, const StmtParser *>({
-        { TokenType::LeftCurlyBrace, &S_BlockStmtParser },
-        { TokenType::If, &S_IfStmtParser },
-        { TokenType::Switch, &S_SwitchStmtParser },
-        { TokenType::Do, &S_DoWhileStmtParser },
-        { TokenType::For, &S_ForStmtParser },
-        { TokenType::While, &S_WhileStmtParser },
-        { TokenType::Break, &S_BreakStmtParser },
-        { TokenType::Continue, &S_ContinueStmtParser },
-        { TokenType::Return, &S_ReturnStmtParser },
-    });
+    static constinit auto S_StmtParsers =
+        frozen::make_unordered_map<TokenType, const StmtParser *>({ { TokenType::LeftCurlyBrace, &S_BlockStmtParser },
+                                                                    { TokenType::Try, &S_TryStmtParser },
+                                                                    { TokenType::If, &S_IfStmtParser },
+                                                                    { TokenType::Switch, &S_SwitchStmtParser },
+                                                                    { TokenType::Do, &S_DoWhileStmtParser },
+                                                                    { TokenType::For, &S_ForStmtParser },
+                                                                    { TokenType::While, &S_WhileStmtParser },
+                                                                    { TokenType::Break, &S_BreakStmtParser },
+                                                                    { TokenType::Continue, &S_ContinueStmtParser },
+                                                                    { TokenType::Return, &S_ReturnStmtParser },
+                                                                    { TokenType::Debugger, &S_DebuggerStmtParser } });
 
     /**
      * +----------------------------------------------------------------------------+
@@ -313,34 +326,34 @@ namespace cial::Syntax {
     static constinit FunctionPrefixParser S_FunctionPrefixParser;
     static constinit UnaryOperatorPrefixParser S_TypeCastPrefixParser{ Precedence::type };
 
-    static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>({
-        { TokenType::Null, &S_ConstValPrefixParser },
-        { TokenType::ConstVal, &S_ConstValPrefixParser },
-        { TokenType::Minus, &S_NegatePrefixParser }, // "-"
-        { TokenType::Identifier, &S_IdentifierPrefixParser },
-        { TokenType::Exclamation, &S_PrefixParser }, // "!"
-        { TokenType::Tilde, &S_PrefixParser }, // "~"
-        { TokenType::Decrement, &S_PrefixParser }, // "--"
-        { TokenType::Increment, &S_PrefixParser }, // "++"
-        { TokenType::New, &S_PrefixParser }, // "new" 函数调用, 或创建新对象
-        { TokenType::Global, &S_InternalIdentifierPrefixParser },
-        { TokenType::Super, &S_InternalIdentifierPrefixParser },
-        { TokenType::This, &S_InternalIdentifierPrefixParser },
-        { TokenType::Invalidate, &S_PrefixParser }, // "invalidate"
-        { TokenType::Isvalid, &S_PrefixParser }, // "isvalid"
-        { TokenType::Delete, &S_PrefixParser }, //"delete"
-        { TokenType::Typeof, &S_PrefixParser }, //"typeof
-        { TokenType::Sharp, &S_PrefixParser }, //"#" 获取字符串第一个字符,转为int
-        { TokenType::Dollar, &S_PrefixParser }, //"$" 将int, 转为char
-        { TokenType::Plus, &S_PrefixParser }, //"+"
-        { TokenType::Ampersand, &S_PrefixParser }, // "&" substance accessing (ignores property operation)
-        { TokenType::Asterisk, &S_PrefixParser }, // "*" force property access
-        { TokenType::LParenthesis, &S_ParenthesizedPrefixParser }, // "(" 括号表达式
-        { TokenType::Function, &S_FunctionPrefixParser },
-        { TokenType::Int, &S_TypeCastPrefixParser }, // "int" unary_expr
-        { TokenType::Real, &S_TypeCastPrefixParser }, // "real" unary_expr
-        { TokenType::String, &S_TypeCastPrefixParser }, // "string" unary_expr
-    });
+    static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>(
+        { { TokenType::Null, &S_ConstValPrefixParser },
+          { TokenType::ConstVal, &S_ConstValPrefixParser },
+          { TokenType::Minus, &S_NegatePrefixParser }, // "-"
+          { TokenType::Identifier, &S_IdentifierPrefixParser },
+          { TokenType::Exclamation, &S_PrefixParser }, // "!"
+          { TokenType::Tilde, &S_PrefixParser }, // "~"
+          { TokenType::Decrement, &S_PrefixParser }, // "--"
+          { TokenType::Increment, &S_PrefixParser }, // "++"
+          { TokenType::New, &S_PrefixParser }, // "new" 函数调用, 或创建新对象
+          { TokenType::Global, &S_InternalIdentifierPrefixParser },
+          { TokenType::Super, &S_InternalIdentifierPrefixParser },
+          { TokenType::This, &S_InternalIdentifierPrefixParser },
+          { TokenType::Invalidate, &S_PrefixParser }, // "invalidate"
+          { TokenType::Isvalid, &S_PrefixParser }, // "isvalid"
+          { TokenType::Delete, &S_PrefixParser }, //"delete"
+          { TokenType::Typeof, &S_PrefixParser }, //"typeof
+          { TokenType::Sharp, &S_PrefixParser }, //"#" 获取字符串第一个字符,转为int
+          { TokenType::Dollar, &S_PrefixParser }, //"$" 将int, 转为char
+          { TokenType::Plus, &S_PrefixParser }, //"+"
+          { TokenType::Ampersand, &S_PrefixParser }, // "&" substance accessing (ignores property operation)
+          { TokenType::Asterisk, &S_PrefixParser }, // "*" force property access
+          { TokenType::LParenthesis, &S_ParenthesizedPrefixParser }, // "(" 括号表达式
+          { TokenType::Function, &S_FunctionPrefixParser },
+          { TokenType::Int, &S_TypeCastPrefixParser }, // "int" unary_expr
+          { TokenType::Real, &S_TypeCastPrefixParser }, // "real" unary_expr
+          { TokenType::String, &S_TypeCastPrefixParser }, // "string" unary_expr
+          { TokenType::Throw, &S_PrefixParser } });
 
     /**
      * +----------------------------------------------------------------------------+
