@@ -162,20 +162,24 @@ namespace cial::Bytecode {
     }
 
     void ToInt::execute(const Instruction &inst, const VMState &vmState) {
-        Value &r = vmState.regRef(dst(inst));
-        r = Value{ r.asInteger().unwrap() };
+        const auto r = vmState.regRef(dst(inst)).toInteger();
+        if(r.isFailed()) {
+            throw r.getErr();
+        }
     }
 
     void ToReal::execute(const Instruction &inst, const VMState &vmState) {
-        Value &r = vmState.regRef(dst(inst));
-        r = Value{ r.asReal().unwrap() };
+        const auto r = vmState.regRef(dst(inst)).toReal();
+        if(r.isFailed()) {
+            throw r.getErr();
+        }
     }
 
     void ToString::execute(const Instruction &inst, const VMState &vmState) {
-        Value &r = vmState.regRef(dst(inst));
-        Value s = r;
-        assert(s.toString().isOk());
-        r = s;
+        const auto r = vmState.regRef(dst(inst)).toString();
+        if(r.isFailed()) {
+            throw r.getErr();
+        }
     }
 
     void ChgThis::execute(const Instruction &inst, const VMState &vmState) {
@@ -426,7 +430,7 @@ namespace cial::Bytecode {
     void Debugger::execute(const Instruction &inst, const VMState &vmState) {
         std::string regs = vmState.dumpCurRegisters();
         std::string localVarInfo = vmState.dumpCurLocalVars();
-        std::string chunk = vmState.dumpCurChunk();
+        std::string chunk = vmState.dumpCurInstructions();
         std::string constants = vmState.dumpCurConstants();
 
         fmt::println("{}", regs);

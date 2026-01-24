@@ -19,38 +19,20 @@
 namespace cial::Bytecode {
 
     void VMState::run() {
-        std::uint64_t &pc = _currentFrame->pc;
-        const auto &instList = instructions();
         const size_t curStackTop = _stackTop;
-// #define CLL_COMPUTED_GOTO
-#ifdef CLL_COMPUTED_GOTO
-        // 标签数组
-        static void *labels[] = {
-#define HANDLE_OPCODE(OP) &&label_##OP,
-            OPCODE_ENUMS(HANDLE_OPCODE)
-#undef HANDLE_OPCODE
-        };
+        for(;;) {
+            std::uint64_t &pc = _currentFrame->pc;
+            const auto &instList = instructions();
 
-        goto label_Dispatch;
+            if(pc >= instList.size())
+                break;
 
-    label_Dispatch: {
-        if(!(pc < instList.size() && _stackTop != 0 && curStackTop == _stackTop)) {
-            return;
-        }
-        goto *labels[static_cast<size_t>(instList[pc]->opcode)];
-    }
+            if(_stackTop == 0)
+                break;
 
-#define HANDLE_OPCODE(OP)                                                                                              \
-    label_##OP : {                                                                                                     \
-        OP::execute(*instList[pc++], *this);                                                                           \
-        goto label_Dispatch;                                                                                           \
-    }
+            if(curStackTop > _stackTop)
+                break;
 
-        OPCODE_ENUMS(HANDLE_OPCODE)
-#undef HANDLE_OPCODE
-#else
-
-        while(pc < instList.size() && _stackTop != 0 && curStackTop == _stackTop) {
             const auto &instruction = instList[pc];
             // fmt::println("{}\n", Instruction::dump(*instruction, this));
             Instruction::execute(instruction, *this);
@@ -63,7 +45,6 @@ namespace cial::Bytecode {
             }
             ++pc;
         }
-#endif
     }
 
     [[nodiscard]] bool VMState::globalHas(const Atom atom) const { return context.global()->hasProp(atom); }
@@ -140,11 +121,11 @@ namespace cial::Bytecode {
 
         if(auto *callFrame = _currentFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
-                for(const auto &localVar : callFrame->funcMeta->localVars) {
-                    if(localVar.endPC > callFrame->pc)
+                for(const auto &[identifier, reg, startPC, endPC] : callFrame->funcMeta->localVars) {
+                    if(startPC <= callFrame->pc && callFrame->pc < endPC)
                         continue;
-                    if(localVar.identifier == atom)
-                        return callFrame->getReg(localVar.reg);
+                    if(identifier == atom)
+                        return callFrame->getReg(reg);
                 }
             }
 

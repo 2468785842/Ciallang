@@ -75,6 +75,7 @@ namespace cial {
             Function getFunc{ propMeta->getFunc };
             getFunc.thisObj = thisObj;
             getFunc.call(vmState, ret, 0);
+            vmState.run();
             return vmState.reg(ret);
         }
 

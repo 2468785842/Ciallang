@@ -224,8 +224,9 @@ namespace cial {
 
         switch(_type) {
             case ValueType::Object: {
+                const String s = TypeConverter::objectToString(*_object);
                 this->~Value();
-                new(this) Value{ TypeConverter::objectToString(*_object) };
+                new(this) Value{ s };
                 return Ret<void>::ok();
             }
 
@@ -233,14 +234,16 @@ namespace cial {
                 return Ret<void>::ok();
 
             case ValueType::Integer: {
+                const String s = TypeConverter::integerToString(_integer);
                 this->~Value();
-                new(this) Value{ TypeConverter::integerToString(_integer) };
+                new(this) Value{ s };
                 return Ret<void>::ok();
             }
 
             case ValueType::Real: {
+                const String s = TypeConverter::realToString(_real);
                 this->~Value();
-                new(this) Value{ TypeConverter::realToString(_real) };
+                new(this) Value{ s };
                 return Ret<void>::ok();
             }
 

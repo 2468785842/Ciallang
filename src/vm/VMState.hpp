@@ -131,7 +131,9 @@ namespace cial::Bytecode {
             return _currentFrame->chunk->dumpConstants(&context.rt()).toStdStr();
         }
 
-        [[nodiscard]] std::string dumpCurChunk() const { return _currentFrame->chunk->dumpInstructions().toStdStr(); }
+        [[nodiscard]] std::string dumpCurInstructions() const {
+            return _currentFrame->chunk->dumpInstructions().toStdStr();
+        }
 
         [[nodiscard]] std::string dumpCurLocalVars() const {
             std::stringstream ss{};
@@ -140,12 +142,14 @@ namespace cial::Bytecode {
                 if(!call.funcMeta)
                     continue;
 
-                for(const auto localeVar : call.funcMeta->localVars) {
-                    const auto *entry = context.rt().atomTable.get(localeVar.identifier);
+                for(const auto &[identifier, reg, startPC, endPC] : call.funcMeta->localVars) {
+                    if(startPC <= getPC().address() && getPC().address() < endPC)
+                        continue;
+                    const auto *entry = context.rt().atomTable.get(identifier);
                     auto varName = "?unknow_var_name?"_str;
                     if(entry)
                         varName = *entry->str;
-                    ss << fmt::format("{} = {}\n", varName, call.getReg(localeVar.reg));
+                    ss << fmt::format("{} = {}\n", varName, call.getReg(reg));
                 }
             }
             return ss.str();

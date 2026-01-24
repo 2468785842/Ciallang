@@ -32,11 +32,11 @@ namespace cial {
         vmState.allocCallFrame(meta, ret);
         auto *currentCallFrame = vmState.curFrame();
         currentCallFrame->thisObj = Value{ thisObj };
-        vmState.run();
-
-        if(cnt > 0)
-            vmState.pop(cnt);
-        assert(meta->chunk->getInstVec().back().opcode == Bytecode::OpCode::Ret);
+        // vmState.run();
+        //
+        // if(cnt > 0)
+        //     vmState.pop(cnt);
+        // assert(meta->chunk->getInstVec().back().opcode == Bytecode::OpCode::Ret);
     }
 
     void NativeFunction::call(Bytecode::VMState &vmState, const Bytecode::Register ret, const size_t argCount) {
