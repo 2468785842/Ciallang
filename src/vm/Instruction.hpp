@@ -31,7 +31,9 @@ namespace cial::Bytecode {
     O(PopN)                                                                                                            \
     O(CP)                                                                                                              \
     O(Add)                                                                                                             \
+    O(AddImm)                                                                                                          \
     O(Sub)                                                                                                             \
+    O(SubImm)                                                                                                          \
     O(Mul)                                                                                                             \
     O(Div)                                                                                                             \
     O(Idiv)                                                                                                            \
@@ -99,7 +101,7 @@ namespace cial::Bytecode {
             Register reg;
             Label label;
             ConstIdx ci;
-            size_t n;
+            Integer num;
             Atom atom;
         } operand;
 
@@ -111,7 +113,7 @@ namespace cial::Bytecode {
 
         explicit Operand(const Label value) : operand{ .label = value }, type(Type::Label) {}
 
-        explicit Operand(const size_t value) : operand{ .n = value }, type(Type::Number) {}
+        explicit Operand(const Integer value) : operand{ .num = value }, type(Type::Number) {}
 
         explicit Operand(const Atom value) : operand{ .atom = value }, type(Type::Atom) {}
 
@@ -196,7 +198,7 @@ namespace cial::Bytecode {
 
         [[nodiscard]] const Operand::Type &getOperand3Type() const { return _operand3->type; }
 
-        [[nodiscard]] size_t operandCount() const {
+        [[nodiscard]] Integer operandCount() const {
             return static_cast<int>(_operand1.has_value()) + static_cast<int>(_operand2.has_value()) +
                 static_cast<int>(_operand3.has_value());
         }
@@ -221,9 +223,9 @@ namespace cial::Bytecode {
             } else if constexpr(std::is_same_v<T, ConstIdx>) {
                 CLL_ASSERT(operand.type == Operand::Type::ConstIndex, "operand type is not ConstIdx");
                 return operand.operand.ci;
-            } else if constexpr(std::is_same_v<T, size_t>) {
+            } else if constexpr(std::is_same_v<T, Integer>) {
                 CLL_ASSERT(operand.type == Operand::Type::Number, "operand type is not Number");
-                return operand.operand.n;
+                return operand.operand.num;
             } else if constexpr(std::is_same_v<T, Atom>) {
                 CLL_ASSERT(operand.type == Operand::Type::Atom, "operand type is not Atom");
                 return operand.operand.atom;
@@ -234,539 +236,141 @@ namespace cial::Bytecode {
         }
     };
 
-    struct NOP {
-        static void execute(const Instruction &, const VMState &) {}
+// 操作码
+#define OP_GET1(name, type)                                                                                            \
+    static type name(const Instruction &inst) { return inst.getOperand1<type>(); }
+#define OP_GET2(name, type)                                                                                            \
+    static type name(const Instruction &inst) { return inst.getOperand2<type>(); }
+#define OP_GET3(name, type)                                                                                            \
+    static type name(const Instruction &inst) { return inst.getOperand3<type>(); }
 
-        [[nodiscard]] static std::string dump(const Instruction &, const VMState *) {
-            return fmt::format("{: <10}", "nop");
-        }
-    }; // struct NOP
+// 定义指令
+#define DEF_INST_EX(className, getters, execute_ref, dump_ref)                                                         \
+    struct className {                                                                                                 \
+        getters static void execute(const Instruction &, execute_ref);                                                 \
+        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);                        \
+    }
 
+// 定义指令可变, 不可变变体
+#define DEF_INST(className, getters) DEF_INST_EX(className, getters, const VMState &, const VMState *)
+#define DEF_INST_MUT(className, getters) DEF_INST_EX(className, getters, VMState &, VMState &)
 
-    struct Load {
-        static Register reg(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    // ────────────────────────────────────────────────
+    // 定义指令
+    // ────────────────────────────────────────────────
 
-        static ConstIdx value(const Instruction &inst) { return inst.getOperand2<ConstIdx>(); }
+    DEF_INST(NOP, /* no getters */);
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST(Load, OP_GET1(reg, Register) OP_GET2(value, ConstIdx));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Load
+    DEF_INST(PushReg, OP_GET1(src, Register));
 
-    struct PushReg {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST(PopN, OP_GET1(count, Integer));
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST(Add, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct PushReg
+    DEF_INST(AddImm, OP_GET1(src, Integer) OP_GET2(dst, Register));
 
-    struct PopN {
-        static size_t count(const Instruction &inst) { return inst.getOperand1<size_t>(); }
+    DEF_INST(Sub, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST(SubImm, OP_GET1(src, Integer) OP_GET2(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct PushReg
+    DEF_INST(Mul, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    struct Add {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST(Div, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+    DEF_INST(Idiv, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST(Mod, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Add
+    // 需要修改 VMState 的用 MUT 版本
+    DEF_INST_MUT(Mov, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    struct Sub {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST_MUT(CP, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+    DEF_INST_MUT(DGlobal, OP_GET1(atom, Atom) OP_GET2(src, Register));
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST_MUT(GGlobal, OP_GET1(atom, Atom) OP_GET2(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Sub
+    DEF_INST(Global, OP_GET1(dst, Register));
 
-    struct Mul {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST(Super, OP_GET1(dst, Register));
 
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+    DEF_INST(This, OP_GET1(dst, Register));
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST(ToInt, OP_GET1(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Mul
+    DEF_INST(ToReal, OP_GET1(dst, Register));
 
-    struct Div {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST(ToString, OP_GET1(dst, Register));
 
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+    DEF_INST(ChgThis, OP_GET1(dst, Register) OP_GET2(src, Register));
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST(Inv, OP_GET1(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Div
+    DEF_INST(ChkInv, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    struct Idiv {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST(ChkIns, OP_GET1(dst, Register) OP_GET2(src, Register));
 
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+    DEF_INST_MUT(Test, OP_GET1(reg, Register));
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST(EQ, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Idiv
+    DEF_INST(NEQ, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    struct Mod {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST(LT, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+    DEF_INST(LE, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST(GT, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Mod
+    DEF_INST(GE, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    struct Mov {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST(AbsEQ, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+    DEF_INST(AbsNEQ, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static void execute(const Instruction &, VMState &);
+    DEF_INST(LNot, OP_GET1(src, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Mov
+    DEF_INST(LAnd, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    struct CP {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST(Jmp, OP_GET1(label, Label));
 
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+    DEF_INST(JmpE, OP_GET1(label, Label));
 
-        static void execute(const Instruction &, VMState &);
+    DEF_INST(JmpNE, OP_GET1(label, Label));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct CP
+    DEF_INST_MUT(Call, OP_GET1(dst, Register) OP_GET2(memberReg, Register) OP_GET3(argCount, Integer));
 
-    struct DGlobal {
-        static Atom atom(const Instruction &inst) { return inst.getOperand1<Atom>(); }
+    DEF_INST_MUT(GProp, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(dst, Register));
 
-        static Register src(const Instruction &inst) { return inst.getOperand2<Register>(); }
+    DEF_INST(DProp, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(src, Register));
 
-        static void execute(const Instruction &, VMState &);
+    DEF_INST_MUT(GThis, OP_GET1(atom, Atom) OP_GET2(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct DGlobal
+    DEF_INST_MUT(DThis, OP_GET1(atom, Atom) OP_GET2(src, Register));
 
-    struct GGlobal {
-        static Atom atom(const Instruction &inst) { return inst.getOperand1<Atom>(); }
+    DEF_INST(GUpval, OP_GET1(atom, Atom) OP_GET2(dst, Register));
 
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
+    DEF_INST(LOr, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static void execute(const Instruction &, VMState &);
+    DEF_INST(BXor, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct GGlobal
+    DEF_INST(BOr, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    struct Global {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST(BAnd, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST(BlShift, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Global
+    DEF_INST(BrShift, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    struct Super {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST(BurShift, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-        static void execute(const Instruction &, const VMState &);
+    DEF_INST(ChgSign, OP_GET1(src, Register));
 
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Super
+    DEF_INST(Debugger, OP_GET1(src, Register));
 
-    struct This {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
+    DEF_INST_MUT(Throw, OP_GET1(src, Register));
 
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct This
-
-    struct ToInt {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct ToInt
-
-    struct ToReal {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Real
-
-    struct ToString {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct String
-
-    struct ChgThis {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
-        static Register src(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct ChgThis
-
-    struct Inv {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Inv
-
-    struct ChkInv {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct ChkInv
-
-    struct ChkIns {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
-        static Register src(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct ChkIns
-
-    struct Test {
-        static Register reg(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static void execute(const Instruction &, VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Test
-
-    struct EQ {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct EQ
-
-    struct NEQ {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct NEQ
-
-    struct LT {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct LT
-
-    struct LE {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct LE
-
-    struct GT {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct GT
-
-    struct GE {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct GE
-
-    struct AbsEQ {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct AbsEQ
-
-    struct AbsNEQ {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct AbsNEQ
-
-    struct LNot {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct LNot
-
-    struct LAnd {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct LAnd
-
-    struct Jmp {
-
-        static Label label(const Instruction &inst) { return inst.getOperand1<Label>(); }
-
-        static void setTarget(Instruction &inst, Label label) { inst.setOperand1(label); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Jmp
-
-    struct JmpE {
-
-        static Label label(const Instruction &inst) { return inst.getOperand1<Label>(); }
-
-        static void setTarget(Instruction &inst, Label label) { inst.setOperand1(label); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct JmpE
-
-    struct JmpNE {
-
-        static Label label(const Instruction &inst) { return inst.getOperand1<Label>(); }
-
-        static void setTarget(Instruction &inst, Label label) { inst.setOperand1(label); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct JmpNE
-
-    struct Call {
-        static Register dst(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register memberReg(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static size_t argCount(const Instruction &inst) { return inst.getOperand3<size_t>(); }
-
-        static void execute(const Instruction &, VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Call
-
-    struct GProp {
-        static Register obj(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register memberReg(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand3<Register>(); }
-
-        static void execute(const Instruction &, VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct GProp
-
-    struct DProp {
-        static Register obj(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register memberReg(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static Register src(const Instruction &inst) { return inst.getOperand3<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct DProp                                                                                          \
-
-    struct GThis {
-        static Atom atom(const Instruction &inst) { return inst.getOperand1<Atom>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct GThis
-
-    struct DThis {
-        static Atom atom(const Instruction &inst) { return inst.getOperand1<Atom>(); }
-
-        static Register src(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct DThis
-
-    struct GUpval {
-        static Atom atom(const Instruction &inst) { return inst.getOperand1<Atom>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct GUpval
-
-    struct LOr {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct LOr
-
-    struct BXor {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct BXor
-
-    struct BOr {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct BOr
-
-    struct BAnd {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct BAnd
-
-    struct BlShift {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct BlShift
-
-    struct BrShift {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct BrShift
-
-    struct BurShift {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static Register dst(const Instruction &inst) { return inst.getOperand2<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct BurShift
-
-    struct ChgSign {
-
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct ChgSign
-
-    struct Debugger {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static void execute(const Instruction &, const VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Debugger
-
-    struct Throw {
-        static Register src(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static void execute(const Instruction &, VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Throw
-
-    struct Ret {
-        static Register retReg(const Instruction &inst) { return inst.getOperand1<Register>(); }
-
-        static void execute(const Instruction &, VMState &);
-
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);
-    }; // struct Ret
-
+    DEF_INST_MUT(Ret, OP_GET1(retReg, Register));
 }; // namespace cial::Bytecode

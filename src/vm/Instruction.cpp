@@ -14,6 +14,7 @@
 #include "Instruction.hpp"
 #include <fmt/format.h>
 
+#include "VMDebug.hpp"
 #include "VMState.hpp"
 #include "logging/Logger.hpp"
 #include "types/Class.hpp"
@@ -68,6 +69,8 @@ namespace cial::Bytecode {
         return false;
     }
 
+    void NOP::execute(const Instruction &, const VMState &) {}
+
     void Load::execute(const Instruction &inst, const VMState &vmState) {
         vmState.regRef(reg(inst)) = vmState.curFrame()->chunk->getConstant(value(inst)).createValue(&vmState.rt);
     }
@@ -82,18 +85,32 @@ namespace cial::Bytecode {
         vmState.reg(dst(inst), srcVal);
     }
 
+    static Value addImpl(const Value &r1, const Value &r2) { return r1.add(r2).unwrap(); }
+
     void Add::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
-        auto r = r1.add(r2);
-        r2 = r.unwrap();
+        r2 = addImpl(r1, r2);
     }
+
+    void AddImm::execute(const Instruction &inst, const VMState &vmState) {
+        const Value r1{ src(inst) };
+        Value &r2 = vmState.regRef(dst(inst));
+        r2 = addImpl(r1, r2);
+    }
+
+    static Value subImpl(const Value &r1, const Value &r2) { return r1.sub(r2).unwrap(); }
 
     void Sub::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
-        auto r = r1.sub(r2);
-        r2 = r.unwrap();
+        r2 = subImpl(r1, r2);
+    }
+
+    void SubImm::execute(const Instruction &inst, const VMState &vmState) {
+        const Value r1{ src(inst) };
+        Value &r2 = vmState.regRef(dst(inst));
+        r2 = subImpl(r1, r2);
     }
 
     void Mul::execute(const Instruction &inst, const VMState &vmState) {
@@ -440,6 +457,7 @@ namespace cial::Bytecode {
         fmt::println("{}", constants);
         fmt::println("====================");
         fmt::println("{}", chunk);
+        DEBUG_BREAK();
     }
 
     void Ret::execute(const Instruction &inst, VMState &vmState) {
@@ -449,6 +467,8 @@ namespace cial::Bytecode {
         vmState.prevFrame()->getReg(*frame->ret) = value;
         vmState.freeCallFrame();
     }
+
+    std::string NOP::dump(const Instruction &, const VMState *) { return fmt::format("{: <10}", "nop"); }
 
     std::string Load::dump(const Instruction &inst, const VMState *vmState) {
 
@@ -493,6 +513,10 @@ namespace cial::Bytecode {
                            vmState->reg(dst(inst)));
     }
 
+    std::string AddImm::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4} {: <4}", "add_imm", src(inst), dst(inst));
+    }
+
     std::string Sub::dump(const Instruction &inst, const VMState *vmState) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "sub", src(inst), dst(inst));
 
@@ -502,6 +526,11 @@ namespace cial::Bytecode {
         return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
                            vmState->reg(dst(inst)));
     }
+
+    std::string SubImm::dump(const Instruction &inst, const VMState *vmState) {
+        return fmt::format("{: <10} {: <4} {: <4}", "sub_imm", src(inst), dst(inst));
+    }
+
     std::string Mul::dump(const Instruction &inst, const VMState *vmState) {
         auto insDump = fmt::format("{: <10} {: <4} {: <4}", "mul", src(inst), dst(inst));
 

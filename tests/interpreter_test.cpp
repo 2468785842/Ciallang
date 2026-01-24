@@ -43,6 +43,27 @@ TEST_CASE("解释器 - 执行测试") {
 }
 
 TEST_CASE("解释器 - 脚本执行性能") {
+    // @1    : cp         %0   %1
+    // @2    : load       %2   *1
+    // @3    : lt         %1   %2
+    // @4    : test       %2
+    // @5    : jmp_ne     @8
+    // @6    : cp         %0   %3
+    // @7    : ret        %3
+    // @8    : g_this     atom_5 %4
+    // @9    : cp         %0   %5
+    // @10   : load       %6   *1
+    // @11   : sub        %5   %6
+    // @12   : push_reg   %6
+    // @13   : call       %4   %2   1
+    // @14   : g_this     atom_5 %7
+    // @15   : cp         %0   %8
+    // @16   : load       %9   *2
+    // @17   : sub        %8   %9
+    // @18   : push_reg   %9
+    // @19   : call       %7   %4   1
+    // @20   : add        %2   %4
+    // @21   : ret        %4
     BENCHMARK("fib 10") {
         Runtime rt{};
         Context context{ rt };
