@@ -35,6 +35,8 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/common/UTF8.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gen/IRGenerator.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/gen/ControlFlowGraph.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/gen/Optimizer.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/Runtime.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/Context.cpp

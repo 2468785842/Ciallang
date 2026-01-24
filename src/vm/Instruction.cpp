@@ -30,7 +30,7 @@ namespace cial::Bytecode {
     case OpCode::OP:                                                                                                   \
         OP::execute(inst, vmState);                                                                                    \
         break;
-        switch(inst.opcode) {
+        switch(inst._opcode) {
             OPCODE_ENUMS(HANDLE_OPCODE)
             default:;
         }
@@ -40,7 +40,7 @@ namespace cial::Bytecode {
 #define DUMP_OPCODE(OP)                                                                                                \
     case OpCode::OP:                                                                                                   \
         return OP::dump(inst, vmState);
-        switch(inst.opcode) {
+        switch(inst._opcode) {
             OPCODE_ENUMS(DUMP_OPCODE)
             default:;
         }

@@ -97,67 +97,43 @@ namespace cial::Bytecode {
 
     struct Operand {
         enum class Type { None, Register, Label, ConstIndex, Number, Atom };
-        union {
-            Register reg;
-            Label label;
-            ConstIdx ci;
-            Integer num;
-            Atom atom;
-        } operand;
 
-        Type type{ Type::None };
+        template <typename T>
+        explicit Operand(T operand) : _operand{ operand } {}
 
-        explicit Operand(const ConstIdx value) : operand{ .ci = value }, type(Type::ConstIndex) {}
+        [[nodiscard]] Type type() const noexcept { return static_cast<Type>(_operand.index()); }
 
-        explicit Operand(const Register value) : operand{ .reg = value }, type(Type::Register) {}
-
-        explicit Operand(const Label value) : operand{ .label = value }, type(Type::Label) {}
-
-        explicit Operand(const Integer value) : operand{ .num = value }, type(Type::Number) {}
-
-        explicit Operand(const Atom value) : operand{ .atom = value }, type(Type::Atom) {}
-
-        Operand(const Operand &other) = delete;
-
-        Operand &operator=(const Operand &other) = delete;
-
-        Operand(Operand &&other) noexcept : operand(other.operand), type(other.type) { other.type = Type::None; }
-
-        Operand &operator=(Operand &&other) noexcept {
-            if(this != &other) {
-                this->~Operand();
-                new(this) Operand(std::move(other));
-            }
-            return *this;
+        template <typename T>
+        [[nodiscard]] T value() const noexcept {
+            assert(std::holds_alternative<T>(_operand));
+            return std::get<T>(_operand);
         }
+
+        bool operator==(const Operand &rhs) const noexcept = default;
+
+    private:
+        using Value = std::variant<std::monostate, Register, Label, ConstIdx, Integer, Atom>;
+        Value _operand;
     };
 
     class Instruction {
     public:
-        const OpCode opcode;
+        explicit Instruction(const OpCode opcode) : _opcode(opcode) {}
+        explicit Instruction(const OpCode opcode, Operand operand) : _opcode(opcode), _operand1(operand) {}
+        explicit Instruction(const OpCode opcode, Operand operand1, Operand operand2) :
+            _opcode(opcode), _operand1(operand1), _operand2(operand2) {}
+        explicit Instruction(const OpCode opcode, Operand operand1, Operand operand2, Operand operand3) :
+            _opcode(opcode), _operand1(operand1), _operand2(operand2), _operand3(operand3) {}
 
-        explicit Instruction(const OpCode opcode) : opcode(opcode) {}
-        explicit Instruction(const OpCode opcode, Operand &&operand) : opcode(opcode), _operand1(std::move(operand)) {}
-        explicit Instruction(const OpCode opcode, Operand &&operand1, Operand &&operand2) :
-            opcode(opcode), _operand1(std::move(operand1)), _operand2(std::move(operand2)) {}
-        explicit Instruction(const OpCode opcode, Operand &&operand1, Operand &&operand2, Operand &&operand3) :
-            opcode(opcode), _operand1(std::move(operand1)), _operand2(std::move(operand2)),
-            _operand3(std::move(operand3)) {}
+        Instruction(const Instruction &) = default;
 
-        Instruction(const Instruction &other) = delete;
+        Instruction &operator=(const Instruction &) = default;
 
-        Instruction(Instruction &&other) noexcept : opcode(other.opcode) {
-            if(other._operand1)
-                _operand1 = std::move(*other._operand1);
-            if(other._operand2)
-                _operand2 = std::move(*other._operand2);
-            if(other._operand3)
-                _operand3 = std::move(*other._operand3);
-        }
+        Instruction(Instruction &&) = default;
 
-        Instruction &operator=(const Operand &other) = delete;
+        Instruction &operator=(Instruction &&) = default;
 
-        Instruction &operator=(Instruction &&other) = delete;
+        [[nodiscard]] OpCode opcode() const { return _opcode; }
 
         template <typename T>
         void setOperand1(T &&v) {
@@ -177,26 +153,20 @@ namespace cial::Bytecode {
         template <typename T>
         [[nodiscard]] constexpr T getOperand1() const {
             CLL_ASSERT(_operand1, "operand1 is empty");
-            return getOperand<T>(*_operand1);
+            return _operand1->value<T>();
         }
 
         template <typename T>
         [[nodiscard]] constexpr T getOperand2() const {
             CLL_ASSERT(_operand2, "operand2 is empty");
-            return getOperand<T>(*_operand2);
+            return _operand2->value<T>();
         }
 
         template <typename T>
         [[nodiscard]] constexpr T getOperand3() const {
             CLL_ASSERT(_operand3, "operand3 is empty");
-            return getOperand<T>(*_operand3);
+            return _operand3->value<T>();
         }
-
-        [[nodiscard]] const Operand::Type &getOperand1Type() const { return _operand1->type; }
-
-        [[nodiscard]] const Operand::Type &getOperand2Type() const { return _operand2->type; }
-
-        [[nodiscard]] const Operand::Type &getOperand3Type() const { return _operand3->type; }
 
         [[nodiscard]] Integer operandCount() const {
             return static_cast<int>(_operand1.has_value()) + static_cast<int>(_operand2.has_value()) +
@@ -207,33 +177,13 @@ namespace cial::Bytecode {
 
         static std::string dump(const Instruction &inst, const VMState *vmState = nullptr);
 
+        bool operator==(const Instruction &) const = default;
+
     private:
+        OpCode _opcode;
         std::optional<Operand> _operand1;
         std::optional<Operand> _operand2;
         std::optional<Operand> _operand3;
-
-        template <typename T>
-        [[nodiscard]] constexpr T getOperand(const Operand &operand) const {
-            if constexpr(std::is_same_v<T, Register>) {
-                CLL_ASSERT(operand.type == Operand::Type::Register, "operand type is not Register");
-                return operand.operand.reg;
-            } else if constexpr(std::is_same_v<T, Label>) {
-                CLL_ASSERT(operand.type == Operand::Type::Label, "operand type is not Label");
-                return operand.operand.label;
-            } else if constexpr(std::is_same_v<T, ConstIdx>) {
-                CLL_ASSERT(operand.type == Operand::Type::ConstIndex, "operand type is not ConstIdx");
-                return operand.operand.ci;
-            } else if constexpr(std::is_same_v<T, Integer>) {
-                CLL_ASSERT(operand.type == Operand::Type::Number, "operand type is not Number");
-                return operand.operand.num;
-            } else if constexpr(std::is_same_v<T, Atom>) {
-                CLL_ASSERT(operand.type == Operand::Type::Atom, "operand type is not Atom");
-                return operand.operand.atom;
-            } else {
-                static_assert(!std::is_same_v<T, T> && "operand type is not support");
-            }
-            throw std::logic_error("unreachable");
-        }
     };
 
 // 操作码
@@ -245,15 +195,15 @@ namespace cial::Bytecode {
     static type name(const Instruction &inst) { return inst.getOperand3<type>(); }
 
 // 定义指令
-#define DEF_INST_EX(className, getters, execute_ref, dump_ref)                                                         \
+#define DEF_INST_EX(className, getters, execute_ref)                                                                   \
     struct className {                                                                                                 \
         getters static void execute(const Instruction &, execute_ref);                                                 \
         [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);                        \
     }
 
 // 定义指令可变, 不可变变体
-#define DEF_INST(className, getters) DEF_INST_EX(className, getters, const VMState &, const VMState *)
-#define DEF_INST_MUT(className, getters) DEF_INST_EX(className, getters, VMState &, VMState &)
+#define DEF_INST(className, getters) DEF_INST_EX(className, getters, const VMState &)
+#define DEF_INST_MUT(className, getters) DEF_INST_EX(className, getters, VMState &)
 
     // ────────────────────────────────────────────────
     // 定义指令
@@ -334,11 +284,14 @@ namespace cial::Bytecode {
 
     DEF_INST(LAnd, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    DEF_INST(Jmp, OP_GET1(label, Label));
+    DEF_INST(
+        Jmp,
+        OP_GET1(label, Label) //
+        static void target(Instruction &inst, Label label) { inst.setOperand1(label); } //
+    );
 
-    DEF_INST(JmpE, OP_GET1(label, Label));
-
-    DEF_INST(JmpNE, OP_GET1(label, Label));
+    DEF_INST(JmpE : Jmp, );
+    DEF_INST(JmpNE : Jmp, );
 
     DEF_INST_MUT(Call, OP_GET1(dst, Register) OP_GET2(memberReg, Register) OP_GET3(argCount, Integer));
 

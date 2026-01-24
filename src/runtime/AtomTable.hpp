@@ -26,9 +26,9 @@ namespace cial {
     class Runtime;
 
     struct Atom {
-        std::uint64_t v{ 0 };
+        std::uint64_t v{};
 
-        constexpr bool operator==(const Atom a) const noexcept { return v == a.v; }
+        bool operator==(const Atom &) const noexcept = default;
     };
 
     static constexpr Atom ATOM_INVALID{};

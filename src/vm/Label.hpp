@@ -22,6 +22,8 @@ namespace cial::Bytecode {
 
         [[nodiscard]] size_t address() const noexcept { return _address; }
 
+        bool operator==(const Label &) const noexcept = default;
+
     private:
         size_t _address;
 

@@ -22,6 +22,7 @@ namespace cial::Bytecode {
         explicit Register(const size_t index) : _index(index) {}
 
         [[nodiscard]] size_t index() const noexcept { return _index; }
+        bool operator==(const Register &) const noexcept = default;
 
     private:
         size_t _index;
