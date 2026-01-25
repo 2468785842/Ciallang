@@ -164,7 +164,7 @@ namespace cial::Inter {
         void error(const std::string &message, const Common::SourceLocation &location) const {
             _sourceFile.error(_r, message, location);
         }
-
-        [[nodiscard]] Constant constVal(const Syntax::Token &token) const;
+        [[nodiscard]] Atom getAtomFromToken(const Syntax::Token &token) const;
+        void genTokenValueLoadInst(Bytecode::Register reg, const Syntax::Token &token) const;
     };
 } // namespace cial::Inter

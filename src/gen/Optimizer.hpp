@@ -36,7 +36,8 @@ namespace cial::Inter {
     protected:
         static void removeNopInst(Vec<Bytecode::Instruction> &instVec);
 
-        bool usingRegister(Bytecode::Instruction &inst);
+        static bool isUsing(const Bytecode::Instruction &instruction, const Bytecode::Register &reg);
+        static bool isDefining(const Bytecode::Instruction &instruction, const Bytecode::Register &reg);
     };
 
     class OptimizerManager {

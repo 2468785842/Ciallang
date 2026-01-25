@@ -14,9 +14,6 @@ namespace cial::Bytecode {
             case ConstantType::None:
                 ss << "Void";
                 break;
-            case ConstantType::Integer:
-                ss << constant.value<Integer>();
-                break;
             case ConstantType::Real:
                 ss << constant.value<Real>().value();
                 break;
@@ -67,9 +64,11 @@ namespace cial::Bytecode {
     [[nodiscard]] String Chunk::dumpInstructions(const VMState *vmState) const {
         std::stringstream ss{ "" };
         size_t pc{};
-        while(pc <= vmState->getPC().address()) {
+        while(pc < vmState->getPC().address()) {
+            const bool isLastInst = pc == vmState->getPC().address() - 1;
             const auto &instruction = _instructions[pc];
-            ss << fmt::format("{: <6}: {}", Label{ pc }, Instruction::dump(instruction, vmState));
+            ss << fmt::format("{: <6}: {}", Label{ pc },
+                              Instruction::dump(instruction, isLastInst ? vmState : nullptr));
             if(pc != _instructions.size() - 1) {
                 ss << '\n';
             }

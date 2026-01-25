@@ -172,7 +172,6 @@ namespace cial {
 
     enum class ConstantType : std::uint8_t {
         None,
-        Integer,
         Real,
         Atom,
         FuncMeta,
@@ -180,7 +179,7 @@ namespace cial {
         PropMeta,
     };
 
-    using ConstantValue = std::variant<std::monostate, Integer, Real, Atom, FuncMeta *, ClassMeta *, PropMeta *>;
+    using ConstantValue = std::variant<std::monostate, Real, Atom, FuncMeta *, ClassMeta *, PropMeta *>;
 
     struct Constant {
 

@@ -72,7 +72,11 @@ namespace cial::Bytecode {
     void NOP::execute(const Instruction &, const VMState &) {}
 
     void Load::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.regRef(reg(inst)) = vmState.curFrame()->chunk->getConstant(value(inst)).createValue(&vmState.rt);
+        vmState.regRef(dst(inst)) = vmState.curFrame()->chunk->getConstant(value(inst)).createValue(&vmState.rt);
+    }
+
+    void ILoad::execute(const Instruction &inst, const VMState &vmState) {
+        vmState.regRef(dst(inst)) = Value{ value(inst) };
     }
 
     void Push::execute(const Instruction &inst, const VMState &vmState) { vmState.push(vmState.reg(src(inst))); }
@@ -428,12 +432,12 @@ namespace cial::Bytecode {
     }
 
     void LNot::execute(const Instruction &inst, const VMState &vmState) {
-        const Register srcReg = src(inst);
+        const Register srcReg = dst(inst);
         vmState.regRef(srcReg).toLogicalNot();
     }
 
     void ChgSign::execute(const Instruction &inst, const VMState &vmState) {
-        auto r = vmState.regRef(src(inst)).toSignChange();
+        auto r = vmState.regRef(dst(inst)).toSignChange();
         if(r.isFailed())
             throw r.getErr();
     }
@@ -555,6 +559,7 @@ namespace cial::Bytecode {
 
     // 基础加载与推栈
     DEF_AUTO_DUMP(Load, "load");
+    DEF_AUTO_DUMP(ILoad, "iload");
     DEF_AUTO_DUMP(Push, "push");
     DEF_AUTO_DUMP(PopN, "pop_n");
     DEF_AUTO_DUMP(Mov, "mov");

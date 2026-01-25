@@ -14,6 +14,7 @@
 
 #include <ranges>
 
+#include "Optimizer.hpp"
 #include "common/Defer.hpp"
 #include "runtime/Runtime.hpp"
 
@@ -32,6 +33,13 @@ namespace cial::Inter {
             return {};
         _chunk->setRegCount(_regNextIndex);
         auto chunk = std::move(_chunk);
+
+        // ===
+        OptimizerManager optimizerManager(*chunk);
+        optimizerManager.addOptimizer(std::make_unique<LoadSubOptimizer>());
+        optimizerManager.applyOptimizations();
+        // ===
+
         _chunk = std::make_unique<Bytecode::Chunk>();
         return Bytecode::Chunk{ std::move(*chunk.release()) };
     }
@@ -64,7 +72,7 @@ namespace cial::Inter {
         if(node->catchErr) {
             beginScope();
 
-            const Atom varName = constVal(node->catchErr->token).value<Atom>();
+            const Atom varName = getAtomFromToken(node->catchErr->token);
             const Bytecode::Register exValue = allocateRegister();
             addLocalVar(LocalVariable{ varName, exValue, static_cast<std::uint32_t>(tryEndIp.address()) });
 
@@ -88,8 +96,7 @@ namespace cial::Inter {
             return;
         }
         auto dst = allocateRegister();
-
-        _chunk->emit<Bytecode::OpCode::Load>(dst, _chunk->addConstant(constVal(node->token)));
+        genTokenValueLoadInst(dst, node->token);
         retReg = dst;
     }
 
@@ -104,7 +111,7 @@ namespace cial::Inter {
             Bytecode::Register dst = allocateRegister();
 
             if(auto *identifier = dynamic_cast<const Syntax::IdentifierExprNode *>(node->rhs); identifier) {
-                _chunk->emit<Bytecode::OpCode::Load>(dst, _chunk->addConstant(constVal(identifier->token)));
+                genTokenValueLoadInst(dst, identifier->token);
                 _chunk->emit<Bytecode::OpCode::GProp>(reg1, dst, dst);
             } else {
                 Bytecode::Register reg2{ 0 };
@@ -125,8 +132,8 @@ namespace cial::Inter {
                 error("isn't support operator", node->location);
                 return;
             }
-            const Atom lVarName = constVal(lVarExpr->token).value<Atom>();
-            const Atom rVarName = constVal(rVarExpr->token).value<Atom>();
+            const Atom lVarName = getAtomFromToken(lVarExpr->token);
+            const Atom rVarName = getAtomFromToken(rVarExpr->token);
             auto *lVar = resolveLocalVariable(lVarName);
             auto *rVar = resolveLocalVariable(rVarName);
             auto dst = allocateRegister();
@@ -343,12 +350,12 @@ namespace cial::Inter {
             }
             case Increment: {
                 if(const auto *expr = dynamic_cast<const Syntax::IdentifierExprNode *>(node->lhs)) {
-                    const Atom identifier = constVal(expr->token).value<Atom>();
+                    const Atom identifier = getAtomFromToken(expr->token);
 
                     if(const auto variable = resolveLocalVariable(identifier)) {
                         Bytecode::Register dst = variable->reg;
                         auto tmpR = allocateRegister();
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR, _chunk->addConstant(1));
+                        _chunk->emit<Bytecode::OpCode::ILoad>(tmpR, 1);
                         _chunk->emit<Bytecode::OpCode::Add>(tmpR, dst);
                         freeRegister(tmpR);
                         retReg = dst;
@@ -359,14 +366,14 @@ namespace cial::Inter {
                     auto tmpR1 = allocateRegister();
                     if(isTopScope()) {
                         // global maybe
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(1));
+                        _chunk->emit<Bytecode::OpCode::ILoad>(tmpR1, 1);
                         _chunk->emit<Bytecode::OpCode::GGlobal>(identifier, tmpR2);
                         _chunk->emit<Bytecode::OpCode::Add>(tmpR1, tmpR2);
                         _chunk->emit<Bytecode::OpCode::DGlobal>(identifier, tmpR2);
                         retReg = tmpR2;
                     } else {
                         // find on context
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(1));
+                        _chunk->emit<Bytecode::OpCode::ILoad>(tmpR1, 1);
                         _chunk->emit<Bytecode::OpCode::GThis>(identifier, tmpR2);
                         _chunk->emit<Bytecode::OpCode::Add>(tmpR1, tmpR2);
                         _chunk->emit<Bytecode::OpCode::DThis>(identifier, tmpR2);
@@ -382,12 +389,12 @@ namespace cial::Inter {
             case Decrement: {
 
                 if(const auto *expr = dynamic_cast<const Syntax::IdentifierExprNode *>(node->lhs)) {
-                    const Atom identifier = constVal(expr->token).value<Atom>();
+                    const Atom identifier = getAtomFromToken(expr->token);
 
                     if(const auto variable = resolveLocalVariable(identifier)) {
                         Bytecode::Register dst = variable->reg;
                         auto tmpR = allocateRegister();
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR, _chunk->addConstant(1));
+                        _chunk->emit<Bytecode::OpCode::ILoad>(tmpR, 1);
                         _chunk->emit<Bytecode::OpCode::Sub>(tmpR, dst);
                         freeRegister(tmpR);
                         retReg = dst;
@@ -398,14 +405,14 @@ namespace cial::Inter {
                     auto tmpR1 = allocateRegister();
                     if(isTopScope()) {
                         // global maybe
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(1));
+                        _chunk->emit<Bytecode::OpCode::ILoad>(tmpR1, 1);
                         _chunk->emit<Bytecode::OpCode::GGlobal>(identifier, tmpR2);
                         _chunk->emit<Bytecode::OpCode::Sub>(tmpR1, tmpR2);
                         _chunk->emit<Bytecode::OpCode::DGlobal>(identifier, tmpR2);
                         retReg = tmpR2;
                     } else {
                         // find on context
-                        _chunk->emit<Bytecode::OpCode::Load>(tmpR1, _chunk->addConstant(1));
+                        _chunk->emit<Bytecode::OpCode::ILoad>(tmpR1, 1);
                         _chunk->emit<Bytecode::OpCode::GThis>(identifier, tmpR2);
                         _chunk->emit<Bytecode::OpCode::Sub>(tmpR1, tmpR2);
                         _chunk->emit<Bytecode::OpCode::DThis>(identifier, tmpR2);
@@ -452,7 +459,7 @@ namespace cial::Inter {
 
     void IRGenerator::generate(const Syntax::AssignExprNode *node, OptReg &retReg) {
         if(const auto *expr = dynamic_cast<const Syntax::IdentifierExprNode *>(node->lhs)) {
-            const Atom identifier = constVal(expr->token).value<Atom>();
+            const Atom identifier = getAtomFromToken(expr->token);
 
             Bytecode::Register src{ 0 };
             if(!expectValue(node->rhs, src))
@@ -492,7 +499,7 @@ namespace cial::Inter {
 
                 if(const auto *identifierExpr = dynamic_cast<const Syntax::IdentifierExprNode *>(expr->rhs)) {
                     auto tmpR = allocateRegister();
-                    _chunk->emit<Bytecode::OpCode::Load>(tmpR, _chunk->addConstant(constVal(identifierExpr->token)));
+                    genTokenValueLoadInst(tmpR, identifierExpr->token);
                     _chunk->emit<Bytecode::OpCode::DProp>(lhsR, tmpR, src);
                     freeRegister(tmpR);
 
@@ -530,7 +537,7 @@ namespace cial::Inter {
 
         auto *propMeta = _rt.createNoGC<PropMeta>(setFuncMeta, getFuncMeta);
 
-        const auto identifier = constVal(node->token).value<Atom>();
+        const auto identifier = getAtomFromToken(node->token);
 
         auto propReg = allocateRegister();
         _chunk->emit<Bytecode::OpCode::Load>(propReg, _chunk->addConstant(propMeta));
@@ -545,7 +552,7 @@ namespace cial::Inter {
     }
 
     void IRGenerator::generate(const Syntax::VarDeclNode *node, OptReg &) {
-        const auto identifier = constVal(node->token).value<Atom>();
+        const auto identifier = getAtomFromToken(node->token);
 
         DEFER {
             OptReg reg;
@@ -596,7 +603,7 @@ namespace cial::Inter {
             return;
         }
 
-        const auto identifier = constVal(node->token).value<Atom>();
+        const auto identifier = getAtomFromToken(node->token);
         funcMeta->name = identifier;
         _chunk->emit<Bytecode::OpCode::Load>(funReg, _chunk->addConstant(funcMeta));
 
@@ -611,7 +618,7 @@ namespace cial::Inter {
 
 
     void IRGenerator::generate(const Syntax::ClassDeclNode *node, OptReg &) {
-        const auto identifier = constVal(node->token).value<Atom>();
+        const auto identifier = getAtomFromToken(node->token);
 
         auto classReg = allocateRegister();
         auto *classMeta = _rt.createNoGC<ClassMeta>(identifier, 0);
@@ -623,7 +630,7 @@ namespace cial::Inter {
         beginScope();
 
         for(const auto *funcDeclNode : node->funcDeclVec) {
-            const auto funName = constVal(funcDeclNode->token).value<Atom>();
+            const auto funName = getAtomFromToken(funcDeclNode->token);
             const auto funcMeta = generateFuncMeta(funcDeclNode->parameters, funcDeclNode->body);
 
             if(!funcMeta) {
@@ -634,7 +641,7 @@ namespace cial::Inter {
         }
 
         for(const auto *ext : node->extends) {
-            classMeta->extends.push_back(constVal(ext->token).value<Atom>());
+            classMeta->extends.push_back(getAtomFromToken(ext->token));
         }
 
         for(const auto *propertyDeclNode : node->propertyDeclVec) {
@@ -648,7 +655,7 @@ namespace cial::Inter {
 
             auto *propMeta = _rt.createNoGC<PropMeta>(setFuncMeta, getFuncMeta);
 
-            const auto varName = constVal(propertyDeclNode->token).value<Atom>();
+            const auto varName = getAtomFromToken(propertyDeclNode->token);
 
             classMeta->setMember(MemberShapeMeta{ .name = varName, .isProp = true }, ClassFieldMeta{ propMeta });
         }
@@ -658,7 +665,7 @@ namespace cial::Inter {
             gen.makeVirtualGlobalScope();
 
             for(const auto *varDeclNode : node->varDeclVec) {
-                const auto varName = constVal(varDeclNode->token).value<Atom>();
+                const auto varName = getAtomFromToken(varDeclNode->token);
 
                 // can init
                 if(varDeclNode->rhs) {
@@ -687,7 +694,7 @@ namespace cial::Inter {
             // must init var in begin state
             if(node->constructor) {
                 for(auto &[token, exprNode] : node->constructor->parameters) {
-                    const auto varName = constVal(token).value<Atom>();
+                    const auto varName = getAtomFromToken(token);
                     OptReg paramReg{};
 
                     if(exprNode) {
@@ -742,7 +749,7 @@ namespace cial::Inter {
 
     void IRGenerator::generate(const Syntax::IdentifierExprNode *node, OptReg &retReg) {
         auto dst = allocateRegister();
-        const auto identifier = constVal(node->token).value<Atom>();
+        const auto identifier = getAtomFromToken(node->token);
 
         if(const auto variable = resolveLocalVariable(identifier)) {
             _chunk->emit<Bytecode::OpCode::CP>(variable->reg, dst);
@@ -1097,7 +1104,7 @@ namespace cial::Inter {
         gen.makeVirtualGlobalScope();
 
         for(auto &[token, exprNode] : parameters) {
-            const auto varName = constVal(token).value<Atom>();
+            const auto varName = getAtomFromToken(token);
             OptReg paramReg{};
 
             if(exprNode) {
@@ -1136,21 +1143,29 @@ namespace cial::Inter {
         return _empty.value();
     }
 
-    Constant IRGenerator::constVal(const Syntax::Token &token) const {
+    Atom IRGenerator::getAtomFromToken(const Syntax::Token &token) const {
+        return _rt.atomTable.intern(token.getString());
+    }
+
+    void IRGenerator::genTokenValueLoadInst(Bytecode::Register reg, const Syntax::Token &token) const {
         switch(token.valueType()) {
-            case Syntax::TokenValueType::Integer:
-                return Constant{ token.getInteger() };
             case Syntax::TokenValueType::Real:
-                return Constant{ token.getReal() };
+                _chunk->emit<Bytecode::OpCode::Load>(reg, _chunk->addConstant(token.getReal()));
+                break;
             case Syntax::TokenValueType::String:
-                return Constant{ _rt.atomTable.intern(token.getString()) };
+                _chunk->emit<Bytecode::OpCode::Load>(reg, _chunk->addConstant(getAtomFromToken(token)));
+                break;
             case Syntax::TokenValueType::Octet:
                 throw std::runtime_error("Unsupported token type octet");
                 // return Constant { token.getOctet() };
+            case Syntax::TokenValueType::Integer:
+                _chunk->emit<Bytecode::OpCode::ILoad>(reg, token.getInteger());
+                break;
             case Syntax::TokenValueType::None:
+                // loadVoidReg();
+                // this is void
                 break;
         }
-        return Constant{};
     }
 
 } // namespace cial::Inter

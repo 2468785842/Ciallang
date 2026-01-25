@@ -33,8 +33,6 @@ namespace cial {
         switch(type()) {
             case ConstantType::None:
                 break;
-            case ConstantType::Integer:
-                return Value{ value<Integer>() };
             case ConstantType::Real:
                 return Value{ value<Real>() };
             case ConstantType::Atom: {

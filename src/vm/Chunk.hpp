@@ -66,7 +66,7 @@ namespace cial::Bytecode {
         Chunk(Chunk &&chunk) = default;
         Chunk &operator=(Chunk &&chunk) = default;
 
-        [[nodiscard]] auto &getInstVec() const noexcept { return _instructions; }
+        [[nodiscard]] auto &getInstVec() noexcept { return _instructions; }
 
         void setRegCount(const std::uint32_t count) noexcept { _registerCount = count; }
         [[nodiscard]] std::uint32_t getRegCount() const noexcept { return _registerCount; }

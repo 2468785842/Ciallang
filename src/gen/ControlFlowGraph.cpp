@@ -19,7 +19,7 @@ namespace cial::Inter {
         for(int i = 0; i < code.size(); i++) {
             const auto &ins = code[i];
             if(ins.opcode() == OpCode::Jmp) {
-                leaders.insert(Jmp::label(ins).address());
+                leaders.insert(static_cast<int>(Jmp::label(ins).address()));
                 leaders.insert(i + 1); // fallthrough
             }
             if(ins.opcode() == OpCode::Ret) {
