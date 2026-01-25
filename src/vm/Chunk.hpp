@@ -101,6 +101,8 @@ namespace cial::Bytecode {
 
         [[nodiscard]] String dumpInstructions() const;
 
+        [[nodiscard]] String dumpInstructions(const VMState *vmState) const;
+
         void marked() noexcept override {
             MarkSweepHeader::marked();
             for(auto &inst : _constants) {

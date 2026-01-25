@@ -13,6 +13,7 @@
  */
 #include "Instruction.hpp"
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include "VMDebug.hpp"
 #include "VMState.hpp"
@@ -24,7 +25,6 @@
 #include "vm/Register.hpp"
 
 namespace cial::Bytecode {
-
     void Instruction::execute(const Instruction &inst, VMState &vmState) {
 #define HANDLE_OPCODE(OP)                                                                                              \
     case OpCode::OP:                                                                                                   \
@@ -75,7 +75,7 @@ namespace cial::Bytecode {
         vmState.regRef(reg(inst)) = vmState.curFrame()->chunk->getConstant(value(inst)).createValue(&vmState.rt);
     }
 
-    void PushReg::execute(const Instruction &inst, const VMState &vmState) { vmState.push(vmState.reg(src(inst))); }
+    void Push::execute(const Instruction &inst, const VMState &vmState) { vmState.push(vmState.reg(src(inst))); }
 
     void PopN::execute(const Instruction &inst, const VMState &vmState) { vmState.pop(count(inst)); }
 
@@ -85,32 +85,28 @@ namespace cial::Bytecode {
         vmState.reg(dst(inst), srcVal);
     }
 
-    static Value addImpl(const Value &r1, const Value &r2) { return r1.add(r2).unwrap(); }
-
     void Add::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
-        r2 = addImpl(r1, r2);
+        r2 = r1.add(r2).unwrap();
     }
 
-    void AddImm::execute(const Instruction &inst, const VMState &vmState) {
+    void IAdd::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1{ src(inst) };
         Value &r2 = vmState.regRef(dst(inst));
-        r2 = addImpl(r1, r2);
+        r2 = r1.add(r2).unwrap();
     }
-
-    static Value subImpl(const Value &r1, const Value &r2) { return r1.sub(r2).unwrap(); }
 
     void Sub::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1 = vmState.reg(src(inst));
         Value &r2 = vmState.regRef(dst(inst));
-        r2 = subImpl(r1, r2);
+        r2 = r1.sub(r2).unwrap();
     }
 
-    void SubImm::execute(const Instruction &inst, const VMState &vmState) {
+    void ISub::execute(const Instruction &inst, const VMState &vmState) {
         const Value r1{ src(inst) };
         Value &r2 = vmState.regRef(dst(inst));
-        r2 = subImpl(r1, r2);
+        r2 = r1.sub(r2).unwrap();
     }
 
     void Mul::execute(const Instruction &inst, const VMState &vmState) {
@@ -468,401 +464,178 @@ namespace cial::Bytecode {
         vmState.freeCallFrame();
     }
 
-    std::string NOP::dump(const Instruction &, const VMState *) { return fmt::format("{: <10}", "nop"); }
+    template <typename... Args>
+    std::string formatInst(const char *name, Args &&...args) {
+        return fmt::format("{: <10} {}", name, fmt::join(std::array{ fmt::format("{: <4}", args)... }, " "));
+    }
 
-    std::string Load::dump(const Instruction &inst, const VMState *vmState) {
+#define DEF_DUMP(className, instName, ops)                                                                             \
+    std::string className::dump(const Instruction &inst, const VMState *vmState) {                                     \
+        auto insDump = formatInst(instName, reg(inst), value(inst));                                                   \
+        return insDump;                                                                                                \
+    }
 
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "load", reg(inst), value(inst));
+    String DumpInst::dumpOperand(const Operand &operand) {
+        switch(operand.type()) {
+            case Operand::Type::Register:
+                return String{ fmt::format("{: <4}", operand.value<Register>()) };
+            case Operand::Type::Label:
+                return String{ fmt::format("{: <4}", operand.value<Label>()) };
+            case Operand::Type::ConstIndex:
+                return String{ fmt::format("{: <4}", operand.value<ConstIdx>()) };
+            case Operand::Type::Number:
+                return String{ fmt::format("{: <4}", operand.value<Integer>()) };
+            case Operand::Type::Atom:
+                return String{ fmt::format("atom_{}", operand.value<Atom>().v) };
+            default:
+                return ""_str;
+        }
+    }
 
-        if(!vmState)
+    struct DumpComment {
+        std::vector<std::string> items;
+
+        void add(std::string s) { items.push_back(std::move(s)); }
+
+        [[nodiscard]] bool empty() const { return items.empty(); }
+
+        [[nodiscard]] std::string format() const { return fmt::format("; {}", fmt::join(items, ", ")); }
+    };
+
+    std::string dumpWithComment(std::string insDump, const DumpComment &c) {
+        if(c.empty())
             return insDump;
 
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, reg(inst), vmState->reg(reg(inst)), value(inst),
-                           vmState->curFrame()->chunk->dumpConstant(&vmState->context.rt(), value(inst)));
+        return fmt::format("{: <30} {}", insDump, c.format());
     }
 
-    std::string PushReg::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4}", "push_reg", src(inst));
+    void dumpOperandComment(DumpComment &c, const Operand &operand, const VMState *vm) {
+        if(!vm)
+            return;
 
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}", insDump, src(inst), vmState->reg(src(inst)));
+        switch(operand.type()) {
+            case Operand::Type::Register: {
+                auto r = operand.value<Register>();
+                c.add(fmt::format("{} = {}", r, vm->reg(r)));
+                break;
+            }
+            case Operand::Type::ConstIndex: {
+                auto idx = operand.value<ConstIdx>();
+                auto s = vm->curFrame()->chunk->dumpConstant(&vm->context.rt(), idx);
+                c.add(fmt::format("{} = {}", idx, s));
+                break;
+            }
+            case Operand::Type::Atom: {
+                auto a = operand.value<Atom>();
+                if(const auto *e = vm->rt.atomTable.get(a))
+                    c.add(fmt::format("atom_{}=\"{}\"", a.v, *e->str));
+                break;
+            }
+            default:
+                break;
+        }
     }
 
-    std::string PopN::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "popn", count(inst));
+    std::string DumpInst::autoDump(std::string_view name, const Instruction &inst, const VMState *vm) {
+        DumpComment c;
+        std::string out = fmt::format("{: <10}", name);
+        auto d = [&out, &c, &vm](const Operand &operand) {
+            out += " ";
+            out += dumpOperand(operand).toStdStr();
+            dumpOperandComment(c, operand, vm);
+        };
+
+        if(inst._operand1)
+            d(inst._operand1.value());
+        if(inst._operand2)
+            d(inst._operand2.value());
+        if(inst._operand3)
+            d(inst._operand3.value());
+
+        return dumpWithComment(out, c);
     }
 
-    std::string CP::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "cp", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}", insDump, src(inst), vmState->reg(src(inst)));
+#define DEF_AUTO_DUMP(className, instName)                                                                             \
+    std::string className::dump(const Instruction &inst, const VMState *vm) {                                          \
+        return DumpInst::autoDump(instName, inst, vm);                                                                 \
     }
 
-    std::string Add::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "add", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string AddImm::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4}", "add_imm", src(inst), dst(inst));
-    }
-
-    std::string Sub::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "sub", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string SubImm::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4}", "sub_imm", src(inst), dst(inst));
-    }
-
-    std::string Mul::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "mul", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string Div::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "div", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string Idiv::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "idiv", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string Mod::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "mod", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string Mov::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4}", "mov", src(inst), dst(inst));
-    }
-
-    std::string DGlobal::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} atom_{}", "d_global", src(inst), atom(inst).v);
-
-        if(!vmState)
-            return insDump;
-        const auto *aEntry = vmState->rt.atomTable.get(atom(inst));
-
-        return fmt::format("{: <30};{}={} atom_{}=\"{}\"", insDump, src(inst), vmState->reg(src(inst)), atom(inst).v,
-                           *aEntry->str);
-    }
-
-    std::string GGlobal::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{} {: <4}", "g_global", atom(inst).v, dst(inst));
-    }
-
-    std::string Global::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "global", dst(inst));
-    }
-
-    std::string Super::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "super", dst(inst));
-    }
-
-    std::string This::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "this", dst(inst));
-    }
-
-    std::string ToInt::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "int", dst(inst));
-    }
-
-    std::string ToReal::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "real", dst(inst));
-    }
-
-    std::string ToString::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "string", dst(inst));
-    }
-
-    std::string ChgThis::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4}", "chg_this", dst(inst), src(inst));
-    }
-
-    std::string Inv::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "inv", dst(inst));
-    }
-
-    std::string ChkInv::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4}", "chk_inv", dst(inst), src(inst));
-    }
-
-    std::string ChkIns::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4}", "chk_ins", dst(inst), src(inst));
-    }
-
-    std::string Test::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "test", reg(inst));
-    }
-
-    std::string EQ::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "eq", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string NEQ::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "neq", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string LT::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "lt", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string LE::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "le", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string AbsEQ::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "abseq", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string AbsNEQ::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "absneq", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string GT::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "gt", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string GE::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "ge", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string LAnd::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "land", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string LOr::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "l_or", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string BXor::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "b_xor", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string BOr::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "b_or", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string BAnd::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "b_and", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string BlShift::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "bl_shift", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string BrShift::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "br_shift", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string BurShift::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4}", "bur_shift", src(inst), dst(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}, {} = {}", insDump, src(inst), vmState->reg(src(inst)), dst(inst),
-                           vmState->reg(dst(inst)));
-    }
-
-    std::string Jmp::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "jmp", label(inst));
-    }
-
-    std::string JmpE::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4}", "jmp_e", label(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; ZF = {}", insDump, vmState->getZF());
-    }
-
-    std::string JmpNE::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4}", "jmp_ne", label(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; ZF = {}", insDump, vmState->getZF());
-    }
-
-    std::string Call::dump(const Instruction &inst, const VMState *vmState) {
-        auto insDump = fmt::format("{: <10} {: <4} {: <4} {: <4}", "call", memberReg(inst), dst(inst), argCount(inst));
-
-        if(!vmState)
-            return insDump;
-
-        return fmt::format("{: <30} ; {} = {}", insDump, memberReg(inst), vmState->reg(memberReg(inst)));
-    }
-
-    std::string GProp::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "g_prop", obj(inst), memberReg(inst), dst(inst));
-    }
-
-    std::string DProp::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4} {: <4} {: <4}", "g_prop", obj(inst), memberReg(inst), src(inst));
-    }
-
-    std::string GThis::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{} {: <4}", "g_this", atom(inst).v, dst(inst));
-    }
-
-    std::string DThis::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{} {: <4}", "d_this", atom(inst).v, src(inst));
-    }
-
-    std::string GUpval::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} atom_{} {: <4}", "g_upval", atom(inst).v, dst(inst));
-    }
-
-    std::string LNot::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "l_not", src(inst));
-    }
-
-    std::string ChgSign::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "chg_sign", src(inst));
-    }
-
-    std::string Throw::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {: <4}", "throw", src(inst));
-    }
-
-    std::string Debugger::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10}", "debugger");
-    }
-
-    std::string Ret::dump(const Instruction &inst, const VMState *vmState) {
-        return fmt::format("{: <10} {}", "ret", retReg(inst));
-    }
+    DEF_AUTO_DUMP(NOP, "nop");
+
+    // 基础加载与推栈
+    DEF_AUTO_DUMP(Load, "load");
+    DEF_AUTO_DUMP(Push, "push");
+    DEF_AUTO_DUMP(PopN, "pop_n");
+    DEF_AUTO_DUMP(Mov, "mov");
+
+    // 算术运算 (带状态输出)
+    DEF_AUTO_DUMP(CP, "cp");
+    DEF_AUTO_DUMP(Add, "add");
+    DEF_AUTO_DUMP(IAdd, "iadd");
+    DEF_AUTO_DUMP(Sub, "sub");
+    DEF_AUTO_DUMP(ISub, "isub");
+    DEF_AUTO_DUMP(Mul, "mul");
+    DEF_AUTO_DUMP(Div, "div");
+    DEF_AUTO_DUMP(Idiv, "idiv");
+    DEF_AUTO_DUMP(Mod, "mod");
+
+    // 全局与作用域
+    DEF_AUTO_DUMP(DGlobal, "d_global");
+    DEF_AUTO_DUMP(GGlobal, "g_global");
+    DEF_AUTO_DUMP(Global, "global");
+    DEF_AUTO_DUMP(GUpval, "g_upval");
+
+    // 对象与上下文
+    DEF_AUTO_DUMP(Super, "super");
+    DEF_AUTO_DUMP(This, "this");
+    DEF_AUTO_DUMP(ChgThis, "chg_this");
+    DEF_AUTO_DUMP(GThis, "g_this");
+    DEF_AUTO_DUMP(DThis, "d_this");
+
+    // 类型转换
+    DEF_AUTO_DUMP(ToInt, "int");
+    DEF_AUTO_DUMP(ToReal, "real");
+    DEF_AUTO_DUMP(ToString, "string");
+
+    // 逻辑与比较
+    DEF_AUTO_DUMP(Inv, "inv");
+    DEF_AUTO_DUMP(ChkInv, "chk_inv");
+    DEF_AUTO_DUMP(ChkIns, "chk_ins");
+    DEF_AUTO_DUMP(Test, "test");
+    DEF_AUTO_DUMP(EQ, "eq");
+    DEF_AUTO_DUMP(NEQ, "neq");
+    DEF_AUTO_DUMP(LT, "lt");
+    DEF_AUTO_DUMP(LE, "le");
+    DEF_AUTO_DUMP(GT, "gt");
+    DEF_AUTO_DUMP(GE, "ge");
+    DEF_AUTO_DUMP(AbsEQ, "abs_eq");
+    DEF_AUTO_DUMP(AbsNEQ, "abs_neq");
+
+    // 位运算与逻辑运算
+    DEF_AUTO_DUMP(LAnd, "land");
+    DEF_AUTO_DUMP(LOr, "l_or");
+    DEF_AUTO_DUMP(LNot, "l_not");
+    DEF_AUTO_DUMP(BXor, "b_xor");
+    DEF_AUTO_DUMP(BOr, "b_or");
+    DEF_AUTO_DUMP(BAnd, "b_and");
+    DEF_AUTO_DUMP(BlShift, "bl_shift");
+    DEF_AUTO_DUMP(BrShift, "br_shift");
+    DEF_AUTO_DUMP(BurShift, "bur_shift");
+
+    // 控制流
+    DEF_AUTO_DUMP(Jmp, "jmp");
+    DEF_AUTO_DUMP(JmpE, "jmp_e");
+    DEF_AUTO_DUMP(JmpNE, "jmp_ne");
+    DEF_AUTO_DUMP(Call, "call");
+    DEF_AUTO_DUMP(Ret, "ret");
+
+    // 属性操作
+    DEF_AUTO_DUMP(GProp, "g_prop");
+    DEF_AUTO_DUMP(DProp, "d_prop");
+
+    // 其他
+    DEF_AUTO_DUMP(ChgSign, "chg_sign");
+    DEF_AUTO_DUMP(Throw, "throw");
+    DEF_AUTO_DUMP(Debugger, "debugger");
 
 } // namespace cial::Bytecode

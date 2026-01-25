@@ -63,4 +63,19 @@ namespace cial::Bytecode {
         }
         return String{ ss.str() };
     }
+
+    [[nodiscard]] String Chunk::dumpInstructions(const VMState *vmState) const {
+        std::stringstream ss{ "" };
+        size_t pc{};
+        while(pc <= vmState->getPC().address()) {
+            const auto &instruction = _instructions[pc];
+            ss << fmt::format("{: <6}: {}", Label{ pc }, Instruction::dump(instruction, vmState));
+            if(pc != _instructions.size() - 1) {
+                ss << '\n';
+            }
+            ++pc;
+        }
+        return String{ ss.str() };
+    }
+
 } // namespace cial::Bytecode

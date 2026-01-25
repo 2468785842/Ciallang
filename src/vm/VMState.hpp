@@ -132,7 +132,7 @@ namespace cial::Bytecode {
         }
 
         [[nodiscard]] std::string dumpCurInstructions() const {
-            return _currentFrame->chunk->dumpInstructions().toStdStr();
+            return _currentFrame->chunk->dumpInstructions(this).toStdStr();
         }
 
         [[nodiscard]] std::string dumpCurLocalVars() const {

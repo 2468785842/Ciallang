@@ -433,13 +433,13 @@ namespace cial::Inter {
 
         for(const auto *exprNode : node->arguments) {
             if(!exprNode) {
-                _chunk->emit<Bytecode::OpCode::PushReg>(loadVoidReg());
+                _chunk->emit<Bytecode::OpCode::Push>(loadVoidReg());
             } else {
                 Bytecode::Register reg{ 0 };
                 if(!expectValue(exprNode, reg)) {
                     return;
                 }
-                _chunk->emit<Bytecode::OpCode::PushReg>(reg);
+                _chunk->emit<Bytecode::OpCode::Push>(reg);
             }
         }
         freeRegister(memberReg);

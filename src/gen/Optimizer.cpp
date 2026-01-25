@@ -11,15 +11,15 @@ namespace cial::Inter {
         if(instVec.empty())
             return;
 
-        const size_t oldLen = instVec.size(); // 记录旧长度
-        Vec<size_t> oldToNew(oldLen, -1); // +1防越界，默认无效
+        const size_t oldLen = instVec.size();
+        Vec<size_t> oldToNew(oldLen, -1);
 
-        size_t write = 0; // if write != i this op is nop
+        int write = 0; // if write != i this op is nop
         for(size_t i = 0; i < oldLen; ++i) {
             oldToNew[i] = write; // 记录：旧read -> 新write
             if(instVec[i].opcode() != OpCode::NOP) {
                 if(write != i) {
-                    instVec[write] = std::move(instVec[i]);
+                    instVec[write] = instVec[i];
                 }
                 ++write;
             }

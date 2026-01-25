@@ -27,13 +27,13 @@ namespace cial::Bytecode {
 #define OPCODE_ENUMS(O)                                                                                                \
     O(NOP)                                                                                                             \
     O(Load)                                                                                                            \
-    O(PushReg)                                                                                                         \
+    O(Push)                                                                                                            \
     O(PopN)                                                                                                            \
     O(CP)                                                                                                              \
     O(Add)                                                                                                             \
-    O(AddImm)                                                                                                          \
+    O(IAdd)                                                                                                            \
     O(Sub)                                                                                                             \
-    O(SubImm)                                                                                                          \
+    O(ISub)                                                                                                            \
     O(Mul)                                                                                                             \
     O(Div)                                                                                                             \
     O(Idiv)                                                                                                            \
@@ -184,6 +184,7 @@ namespace cial::Bytecode {
         std::optional<Operand> _operand1;
         std::optional<Operand> _operand2;
         std::optional<Operand> _operand3;
+        friend struct DumpInst;
     };
 
 // 操作码
@@ -213,17 +214,17 @@ namespace cial::Bytecode {
 
     DEF_INST(Load, OP_GET1(reg, Register) OP_GET2(value, ConstIdx));
 
-    DEF_INST(PushReg, OP_GET1(src, Register));
+    DEF_INST(Push, OP_GET1(src, Register));
 
     DEF_INST(PopN, OP_GET1(count, Integer));
 
     DEF_INST(Add, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    DEF_INST(AddImm, OP_GET1(src, Integer) OP_GET2(dst, Register));
+    DEF_INST(IAdd, OP_GET1(src, Integer) OP_GET2(dst, Register));
 
     DEF_INST(Sub, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    DEF_INST(SubImm, OP_GET1(src, Integer) OP_GET2(dst, Register));
+    DEF_INST(ISub, OP_GET1(src, Integer) OP_GET2(dst, Register));
 
     DEF_INST(Mul, OP_GET1(src, Register) OP_GET2(dst, Register));
 
@@ -326,4 +327,9 @@ namespace cial::Bytecode {
     DEF_INST_MUT(Throw, OP_GET1(src, Register));
 
     DEF_INST_MUT(Ret, OP_GET1(retReg, Register));
+
+    struct DumpInst {
+        [[nodiscard]] static String dumpOperand(const Operand &operand);
+        [[nodiscard]] static std::string autoDump(std::string_view name, const Instruction &inst, const VMState *vm);
+    };
 }; // namespace cial::Bytecode
