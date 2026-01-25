@@ -464,17 +464,6 @@ namespace cial::Bytecode {
         vmState.freeCallFrame();
     }
 
-    template <typename... Args>
-    std::string formatInst(const char *name, Args &&...args) {
-        return fmt::format("{: <10} {}", name, fmt::join(std::array{ fmt::format("{: <4}", args)... }, " "));
-    }
-
-#define DEF_DUMP(className, instName, ops)                                                                             \
-    std::string className::dump(const Instruction &inst, const VMState *vmState) {                                     \
-        auto insDump = formatInst(instName, reg(inst), value(inst));                                                   \
-        return insDump;                                                                                                \
-    }
-
     String DumpInst::dumpOperand(const Operand &operand) {
         switch(operand.type()) {
             case Operand::Type::Register:
@@ -492,49 +481,51 @@ namespace cial::Bytecode {
         }
     }
 
-    struct DumpComment {
-        std::vector<std::string> items;
+    namespace {
+        struct DumpComment {
+            std::vector<std::string> items;
 
-        void add(std::string s) { items.push_back(std::move(s)); }
+            void add(std::string s) { items.push_back(std::move(s)); }
 
-        [[nodiscard]] bool empty() const { return items.empty(); }
+            [[nodiscard]] bool empty() const { return items.empty(); }
 
-        [[nodiscard]] std::string format() const { return fmt::format("; {}", fmt::join(items, ", ")); }
-    };
+            [[nodiscard]] std::string format() const { return fmt::format("; {}", fmt::join(items, ", ")); }
+        };
 
-    std::string dumpWithComment(std::string insDump, const DumpComment &c) {
-        if(c.empty())
-            return insDump;
+        std::string dumpWithComment(std::string insDump, const DumpComment &c) {
+            if(c.empty())
+                return insDump;
 
-        return fmt::format("{: <30} {}", insDump, c.format());
-    }
-
-    void dumpOperandComment(DumpComment &c, const Operand &operand, const VMState *vm) {
-        if(!vm)
-            return;
-
-        switch(operand.type()) {
-            case Operand::Type::Register: {
-                auto r = operand.value<Register>();
-                c.add(fmt::format("{} = {}", r, vm->reg(r)));
-                break;
-            }
-            case Operand::Type::ConstIndex: {
-                auto idx = operand.value<ConstIdx>();
-                auto s = vm->curFrame()->chunk->dumpConstant(&vm->context.rt(), idx);
-                c.add(fmt::format("{} = {}", idx, s));
-                break;
-            }
-            case Operand::Type::Atom: {
-                auto a = operand.value<Atom>();
-                if(const auto *e = vm->rt.atomTable.get(a))
-                    c.add(fmt::format("atom_{}=\"{}\"", a.v, *e->str));
-                break;
-            }
-            default:
-                break;
+            return fmt::format("{: <30} {}", insDump, c.format());
         }
-    }
+
+        void dumpOperandComment(DumpComment &c, const Operand &operand, const VMState *vm) {
+            if(!vm)
+                return;
+
+            switch(operand.type()) {
+                case Operand::Type::Register: {
+                    auto r = operand.value<Register>();
+                    c.add(fmt::format("{} = {}", r, vm->reg(r)));
+                    break;
+                }
+                case Operand::Type::ConstIndex: {
+                    auto idx = operand.value<ConstIdx>();
+                    auto s = vm->curFrame()->chunk->dumpConstant(&vm->context.rt(), idx);
+                    c.add(fmt::format("{} = {}", idx, s));
+                    break;
+                }
+                case Operand::Type::Atom: {
+                    auto a = operand.value<Atom>();
+                    if(const auto *e = vm->rt.atomTable.get(a))
+                        c.add(fmt::format("atom_{}=\"{}\"", a.v, *e->str));
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+    } // namespace
 
     std::string DumpInst::autoDump(std::string_view name, const Instruction &inst, const VMState *vm) {
         DumpComment c;
