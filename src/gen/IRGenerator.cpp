@@ -169,94 +169,100 @@ namespace cial::Inter {
             return;
         }
 
-        Register src{ 0 };
-        if(!expectValue(node->lhs, src))
+        Register src1{ 0 };
+        if(!expectValue(node->lhs, src1))
             return;
 
-        Register dst{ 0 };
-        if(!expectValue(node->rhs, dst))
+        Register src2{ 0 };
+        if(!expectValue(node->rhs, src2))
             return;
 
         if(node->token.type() == Comma) {
-            retReg = dst;
+            retReg = src2;
             return;
         }
 
+        if(node->token.type() == InContextOf) {
+            _chunk->emit<ChgThis>(src1, src2);
+            retReg = src1;
+            return;
+        }
+
+        if(node->token.type() == Instanceof) {
+            _chunk->emit<ChkIns>(src1, src2);
+            retReg = src1;
+            return;
+        }
+
+        Register dst = allocateRegister();
+
         switch(node->token.type()) {
             case Equal:
-                _chunk->emit<EQ>(src, dst);
+                _chunk->emit<EQ>(src1, src2, dst);
                 break;
             case NotEqual:
-                _chunk->emit<NEQ>(src, dst);
+                _chunk->emit<NEQ>(src1, src2, dst);
                 break;
             case DiscEqual:
-                _chunk->emit<AbsEQ>(src, dst);
+                _chunk->emit<AbsEQ>(src1, src2, dst);
                 break;
             case DiscNotEqual:
-                _chunk->emit<AbsNEQ>(src, dst);
+                _chunk->emit<AbsNEQ>(src1, src2, dst);
                 break;
             case Gt:
-                _chunk->emit<GT>(src, dst);
+                _chunk->emit<GT>(src1, src2, dst);
                 break;
             case GtOrEqual:
-                _chunk->emit<GE>(src, dst);
+                _chunk->emit<GE>(src1, src2, dst);
                 break;
             case Lt:
-                _chunk->emit<LT>(src, dst);
+                _chunk->emit<LT>(src1, src2, dst);
                 break;
             case LtOrEqual:
-                _chunk->emit<LE>(src, dst);
+                _chunk->emit<LE>(src1, src2, dst);
                 break;
             case LogicalAnd:
-                _chunk->emit<LAnd>(src, dst);
+                _chunk->emit<LAnd>(src1, src2, dst);
                 break;
             case LogicalOr:
-                _chunk->emit<LOr>(src, dst);
+                _chunk->emit<LOr>(src1, src2, dst);
                 break;
             case Plus:
-                _chunk->emit<Add>(src, dst);
+                _chunk->emit<Add>(src1, src2, dst);
                 break;
             case Minus:
-                _chunk->emit<Sub>(src, dst);
+                _chunk->emit<Sub>(src1, src2, dst);
                 break;
             case Asterisk:
-                _chunk->emit<Mul>(src, dst);
+                _chunk->emit<Mul>(src1, src2, dst);
                 break;
             case Slash:
-                _chunk->emit<Div>(src, dst);
+                _chunk->emit<Div>(src1, src2, dst);
                 break;
             case Backslash:
-                _chunk->emit<Idiv>(src, dst);
+                _chunk->emit<Idiv>(src1, src2, dst);
                 break;
             case Percent:
-                _chunk->emit<Mod>(src, dst);
+                _chunk->emit<Mod>(src1, src2, dst);
                 break;
             case Chevron:
-                _chunk->emit<BXor>(src, dst);
+                _chunk->emit<BXor>(src1, src2, dst);
                 break;
             case VertLine:
-                _chunk->emit<BOr>(src, dst);
+                _chunk->emit<BOr>(src1, src2, dst);
                 break;
             case Ampersand:
-                _chunk->emit<BAnd>(src, dst);
+                _chunk->emit<BAnd>(src1, src2, dst);
                 break;
             case LArithShift:
-                _chunk->emit<BlShift>(src, dst);
+                _chunk->emit<BlShift>(src1, src2, dst);
                 break;
             case RArithShift:
-                _chunk->emit<BrShift>(src, dst);
+                _chunk->emit<BrShift>(src1, src2, dst);
                 break;
             case RBitShift:
-                _chunk->emit<BurShift>(src, dst);
+                _chunk->emit<BurShift>(src1, src2, dst);
                 break;
-            case InContextOf:
-                _chunk->emit<ChgThis>(src, dst);
-                retReg = src;
-                return;
-            case Instanceof:
-                _chunk->emit<ChkIns>(src, dst);
-                retReg = src;
-                return;
             default:
                 error("unknow binary operator", node->location);
                 return;
@@ -266,26 +272,33 @@ namespace cial::Inter {
     }
 
     void IRGenerator::generate(const Syntax::PrefixUnaryExprNode *node, OptReg &retReg) {
-        switch(node->token.type()) {
-            case Syntax::TokenType::Throw: {
-                Register reg{};
-                if(!expectValue(node->rhs, reg)) {
-                    return;
-                }
-                _chunk->emit<Throw>(reg);
-                // retReg = reg;
-                break;
+        if(node->token.type() == Syntax::TokenType::Throw) {
+            Register reg{};
+            if(!expectValue(node->rhs, reg)) {
+                return;
             }
-            case Syntax::TokenType::New:
-                node->rhs->generateBytecode(this, retReg);
-                break;
+            _chunk->emit<Throw>(reg);
+            // retReg = reg;
+            return;
+        }
+
+        if(node->token.type() == Syntax::TokenType::New) {
+            node->rhs->generateBytecode(this, retReg);
+            return;
+        }
+
+        Register dst = allocateRegister();
+
+        switch(node->token.type()) {
             case Syntax::TokenType::Exclamation:
                 node->rhs->generateBytecode(this, retReg);
-                _chunk->emit<LNot>(*retReg);
+                _chunk->emit<LNot>(*retReg, dst);
+                retReg = dst;
                 break;
             case Syntax::TokenType::Minus:
                 node->rhs->generateBytecode(this, retReg);
-                _chunk->emit<ChgSign>(*retReg);
+                _chunk->emit<ChgSign>(*retReg, dst);
+                retReg = dst;
                 break;
             case Syntax::TokenType::Invalidate:
                 node->rhs->generateBytecode(this, retReg);
@@ -293,7 +306,6 @@ namespace cial::Inter {
                 break;
             case Syntax::TokenType::Isvalid: {
                 Register reg{};
-                auto dst = allocateRegister();
                 if(!expectValue(node->rhs, reg)) {
                     return;
                 }
@@ -306,8 +318,8 @@ namespace cial::Inter {
                 if(!expectValue(node->rhs, reg)) {
                     return;
                 }
-                _chunk->emit<ToInt>(reg);
-                retReg = reg;
+                _chunk->emit<ToInt>(reg, dst);
+                retReg = dst;
                 break;
             }
             case Syntax::TokenType::Real: {
@@ -315,8 +327,8 @@ namespace cial::Inter {
                 if(!expectValue(node->rhs, reg)) {
                     return;
                 }
-                _chunk->emit<ToReal>(reg);
-                retReg = reg;
+                _chunk->emit<ToReal>(reg, dst);
+                retReg = dst;
                 break;
             }
             case Syntax::TokenType::String: {
@@ -324,8 +336,8 @@ namespace cial::Inter {
                 if(!expectValue(node->rhs, reg)) {
                     return;
                 }
-                _chunk->emit<ToString>(reg);
-                retReg = reg;
+                _chunk->emit<ToString>(reg, dst);
+                retReg = dst;
                 break;
             }
             default:
@@ -352,34 +364,34 @@ namespace cial::Inter {
                     const Atom identifier = getAtomFromToken(expr->token);
 
                     if(const auto variable = resolveLocalVariable(identifier)) {
-                        Register dst = variable->reg;
-                        auto tmpR = allocateRegister();
-                        _chunk->emit<ILoad>(tmpR, 1);
-                        _chunk->emit<Add>(tmpR, dst);
-                        freeRegister(tmpR);
+                        Register src2 = variable->reg;
+                        auto src1 = allocateRegister();
+                        Register dst = allocateRegister();
+                        _chunk->emit<ILoad>(src1, 1);
+                        _chunk->emit<Add>(src1, src2, dst);
+                        freeRegister(src1);
                         retReg = dst;
                         return;
                     }
 
-                    auto tmpR2 = allocateRegister();
-                    auto tmpR1 = allocateRegister();
+                    auto src1 = allocateRegister();
+                    auto src2 = allocateRegister();
+                    auto dst = allocateRegister();
                     if(isTopScope()) {
                         // global maybe
-                        _chunk->emit<ILoad>(tmpR1, 1);
-                        _chunk->emit<GGlobal>(identifier, tmpR2);
-                        _chunk->emit<Add>(tmpR1, tmpR2);
-                        _chunk->emit<DGlobal>(identifier, tmpR2);
-                        retReg = tmpR2;
+                        _chunk->emit<ILoad>(src2, 1);
+                        _chunk->emit<GGlobal>(identifier, src1);
+                        _chunk->emit<Add>(src2, src1, dst);
+                        _chunk->emit<DGlobal>(identifier, dst);
                     } else {
                         // find on context
-                        _chunk->emit<ILoad>(tmpR1, 1);
-                        _chunk->emit<GThis>(identifier, tmpR2);
-                        _chunk->emit<Add>(tmpR1, tmpR2);
-                        _chunk->emit<DThis>(identifier, tmpR2);
+                        _chunk->emit<ILoad>(src2, 1);
+                        _chunk->emit<GThis>(identifier, src1);
+                        _chunk->emit<Add>(src2, src1, dst);
+                        _chunk->emit<DThis>(identifier, dst);
                     }
-                    freeRegister(tmpR1);
-
-                    retReg = tmpR2;
+                    freeRegister(src2);
+                    retReg = dst;
                     return;
                 }
                 error("current not support dot chain call", node->location);
@@ -391,34 +403,34 @@ namespace cial::Inter {
                     const Atom identifier = getAtomFromToken(expr->token);
 
                     if(const auto variable = resolveLocalVariable(identifier)) {
-                        Register dst = variable->reg;
-                        auto tmpR = allocateRegister();
-                        _chunk->emit<ILoad>(tmpR, 1);
-                        _chunk->emit<Sub>(tmpR, dst);
-                        freeRegister(tmpR);
+                        Register src2 = variable->reg;
+                        auto src1 = allocateRegister();
+                        auto dst = allocateRegister();
+                        _chunk->emit<ILoad>(src1, 1);
+                        _chunk->emit<Sub>(src1, src2, dst);
+                        freeRegister(src1);
                         retReg = dst;
                         return;
                     }
 
-                    auto tmpR2 = allocateRegister();
-                    auto tmpR1 = allocateRegister();
+                    auto src1 = allocateRegister();
+                    auto src2 = allocateRegister();
+                    auto dst = allocateRegister();
                     if(isTopScope()) {
                         // global maybe
-                        _chunk->emit<ILoad>(tmpR1, 1);
-                        _chunk->emit<GGlobal>(identifier, tmpR2);
-                        _chunk->emit<Sub>(tmpR1, tmpR2);
-                        _chunk->emit<DGlobal>(identifier, tmpR2);
-                        retReg = tmpR2;
+                        _chunk->emit<ILoad>(src2, 1);
+                        _chunk->emit<GGlobal>(identifier, src1);
+                        _chunk->emit<Sub>(src2, src1, dst);
+                        _chunk->emit<DGlobal>(identifier, dst);
                     } else {
                         // find on context
-                        _chunk->emit<ILoad>(tmpR1, 1);
-                        _chunk->emit<GThis>(identifier, tmpR2);
-                        _chunk->emit<Sub>(tmpR1, tmpR2);
-                        _chunk->emit<DThis>(identifier, tmpR2);
+                        _chunk->emit<ILoad>(src2, 1);
+                        _chunk->emit<GThis>(identifier, src1);
+                        _chunk->emit<Sub>(src2, src1, dst);
+                        _chunk->emit<DThis>(identifier, dst);
                     }
-                    freeRegister(tmpR1);
-
-                    retReg = tmpR2;
+                    freeRegister(src2);
+                    retReg = dst;
                     return;
                 }
                 error("current not support dot chain call", node->location);
@@ -855,8 +867,10 @@ namespace cial::Inter {
                 if(!expectValue(matchExpr, matchReg))
                     return;
 
-                _chunk->emit<EQ>(testReg, matchReg);
-                _chunk->emit<Test>(matchReg);
+                Register dst = allocateRegister();
+                _chunk->emit<EQ>(testReg, matchReg, dst);
+                _chunk->emit<Test>(dst);
+                freeRegister(dst);
                 jmpEIdxVec.push_back(_chunk->emit<NOP>());
             }
 
