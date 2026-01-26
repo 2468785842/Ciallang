@@ -99,6 +99,8 @@ namespace cial::Bytecode {
     struct Operand {
         enum class Type { None, Register, Label, ConstIndex, Number, Atom };
 
+        explicit Operand() = default;
+
         template <typename T>
         explicit Operand(T operand) : _operand{ operand } {}
 
@@ -123,11 +125,8 @@ namespace cial::Bytecode {
 
     class Instruction {
     public:
-        explicit Instruction(const OpCode opcode) : _opcode(opcode) {}
-        explicit Instruction(const OpCode opcode, Operand operand) : _opcode(opcode), _operand1(operand) {}
-        explicit Instruction(const OpCode opcode, Operand operand1, Operand operand2) :
-            _opcode(opcode), _operand1(operand1), _operand2(operand2) {}
-        explicit Instruction(const OpCode opcode, Operand operand1, Operand operand2, Operand operand3) :
+        explicit Instruction(const OpCode opcode, Operand operand1 = Operand{}, Operand operand2 = Operand{},
+                             Operand operand3 = Operand{}) :
             _opcode(opcode), _operand1(operand1), _operand2(operand2), _operand3(operand3) {}
 
         Instruction(const Instruction &) = default;
@@ -161,25 +160,17 @@ namespace cial::Bytecode {
 
         template <typename T>
         [[nodiscard]] constexpr T getOp1Val() const {
-            CLL_ASSERT(_operand1, "operand1 is empty");
-            return _operand1->value<T>();
+            return _operand1.value<T>();
         }
 
         template <typename T>
         [[nodiscard]] constexpr T getOp2Val() const {
-            CLL_ASSERT(_operand2, "operand2 is empty");
-            return _operand2->value<T>();
+            return _operand2.value<T>();
         }
 
         template <typename T>
         [[nodiscard]] constexpr T getOp3Val() const {
-            CLL_ASSERT(_operand3, "operand3 is empty");
-            return _operand3->value<T>();
-        }
-
-        [[nodiscard]] Integer operandCount() const {
-            return static_cast<int>(_operand1.has_value()) + static_cast<int>(_operand2.has_value()) +
-                static_cast<int>(_operand3.has_value());
+            return _operand3.value<T>();
         }
 
         static void execute(const Instruction &inst, VMState &vmState);
@@ -188,9 +179,9 @@ namespace cial::Bytecode {
 
     private:
         OpCode _opcode;
-        std::optional<Operand> _operand1;
-        std::optional<Operand> _operand2;
-        std::optional<Operand> _operand3;
+        Operand _operand1;
+        Operand _operand2;
+        Operand _operand3;
         friend struct DumpInst;
     };
 

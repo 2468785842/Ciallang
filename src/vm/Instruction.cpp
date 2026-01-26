@@ -535,17 +535,16 @@ namespace cial::Bytecode {
         DumpComment c;
         std::string out = fmt::format("{: <10}", name);
         auto d = [&out, &c, &vm](const Operand &operand) {
+            if(operand.type() != Operand::Type::None)
+                return;
             out += " ";
             out += dumpOperand(operand).toStdStr();
             dumpOperandComment(c, operand, vm);
         };
 
-        if(inst._operand1)
-            d(inst._operand1.value());
-        if(inst._operand2)
-            d(inst._operand2.value());
-        if(inst._operand3)
-            d(inst._operand3.value());
+        d(inst._operand2);
+        d(inst._operand2);
+        d(inst._operand3);
 
         return dumpWithComment(out, c);
     }
