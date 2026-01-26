@@ -15,13 +15,13 @@ namespace cial::TypeConverter {
         if(oct.getSize() == 0)
             return ""_str;
 
-        const std::uint32_t stringLen = oct.getSize() * 3 - 1;
+        const u32 stringLen = oct.getSize() * 3 - 1;
         const auto buf = new char[stringLen];
         char *pBuf = buf;
         DEFER { delete[] buf; };
 
         static constexpr char hex[] = "0123456789ABCDEF";
-        const std::uint8_t *data = oct.getData();
+        const u8 *data = oct.getData();
         Integer n = oct.getSize();
         while(n--) {
             pBuf[0] = hex[*data >> 4];
@@ -44,7 +44,7 @@ namespace cial::TypeConverter {
         auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), integer);
         if(ec != std::errc())
             return ""_str;
-        return String{ buf, static_cast<std::uint32_t>(ptr - buf) };
+        return String{ buf, static_cast<u32>(ptr - buf) };
     }
 
     String realToString(const Real real) {
@@ -71,7 +71,7 @@ namespace cial::TypeConverter {
             return real.sign() ? "-0.0"_str : "+0.0"_str;
 
         // 取 raw bits（无 UB）
-        const std::uint64_t bits = real.bits();
+        const u64 bits = real.bits();
 
         static constexpr char hex[] = "0123456789ABCDEF";
 
@@ -90,7 +90,7 @@ namespace cial::TypeConverter {
             *p++ = '.';
 
             // significand
-            const std::uint64_t frac = bits & (1ULL << SIGNIFICAND_BITS) - 1;
+            const u64 frac = bits & (1ULL << SIGNIFICAND_BITS) - 1;
             for(int i = SIGNIFICAND_BITS - 4; i >= 0; i -= 4) {
                 *p++ = hex[frac >> i & 0xF];
             }
@@ -105,7 +105,7 @@ namespace cial::TypeConverter {
                 p += ep - expBuf;
             }
 
-            result = String(buf, static_cast<std::uint32_t>(p - buf));
+            result = String(buf, static_cast<u32>(p - buf));
         }
 
         return result;

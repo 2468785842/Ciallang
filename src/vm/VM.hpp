@@ -170,7 +170,7 @@ namespace cial {
             _vmState->makeClosure();
             _vmState->allocCallFrame(evalChunk, retReg);
             _vmState->makeClosure();
-            std::uint32_t stackTop = _vmState->context.stackTop();
+            u32 stackTop = _vmState->context.stackTop();
             _vmState->run();
             Value ret = _vmState->reg(retReg);
 

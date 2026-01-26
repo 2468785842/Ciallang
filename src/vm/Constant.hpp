@@ -43,7 +43,7 @@ namespace cial {
 
     struct FuncMeta : MarkSweepHeader {
         Atom name = ATOM_INVALID;
-        std::uint32_t arity;
+        u32 arity;
         Bytecode::Chunk *chunk; // manager for gc
         Vec<LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
 
@@ -58,7 +58,7 @@ namespace cial {
 
     private:
         friend class Runtime;
-        explicit FuncMeta(const std::uint32_t arity, Bytecode::Chunk *chunk, Vec<LocalVariable> localVars) :
+        explicit FuncMeta(const u32 arity, Bytecode::Chunk *chunk, Vec<LocalVariable> localVars) :
             arity(arity), chunk(chunk), localVars(std::move(localVars)) {}
     };
 
@@ -104,7 +104,7 @@ namespace cial {
 
     struct ClassMeta : MarkSweepHeader {
         Atom className;
-        std::uint32_t arity;
+        u32 arity;
         FuncMeta *initDefaultVal{};
         FuncMeta *constructor{};
         Vec<Atom> extends; // 因为动态语言无法在生成bytecode时决定class所以,只有new
@@ -117,9 +117,9 @@ namespace cial {
         explicit ClassMeta(const ClassMeta &) noexcept = delete;
         ClassMeta &operator=(const ClassMeta &) noexcept = delete;
 
-        [[nodiscard]] std::int64_t hasMember(const Atom name) const noexcept {
+        [[nodiscard]] i64 hasMember(const Atom name) const noexcept {
             const size_t len = memberShapeMetas.size();
-            for(std::int64_t i = 0; i < len; ++i) {
+            for(i64 i = 0; i < len; ++i) {
                 if(memberShapeMetas[i].name == name) {
                     return i;
                 }
@@ -167,10 +167,10 @@ namespace cial {
 
     private:
         friend class Runtime;
-        explicit ClassMeta(const Atom className, const std::uint32_t arity) : className(className), arity(arity) {}
+        explicit ClassMeta(const Atom className, const u32 arity) : className(className), arity(arity) {}
     };
 
-    enum class ConstantType : std::uint8_t {
+    enum class ConstantType : u8 {
         None,
         Real,
         Atom,

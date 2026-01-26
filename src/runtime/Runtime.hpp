@@ -50,7 +50,7 @@ namespace cial {
 
         explicit Runtime() = default;
 
-        explicit Runtime(const std::uint32_t gcSize) noexcept : markSweep{ gcSize } {}
+        explicit Runtime(const u32 gcSize) noexcept : markSweep{ gcSize } {}
 
         void addHandleVal(MarkSweepHeader *);
 

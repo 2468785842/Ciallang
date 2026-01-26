@@ -184,7 +184,7 @@ namespace cial::StdLib {
         for(Integer i = 0; i < count; ++i)
             result.append(str->getData(), str->length());
 
-        return String(result.c_str(), static_cast<std::uint32_t>(result.size()));
+        return String(result.c_str(), static_cast<u32>(result.size()));
     }
 
 } // namespace cial::StdLib

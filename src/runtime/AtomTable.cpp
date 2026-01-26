@@ -22,15 +22,15 @@ namespace cial {
 
     Atom AtomTable::intern(const String &str) { return intern(nullptr, str.getData(), str.length()); }
 
-    Atom AtomTable::intern(const char *s, const std::uint32_t len) { return intern(nullptr, s, len); }
+    Atom AtomTable::intern(const char *s, const u32 len) { return intern(nullptr, s, len); }
 
-    Atom AtomTable::intern(Runtime *rt, const char *s, std::uint32_t len) {
+    Atom AtomTable::intern(Runtime *rt, const char *s, u32 len) {
         if(len == 0) {
             return ATOM_INVALID; // Handle empty string as invalid, adjust if needed
         }
 
-        const uint32_t h = fnv1a(s, len);
-        const uint64_t key = static_cast<uint64_t>(h) << 32 | static_cast<uint64_t>(len);
+        const u32 h = fnv1a(s, len);
+        const u64 key = static_cast<u64>(h) << 32 | static_cast<u64>(len);
 
         const auto it = _map.find(key);
         if(it != _map.end()) {

@@ -35,9 +35,6 @@ namespace cial::Inter {
 
     protected:
         static void removeNopInst(Vec<Bytecode::Instruction> &instVec);
-
-        static bool isUsing(const Bytecode::Instruction &instruction, const Bytecode::Register &reg);
-        static bool isDefining(const Bytecode::Instruction &instruction, const Bytecode::Register &reg);
     };
 
     class OptimizerManager {
@@ -45,7 +42,7 @@ namespace cial::Inter {
         explicit OptimizerManager(Bytecode::Chunk &chunk) : chunk(chunk) {}
 
         // 添加优化器
-        void addOptimizer(std::unique_ptr<Optimizer> optimizer) { optimizers.push_back(std::move(optimizer)); }
+        void addOptimizer(Box<Optimizer> optimizer) { optimizers.push_back(std::move(optimizer)); }
 
         // 执行所有优化
         void applyOptimizations() const {
@@ -59,12 +56,7 @@ namespace cial::Inter {
 
     private:
         Bytecode::Chunk &chunk;
-        Vec<std::unique_ptr<Optimizer>> optimizers;
-    };
-
-    class LoadSubOptimizer : public Optimizer {
-    public:
-        void optimize(Bytecode::Chunk &chunk, const Vec<BasicBlock> &blocks) override;
+        Vec<Box<Optimizer>> optimizers;
     };
 
 } // namespace cial::Inter

@@ -24,12 +24,12 @@ void SourceLocation::end(const LocationType &value) { _end = value; }
 
 void SourceLocation::start(const LocationType &value) { _start = value; }
 
-void SourceLocation::end(const uint32_t line, const uint32_t column) {
+void SourceLocation::end(const u32 line, const u32 column) {
     _end.line = line;
     _end.column = column;
 }
 
-void SourceLocation::start(const uint32_t line, const uint32_t column) {
+void SourceLocation::start(const u32 line, const u32 column) {
     _start.line = line;
     _start.column = column;
 }

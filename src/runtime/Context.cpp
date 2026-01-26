@@ -66,8 +66,8 @@ namespace cial {
         }
 
         // scan stack
-        const std::uint32_t used = _impl->regPool.used();
-        for(std::uint32_t i = 0; i < used; ++i) {
+        const u32 used = _impl->regPool.used();
+        for(u32 i = 0; i < used; ++i) {
             if(const Value *val = _impl->regPool.ptrAt(i)) {
                 if(auto *msHeader = val->asObject().value()) {
                     msHeader->marked();
@@ -79,7 +79,7 @@ namespace cial {
         }
 
         // call frame
-        for(std::uint32_t i = 0; i < _impl->stackTop; ++i) {
+        for(u32 i = 0; i < _impl->stackTop; ++i) {
             const CallFrame &callFrame = _impl->callStack[i];
             if(callFrame.funcMeta)
                 callFrame.funcMeta->marked();

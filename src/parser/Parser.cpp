@@ -1031,7 +1031,7 @@ namespace cial::Syntax {
      */
     ExprNode *BinaryOperatorInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
         const auto associativePrecedence =
-            static_cast<Precedence>(static_cast<uint8_t>(_precedence) - (_isRightAssociative ? 1 : 0));
+            static_cast<Precedence>(static_cast<u8>(_precedence) - (_isRightAssociative ? 1 : 0));
 
         const auto rhs = parser->parseExpression(r, true, associativePrecedence);
         if(!rhs) {

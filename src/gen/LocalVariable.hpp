@@ -11,7 +11,7 @@
 //
 #pragma once
 
-#include <cstdint>
+#include "types/Types.hpp"
 
 #include "runtime/AtomTable.hpp"
 #include "vm/Register.hpp"
@@ -22,8 +22,8 @@ namespace cial {
         Atom identifier = ATOM_INVALID;
         Bytecode::Register reg{ 0 };
         // when (var.startPC <= inst.pc) you can use
-        std::uint32_t startPC{}; // Effective start PC
+        u32 startPC{}; // Effective start PC
         // when (var.endPC > inst.pc) you can't use
-        std::uint32_t endPC{}; // Invalid PC (scope ended)
+        u32 endPC{}; // Invalid PC (scope ended)
     };
 } // namespace cial

@@ -15,6 +15,8 @@
 
 #include <functional>
 
+#include "types/Types.hpp"
+
 namespace cial {
 
     template <typename T>
@@ -45,7 +47,7 @@ namespace cial {
     private:
         struct RefCountBox {
             T *_data{ nullptr };
-            std::uint32_t _ref{ 1 };
+            u32 _ref{ 1 };
 
             template <typename... Args>
             explicit RefCountBox(Args... args) : _data(new T{ std::forward<Args>(args)... }) {}
@@ -117,7 +119,7 @@ namespace cial {
         }
 
         // Byte Unit
-        [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> memoryInfo() const;
+        [[nodiscard]] std::pair<u32, u32> memoryInfo() const;
 
     private:
         MarkSweepHeader *_nextFree{ nullptr };

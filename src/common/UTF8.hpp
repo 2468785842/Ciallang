@@ -14,17 +14,17 @@
 
 #pragma once
 
-#include <cstdint>
 #include <string>
+#include "types/Types.hpp"
 
 namespace cial::Common {
 
-    static constexpr int32_t runeInvalid = 0xfffd;
-    static constexpr int32_t runeMax = 0x0010ffff;
-    static constexpr int32_t runeBom = 0xfeff;
-    static constexpr int32_t runeEof = -1;
+    static constexpr i32 runeInvalid = 0xfffd;
+    static constexpr i32 runeMax = 0x0010ffff;
+    static constexpr i32 runeBom = 0xfeff;
+    static constexpr i32 runeEof = -1;
 
-    static inline const uint8_t S_Utf8_First[256] = {
+    static inline const u8 S_Utf8_First[256] = {
         0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x00-0x0F
         0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x10-0x1F
         0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x20-0x2F
@@ -44,8 +44,8 @@ namespace cial::Common {
     };
 
     struct Utf8AcceptRangeType {
-        uint8_t low;
-        uint8_t high;
+        u8 low;
+        u8 high;
     };
 
     static inline const Utf8AcceptRangeType S_Utf8AcceptRanges[] = {
@@ -54,23 +54,23 @@ namespace cial::Common {
     };
 
     struct CodePointType {
-        int32_t width = 0;
-        int32_t value = runeInvalid;
+        i32 width = 0;
+        i32 value = runeInvalid;
     };
 
     struct EncodedRuneType {
-        int32_t width = 0;
-        int32_t value = runeInvalid;
-        uint8_t data[4]{};
+        i32 width = 0;
+        i32 value = runeInvalid;
+        u8 data[4]{};
     };
 
-    bool isRuneDigit(int32_t r);
+    bool isRuneDigit(i32 r);
 
-    bool isRuneLetter(int32_t r);
+    bool isRuneLetter(i32 r);
 
-    bool isRuneWhitespace(int32_t r);
+    bool isRuneWhitespace(i32 r);
 
-    EncodedRuneType utf8Encode(int32_t r);
+    EncodedRuneType utf8Encode(i32 r);
 
     int64_t utf8Strlen(const std::string &str);
 

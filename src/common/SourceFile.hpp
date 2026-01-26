@@ -32,8 +32,8 @@ namespace cial::Common {
     struct SourceFileLineType {
         size_t end = 0;
         size_t begin = 0;
-        uint32_t line = 0;
-        uint32_t columns = 0;
+        u32 line = 0;
+        u32 columns = 0;
     };
 
     class SourceFile {
@@ -68,15 +68,15 @@ namespace cial::Common {
 
         bool load(Result &r, const std::string &buffer);
 
-        int32_t next(Result &r);
+        i32 next(Result &r);
 
         [[nodiscard]] size_t numberOfLines() const;
 
-        uint8_t operator[](size_t index) const;
+        u8 operator[](size_t index) const;
 
         [[nodiscard]] const std::filesystem::path &path() const;
 
-        [[nodiscard]] uint32_t columnByIndex(size_t index) const;
+        [[nodiscard]] u32 columnByIndex(size_t index) const;
 
         [[nodiscard]] std::string substring(size_t start, size_t end) const;
 
@@ -91,7 +91,7 @@ namespace cial::Common {
 
         size_t _index = 0;
         std::filesystem::path _path;
-        std::vector<uint8_t> _buffer;
+        std::vector<u8> _buffer;
         std::stack<size_t> _markStack{};
         std::map<size_t, SourceFileLineType *> _linesByNumber{};
         std::map<SourceFileRangeType, SourceFileLineType, SourceFileRangeCompareType> _linesByIndexRange{};

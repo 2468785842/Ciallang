@@ -68,8 +68,8 @@ namespace cial::Bytecode {
 
         [[nodiscard]] auto &getInstVec() noexcept { return _instructions; }
 
-        void setRegCount(const std::uint32_t count) noexcept { _registerCount = count; }
-        [[nodiscard]] std::uint32_t getRegCount() const noexcept { return _registerCount; }
+        void setRegCount(const u32 count) noexcept { _registerCount = count; }
+        [[nodiscard]] u32 getRegCount() const noexcept { return _registerCount; }
 
         template <typename... Args>
         ConstIdx addConstant(Args &&...args) {
@@ -118,6 +118,6 @@ namespace cial::Bytecode {
         Vec<Instruction> _instructions{};
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
-        std::uint32_t _registerCount{};
+        u32 _registerCount{};
     };
 } // namespace cial::Bytecode

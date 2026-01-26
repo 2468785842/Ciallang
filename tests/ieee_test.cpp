@@ -54,9 +54,9 @@ TEST_CASE("IEEE 754 - Component Composition") {
     }
 
     SECTION("Exponent composition") {
-        REQUIRE(make_exponent(0) == (static_cast<uint64_t>(EXP_BIAS) << SIGNIFICAND_BITS));
-        REQUIRE(make_exponent(EXP_MAX) == (static_cast<uint64_t>(EXP_MAX + EXP_BIAS) << SIGNIFICAND_BITS));
-        REQUIRE(make_exponent(EXP_MIN) == (static_cast<uint64_t>(1) << SIGNIFICAND_BITS));
+        REQUIRE(make_exponent(0) == (static_cast<u64>(EXP_BIAS) << SIGNIFICAND_BITS));
+        REQUIRE(make_exponent(EXP_MAX) == (static_cast<u64>(EXP_MAX + EXP_BIAS) << SIGNIFICAND_BITS));
+        REQUIRE(make_exponent(EXP_MIN) == (static_cast<u64>(1) << SIGNIFICAND_BITS));
     }
 
     SECTION("Significand composition") {
@@ -137,18 +137,18 @@ TEST_CASE("IEEE 754 - Double Class") {
 
 TEST_CASE("IEEE 754 - Bit Manipulation Utilities") {
     SECTION("Bit extraction") {
-        uint64_t test_val = 0b1010'1100'1110'0000ull;
+        u64 test_val = 0b1010'1100'1110'0000ull;
         REQUIRE(bit_extract(test_val, 4, 4) == 0b1110);
         REQUIRE(bit_extract(test_val, 8, 4) == 0b1100);
         REQUIRE(bit_extract(test_val, 0, 16) == test_val);
     }
 
     SECTION("Bit insertion") {
-        uint64_t base = 0b0000'0000'0000'0000ull;
-        uint64_t modified = bit_insert(base, 4, 4, 0b1010ull);
+        u64 base = 0b0000'0000'0000'0000ull;
+        u64 modified = bit_insert(base, 4, 4, 0b1010ull);
         REQUIRE(bit_extract(modified, 4, 4) == 0b1010);
 
-        uint64_t complex = bit_insert(base, 8, 8, 0b1111'0000ull);
+        u64 complex = bit_insert(base, 8, 8, 0b1111'0000ull);
         REQUIRE(bit_extract(complex, 8, 8) == 0b1111'0000);
     }
 }
@@ -167,9 +167,9 @@ TEST_CASE("IEEE 754 - Constexpr Support") {
         // Test that functions can be evaluated at compile time
         constexpr bool test1 = check_nan(P_NaN);
         constexpr bool test2 = check_inf(P_INF);
-        constexpr int32_t exp = get_exponent(P_INF);
+        constexpr i32 exp = get_exponent(P_INF);
         constexpr bool sign = get_sign(N_INF);
-        constexpr uint64_t bits = double_to_bits(1.0);
+        constexpr u64 bits = double_to_bits(1.0);
 
         static_assert(test1 == true);
         static_assert(test2 == true);
@@ -206,7 +206,7 @@ TEST_CASE("IEEE 754 - Real-world Values") {
             REQUIRE(d.is_finite());
             REQUIRE(d.value() == val);
 
-            uint64_t bits = double_to_bits(val);
+            u64 bits = double_to_bits(val);
             REQUIRE(d.bits() == bits);
 
             double reconstructed = bits_to_double(bits);

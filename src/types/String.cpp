@@ -8,7 +8,7 @@
 
 namespace cial {
 
-    String::String(const char *str, const std::uint32_t len) : _len(len) {
+    String::String(const char *str, const u32 len) : _len(len) {
         char *buf = _shortStr;
         if(len > SHORT_STR_LEN) {
             _longStr = new char[len + 1];
@@ -181,20 +181,20 @@ namespace cial {
             }
         }
 
-        return String(result.c_str(), static_cast<std::uint32_t>(result.size()));
+        return String(result.c_str(), static_cast<u32>(result.size()));
     }
 
     String String::escapeBackSlash() const {
         std::string ret;
         ret.reserve(_len * 2); // 预分配，避免频繁扩容
 
-        auto appendHex = [&](const std::uint8_t c) {
+        auto appendHex = [&](const u8 c) {
             char buf[5]; // \xHH\0
             std::snprintf(buf, sizeof(buf), "\\x%02x", c);
             ret += buf;
         };
 
-        for(std::uint32_t i = 0; i < _len; ++i) {
+        for(u32 i = 0; i < _len; ++i) {
             switch(char c = getData()[i]) {
                 case '\a':
                     ret += "\\a";
@@ -236,14 +236,14 @@ namespace cial {
             }
         }
 
-        return String(ret.c_str(), static_cast<std::uint32_t>(ret.size()));
+        return String(ret.c_str(), static_cast<u32>(ret.size()));
     }
 
     void String::append(const String &str) {
         if(str.isEmpty())
             return;
 
-        const std::uint32_t newLen = _len + str._len;
+        const u32 newLen = _len + str._len;
 
         if(newLen < SHORT_STR_LEN) {
             auto i = this->_len;

@@ -117,15 +117,14 @@ namespace cial::Syntax {
 
         bool match(const String &literal);
 
-        int32_t read(bool skipWhitespace = true);
+        i32 read(bool skipWhitespace = true);
 
-        static void patchTokenLoc(Token &token, const std::pair<uint32_t, uint32_t> &start,
-                                  const std::pair<uint32_t, uint32_t> &end) {
+        static void patchTokenLoc(Token &token, const std::pair<u32, u32> &start, const std::pair<u32, u32> &end) {
             token.location.start(start.first, start.second);
             token.location.end(end.first, end.second);
         }
 
-        [[nodiscard]] std::pair<uint32_t, uint32_t> getRowCol(const size_t pos) const {
+        [[nodiscard]] std::pair<u32, u32> getRowCol(const size_t pos) const {
             return std::make_pair(_sourceFile.lineByIndex(pos)->line, _sourceFile.columnByIndex(pos));
         }
 
@@ -147,13 +146,13 @@ namespace cial::Syntax {
 
         bool templateStringConstVal(Token *&token);
 
-        bool parseNonDecimalNumber(Token *&token, std::stringstream &, std::int8_t (*)(char), std::int8_t);
+        bool parseNonDecimalNumber(Token *&token, std::stringstream &, i8 (*)(char), i8);
 
-        bool parseNonDecimalInteger(Token *&token, const std::string &, std::int8_t (*)(char), std::int8_t);
+        bool parseNonDecimalInteger(Token *&token, const std::string &, i8 (*)(char), i8);
 
-        void parseNonDecimalReal(Token *&token, const std::string &, std::int8_t (*)(char), std::int8_t);
+        void parseNonDecimalReal(Token *&token, const std::string &, i8 (*)(char), i8);
 
-        void extractNumber(std::int8_t (*)(char), const std::string &expMark, std::stringstream &, bool &);
+        void extractNumber(i8 (*)(char), const std::string &expMark, std::stringstream &, bool &);
 
         void identifier(Token *&);
 
@@ -161,26 +160,25 @@ namespace cial::Syntax {
 
         TemplateStringContext::State parseStringConstVal(Token *&token, char delimiter);
 
-
-        static std::int8_t getHexNum(const char c) noexcept {
+        static i8 getHexNum(const char c) noexcept {
             if(c >= 'a' && c <= 'f')
-                return static_cast<std::int8_t>(c - 'a' + 10);
+                return static_cast<i8>(c - 'a' + 10);
             if(c >= 'A' && c <= 'F')
-                return static_cast<std::int8_t>(c - 'A' + 10);
+                return static_cast<i8>(c - 'A' + 10);
             if(c >= '0' && c <= '9')
-                return static_cast<std::int8_t>(c - '0');
+                return static_cast<i8>(c - '0');
             return -1;
         }
 
-        static std::int8_t getOctNum(const char c) noexcept {
+        static i8 getOctNum(const char c) noexcept {
             if(c >= '0' && c <= '7')
-                return static_cast<std::int8_t>(c - '0');
+                return static_cast<i8>(c - '0');
             return -1;
         }
 
-        static std::int8_t getBinNum(const char c) noexcept {
+        static i8 getBinNum(const char c) noexcept {
             if(c == '0' || c == '1')
-                return static_cast<std::int8_t>(c - '0');
+                return static_cast<i8>(c - '0');
             return -1;
         }
     };

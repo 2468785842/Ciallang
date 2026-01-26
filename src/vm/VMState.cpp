@@ -21,7 +21,7 @@ namespace cial::Bytecode {
     void VMState::run() {
         const size_t curStackTop = _stackTop;
         for(;;) {
-            std::uint64_t &pc = _currentFrame->pc;
+            u64 &pc = _currentFrame->pc;
             const auto &instList = instructions();
 
             if(pc >= instList.size())
@@ -178,7 +178,7 @@ namespace cial::Bytecode {
             }
         }
 
-        for(std::uint16_t i = _stackTop - 1; i > 0; --i) {
+        for(u16 i = _stackTop - 1; i > 0; --i) {
             const auto &callFrame = _callStack[i - 1];
             // prev local scope
             if(callFrame.funcMeta) {

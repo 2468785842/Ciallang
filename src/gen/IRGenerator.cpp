@@ -35,9 +35,9 @@ namespace cial::Inter {
         auto chunk = std::move(_chunk);
 
         // ===
-        OptimizerManager optimizerManager(*chunk);
-        optimizerManager.addOptimizer(std::make_unique<LoadSubOptimizer>());
-        optimizerManager.applyOptimizations();
+        // OptimizerManager optimizerManager(*chunk);
+        // optimizerManager.addOptimizer(std::make_unique<LoadSubOptimizer>());
+        // optimizerManager.applyOptimizations();
         // ===
 
         _chunk = std::make_unique<Bytecode::Chunk>();
@@ -74,7 +74,7 @@ namespace cial::Inter {
 
             const Atom varName = getAtomFromToken(node->catchErr->token);
             const Bytecode::Register exValue = allocateRegister();
-            addLocalVar(LocalVariable{ varName, exValue, static_cast<std::uint32_t>(tryEndIp.address()) });
+            addLocalVar(LocalVariable{ varName, exValue, static_cast<u32>(tryEndIp.address()) });
 
             node->catchBlock->generateBytecode(this, retReg);
             Bytecode::Jmp::target(_chunk->inst(jmpIdx), makeLabel());
@@ -724,7 +724,7 @@ namespace cial::Inter {
                 auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
                 const size_t paramCount = node->constructor->parameters.size();
                 auto *initFuncMeta =
-                    _rt.createNoGC<FuncMeta>(static_cast<std::uint32_t>(paramCount), chunk, std::move(gen._localVars));
+                    _rt.createNoGC<FuncMeta>(static_cast<u32>(paramCount), chunk, std::move(gen._localVars));
                 initFuncMeta->name = identifier;
                 classMeta->setConstructor(initFuncMeta);
             }
@@ -1131,8 +1131,7 @@ namespace cial::Inter {
         }
 
         auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
-        return _rt.createNoGC<FuncMeta>(static_cast<std::uint32_t>(parameters.size()), chunk,
-                                        std::move(gen._localVars));
+        return _rt.createNoGC<FuncMeta>(static_cast<u32>(parameters.size()), chunk, std::move(gen._localVars));
     }
 
     Bytecode::Register IRGenerator::loadVoidReg() {

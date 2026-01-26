@@ -211,19 +211,19 @@ TEST_CASE("Value - 算术运算") {
 // TEST_CASE("Octet - 字节操作") {
 //     // 注意：TjsOctet没有公共访问方法，这里只测试创建
 //     SECTION("字节数组创建") {
-//         std::vector<uint8_t> data{ 0x01, 0x02, 0x03, 0x04 };
+//         std::vector<u8> data{ 0x01, 0x02, 0x03, 0x04 };
 //         Ciallang::Octet octet{ data };
 //         REQUIRE(true); // 如果能创建成功就通过
 //     }
 
 //     SECTION("空字节数组") {
-//         std::vector<uint8_t> emptyData;
+//         std::vector<u8> emptyData;
 //         Ciallang::Octet emptyOctet{ emptyData };
 //         REQUIRE(true); // 如果能创建成功就通过
 //     }
 
 //     SECTION("字节数组访问") {
-//         std::vector<uint8_t> data{ 0x10, 0x20, 0x30 };
+//         std::vector<u8> data{ 0x10, 0x20, 0x30 };
 //         Ciallang::Octet octet{ data };
 //         REQUIRE(true); // 如果能创建成功就通过
 //     }

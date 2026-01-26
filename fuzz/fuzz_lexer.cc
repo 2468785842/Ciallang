@@ -8,7 +8,7 @@
 
 using namespace cial;
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+extern "C" int LLVMFuzzerTestOneInput(const u8 *data, size_t size) {
     if(size == 0)
         return 0;
     {

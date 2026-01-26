@@ -40,7 +40,7 @@ namespace cial {
                     }
                 }
 
-                for(std::int64_t i = 0; i < currentClass->meta->memberShapeMetas.size(); ++i) {
+                for(i64 i = 0; i < currentClass->meta->memberShapeMetas.size(); ++i) {
                     auto memberShapeMeta = currentClass->meta->getMemberShape(i);
 
                     if(memberShapeMeta.isProp) {
@@ -81,7 +81,7 @@ namespace cial {
             // 最后，初始化当前类 (this/clazz) 的属性，确保覆盖基类的同名属性
             {
 
-                for(std::int64_t i = 0; i < clazz->meta->memberShapeMetas.size(); ++i) {
+                for(i64 i = 0; i < clazz->meta->memberShapeMetas.size(); ++i) {
                     auto memberShapeMeta = clazz->meta->getMemberShape(i);
 
                     if(memberShapeMeta.isProp) {
@@ -191,7 +191,7 @@ namespace cial {
             return it->second;
 
         if(meta) {
-            if(const std::int64_t i = meta->hasMember(a); i > -1) {
+            if(const i64 i = meta->hasMember(a); i > -1) {
                 auto shape = meta->getMemberShape(i);
                 if(!shape.isStatic && shape.isMethod) {
                     const auto fun = _rt->create<Function>(meta->getMember(i).funcMeta);
@@ -212,7 +212,7 @@ namespace cial {
         if(const auto it = _props.find(a); it != _props.end())
             return it->second;
 
-        if(const std::int64_t i = _class->meta->hasMember(a); i > -1) {
+        if(const i64 i = _class->meta->hasMember(a); i > -1) {
             auto shape = _class->meta->getMemberShape(i);
             if(!shape.isStatic && shape.isMethod) {
                 const auto fun = _vmState->context.rt().create<Function>(_class->meta->getMember(i).funcMeta);
@@ -226,7 +226,7 @@ namespace cial {
                 if(_vmState->globalHas(ext)) {
                     auto *clazz = dynamic_cast<ClassObject *>(_vmState->global(ext).asObject().unwrap());
 
-                    if(const std::int64_t i = clazz->meta->hasMember(a); i > -1) {
+                    if(const i64 i = clazz->meta->hasMember(a); i > -1) {
                         auto shape = clazz->meta->getMemberShape(i);
                         if(!shape.isStatic && shape.isMethod) {
                             const auto fun =
@@ -247,7 +247,7 @@ namespace cial {
         if(_props.contains(a))
             return true;
 
-        if(const std::int64_t i = _class->meta->hasMember(a); i > -1) {
+        if(const i64 i = _class->meta->hasMember(a); i > -1) {
             auto shape = _class->meta->getMemberShape(i);
             if(!shape.isStatic && shape.isMethod) {
                 return true;
@@ -259,7 +259,7 @@ namespace cial {
                 if(_vmState->globalHas(ext)) {
                     auto *clazz = dynamic_cast<ClassObject *>(_vmState->global(ext).asObject().unwrap());
 
-                    if(const std::int64_t i = clazz->meta->hasMember(a); i > -1) {
+                    if(const i64 i = clazz->meta->hasMember(a); i > -1) {
                         auto shape = clazz->meta->getMemberShape(i);
                         if(!shape.isStatic && shape.isMethod) {
                             return true;

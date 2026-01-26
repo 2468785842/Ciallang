@@ -171,7 +171,7 @@ namespace cial::Syntax {
         return "unknown";
     }
 
-    enum class TokenValueType : std::uint8_t { None, Integer, Real, String, Octet };
+    enum class TokenValueType : u8 { None, Integer, Real, String, Octet };
 
     struct Token {
         SourceLocation location{};

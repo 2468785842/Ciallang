@@ -25,7 +25,7 @@ namespace cial {
         FuncMeta *funcMeta{}; // funcMeta != nullptr is function call
         Value thisObj{};
         OptReg ret{};
-        std::uint64_t pc{};
+        u64 pc{};
 
         explicit CallFrame() = default;
 
@@ -65,7 +65,7 @@ namespace cial {
             }
         }
 
-        [[nodiscard]] std::uint64_t getSP() const noexcept { return _sp; }
+        [[nodiscard]] u64 getSP() const noexcept { return _sp; }
 
         [[nodiscard]] Value *getArgs(const size_t argCount) const { return _pool->ptrAt(_pool->used() - argCount); }
 
@@ -78,6 +78,6 @@ namespace cial {
     private:
         friend class Bytecode::VMState;
         Bytecode::FastRegisterPool *_pool{ nullptr };
-        std::uint64_t _sp{};
+        u64 _sp{};
     };
 } // namespace cial

@@ -19,7 +19,17 @@
 
 namespace cial {
 
-    enum class ValueType : std::uint8_t {
+    using u8 = std::uint8_t;
+    using u16 = std::uint16_t;
+    using u32 = std::uint32_t;
+    using u64 = std::uint64_t;
+
+    using i8 = std::int8_t;
+    using i16 = std::int16_t;
+    using i32 = std::int32_t;
+    using i64 = std::int64_t;
+
+    enum class ValueType : u8 {
         Void, // empty
         Object,
         String,
@@ -28,8 +38,8 @@ namespace cial {
         Real
     };
 
-    using Integer = std::int64_t;
-    using UInteger = std::uint64_t;
+    using Integer = i64;
+    using UInteger = u64;
     class Real;
     class String;
     class Octet;

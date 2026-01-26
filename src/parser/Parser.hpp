@@ -23,7 +23,7 @@ namespace cial::Syntax {
 
     class Parser;
 
-    enum class Precedence : uint8_t {
+    enum class Precedence : u8 {
         lowest = 0,
         comma, // ,
         swap,

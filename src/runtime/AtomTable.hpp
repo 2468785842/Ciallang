@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include <unordered_map>
 #include <vector>
 
@@ -26,7 +25,7 @@ namespace cial {
     class Runtime;
 
     struct Atom {
-        std::uint64_t v{};
+        u64 v{};
 
         bool operator==(const Atom &) const noexcept = default;
     };
@@ -34,12 +33,11 @@ namespace cial {
     static constexpr Atom ATOM_INVALID{};
 
     struct AtomEntry : MarkSweepHeader {
-        std::uint32_t hash;
-        std::uint32_t length;
+        u32 hash;
+        u32 length;
         String *str;
 
-        explicit AtomEntry(const std::uint32_t hash, const std::uint32_t length, String *str) :
-            hash(hash), length(length), str(str) {}
+        explicit AtomEntry(const u32 hash, const u32 length, String *str) : hash(hash), length(length), str(str) {}
 
         ~AtomEntry() noexcept override { delete str; }
     };
@@ -72,15 +70,15 @@ namespace cial {
         }
 
         Atom intern(const String &str);
-        Atom intern(const char *s, std::uint32_t len);
-        Atom intern(Runtime *rt, const char *s, std::uint32_t len);
+        Atom intern(const char *s, u32 len);
+        Atom intern(Runtime *rt, const char *s, u32 len);
 
         [[nodiscard]] AtomEntry *get(Atom a) const;
 
     private:
         Vec<Atom> _handleAtoms{};
         Vec<AtomEntry *> _atoms{}; // index = Atom, atoms[0] = nullptr
-        Map<std::uint64_t, std::vector<Atom>> _map{}; // key to list of Atoms for collision handling
+        Map<u64, std::vector<Atom>> _map{}; // key to list of Atoms for collision handling
     };
 
 } // namespace cial

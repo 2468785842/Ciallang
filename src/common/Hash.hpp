@@ -14,14 +14,14 @@
 
 #pragma once
 
-#include <cstdint>
+#include "types/Types.hpp"
 
 namespace cial {
 
-    inline std::uint32_t fnv1a(const char *s, const size_t len) {
-        std::uint32_t h = 2166136261u;
+    inline u32 fnv1a(const char *s, const size_t len) {
+        u32 h = 2166136261u;
         for(size_t i = 0; i < len; ++i) {
-            h ^= static_cast<std::uint8_t>(s[i]);
+            h ^= static_cast<u8>(s[i]);
             h *= 16777619u;
         }
         return h;

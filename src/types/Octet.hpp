@@ -17,9 +17,9 @@
 namespace cial {
     class Octet final {
     public:
-        explicit Octet(const std::uint8_t *src, std::uint32_t size);
+        explicit Octet(const u8 *src, u32 size);
 
-        explicit Octet(const std::uint8_t *src1, std::uint32_t size1, const std::uint8_t *src2, std::uint32_t size2);
+        explicit Octet(const u8 *src1, u32 size1, const u8 *src2, u32 size2);
 
         explicit Octet(const Octet &oct1, const Octet &oct2);
 
@@ -45,17 +45,17 @@ namespace cial {
 
         ~Octet() noexcept { delete[] _buf; }
 
-        [[nodiscard]] std::uint32_t getSize() const { return _size; }
+        [[nodiscard]] u32 getSize() const { return _size; }
 
-        [[nodiscard]] const std::uint8_t *getData() const { return _buf; }
+        [[nodiscard]] const u8 *getData() const { return _buf; }
 
         [[nodiscard]] int getPersistSize() const { return static_cast<int>(sizeof(decltype(_size)) + _size); }
 
-        void persist(std::uint8_t *dst);
+        void persist(u8 *dst);
 
     private:
-        std::uint8_t *_buf;
-        std::uint32_t _size;
+        u8 *_buf;
+        u32 _size;
     };
 
 

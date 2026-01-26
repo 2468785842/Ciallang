@@ -14,10 +14,10 @@
 #pragma once
 
 #include <array>
-#include <cstdint>
 
 #include "Token.hpp"
 #include "types/String.hpp"
+#include "types/Types.hpp"
 
 namespace cial::Syntax {
 
@@ -45,7 +45,7 @@ namespace cial::Syntax {
         void insert(const String &op, const TokenType type) {
             int node = _opTrieRoot;
 
-            for(const std::uint8_t b : op) {
+            for(const u8 b : op) {
                 assert(b < 0x80);
                 int &next = _opTrie[node].next[b];
                 if(next == -1) {

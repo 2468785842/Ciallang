@@ -128,14 +128,12 @@ namespace cial::Inter {
 
         Vec<ContinueContext> _continueStack{};
 
-        Vec<std::uint32_t> _scopeStartPC{};
+        Vec<u32> _scopeStartPC{};
         Vec<LocalVariable> _localVars{};
 
-        std::uint64_t _regNextIndex{ 0 };
+        u64 _regNextIndex{ 0 };
 
-        [[nodiscard]] std::uint32_t getNextInstPos() const {
-            return static_cast<std::uint32_t>(this->_chunk->getInstVec().size());
-        }
+        [[nodiscard]] u32 getNextInstPos() const { return static_cast<u32>(this->_chunk->getInstVec().size()); }
 
         Bytecode::Label makeLabel() const { return Bytecode::Label{ getNextInstPos() }; }
 

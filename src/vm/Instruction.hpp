@@ -84,7 +84,7 @@ namespace cial::Bytecode {
     O(Throw)                                                                                                           \
     O(Ret)
 
-    enum class OpCode : std::uint16_t {
+    enum class OpCode : u16 {
 #define OPCODE_ENUM_CLASS(OP) OP,
         OPCODE_ENUMS(OPCODE_ENUM_CLASS)
 #undef OPCODE_ENUM_CLASS

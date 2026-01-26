@@ -45,7 +45,7 @@ namespace cial {
         bool instanceOf(const Atom a) override { return a == Runtime::ATOM_CLASS; }
 
         [[nodiscard]] FuncMeta *getFunc(const Atom a) const {
-            const std::int64_t i = this->meta->hasMember(a);
+            const i64 i = this->meta->hasMember(a);
             if(i < 0)
                 return nullptr;
             const auto v = this->meta->getMemberShape(i);
@@ -125,7 +125,7 @@ namespace cial {
                 const size_t abs = _vmState->getRegPoolTop() - _vmState->curFrame()->getSP();
                 _vmState->pushVoid(1);
                 // if not found finalize, may ignore??
-                if(const std::int64_t idx = _class->meta->hasMember(finalizeAtom); idx > -1) {
+                if(const i64 idx = _class->meta->hasMember(finalizeAtom); idx > -1) {
                     Function finalizeFun{ _class->meta->getMember(idx).funcMeta };
                     finalizeFun.thisObj = this;
                     finalizeFun.call(*_vmState, Bytecode::Register{ abs }, 0);

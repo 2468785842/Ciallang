@@ -26,19 +26,19 @@ namespace cial::Common {
     void SourceFile::error(Result &r, const std::string &message, const SourceLocation &location) const {
         std::stringstream stream{ "" };
 
-        const auto numberOfLines = static_cast<int32_t>(_linesByNumber.size());
-        const auto targetLine = static_cast<int32_t>(location.start().line);
+        const auto numberOfLines = static_cast<i32>(_linesByNumber.size());
+        const auto targetLine = static_cast<i32>(location.start().line);
         const auto messageIndicator = Colorizer::colorize("^ " + message, fmt::color::red);
 
-        auto startLine = static_cast<int32_t>(location.start().line - 1);
+        auto startLine = static_cast<i32>(location.start().line - 1);
         if(startLine < 0)
             startLine = 0;
 
-        auto stopLine = static_cast<int32_t>(location.end().line + 1);
+        auto stopLine = static_cast<i32>(location.end().line + 1);
         if(stopLine >= numberOfLines)
             stopLine = numberOfLines;
 
-        for(int32_t i = startLine; i < stopLine; i++) {
+        for(i32 i = startLine; i < stopLine; i++) {
             const auto sourceLine = lineByNumber(static_cast<size_t>(i));
             if(sourceLine == nullptr)
                 break;
@@ -79,8 +79,8 @@ namespace cial::Common {
     bool SourceFile::empty() const { return _buffer.empty(); }
 
     void SourceFile::buildLines(Result &r) {
-        uint32_t line = 0; // Start line numbers from 0
-        uint32_t columns = 0;
+        u32 line = 0; // Start line numbers from 0
+        u32 columns = 0;
         size_t lineStart = 0;
 
         while(true) {
@@ -140,7 +140,7 @@ namespace cial::Common {
         stream.seekg(0, std::ios::beg);
 
         _buffer.reserve(buffer.length());
-        _buffer.insert(_buffer.begin(), std::istream_iterator<uint8_t>(stream), std::istream_iterator<uint8_t>());
+        _buffer.insert(_buffer.begin(), std::istream_iterator<u8>(stream), std::istream_iterator<u8>());
         buildLines(r);
 
         return true;
@@ -164,7 +164,7 @@ namespace cial::Common {
             const auto file_size = file.tellg();
             file.seekg(0, std::ios::beg);
             _buffer.reserve(file_size);
-            _buffer.insert(_buffer.begin(), std::istream_iterator<uint8_t>(file), std::istream_iterator<uint8_t>());
+            _buffer.insert(_buffer.begin(), std::istream_iterator<u8>(file), std::istream_iterator<u8>());
             buildLines(r);
         } else {
             r.error(fmt::format("unable to open source file: {}", _path.string()));
@@ -174,7 +174,7 @@ namespace cial::Common {
 
     size_t SourceFile::numberOfLines() const { return _linesByNumber.size(); }
 
-    int32_t SourceFile::next(Result &r) {
+    i32 SourceFile::next(Result &r) {
         size_t width = 1;
 
         DEFER { _index += width; };
@@ -183,7 +183,7 @@ namespace cial::Common {
             return runeEof;
 
         const auto ch = _buffer[_index];
-        int32_t rune = ch;
+        i32 rune = ch;
         if(ch == 0) {
             r.error("illegal character NUL");
             return runeInvalid;
@@ -216,7 +216,7 @@ namespace cial::Common {
         return rune;
     }
 
-    uint8_t SourceFile::operator[](const size_t index) const { return _buffer[index]; }
+    u8 SourceFile::operator[](const size_t index) const { return _buffer[index]; }
 
     const std::filesystem::path &SourceFile::path() const { return _path; }
 
@@ -242,11 +242,11 @@ namespace cial::Common {
         return &it->second;
     }
 
-    uint32_t SourceFile::columnByIndex(const size_t index) const {
+    u32 SourceFile::columnByIndex(const size_t index) const {
         const auto line = lineByIndex(index);
         if(line == nullptr)
             return 0;
-        return static_cast<const uint32_t>(index - line->begin);
+        return static_cast<const u32>(index - line->begin);
     }
 
 } // namespace cial::Common

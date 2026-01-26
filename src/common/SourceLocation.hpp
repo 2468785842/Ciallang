@@ -14,13 +14,13 @@
 
 #pragma once
 
-#include <cstdint>
+#include "types/Types.hpp"
 
 namespace cial::Common {
 
     struct LocationType {
-        uint32_t line = 0;
-        uint32_t column = 0;
+        u32 line = 0;
+        u32 column = 0;
 
         bool operator==(const LocationType &type) const { return line == type.line && column == type.column; }
     };
@@ -38,9 +38,9 @@ namespace cial::Common {
 
         void start(const LocationType &value);
 
-        void end(uint32_t line, uint32_t column);
+        void end(u32 line, u32 column);
 
-        void start(uint32_t line, uint32_t column);
+        void start(u32 line, u32 column);
 
         bool operator==(const SourceLocation &sourceLocation) const {
             return _start == sourceLocation._start && _end == sourceLocation._end;

@@ -16,7 +16,7 @@
 
 #include <bit>
 #include <complex>
-#include <cstdint>
+#include "types/Types.hpp"
 
 // 单精度（32位）：  S EEEEEEEE MMMMMMMMMMMMMMMMMMMMMMM
 //                31  30-23            22-0
@@ -30,60 +30,58 @@
 namespace cial {
 
     // double related constants
-    static constexpr int32_t EXP_MAX = 1023;
-    static constexpr int32_t EXP_MIN = -1022;
-    static constexpr int64_t SIGNIFICAND_BITS = 52;
-    static constexpr uint64_t EXP_BIAS = 1023;
+    static constexpr i32 EXP_MAX = 1023;
+    static constexpr i32 EXP_MIN = -1022;
+    static constexpr i64 SIGNIFICAND_BITS = 52;
+    static constexpr u64 EXP_BIAS = 1023;
 
     // component extraction bit masks
-    static constexpr uint64_t SIGN_MASK = 0x8000'0000'0000'0000ull;
-    static constexpr uint64_t EXP_MASK = 0x7ff0'0000'0000'0000ull;
-    static constexpr uint64_t SIGNIFICAND_MASK = 0x000f'ffff'ffff'ffffull;
-    static constexpr uint64_t SIGNIFICAND_MSB_MASK = 0x0008'0000'0000'0000ull;
+    static constexpr u64 SIGN_MASK = 0x8000'0000'0000'0000ull;
+    static constexpr u64 EXP_MASK = 0x7ff0'0000'0000'0000ull;
+    static constexpr u64 SIGNIFICAND_MASK = 0x000f'ffff'ffff'ffffull;
+    static constexpr u64 SIGNIFICAND_MSB_MASK = 0x0008'0000'0000'0000ull;
 
     // Special values
-    static constexpr uint64_t P_NaN = EXP_MASK | SIGNIFICAND_MSB_MASK;
-    static constexpr uint64_t N_NaN = SIGN_MASK | P_NaN;
-    static constexpr uint64_t P_INF = EXP_MASK;
-    static constexpr uint64_t N_INF = SIGN_MASK | P_INF;
+    static constexpr u64 P_NaN = EXP_MASK | SIGNIFICAND_MSB_MASK;
+    static constexpr u64 N_NaN = SIGN_MASK | P_NaN;
+    static constexpr u64 P_INF = EXP_MASK;
+    static constexpr u64 N_INF = SIGN_MASK | P_INF;
 
     // Special value check functions (replacing macros)
-    [[nodiscard]] constexpr bool checkNan(const uint64_t bits) noexcept {
+    [[nodiscard]] constexpr bool checkNan(const u64 bits) noexcept {
         return (bits & EXP_MASK) == EXP_MASK && (bits & SIGNIFICAND_MASK) != 0;
     }
 
-    [[nodiscard]] constexpr bool checkInf(const uint64_t bits) noexcept {
+    [[nodiscard]] constexpr bool checkInf(const u64 bits) noexcept {
         return (bits & EXP_MASK) == EXP_MASK && (bits & SIGNIFICAND_MASK) == 0;
     }
 
-    [[nodiscard]] constexpr uint64_t doubleToBits(double value) noexcept { return std::bit_cast<uint64_t>(value); }
+    [[nodiscard]] constexpr u64 doubleToBits(double value) noexcept { return std::bit_cast<u64>(value); }
 
-    [[nodiscard]] constexpr double bitsToDouble(const uint64_t bits) noexcept { return std::bit_cast<double>(bits); }
+    [[nodiscard]] constexpr double bitsToDouble(const u64 bits) noexcept { return std::bit_cast<double>(bits); }
 
     // Component extraction functions
-    [[nodiscard]] constexpr bool hasSign(const uint64_t bits) noexcept { return (bits & SIGN_MASK) != 0; }
+    [[nodiscard]] constexpr bool hasSign(const u64 bits) noexcept { return (bits & SIGN_MASK) != 0; }
 
-    [[nodiscard]] constexpr int32_t getExponent(const uint64_t bits) noexcept {
-        const uint32_t raw = bits >> SIGNIFICAND_BITS & (1 << 11) - 1;
+    [[nodiscard]] constexpr i32 getExponent(const u64 bits) noexcept {
+        const u32 raw = bits >> SIGNIFICAND_BITS & (1 << 11) - 1;
         if(raw == 0) {
             return EXP_MIN;
         }
         if(raw == 0x7FF) {
             return checkNan(bits) ? 0 : 9999;
         }
-        return static_cast<int32_t>(raw) - EXP_MAX;
+        return static_cast<i32>(raw) - EXP_MAX;
     }
 
-    [[nodiscard]] constexpr uint64_t getSignificand(const uint64_t bits) noexcept { return bits & SIGNIFICAND_MASK; }
+    [[nodiscard]] constexpr u64 getSignificand(const u64 bits) noexcept { return bits & SIGNIFICAND_MASK; }
 
     // Component composition functions
-    [[nodiscard]] constexpr uint64_t makeSign(const bool negative) noexcept { return negative ? SIGN_MASK : 0ull; }
+    [[nodiscard]] constexpr u64 makeSign(const bool negative) noexcept { return negative ? SIGN_MASK : 0ull; }
 
-    [[nodiscard]] constexpr uint64_t makeExponent(const int32_t exp) noexcept {
-        return (exp + EXP_BIAS) << SIGNIFICAND_BITS;
-    }
+    [[nodiscard]] constexpr u64 makeExponent(const i32 exp) noexcept { return (exp + EXP_BIAS) << SIGNIFICAND_BITS; }
 
-    [[nodiscard]] constexpr uint64_t makeSignificand(const uint64_t significand) noexcept {
+    [[nodiscard]] constexpr u64 makeSignificand(const u64 significand) noexcept {
         return significand & SIGNIFICAND_MASK;
     }
 
@@ -91,19 +89,19 @@ namespace cial {
     class Real {
     public:
         constexpr explicit Real() noexcept = default;
-        constexpr explicit Real(const uint64_t bits) noexcept : _bits(bits) {}
+        constexpr explicit Real(const u64 bits) noexcept : _bits(bits) {}
         constexpr explicit Real(const double value) noexcept : _bits(doubleToBits(value)) {}
 
         [[nodiscard]] constexpr bool sign() const noexcept { return hasSign(_bits); }
-        [[nodiscard]] constexpr int32_t exponent() const noexcept { return getExponent(_bits); }
-        [[nodiscard]] constexpr uint64_t significand() const noexcept { return getSignificand(_bits); }
+        [[nodiscard]] constexpr i32 exponent() const noexcept { return getExponent(_bits); }
+        [[nodiscard]] constexpr u64 significand() const noexcept { return getSignificand(_bits); }
 
         [[nodiscard]] constexpr bool isNan() const noexcept { return checkNan(_bits); }
         [[nodiscard]] constexpr bool isInfinity() const noexcept { return checkInf(_bits); }
         [[nodiscard]] constexpr bool isFinite() const noexcept { return !isNan() && !isInfinity(); }
 
         [[nodiscard]] constexpr double value() const noexcept { return bitsToDouble(_bits); }
-        [[nodiscard]] constexpr uint64_t bits() const noexcept { return _bits; }
+        [[nodiscard]] constexpr u64 bits() const noexcept { return _bits; }
 
         Real operator+(const Real &real) const { return Real(this->value() + real.value()); }
 
@@ -126,7 +124,7 @@ namespace cial {
         friend std::ostream &operator<<(std::ostream &os, const Real &rhs) { return os << rhs.value(); }
 
     private:
-        std::uint64_t _bits{ 0 };
+        u64 _bits{ 0 };
     };
 
 } // namespace cial

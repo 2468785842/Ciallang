@@ -20,8 +20,8 @@ namespace cial {
         constexpr explicit String(const char (&arr)[N]) : String(arr, N - 1) {}
 
         explicit String(const char *str) : String(str, std::strlen(str)) {}
-        explicit String(const char *str, std::uint32_t len);
-        explicit String(const std::string &s) : String(s.data(), static_cast<std::uint32_t>(s.size())) {}
+        explicit String(const char *str, u32 len);
+        explicit String(const std::string &s) : String(s.data(), static_cast<u32>(s.size())) {}
 
         ~String() noexcept;
 
@@ -41,7 +41,7 @@ namespace cial {
 
         void append(const String &str);
 
-        [[nodiscard]] std::uint32_t length() const { return _len; }
+        [[nodiscard]] u32 length() const { return _len; }
 
         [[nodiscard]] char *getBuffer() { return _longStr ? _longStr : _shortStr; }
         [[nodiscard]] const char *getData() const { return _longStr ? _longStr : _shortStr; }
@@ -60,7 +60,7 @@ namespace cial {
             return std::memcmp(getData(), str.getData(), _len) == 0;
         }
 
-        char operator[](const std::uint32_t index) const { return getData()[index]; }
+        char operator[](const u32 index) const { return getData()[index]; }
 
         friend std::ostream &operator<<(std::ostream &os, const String &d) { return os.write(d.getData(), d.length()); }
 
@@ -72,7 +72,7 @@ namespace cial {
     private:
         char *_longStr = nullptr;
         char _shortStr[SHORT_STR_LEN + 1]{};
-        std::uint32_t _len;
+        u32 _len;
 
     public:
         using iterator = char *;
@@ -101,8 +101,8 @@ struct fmt::formatter<cial::String> : ostream_formatter {};
 template <>
 struct std::hash<cial::String> {
     size_t operator()(const cial::String &v) const noexcept {
-        const uint32_t h = cial::fnv1a(v.getData(), v.length());
-        const uint64_t key = static_cast<uint64_t>(h) << 32 | static_cast<uint64_t>(v.length());
+        const cial::u32 h = cial::fnv1a(v.getData(), v.length());
+        const cial::u64 key = static_cast<cial::u64>(h) << 32 | static_cast<cial::u64>(v.length());
         return key;
     }
 };

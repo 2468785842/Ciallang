@@ -50,9 +50,9 @@ namespace cial {
         }
     }
 
-    std::pair<std::uint32_t, std::uint32_t> MarkSweep::memoryInfo() const {
-        std::uint32_t used{ 0 };
-        std::uint32_t total{ 0 };
+    std::pair<u32, u32> MarkSweep::memoryInfo() const {
+        u32 used{ 0 };
+        u32 total{ 0 };
         for(const MarkSweepHeader *cursor = _head; cursor; cursor = cursor->_next) {
             if(!cursor->_isFree) {
                 used += NODE_SIZE;

@@ -17,14 +17,14 @@
 
 namespace cial::Common {
 
-    bool isRuneDigit(const int32_t r) {
+    bool isRuneDigit(const i32 r) {
         if(r < 0x80) {
             return isdigit(r) != 0;
         }
         return utf8proc_category(r) == UTF8PROC_CATEGORY_ND;
     }
 
-    bool isRuneLetter(const int32_t r) {
+    bool isRuneLetter(const i32 r) {
         if(r < 0x80) {
             if(r == '_')
                 return true;
@@ -43,7 +43,7 @@ namespace cial::Common {
         return false;
     }
 
-    bool isRuneWhitespace(const int32_t r) {
+    bool isRuneWhitespace(const i32 r) {
         switch(r) {
             case ' ':
             case '\t':
@@ -55,7 +55,7 @@ namespace cial::Common {
         }
     }
 
-    EncodedRuneType utf8Encode(int32_t r) {
+    EncodedRuneType utf8Encode(i32 r) {
         EncodedRuneType e{};
         e.value = r;
 
@@ -66,7 +66,7 @@ namespace cial::Common {
         }
 
         if(r <= 0x7F) { // 1 字节
-            e.data[0] = static_cast<uint8_t>(r);
+            e.data[0] = static_cast<u8>(r);
             e.width = 1;
         } else if(r <= 0x7FF) { // 2 字节
             e.data[0] = 0xC0 | ((r >> 6) & 0x1F);
@@ -92,7 +92,7 @@ namespace cial::Common {
     int64_t utf8Strlen(const std::string &str) {
         int64_t len = 0;
         for(auto p = str.data(); *p; len++) {
-            const auto c = static_cast<uint8_t>(*p);
+            const auto c = static_cast<u8>(*p);
 
             size_t cp_size;
             if(c < 0x80)
@@ -115,7 +115,7 @@ namespace cial::Common {
         if(length == 0)
             return cp;
 
-        uint8_t b0 = static_cast<uint8_t>(str[0]);
+        u8 b0 = static_cast<u8>(str[0]);
 
         if(b0 <= 0x7F) { // 1 字节 ASCII
             cp.value = b0;
@@ -123,11 +123,11 @@ namespace cial::Common {
         } else if((b0 & 0xE0) == 0xC0) { // 2 字节
             if(length < 2)
                 return cp;
-            uint8_t b1 = static_cast<uint8_t>(str[1]);
+            u8 b1 = static_cast<u8>(str[1]);
             if((b1 & 0xC0) != 0x80)
                 return cp;
 
-            int32_t r = ((b0 & 0x1F) << 6) | (b1 & 0x3F);
+            i32 r = ((b0 & 0x1F) << 6) | (b1 & 0x3F);
             if(r < 0x80)
                 r = runeInvalid; // 避免过长编码
             cp.value = r;
@@ -135,12 +135,12 @@ namespace cial::Common {
         } else if((b0 & 0xF0) == 0xE0) { // 3 字节
             if(length < 3)
                 return cp;
-            uint8_t b1 = static_cast<uint8_t>(str[1]);
-            uint8_t b2 = static_cast<uint8_t>(str[2]);
+            u8 b1 = static_cast<u8>(str[1]);
+            u8 b2 = static_cast<u8>(str[2]);
             if((b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80)
                 return cp;
 
-            int32_t r = ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F);
+            i32 r = ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F);
             if(r < 0x800 || (r >= 0xD800 && r <= 0xDFFF))
                 r = runeInvalid;
             cp.value = r;
@@ -148,13 +148,13 @@ namespace cial::Common {
         } else if((b0 & 0xF8) == 0xF0) { // 4 字节
             if(length < 4)
                 return cp;
-            uint8_t b1 = static_cast<uint8_t>(str[1]);
-            uint8_t b2 = static_cast<uint8_t>(str[2]);
-            uint8_t b3 = static_cast<uint8_t>(str[3]);
+            u8 b1 = static_cast<u8>(str[1]);
+            u8 b2 = static_cast<u8>(str[2]);
+            u8 b3 = static_cast<u8>(str[3]);
             if((b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
                 return cp;
 
-            int32_t r = ((b0 & 0x07) << 18) | ((b1 & 0x3F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+            i32 r = ((b0 & 0x07) << 18) | ((b1 & 0x3F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
             if(r < 0x10000 || r > runeMax)
                 r = runeInvalid;
             cp.value = r;
