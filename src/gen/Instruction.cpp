@@ -64,7 +64,7 @@ namespace cial::Inter {
     void CP::execute(VMState &vmState) {
         Value srcVal = vmState.reg(src().index());
         propObjectGet(vmState, srcVal, srcVal);
-        vmState.reg(dst().index(), srcVal);
+        vmState.regRef(dst().index()) = srcVal;
     }
 
     void Add::execute(VMState &vmState) {
@@ -124,7 +124,7 @@ namespace cial::Inter {
         if(propObjectSet(vmState, srcVal, vmState.regRef(dst().index()))) {
             return;
         }
-        vmState.reg(dst().index(), srcVal);
+        vmState.regRef(dst().index()) = srcVal;
     }
 
     void DGlobal::execute(VMState &vmState) {
@@ -139,18 +139,17 @@ namespace cial::Inter {
     void GGlobal::execute(VMState &vmState) {
         Value srcVal = vmState.global(atom());
         propObjectGet(vmState, srcVal, srcVal);
-        vmState.reg(dst().index(), srcVal);
+        vmState.regRef(dst().index()) = srcVal;
     }
 
-    void Global::execute(VMState &vmState) { vmState.reg(dst().index(), Value{ vmState.context.global() }); }
+    void Global::execute(VMState &vmState) { vmState.regRef(dst().index()) = Value{ vmState.context.global() }; }
 
     void Super::execute(VMState &vmState) {
-        vmState.reg(
-            dst().index(),
-            Value{ dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().unwrap())->getSuperClass() });
+        vmState.regRef(dst().index()) =
+            Value{ dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().unwrap())->getSuperClass() };
     }
 
-    void This::execute(VMState &vmState) { vmState.reg(dst().index(), Value{ vmState.curFrame()->thisObj }); }
+    void This::execute(VMState &vmState) { vmState.regRef(dst().index()) = Value{ vmState.curFrame()->thisObj }; }
 
     void ToInt::execute(VMState &vmState) {
         const auto r = vmState.regRef(dst().index()).toInteger();
@@ -343,7 +342,7 @@ namespace cial::Inter {
                     // return;
                     throw std::runtime_error("Not implemented");
                 }
-                vmState.reg(dst().index(), global->getProp(atom));
+                vmState.regRef(dst().index()) = global->getProp(atom);
                 return;
             }
 
@@ -355,13 +354,13 @@ namespace cial::Inter {
                     auto *fun = dynamic_cast<Function *>(tmp.asObject().value());
                     fun->thisObj = vmState.curFrame()->thisObj.asObject().value();
                 }
-                vmState.reg(dst().index(), tmp);
+                vmState.regRef(dst().index()) = tmp;
                 return;
             }
 
             auto tmp = obj->getProp(atom);
             propObjectGet(vmState, tmp, tmp);
-            vmState.reg(dst().index(), tmp);
+            vmState.regRef(dst().index()) = tmp;
             return;
         }
 
@@ -372,7 +371,7 @@ namespace cial::Inter {
         assert(nativeFn != nullptr);
         nativeFn = vmState.rt.create<NativeFunction>(*nativeFn).get();
         nativeFn->setThisObj(val);
-        vmState.reg(dst().index(), Value{ nativeFn });
+        vmState.regRef(dst().index()) = Value{ nativeFn };
     }
 
     void DProp::execute(VMState &vmState) {
@@ -386,7 +385,7 @@ namespace cial::Inter {
     void GThis::execute(VMState &vmState) {
         Value srcVal = vmState.getThis(atom());
         propObjectGet(vmState, srcVal, srcVal);
-        vmState.reg(dst().index(), srcVal);
+        vmState.regRef(dst().index()) = srcVal;
     }
 
     void DThis::execute(VMState &vmState) {
@@ -401,7 +400,7 @@ namespace cial::Inter {
         vmState.setThis(atom(), srcVal);
     }
 
-    void GUpval::execute(VMState &vmState) { vmState.reg(dst().index(), vmState.getUpVal(atom())); }
+    void GUpval::execute(VMState &vmState) { vmState.regRef(dst().index()) = vmState.getUpVal(atom()); }
 
     void LNot::execute(VMState &vmState) {
         const Register srcReg = dst();

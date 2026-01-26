@@ -165,7 +165,7 @@ namespace cial {
                         assert(extVal.isObject());
                         auto *clazzObject = dynamic_cast<ClassObject *>(extVal.asObject().unwrap());
                         dataObject->setSuperClass(extName, clazzObject);
-                        vmState.reg(ret, Value{ dataObject });
+                        vmState.regRef(ret) = Value{ dataObject };
                         return;
                     }
                 }
@@ -181,7 +181,7 @@ namespace cial {
             }
         }
 
-        vmState.reg(ret, Value{ dataObject.get() });
+        vmState.regRef(ret) = Value{ dataObject.get() };
     }
 
     void ClassObject::setProp(const Atom a, const Value &v) { _props[a] = v; }

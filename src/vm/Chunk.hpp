@@ -26,7 +26,7 @@ namespace cial::Bytecode {
     struct ThrowHandler {
         u64 tryStart;
         u64 tryEnd;
-        u64 exValueReg;
+        u16 exValueReg;
     };
 
     class Chunk : public MarkSweepHeader {

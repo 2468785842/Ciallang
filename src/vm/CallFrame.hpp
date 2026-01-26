@@ -24,15 +24,15 @@ namespace cial {
         Bytecode::Chunk *chunk{};
         FuncMeta *funcMeta{}; // funcMeta != nullptr is function call
         Value thisObj{};
-        Opt<u64> ret{};
+        Opt<u16> ret{};
         u64 pc{};
 
         explicit CallFrame() = default;
 
-        explicit CallFrame(Bytecode::Chunk *chunk, const Opt<u64> ret, Bytecode::FastRegisterPool &pool) :
+        explicit CallFrame(Bytecode::Chunk *chunk, const Opt<u16> ret, Bytecode::FastRegisterPool &pool) :
             chunk(chunk), ret(ret), _pool(&pool), _sp(pool.allocFrame(chunk->getRegCount())) {}
 
-        explicit CallFrame(FuncMeta *funcMeta, const Opt<u64> ret, Bytecode::FastRegisterPool &pool) :
+        explicit CallFrame(FuncMeta *funcMeta, const Opt<u16> ret, Bytecode::FastRegisterPool &pool) :
             chunk(funcMeta->chunk), funcMeta(funcMeta), ret(ret), _pool(&pool),
             _sp(pool.allocFrame(funcMeta->chunk->getRegCount()) - funcMeta->arity) {}
 
@@ -40,15 +40,12 @@ namespace cial {
             closure(callFrame.closure), chunk(callFrame.chunk), funcMeta(callFrame.funcMeta),
             thisObj(std::move(callFrame.thisObj)), ret(callFrame.ret), pc(callFrame.pc), _pool(callFrame._pool),
             _sp(callFrame._sp) {
-            callFrame.closure = nullptr;
-            callFrame.chunk = nullptr;
-            callFrame.funcMeta = nullptr;
-            callFrame.thisObj = Value{};
-            callFrame._pool = nullptr;
+            new(&callFrame) CallFrame{};
         }
 
         CallFrame &operator=(CallFrame &&callFrame) noexcept {
             if(this != &callFrame) {
+                this->~CallFrame();
                 new(this) CallFrame(std::move(callFrame));
             }
 
@@ -61,21 +58,21 @@ namespace cial {
         ~CallFrame() {
             if(_pool) {
                 _pool->maybeShrink(_sp);
-                _pool = nullptr;
             }
+            new(this) CallFrame{};
         }
 
         [[nodiscard]] u64 getSP() const noexcept { return _sp; }
 
         [[nodiscard]] Value *getArgs(const size_t argCount) const { return _pool->ptrAt(_pool->used() - argCount); }
 
-        [[nodiscard]] Value &getReg(const u64 reg) { return *_pool->ptrAt(_sp + reg); }
+        [[nodiscard]] Value &getReg(const u16 reg) { return *_pool->ptrAt(_sp + reg); }
 
-        [[nodiscard]] const Value &getReg(const u64 reg) const { return *_pool->ptrAt(_sp + reg); }
+        [[nodiscard]] const Value &getReg(const u16 reg) const { return *_pool->ptrAt(_sp + reg); }
 
     private:
         friend class Bytecode::VMState;
-        Bytecode::FastRegisterPool *_pool{ nullptr };
-        u64 _sp{};
+        Bytecode::FastRegisterPool *_pool{};
+        u32 _sp{};
     };
 } // namespace cial

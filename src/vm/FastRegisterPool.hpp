@@ -39,7 +39,7 @@ namespace cial::Bytecode {
             maybeShrink(_sp);
         }
 
-        void maybeShrink(const size_t sp) {
+        void maybeShrink(const u64 sp) {
             _sp = sp;
             const size_t totalUsed = _sp;
             size_t totalCapacity = (_blocks.size() - 1) * _blockSize;
@@ -53,7 +53,7 @@ namespace cial::Bytecode {
             }
         }
 
-        [[nodiscard]] Value *ptrAt(const size_t globalIndex) const {
+        [[nodiscard]] Value *ptrAt(const u64 globalIndex) const {
             const size_t blockIndex = globalIndex / _blockSize; // 第几个块
             const size_t offset = globalIndex % _blockSize; // 块内偏移
             return _blocks[blockIndex].data + offset;

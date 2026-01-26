@@ -39,11 +39,9 @@ namespace cial::Bytecode {
 
         void run();
 
-        void reg(u64 reg, const Value &value) const;
+        [[nodiscard]] Value reg(u16 reg) const;
 
-        [[nodiscard]] Value reg(u64 reg) const;
-
-        [[nodiscard]] Value &regRef(u64 reg) const;
+        [[nodiscard]] Value &regRef(u16 reg) const;
 
         [[nodiscard]] bool globalHas(Atom atom) const;
         [[nodiscard]] bool globalHas(const std::string &name) const;
@@ -81,10 +79,10 @@ namespace cial::Bytecode {
 
         void pop(const size_t count) const { context.regPool().freeFrame(count); }
 
-        void makeClosure() { _currentFrame->closure = _stackTop > 0 ? prevFrame() : nullptr; }
+        void makeClosure() { _currentFrame->closure = _stackTop > 1 ? prevFrame() : nullptr; }
 
         template <typename T>
-        void allocCallFrame(T *arg, const Opt<u32> ret = {}) {
+        void allocCallFrame(T *arg, const Opt<u16> ret = {}) {
             if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
             _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, context.regPool() };

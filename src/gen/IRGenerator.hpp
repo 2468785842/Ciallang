@@ -29,7 +29,7 @@ namespace cial::Inter {
 
         Opt<Bytecode::Chunk> parseAst(const Syntax::AstNode *node, OptReg &retReg);
 
-        void addLocalVar(LocalVariable &&variable) { _localVars.emplace_back(variable); }
+        void addLocalVar(LocalVariable variable) { _localVars.emplace_back(variable); }
 
         /**
          * allocate a temp register in this chunk
@@ -42,6 +42,9 @@ namespace cial::Inter {
                 return reg;
             }
             const Register reg{ _regNextIndex++ };
+            if(reg.index() >= std::numeric_limits<u16>::max()) {
+                throw std::runtime_error("too many registers");
+            }
             return reg;
         }
 
@@ -131,7 +134,7 @@ namespace cial::Inter {
         Vec<u32> _scopeStartPC{};
         Vec<LocalVariable> _localVars{};
 
-        u64 _regNextIndex{ 0 };
+        u16 _regNextIndex{};
 
         [[nodiscard]] u32 getNextInstPos() const { return static_cast<u32>(this->_chunk->getInstVec().size()); }
 

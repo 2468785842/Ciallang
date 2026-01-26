@@ -162,7 +162,7 @@ namespace cial {
 
             auto *evalChunk = _vmState->rt.create<Bytecode::Chunk>(std::move(*chunk)).get();
 
-            u32 retReg{ 0 };
+            u16 retReg{ 0 };
             Bytecode::Chunk tmpChunk{};
             tmpChunk.setRegCount(1); // accept ret val
 

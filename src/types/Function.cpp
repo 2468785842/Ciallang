@@ -49,7 +49,7 @@ namespace cial {
 
         const auto &value = callProc(&vm, argCount, curFrame->getArgs(cnt != 0 ? _arity : argCount));
 
-        vmState.reg(ret, value);
+        vmState.regRef(ret) = value;
 
         if(cnt > 0)
             vmState.pop(cnt);

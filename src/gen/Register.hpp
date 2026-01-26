@@ -15,24 +15,26 @@
 
 #include <fmt/ostream.h>
 
+#include "types/Types.hpp"
+
 namespace cial::Inter {
     class [[nodiscard]] Register {
     public:
         explicit Register() = default;
-        explicit Register(const size_t index) : _index(index) {}
+        explicit Register(const u16 index) : _index(index) {}
 
-        [[nodiscard]] size_t index() const noexcept { return _index; }
+        [[nodiscard]] u16 index() const noexcept { return _index; }
         bool operator==(const Register &) const noexcept = default;
 
     private:
-        size_t _index;
+        u16 _index;
 
         friend std::ostream &operator<<(std::ostream &os, const Register &reg) { return os << '%' << reg._index; }
     };
 } // namespace cial::Inter
 
 namespace cial {
-    using OptReg = std::optional<Inter::Register>;
+    using OptReg = Opt<Inter::Register>;
 }
 
 template <>

@@ -68,11 +68,9 @@ namespace cial::Bytecode {
         context.global()->setProp(atom, value);
     }
 
-    void VMState::reg(const u64 reg, const Value &value) const { _currentFrame->getReg(reg) = value; }
+    Value VMState::reg(const u16 reg) const { return _currentFrame->getReg(reg); }
 
-    Value VMState::reg(const u64 reg) const { return _currentFrame->getReg(reg); }
-
-    Value &VMState::regRef(const u64 reg) const { return _currentFrame->getReg(reg); }
+    Value &VMState::regRef(const u16 reg) const { return _currentFrame->getReg(reg); }
 
     bool VMState::hasThis(const Atom atom) const {
 
