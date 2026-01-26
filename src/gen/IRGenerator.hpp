@@ -12,12 +12,12 @@
 
 #pragma once
 
+#include "Label.hpp"
+#include "Register.hpp"
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
 #include "parser/ast/AstNode.hpp"
 #include "vm/Chunk.hpp"
-#include "vm/Label.hpp"
-#include "vm/Register.hpp"
 
 namespace cial::Inter {
 
@@ -35,17 +35,17 @@ namespace cial::Inter {
          * allocate a temp register in this chunk
          * @return register
          */
-        Bytecode::Register allocateRegister() {
+        Register allocateRegister() {
             if(!_freeRegisters.empty()) {
-                const Bytecode::Register reg = _freeRegisters.back();
+                const Register reg = _freeRegisters.back();
                 _freeRegisters.pop_back();
                 return reg;
             }
-            const Bytecode::Register reg{ _regNextIndex++ };
+            const Register reg{ _regNextIndex++ };
             return reg;
         }
 
-        void freeRegister(const Bytecode::Register reg) { _freeRegisters.push_back(reg); }
+        void freeRegister(const Register reg) { _freeRegisters.push_back(reg); }
 
         /**
          * create a global scope
@@ -116,13 +116,13 @@ namespace cial::Inter {
 
         OptReg _empty{};
 
-        Vec<Bytecode::Register> _freeRegisters{};
+        Vec<Register> _freeRegisters{};
 
         using BreakContext = Vec<size_t>;
         Vec<BreakContext> _breakStack{};
 
         struct ContinueContext {
-            Opt<Bytecode::Label> continueLabel;
+            Opt<Label> continueLabel;
             Vec<size_t> continues;
         };
 
@@ -135,7 +135,7 @@ namespace cial::Inter {
 
         [[nodiscard]] u32 getNextInstPos() const { return static_cast<u32>(this->_chunk->getInstVec().size()); }
 
-        Bytecode::Label makeLabel() const { return Bytecode::Label{ getNextInstPos() }; }
+        Label makeLabel() const { return Label{ getNextInstPos() }; }
 
         [[nodiscard]] bool isTopScope() const noexcept { return _scopeStartPC.size() == 1; }
 
@@ -143,9 +143,9 @@ namespace cial::Inter {
 
         void endScope() {
             for(auto &localVar : _localVars) {
-                if(localVar.startPC > _scopeStartPC.back()) {
-                    freeRegister(localVar.reg);
-                    localVar.endPC = getNextInstPos();
+                if(localVar.startPC.address() > _scopeStartPC.back()) {
+                    freeRegister(Register{ localVar.reg });
+                    localVar.endPC = Label{ getNextInstPos() };
                 }
             }
             _scopeStartPC.pop_back();
@@ -153,16 +153,16 @@ namespace cial::Inter {
 
         LocalVariable *resolveLocalVariable(Atom identifier);
 
-        Bytecode::Register loadVoidReg();
+        Register loadVoidReg();
 
         FuncMeta *generateFuncMeta(const Syntax::Parameters &parameters, const Syntax::BlockStmtNode *body) const;
 
-        bool expectValue(const Syntax::ExprNode *node, Bytecode::Register &ret);
+        bool expectValue(const Syntax::ExprNode *node, Register &ret);
 
         void error(const std::string &message, const Common::SourceLocation &location) const {
             _sourceFile.error(_r, message, location);
         }
         [[nodiscard]] Atom getAtomFromToken(const Syntax::Token &token) const;
-        void genTokenValueLoadInst(Bytecode::Register reg, const Syntax::Token &token) const;
+        void genTokenValueLoadInst(Register reg, const Syntax::Token &token) const;
     };
 } // namespace cial::Inter

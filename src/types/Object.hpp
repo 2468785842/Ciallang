@@ -35,7 +35,7 @@ namespace cial {
 
         void setName(const Atom atom) noexcept { _name = atom; }
 
-        virtual void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) = 0;
+        virtual void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) = 0;
 
         virtual bool instanceOf(Atom a) { return false; }
 

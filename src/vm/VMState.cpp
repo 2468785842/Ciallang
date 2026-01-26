@@ -13,7 +13,7 @@
  */
 #include "VMState.hpp"
 
-#include "Instruction.hpp"
+#include "../gen/Instruction.hpp"
 #include "types/Class.hpp"
 
 namespace cial::Bytecode {
@@ -35,7 +35,7 @@ namespace cial::Bytecode {
 
             const auto &instruction = instList[pc];
             // fmt::println("{}\n", Instruction::dump(*instruction, this));
-            Instruction::execute(instruction, *this);
+            Inter::Instruction::execute(instruction, *this);
             switch(_pending) {
                 case PendingCF::Throw:
                     unwind();
@@ -68,11 +68,11 @@ namespace cial::Bytecode {
         context.global()->setProp(atom, value);
     }
 
-    void VMState::reg(const Register &reg, const Value &value) const { _currentFrame->getReg(reg) = value; }
+    void VMState::reg(const u64 reg, const Value &value) const { _currentFrame->getReg(reg) = value; }
 
-    Value VMState::reg(const Register reg) const { return _currentFrame->getReg(reg); }
+    Value VMState::reg(const u64 reg) const { return _currentFrame->getReg(reg); }
 
-    Value &VMState::regRef(const Register reg) const { return _currentFrame->getReg(reg); }
+    Value &VMState::regRef(const u64 reg) const { return _currentFrame->getReg(reg); }
 
     bool VMState::hasThis(const Atom atom) const {
 
@@ -88,7 +88,7 @@ namespace cial::Bytecode {
         if(auto *callFrame = _currentFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
                 for(const auto &localVar : callFrame->funcMeta->localVars) {
-                    if(localVar.endPC > callFrame->pc)
+                    if(localVar.endPC.address() > callFrame->pc)
                         continue;
                     if(localVar.identifier == atom)
                         return true;
@@ -122,10 +122,10 @@ namespace cial::Bytecode {
         if(auto *callFrame = _currentFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
                 for(const auto &[identifier, reg, startPC, endPC] : callFrame->funcMeta->localVars) {
-                    if(startPC <= callFrame->pc && callFrame->pc < endPC)
+                    if(startPC.address() <= callFrame->pc && callFrame->pc < endPC.address())
                         continue;
                     if(identifier == atom)
-                        return callFrame->getReg(reg);
+                        return callFrame->getReg(reg.index());
                 }
             }
 
@@ -157,10 +157,10 @@ namespace cial::Bytecode {
         if(auto *callFrame = _currentFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
                 for(const auto &localVar : callFrame->funcMeta->localVars) {
-                    if(localVar.endPC > callFrame->pc)
+                    if(localVar.endPC.address() > callFrame->pc)
                         continue;
                     if(localVar.identifier == atom)
-                        callFrame->getReg(localVar.reg) = v;
+                        callFrame->getReg(localVar.reg.index()) = v;
                 }
             }
         }
@@ -183,10 +183,10 @@ namespace cial::Bytecode {
             // prev local scope
             if(callFrame.funcMeta) {
                 for(const auto &localVar : callFrame.funcMeta->localVars) {
-                    if(localVar.endPC > callFrame.pc)
+                    if(localVar.endPC.address() > callFrame.pc)
                         continue;
                     if(localVar.identifier == atom)
-                        return callFrame.getReg(localVar.reg);
+                        return callFrame.getReg(localVar.reg.index());
                 }
             }
 
@@ -218,7 +218,7 @@ namespace cial::Bytecode {
             }
 
             if(th->exValueReg)
-                regRef(th->exValueReg.value()) = _exValue;
+                regRef(th->exValueReg) = _exValue;
 
             setPC(th->tryEnd);
             clearException();

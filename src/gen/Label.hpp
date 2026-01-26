@@ -15,9 +15,10 @@
 
 #include <fmt/ostream.h>
 
-namespace cial::Bytecode {
+namespace cial::Inter {
     class [[nodiscard]] Label {
     public:
+        explicit Label() = default;
         explicit Label(const size_t address) : _address(address) {}
 
         [[nodiscard]] size_t address() const noexcept { return _address; }
@@ -29,7 +30,7 @@ namespace cial::Bytecode {
 
         friend std::ostream &operator<<(std::ostream &os, const Label &label) { return os << '@' << label._address; }
     };
-} // namespace cial::Bytecode
+} // namespace cial::Inter
 
 template <>
-struct fmt::formatter<cial::Bytecode::Label> : ostream_formatter {};
+struct fmt::formatter<cial::Inter::Label> : ostream_formatter {};

@@ -4,8 +4,8 @@
 #pragma once
 
 #include "ControlFlowGraph.hpp"
+#include "Instruction.hpp"
 #include "vm/Chunk.hpp"
-#include "vm/Instruction.hpp"
 
 namespace cial::Inter {
 
@@ -34,7 +34,7 @@ namespace cial::Inter {
         virtual ~Optimizer() = default;
 
     protected:
-        static void removeNopInst(Vec<Bytecode::Instruction> &instVec);
+        static void removeNopInst(Vec<Instruction> &instVec);
     };
 
     class OptimizerManager {

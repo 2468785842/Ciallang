@@ -11,19 +11,18 @@
 //
 #pragma once
 
-#include "types/Types.hpp"
-
+#include "Label.hpp"
+#include "Register.hpp"
 #include "runtime/AtomTable.hpp"
-#include "vm/Register.hpp"
 
-namespace cial {
+namespace cial::Inter {
 
     struct LocalVariable {
         Atom identifier = ATOM_INVALID;
-        Bytecode::Register reg{ 0 };
+        Register reg{};
         // when (var.startPC <= inst.pc) you can use
-        u32 startPC{}; // Effective start PC
+        Label startPC{}; // Effective start PC
         // when (var.endPC > inst.pc) you can't use
-        u32 endPC{}; // Invalid PC (scope ended)
+        Label endPC{}; // Invalid PC (scope ended)
     };
-} // namespace cial
+} // namespace cial::Inter

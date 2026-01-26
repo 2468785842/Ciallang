@@ -15,7 +15,7 @@
 
 #include <fmt/ostream.h>
 
-#include "Register.hpp"
+#include "../gen/Register.hpp"
 #include "gen/LocalVariable.hpp"
 
 #include "runtime/AtomTable.hpp"
@@ -45,7 +45,7 @@ namespace cial {
         Atom name = ATOM_INVALID;
         u32 arity;
         Bytecode::Chunk *chunk; // manager for gc
-        Vec<LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
+        Vec<Inter::LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
 
         explicit FuncMeta(FuncMeta &&funcMeta) = delete;
         FuncMeta &operator=(FuncMeta &&funcMeta) = delete;
@@ -58,7 +58,7 @@ namespace cial {
 
     private:
         friend class Runtime;
-        explicit FuncMeta(const u32 arity, Bytecode::Chunk *chunk, Vec<LocalVariable> localVars) :
+        explicit FuncMeta(const u32 arity, Bytecode::Chunk *chunk, Vec<Inter::LocalVariable> localVars) :
             arity(arity), chunk(chunk), localVars(std::move(localVars)) {}
     };
 

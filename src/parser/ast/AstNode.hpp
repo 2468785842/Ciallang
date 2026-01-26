@@ -12,9 +12,9 @@
 
 #pragma once
 
+#include "../../gen/Register.hpp"
 #include "common/SourceLocation.hpp"
 #include "parser/Token.hpp"
-#include "vm/Register.hpp"
 
 namespace cial::Inter {
     class IRGenerator;

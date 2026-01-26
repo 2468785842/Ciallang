@@ -12,10 +12,10 @@
 
 #pragma once
 
+#include "../gen/Register.hpp"
 #include "Object.hpp"
 #include "Value.hpp"
 #include "vm/Constant.hpp"
-#include "vm/Register.hpp"
 #include "vm/VMState.hpp"
 
 namespace cial {
@@ -54,7 +54,7 @@ namespace cial {
 
             const size_t absSP{ vmState.getRegPoolTop() - vmState.curFrame()->getSP() };
 
-            const Bytecode::Register ret{ absSP };
+            const u32 ret{ static_cast<u32>(absSP) };
             vmState.pushVoid(1);
             vmState.push(v); // absSP + 1
 
@@ -69,7 +69,7 @@ namespace cial {
 
             const size_t absSP{ vmState.getRegPoolTop() - vmState.curFrame()->getSP() };
 
-            const Bytecode::Register ret{ absSP };
+            const u32 ret{ static_cast<u32>(absSP) };
             vmState.pushVoid(1);
 
             Function getFunc{ propMeta->getFunc };
@@ -79,7 +79,7 @@ namespace cial {
             return vmState.reg(ret);
         }
 
-        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override {
+        void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) override {
             throw std::runtime_error("Not Support call operator for property");
         }
 

@@ -52,7 +52,7 @@ namespace cial::Bytecode {
         size_t pc{};
         while(pc < _instructions.size()) {
             const auto &instruction = _instructions[pc];
-            ss << fmt::format("{: <6}: {}", Label{ pc }, Instruction::dump(instruction));
+            ss << fmt::format("{: <6}: {}", Inter::Label{ pc }, Inter::Instruction::dump(instruction));
             if(pc != _instructions.size() - 1) {
                 ss << '\n';
             }
@@ -64,11 +64,11 @@ namespace cial::Bytecode {
     [[nodiscard]] String Chunk::dumpInstructions(const VMState *vmState) const {
         std::stringstream ss{ "" };
         size_t pc{};
-        while(pc < vmState->getPC().address()) {
-            const bool isLastInst = pc == vmState->getPC().address() - 1;
+        while(pc < vmState->getPC()) {
+            const bool isLastInst = pc == vmState->getPC() - 1;
             const auto &instruction = _instructions[pc];
-            ss << fmt::format("{: <6}: {}", Label{ pc },
-                              Instruction::dump(instruction, isLastInst ? vmState : nullptr));
+            ss << fmt::format("{: <6}: {}", Inter::Label{ pc },
+                              Inter::Instruction::dump(instruction, isLastInst ? vmState : nullptr));
             if(pc != _instructions.size() - 1) {
                 ss << '\n';
             }

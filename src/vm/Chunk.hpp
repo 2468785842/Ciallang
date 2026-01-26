@@ -17,15 +17,16 @@
 
 #include "Constant.hpp"
 
-#include "Instruction.hpp"
+#include "gen/Instruction.hpp"
+#include "logging/Logger.hpp"
 
 namespace cial::Bytecode {
     class VMState;
 
     struct ThrowHandler {
-        Label tryStart;
-        Label tryEnd;
-        OptReg exValueReg;
+        u64 tryStart;
+        u64 tryEnd;
+        u64 exValueReg;
     };
 
     class Chunk : public MarkSweepHeader {
@@ -36,9 +37,9 @@ namespace cial::Bytecode {
 
         void addThrowHandler(const ThrowHandler &tHandler) { _throwHandlers.push_back(tHandler); }
 
-        [[nodiscard]] Opt<ThrowHandler> findThrowHandler(const Label pc) const {
+        [[nodiscard]] Opt<ThrowHandler> findThrowHandler(const u64 pc) const {
             for(const auto &h : _throwHandlers) {
-                if(h.tryStart.address() <= pc.address() && pc.address() < h.tryEnd.address()) {
+                if(h.tryStart <= pc && pc < h.tryEnd) {
                     return h;
                 }
             }
@@ -51,14 +52,14 @@ namespace cial::Bytecode {
          * @param args 值数组
          * @return 指令在内存的索引
          */
-        template <OpCode OP, typename... Args>
+        template <Inter::OpCode OP, typename... Args>
         size_t emit(Args &&...args) {
             const size_t index = _instructions.size();
-            _instructions.emplace_back(OP, Operand(std::forward<Args>(args))...);
+            _instructions.emplace_back(OP, Inter::Operand(std::forward<Args>(args))...);
             return index;
         }
 
-        Instruction &inst(const size_t index) { return _instructions[index]; }
+        Inter::Instruction &inst(const size_t index) { return _instructions[index]; }
 
         Chunk(const Chunk &) = delete;
         Chunk &operator=(const Chunk &) = delete;
@@ -115,7 +116,7 @@ namespace cial::Bytecode {
         }
 
     private:
-        Vec<Instruction> _instructions{};
+        Vec<Inter::Instruction> _instructions{};
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
         u32 _registerCount{};

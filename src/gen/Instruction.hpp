@@ -13,17 +13,16 @@
  */
 #pragma once
 
-#include <optional>
-
-#include "Constant.hpp"
 #include "Label.hpp"
 #include "Register.hpp"
-#include "logging/Logger.hpp"
 #include "runtime/AtomTable.hpp"
+#include "vm/Constant.hpp"
 
 namespace cial::Bytecode {
     class VMState;
+}
 
+namespace cial::Inter {
 #define OPCODE_ENUMS(O)                                                                                                \
     O(NOP)                                                                                                             \
     O(Load)                                                                                                            \
@@ -93,8 +92,8 @@ namespace cial::Bytecode {
 
     class Instruction;
 
-    using ExecuteCallback = void (*)(const Instruction &, VMState &);
-    using DumpCallback = std::string (*)(const Instruction &, const VMState &, bool);
+    using ExecuteCallback = void (*)(const Instruction &, Bytecode::VMState &);
+    using DumpCallback = std::string (*)(const Instruction &, const Bytecode::VMState &, bool);
 
     struct Operand {
         enum class Type { None, Register, Label, ConstIndex, Number, Atom };
@@ -126,8 +125,11 @@ namespace cial::Bytecode {
     class Instruction {
     public:
         explicit Instruction(const OpCode opcode, Operand operand1 = Operand{}, Operand operand2 = Operand{},
-                             Operand operand3 = Operand{}) :
-            _opcode(opcode), _operand1(operand1), _operand2(operand2), _operand3(operand3) {}
+                             Operand operand3 = Operand{}) : _opcode(opcode) {
+            _ops[0] = operand1;
+            _ops[1] = operand2;
+            _ops[2] = operand3;
+        }
 
         Instruction(const Instruction &) = default;
 
@@ -139,49 +141,47 @@ namespace cial::Bytecode {
 
         [[nodiscard]] OpCode opcode() const { return _opcode; }
 
-        [[nodiscard]] auto getOp1() const { return _operand1; }
-        [[nodiscard]] auto getOp2() const { return _operand2; }
-        [[nodiscard]] auto getOp3() const { return _operand3; }
+        [[nodiscard]] auto getOp1() const { return _ops[0]; }
+        [[nodiscard]] auto getOp2() const { return _ops[1]; }
+        [[nodiscard]] auto getOp3() const { return _ops[2]; }
 
         template <typename T>
         void setOp1Val(T &&v) {
-            _operand1 = Operand{ std::forward<T>(v) };
+            _ops[0] = Operand{ std::forward<T>(v) };
         }
 
         template <typename T>
         void setOp2Val(T &&v) {
-            _operand2 = Operand{ std::forward<T>(v) };
+            _ops[1] = Operand{ std::forward<T>(v) };
         }
 
         template <typename T>
         void setOp3Val(T &&v) {
-            _operand3 = Operand{ std::forward<T>(v) };
+            _ops[2] = Operand{ std::forward<T>(v) };
         }
 
         template <typename T>
         [[nodiscard]] constexpr T getOp1Val() const {
-            return _operand1.value<T>();
+            return _ops[0].value<T>();
         }
 
         template <typename T>
         [[nodiscard]] constexpr T getOp2Val() const {
-            return _operand2.value<T>();
+            return _ops[1].value<T>();
         }
 
         template <typename T>
         [[nodiscard]] constexpr T getOp3Val() const {
-            return _operand3.value<T>();
+            return _ops[2].value<T>();
         }
 
-        static void execute(const Instruction &inst, VMState &vmState);
+        static void execute(const Instruction &inst, Bytecode::VMState &vmState);
 
-        static std::string dump(const Instruction &inst, const VMState *vmState = nullptr);
+        static std::string dump(const Instruction &inst, const Bytecode::VMState *vmState = nullptr);
 
     private:
         OpCode _opcode;
-        Operand _operand1;
-        Operand _operand2;
-        Operand _operand3;
+        Operand _ops[3];
         friend struct DumpInst;
     };
 
@@ -197,12 +197,12 @@ namespace cial::Bytecode {
 #define DEF_INST_EX(className, getters, execute_ref)                                                                   \
     struct className {                                                                                                 \
         getters static void execute(const Instruction &, execute_ref);                                                 \
-        [[nodiscard]] static std::string dump(const Instruction &inst, const VMState *vmState);                        \
+        [[nodiscard]] static std::string dump(const Instruction &inst, const Bytecode::VMState *vmState);              \
     }
 
 // 定义指令可变, 不可变变体
-#define DEF_INST(className, getters) DEF_INST_EX(className, getters, const VMState &)
-#define DEF_INST_MUT(className, getters) DEF_INST_EX(className, getters, VMState &)
+#define DEF_INST(className, getters) DEF_INST_EX(className, getters, const Bytecode::VMState &)
+#define DEF_INST_MUT(className, getters) DEF_INST_EX(className, getters, Bytecode::VMState &)
 
     // ────────────────────────────────────────────────
     // 定义指令
@@ -381,6 +381,7 @@ namespace cial::Bytecode {
 
     struct DumpInst {
         [[nodiscard]] static String dumpOperand(const Operand &operand);
-        [[nodiscard]] static std::string autoDump(std::string_view name, const Instruction &inst, const VMState *vm);
+        [[nodiscard]] static std::string autoDump(std::string_view name, const Instruction &inst,
+                                                  const Bytecode::VMState *vm);
     };
-}; // namespace cial::Bytecode
+}; // namespace cial::Inter

@@ -15,7 +15,7 @@
 
 #include <fmt/ostream.h>
 
-namespace cial::Bytecode {
+namespace cial::Inter {
     class [[nodiscard]] Register {
     public:
         explicit Register() = default;
@@ -29,11 +29,11 @@ namespace cial::Bytecode {
 
         friend std::ostream &operator<<(std::ostream &os, const Register &reg) { return os << '%' << reg._index; }
     };
-} // namespace cial::Bytecode
+} // namespace cial::Inter
 
 namespace cial {
-    using OptReg = std::optional<Bytecode::Register>;
+    using OptReg = std::optional<Inter::Register>;
 }
 
 template <>
-struct fmt::formatter<cial::Bytecode::Register> : ostream_formatter {};
+struct fmt::formatter<cial::Inter::Register> : ostream_formatter {};

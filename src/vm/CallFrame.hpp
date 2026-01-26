@@ -24,15 +24,15 @@ namespace cial {
         Bytecode::Chunk *chunk{};
         FuncMeta *funcMeta{}; // funcMeta != nullptr is function call
         Value thisObj{};
-        OptReg ret{};
+        Opt<u64> ret{};
         u64 pc{};
 
         explicit CallFrame() = default;
 
-        explicit CallFrame(Bytecode::Chunk *chunk, const OptReg ret, Bytecode::FastRegisterPool &pool) :
+        explicit CallFrame(Bytecode::Chunk *chunk, const Opt<u64> ret, Bytecode::FastRegisterPool &pool) :
             chunk(chunk), ret(ret), _pool(&pool), _sp(pool.allocFrame(chunk->getRegCount())) {}
 
-        explicit CallFrame(FuncMeta *funcMeta, const OptReg ret, Bytecode::FastRegisterPool &pool) :
+        explicit CallFrame(FuncMeta *funcMeta, const Opt<u64> ret, Bytecode::FastRegisterPool &pool) :
             chunk(funcMeta->chunk), funcMeta(funcMeta), ret(ret), _pool(&pool),
             _sp(pool.allocFrame(funcMeta->chunk->getRegCount()) - funcMeta->arity) {}
 
@@ -69,11 +69,9 @@ namespace cial {
 
         [[nodiscard]] Value *getArgs(const size_t argCount) const { return _pool->ptrAt(_pool->used() - argCount); }
 
-        [[nodiscard]] Value &getReg(const Bytecode::Register reg) { return *_pool->ptrAt(_sp + reg.index()); }
+        [[nodiscard]] Value &getReg(const u64 reg) { return *_pool->ptrAt(_sp + reg); }
 
-        [[nodiscard]] const Value &getReg(const Bytecode::Register reg) const {
-            return *_pool->ptrAt(_sp + reg.index());
-        }
+        [[nodiscard]] const Value &getReg(const u64 reg) const { return *_pool->ptrAt(_sp + reg); }
 
     private:
         friend class Bytecode::VMState;

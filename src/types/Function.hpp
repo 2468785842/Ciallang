@@ -30,7 +30,7 @@ namespace cial {
 
         explicit Function(FuncMeta *funcMeta) : Object(Runtime::ATOM_FUNCTION), meta(funcMeta) {}
 
-        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
+        void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
             Object::marked();
@@ -66,7 +66,7 @@ namespace cial {
 
         void setThisObj(const Value &thisObj) { _thisObj = thisObj; }
 
-        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
+        void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
             Object::marked();

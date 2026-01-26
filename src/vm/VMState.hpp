@@ -24,7 +24,7 @@
 
 #include "types/Value.hpp"
 
-#include "vm/Register.hpp"
+#include "gen/Register.hpp"
 
 namespace cial::Bytecode {
 
@@ -39,11 +39,11 @@ namespace cial::Bytecode {
 
         void run();
 
-        void reg(const Register &reg, const Value &value) const;
+        void reg(u64 reg, const Value &value) const;
 
-        [[nodiscard]] Value reg(Register reg) const;
+        [[nodiscard]] Value reg(u64 reg) const;
 
-        [[nodiscard]] Value &regRef(Register reg) const;
+        [[nodiscard]] Value &regRef(u64 reg) const;
 
         [[nodiscard]] bool globalHas(Atom atom) const;
         [[nodiscard]] bool globalHas(const std::string &name) const;
@@ -63,12 +63,12 @@ namespace cial::Bytecode {
 
         [[nodiscard]] bool getZF() const { return _zf; }
 
-        void setPC(const Label &label) const {
+        void setPC(const u64 label) const {
             // because run() pc will auto plus one so - 1
-            _currentFrame->pc = label.address() - 1;
+            _currentFrame->pc = label - 1;
         }
 
-        [[nodiscard]] Label getPC() const { return Label{ _currentFrame->pc }; }
+        [[nodiscard]] u64 getPC() const { return _currentFrame->pc; }
 
         void pushVoid(const size_t n) const {
             const size_t base = context.regPool().allocFrame(n);
@@ -84,7 +84,7 @@ namespace cial::Bytecode {
         void makeClosure() { _currentFrame->closure = _stackTop > 0 ? prevFrame() : nullptr; }
 
         template <typename T>
-        void allocCallFrame(T *arg, const OptReg &ret = {}) {
+        void allocCallFrame(T *arg, const Opt<u32> ret = {}) {
             if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
             _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, context.regPool() };
@@ -99,7 +99,7 @@ namespace cial::Bytecode {
 
         [[nodiscard]] size_t getRegPoolTop() const { return context.regPool().used(); }
 
-        [[nodiscard]] const Vec<Instruction> &instructions() const noexcept {
+        [[nodiscard]] const Vec<Inter::Instruction> &instructions() const noexcept {
             return _currentFrame->chunk->getInstVec();
         }
 
@@ -143,13 +143,13 @@ namespace cial::Bytecode {
                     continue;
 
                 for(const auto &[identifier, reg, startPC, endPC] : call.funcMeta->localVars) {
-                    if(startPC <= getPC().address() && getPC().address() < endPC)
+                    if(startPC.address() <= getPC() && getPC() < endPC.address())
                         continue;
                     const auto *entry = context.rt().atomTable.get(identifier);
                     auto varName = "?unknow_var_name?"_str;
                     if(entry)
                         varName = *entry->str;
-                    ss << fmt::format("{} = {}\n", varName, call.getReg(reg));
+                    ss << fmt::format("{} = {}\n", varName, call.getReg(reg.index()));
                 }
             }
             return ss.str();
@@ -157,8 +157,8 @@ namespace cial::Bytecode {
 
         [[nodiscard]] std::string dumpCurRegisters() const {
             std::stringstream ss{};
-            for(size_t j = 0; j < _currentFrame->chunk->getRegCount(); j++) {
-                ss << fmt::format("(%{}): {}\n", j, _currentFrame->getReg(Register{ j }));
+            for(u32 j = 0; j < _currentFrame->chunk->getRegCount(); j++) {
+                ss << fmt::format("(%{}): {}\n", j, _currentFrame->getReg(j));
             }
             return ss.str();
         }

@@ -3,7 +3,7 @@
 //
 #pragma once
 
-#include "vm/Instruction.hpp"
+#include "Instruction.hpp"
 
 namespace cial::Inter {
     class BasicBlock {

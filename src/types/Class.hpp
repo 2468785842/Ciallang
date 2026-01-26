@@ -29,7 +29,7 @@ namespace cial {
 
         explicit ClassObject(ClassMeta *classMeta, Runtime *rt);
 
-        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
+        void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
             Object::marked();
@@ -78,7 +78,7 @@ namespace cial {
 
         ~DataObject() noexcept override { invalidate(); }
 
-        void call(Bytecode::VMState &vmState, Bytecode::Register ret, size_t argCount) override;
+        void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) override;
 
         [[nodiscard]] ClassObject *klass() const noexcept { return _class; }
 
@@ -128,7 +128,7 @@ namespace cial {
                 if(const i64 idx = _class->meta->hasMember(finalizeAtom); idx > -1) {
                     Function finalizeFun{ _class->meta->getMember(idx).funcMeta };
                     finalizeFun.thisObj = this;
-                    finalizeFun.call(*_vmState, Bytecode::Register{ abs }, 0);
+                    finalizeFun.call(*_vmState, static_cast<u32>(abs), 0);
                     _vmState->pop(1);
                 }
             }
