@@ -65,7 +65,7 @@ namespace cial::Inter {
         const auto tryStartIp = makeLabel(); // closed interval
         node->tryBlock->generateBytecode(this, retReg);
 
-        size_t jmpIdx = _chunk->emit<OpCode::Jmp>();
+        const size_t jmpIdx = _chunk->emit<NOP>();
 
         const auto tryEndIp = makeLabel(); // open interval (same as catch start ip closed interval)
 
@@ -77,13 +77,13 @@ namespace cial::Inter {
             addLocalVar(LocalVariable{ varName, exValue, tryEndIp });
 
             node->catchBlock->generateBytecode(this, retReg);
-            Jmp::target(_chunk->inst(jmpIdx), makeLabel());
+            _chunk->repl<Jmp>(jmpIdx, makeLabel());
 
             _chunk->addThrowHandler({ tryStartIp.address(), tryEndIp.address(), exValue.index() });
             endScope();
         } else {
             node->catchBlock->generateBytecode(this, retReg);
-            Jmp::target(_chunk->inst(jmpIdx), makeLabel());
+            _chunk->repl<Jmp>(jmpIdx, makeLabel());
             _chunk->addThrowHandler({ tryStartIp.address(), tryEndIp.address() });
         }
 
@@ -112,13 +112,13 @@ namespace cial::Inter {
 
             if(auto *identifier = dynamic_cast<const Syntax::IdentifierExprNode *>(node->rhs); identifier) {
                 genTokenValueLoadInst(dst, identifier->token);
-                _chunk->emit<OpCode::GProp>(reg1, dst, dst);
+                _chunk->emit<GProp>(reg1, dst, dst);
             } else {
                 Register reg2{ 0 };
                 if(!expectValue(node->rhs, reg2))
                     return;
 
-                _chunk->emit<OpCode::GProp>(reg1, reg2, dst);
+                _chunk->emit<GProp>(reg1, reg2, dst);
             }
             retReg = dst;
             return;
@@ -142,28 +142,28 @@ namespace cial::Inter {
                 lVarReg = lVar->reg;
             } else {
                 lVarReg = allocateRegister();
-                _chunk->emit<OpCode::GGlobal>(lVarName, *lVarReg);
+                _chunk->emit<GGlobal>(lVarName, *lVarReg);
             }
-            _chunk->emit<OpCode::Mov>(*lVarReg, dst);
+            _chunk->emit<Mov>(*lVarReg, dst);
             OptReg rVarReg{};
 
             if(rVar) {
                 rVarReg = rVar->reg;
             } else {
                 rVarReg = allocateRegister();
-                _chunk->emit<OpCode::GGlobal>(rVarName, *rVarReg);
+                _chunk->emit<GGlobal>(rVarName, *rVarReg);
             }
 
             if(lVar) {
-                _chunk->emit<OpCode::Mov>(*rVarReg, *lVarReg);
+                _chunk->emit<Mov>(*rVarReg, *lVarReg);
             } else {
-                _chunk->emit<OpCode::DGlobal>(lVarName, *rVarReg);
+                _chunk->emit<DGlobal>(lVarName, *rVarReg);
             }
 
             if(rVar) {
-                _chunk->emit<OpCode::Mov>(dst, rVar->reg);
+                _chunk->emit<Mov>(dst, rVar->reg);
             } else {
-                _chunk->emit<OpCode::DGlobal>(rVarName, dst);
+                _chunk->emit<DGlobal>(rVarName, dst);
             }
             // retReg = rVarReg;
             return;
@@ -184,77 +184,77 @@ namespace cial::Inter {
 
         switch(node->token.type()) {
             case Equal:
-                _chunk->emit<OpCode::EQ>(src, dst);
+                _chunk->emit<EQ>(src, dst);
                 break;
             case NotEqual:
-                _chunk->emit<OpCode::NEQ>(src, dst);
+                _chunk->emit<NEQ>(src, dst);
                 break;
             case DiscEqual:
-                _chunk->emit<OpCode::AbsEQ>(src, dst);
+                _chunk->emit<AbsEQ>(src, dst);
                 break;
             case DiscNotEqual:
-                _chunk->emit<OpCode::AbsNEQ>(src, dst);
+                _chunk->emit<AbsNEQ>(src, dst);
                 break;
             case Gt:
-                _chunk->emit<OpCode::GT>(src, dst);
+                _chunk->emit<GT>(src, dst);
                 break;
             case GtOrEqual:
-                _chunk->emit<OpCode::GE>(src, dst);
+                _chunk->emit<GE>(src, dst);
                 break;
             case Lt:
-                _chunk->emit<OpCode::LT>(src, dst);
+                _chunk->emit<LT>(src, dst);
                 break;
             case LtOrEqual:
-                _chunk->emit<OpCode::LE>(src, dst);
+                _chunk->emit<LE>(src, dst);
                 break;
             case LogicalAnd:
-                _chunk->emit<OpCode::LAnd>(src, dst);
+                _chunk->emit<LAnd>(src, dst);
                 break;
             case LogicalOr:
-                _chunk->emit<OpCode::LOr>(src, dst);
+                _chunk->emit<LOr>(src, dst);
                 break;
             case Plus:
-                _chunk->emit<OpCode::Add>(src, dst);
+                _chunk->emit<Add>(src, dst);
                 break;
             case Minus:
-                _chunk->emit<OpCode::Sub>(src, dst);
+                _chunk->emit<Sub>(src, dst);
                 break;
             case Asterisk:
-                _chunk->emit<OpCode::Mul>(src, dst);
+                _chunk->emit<Mul>(src, dst);
                 break;
             case Slash:
-                _chunk->emit<OpCode::Div>(src, dst);
+                _chunk->emit<Div>(src, dst);
                 break;
             case Backslash:
-                _chunk->emit<OpCode::Idiv>(src, dst);
+                _chunk->emit<Idiv>(src, dst);
                 break;
             case Percent:
-                _chunk->emit<OpCode::Mod>(src, dst);
+                _chunk->emit<Mod>(src, dst);
                 break;
             case Chevron:
-                _chunk->emit<OpCode::BXor>(src, dst);
+                _chunk->emit<BXor>(src, dst);
                 break;
             case VertLine:
-                _chunk->emit<OpCode::BOr>(src, dst);
+                _chunk->emit<BOr>(src, dst);
                 break;
             case Ampersand:
-                _chunk->emit<OpCode::BAnd>(src, dst);
+                _chunk->emit<BAnd>(src, dst);
                 break;
             case LArithShift:
-                _chunk->emit<OpCode::BlShift>(src, dst);
+                _chunk->emit<BlShift>(src, dst);
                 break;
             case RArithShift:
-                _chunk->emit<OpCode::BrShift>(src, dst);
+                _chunk->emit<BrShift>(src, dst);
                 break;
             case RBitShift:
-                _chunk->emit<OpCode::BurShift>(src, dst);
+                _chunk->emit<BurShift>(src, dst);
                 break;
             case InContextOf:
-                _chunk->emit<OpCode::ChgThis>(src, dst);
+                _chunk->emit<ChgThis>(src, dst);
                 retReg = src;
                 return;
             case Instanceof:
-                _chunk->emit<OpCode::ChkIns>(src, dst);
+                _chunk->emit<ChkIns>(src, dst);
                 retReg = src;
                 return;
             default:
@@ -266,66 +266,65 @@ namespace cial::Inter {
     }
 
     void IRGenerator::generate(const Syntax::PrefixUnaryExprNode *node, OptReg &retReg) {
-        using enum Syntax::TokenType;
         switch(node->token.type()) {
-            case Throw: {
+            case Syntax::TokenType::Throw: {
                 Register reg{};
                 if(!expectValue(node->rhs, reg)) {
                     return;
                 }
-                _chunk->emit<OpCode::Throw>(reg);
+                _chunk->emit<Throw>(reg);
                 // retReg = reg;
                 break;
             }
-            case New:
+            case Syntax::TokenType::New:
                 node->rhs->generateBytecode(this, retReg);
                 break;
-            case Exclamation:
+            case Syntax::TokenType::Exclamation:
                 node->rhs->generateBytecode(this, retReg);
-                _chunk->emit<OpCode::LNot>(*retReg);
+                _chunk->emit<LNot>(*retReg);
                 break;
-            case Minus:
+            case Syntax::TokenType::Minus:
                 node->rhs->generateBytecode(this, retReg);
-                _chunk->emit<OpCode::ChgSign>(*retReg);
+                _chunk->emit<ChgSign>(*retReg);
                 break;
-            case Invalidate:
+            case Syntax::TokenType::Invalidate:
                 node->rhs->generateBytecode(this, retReg);
-                _chunk->emit<OpCode::Inv>(*retReg);
+                _chunk->emit<Inv>(*retReg);
                 break;
-            case Isvalid: {
+            case Syntax::TokenType::Isvalid: {
                 Register reg{};
                 auto dst = allocateRegister();
                 if(!expectValue(node->rhs, reg)) {
                     return;
                 }
-                _chunk->emit<OpCode::ChkInv>(reg, dst);
+                _chunk->emit<ChkInv>(reg, dst);
                 retReg = dst;
                 break;
             }
-            case Int: {
+            case Syntax::TokenType::Int: {
                 Register reg{};
                 if(!expectValue(node->rhs, reg)) {
                     return;
                 }
-                _chunk->emit<OpCode::ToInt>(reg);
+                _chunk->emit<ToInt>(reg);
                 retReg = reg;
                 break;
             }
-            case Real: {
+            case Syntax::TokenType::Real: {
                 Register reg{};
                 if(!expectValue(node->rhs, reg)) {
                     return;
                 }
-                _chunk->emit<OpCode::ToReal>(reg);
+                _chunk->emit<ToReal>(reg);
                 retReg = reg;
                 break;
             }
-            case String: {
+            case Syntax::TokenType::String: {
                 Register reg{};
                 if(!expectValue(node->rhs, reg)) {
                     return;
                 }
-                _chunk->emit<OpCode::ToString>(reg);
+                _chunk->emit<ToString>(reg);
                 retReg = reg;
                 break;
             }
@@ -344,7 +343,7 @@ namespace cial::Inter {
                 if(!expectValue(node->lhs, src)) {
                     return;
                 }
-                _chunk->emit<OpCode::ChkInv>(src, *retReg);
+                _chunk->emit<ChkInv>(src, *retReg);
                 freeRegister(src);
                 break;
             }
@@ -355,8 +354,8 @@ namespace cial::Inter {
                     if(const auto variable = resolveLocalVariable(identifier)) {
                         Register dst = variable->reg;
                         auto tmpR = allocateRegister();
-                        _chunk->emit<OpCode::ILoad>(tmpR, 1);
-                        _chunk->emit<OpCode::Add>(tmpR, dst);
+                        _chunk->emit<ILoad>(tmpR, 1);
+                        _chunk->emit<Add>(tmpR, dst);
                         freeRegister(tmpR);
                         retReg = dst;
                         return;
@@ -366,17 +365,17 @@ namespace cial::Inter {
                     auto tmpR1 = allocateRegister();
                     if(isTopScope()) {
                         // global maybe
-                        _chunk->emit<OpCode::ILoad>(tmpR1, 1);
-                        _chunk->emit<OpCode::GGlobal>(identifier, tmpR2);
-                        _chunk->emit<OpCode::Add>(tmpR1, tmpR2);
-                        _chunk->emit<OpCode::DGlobal>(identifier, tmpR2);
+                        _chunk->emit<ILoad>(tmpR1, 1);
+                        _chunk->emit<GGlobal>(identifier, tmpR2);
+                        _chunk->emit<Add>(tmpR1, tmpR2);
+                        _chunk->emit<DGlobal>(identifier, tmpR2);
                         retReg = tmpR2;
                     } else {
                         // find on context
-                        _chunk->emit<OpCode::ILoad>(tmpR1, 1);
-                        _chunk->emit<OpCode::GThis>(identifier, tmpR2);
-                        _chunk->emit<OpCode::Add>(tmpR1, tmpR2);
-                        _chunk->emit<OpCode::DThis>(identifier, tmpR2);
+                        _chunk->emit<ILoad>(tmpR1, 1);
+                        _chunk->emit<GThis>(identifier, tmpR2);
+                        _chunk->emit<Add>(tmpR1, tmpR2);
+                        _chunk->emit<DThis>(identifier, tmpR2);
                     }
                     freeRegister(tmpR1);
 
@@ -394,8 +393,8 @@ namespace cial::Inter {
                     if(const auto variable = resolveLocalVariable(identifier)) {
                         Register dst = variable->reg;
                         auto tmpR = allocateRegister();
-                        _chunk->emit<OpCode::ILoad>(tmpR, 1);
-                        _chunk->emit<OpCode::Sub>(tmpR, dst);
+                        _chunk->emit<ILoad>(tmpR, 1);
+                        _chunk->emit<Sub>(tmpR, dst);
                         freeRegister(tmpR);
                         retReg = dst;
                         return;
@@ -405,17 +404,17 @@ namespace cial::Inter {
                     auto tmpR1 = allocateRegister();
                     if(isTopScope()) {
                         // global maybe
-                        _chunk->emit<OpCode::ILoad>(tmpR1, 1);
-                        _chunk->emit<OpCode::GGlobal>(identifier, tmpR2);
-                        _chunk->emit<OpCode::Sub>(tmpR1, tmpR2);
-                        _chunk->emit<OpCode::DGlobal>(identifier, tmpR2);
+                        _chunk->emit<ILoad>(tmpR1, 1);
+                        _chunk->emit<GGlobal>(identifier, tmpR2);
+                        _chunk->emit<Sub>(tmpR1, tmpR2);
+                        _chunk->emit<DGlobal>(identifier, tmpR2);
                         retReg = tmpR2;
                     } else {
                         // find on context
-                        _chunk->emit<OpCode::ILoad>(tmpR1, 1);
-                        _chunk->emit<OpCode::GThis>(identifier, tmpR2);
-                        _chunk->emit<OpCode::Sub>(tmpR1, tmpR2);
-                        _chunk->emit<OpCode::DThis>(identifier, tmpR2);
+                        _chunk->emit<ILoad>(tmpR1, 1);
+                        _chunk->emit<GThis>(identifier, tmpR2);
+                        _chunk->emit<Sub>(tmpR1, tmpR2);
+                        _chunk->emit<DThis>(identifier, tmpR2);
                     }
                     freeRegister(tmpR1);
 
@@ -440,19 +439,19 @@ namespace cial::Inter {
 
         for(const auto *exprNode : node->arguments) {
             if(!exprNode) {
-                _chunk->emit<OpCode::Push>(loadVoidReg());
+                _chunk->emit<Push>(loadVoidReg());
             } else {
                 Register reg{ 0 };
                 if(!expectValue(exprNode, reg)) {
                     return;
                 }
-                _chunk->emit<OpCode::Push>(reg);
+                _chunk->emit<Push>(reg);
             }
         }
         freeRegister(memberReg);
-        _chunk->emit<OpCode::Call>(dst, memberReg, static_cast<Integer>(node->arguments.size()));
+        _chunk->emit<Call>(dst, memberReg, static_cast<Integer>(node->arguments.size()));
         // if(!node->arguments.empty()) {
-        //     _chunk->emit<OpCode::PopN>(node->arguments.size());
+        //     _chunk->emit<PopN>(node->arguments.size());
         // }
         retReg = dst;
     }
@@ -467,7 +466,7 @@ namespace cial::Inter {
 
             if(const auto variable = resolveLocalVariable(identifier)) {
                 Register dst = variable->reg;
-                _chunk->emit<OpCode::Mov>(src, dst);
+                _chunk->emit<Mov>(src, dst);
                 freeRegister(src);
                 retReg = dst;
                 return;
@@ -475,10 +474,10 @@ namespace cial::Inter {
 
             if(isTopScope()) {
                 // global maybe
-                _chunk->emit<OpCode::DGlobal>(identifier, src);
+                _chunk->emit<DGlobal>(identifier, src);
             } else {
                 // find on context
-                _chunk->emit<OpCode::DThis>(identifier, src);
+                _chunk->emit<DThis>(identifier, src);
             }
 
             retReg = src;
@@ -500,7 +499,7 @@ namespace cial::Inter {
                 if(const auto *identifierExpr = dynamic_cast<const Syntax::IdentifierExprNode *>(expr->rhs)) {
                     auto tmpR = allocateRegister();
                     genTokenValueLoadInst(tmpR, identifierExpr->token);
-                    _chunk->emit<OpCode::DProp>(lhsR, tmpR, src);
+                    _chunk->emit<DProp>(lhsR, tmpR, src);
                     freeRegister(tmpR);
 
                     retReg = src;
@@ -521,7 +520,7 @@ namespace cial::Inter {
             return;
         }
 
-        _chunk->emit<OpCode::Load>(funReg, _chunk->addConstant(funcMeta));
+        _chunk->emit<Load>(funReg, _chunk->addConstant(funcMeta));
 
         retReg = funReg;
     }
@@ -540,11 +539,11 @@ namespace cial::Inter {
         const auto identifier = getAtomFromToken(node->token);
 
         auto propReg = allocateRegister();
-        _chunk->emit<OpCode::Load>(propReg, _chunk->addConstant(propMeta));
+        _chunk->emit<Load>(propReg, _chunk->addConstant(propMeta));
 
         if(isTopScope()) {
             freeRegister(propReg);
-            _chunk->emit<OpCode::DGlobal>(identifier, propReg);
+            _chunk->emit<DGlobal>(identifier, propReg);
             return;
         }
 
@@ -568,14 +567,14 @@ namespace cial::Inter {
 
             if(isTopScope()) {
                 freeRegister(src);
-                _chunk->emit<OpCode::DGlobal>(identifier, src);
+                _chunk->emit<DGlobal>(identifier, src);
                 return;
             }
 
             // already have this variable, in same scope
             if(const auto variable = resolveLocalVariable(identifier)) {
                 freeRegister(src);
-                _chunk->emit<OpCode::Mov>(src, variable->reg);
+                _chunk->emit<Mov>(src, variable->reg);
                 return;
             }
 
@@ -586,7 +585,7 @@ namespace cial::Inter {
 
         // global
         if(isTopScope()) {
-            _chunk->emit<OpCode::DGlobal>(identifier, loadVoidReg());
+            _chunk->emit<DGlobal>(identifier, loadVoidReg());
             return;
         }
 
@@ -605,11 +604,11 @@ namespace cial::Inter {
 
         const auto identifier = getAtomFromToken(node->token);
         funcMeta->name = identifier;
-        _chunk->emit<OpCode::Load>(funReg, _chunk->addConstant(funcMeta));
+        _chunk->emit<Load>(funReg, _chunk->addConstant(funcMeta));
 
         if(isTopScope()) {
             freeRegister(funReg);
-            _chunk->emit<OpCode::DGlobal>(identifier, funReg);
+            _chunk->emit<DGlobal>(identifier, funReg);
             return;
         }
 
@@ -622,10 +621,10 @@ namespace cial::Inter {
 
         auto classReg = allocateRegister();
         auto *classMeta = _rt.createNoGC<ClassMeta>(identifier, 0);
-        _chunk->emit<OpCode::Load>(classReg, _chunk->addConstant(classMeta));
+        _chunk->emit<Load>(classReg, _chunk->addConstant(classMeta));
 
         // class is always global in current design
-        _chunk->emit<OpCode::DGlobal>(identifier, classReg);
+        _chunk->emit<DGlobal>(identifier, classReg);
 
         beginScope();
 
@@ -673,7 +672,7 @@ namespace cial::Inter {
                     if(!gen.expectValue(varDeclNode->rhs, defaultVarReg)) {
                         return;
                     }
-                    gen._chunk->emit<OpCode::DThis>(varName, defaultVarReg);
+                    gen._chunk->emit<DThis>(varName, defaultVarReg);
                 }
 
                 classMeta->setMember(MemberShapeMeta{ .name = varName, .isVar = true }, ClassFieldMeta{});
@@ -718,7 +717,7 @@ namespace cial::Inter {
 
                 // the last patch one ret
                 auto voidReg = gen.loadVoidReg();
-                funChunk->emit<OpCode::Ret>(voidReg);
+                funChunk->emit<Ret>(voidReg);
 
                 auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
                 const size_t paramCount = node->constructor->parameters.size();
@@ -737,7 +736,7 @@ namespace cial::Inter {
             auto funChunk = _rt.createNoGC<Bytecode::Chunk>(*genFinalize.parseAst(nullptr, ignoreReg));
 
             auto voidReg = genFinalize.loadVoidReg();
-            funChunk->emit<OpCode::Ret>(voidReg);
+            funChunk->emit<Ret>(voidReg);
 
             classMeta->setMember(MemberShapeMeta{ .name = finalizeAtom, .isMethod = true },
                                  ClassFieldMeta{ _rt.createNoGC<FuncMeta>(0, funChunk, Vec<LocalVariable>{}) });
@@ -751,19 +750,19 @@ namespace cial::Inter {
         const auto identifier = getAtomFromToken(node->token);
 
         if(const auto variable = resolveLocalVariable(identifier)) {
-            _chunk->emit<OpCode::CP>(variable->reg, dst);
+            _chunk->emit<CP>(variable->reg, dst);
             retReg = dst;
             return;
         }
 
         if(isTopScope()) {
-            _chunk->emit<OpCode::GGlobal>(identifier, dst);
+            _chunk->emit<GGlobal>(identifier, dst);
         } else {
             // dynamic get
             // but tjs2 doesn't support get up function scope local var
-            // _chunk->emit<OpCode::GUpval>(identifier, dst);
+            // _chunk->emit<GUpval>(identifier, dst);
             // find on context
-            _chunk->emit<OpCode::GThis>(identifier, dst);
+            _chunk->emit<GThis>(identifier, dst);
         }
 
         retReg = dst;
@@ -774,13 +773,13 @@ namespace cial::Inter {
 
         switch(node->token.type()) {
             case Syntax::TokenType::Global:
-                _chunk->emit<OpCode::Global>(dst);
+                _chunk->emit<Global>(dst);
                 break;
             case Syntax::TokenType::Super:
-                _chunk->emit<OpCode::Super>(dst);
+                _chunk->emit<Super>(dst);
                 break;
             case Syntax::TokenType::This:
-                _chunk->emit<OpCode::This>(dst);
+                _chunk->emit<This>(dst);
                 break;
             default:
                 error("not support", node->location);
@@ -811,21 +810,21 @@ namespace cial::Inter {
             return;
         }
 
-        _chunk->emit<OpCode::Test>(testReg);
+        _chunk->emit<Test>(testReg);
 
-        const size_t jmpNeIdx = _chunk->emit<OpCode::JmpNE>();
+        const size_t jmpNeIdx = _chunk->emit<NOP>();
         node->body->generateBytecode(this, ignore);
         size_t jmpIdx{};
 
         if(node->elseBody) {
-            jmpIdx = _chunk->emit<OpCode::Jmp>();
+            jmpIdx = _chunk->emit<NOP>();
         }
 
-        Jmp::target(_chunk->inst(jmpNeIdx), makeLabel());
+        _chunk->repl<JmpNE>(jmpNeIdx, makeLabel());
 
         if(node->elseBody) {
             node->elseBody->generateBytecode(this, ignore);
-            Jmp::target(_chunk->inst(jmpIdx), makeLabel());
+            _chunk->repl<JmpNE>(jmpIdx, makeLabel());
         }
 
         freeRegister(testReg);
@@ -856,25 +855,25 @@ namespace cial::Inter {
                 if(!expectValue(matchExpr, matchReg))
                     return;
 
-                _chunk->emit<OpCode::EQ>(testReg, matchReg);
-                _chunk->emit<OpCode::Test>(matchReg);
-                jmpEIdxVec.push_back(_chunk->emit<OpCode::JmpE>());
+                _chunk->emit<EQ>(testReg, matchReg);
+                _chunk->emit<Test>(matchReg);
+                jmpEIdxVec.push_back(_chunk->emit<NOP>());
             }
 
-            const size_t jmpIdx = _chunk->emit<OpCode::Jmp>();
+            const size_t jmpIdx = _chunk->emit<NOP>();
             for(const size_t jmpEIdx : jmpEIdxVec) {
-                Jmp::target(_chunk->inst(jmpEIdx), makeLabel());
+                _chunk->repl<JmpE>(jmpEIdx, makeLabel());
             }
 
             if(i != 0)
-                Jmp::target(_chunk->inst(prevCaseJmpIdx), makeLabel());
+                _chunk->repl<Jmp>(prevCaseJmpIdx, makeLabel());
 
             body->generateBytecode(this, ignore);
 
             if(body != node->matches.back().second)
-                prevCaseJmpIdx = _chunk->emit<OpCode::Jmp>();
+                prevCaseJmpIdx = _chunk->emit<NOP>();
 
-            Jmp::target(_chunk->inst(jmpIdx), makeLabel());
+            _chunk->repl<Jmp>(jmpIdx, makeLabel());
         }
 
         if(node->defaultBody)
@@ -883,7 +882,7 @@ namespace cial::Inter {
         const auto exitLabel = makeLabel();
 
         for(const size_t br : _breakStack.back()) {
-            Jmp::target(_chunk->inst(br), exitLabel);
+            _chunk->repl<Jmp>(br, exitLabel);
         }
     }
 
@@ -904,7 +903,7 @@ namespace cial::Inter {
         const auto testLabel = makeLabel();
         _continueStack.back().continueLabel = testLabel;
         for(const size_t idx : _continueStack.back().continues) {
-            Jmp::target(_chunk->inst(idx), testLabel);
+            _chunk->repl<Jmp>(idx, testLabel);
         }
 
         Register testReg{ 0 };
@@ -912,14 +911,14 @@ namespace cial::Inter {
             return;
         }
 
-        _chunk->emit<OpCode::Test>(testReg);
-        const size_t jmpNEIdx = _chunk->emit<OpCode::JmpNE>();
-        Jmp::target(_chunk->inst(_chunk->emit<OpCode::Jmp>()), bodyLabel);
+        _chunk->emit<Test>(testReg);
+        const size_t jmpNEIdx = _chunk->emit<NOP>();
+        _chunk->emit<Jmp>(bodyLabel);
 
         const auto exitLabel = makeLabel();
-        Jmp::target(_chunk->inst(jmpNEIdx), exitLabel);
+        _chunk->repl<JmpNE>(jmpNEIdx, exitLabel);
         for(const size_t idx : _breakStack.back()) {
-            Jmp::target(_chunk->inst(idx), exitLabel);
+            _chunk->repl<Jmp>(idx, exitLabel);
         }
 
         freeRegister(testReg);
@@ -944,8 +943,8 @@ namespace cial::Inter {
         if(node->test) {
             if(!expectValue(node->test, testReg))
                 return;
-            _chunk->emit<OpCode::Test>(testReg);
-            jmpNeIdx = _chunk->emit<OpCode::JmpNE>();
+            _chunk->emit<Test>(testReg);
+            jmpNeIdx = _chunk->emit<NOP>();
         }
 
         node->body->generateBytecode(this, ignore);
@@ -953,7 +952,7 @@ namespace cial::Inter {
         const auto stepLabel = makeLabel();
         _continueStack.back().continueLabel = stepLabel;
         for(const size_t idx : _continueStack.back().continues) {
-            Jmp::target(_chunk->inst(idx), stepLabel);
+            _chunk->repl<Jmp>(idx, stepLabel);
         }
 
         if(node->step) {
@@ -964,13 +963,13 @@ namespace cial::Inter {
             freeRegister(stepReg);
         }
 
-        Jmp::target(_chunk->inst(_chunk->emit<OpCode::Jmp>()), testLabel);
+        _chunk->emit<Jmp>(testLabel);
 
         const auto exitLabel = makeLabel();
         if(node->test)
-            Jmp::target(_chunk->inst(jmpNeIdx), exitLabel);
+            _chunk->repl<JmpNE>(jmpNeIdx, exitLabel);
         for(const size_t idx : _breakStack.back()) {
-            Jmp::target(_chunk->inst(idx), exitLabel);
+            _chunk->repl<Jmp>(idx, exitLabel);
         }
 
         if(node->test)
@@ -994,23 +993,23 @@ namespace cial::Inter {
             return;
         }
 
-        _chunk->emit<OpCode::Test>(testReg);
-        const size_t jmpNeIdx = _chunk->emit<OpCode::JmpNE>();
+        _chunk->emit<Test>(testReg);
+        const size_t jmpNeIdx = _chunk->emit<NOP>();
 
         node->body->generateBytecode(this, ignore);
 
         const auto testLabel = makeLabel();
         _continueStack.back().continueLabel = testLabel;
         for(const size_t idx : _continueStack.back().continues) {
-            Jmp::target(_chunk->inst(idx), testLabel);
+            _chunk->repl<Jmp>(idx, testLabel);
         }
 
-        Jmp::target(_chunk->inst(_chunk->emit<OpCode::Jmp>()), loopLabel);
+        _chunk->emit<Jmp>(loopLabel);
         const auto exitLabel = makeLabel();
-        Jmp::target(_chunk->inst(jmpNeIdx), exitLabel);
+        _chunk->repl<JmpNE>(jmpNeIdx, exitLabel);
 
         for(const size_t idx : _breakStack.back()) {
-            Jmp::target(_chunk->inst(idx), exitLabel);
+            _chunk->repl<Jmp>(idx, exitLabel);
         }
 
         freeRegister(testReg);
@@ -1021,7 +1020,7 @@ namespace cial::Inter {
             error("break keyword must in loop or switch scope", node->location);
             return;
         }
-        const size_t idx = _chunk->emit<OpCode::Jmp>();
+        const size_t idx = _chunk->emit<NOP>();
         _breakStack.back().push_back(idx);
     }
 
@@ -1031,9 +1030,9 @@ namespace cial::Inter {
             return;
         }
         if(_continueStack.back().continueLabel.has_value()) {
-            Jmp::target(_chunk->inst(_chunk->emit<OpCode::Jmp>()), _continueStack.back().continueLabel.value());
+            _chunk->emit<Jmp>(_continueStack.back().continueLabel.value());
         } else {
-            const size_t idx = _chunk->emit<OpCode::Jmp>();
+            const size_t idx = _chunk->emit<NOP>();
             _continueStack.back().continues.push_back(idx);
         }
     }
@@ -1045,27 +1044,27 @@ namespace cial::Inter {
             return;
         }
 
-        _chunk->emit<OpCode::Test>(testReg);
-        const size_t jmpNeIdx = _chunk->emit<OpCode::JmpNE>();
+        _chunk->emit<Test>(testReg);
+        const size_t jmpNeIdx = _chunk->emit<NOP>();
 
         Register lhsReg{ 0 };
         if(!expectValue(node->lhsExpr, lhsReg)) {
             return;
         }
 
-        _chunk->emit<OpCode::Mov>(lhsReg, dst);
+        _chunk->emit<Mov>(lhsReg, dst);
 
-        const size_t jmpIdx = _chunk->emit<OpCode::Jmp>();
-        Jmp::target(_chunk->inst(jmpNeIdx), makeLabel());
+        const size_t jmpIdx = _chunk->emit<NOP>();
+        _chunk->repl<JmpNE>(jmpNeIdx, makeLabel());
 
         Register rhsReg{ 0 };
         if(!expectValue(node->rhsExpr, rhsReg)) {
             return;
         }
 
-        _chunk->emit<OpCode::Mov>(rhsReg, dst);
+        _chunk->emit<Mov>(rhsReg, dst);
 
-        Jmp::target(_chunk->inst(jmpIdx), makeLabel());
+        _chunk->repl<Jmp>(jmpIdx, makeLabel());
         freeRegister(testReg);
         retReg = dst;
     }
@@ -1076,13 +1075,13 @@ namespace cial::Inter {
             if(!expectValue(node->expr, reg)) {
                 return;
             }
-            _chunk->emit<OpCode::Ret>(reg);
+            _chunk->emit<Ret>(reg);
             return;
         }
-        _chunk->emit<OpCode::Ret>(loadVoidReg());
+        _chunk->emit<Ret>(loadVoidReg());
     }
 
-    void IRGenerator::generate(const Syntax::DebuggerStmtNode *, OptReg &) const { _chunk->emit<OpCode::Debugger>(); }
+    void IRGenerator::generate(const Syntax::DebuggerStmtNode *, OptReg &) const { _chunk->emit<Debugger>(); }
 
     LocalVariable *IRGenerator::resolveLocalVariable(const Atom identifier) {
         for(auto &var : std::ranges::reverse_view(_localVars)) {
@@ -1120,8 +1119,8 @@ namespace cial::Inter {
         assert(funChunk);
 
         // the last instruction is not ret, patch one ret
-        if(auto &instVec = funChunk->getInstVec(); instVec.empty() || instVec.back().opcode() != OpCode::Ret) {
-            funChunk->emit<OpCode::Ret>(gen.loadVoidReg());
+        if(auto &instVec = funChunk->getInstVec(); instVec.empty() || instVec.back()->opcode() != OpCode::Ret) {
+            funChunk->emit<Ret>(gen.loadVoidReg());
         }
 
         auto *chunk = _rt.createNoGC<Bytecode::Chunk>(std::move(*funChunk));
@@ -1131,7 +1130,7 @@ namespace cial::Inter {
     Register IRGenerator::loadVoidReg() {
         if(!_empty.has_value()) {
             _empty = allocateRegister();
-            _chunk->emit<OpCode::Load>(_empty.value(), ConstIdx{ 0 });
+            _chunk->emit<Load>(_empty.value(), ConstIdx{ 0 });
         }
         return _empty.value();
     }
@@ -1143,16 +1142,16 @@ namespace cial::Inter {
     void IRGenerator::genTokenValueLoadInst(Register reg, const Syntax::Token &token) const {
         switch(token.valueType()) {
             case Syntax::TokenValueType::Real:
-                _chunk->emit<OpCode::Load>(reg, _chunk->addConstant(token.getReal()));
+                _chunk->emit<Load>(reg, _chunk->addConstant(token.getReal()));
                 break;
             case Syntax::TokenValueType::String:
-                _chunk->emit<OpCode::Load>(reg, _chunk->addConstant(getAtomFromToken(token)));
+                _chunk->emit<Load>(reg, _chunk->addConstant(getAtomFromToken(token)));
                 break;
             case Syntax::TokenValueType::Octet:
                 throw std::runtime_error("Unsupported token type octet");
                 // return Constant { token.getOctet() };
             case Syntax::TokenValueType::Integer:
-                _chunk->emit<OpCode::ILoad>(reg, token.getInteger());
+                _chunk->emit<ILoad>(reg, token.getInteger());
                 break;
             case Syntax::TokenValueType::None:
                 // loadVoidReg();

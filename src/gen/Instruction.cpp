@@ -26,27 +26,6 @@
 
 namespace cial::Inter {
     using namespace cial::Bytecode;
-    void Instruction::execute(const Instruction &inst, VMState &vmState) {
-#define HANDLE_OPCODE(OP)                                                                                              \
-    case OpCode::OP:                                                                                                   \
-        OP::execute(inst, vmState);                                                                                    \
-        break;
-        switch(inst._opcode) {
-            OPCODE_ENUMS(HANDLE_OPCODE)
-            default:;
-        }
-    }
-
-    std::string Instruction::dump(const Instruction &inst, const VMState *vmState) {
-#define DUMP_OPCODE(OP)                                                                                                \
-    case OpCode::OP:                                                                                                   \
-        return OP::dump(inst, vmState);
-        switch(inst._opcode) {
-            OPCODE_ENUMS(DUMP_OPCODE)
-            default:;
-        }
-        return "";
-    }
 
     static bool propObjectSet(VMState &vmState, const Value &src, const Value &dst) {
         if(dst.isObject()) {
@@ -70,159 +49,150 @@ namespace cial::Inter {
         return false;
     }
 
-    void NOP::execute(const Instruction &, const VMState &) {}
+    void NOP::execute(VMState &vmState) {}
 
-    void Load::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.regRef(dst(inst).index()) =
-            vmState.curFrame()->chunk->getConstant(value(inst)).createValue(&vmState.rt);
+    void Load::execute(VMState &vmState) {
+        vmState.regRef(dst().index()) = vmState.curFrame()->chunk->getConstant(value()).createValue(&vmState.rt);
     }
 
-    void ILoad::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.regRef(dst(inst).index()) = Value{ value(inst) };
-    }
+    void ILoad::execute(VMState &vmState) { vmState.regRef(dst().index()) = Value{ value() }; }
 
-    void Push::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.push(vmState.reg(src(inst).index()));
-    }
+    void Push::execute(VMState &vmState) { vmState.push(vmState.reg(src().index())); }
 
-    void PopN::execute(const Instruction &inst, const VMState &vmState) { vmState.pop(count(inst)); }
+    void PopN::execute(VMState &vmState) { vmState.pop(count()); }
 
-    void CP::execute(const Instruction &inst, VMState &vmState) {
-        Value srcVal = vmState.reg(src(inst).index());
+    void CP::execute(VMState &vmState) {
+        Value srcVal = vmState.reg(src().index());
         propObjectGet(vmState, srcVal, srcVal);
-        vmState.reg(dst(inst).index(), srcVal);
+        vmState.reg(dst().index(), srcVal);
     }
 
-    void Add::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void Add::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         r2 = r1.add(r2).unwrap();
     }
 
-    void IAdd::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1{ src(inst) };
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void IAdd::execute(VMState &vmState) {
+        const Value r1{ src() };
+        Value &r2 = vmState.regRef(dst().index());
         r2 = r1.add(r2).unwrap();
     }
 
-    void Sub::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void Sub::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         r2 = r1.sub(r2).unwrap();
     }
 
-    void ISub::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1{ src(inst) };
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void ISub::execute(VMState &vmState) {
+        const Value r1{ src() };
+        Value &r2 = vmState.regRef(dst().index());
         r2 = r1.sub(r2).unwrap();
     }
 
-    void Mul::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void Mul::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         auto r = r1.mul(r2);
         r2 = r.unwrap();
     }
 
-    void Div::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void Div::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         auto r = r1.div(r2);
         r2 = r.unwrap();
     }
 
-    void Idiv::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void Idiv::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         auto r = r1.idiv(r2);
         r2 = r.unwrap();
     }
 
-    void Mod::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void Mod::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         auto r = r1.mod(r2);
         r2 = r.unwrap();
     }
 
-    void Mov::execute(const Instruction &inst, VMState &vmState) {
-        const Value &srcVal = vmState.reg(src(inst).index());
-        if(propObjectSet(vmState, srcVal, vmState.regRef(dst(inst).index()))) {
+    void Mov::execute(VMState &vmState) {
+        const Value &srcVal = vmState.reg(src().index());
+        if(propObjectSet(vmState, srcVal, vmState.regRef(dst().index()))) {
             return;
         }
-        vmState.reg(dst(inst).index(), srcVal);
+        vmState.reg(dst().index(), srcVal);
     }
 
-    void DGlobal::execute(const Instruction &inst, VMState &vmState) {
-        const Value &srcVal = vmState.regRef(src(inst).index());
-        if(vmState.globalHas(atom(inst)) && propObjectSet(vmState, srcVal, vmState.global(atom(inst)))) {
+    void DGlobal::execute(VMState &vmState) {
+        const Value &srcVal = vmState.regRef(src().index());
+        if(vmState.globalHas(atom()) && propObjectSet(vmState, srcVal, vmState.global(atom()))) {
             return;
         }
 
-        vmState.global(atom(inst), Value{ srcVal });
+        vmState.global(atom(), Value{ srcVal });
     }
 
-    void GGlobal::execute(const Instruction &inst, VMState &vmState) {
-        Value srcVal = vmState.global(atom(inst));
+    void GGlobal::execute(VMState &vmState) {
+        Value srcVal = vmState.global(atom());
         propObjectGet(vmState, srcVal, srcVal);
-        vmState.reg(dst(inst).index(), srcVal);
+        vmState.reg(dst().index(), srcVal);
     }
 
-    void Global::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.reg(dst(inst).index(), Value{ vmState.context.global() });
-    }
+    void Global::execute(VMState &vmState) { vmState.reg(dst().index(), Value{ vmState.context.global() }); }
 
-    void Super::execute(const Instruction &inst, const VMState &vmState) {
+    void Super::execute(VMState &vmState) {
         vmState.reg(
-            dst(inst).index(),
+            dst().index(),
             Value{ dynamic_cast<DataObject *>(vmState.curFrame()->thisObj.asObject().unwrap())->getSuperClass() });
     }
 
-    void This::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.reg(dst(inst).index(), Value{ vmState.curFrame()->thisObj });
-    }
+    void This::execute(VMState &vmState) { vmState.reg(dst().index(), Value{ vmState.curFrame()->thisObj }); }
 
-    void ToInt::execute(const Instruction &inst, const VMState &vmState) {
-        const auto r = vmState.regRef(dst(inst).index()).toInteger();
+    void ToInt::execute(VMState &vmState) {
+        const auto r = vmState.regRef(dst().index()).toInteger();
         if(r.isFailed()) {
             throw r.getErr();
         }
     }
 
-    void ToReal::execute(const Instruction &inst, const VMState &vmState) {
-        const auto r = vmState.regRef(dst(inst).index()).toReal();
+    void ToReal::execute(VMState &vmState) {
+        const auto r = vmState.regRef(dst().index()).toReal();
         if(r.isFailed()) {
             throw r.getErr();
         }
     }
 
-    void ToString::execute(const Instruction &inst, const VMState &vmState) {
-        const auto r = vmState.regRef(dst(inst).index()).toString();
+    void ToString::execute(VMState &vmState) {
+        const auto r = vmState.regRef(dst().index()).toString();
         if(r.isFailed()) {
             throw r.getErr();
         }
     }
 
-    void ChgThis::execute(const Instruction &inst, const VMState &vmState) {
-        const auto &srcVal = vmState.reg(src(inst).index());
-        const auto &dstVal = vmState.reg(dst(inst).index());
+    void ChgThis::execute(VMState &vmState) {
+        const auto &srcVal = vmState.reg(src().index());
+        const auto &dstVal = vmState.reg(dst().index());
         dynamic_cast<Function *>(dstVal.asObject().unwrap())->thisObj = srcVal.asObject().unwrap();
     }
 
-    void Inv::execute(const Instruction &inst, const VMState &vmState) {
-        const auto &dstVal = vmState.reg(dst(inst).index());
+    void Inv::execute(VMState &vmState) {
+        const auto &dstVal = vmState.reg(dst().index());
         dynamic_cast<DataObject *>(dstVal.asObject().unwrap())->invalidate();
     }
 
-    void ChkInv::execute(const Instruction &inst, const VMState &vmState) {
-        const auto &srcVal = vmState.reg(src(inst).index());
-        Value &dstVal = vmState.regRef(dst(inst).index());
+    void ChkInv::execute(VMState &vmState) {
+        const auto &srcVal = vmState.reg(src().index());
+        Value &dstVal = vmState.regRef(dst().index());
         dstVal = Value{ dynamic_cast<DataObject *>(srcVal.asObject().unwrap())->isValid() };
     }
 
-    void ChkIns::execute(const Instruction &inst, const VMState &vmState) {
-        Value &dstVal = vmState.regRef(dst(inst).index());
-        if(const Value &srcVal = vmState.reg(src(inst).index()); srcVal.isString()) {
+    void ChkIns::execute(VMState &vmState) {
+        Value &dstVal = vmState.regRef(dst().index());
+        if(const Value &srcVal = vmState.reg(src().index()); srcVal.isString()) {
             const Atom atom = vmState.context.rt().atomTable.intern(*srcVal.asString().value());
             dstVal = Value{ dstVal.asObject().unwrap()->instanceOf(atom) };
             return;
@@ -230,138 +200,136 @@ namespace cial::Inter {
         dstVal = Value{ false };
     }
 
-    void Test::execute(const Instruction &inst, VMState &vmState) {
-        vmState.setZF(vmState.reg(reg(inst).index()).asBool());
-    }
+    void Test::execute(VMState &vmState) { vmState.setZF(vmState.reg(reg().index()).asBool()); }
 
-    void EQ::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void EQ::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         const bool r = r1.equals(r2);
         r2 = Value{ r };
     }
 
-    void NEQ::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void NEQ::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         const bool r = !r1.equals(r2);
         r2 = Value{ r };
     }
 
-    void AbsEQ::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void AbsEQ::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         const bool r = r1.discernEquals(r2);
         r2 = Value{ r };
     }
 
-    void AbsNEQ::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void AbsNEQ::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         const bool r = !r1.discernEquals(r2);
         r2 = Value{ r };
     }
 
-    void LT::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void LT::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         const bool r = r1.littlerThan(r2).unwrap();
         r2 = Value{ r };
     }
 
-    void LE::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void LE::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         const bool r = !r1.greaterThan(r2).unwrap();
         r2 = Value{ r };
     }
 
-    void GT::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void GT::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         const bool r = r1.greaterThan(r2).unwrap();
         r2 = Value{ r };
     }
 
-    void GE::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void GE::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         const bool r = !r1.littlerThan(r2).unwrap();
         r2 = Value{ r };
     }
 
-    void LAnd::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void LAnd::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         const bool r = r1.logicalAnd(r2);
         r2 = Value{ r };
     }
 
-    void LOr::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void LOr::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         const bool r = r1.logicalOr(r2);
         r2 = Value{ r };
     }
 
-    void BXor::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void BXor::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         r2 = r1.bitwiseXor(r2).unwrap();
     }
 
-    void BOr::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void BOr::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         r2 = r1.bitwiseOr(r2).unwrap();
     }
 
-    void BAnd::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void BAnd::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         r2 = r1.bitwiseAnd(r2).unwrap();
     }
 
-    void BlShift::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void BlShift::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         r2 = r1.bitwiseLeftShift(r2).unwrap();
     }
 
-    void BrShift::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void BrShift::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         r2 = r1.bitwiseRightShift(r2).unwrap();
     }
 
-    void BurShift::execute(const Instruction &inst, const VMState &vmState) {
-        const Value r1 = vmState.reg(src(inst).index());
-        Value &r2 = vmState.regRef(dst(inst).index());
+    void BurShift::execute(VMState &vmState) {
+        const Value r1 = vmState.reg(src().index());
+        Value &r2 = vmState.regRef(dst().index());
         r2 = r1.bitwiseUnsignedRightShift(r2).unwrap();
     }
 
-    void Jmp::execute(const Instruction &inst, const VMState &vmState) { vmState.setPC(label(inst).address()); }
+    void Jmp::execute(VMState &vmState) { vmState.setPC(label().address()); }
 
-    void JmpE::execute(const Instruction &inst, const VMState &vmState) {
+    void JmpE::execute(VMState &vmState) {
         if(vmState.getZF()) {
-            vmState.setPC(label(inst).address());
+            vmState.setPC(label().address());
         }
     }
 
-    void JmpNE::execute(const Instruction &inst, const VMState &vmState) {
+    void JmpNE::execute(VMState &vmState) {
         if(!vmState.getZF()) {
-            vmState.setPC(label(inst).address());
+            vmState.setPC(label().address());
         }
     }
 
-    void Call::execute(const Instruction &inst, VMState &vmState) {
-        const auto &object = vmState.reg(memberReg(inst).index()).asObject().unwrap();
-        object->call(vmState, dst(inst).index(), argCount(inst));
+    void Call::execute(VMState &vmState) {
+        const auto &object = vmState.reg(memberReg().index()).asObject().unwrap();
+        object->call(vmState, dst().index(), argCount());
     }
 
-    void GProp::execute(const Instruction &inst, VMState &vmState) {
-        const auto &val = vmState.reg(obj(inst).index());
-        const String &name = *vmState.reg(memberReg(inst).index()).asString().unwrap();
+    void GProp::execute(VMState &vmState) {
+        const auto &val = vmState.reg(obj().index());
+        const String &name = *vmState.reg(memberReg().index()).asString().unwrap();
         const Atom atom = vmState.rt.atomTable.intern(name);
 
         if(val.isObject()) {
@@ -375,7 +343,7 @@ namespace cial::Inter {
                     // return;
                     throw std::runtime_error("Not implemented");
                 }
-                vmState.reg(dst(inst).index(), global->getProp(atom));
+                vmState.reg(dst().index(), global->getProp(atom));
                 return;
             }
 
@@ -387,13 +355,13 @@ namespace cial::Inter {
                     auto *fun = dynamic_cast<Function *>(tmp.asObject().value());
                     fun->thisObj = vmState.curFrame()->thisObj.asObject().value();
                 }
-                vmState.reg(dst(inst).index(), tmp);
+                vmState.reg(dst().index(), tmp);
                 return;
             }
 
             auto tmp = obj->getProp(atom);
             propObjectGet(vmState, tmp, tmp);
-            vmState.reg(dst(inst).index(), tmp);
+            vmState.reg(dst().index(), tmp);
             return;
         }
 
@@ -404,55 +372,51 @@ namespace cial::Inter {
         assert(nativeFn != nullptr);
         nativeFn = vmState.rt.create<NativeFunction>(*nativeFn).get();
         nativeFn->setThisObj(val);
-        vmState.reg(dst(inst).index(), Value{ nativeFn });
+        vmState.reg(dst().index(), Value{ nativeFn });
     }
 
-    void DProp::execute(const Instruction &inst, const VMState &vmState) {
-        const auto &r = vmState.reg(obj(inst).index());
+    void DProp::execute(VMState &vmState) {
+        const auto &r = vmState.reg(obj().index());
         CLL_ASSERT(r.isObject(), "gprop obj is not object");
-        const String &name = *vmState.reg(memberReg(inst).index()).asString().unwrap();
+        const String &name = *vmState.reg(memberReg().index()).asString().unwrap();
         const Atom atom = vmState.rt.atomTable.intern(name);
-        r.asObject().unwrap()->setProp(atom, vmState.reg(src(inst).index()));
+        r.asObject().unwrap()->setProp(atom, vmState.reg(src().index()));
     }
 
-    void GThis::execute(const Instruction &inst, VMState &vmState) {
-        Value srcVal = vmState.getThis(atom(inst));
+    void GThis::execute(VMState &vmState) {
+        Value srcVal = vmState.getThis(atom());
         propObjectGet(vmState, srcVal, srcVal);
-        vmState.reg(dst(inst).index(), srcVal);
+        vmState.reg(dst().index(), srcVal);
     }
 
-    void DThis::execute(const Instruction &inst, VMState &vmState) {
-        const Value &srcVal = vmState.regRef(src(inst).index());
+    void DThis::execute(VMState &vmState) {
+        const Value &srcVal = vmState.regRef(src().index());
 
-        if(vmState.hasThis(atom(inst))) {
-            if(propObjectSet(vmState, srcVal, vmState.getThis(atom(inst)))) {
+        if(vmState.hasThis(atom())) {
+            if(propObjectSet(vmState, srcVal, vmState.getThis(atom()))) {
                 return;
             }
         }
 
-        vmState.setThis(atom(inst), srcVal);
+        vmState.setThis(atom(), srcVal);
     }
 
-    void GUpval::execute(const Instruction &inst, const VMState &vmState) {
-        vmState.reg(dst(inst).index(), vmState.getUpVal(atom(inst)));
-    }
+    void GUpval::execute(VMState &vmState) { vmState.reg(dst().index(), vmState.getUpVal(atom())); }
 
-    void LNot::execute(const Instruction &inst, const VMState &vmState) {
-        const Register srcReg = dst(inst);
+    void LNot::execute(VMState &vmState) {
+        const Register srcReg = dst();
         vmState.regRef(srcReg.index()).toLogicalNot();
     }
 
-    void ChgSign::execute(const Instruction &inst, const VMState &vmState) {
-        auto r = vmState.regRef(dst(inst).index()).toSignChange();
+    void ChgSign::execute(VMState &vmState) {
+        auto r = vmState.regRef(dst().index()).toSignChange();
         if(r.isFailed())
             throw r.getErr();
     }
 
-    void Throw::execute(const Instruction &inst, VMState &vmState) {
-        vmState.throwException(vmState.reg(src(inst).index()));
-    }
+    void Throw::execute(VMState &vmState) { vmState.throwException(vmState.reg(src().index())); }
 
-    void Debugger::execute(const Instruction &inst, const VMState &vmState) {
+    void Debugger::execute(VMState &vmState) {
         std::string regs = vmState.dumpCurRegisters();
         std::string localVarInfo = vmState.dumpCurLocalVars();
         std::string chunk = vmState.dumpCurInstructions();
@@ -468,8 +432,8 @@ namespace cial::Inter {
         DEBUG_BREAK();
     }
 
-    void Ret::execute(const Instruction &inst, VMState &vmState) {
-        const auto &value = vmState.reg(retReg(inst).index());
+    void Ret::execute(VMState &vmState) {
+        const auto &value = vmState.reg(retReg().index());
         const auto frame = vmState.curFrame();
         CLL_ASSERT(frame->ret, "frame.ret val is empty");
         vmState.prevFrame()->getReg(*frame->ret) = value;
@@ -558,9 +522,7 @@ namespace cial::Inter {
     }
 
 #define DEF_AUTO_DUMP(className, instName)                                                                             \
-    std::string className::dump(const Instruction &inst, const VMState *vm) {                                          \
-        return DumpInst::autoDump(instName, inst, vm);                                                                 \
-    }
+    std::string className::dump(const VMState *vm) { return DumpInst::autoDump(instName, *this, vm); }
 
     DEF_AUTO_DUMP(NOP, "nop");
 

@@ -35,7 +35,7 @@ namespace cial::Bytecode {
 
             const auto &instruction = instList[pc];
             // fmt::println("{}\n", Instruction::dump(*instruction, this));
-            Inter::Instruction::execute(instruction, *this);
+            instruction->execute(*this);
             switch(_pending) {
                 case PendingCF::Throw:
                     unwind();

@@ -124,12 +124,9 @@ namespace cial::Inter {
 
     class Instruction {
     public:
-        explicit Instruction(const OpCode opcode, Operand operand1 = Operand{}, Operand operand2 = Operand{},
-                             Operand operand3 = Operand{}) : _opcode(opcode) {
-            _ops[0] = operand1;
-            _ops[1] = operand2;
-            _ops[2] = operand3;
-        }
+        explicit Instruction() = default;
+
+        virtual ~Instruction() = default;
 
         Instruction(const Instruction &) = default;
 
@@ -139,7 +136,7 @@ namespace cial::Inter {
 
         Instruction &operator=(Instruction &&) = default;
 
-        [[nodiscard]] OpCode opcode() const { return _opcode; }
+        [[nodiscard]] virtual OpCode opcode() const = 0;
 
         [[nodiscard]] auto getOp1() const { return _ops[0]; }
         [[nodiscard]] auto getOp2() const { return _ops[1]; }
@@ -175,209 +172,226 @@ namespace cial::Inter {
             return _ops[2].value<T>();
         }
 
-        static void execute(const Instruction &inst, Bytecode::VMState &vmState);
+        virtual void execute(Bytecode::VMState &vmState) = 0;
 
-        static std::string dump(const Instruction &inst, const Bytecode::VMState *vmState = nullptr);
+        virtual std::string dump(const Bytecode::VMState *vmState) = 0;
 
-    private:
-        OpCode _opcode;
+    protected:
         Operand _ops[3];
         friend struct DumpInst;
     };
 
 // 操作码
 #define OP_GET1(name, type)                                                                                            \
-    static type name(const Instruction &inst) { return inst.getOp1Val<type>(); }
+    type name() const { return getOp1Val<type>(); }
 #define OP_GET2(name, type)                                                                                            \
-    static type name(const Instruction &inst) { return inst.getOp2Val<type>(); }
+    type name() const { return getOp2Val<type>(); }
 #define OP_GET3(name, type)                                                                                            \
-    static type name(const Instruction &inst) { return inst.getOp3Val<type>(); }
+    type name() const { return getOp3Val<type>(); }
 
-// 定义指令
-#define DEF_INST_EX(className, getters, execute_ref)                                                                   \
-    struct className {                                                                                                 \
-        getters static void execute(const Instruction &, execute_ref);                                                 \
-        [[nodiscard]] static std::string dump(const Instruction &inst, const Bytecode::VMState *vmState);              \
+#define PP_NARG(...) PP_NARG_(__VA_ARGS__, PP_RSEQ_N())
+#define PP_NARG_(...) PP_ARG_N(__VA_ARGS__)
+#define PP_ARG_N(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, N, ...) N
+#define PP_RSEQ_N() 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
+
+#define DEF_CTOR_0(className)                                                                                          \
+    explicit className() : Instruction() {}
+
+#define DEF_CTOR_1(className)                                                                                          \
+    explicit className(Operand o1) : Instruction() { _ops[0] = o1; }
+
+#define DEF_CTOR_2(className)                                                                                          \
+    explicit className(Operand o1, Operand o2) : Instruction() {                                                       \
+        _ops[0] = o1;                                                                                                  \
+        _ops[1] = o2;                                                                                                  \
     }
 
-// 定义指令可变, 不可变变体
-#define DEF_INST(className, getters) DEF_INST_EX(className, getters, const Bytecode::VMState &)
-#define DEF_INST_MUT(className, getters) DEF_INST_EX(className, getters, Bytecode::VMState &)
+#define DEF_CTOR_3(className)                                                                                          \
+    explicit className(Operand o1, Operand o2, Operand o3) : Instruction() {                                           \
+        _ops[0] = o1;                                                                                                  \
+        _ops[1] = o2;                                                                                                  \
+        _ops[2] = o3;                                                                                                  \
+    }
+
+#define DEF_INST(className, N, getters)                                                                                \
+    struct className : Instruction {                                                                                   \
+        DEF_CTOR_##N(className) virtual ~className() = default;                                                        \
+        [[nodiscard]] OpCode opcode() const override { return OpCode::className; }                                     \
+        getters void execute(Bytecode::VMState &vmState) override;                                                     \
+        [[nodiscard]] std::string dump(const Bytecode::VMState *vmState) override;                                     \
+    }
 
     // ────────────────────────────────────────────────
     // 定义指令
     // ────────────────────────────────────────────────
 
-    DEF_INST(NOP, /* no getters */);
+    DEF_INST(NOP, 0, /* no getters */);
 
-    // def op1
-    DEF_INST(Load, OP_GET1(dst, Register) OP_GET2(value, ConstIdx));
-
-    // def op1
-    DEF_INST(ILoad, OP_GET1(dst, Register) OP_GET2(value, Integer));
+    DEF_INST(Debugger, 0, );
 
     // use op1
-    DEF_INST(Push, OP_GET1(src, Register));
+    DEF_INST(Push, 1, OP_GET1(src, Register));
 
-    DEF_INST(PopN, OP_GET1(count, Integer));
+    DEF_INST(PopN, 1, OP_GET1(count, Integer));
+
+    // def op1
+    DEF_INST(Global, 1, OP_GET1(dst, Register));
+
+    // def op1
+    DEF_INST(Super, 1, OP_GET1(dst, Register));
+
+    // def op1
+    DEF_INST(This, 1, OP_GET1(dst, Register));
+
+    // def op1
+    DEF_INST(ToInt, 1, OP_GET1(dst, Register));
+
+    // def op1
+    DEF_INST(ToReal, 1, OP_GET1(dst, Register));
+
+    // def op1
+    DEF_INST(ToString, 1, OP_GET1(dst, Register));
+
+    // use op1
+    DEF_INST(Inv, 1, OP_GET1(dst, Register));
+
+    // use op1
+    DEF_INST(Test, 1, OP_GET1(reg, Register));
+
+    // use op1 def op1
+    DEF_INST(LNot, 1, OP_GET1(dst, Register));
+
+    // use op1 def op1
+    DEF_INST(ChgSign, 1, OP_GET1(dst, Register));
+
+    // use op1
+    DEF_INST(Throw, 1, OP_GET1(src, Register));
+
+    // use op1
+    DEF_INST(Ret, 1, OP_GET1(retReg, Register));
+
+    DEF_INST(Jmp, 1, OP_GET1(label, Label));
+
+    DEF_INST(JmpE, 1, OP_GET1(label, Label));
+
+    DEF_INST(JmpNE, 1, OP_GET1(label, Label));
+
+    // def op1
+    DEF_INST(Load, 2, OP_GET1(dst, Register) OP_GET2(value, ConstIdx));
+
+    // def op1
+    DEF_INST(ILoad, 2, OP_GET1(dst, Register) OP_GET2(value, Integer));
 
     // use op1 op2 def op2
-    DEF_INST(Add, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(Add, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(IAdd, OP_GET1(src, Integer) OP_GET2(dst, Register));
+    DEF_INST(IAdd, 2, OP_GET1(src, Integer) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(Sub, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(Sub, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(ISub, OP_GET1(src, Integer) OP_GET2(dst, Register));
+    DEF_INST(ISub, 2, OP_GET1(src, Integer) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(Mul, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(Mul, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(Div, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(Div, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(Idiv, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(Idiv, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(Mod, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(Mod, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 def op2
-    DEF_INST_MUT(Mov, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(Mov, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 def op2
-    DEF_INST_MUT(CP, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(CP, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op2
-    DEF_INST_MUT(DGlobal, OP_GET1(atom, Atom) OP_GET2(src, Register));
+    DEF_INST(DGlobal, 2, OP_GET1(atom, Atom) OP_GET2(src, Register));
 
     // def op2
-    DEF_INST_MUT(GGlobal, OP_GET1(atom, Atom) OP_GET2(dst, Register));
-
-    // def op1
-    DEF_INST(Global, OP_GET1(dst, Register));
-
-    // def op1
-    DEF_INST(Super, OP_GET1(dst, Register));
-
-    // def op1
-    DEF_INST(This, OP_GET1(dst, Register));
-
-    // def op1
-    DEF_INST(ToInt, OP_GET1(dst, Register));
-
-    // def op1
-    DEF_INST(ToReal, OP_GET1(dst, Register));
-
-    // def op1
-    DEF_INST(ToString, OP_GET1(dst, Register));
+    DEF_INST(GGlobal, 2, OP_GET1(atom, Atom) OP_GET2(dst, Register));
 
     // use op1 op2
-    DEF_INST(ChgThis, OP_GET1(dst, Register) OP_GET2(src, Register));
-
-    // use op1
-    DEF_INST(Inv, OP_GET1(dst, Register));
+    DEF_INST(ChgThis, 2, OP_GET1(dst, Register) OP_GET2(src, Register));
 
     // use op1 op2 def op2
-    DEF_INST(ChkInv, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(ChkInv, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op1
-    DEF_INST(ChkIns, OP_GET1(dst, Register) OP_GET2(src, Register));
-
-    // use op1
-    DEF_INST_MUT(Test, OP_GET1(reg, Register));
+    DEF_INST(ChkIns, 2, OP_GET1(dst, Register) OP_GET2(src, Register));
 
     // use op1 op2 def op2
-    DEF_INST(EQ, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(EQ, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(NEQ, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(NEQ, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(LT, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(LT, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(LE, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(LE, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(GT, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(GT, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(GE, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(GE, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(AbsEQ, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(AbsEQ, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(AbsNEQ, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(AbsNEQ, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op2
-    DEF_INST(LAnd, OP_GET1(src, Register) OP_GET2(dst, Register));
-
-    // use op1 def op1
-    DEF_INST(LNot, OP_GET1(dst, Register));
-
-    DEF_INST(
-        Jmp,
-        OP_GET1(label, Label) //
-        static void target(Instruction &inst, Label label) { inst.setOp1Val(label); } //
-    );
-
-    DEF_INST(JmpE : Jmp, );
-    DEF_INST(JmpNE : Jmp, );
-
-    // use op2 def op1
-    DEF_INST_MUT(Call, OP_GET1(dst, Register) OP_GET2(memberReg, Register) OP_GET3(argCount, Integer));
-
-    // use op1 op2 def op3
-    DEF_INST_MUT(GProp, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(dst, Register));
-
-    // use op1 op2 op3
-    DEF_INST(DProp, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(src, Register));
+    DEF_INST(LAnd, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // def op2
-    DEF_INST_MUT(GThis, OP_GET1(atom, Atom) OP_GET2(dst, Register));
+    DEF_INST(GThis, 2, OP_GET1(atom, Atom) OP_GET2(dst, Register));
 
     // use op2
-    DEF_INST_MUT(DThis, OP_GET1(atom, Atom) OP_GET2(src, Register));
+    DEF_INST(DThis, 2, OP_GET1(atom, Atom) OP_GET2(src, Register));
 
     // def op2
-    DEF_INST(GUpval, OP_GET1(atom, Atom) OP_GET2(dst, Register));
+    DEF_INST(GUpval, 2, OP_GET1(atom, Atom) OP_GET2(dst, Register));
 
     // use op1 op2 def op3
-    DEF_INST(LOr, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(LOr, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op3
-    DEF_INST(BXor, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(BXor, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op3
-    DEF_INST(BOr, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(BOr, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op3
-    DEF_INST(BAnd, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(BAnd, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op3
-    DEF_INST(BlShift, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(BlShift, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op3
-    DEF_INST(BrShift, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(BrShift, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     // use op1 op2 def op3
-    DEF_INST(BurShift, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(BurShift, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
-    // use op1 def op1
-    DEF_INST(ChgSign, OP_GET1(dst, Register));
+    // use op2 def op1
+    DEF_INST(Call, 3, OP_GET1(dst, Register) OP_GET2(memberReg, Register) OP_GET3(argCount, Integer));
 
-    DEF_INST(Debugger, );
+    // use op1 op2 def op3
+    DEF_INST(GProp, 3, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(dst, Register));
 
-    // use op1
-    DEF_INST_MUT(Throw, OP_GET1(src, Register));
-
-    // use op1
-    DEF_INST_MUT(Ret, OP_GET1(retReg, Register));
+    // use op1 op2 op3
+    DEF_INST(DProp, 3, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(src, Register));
 
     struct DumpInst {
         [[nodiscard]] static String dumpOperand(const Operand &operand);

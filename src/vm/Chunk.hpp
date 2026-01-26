@@ -47,19 +47,28 @@ namespace cial::Bytecode {
         }
 
         /**
-         * @tparam OP 操作码
          * @tparam Args 指令的值类型
          * @param args 值数组
          * @return 指令在内存的索引
          */
-        template <Inter::OpCode OP, typename... Args>
+        template <typename T, typename... Args>
+            requires std::is_base_of_v<Inter::Instruction, T>
         size_t emit(Args &&...args) {
             const size_t index = _instructions.size();
-            _instructions.emplace_back(OP, Inter::Operand(std::forward<Args>(args))...);
+            _instructions.push_back(std::make_unique<T>(Inter::Operand(std::forward<Args>(args))...));
             return index;
         }
 
-        Inter::Instruction &inst(const size_t index) { return _instructions[index]; }
+        template <typename T, typename... Args>
+            requires std::is_base_of_v<Inter::Instruction, T>
+        void repl(const size_t index, Args &&...args) {
+            if(index > _instructions.size()) {
+                throw std::runtime_error("instruction index out of range");
+            }
+            _instructions[index] = std::make_unique<T>(Inter::Operand(std::forward<Args>(args))...);
+        }
+
+        [[nodiscard]] Inter::Instruction *inst(const size_t index) const { return _instructions[index].get(); }
 
         Chunk(const Chunk &) = delete;
         Chunk &operator=(const Chunk &) = delete;
@@ -116,7 +125,7 @@ namespace cial::Bytecode {
         }
 
     private:
-        Vec<Inter::Instruction> _instructions{};
+        Vec<Box<Inter::Instruction>> _instructions{};
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
         u32 _registerCount{};

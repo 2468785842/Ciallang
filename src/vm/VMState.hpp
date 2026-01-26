@@ -99,7 +99,7 @@ namespace cial::Bytecode {
 
         [[nodiscard]] size_t getRegPoolTop() const { return context.regPool().used(); }
 
-        [[nodiscard]] const Vec<Inter::Instruction> &instructions() const noexcept {
+        [[nodiscard]] const Vec<Box<Inter::Instruction>> &instructions() const noexcept {
             return _currentFrame->chunk->getInstVec();
         }
 
