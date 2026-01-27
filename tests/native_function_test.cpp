@@ -11,13 +11,13 @@
 #include "vm/VMState.hpp"
 
 using namespace cial;
-using namespace cial::StdLib;
+using namespace cial::stdlib;
 
 TEST_CASE("本地函数声明 - 字符串成员方法定义") {
     Runtime rt{};
     Context context{ rt };
     context.initNativeMethod();
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     const VM vm{ &vmState };
 
     SECTION("Method - charAt") {

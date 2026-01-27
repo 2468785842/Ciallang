@@ -12,7 +12,7 @@ namespace cial {
 }
 
 // 函数特性萃取
-namespace cial::NativeFunDetail {
+namespace cial::native {
     template <typename T>
     struct NativeFunTraits;
 
@@ -113,4 +113,4 @@ namespace cial::NativeFunDetail {
                                                    std::make_index_sequence<N>{});
     }
 
-} // namespace cial::NativeFunDetail
+} // namespace cial::native

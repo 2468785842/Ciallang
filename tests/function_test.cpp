@@ -16,7 +16,7 @@ using namespace cial;
 TEST_CASE("函数声明 - 简单函数定义") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         function empty() { }
@@ -36,7 +36,7 @@ TEST_CASE("函数声明 - 简单函数定义") {
 TEST_CASE("函数声明 - 参数列表") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         function single(x) { return x; }
@@ -66,7 +66,7 @@ TEST_CASE("函数声明 - 函数体内容") {
 
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         VM vm{ &vmState };
         vm.eval(R"(
             function test() {
@@ -85,7 +85,7 @@ TEST_CASE("函数声明 - 函数体内容") {
 
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         VM vm{ &vmState };
         vm.eval(R"(
             function control() {
@@ -103,7 +103,7 @@ TEST_CASE("函数声明 - 函数体内容") {
 
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         VM vm{ &vmState };
         vm.eval(R"(
             function loop() {
@@ -124,7 +124,7 @@ TEST_CASE("函数声明 - 函数调用") {
     SECTION("无参数省略括号函数调用") {
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         VM vm{ &vmState };
         vm.eval(R"(
             function foo { return 1; }
@@ -137,7 +137,7 @@ TEST_CASE("函数声明 - 函数调用") {
     SECTION("无参数函数调用") {
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         VM vm{ &vmState };
         vm.eval(R"(
             function foo() { return 1; }
@@ -150,7 +150,7 @@ TEST_CASE("函数声明 - 函数调用") {
     SECTION("带参数函数调用") {
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         VM vm{ &vmState };
         VM::Handle<Value> ret = vm.eval<Value>(R"(
             function add(a, b) { return a + b; }
@@ -162,7 +162,7 @@ TEST_CASE("函数声明 - 函数调用") {
     SECTION("嵌套函数调用") {
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         VM vm{ &vmState };
         VM::Handle<Value> ret = vm.eval<Value>(R"(
             function outer(a) { return a; }
@@ -180,7 +180,7 @@ TEST_CASE("函数声明 - 多个函数定义") {
 
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         VM vm{ &vmState };
         VM::Handle<Value> ret = vm.eval<Value>(R"(
             function a() { return 1; }
@@ -199,7 +199,7 @@ TEST_CASE("函数声明 - 多个函数定义") {
 
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         VM vm{ &vmState };
         VM::Handle<Value> ret = vm.eval<Value>(R"(
             var x = 10;
@@ -220,7 +220,7 @@ TEST_CASE("函数声明 - 递归函数") {
 
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         VM vm{ &vmState };
         VM::Handle<Integer> ret = vm.eval<Integer>(R"(
             function factorial(n) {

@@ -13,7 +13,7 @@ TEST_CASE("preprocessor basic @if/@endif") {
     Runtime rt{};
     Context context{ rt };
     context.pp().setVar("version"_str, 0x02040009);
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -28,7 +28,7 @@ TEST_CASE("preprocessor basic @if/@endif") {
 TEST_CASE("preprocessor @set and variable usage") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -45,7 +45,7 @@ TEST_CASE("preprocessor nested @if") {
     Runtime rt{};
     Context context{ rt };
     context.pp().setVar("version"_str, 0x02040009);
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -65,7 +65,7 @@ TEST_CASE("preprocessor nested @if") {
 TEST_CASE("preprocessor binary/hex literals") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -82,7 +82,7 @@ TEST_CASE("preprocessor binary/hex literals") {
 TEST_CASE("preprocessor disabled code via @if") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -99,7 +99,7 @@ TEST_CASE("preprocessor disabled code via @if") {
 TEST_CASE("preprocessor comments ignored") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -123,7 +123,7 @@ TEST_CASE("preprocessor comments ignored") {
 TEST_CASE("preprocessor logical operators") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -156,7 +156,7 @@ TEST_CASE("preprocessor logical operators") {
 TEST_CASE("preprocessor complex nested expressions") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(

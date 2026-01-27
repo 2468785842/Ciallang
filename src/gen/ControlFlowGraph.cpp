@@ -8,8 +8,8 @@
 
 #include "vm/Chunk.hpp"
 
-namespace cial::Inter {
-    using namespace Bytecode;
+namespace cial::inter {
+    using namespace vm;
 
     Vec<BasicBlock> ControlFlowGraph::buildCFG(Chunk &chunk) {
         // const Vec<Instruction> &code = chunk.getInstVec();
@@ -50,4 +50,4 @@ namespace cial::Inter {
         return _basicBlocks;
     }
 
-} // namespace cial::Inter
+} // namespace cial::inter

@@ -23,7 +23,7 @@ TEST_CASE("函数作用域 - 上层访问") {
     // NOTE: TJS2 doesn't support accessing local variables of parent functions
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     const VM vm{ &vmState };
     const auto r = vm.eval<Integer>(R"(
         var r = 1;
@@ -45,7 +45,7 @@ TEST_CASE("函数作用域 - 初始化变量") {
     // NOTE: TJS2 function default param value eval on `call` invoke time
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     const VM vm{ &vmState };
     const auto r = vm.eval<Integer>(R"(
         var a = 1;
@@ -65,7 +65,7 @@ TEST_CASE("函数作用域 - 初始化变量") {
 TEST_CASE("类作用域 - 上下文静态变量访问") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     const VM vm{ &vmState };
 
     auto r = vm.eval<Integer>(R"(
@@ -109,7 +109,7 @@ TEST_CASE("类作用域 - 上下文静态变量访问") {
 // TEST_CASE("作用域 - 父类静态变量访问") {
 //     Runtime rt{};
 //     Context context{ rt };
-//     Bytecode::VMState vmState{ context };
+//     vm::VMState vmState{ context };
 //     const VM vm{ &vmState };
 //     const auto r = vm.eval<Integer>(R"(
 //         class Base {}

@@ -4,8 +4,8 @@
 
 #include "Optimizer.hpp"
 
-namespace cial::Inter {
-    using namespace Bytecode;
+namespace cial::inter {
+    using namespace vm;
 
     void Optimizer::removeNopInst(Vec<Instruction> &instVec) {
         // if(instVec.empty())
@@ -40,4 +40,4 @@ namespace cial::Inter {
         //     }
         // }
     }
-} // namespace cial::Inter
+} // namespace cial::inter

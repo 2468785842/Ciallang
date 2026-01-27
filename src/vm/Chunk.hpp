@@ -20,7 +20,7 @@
 #include "gen/Instruction.hpp"
 #include "logging/Logger.hpp"
 
-namespace cial::Bytecode {
+namespace cial::vm {
     class VMState;
 
     struct ThrowHandler {
@@ -52,23 +52,23 @@ namespace cial::Bytecode {
          * @return 指令在内存的索引
          */
         template <typename T, typename... Args>
-            requires std::is_base_of_v<Inter::Instruction, T>
+            requires std::is_base_of_v<inter::Instruction, T>
         size_t emit(Args &&...args) {
             const size_t index = _instructions.size();
-            _instructions.push_back(std::make_unique<T>(Inter::Operand(std::forward<Args>(args))...));
+            _instructions.push_back(std::make_unique<T>(inter::Operand(std::forward<Args>(args))...));
             return index;
         }
 
         template <typename T, typename... Args>
-            requires std::is_base_of_v<Inter::Instruction, T>
+            requires std::is_base_of_v<inter::Instruction, T>
         void repl(const size_t index, Args &&...args) {
             if(index > _instructions.size()) {
                 throw std::runtime_error("instruction index out of range");
             }
-            _instructions[index] = std::make_unique<T>(Inter::Operand(std::forward<Args>(args))...);
+            _instructions[index] = std::make_unique<T>(inter::Operand(std::forward<Args>(args))...);
         }
 
-        [[nodiscard]] Inter::Instruction *inst(const size_t index) const { return _instructions[index].get(); }
+        [[nodiscard]] inter::Instruction *inst(const size_t index) const { return _instructions[index].get(); }
 
         Chunk(const Chunk &) = delete;
         Chunk &operator=(const Chunk &) = delete;
@@ -125,9 +125,9 @@ namespace cial::Bytecode {
         }
 
     private:
-        Vec<Box<Inter::Instruction>> _instructions{};
+        Vec<Box<inter::Instruction>> _instructions{};
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
         u32 _registerCount{};
     };
-} // namespace cial::Bytecode
+} // namespace cial::vm

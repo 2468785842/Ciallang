@@ -21,7 +21,7 @@
 namespace cial {
     struct CallFrame {
         CallFrame *closure{};
-        Bytecode::Chunk *chunk{};
+        vm::Chunk *chunk{};
         FuncMeta *funcMeta{}; // funcMeta != nullptr is function call
         Value thisObj{};
         Opt<u16> ret{};
@@ -29,10 +29,10 @@ namespace cial {
 
         explicit CallFrame() = default;
 
-        explicit CallFrame(Bytecode::Chunk *chunk, const Opt<u16> ret, Bytecode::FastRegisterPool &pool) :
+        explicit CallFrame(vm::Chunk *chunk, const Opt<u16> ret, vm::FastRegisterPool &pool) :
             chunk(chunk), ret(ret), _pool(&pool), _sp(pool.allocFrame(chunk->getRegCount())) {}
 
-        explicit CallFrame(FuncMeta *funcMeta, const Opt<u16> ret, Bytecode::FastRegisterPool &pool) :
+        explicit CallFrame(FuncMeta *funcMeta, const Opt<u16> ret, vm::FastRegisterPool &pool) :
             chunk(funcMeta->chunk), funcMeta(funcMeta), ret(ret), _pool(&pool),
             _sp(pool.allocFrame(funcMeta->chunk->getRegCount()) - funcMeta->arity) {}
 
@@ -71,8 +71,8 @@ namespace cial {
         [[nodiscard]] const Value &getReg(const u16 reg) const { return *_pool->ptrAt(_sp + reg); }
 
     private:
-        friend class Bytecode::VMState;
-        Bytecode::FastRegisterPool *_pool{};
+        friend class vm::VMState;
+        vm::FastRegisterPool *_pool{};
         u32 _sp{};
     };
 } // namespace cial

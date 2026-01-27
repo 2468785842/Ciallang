@@ -26,11 +26,11 @@ void run_lexer(const std::string &input) {
     Common::Result r{};
     sourceFile.load(r, input);
     if(!r.isFailed()) {
-        Syntax::Lexer lexer{ sourceFile, context.pp() };
+        syntax::Lexer lexer{ sourceFile, context.pp() };
         while(lexer.hasNext()) {
-            Syntax::Token *t;
+            syntax::Token *t;
             lexer.next(t);
-            Syntax::Token take;
+            syntax::Token take;
             lexer.takeOverToken(take);
         }
     }

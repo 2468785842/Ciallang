@@ -19,7 +19,7 @@ extern "C" int LLVMFuzzerTestOneInput(const u8 *data, size_t size) {
     Common::Result r{};
     sourceFile.load(r, input);
 
-    Syntax::Parser parser{ sourceFile, context.pp() };
+    syntax::Parser parser{ sourceFile, context.pp() };
     try {
         parser.parse(r);
     } catch(...) {

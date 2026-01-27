@@ -16,10 +16,10 @@
 #include "gc/gc.hpp"
 #include "runtime/AtomTable.hpp"
 
-namespace cial::Bytecode {
+namespace cial::vm {
     class VMState;
     class Register;
-} // namespace cial::Bytecode
+} // namespace cial::vm
 
 namespace cial {
     class Object : public MarkSweepHeader {
@@ -35,7 +35,7 @@ namespace cial {
 
         void setName(const Atom atom) noexcept { _name = atom; }
 
-        virtual void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) = 0;
+        virtual void call(vm::VMState &vmState, u32 ret, size_t argCount) = 0;
 
         virtual bool instanceOf(Atom a) { return false; }
 

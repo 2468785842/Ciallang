@@ -19,7 +19,7 @@
 #include "types/String.hpp"
 #include "types/Types.hpp"
 
-namespace cial::Syntax {
+namespace cial::syntax {
 
     struct OpTrieNode {
         TokenType token = TokenType::Invalid;
@@ -64,4 +64,4 @@ namespace cial::Syntax {
 
         [[nodiscard]] const OpTrieNode &getNode(const size_t nodeIndex) const { return _opTrie[nodeIndex]; }
     };
-} // namespace cial::Syntax
+} // namespace cial::syntax

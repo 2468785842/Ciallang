@@ -19,7 +19,7 @@
 #include "parser/ast/AstNode.hpp"
 #include "vm/Chunk.hpp"
 
-namespace cial::Inter {
+namespace cial::inter {
 
     class IRGenerator {
 
@@ -27,7 +27,7 @@ namespace cial::Inter {
         explicit IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile) :
             _rt(rt), _sourceFile(sourceFile), _r(r) {}
 
-        Opt<Bytecode::Chunk> parseAst(const Syntax::AstNode *node, OptReg &retReg);
+        Opt<vm::Chunk> parseAst(const syntax::AstNode *node, OptReg &retReg);
 
         void addLocalVar(LocalVariable variable) { _localVars.emplace_back(variable); }
 
@@ -56,62 +56,62 @@ namespace cial::Inter {
          */
         void makeVirtualGlobalScope() { _scopeStartPC.emplace_back(0); }
 
-        void generate(const Syntax::ValueExprNode *, OptReg &);
+        void generate(const syntax::ValueExprNode *, OptReg &);
 
-        void generate(const Syntax::IdentifierExprNode *, OptReg &);
+        void generate(const syntax::IdentifierExprNode *, OptReg &);
 
-        void generate(const Syntax::InternalIdentifierExprNode *, OptReg &);
+        void generate(const syntax::InternalIdentifierExprNode *, OptReg &);
 
-        void generate(const Syntax::BinaryExprNode *, OptReg &);
+        void generate(const syntax::BinaryExprNode *, OptReg &);
 
-        void generate(const Syntax::PrefixUnaryExprNode *, OptReg &);
+        void generate(const syntax::PrefixUnaryExprNode *, OptReg &);
 
-        void generate(const Syntax::SuffixUnaryExprNode *, OptReg &);
+        void generate(const syntax::SuffixUnaryExprNode *, OptReg &);
 
-        void generate(const Syntax::ProcCallExprNode *, OptReg &);
+        void generate(const syntax::ProcCallExprNode *, OptReg &);
 
-        void generate(const Syntax::AssignExprNode *, OptReg &);
+        void generate(const syntax::AssignExprNode *, OptReg &);
 
-        void generate(const Syntax::FunctionExprNode *, OptReg &);
+        void generate(const syntax::FunctionExprNode *, OptReg &);
 
-        void generate(const Syntax::BlockStmtNode *, OptReg &);
+        void generate(const syntax::BlockStmtNode *, OptReg &);
 
-        void generate(const Syntax::ExprStmtNode *, OptReg &);
+        void generate(const syntax::ExprStmtNode *, OptReg &);
 
-        void generate(const Syntax::TryStmtNode *, OptReg &);
+        void generate(const syntax::TryStmtNode *, OptReg &);
 
-        void generate(const Syntax::IfStmtNode *, OptReg &);
+        void generate(const syntax::IfStmtNode *, OptReg &);
 
-        void generate(const Syntax::SwitchStmtNode *, OptReg &);
+        void generate(const syntax::SwitchStmtNode *, OptReg &);
 
-        void generate(const Syntax::PropertyDeclNode *, OptReg &);
+        void generate(const syntax::PropertyDeclNode *, OptReg &);
 
-        void generate(const Syntax::VarDeclNode *, OptReg &);
+        void generate(const syntax::VarDeclNode *, OptReg &);
 
-        void generate(const Syntax::FunctionDeclNode *, OptReg &);
+        void generate(const syntax::FunctionDeclNode *, OptReg &);
 
-        void generate(const Syntax::ClassDeclNode *, OptReg &);
+        void generate(const syntax::ClassDeclNode *, OptReg &);
 
-        void generate(const Syntax::StmtDeclNode *, OptReg &);
+        void generate(const syntax::StmtDeclNode *, OptReg &);
 
-        void generate(const Syntax::DoWhileStmtNode *, OptReg &);
+        void generate(const syntax::DoWhileStmtNode *, OptReg &);
 
-        void generate(const Syntax::ForStmtNode *, OptReg &);
+        void generate(const syntax::ForStmtNode *, OptReg &);
 
-        void generate(const Syntax::WhileStmtNode *, OptReg &);
+        void generate(const syntax::WhileStmtNode *, OptReg &);
 
-        void generate(const Syntax::BreakStmtNode *, OptReg &);
+        void generate(const syntax::BreakStmtNode *, OptReg &);
 
-        void generate(const Syntax::ContinueStmtNode *, OptReg &);
+        void generate(const syntax::ContinueStmtNode *, OptReg &);
 
-        void generate(const Syntax::ReturnStmtNode *, OptReg &);
+        void generate(const syntax::ReturnStmtNode *, OptReg &);
 
-        void generate(const Syntax::DebuggerStmtNode *, OptReg &) const;
+        void generate(const syntax::DebuggerStmtNode *, OptReg &) const;
 
-        void generate(const Syntax::TernaryExprNode *, OptReg &);
+        void generate(const syntax::TernaryExprNode *, OptReg &);
 
     private:
-        Box<Bytecode::Chunk> _chunk = std::make_unique<Bytecode::Chunk>();
+        Box<vm::Chunk> _chunk = std::make_unique<vm::Chunk>();
 
         Runtime &_rt;
         Common::SourceFile &_sourceFile;
@@ -158,14 +158,14 @@ namespace cial::Inter {
 
         Register loadVoidReg();
 
-        FuncMeta *generateFuncMeta(const Syntax::Parameters &parameters, const Syntax::BlockStmtNode *body) const;
+        FuncMeta *generateFuncMeta(const syntax::Parameters &parameters, const syntax::BlockStmtNode *body) const;
 
-        bool expectValue(const Syntax::ExprNode *node, Register &ret);
+        bool expectValue(const syntax::ExprNode *node, Register &ret);
 
         void error(const std::string &message, const Common::SourceLocation &location) const {
             _sourceFile.error(_r, message, location);
         }
-        [[nodiscard]] Atom getAtomFromToken(const Syntax::Token &token) const;
-        void genTokenValueLoadInst(Register reg, const Syntax::Token &token) const;
+        [[nodiscard]] Atom getAtomFromToken(const syntax::Token &token) const;
+        void genTokenValueLoadInst(Register reg, const syntax::Token &token) const;
     };
-} // namespace cial::Inter
+} // namespace cial::inter

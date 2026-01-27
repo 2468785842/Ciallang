@@ -22,11 +22,11 @@
 #include "parser/Token.hpp"
 
 namespace cial {
-    class AstFormatter final : public Syntax::AstNode::Visitor {
+    class AstFormatter final : public syntax::AstNode::Visitor {
     public:
         explicit AstFormatter() = default;
 
-        void formatAst(const Syntax::AstNode *node) {
+        void formatAst(const syntax::AstNode *node) {
             _branchStack.clear();
             // root
             _ss << "Program" << '\n';
@@ -54,13 +54,13 @@ namespace cial {
         }
 
         // 保持和你原来签名接近的 printNode（T* 默认 nullptr）
-        template <typename T = Syntax::AstNode>
+        template <typename T = syntax::AstNode>
         void printNode(const std::string &type, const T *value = nullptr) {
             printPrefix();
             _ss << fmt::format("{}", type);
 
             if(value) {
-                if constexpr(std::is_base_of_v<Syntax::AstNode, T>) {
+                if constexpr(std::is_base_of_v<syntax::AstNode, T>) {
                     // 不在这里直接递归 accept（会导致前缀错位）
                     // 我们选择在 visitor 中明确 child(...) 来控制分支标志
                     _ss << fmt::format(" ");
@@ -89,7 +89,7 @@ namespace cial {
 
         // ======= child helpers: 用来统一管理 branchStack（避免直接把节点当成可调用对象） =======
         // 传 AstNode*，自动 accept(this)
-        void child(const Syntax::AstNode *node, const bool hasSibling) {
+        void child(const syntax::AstNode *node, const bool hasSibling) {
             _branchStack.push_back(hasSibling);
             node->accept(this);
             _branchStack.pop_back();
@@ -104,12 +104,12 @@ namespace cial {
 
         // ======= VISITOR 实现（全部覆盖） =======
 
-        void visit(const Syntax::StmtDeclNode *node) override {
+        void visit(const syntax::StmtDeclNode *node) override {
             // StmtDecl 只是包装 statement
             node->statement->accept(this);
         }
 
-        void visit(const Syntax::VarDeclNode *node) override {
+        void visit(const syntax::VarDeclNode *node) override {
             // printNode("DeclareVar");
             // child(
             //     [&] {
@@ -123,7 +123,7 @@ namespace cial {
             //     false);
         }
 
-        void visit(const Syntax::FunctionDeclNode *node) override {
+        void visit(const syntax::FunctionDeclNode *node) override {
             printNode("FunctionDecl");
             // child(
             //     [&] {
@@ -157,7 +157,7 @@ namespace cial {
             //     false);
         }
 
-        void visit(const Syntax::ClassDeclNode *node) override {
+        void visit(const syntax::ClassDeclNode *node) override {
             printNode("ClassDecl");
             child(
                 [&] {
@@ -168,7 +168,7 @@ namespace cial {
                 false);
         }
 
-        void visit(const Syntax::BinaryExprNode *node) override {
+        void visit(const syntax::BinaryExprNode *node) override {
             printNode("BinaryExpression");
             child(
                 [&] {
@@ -179,7 +179,7 @@ namespace cial {
                 false);
         }
 
-        void visit(const Syntax::UnaryExprNode *node) override {
+        void visit(const syntax::UnaryExprNode *node) override {
             printNode("UnaryExpression");
             child(
                 [&] {
@@ -189,7 +189,7 @@ namespace cial {
                 false);
         }
 
-        void visit(const Syntax::ProcCallExprNode *node) override {
+        void visit(const syntax::ProcCallExprNode *node) override {
             printNode("ProcCall");
             if(!node->arguments.empty()) {
                 child(
@@ -204,7 +204,7 @@ namespace cial {
             }
         }
 
-        void visit(const Syntax::AssignExprNode *node) override {
+        void visit(const syntax::AssignExprNode *node) override {
             printNode("AssignmentExpression");
             child(
                 [&] {
@@ -215,7 +215,7 @@ namespace cial {
                 false);
         }
 
-        void visit(const Syntax::BlockStmtNode *node) override {
+        void visit(const syntax::BlockStmtNode *node) override {
             printNode("BlockStatement");
             child(
                 [&] {
@@ -228,9 +228,9 @@ namespace cial {
                 false);
         }
 
-        void visit(const Syntax::ExprStmtNode *node) override { node->expression->accept(this); }
+        void visit(const syntax::ExprStmtNode *node) override { node->expression->accept(this); }
 
-        void visit(const Syntax::IfStmtNode *node) override {
+        void visit(const syntax::IfStmtNode *node) override {
             printNode("IfStatement");
             child(
                 [&] {
@@ -248,7 +248,7 @@ namespace cial {
                 false);
         }
 
-        void visit(const Syntax::DoWhileStmtNode *node) override {
+        void visit(const syntax::DoWhileStmtNode *node) override {
             printNode("DoWhileStatement");
             child(
                 [&] {
@@ -261,7 +261,7 @@ namespace cial {
                 false);
         }
 
-        void visit(const Syntax::ForStmtNode *node) override {
+        void visit(const syntax::ForStmtNode *node) override {
             printNode("ForStatement");
             child(
                 [&] {
@@ -286,7 +286,7 @@ namespace cial {
                 false);
         }
 
-        void visit(const Syntax::WhileStmtNode *node) override {
+        void visit(const syntax::WhileStmtNode *node) override {
             printNode("WhileStatement");
             child(
                 [&] {
@@ -299,16 +299,16 @@ namespace cial {
                 false);
         }
 
-        void visit(const Syntax::BreakStmtNode *node) override { printNode("BreakStatement"); }
+        void visit(const syntax::BreakStmtNode *node) override { printNode("BreakStatement"); }
 
-        void visit(const Syntax::ContinueStmtNode *node) override { printNode("ContinueStatement"); }
+        void visit(const syntax::ContinueStmtNode *node) override { printNode("ContinueStatement"); }
 
-        void visit(const Syntax::ReturnStmtNode *node) override {
+        void visit(const syntax::ReturnStmtNode *node) override {
             printNode("ReturnStatement");
             child([&] { node->expr->accept(this); }, false);
         }
 
-        void visit(const Syntax::IdentifierExprNode *node) override {
+        void visit(const syntax::IdentifierExprNode *node) override {
             printPrefix();
             // 打成 Identifier (name)
             // if(node->token && node->token->value().value<Atom>().isString()) {
@@ -318,7 +318,7 @@ namespace cial {
             // }
         }
 
-        void visit(const Syntax::ValueExprNode *node) override {
+        void visit(const syntax::ValueExprNode *node) override {
             // printPrefix();
             // _ss << fmt::format("Value ({})", node->token->value()) << '\n';
         }

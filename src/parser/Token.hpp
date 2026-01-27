@@ -23,7 +23,7 @@
 #include "types/Octet.hpp"
 #include "types/Value.hpp"
 
-namespace cial::Syntax {
+namespace cial::syntax {
     using namespace Common;
 #define KEYWORD_LIST(X)                                                                                                \
     X(Void, "void")                                                                                                    \
@@ -329,4 +329,4 @@ namespace cial::Syntax {
             { TokenType::RArithShiftEqual, TokenType::RArithShift } // >>=
         });
     };
-} // namespace cial::Syntax
+} // namespace cial::syntax

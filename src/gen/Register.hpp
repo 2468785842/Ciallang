@@ -17,7 +17,7 @@
 
 #include "types/Types.hpp"
 
-namespace cial::Inter {
+namespace cial::inter {
     class [[nodiscard]] Register {
     public:
         explicit Register() = default;
@@ -31,11 +31,11 @@ namespace cial::Inter {
 
         friend std::ostream &operator<<(std::ostream &os, const Register &reg) { return os << '%' << reg._index; }
     };
-} // namespace cial::Inter
+} // namespace cial::inter
 
 namespace cial {
-    using OptReg = Opt<Inter::Register>;
+    using OptReg = Opt<inter::Register>;
 }
 
 template <>
-struct fmt::formatter<cial::Inter::Register> : ostream_formatter {};
+struct fmt::formatter<cial::inter::Register> : ostream_formatter {};

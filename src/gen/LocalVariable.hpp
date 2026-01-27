@@ -15,7 +15,7 @@
 #include "Register.hpp"
 #include "runtime/AtomTable.hpp"
 
-namespace cial::Inter {
+namespace cial::inter {
 
     struct LocalVariable {
         Atom identifier = ATOM_INVALID;
@@ -25,4 +25,4 @@ namespace cial::Inter {
         // when (var.endPC > inst.pc) you can't use
         Label endPC{}; // Invalid PC (scope ended)
     };
-} // namespace cial::Inter
+} // namespace cial::inter

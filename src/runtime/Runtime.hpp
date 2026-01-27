@@ -20,7 +20,7 @@
 #include "gc/gc.hpp"
 
 namespace cial {
-    namespace Inter {
+    namespace inter {
         class IRGenerator;
     }
     struct FuncMeta;
@@ -92,7 +92,7 @@ namespace cial {
         }
 
     private:
-        friend class Inter::IRGenerator;
+        friend class inter::IRGenerator;
         template <typename T, typename... Args>
             requires std::is_base_of_v<MarkSweepHeader, T>
         T *createNoGC(Args &&...args) {

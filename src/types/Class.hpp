@@ -29,7 +29,7 @@ namespace cial {
 
         explicit ClassObject(ClassMeta *classMeta, Runtime *rt);
 
-        void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) override;
+        void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
             Object::marked();
@@ -74,11 +74,11 @@ namespace cial {
     public:
         DataObject() = delete;
 
-        explicit DataObject(Bytecode::VMState *vmState, ClassObject *klass) : _vmState(vmState), _class(klass) {}
+        explicit DataObject(vm::VMState *vmState, ClassObject *klass) : _vmState(vmState), _class(klass) {}
 
         ~DataObject() noexcept override { invalidate(); }
 
-        void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) override;
+        void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         [[nodiscard]] ClassObject *klass() const noexcept { return _class; }
 
@@ -139,7 +139,7 @@ namespace cial {
 
     private:
         bool _isValid{ true }; // 保留这个字段只是为了兼容性,我们不需要使用它, 主要是配合invalidate
-        Bytecode::VMState *_vmState; // 保留vm以便析构函数调用finalize方法, 兼容性
+        vm::VMState *_vmState; // 保留vm以便析构函数调用finalize方法, 兼容性
         ClassObject *_class{};
         Map<Atom, Value> _props{};
         Map<Atom, ClassObject *> _superClass{};

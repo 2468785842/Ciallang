@@ -18,7 +18,7 @@
 
 #include "gen/IRGenerator.hpp"
 
-namespace cial::Syntax {
+namespace cial::syntax {
     class DeclNode : public AstNode {
     protected:
         using AstNode::AstNode;
@@ -36,7 +36,7 @@ namespace cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
             return gen->generate(this, retReg);
         }
     };
@@ -53,7 +53,7 @@ namespace cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
             return gen->generate(this, retReg);
         }
     };
@@ -73,7 +73,7 @@ namespace cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
             return gen->generate(this, retReg);
         }
     };
@@ -89,7 +89,7 @@ namespace cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
             return gen->generate(this, retReg);
         }
     };
@@ -106,8 +106,8 @@ namespace cial::Syntax {
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 
-        void generateBytecode(Inter::IRGenerator *gen, OptReg &retReg) const override {
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
             return gen->generate(this, retReg);
         }
     };
-} // namespace cial::Syntax
+} // namespace cial::syntax

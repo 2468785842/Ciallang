@@ -16,11 +16,11 @@
 #include "common/SourceLocation.hpp"
 #include "parser/Token.hpp"
 
-namespace cial::Inter {
+namespace cial::inter {
     class IRGenerator;
 }
 
-namespace cial::Syntax {
+namespace cial::syntax {
     class AstNode;
 
     class DeclNode;
@@ -104,7 +104,7 @@ namespace cial::Syntax {
 
         virtual void accept(Visitor *) const = 0;
 
-        virtual void generateBytecode(Inter::IRGenerator *, OptReg &) const = 0;
+        virtual void generateBytecode(inter::IRGenerator *, OptReg &) const = 0;
 
         [[nodiscard]] std::string_view name() const noexcept { return _name; }
 
@@ -171,4 +171,4 @@ namespace cial::Syntax {
 
         virtual void visit(const TernaryExprNode *) = 0;
     };
-} // namespace cial::Syntax
+} // namespace cial::syntax

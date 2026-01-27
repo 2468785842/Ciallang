@@ -26,7 +26,7 @@
 
 #include "gen/Register.hpp"
 
-namespace cial::Bytecode {
+namespace cial::vm {
 
     enum class PendingCF { None, Throw };
 
@@ -97,7 +97,7 @@ namespace cial::Bytecode {
 
         [[nodiscard]] size_t getRegPoolTop() const { return context.regPool().used(); }
 
-        [[nodiscard]] const Vec<Box<Inter::Instruction>> &instructions() const noexcept {
+        [[nodiscard]] const Vec<Box<inter::Instruction>> &instructions() const noexcept {
             return _currentFrame->chunk->getInstVec();
         }
 
@@ -169,4 +169,4 @@ namespace cial::Bytecode {
         PendingCF _pending{};
         Value _exValue{};
     };
-} // namespace cial::Bytecode
+} // namespace cial::vm

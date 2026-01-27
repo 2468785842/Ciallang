@@ -21,7 +21,7 @@
 
 #include "types/Real.hpp"
 
-namespace cial::Syntax {
+namespace cial::syntax {
 
     Lexer::Lexer(SourceFile &sourceFile, PreProcessor &preProcessor) :
         _sourceFile(sourceFile), _preProcessor(preProcessor) {}
@@ -1126,4 +1126,4 @@ namespace cial::Syntax {
         token = makeToken(TokenType::Error, "unexcepted character in octet literal"_str);
         return false;
     }
-} // namespace cial::Syntax
+} // namespace cial::syntax

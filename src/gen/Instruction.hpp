@@ -18,11 +18,11 @@
 #include "runtime/AtomTable.hpp"
 #include "vm/Constant.hpp"
 
-namespace cial::Bytecode {
+namespace cial::vm {
     class VMState;
 }
 
-namespace cial::Inter {
+namespace cial::inter {
 #define OPCODE_ENUMS(O)                                                                                                \
     O(NOP)                                                                                                             \
     O(Load)                                                                                                            \
@@ -91,8 +91,8 @@ namespace cial::Inter {
 
     class Instruction;
 
-    using ExecuteCallback = void (*)(const Instruction &, Bytecode::VMState &);
-    using DumpCallback = std::string (*)(const Instruction &, const Bytecode::VMState &, bool);
+    using ExecuteCallback = void (*)(const Instruction &, vm::VMState &);
+    using DumpCallback = std::string (*)(const Instruction &, const vm::VMState &, bool);
 
     struct Operand {
         enum class Type { None, Register, Label, ConstIndex, Number, Atom };
@@ -171,9 +171,9 @@ namespace cial::Inter {
             return _ops[2].value<T>();
         }
 
-        virtual void execute(Bytecode::VMState &vmState) = 0;
+        virtual void execute(vm::VMState &vmState) = 0;
 
-        virtual std::string dump(const Bytecode::VMState *vmState) = 0;
+        virtual std::string dump(const vm::VMState *vmState) = 0;
 
         virtual void encode(Vec<u8> &code) = 0;
 
@@ -213,8 +213,8 @@ namespace cial::Inter {
     struct className : Instruction {                                                                                   \
         DEF_CTOR_##N(className) virtual ~className() = default;                                                        \
         [[nodiscard]] OpCode opcode() const override { return OpCode::className; }                                     \
-        getters void execute(Bytecode::VMState &vmState) override;                                                     \
-        [[nodiscard]] std::string dump(const Bytecode::VMState *vmState) override;                                     \
+        getters void execute(vm::VMState &vmState) override;                                                           \
+        [[nodiscard]] std::string dump(const vm::VMState *vmState) override;                                           \
         void encode(Vec<u8> &code) override {}                                                                         \
     }
 
@@ -297,6 +297,6 @@ namespace cial::Inter {
     struct DumpInst {
         [[nodiscard]] static String dumpOperand(const Operand &operand);
         [[nodiscard]] static std::string autoDump(std::string_view name, const Instruction &inst,
-                                                  const Bytecode::VMState *vm);
+                                                  const vm::VMState *vm);
     };
-}; // namespace cial::Inter
+}; // namespace cial::inter

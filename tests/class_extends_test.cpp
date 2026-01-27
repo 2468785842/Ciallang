@@ -12,7 +12,7 @@ using namespace cial;
 TEST_CASE("OOP - 构造函数调用与参数传递") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -31,7 +31,7 @@ TEST_CASE("OOP - 构造函数调用与参数传递") {
 TEST_CASE("OOP - 成员变量初始化发生在构造函数之前") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -50,7 +50,7 @@ TEST_CASE("OOP - 成员变量初始化发生在构造函数之前") {
 TEST_CASE("OOP - 成员属性 getter 行为") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -72,7 +72,7 @@ TEST_CASE("OOP - 成员属性 getter 行为") {
 TEST_CASE("OOP - instanceof Class 判断") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -87,7 +87,7 @@ TEST_CASE("OOP - instanceof Class 判断") {
 TEST_CASE("OOP - 类方法内 new 必须使用 global.ClassName") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -110,7 +110,7 @@ TEST_CASE("OOP - 类方法内 new 必须使用 global.ClassName") {
 TEST_CASE("OOP - invalidate 调用 finalize") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -132,7 +132,7 @@ TEST_CASE("OOP - invalidate 调用 finalize") {
 TEST_CASE("OOP - isvalid 在 invalidate 前后行为") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -150,7 +150,7 @@ TEST_CASE("OOP - isvalid 在 invalidate 前后行为") {
 TEST_CASE("OOP - 方法闭包保持对象上下文") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -172,7 +172,7 @@ TEST_CASE("OOP - 方法闭包保持对象上下文") {
 TEST_CASE("OOP - incontextof 修改闭包上下文") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -196,7 +196,7 @@ TEST_CASE("OOP - incontextof 修改闭包上下文") {
 TEST_CASE("OOP - 单继承与 super 方法调用") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -218,7 +218,7 @@ TEST_CASE("OOP - 单继承与 super 方法调用") {
 TEST_CASE("OOP - override 隐藏父类方法") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -241,7 +241,7 @@ TEST_CASE("OOP - override 隐藏父类方法") {
 TEST_CASE("OOP - 多重继承方法覆盖顺序") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -259,7 +259,7 @@ TEST_CASE("OOP - 多重继承方法覆盖顺序") {
 TEST_CASE("OOP - 子类成员变量覆盖父类成员变量") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(
@@ -276,7 +276,7 @@ TEST_CASE("OOP - 子类成员变量覆盖父类成员变量") {
 TEST_CASE("OOP - 父类构造函数初始化字段对子类可见") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -296,7 +296,7 @@ TEST_CASE("OOP - 父类构造函数初始化字段对子类可见") {
 TEST_CASE("OOP - super 方法应作用于子类对象") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -319,7 +319,7 @@ TEST_CASE("OOP - super 方法应作用于子类对象") {
 TEST_CASE("OOP - 父子字段应共享同一 this") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -341,7 +341,7 @@ TEST_CASE("OOP - 父子字段应共享同一 this") {
 TEST_CASE("TJS2 - 方法字段解析优先使用定义 class 的 slot") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -363,7 +363,7 @@ TEST_CASE("TJS2 - 方法字段解析优先使用定义 class 的 slot") {
 TEST_CASE("TJS2 - 字段仅在 slot 链不存在时 fallback 到 instance") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -384,7 +384,7 @@ TEST_CASE("TJS2 - 字段仅在 slot 链不存在时 fallback 到 instance") {
 TEST_CASE("TJS2 - super slot 优先于 instance 字段") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class C { var x = 4; function C() {} }
@@ -408,7 +408,7 @@ TEST_CASE("TJS2 - super slot 优先于 instance 字段") {
 TEST_CASE("TJS2 - 构造函数调用会覆盖子类字段") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -429,7 +429,7 @@ TEST_CASE("TJS2 - 构造函数调用会覆盖子类字段") {
 TEST_CASE("TJS2 - 父构造函数仅初始化父 slot") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -450,7 +450,7 @@ TEST_CASE("TJS2 - 父构造函数仅初始化父 slot") {
 TEST_CASE("TJS2 - 多继承 slot 查找顺序") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A { var x = 1; function A() {} }
@@ -469,7 +469,7 @@ TEST_CASE("TJS2 - 多继承 slot 查找顺序") {
 TEST_CASE("TJS2 - 多继承 slot 不存在时 fallback 到 instance") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A { function A() {} }
@@ -489,7 +489,7 @@ TEST_CASE("TJS2 - 多继承 slot 不存在时 fallback 到 instance") {
 TEST_CASE("TJS2 - 方法不是闭包而是绑定 slot 的函数") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -508,7 +508,7 @@ TEST_CASE("TJS2 - 方法不是闭包而是绑定 slot 的函数") {
 TEST_CASE("TJS2 - 方法不绑定 slot 而不是调用者") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -531,7 +531,7 @@ TEST_CASE("TJS2 - 方法不绑定 slot 而不是调用者") {
 TEST_CASE("TJS2 - 子类字段不 override 父类字段") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -553,7 +553,7 @@ TEST_CASE("TJS2 - 子类字段不 override 父类字段") {
 TEST_CASE("TJS2 - 多层 slot 同名字段解析") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class C { var x = 3; function C() {} }
@@ -573,7 +573,7 @@ TEST_CASE("TJS2 - 多层 slot 同名字段解析") {
 TEST_CASE("TJS2 - 仅当 slot 链完全无字段才访问 proxy") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         class A {
@@ -595,7 +595,7 @@ TEST_CASE("TJS2 - 仅当 slot 链完全无字段才访问 proxy") {
 TEST_CASE("OOP - Legacy TJS2 Class/Slot/Constructor/Lookup 行为全集") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     vm.eval(R"(

@@ -12,7 +12,7 @@ using namespace cial;
 TEST_CASE("异常处理 - 执行") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("try内无异常-catch不执行") {

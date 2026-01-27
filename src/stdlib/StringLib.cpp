@@ -15,7 +15,7 @@
 
 // TODO: UTF-8 support
 // TODO: length property support
-namespace cial::StdLib {
+namespace cial::stdlib {
 
     String stringCharAt(VM *, const Value &thisObj, size_t, const Integer index) {
         const String *str = thisObj.asString().unwrap();
@@ -187,4 +187,4 @@ namespace cial::StdLib {
         return String(result.c_str(), static_cast<u32>(result.size()));
     }
 
-} // namespace cial::StdLib
+} // namespace cial::stdlib

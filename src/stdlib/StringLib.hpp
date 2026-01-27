@@ -18,7 +18,7 @@ namespace cial {
     class VM;
 }
 
-namespace cial::StdLib {
+namespace cial::stdlib {
 
     String stringCharAt(VM *, const Value &thisObj, size_t argCount, Integer index);
 
@@ -47,4 +47,4 @@ namespace cial::StdLib {
 
     String stringRepeat(VM *, const Value &thisObj, size_t, Integer count);
 
-} // namespace cial::StdLib
+} // namespace cial::stdlib

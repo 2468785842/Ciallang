@@ -24,7 +24,7 @@
 
 namespace cial {
 
-    void Function::call(Bytecode::VMState &vmState, const u32 ret, const size_t argCount) {
+    void Function::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {
         const auto cnt = meta->arity > argCount ? meta->arity - argCount : 0;
         if(cnt > 0)
             vmState.pushVoid(cnt);
@@ -36,10 +36,10 @@ namespace cial {
         //
         // if(cnt > 0)
         //     vmState.pop(cnt);
-        // assert(meta->chunk->getInstVec().back().opcode == Inter::OpCode::Ret);
+        // assert(meta->chunk->getInstVec().back().opcode == inter::OpCode::Ret);
     }
 
-    void NativeFunction::call(Bytecode::VMState &vmState, const u32 ret, const size_t argCount) {
+    void NativeFunction::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {
         const auto cnt = _arity > argCount ? _arity - argCount : 0;
         if(cnt > 0)
             vmState.pushVoid(cnt);

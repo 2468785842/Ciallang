@@ -117,7 +117,7 @@ namespace cial {
             }
         };
 
-        explicit VM(Bytecode::VMState *vmState) : _vmState(vmState) {}
+        explicit VM(vm::VMState *vmState) : _vmState(vmState) {}
 
         template <typename T, typename... Args>
         T *create(Args &&...args) {
@@ -145,25 +145,25 @@ namespace cial {
             }
             assert(!r.isFailed());
 
-            Syntax::Parser parser{ sourceFile, _vmState->context.pp() };
+            syntax::Parser parser{ sourceFile, _vmState->context.pp() };
 
-            Syntax::AstNode *node = parser.parse(r);
+            syntax::AstNode *node = parser.parse(r);
             assert(!r.isFailed());
 
-            Inter::IRGenerator codeGen{ r, rt, sourceFile };
+            inter::IRGenerator codeGen{ r, rt, sourceFile };
 
             OptReg ignoreReg{};
-            Opt<Bytecode::Chunk> chunk = codeGen.parseAst(node, ignoreReg);
+            Opt<vm::Chunk> chunk = codeGen.parseAst(node, ignoreReg);
 
             assert(!r.isFailed());
             assert(chunk);
             assert(chunk->getRegCount() != 0);
             assert(!chunk->getInstVec().empty());
 
-            auto *evalChunk = _vmState->rt.create<Bytecode::Chunk>(std::move(*chunk)).get();
+            auto *evalChunk = _vmState->rt.create<vm::Chunk>(std::move(*chunk)).get();
 
             u16 retReg{ 0 };
-            Bytecode::Chunk tmpChunk{};
+            vm::Chunk tmpChunk{};
             tmpChunk.setRegCount(1); // accept ret val
 
             _vmState->allocCallFrame(&tmpChunk);
@@ -196,15 +196,15 @@ namespace cial {
             sourceFile.load(r, expr.toStdStr());
             assert(!r.isFailed());
 
-            Syntax::Parser parser{ sourceFile, _vmState->context.pp() };
+            syntax::Parser parser{ sourceFile, _vmState->context.pp() };
 
-            Syntax::ExprNode *node = parser.parseExpression(r, true);
+            syntax::ExprNode *node = parser.parseExpression(r, true);
             assert(!r.isFailed());
 
-            Inter::IRGenerator codeGen{ r, rt, sourceFile };
+            inter::IRGenerator codeGen{ r, rt, sourceFile };
 
             OptReg retReg{};
-            Opt<Bytecode::Chunk> chunk = codeGen.parseAst(node, retReg);
+            Opt<vm::Chunk> chunk = codeGen.parseAst(node, retReg);
 
             assert(!r.isFailed());
             assert(chunk);
@@ -228,7 +228,7 @@ namespace cial {
         [[nodiscard]] String dumpCurCallFrameInst() const { return _vmState->curFrame()->chunk->dumpInstructions(); }
 
     private:
-        Bytecode::VMState *_vmState;
+        vm::VMState *_vmState;
     };
 
 } // namespace cial

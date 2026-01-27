@@ -21,7 +21,7 @@ namespace cial {
 
     ClassObject::ClassObject(ClassMeta *classMeta, Runtime *rt) : meta(classMeta), _rt(rt) {}
     namespace {
-        void newClass(DataObject *dataObject, const ClassObject *clazz, Bytecode::VMState &vmState, const u32 ret,
+        void newClass(DataObject *dataObject, const ClassObject *clazz, vm::VMState &vmState, const u32 ret,
                       const size_t argCount) {
             // 1. 定义一个用于追踪已访问类的集合
             std::unordered_set<ClassObject *> visited;
@@ -123,14 +123,14 @@ namespace cial {
 
             if(cnt > 0)
                 vmState.pop(cnt);
-            assert(constructor.meta->chunk->getInstVec().back()->opcode() == Inter::OpCode::Ret);
+            assert(constructor.meta->chunk->getInstVec().back()->opcode() == inter::OpCode::Ret);
         }
     } // namespace
 
     /**
      * WARN: This runtime prioritizes behavioral compatibility over architectural elegance.
      */
-    void ClassObject::call(Bytecode::VMState &vmState, const u32 ret, const size_t argCount) {
+    void ClassObject::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {
 
         if(!meta)
             throw std::runtime_error("can't new");
@@ -160,7 +160,7 @@ namespace cial {
 
                         if(cnt > 0)
                             vmState.pop(cnt);
-                        assert(constructor.meta->chunk->getInstVec().back()->opcode() == Inter::OpCode::Ret);
+                        assert(constructor.meta->chunk->getInstVec().back()->opcode() == inter::OpCode::Ret);
                         const Value extVal = vmState.global(extName);
                         assert(extVal.isObject());
                         auto *clazzObject = dynamic_cast<ClassObject *>(extVal.asObject().unwrap());
@@ -272,7 +272,7 @@ namespace cial {
         return false;
     }
 
-    void DataObject::call(Bytecode::VMState &vmState, const u32 ret, const size_t argCount) {
+    void DataObject::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {
         throw std::runtime_error("Not implemented DataObject call");
     }
 

@@ -15,7 +15,7 @@
 
 #include <fmt/ostream.h>
 
-namespace cial::Inter {
+namespace cial::inter {
     class [[nodiscard]] Label {
     public:
         explicit Label() = default;
@@ -30,7 +30,7 @@ namespace cial::Inter {
 
         friend std::ostream &operator<<(std::ostream &os, const Label &label) { return os << '@' << label._address; }
     };
-} // namespace cial::Inter
+} // namespace cial::inter
 
 template <>
-struct fmt::formatter<cial::Inter::Label> : ostream_formatter {};
+struct fmt::formatter<cial::inter::Label> : ostream_formatter {};

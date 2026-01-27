@@ -23,7 +23,7 @@
 
 namespace cial {
     class Runtime;
-    namespace Bytecode {
+    namespace vm {
         class Chunk;
     }
 } // namespace cial
@@ -44,8 +44,8 @@ namespace cial {
     struct FuncMeta : MarkSweepHeader {
         Atom name = ATOM_INVALID;
         u32 arity;
-        Bytecode::Chunk *chunk; // manager for gc
-        Vec<Inter::LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
+        vm::Chunk *chunk; // manager for gc
+        Vec<inter::LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
 
         explicit FuncMeta(FuncMeta &&funcMeta) = delete;
         FuncMeta &operator=(FuncMeta &&funcMeta) = delete;
@@ -58,7 +58,7 @@ namespace cial {
 
     private:
         friend class Runtime;
-        explicit FuncMeta(const u32 arity, Bytecode::Chunk *chunk, Vec<Inter::LocalVariable> localVars) :
+        explicit FuncMeta(const u32 arity, vm::Chunk *chunk, Vec<inter::LocalVariable> localVars) :
             arity(arity), chunk(chunk), localVars(std::move(localVars)) {}
     };
 

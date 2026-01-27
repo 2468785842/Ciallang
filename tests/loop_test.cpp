@@ -12,7 +12,7 @@ using namespace cial;
 TEST_CASE("循环 - 执行") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("while执行") {

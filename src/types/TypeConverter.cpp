@@ -119,12 +119,12 @@ namespace cial::TypeConverter {
         if(r.isFailed())
             return retErr;
         PreProcessor pp{};
-        Syntax::Lexer lexer{ sf, pp };
+        syntax::Lexer lexer{ sf, pp };
 
-        Syntax::Token *t;
+        syntax::Token *t;
         lexer.next(t, false);
 
-        if(t->type() != Syntax::TokenType::ConstVal || t->valueType() != Syntax::TokenValueType::Integer)
+        if(t->type() != syntax::TokenType::ConstVal || t->valueType() != syntax::TokenValueType::Integer)
             return retErr;
 
         return Ret<Integer>::ok(t->getInteger());
@@ -138,12 +138,12 @@ namespace cial::TypeConverter {
         if(r.isFailed())
             return retErr;
         PreProcessor pp{};
-        Syntax::Lexer lexer{ sf, pp };
+        syntax::Lexer lexer{ sf, pp };
 
-        Syntax::Token *t;
+        syntax::Token *t;
         lexer.next(t, false);
 
-        if(t->type() != Syntax::TokenType::ConstVal || t->valueType() != Syntax::TokenValueType::Real)
+        if(t->type() != syntax::TokenType::ConstVal || t->valueType() != syntax::TokenValueType::Real)
             return retErr;
 
         return Ret<Real>::ok(t->getReal());

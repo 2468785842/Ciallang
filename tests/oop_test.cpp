@@ -13,7 +13,7 @@ using namespace cial;
 TEST_CASE("OOP - 类声明与实例化") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     const auto r = vm.eval<DataObject *>(R"(
         class A { function A() {} }
@@ -26,7 +26,7 @@ TEST_CASE("OOP - 类声明与实例化") {
 TEST_CASE("OOP - 类方法定义与调用") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("实例方法调用") {
@@ -51,7 +51,7 @@ TEST_CASE("OOP - 类方法定义与调用") {
 TEST_CASE("OOP - 类访问变量") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("实例成员初始化变量访问") {

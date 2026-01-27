@@ -14,7 +14,7 @@ using namespace cial;
 TEST_CASE("表达式 - 字面量表达式") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("整数字面量") { REQUIRE(*vm.evalExpr<Integer>("123"_str) == 123); }
@@ -33,7 +33,7 @@ TEST_CASE("表达式 - 顺序运算符") {
     // This is because it is the same as the tjs2 language, and there are conflicts in the syntax.
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval("var a, b, c;"_str);
     REQUIRE(*vm.evalExpr<Integer>("c = (a = 1, b = 2)"_str) == 2);
@@ -44,7 +44,7 @@ TEST_CASE("表达式 - 顺序运算符") {
 TEST_CASE("表达式 - 三元运算符") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval("var a;"_str);
     REQUIRE(*vm.evalExpr<Integer>("a ? 2 : 4"_str) == 4);
@@ -55,7 +55,7 @@ TEST_CASE("表达式 - 三元运算符") {
 TEST_CASE("表达式 - 二元运算表达式") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("算术运算") { REQUIRE((*vm.evalExpr<Integer>("1 + 2"_str)) == 3); }
@@ -98,7 +98,7 @@ TEST_CASE("表达式 - 二元运算表达式") {
 TEST_CASE("表达式 - 一元运算表达式") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("逻辑非") {
@@ -114,7 +114,7 @@ TEST_CASE("表达式 - 一元运算表达式") {
 TEST_CASE("表达式 - 赋值表达式") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("简单赋值") { REQUIRE((*vm.eval<Integer>("var a; a = 42; return a;"_str)) == 42); }
@@ -170,7 +170,7 @@ TEST_CASE("表达式 - 赋值表达式") {
 TEST_CASE("表达式 - 函数表达式") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("无参数调用") { REQUIRE((*vm.evalExpr<bool>("function { return true; }()"_str)) == true); }
@@ -221,7 +221,7 @@ TEST_CASE("表达式 - 函数表达式") {
 TEST_CASE("表达式 - 复杂表达式组合") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("混合表达式") { REQUIRE((*vm.evalExpr<Integer>("1 + 2 * 3 - 4 / 4"_str)) == 6); }
@@ -234,7 +234,7 @@ TEST_CASE("表达式 - 复杂表达式组合") {
 TEST_CASE("模版字符串") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("混合表达式（模板字符串）") {
@@ -259,7 +259,7 @@ TEST_CASE("模版字符串") {
 TEST_CASE("类型转换") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("convert int") { REQUIRE((*vm.evalExpr<Integer>(R"(int "1")"_str)) == 1); }

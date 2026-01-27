@@ -27,8 +27,8 @@ TEST_CASE("集成测试 - 基本脚本解析") {
             return;
         }
 
-        Syntax::AstBuilder astBuilder{};
-        Syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::AstBuilder astBuilder{};
+        syntax::Parser parser{ sourceFile, astBuilder };
         auto *globalNode = parser.parse(r);
 
         REQUIRE(globalNode != nullptr);
@@ -40,8 +40,8 @@ TEST_CASE("集成测试 - 基本脚本解析") {
         Common::Result r{};
         sourceFile.load(r, "var x = 10;");
 
-        Syntax::AstBuilder astBuilder{};
-        Syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::AstBuilder astBuilder{};
+        syntax::Parser parser{ sourceFile, astBuilder };
         auto *globalNode = parser.parse(r);
 
         REQUIRE(globalNode != nullptr);
@@ -53,8 +53,8 @@ TEST_CASE("集成测试 - 基本脚本解析") {
         Common::Result r{};
         sourceFile.load(r, "function add(a, b) { return a + b; }");
 
-        Syntax::AstBuilder astBuilder{};
-        Syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::AstBuilder astBuilder{};
+        syntax::Parser parser{ sourceFile, astBuilder };
         auto *globalNode = parser.parse(r);
 
         REQUIRE(globalNode != nullptr);
@@ -66,8 +66,8 @@ TEST_CASE("集成测试 - 基本脚本解析") {
         Common::Result r{};
         sourceFile.load(r, "class MyClass { function A() {} }");
 
-        Syntax::AstBuilder astBuilder{};
-        Syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::AstBuilder astBuilder{};
+        syntax::Parser parser{ sourceFile, astBuilder };
         auto *globalNode = parser.parse(r);
 
         REQUIRE(globalNode != nullptr);
@@ -87,8 +87,8 @@ TEST_CASE("集成测试 - 代码生成和执行") {
         Common::Result r{};
         sourceFile.load(r, "println(\"Hello World!\");");
 
-        Syntax::AstBuilder astBuilder{};
-        Syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::AstBuilder astBuilder{};
+        syntax::Parser parser{ sourceFile, astBuilder };
         auto *globalNode = parser.parse(r);
 
         if(r.isFailed() || globalNode == nullptr) {
@@ -96,8 +96,8 @@ TEST_CASE("集成测试 - 代码生成和执行") {
             return;
         }
 
-        Inter::SymbolTable globalTable{};
-        Inter::IRGenerator codeGen{ sourceFile, globalTable };
+        inter::SymbolTable globalTable{};
+        inter::IRGenerator codeGen{ sourceFile, globalTable };
         auto chunk = codeGen.parseAst(r, globalNode);
 
         if(r.isFailed() || !chunk) {
@@ -106,9 +106,9 @@ TEST_CASE("集成测试 - 代码生成和执行") {
         }
 
         Runtime rt;
-        Bytecode::VMState vm{ globalTable, rt };
+        vm::VMState vm{ globalTable, rt };
 
-        vm.global("println", StdLib::S_PrintlnFunction);
+        vm.global("println", stdlib::S_PrintlnFunction);
         vm.allocCallFrame(chunk.get());
         vm.run();
 

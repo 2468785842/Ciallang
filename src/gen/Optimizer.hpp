@@ -7,7 +7,7 @@
 #include "Instruction.hpp"
 #include "vm/Chunk.hpp"
 
-namespace cial::Inter {
+namespace cial::inter {
 
     // int main() {
     //     Vec<Instruction> code = {
@@ -29,7 +29,7 @@ namespace cial::Inter {
 
     class Optimizer {
     public:
-        virtual void optimize(Bytecode::Chunk &chunk, const Vec<BasicBlock> &blocks) = 0;
+        virtual void optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) = 0;
 
         virtual ~Optimizer() = default;
 
@@ -39,7 +39,7 @@ namespace cial::Inter {
 
     class OptimizerManager {
     public:
-        explicit OptimizerManager(Bytecode::Chunk &chunk) : chunk(chunk) {}
+        explicit OptimizerManager(vm::Chunk &chunk) : chunk(chunk) {}
 
         // 添加优化器
         void addOptimizer(Box<Optimizer> optimizer) { optimizers.push_back(std::move(optimizer)); }
@@ -55,8 +55,8 @@ namespace cial::Inter {
         }
 
     private:
-        Bytecode::Chunk &chunk;
+        vm::Chunk &chunk;
         Vec<Box<Optimizer>> optimizers;
     };
 
-} // namespace cial::Inter
+} // namespace cial::inter

@@ -12,7 +12,7 @@ using namespace cial;
 TEST_CASE("property - base read/write") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         var value;
@@ -34,7 +34,7 @@ TEST_CASE("property - base read/write") {
 TEST_CASE("property - read/write behavior") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         var log = "";
@@ -64,7 +64,7 @@ TEST_CASE("property - read/write behavior") {
 TEST_CASE("property - only getter") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         property p_readonly {
@@ -82,7 +82,7 @@ TEST_CASE("property - only getter") {
 TEST_CASE("property - only setter") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
     vm.eval(R"(
         var last;

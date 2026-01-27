@@ -27,9 +27,9 @@ int main(const int argc, char **argv) {
     const auto start = std::chrono::high_resolution_clock::now();
     Runtime rt{};
     Context context{ rt };
-    context.registryGlobalFunc("print"_str, &StdLib::S_PrintFunction);
-    context.registryGlobalFunc("println"_str, &StdLib::S_PrintlnFunction);
-    Bytecode::VMState vmState{ context };
+    context.registryGlobalFunc("print"_str, &stdlib::S_PrintFunction);
+    context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
+    vm::VMState vmState{ context };
     const VM vm{ &vmState };
     vm.eval(String(argv[1]), true);
 

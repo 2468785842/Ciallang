@@ -12,7 +12,7 @@ using namespace cial;
 TEST_CASE("switch - execution") {
     Runtime rt{};
     Context context{ rt };
-    Bytecode::VMState vmState{ context };
+    vm::VMState vmState{ context };
     VM vm{ &vmState };
 
     SECTION("empty switch body") {

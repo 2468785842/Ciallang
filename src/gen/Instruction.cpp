@@ -24,8 +24,8 @@
 #include "vm/VMDebug.hpp"
 #include "vm/VMState.hpp"
 
-namespace cial::Inter {
-    using namespace cial::Bytecode;
+namespace cial::inter {
+    using namespace cial::vm;
 
     static bool propObjectSet(VMState &vmState, const Value &src, const Value &dst) {
         if(dst.isObject()) {
@@ -738,4 +738,4 @@ namespace cial::Inter {
     //             // ...
     //     }
     // }
-} // namespace cial::Inter
+} // namespace cial::inter

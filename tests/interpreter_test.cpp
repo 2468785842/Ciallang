@@ -27,8 +27,8 @@ using namespace cial;
 TEST_CASE("解释器 - Hello World") {
     Runtime rt{};
     Context context{ rt };
-    context.registryGlobalFunc("println"_str, &StdLib::S_PrintlnFunction);
-    Bytecode::VMState vmState{ context };
+    context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
+    vm::VMState vmState{ context };
     const VM vm{ &vmState };
     vm.evalExpr(R"(println("Hello World!"))"_str);
 }
@@ -36,8 +36,8 @@ TEST_CASE("解释器 - Hello World") {
 TEST_CASE("解释器 - 执行测试") {
     Runtime rt{};
     Context context{ rt };
-    context.registryGlobalFunc("println"_str, &StdLib::S_PrintlnFunction);
-    Bytecode::VMState vmState{ context };
+    context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
+    vm::VMState vmState{ context };
     const VM vm{ &vmState };
     vm.eval(String(TEST_FILES_PATH R"(/startup.tjs)"), true);
 }
@@ -67,7 +67,7 @@ TEST_CASE("解释器 - 脚本执行性能") {
     BENCHMARK("fib 10") {
         Runtime rt{};
         Context context{ rt };
-        Bytecode::VMState vmState{ context };
+        vm::VMState vmState{ context };
         const VM vm{ &vmState };
         vm.eval(R"(
             function fib(n) {

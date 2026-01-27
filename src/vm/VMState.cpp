@@ -16,7 +16,7 @@
 #include "../gen/Instruction.hpp"
 #include "types/Class.hpp"
 
-namespace cial::Bytecode {
+namespace cial::vm {
 
     void VMState::run() {
         const size_t curStackTop = _stackTop;
@@ -224,4 +224,4 @@ namespace cial::Bytecode {
         }
     }
 
-} // namespace cial::Bytecode
+} // namespace cial::vm

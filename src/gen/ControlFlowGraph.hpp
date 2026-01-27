@@ -5,16 +5,16 @@
 
 #include "Instruction.hpp"
 
-namespace cial::Inter {
+namespace cial::inter {
     class BasicBlock {
     public:
-        Bytecode::Chunk *parentChunk{};
+        vm::Chunk *parentChunk{};
         int start{}; // 该基本块的开始指令索引
         int end{}; // 该基本块的结束指令索引
         bool hasSideEffect{}; // 是否有副作用（如函数调用）
 
         explicit BasicBlock();
-        explicit BasicBlock(Bytecode::Chunk *chunk, const int start, const int end) :
+        explicit BasicBlock(vm::Chunk *chunk, const int start, const int end) :
             parentChunk(chunk), start(start), end(end) {}
 
         BasicBlock(BasicBlock &&rhs) noexcept = default;
@@ -28,7 +28,7 @@ namespace cial::Inter {
     class ControlFlowGraph {
     public:
         // 构建 CFG，返回基本块
-        Vec<BasicBlock> buildCFG(Bytecode::Chunk &chunk);
+        Vec<BasicBlock> buildCFG(vm::Chunk &chunk);
 
         // 获取所有的基本块
         const Vec<BasicBlock> &getBasicBlocks() const { return _basicBlocks; }
@@ -37,4 +37,4 @@ namespace cial::Inter {
         Vec<BasicBlock> _basicBlocks; // 所有基本块
     };
 
-} // namespace cial::Inter
+} // namespace cial::inter

@@ -52,7 +52,7 @@ namespace cial {
 
         [[nodiscard]] Runtime &rt() const;
 
-        [[nodiscard]] Bytecode::FastRegisterPool &regPool() const;
+        [[nodiscard]] vm::FastRegisterPool &regPool() const;
 
         [[nodiscard]] GlobalObject *global() const;
 

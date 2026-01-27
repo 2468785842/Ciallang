@@ -17,7 +17,7 @@
 
 #include "types/Value.hpp"
 
-namespace cial::Bytecode {
+namespace cial::vm {
 
     // FIFO Model
     class FastRegisterPool {
@@ -96,4 +96,4 @@ namespace cial::Bytecode {
             }
         }
     };
-} // namespace cial::Bytecode
+} // namespace cial::vm

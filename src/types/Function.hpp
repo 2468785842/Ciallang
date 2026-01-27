@@ -30,7 +30,7 @@ namespace cial {
 
         explicit Function(FuncMeta *funcMeta) : Object(Runtime::ATOM_FUNCTION), meta(funcMeta) {}
 
-        void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) override;
+        void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
             Object::marked();
@@ -56,9 +56,9 @@ namespace cial {
         explicit NativeFunction(Callable &&callable) :
             Object(Runtime::ATOM_FUNCTION), _callback([callable = std::forward<Callable>(callable)](
                                                           VM *vm, Value thisObj, size_t argCount, Value *args) {
-                return NativeFunDetail::invokeCallable(callable, vm, thisObj, argCount, args);
+                return native::invokeCallable(callable, vm, thisObj, argCount, args);
             }),
-            _arity(NativeFunDetail::NativeFunTraits<Callable>::arity) {}
+            _arity(native::NativeFunTraits<Callable>::arity) {}
 
         Value callProc(VM *vm, const size_t argCount, Value *args) const {
             return _callback(vm, _thisObj, argCount, args);
@@ -66,7 +66,7 @@ namespace cial {
 
         void setThisObj(const Value &thisObj) { _thisObj = thisObj; }
 
-        void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) override;
+        void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
             Object::marked();

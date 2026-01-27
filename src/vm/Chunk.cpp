@@ -6,7 +6,7 @@
 
 #include "VMState.hpp"
 
-namespace cial::Bytecode {
+namespace cial::vm {
 
     [[nodiscard]] String Chunk::dumpConstant(const Runtime *rt, const ConstIdx idx) const {
         std::stringstream ss{ "" };
@@ -52,7 +52,7 @@ namespace cial::Bytecode {
         size_t pc{};
         while(pc < _instructions.size()) {
             const auto &instruction = _instructions[pc];
-            ss << fmt::format("{: <6}: {}", Inter::Label{ pc }, instruction->dump(nullptr));
+            ss << fmt::format("{: <6}: {}", inter::Label{ pc }, instruction->dump(nullptr));
             if(pc != _instructions.size() - 1) {
                 ss << '\n';
             }
@@ -67,7 +67,7 @@ namespace cial::Bytecode {
         while(pc < vmState->getPC()) {
             const bool isLastInst = pc == vmState->getPC() - 1;
             const auto &instruction = _instructions[pc];
-            ss << fmt::format("{: <6}: {}", Inter::Label{ pc }, instruction->dump(isLastInst ? vmState : nullptr));
+            ss << fmt::format("{: <6}: {}", inter::Label{ pc }, instruction->dump(isLastInst ? vmState : nullptr));
             if(pc != _instructions.size() - 1) {
                 ss << '\n';
             }
@@ -76,4 +76,4 @@ namespace cial::Bytecode {
         return String{ ss.str() };
     }
 
-} // namespace cial::Bytecode
+} // namespace cial::vm

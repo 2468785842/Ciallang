@@ -16,7 +16,7 @@ namespace cial {
         GlobalObject globalObject{ &rt };
         NativeRegister nativeRegister{ rt };
 
-        Bytecode::FastRegisterPool regPool{};
+        vm::FastRegisterPool regPool{};
 
         CallFrame callStack[maxCallDepth];
 
@@ -29,19 +29,19 @@ namespace cial {
     Context::~Context() noexcept { delete _impl; }
 
     void Context::initNativeMethod() {
-        registerMethod<String>("charAt"_str, &StdLib::stringCharAt);
-        registerMethod<String>("indexOf"_str, &StdLib::stringIndexOf);
-        registerMethod<String>("toUpperCase"_str, &StdLib::stringToUpperCase);
-        registerMethod<String>("toLowerCase"_str, &StdLib::stringToLowerCase);
-        registerMethod<String>("substring"_str, &StdLib::stringSubstring);
-        registerMethod<String>("substr"_str, &StdLib::stringSubstring);
-        registerMethod<String>("sprintf"_str, &StdLib::stringSprintf);
-        // registerMethod<String>("replace"_str, &StdLib::stringReplace);
-        registerMethod<String>("escape"_str, &StdLib::stringEscape);
+        registerMethod<String>("charAt"_str, &stdlib::stringCharAt);
+        registerMethod<String>("indexOf"_str, &stdlib::stringIndexOf);
+        registerMethod<String>("toUpperCase"_str, &stdlib::stringToUpperCase);
+        registerMethod<String>("toLowerCase"_str, &stdlib::stringToLowerCase);
+        registerMethod<String>("substring"_str, &stdlib::stringSubstring);
+        registerMethod<String>("substr"_str, &stdlib::stringSubstring);
+        registerMethod<String>("sprintf"_str, &stdlib::stringSprintf);
+        // registerMethod<String>("replace"_str, &stdlib::stringReplace);
+        registerMethod<String>("escape"_str, &stdlib::stringEscape);
         // registerMethod<String>("split"_str, &stringSplit);
-        registerMethod<String>("trim"_str, &StdLib::stringTrim);
-        registerMethod<String>("reverse"_str, &StdLib::stringReverse);
-        registerMethod<String>("repeat"_str, &StdLib::stringRepeat);
+        registerMethod<String>("trim"_str, &stdlib::stringTrim);
+        registerMethod<String>("reverse"_str, &stdlib::stringReverse);
+        registerMethod<String>("repeat"_str, &stdlib::stringRepeat);
     }
 
     void Context::collectMark() const {
@@ -105,7 +105,7 @@ namespace cial {
 
     Runtime &Context::rt() const { return _impl->rt; }
 
-    Bytecode::FastRegisterPool &Context::regPool() const { return _impl->regPool; }
+    vm::FastRegisterPool &Context::regPool() const { return _impl->regPool; }
 
     GlobalObject *Context::global() const { return &_impl->globalObject; }
 

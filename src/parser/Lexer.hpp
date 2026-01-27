@@ -19,7 +19,7 @@
 #include "common/SourceFile.hpp"
 #include "runtime/Runtime.hpp"
 
-namespace cial::Syntax {
+namespace cial::syntax {
 
     struct TemplateStringContext {
         enum class Stage {
@@ -182,4 +182,4 @@ namespace cial::Syntax {
             return -1;
         }
     };
-} // namespace cial::Syntax
+} // namespace cial::syntax

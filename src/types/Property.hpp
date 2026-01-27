@@ -48,7 +48,7 @@ namespace cial {
 
         explicit Property(Object *thisObj, PropMeta *propMeta) : thisObj{ thisObj }, propMeta{ propMeta } {}
 
-        void invokeSet(Bytecode::VMState &vmState, const Value &v) const {
+        void invokeSet(vm::VMState &vmState, const Value &v) const {
             if(!propMeta->setFunc)
                 throw std::runtime_error("property no have setter");
 
@@ -63,7 +63,7 @@ namespace cial {
             setFunc.call(vmState, ret, 1);
         }
 
-        Value invokeGet(Bytecode::VMState &vmState) const {
+        Value invokeGet(vm::VMState &vmState) const {
             if(!propMeta->getFunc)
                 throw std::runtime_error("property no have getter");
 
@@ -79,7 +79,7 @@ namespace cial {
             return vmState.reg(ret);
         }
 
-        void call(Bytecode::VMState &vmState, u32 ret, size_t argCount) override {
+        void call(vm::VMState &vmState, u32 ret, size_t argCount) override {
             throw std::runtime_error("Not Support call operator for property");
         }
 
