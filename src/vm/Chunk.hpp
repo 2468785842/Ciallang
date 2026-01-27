@@ -15,6 +15,7 @@
 
 #include <ranges>
 
+#include "Bytecode.hpp"
 #include "Constant.hpp"
 
 #include "gen/Instruction.hpp"
@@ -124,10 +125,22 @@ namespace cial::vm {
             }
         }
 
+        Bytecode &toBytecode() {
+            if(!_isBytecode) {
+                for(const auto &inst : _instructions) {
+                    inst->accept(&_bc);
+                }
+                _isBytecode = true;
+            }
+            return _bc;
+        }
+
     private:
         Vec<Box<inter::Instruction>> _instructions{};
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
+        Bytecode _bc{};
         u32 _registerCount{};
+        bool _isBytecode{ false };
     };
 } // namespace cial::vm

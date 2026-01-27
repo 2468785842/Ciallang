@@ -26,9 +26,9 @@
 
 namespace cial::inter {
 
-    Opt<vm::Chunk> IRGenerator::parseAst(const syntax::AstNode *node, OptReg &retReg) {
+    Opt<vm::Chunk> IRGenerator::parseAst(const syntax::AstNode *node, OptReg &optReg) {
         if(node)
-            node->generateBytecode(this, retReg);
+            node->generateBytecode(this, optReg);
         if(_r.isFailed())
             return {};
         _chunk->setRegCount(_regNextIndex);
@@ -57,13 +57,13 @@ namespace cial::inter {
         return true;
     }
 
-    void IRGenerator::generate(const syntax::ExprStmtNode *node, OptReg &retReg) {
-        return node->expression->generateBytecode(this, retReg);
+    void IRGenerator::generate(const syntax::ExprStmtNode *node, OptReg &optReg) {
+        return node->expression->generateBytecode(this, optReg);
     }
 
-    void IRGenerator::generate(const syntax::TryStmtNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::TryStmtNode *node, OptReg &optReg) {
         const auto tryStartIp = makeLabel(); // closed interval
-        node->tryBlock->generateBytecode(this, retReg);
+        node->tryBlock->generateBytecode(this, optReg);
 
         const size_t jmpIdx = _chunk->emit<NOP>();
 
@@ -76,31 +76,31 @@ namespace cial::inter {
             const Register exValue = allocateRegister();
             addLocalVar(LocalVariable{ varName, exValue, tryEndIp });
 
-            node->catchBlock->generateBytecode(this, retReg);
+            node->catchBlock->generateBytecode(this, optReg);
             _chunk->repl<Jmp>(jmpIdx, makeLabel());
 
             _chunk->addThrowHandler({ tryStartIp.address(), tryEndIp.address(), exValue.index() });
             endScope();
         } else {
-            node->catchBlock->generateBytecode(this, retReg);
+            node->catchBlock->generateBytecode(this, optReg);
             _chunk->repl<Jmp>(jmpIdx, makeLabel());
             _chunk->addThrowHandler({ tryStartIp.address(), tryEndIp.address() });
         }
 
-        retReg = {};
+        optReg = {};
     }
 
-    void IRGenerator::generate(const syntax::ValueExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::ValueExprNode *node, OptReg &optReg) {
         if(node->token.type() == syntax::TokenType::Null) {
             error("null token current not support", node->location);
             return;
         }
         auto dst = allocateRegister();
         genTokenValueLoadInst(dst, node->token);
-        retReg = dst;
+        optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::BinaryExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::BinaryExprNode *node, OptReg &optReg) {
         using enum syntax::TokenType;
 
         if(node->token.type() == Dot) {
@@ -120,7 +120,7 @@ namespace cial::inter {
 
                 _chunk->emit<GProp>(reg1, reg2, dst);
             }
-            retReg = dst;
+            optReg = dst;
             return;
         }
 
@@ -165,7 +165,7 @@ namespace cial::inter {
             } else {
                 _chunk->emit<DGlobal>(rVarName, dst);
             }
-            // retReg = rVarReg;
+            // optReg = rVarReg;
             return;
         }
 
@@ -178,19 +178,19 @@ namespace cial::inter {
             return;
 
         if(node->token.type() == Comma) {
-            retReg = src2;
+            optReg = src2;
             return;
         }
 
         if(node->token.type() == InContextOf) {
             _chunk->emit<ChgThis>(src1, src2);
-            retReg = src1;
+            optReg = src1;
             return;
         }
 
         if(node->token.type() == Instanceof) {
             _chunk->emit<ChkIns>(src1, src2);
-            retReg = src1;
+            optReg = src1;
             return;
         }
 
@@ -268,22 +268,22 @@ namespace cial::inter {
                 return;
         }
 
-        retReg = dst;
+        optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::PrefixUnaryExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::PrefixUnaryExprNode *node, OptReg &optReg) {
         if(node->token.type() == syntax::TokenType::Throw) {
             Register reg{};
             if(!expectValue(node->rhs, reg)) {
                 return;
             }
             _chunk->emit<Throw>(reg);
-            // retReg = reg;
+            // optReg = reg;
             return;
         }
 
         if(node->token.type() == syntax::TokenType::New) {
-            node->rhs->generateBytecode(this, retReg);
+            node->rhs->generateBytecode(this, optReg);
             return;
         }
 
@@ -291,18 +291,18 @@ namespace cial::inter {
 
         switch(node->token.type()) {
             case syntax::TokenType::Exclamation:
-                node->rhs->generateBytecode(this, retReg);
-                _chunk->emit<LNot>(*retReg, dst);
-                retReg = dst;
+                node->rhs->generateBytecode(this, optReg);
+                _chunk->emit<LNot>(*optReg, dst);
+                optReg = dst;
                 break;
             case syntax::TokenType::Minus:
-                node->rhs->generateBytecode(this, retReg);
-                _chunk->emit<ChgSign>(*retReg, dst);
-                retReg = dst;
+                node->rhs->generateBytecode(this, optReg);
+                _chunk->emit<ChgSign>(*optReg, dst);
+                optReg = dst;
                 break;
             case syntax::TokenType::Invalidate:
-                node->rhs->generateBytecode(this, retReg);
-                _chunk->emit<Inv>(*retReg);
+                node->rhs->generateBytecode(this, optReg);
+                _chunk->emit<Inv>(*optReg);
                 break;
             case syntax::TokenType::Isvalid: {
                 Register reg{};
@@ -310,7 +310,7 @@ namespace cial::inter {
                     return;
                 }
                 _chunk->emit<ChkInv>(reg, dst);
-                retReg = dst;
+                optReg = dst;
                 break;
             }
             case syntax::TokenType::Int: {
@@ -319,7 +319,7 @@ namespace cial::inter {
                     return;
                 }
                 _chunk->emit<ToInt>(reg, dst);
-                retReg = dst;
+                optReg = dst;
                 break;
             }
             case syntax::TokenType::Real: {
@@ -328,7 +328,7 @@ namespace cial::inter {
                     return;
                 }
                 _chunk->emit<ToReal>(reg, dst);
-                retReg = dst;
+                optReg = dst;
                 break;
             }
             case syntax::TokenType::String: {
@@ -337,7 +337,7 @@ namespace cial::inter {
                     return;
                 }
                 _chunk->emit<ToString>(reg, dst);
-                retReg = dst;
+                optReg = dst;
                 break;
             }
             default:
@@ -346,7 +346,7 @@ namespace cial::inter {
     }
 
 
-    void IRGenerator::generate(const syntax::SuffixUnaryExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::SuffixUnaryExprNode *node, OptReg &optReg) {
         // TODO:
         using enum syntax::TokenType;
         switch(node->token.type()) {
@@ -355,7 +355,7 @@ namespace cial::inter {
                 if(!expectValue(node->lhs, src)) {
                     return;
                 }
-                _chunk->emit<ChkInv>(src, *retReg);
+                _chunk->emit<ChkInv>(src, *optReg);
                 freeRegister(src);
                 break;
             }
@@ -367,10 +367,10 @@ namespace cial::inter {
                         Register src2 = variable->reg;
                         auto src1 = allocateRegister();
                         Register dst = allocateRegister();
-                        _chunk->emit<ILoad>(src1, 1);
+                        _chunk->emit<LoadImm>(src1, 1);
                         _chunk->emit<Add>(src1, src2, dst);
                         freeRegister(src1);
-                        retReg = dst;
+                        optReg = dst;
                         return;
                     }
 
@@ -379,19 +379,19 @@ namespace cial::inter {
                     auto dst = allocateRegister();
                     if(isTopScope()) {
                         // global maybe
-                        _chunk->emit<ILoad>(src2, 1);
+                        _chunk->emit<LoadImm>(src2, 1);
                         _chunk->emit<GGlobal>(identifier, src1);
                         _chunk->emit<Add>(src2, src1, dst);
                         _chunk->emit<DGlobal>(identifier, dst);
                     } else {
                         // find on context
-                        _chunk->emit<ILoad>(src2, 1);
+                        _chunk->emit<LoadImm>(src2, 1);
                         _chunk->emit<GThis>(identifier, src1);
                         _chunk->emit<Add>(src2, src1, dst);
                         _chunk->emit<DThis>(identifier, dst);
                     }
                     freeRegister(src2);
-                    retReg = dst;
+                    optReg = dst;
                     return;
                 }
                 error("current not support dot chain call", node->location);
@@ -406,10 +406,10 @@ namespace cial::inter {
                         Register src2 = variable->reg;
                         auto src1 = allocateRegister();
                         auto dst = allocateRegister();
-                        _chunk->emit<ILoad>(src1, 1);
+                        _chunk->emit<LoadImm>(src1, 1);
                         _chunk->emit<Sub>(src1, src2, dst);
                         freeRegister(src1);
-                        retReg = dst;
+                        optReg = dst;
                         return;
                     }
 
@@ -418,19 +418,19 @@ namespace cial::inter {
                     auto dst = allocateRegister();
                     if(isTopScope()) {
                         // global maybe
-                        _chunk->emit<ILoad>(src2, 1);
+                        _chunk->emit<LoadImm>(src2, 1);
                         _chunk->emit<GGlobal>(identifier, src1);
                         _chunk->emit<Sub>(src2, src1, dst);
                         _chunk->emit<DGlobal>(identifier, dst);
                     } else {
                         // find on context
-                        _chunk->emit<ILoad>(src2, 1);
+                        _chunk->emit<LoadImm>(src2, 1);
                         _chunk->emit<GThis>(identifier, src1);
                         _chunk->emit<Sub>(src2, src1, dst);
                         _chunk->emit<DThis>(identifier, dst);
                     }
                     freeRegister(src2);
-                    retReg = dst;
+                    optReg = dst;
                     return;
                 }
                 error("current not support dot chain call", node->location);
@@ -441,7 +441,7 @@ namespace cial::inter {
         }
     }
 
-    void IRGenerator::generate(const syntax::ProcCallExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::ProcCallExprNode *node, OptReg &optReg) {
         auto dst = allocateRegister();
         std::vector<Register> arguments{};
         Register memberReg{ 0 };
@@ -465,10 +465,10 @@ namespace cial::inter {
         // if(!node->arguments.empty()) {
         //     _chunk->emit<PopN>(node->arguments.size());
         // }
-        retReg = dst;
+        optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::AssignExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::AssignExprNode *node, OptReg &optReg) {
         if(const auto *expr = dynamic_cast<const syntax::IdentifierExprNode *>(node->lhs)) {
             const Atom identifier = getAtomFromToken(expr->token);
 
@@ -480,7 +480,7 @@ namespace cial::inter {
                 Register dst = variable->reg;
                 _chunk->emit<Mov>(src, dst);
                 freeRegister(src);
-                retReg = dst;
+                optReg = dst;
                 return;
             }
 
@@ -492,7 +492,7 @@ namespace cial::inter {
                 _chunk->emit<DThis>(identifier, src);
             }
 
-            retReg = src;
+            optReg = src;
             return;
         }
 
@@ -514,7 +514,7 @@ namespace cial::inter {
                     _chunk->emit<DProp>(lhsR, tmpR, src);
                     freeRegister(tmpR);
 
-                    retReg = src;
+                    optReg = src;
                     return;
                 }
             }
@@ -523,7 +523,7 @@ namespace cial::inter {
         error("isn't support assign operator", node->location);
     }
 
-    void IRGenerator::generate(const syntax::FunctionExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::FunctionExprNode *node, OptReg &optReg) {
         auto funReg = allocateRegister();
         auto *funcMeta = generateFuncMeta(node->parameters, node->body);
 
@@ -534,7 +534,7 @@ namespace cial::inter {
 
         _chunk->emit<Load>(funReg, _chunk->addConstant(funcMeta));
 
-        retReg = funReg;
+        optReg = funReg;
     }
 
     void IRGenerator::generate(const syntax::PropertyDeclNode *node, OptReg &) {
@@ -757,13 +757,13 @@ namespace cial::inter {
         freeRegister(classReg);
     }
 
-    void IRGenerator::generate(const syntax::IdentifierExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::IdentifierExprNode *node, OptReg &optReg) {
         auto dst = allocateRegister();
         const auto identifier = getAtomFromToken(node->token);
 
         if(const auto variable = resolveLocalVariable(identifier)) {
             _chunk->emit<CP>(variable->reg, dst);
-            retReg = dst;
+            optReg = dst;
             return;
         }
 
@@ -777,10 +777,10 @@ namespace cial::inter {
             _chunk->emit<GThis>(identifier, dst);
         }
 
-        retReg = dst;
+        optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::InternalIdentifierExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::InternalIdentifierExprNode *node, OptReg &optReg) {
         auto dst = allocateRegister();
 
         switch(node->token.type()) {
@@ -798,11 +798,11 @@ namespace cial::inter {
                 return;
         }
 
-        retReg = dst;
+        optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::StmtDeclNode *node, OptReg &retReg) {
-        return node->statement->generateBytecode(this, retReg);
+    void IRGenerator::generate(const syntax::StmtDeclNode *node, OptReg &optReg) {
+        return node->statement->generateBytecode(this, optReg);
     }
 
     void IRGenerator::generate(const syntax::BlockStmtNode *node, OptReg &) {
@@ -1051,7 +1051,7 @@ namespace cial::inter {
         }
     }
 
-    void IRGenerator::generate(const syntax::TernaryExprNode *node, OptReg &retReg) {
+    void IRGenerator::generate(const syntax::TernaryExprNode *node, OptReg &optReg) {
         Register dst = allocateRegister();
         Register testReg{ 0 };
         if(!expectValue(node->test, testReg)) {
@@ -1080,7 +1080,7 @@ namespace cial::inter {
 
         _chunk->repl<Jmp>(jmpIdx, makeLabel());
         freeRegister(testReg);
-        retReg = dst;
+        optReg = dst;
     }
 
     void IRGenerator::generate(const syntax::ReturnStmtNode *node, OptReg &) {
@@ -1095,7 +1095,7 @@ namespace cial::inter {
         _chunk->emit<Ret>(loadVoidReg());
     }
 
-    void IRGenerator::generate(const syntax::DebuggerStmtNode *, OptReg &) const { _chunk->emit<Debugger>(); }
+    void IRGenerator::generate(const syntax::DebuggerStmtNode *, OptReg &) { _chunk->emit<Debugger>(); }
 
     LocalVariable *IRGenerator::resolveLocalVariable(const Atom identifier) {
         for(auto &var : std::ranges::reverse_view(_localVars)) {
@@ -1133,7 +1133,7 @@ namespace cial::inter {
         assert(funChunk);
 
         // the last instruction is not ret, patch one ret
-        if(auto &instVec = funChunk->getInstVec(); instVec.empty() || instVec.back()->opcode() != OpCode::Ret) {
+        if(auto &instVec = funChunk->getInstVec(); instVec.empty() || instVec.back()->opcode() != TacOpCode::Ret) {
             funChunk->emit<Ret>(gen.loadVoidReg());
         }
 
@@ -1165,7 +1165,7 @@ namespace cial::inter {
                 throw std::runtime_error("Unsupported token type octet");
                 // return Constant { token.getOctet() };
             case syntax::TokenValueType::Integer:
-                _chunk->emit<ILoad>(reg, token.getInteger());
+                _chunk->emit<LoadImm>(reg, token.getInteger());
                 break;
             case syntax::TokenValueType::None:
                 // loadVoidReg();

@@ -183,7 +183,7 @@ namespace cial::inter {
         vmState.regRef(dst().index()) = vmState.curFrame()->chunk->getConstant(value()).createValue(&vmState.rt);
     }
 
-    void ILoad::execute(VMState &vmState) { vmState.regRef(dst().index()) = Value{ value() }; }
+    void LoadImm::execute(VMState &vmState) { vmState.regRef(dst().index()) = Value{ value() }; }
 
 
     void DGlobal::execute(VMState &vmState) {
@@ -550,7 +550,7 @@ namespace cial::inter {
 
     // 基础加载与推栈
     DEF_AUTO_DUMP(Load, "load");
-    DEF_AUTO_DUMP(ILoad, "iload");
+    DEF_AUTO_DUMP(LoadImm, "iload");
     DEF_AUTO_DUMP(Push, "push");
     DEF_AUTO_DUMP(PopN, "pop_n");
     DEF_AUTO_DUMP(Mov, "mov");
@@ -621,95 +621,6 @@ namespace cial::inter {
     DEF_AUTO_DUMP(ChgSign, "chg_sign");
     DEF_AUTO_DUMP(Throw, "throw");
     DEF_AUTO_DUMP(Debugger, "debugger");
-
-    namespace {
-        // ---------------------- 无符号 LEB128 (uLEB128) ----------------------
-
-        // 编码：把 uint64_t 值写到 vector<uint8_t> 的末尾，返回写入的字节数
-        size_t encode_uleb128(uint64_t value, Vec<u8> &buffer) {
-            const size_t start = buffer.size();
-            do {
-                u8 byte = value & 0x7F;
-                value >>= 7;
-                if(value != 0)
-                    byte |= 0x80; // 延续位
-                buffer.push_back(byte);
-            } while(value != 0);
-            return buffer.size() - start;
-        }
-
-        // 解码：从 pc 位置读取 uLEB128，返回值 + 消耗的字节数
-        // 用 pair 返回 {value, bytes_read}
-        std::pair<u64, size_t> decode_uleb128(const u8 *ptr, const size_t max_len) {
-            u64 result = 0;
-            size_t shift = 0;
-            size_t bytes = 0;
-
-            while(true) {
-                if(bytes >= max_len) {
-                    throw std::runtime_error("ULEB128 overflow or truncated");
-                }
-                const u8 byte = ptr[bytes++];
-                result |= static_cast<u64>(byte & 0x7F) << shift;
-                if((byte & 0x80) == 0)
-                    break;
-                shift += 7;
-                if(shift >= 64) {
-                    throw std::runtime_error("ULEB128 too large for uint64_t");
-                }
-            }
-            return { result, bytes };
-        }
-
-        // ---------------------- 有符号 LEB128 (sLEB128) ----------------------
-
-        // ZigZag 编码：把 int64_t 转为无符号表示（负数变奇数，正数变偶数）
-        u64 zigzagEncode(const i64 value) {
-            if(value >= 0)
-                return static_cast<u64>(value) << 1;
-            return (static_cast<u64>(-value) << 1) | 1;
-        }
-
-        // ZigZag 解码
-        i64 zigzagDecode(const u64 value) {
-            return (value & 1) ? -(static_cast<i64>(value >> 1)) : static_cast<i64>(value >> 1);
-        }
-
-        // 编码有符号数
-        size_t encodeSleb128(const i64 value, Vec<u8> &buffer) { return encode_uleb128(zigzagEncode(value), buffer); }
-
-        // 解码有符号数
-        std::pair<i64, size_t> decodeSleb128(const u8 *ptr, const size_t max_len) {
-            auto [uval, bytes] = decode_uleb128(ptr, max_len);
-            return { zigzagDecode(uval), bytes };
-        }
-
-        // 写 u16（小端）
-        void writeU16(Vec<u8> &buffer, const u16 value) {
-            buffer.push_back(static_cast<u8>(value & 0xFF));
-            buffer.push_back(static_cast<u8>(value >> 8));
-        }
-
-        // 读 u16（小端）
-        u16 readU16(const u8 *ptr) { return static_cast<u16>(ptr[0]) | (static_cast<u16>(ptr[1]) << 8); }
-
-    } // namespace
-
-    // void NOP::encode(Vec<u8> &code) { code.push_back(static_cast<uint8_t>(OpCode::NOP)); }
-    //
-    // void Debugger::encode(Vec<u8> &code) { code.push_back(static_cast<uint8_t>(OpCode::Debugger)); }
-    //
-    // void Push::encode(Vec<u8> &code) {
-    //     const uint16_t dst = getOp1Val<Register>().index();
-    //     code.push_back(static_cast<uint8_t>(OpCode::Push));
-    //     writeU16(code, dst);
-    // }
-    //
-    // void PopN::encode(Vec<u8> &code) {
-    //     const i64 imm = getOp1Val<Integer>();
-    //     code.push_back(static_cast<uint8_t>(OpCode::PopN));
-    //     encodeSleb128(imm, code);
-    // }
 
     // void dispatch(const uint8_t* pc, size_t remaining) {
     //     Opcode op = static_cast<Opcode>(*pc++);

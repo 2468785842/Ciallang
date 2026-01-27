@@ -16,6 +16,38 @@
 #include "common/SourceLocation.hpp"
 #include "parser/Token.hpp"
 
+#define CIAL_AST_NODE_ENUMS(O)                                                                                         \
+    O(DeclNode)                                                                                                        \
+    O(ExprNode)                                                                                                        \
+    O(StmtNode)                                                                                                        \
+    O(ValueExprNode)                                                                                                   \
+    O(IdentifierExprNode)                                                                                              \
+    O(InternalIdentifierExprNode)                                                                                      \
+    O(BinaryExprNode)                                                                                                  \
+    O(PrefixUnaryExprNode)                                                                                             \
+    O(SuffixUnaryExprNode)                                                                                             \
+    O(ProcCallExprNode)                                                                                                \
+    O(AssignExprNode)                                                                                                  \
+    O(FunctionExprNode)                                                                                                \
+    O(BlockStmtNode)                                                                                                   \
+    O(ExprStmtNode)                                                                                                    \
+    O(TryStmtNode)                                                                                                     \
+    O(IfStmtNode)                                                                                                      \
+    O(SwitchStmtNode)                                                                                                  \
+    O(DoWhileStmtNode)                                                                                                 \
+    O(ForStmtNode)                                                                                                     \
+    O(WhileStmtNode)                                                                                                   \
+    O(BreakStmtNode)                                                                                                   \
+    O(ContinueStmtNode)                                                                                                \
+    O(ReturnStmtNode)                                                                                                  \
+    O(DebuggerStmtNode)                                                                                                \
+    O(TernaryExprNode)                                                                                                 \
+    O(PropertyDeclNode)                                                                                                \
+    O(VarDeclNode)                                                                                                     \
+    O(FunctionDeclNode)                                                                                                \
+    O(ClassDeclNode)                                                                                                   \
+    O(StmtDeclNode)
+
 namespace cial::inter {
     class IRGenerator;
 }
@@ -23,65 +55,9 @@ namespace cial::inter {
 namespace cial::syntax {
     class AstNode;
 
-    class DeclNode;
-
-    class ExprNode;
-
-    class StmtNode;
-
-    class ValueExprNode;
-
-    class IdentifierExprNode;
-
-    class InternalIdentifierExprNode;
-
-    class BinaryExprNode;
-
-    class PrefixUnaryExprNode;
-
-    class SuffixUnaryExprNode;
-
-    class ProcCallExprNode;
-
-    class AssignExprNode;
-
-    class FunctionExprNode;
-
-    class BlockStmtNode;
-
-    class ExprStmtNode;
-
-    class TryStmtNode;
-
-    class IfStmtNode;
-
-    class SwitchStmtNode;
-
-    class DoWhileStmtNode;
-
-    class ForStmtNode;
-
-    class WhileStmtNode;
-
-    class BreakStmtNode;
-
-    class ContinueStmtNode;
-
-    class ReturnStmtNode;
-
-    class DebuggerStmtNode;
-
-    class TernaryExprNode;
-
-    class PropertyDeclNode;
-
-    class VarDeclNode;
-
-    class FunctionDeclNode;
-
-    class ClassDeclNode;
-
-    class StmtDeclNode;
+#define DECLARE_AST_NODE_CLASS(name) class name;
+    CIAL_AST_NODE_ENUMS(DECLARE_AST_NODE_CLASS)
+#undef DECLARE_AST_NODE_CLASS
 
     using Parameters = std::vector<std::pair<Token, ExprNode *>>;
 
@@ -117,58 +93,8 @@ namespace cial::syntax {
     struct AstNode::Visitor {
         virtual ~Visitor() = default;
 
-        virtual void visit(const StmtDeclNode *) = 0;
-
-        virtual void visit(const PropertyDeclNode *) = 0;
-
-        virtual void visit(const VarDeclNode *) = 0;
-
-        virtual void visit(const FunctionDeclNode *) = 0;
-
-        virtual void visit(const ClassDeclNode *) = 0;
-
-        virtual void visit(const ValueExprNode *) = 0;
-
-        virtual void visit(const IdentifierExprNode *) = 0;
-
-        virtual void visit(const InternalIdentifierExprNode *) = 0;
-
-        virtual void visit(const BinaryExprNode *) = 0;
-
-        virtual void visit(const PrefixUnaryExprNode *) = 0;
-
-        virtual void visit(const SuffixUnaryExprNode *) = 0;
-
-        virtual void visit(const ProcCallExprNode *) = 0;
-
-        virtual void visit(const AssignExprNode *) = 0;
-
-        virtual void visit(const FunctionExprNode *) = 0;
-
-        virtual void visit(const BlockStmtNode *) = 0;
-
-        virtual void visit(const ExprStmtNode *) = 0;
-
-        virtual void visit(const TryStmtNode *) = 0;
-
-        virtual void visit(const IfStmtNode *) = 0;
-
-        virtual void visit(const SwitchStmtNode *) = 0;
-
-        virtual void visit(const DoWhileStmtNode *) = 0;
-
-        virtual void visit(const ForStmtNode *) = 0;
-
-        virtual void visit(const WhileStmtNode *) = 0;
-
-        virtual void visit(const BreakStmtNode *) = 0;
-
-        virtual void visit(const ContinueStmtNode *) = 0;
-
-        virtual void visit(const ReturnStmtNode *) = 0;
-
-        virtual void visit(const DebuggerStmtNode *) = 0;
-
-        virtual void visit(const TernaryExprNode *) = 0;
+#define DECLARE_AST_NODE_VISIT(name) virtual void visit(const name *) = 0;
+        CIAL_AST_NODE_ENUMS(DECLARE_AST_NODE_VISIT)
+#undef DECLARE_AST_NODE_VISIT
     };
 } // namespace cial::syntax

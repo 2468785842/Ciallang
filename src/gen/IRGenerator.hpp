@@ -27,7 +27,7 @@ namespace cial::inter {
         explicit IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile) :
             _rt(rt), _sourceFile(sourceFile), _r(r) {}
 
-        Opt<vm::Chunk> parseAst(const syntax::AstNode *node, OptReg &retReg);
+        Opt<vm::Chunk> parseAst(const syntax::AstNode *node, OptReg &optReg);
 
         void addLocalVar(LocalVariable variable) { _localVars.emplace_back(variable); }
 
@@ -56,59 +56,9 @@ namespace cial::inter {
          */
         void makeVirtualGlobalScope() { _scopeStartPC.emplace_back(0); }
 
-        void generate(const syntax::ValueExprNode *, OptReg &);
-
-        void generate(const syntax::IdentifierExprNode *, OptReg &);
-
-        void generate(const syntax::InternalIdentifierExprNode *, OptReg &);
-
-        void generate(const syntax::BinaryExprNode *, OptReg &);
-
-        void generate(const syntax::PrefixUnaryExprNode *, OptReg &);
-
-        void generate(const syntax::SuffixUnaryExprNode *, OptReg &);
-
-        void generate(const syntax::ProcCallExprNode *, OptReg &);
-
-        void generate(const syntax::AssignExprNode *, OptReg &);
-
-        void generate(const syntax::FunctionExprNode *, OptReg &);
-
-        void generate(const syntax::BlockStmtNode *, OptReg &);
-
-        void generate(const syntax::ExprStmtNode *, OptReg &);
-
-        void generate(const syntax::TryStmtNode *, OptReg &);
-
-        void generate(const syntax::IfStmtNode *, OptReg &);
-
-        void generate(const syntax::SwitchStmtNode *, OptReg &);
-
-        void generate(const syntax::PropertyDeclNode *, OptReg &);
-
-        void generate(const syntax::VarDeclNode *, OptReg &);
-
-        void generate(const syntax::FunctionDeclNode *, OptReg &);
-
-        void generate(const syntax::ClassDeclNode *, OptReg &);
-
-        void generate(const syntax::StmtDeclNode *, OptReg &);
-
-        void generate(const syntax::DoWhileStmtNode *, OptReg &);
-
-        void generate(const syntax::ForStmtNode *, OptReg &);
-
-        void generate(const syntax::WhileStmtNode *, OptReg &);
-
-        void generate(const syntax::BreakStmtNode *, OptReg &);
-
-        void generate(const syntax::ContinueStmtNode *, OptReg &);
-
-        void generate(const syntax::ReturnStmtNode *, OptReg &);
-
-        void generate(const syntax::DebuggerStmtNode *, OptReg &) const;
-
-        void generate(const syntax::TernaryExprNode *, OptReg &);
+#define DECLARE_AST_NODE_VISIT(name) void generate(const syntax::name *node, OptReg &optReg);
+        CIAL_AST_NODE_ENUMS(DECLARE_AST_NODE_VISIT)
+#undef DECLARE_AST_NODE_VISIT
 
     private:
         Box<vm::Chunk> _chunk = std::make_unique<vm::Chunk>();

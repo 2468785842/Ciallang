@@ -18,22 +18,15 @@
 #include "runtime/AtomTable.hpp"
 #include "vm/Constant.hpp"
 
-namespace cial::vm {
-    class VMState;
-}
-
-namespace cial::inter {
-#define OPCODE_ENUMS(O)                                                                                                \
+#define CIAL_TAC_OPCODE_ENUMS(O)                                                                                       \
     O(NOP)                                                                                                             \
     O(Load)                                                                                                            \
-    O(ILoad)                                                                                                           \
+    O(LoadImm)                                                                                                         \
     O(Push)                                                                                                            \
     O(PopN)                                                                                                            \
     O(CP)                                                                                                              \
     O(Add)                                                                                                             \
-    O(IAdd)                                                                                                            \
     O(Sub)                                                                                                             \
-    O(ISub)                                                                                                            \
     O(Mul)                                                                                                             \
     O(Div)                                                                                                             \
     O(Idiv)                                                                                                            \
@@ -82,11 +75,16 @@ namespace cial::inter {
     O(Throw)                                                                                                           \
     O(Ret)
 
-    enum class OpCode : u8 {
+namespace cial::vm {
+    class VMState;
+    class Bytecode;
+} // namespace cial::vm
+
+namespace cial::inter {
+    enum class TacOpCode : u8 {
 #define OPCODE_ENUM_CLASS(OP) OP,
-        OPCODE_ENUMS(OPCODE_ENUM_CLASS)
+        CIAL_TAC_OPCODE_ENUMS(OPCODE_ENUM_CLASS)
 #undef OPCODE_ENUM_CLASS
-            COUNT
     };
 
     class Instruction;
@@ -123,6 +121,7 @@ namespace cial::inter {
 
     class Instruction {
     public:
+        struct Visitor;
         explicit Instruction() = default;
 
         virtual ~Instruction() = default;
@@ -135,7 +134,9 @@ namespace cial::inter {
 
         Instruction &operator=(Instruction &&) = default;
 
-        [[nodiscard]] virtual OpCode opcode() const = 0;
+        [[nodiscard]] virtual TacOpCode opcode() const = 0;
+
+        virtual void accept(Visitor *visitor) const = 0;
 
         [[nodiscard]] auto getOp1() const { return _ops[0]; }
         [[nodiscard]] auto getOp2() const { return _ops[1]; }
@@ -182,6 +183,17 @@ namespace cial::inter {
         friend struct DumpInst;
     };
 
+#define DECLARE_TAC_OPCODE_CLASS(name) class name;
+    CIAL_TAC_OPCODE_ENUMS(DECLARE_TAC_OPCODE_CLASS)
+#undef DECLARE_TAC_OPCODE_CLASS
+
+    struct Instruction::Visitor {
+        virtual ~Visitor() = default;
+#define DECLARE_TAC_OPCODE_VISIT(name) virtual void visit(const name *) = 0;
+        CIAL_TAC_OPCODE_ENUMS(DECLARE_TAC_OPCODE_VISIT)
+#undef DECLARE_TAC_OPCODE_VISIT
+    };
+
 // 操作码
 #define OP_GET1(name, type)                                                                                            \
     type name() const { return getOp1Val<type>(); }
@@ -212,7 +224,8 @@ namespace cial::inter {
 #define DEF_INST(className, N, getters)                                                                                \
     struct className : Instruction {                                                                                   \
         DEF_CTOR_##N(className) virtual ~className() = default;                                                        \
-        [[nodiscard]] OpCode opcode() const override { return OpCode::className; }                                     \
+        [[nodiscard]] TacOpCode opcode() const override { return TacOpCode::className; }                               \
+        void accept(Visitor *visitor) const override { visitor->visit(this); }                                         \
         getters void execute(vm::VMState &vmState) override;                                                           \
         [[nodiscard]] std::string dump(const vm::VMState *vmState) override;                                           \
         void encode(Vec<u8> &code) override {}                                                                         \
@@ -255,7 +268,7 @@ namespace cial::inter {
     DEF_INST(ChkIns, 2, OP_GET1(dst, Register) OP_GET2(src, Register));
 
     DEF_INST(Load, 2, OP_GET1(dst, Register) OP_GET2(value, ConstIdx));
-    DEF_INST(ILoad, 2, OP_GET1(dst, Register) OP_GET2(value, Integer));
+    DEF_INST(LoadImm, 2, OP_GET1(dst, Register) OP_GET2(value, Integer));
 
     DEF_INST(DGlobal, 2, OP_GET1(atom, Atom) OP_GET2(src, Register));
     DEF_INST(GGlobal, 2, OP_GET1(atom, Atom) OP_GET2(dst, Register));
@@ -299,4 +312,5 @@ namespace cial::inter {
         [[nodiscard]] static std::string autoDump(std::string_view name, const Instruction &inst,
                                                   const vm::VMState *vm);
     };
+
 }; // namespace cial::inter
