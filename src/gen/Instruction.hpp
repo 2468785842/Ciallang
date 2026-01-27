@@ -20,10 +20,34 @@
 
 #define CIAL_TAC_OPCODE_ENUMS(O)                                                                                       \
     O(NOP)                                                                                                             \
-    O(Load)                                                                                                            \
-    O(LoadImm)                                                                                                         \
+    O(Debugger)                                                                                                        \
     O(Push)                                                                                                            \
     O(PopN)                                                                                                            \
+    O(Global)                                                                                                          \
+    O(Super)                                                                                                           \
+    O(This)                                                                                                            \
+    O(Test)                                                                                                            \
+    O(Inv)                                                                                                             \
+    O(Throw)                                                                                                           \
+    O(Ret)                                                                                                             \
+    O(Jmp)                                                                                                             \
+    O(JmpE)                                                                                                            \
+    O(JmpNE)                                                                                                           \
+    O(ToInt)                                                                                                           \
+    O(ToReal)                                                                                                          \
+    O(ToString)                                                                                                        \
+    O(LNot)                                                                                                            \
+    O(ChgSign)                                                                                                         \
+    O(ChgThis)                                                                                                         \
+    O(ChkInv)                                                                                                          \
+    O(ChkIns)                                                                                                          \
+    O(Load)                                                                                                            \
+    O(LoadImm)                                                                                                         \
+    O(DGlobal)                                                                                                         \
+    O(GGlobal)                                                                                                         \
+    O(GThis)                                                                                                           \
+    O(DThis)                                                                                                           \
+    O(Mov)                                                                                                             \
     O(CP)                                                                                                              \
     O(Add)                                                                                                             \
     O(Sub)                                                                                                             \
@@ -31,49 +55,25 @@
     O(Div)                                                                                                             \
     O(Idiv)                                                                                                            \
     O(Mod)                                                                                                             \
-    O(Mov)                                                                                                             \
-    O(DGlobal)                                                                                                         \
-    O(GGlobal)                                                                                                         \
-    O(Global)                                                                                                          \
-    O(Super)                                                                                                           \
-    O(This)                                                                                                            \
-    O(ToInt)                                                                                                           \
-    O(ToReal)                                                                                                          \
-    O(ToString)                                                                                                        \
-    O(ChgThis)                                                                                                         \
-    O(Inv)                                                                                                             \
-    O(ChkInv)                                                                                                          \
-    O(ChkIns)                                                                                                          \
-    O(Test)                                                                                                            \
-    O(EQ)                                                                                                              \
-    O(NEQ)                                                                                                             \
-    O(LT)                                                                                                              \
-    O(LE)                                                                                                              \
-    O(GT)                                                                                                              \
-    O(GE)                                                                                                              \
-    O(AbsEQ)                                                                                                           \
-    O(AbsNEQ)                                                                                                          \
-    O(Jmp)                                                                                                             \
-    O(JmpE)                                                                                                            \
-    O(JmpNE)                                                                                                           \
-    O(Call)                                                                                                            \
-    O(GProp)                                                                                                           \
-    O(DProp)                                                                                                           \
-    O(GThis)                                                                                                           \
-    O(DThis)                                                                                                           \
-    O(LNot)                                                                                                            \
-    O(LAnd)                                                                                                            \
-    O(LOr)                                                                                                             \
     O(BXor)                                                                                                            \
     O(BOr)                                                                                                             \
     O(BAnd)                                                                                                            \
     O(BlShift)                                                                                                         \
     O(BrShift)                                                                                                         \
     O(BurShift)                                                                                                        \
-    O(ChgSign)                                                                                                         \
-    O(Debugger)                                                                                                        \
-    O(Throw)                                                                                                           \
-    O(Ret)
+    O(EQ)                                                                                                              \
+    O(NEQ)                                                                                                             \
+    O(AbsEQ)                                                                                                           \
+    O(AbsNEQ)                                                                                                          \
+    O(LT)                                                                                                              \
+    O(LE)                                                                                                              \
+    O(GT)                                                                                                              \
+    O(GE)                                                                                                              \
+    O(LAnd)                                                                                                            \
+    O(LOr)                                                                                                             \
+    O(Call)                                                                                                            \
+    O(GProp)                                                                                                           \
+    O(DProp)
 
 namespace cial::vm {
     class VMState;

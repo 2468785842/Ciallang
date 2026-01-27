@@ -38,6 +38,7 @@ namespace cial::vm {
         explicit VMState(Context &context) : rt(context.rt()), context(context) {}
 
         void run();
+        void run0();
 
         [[nodiscard]] Value reg(u16 reg) const;
 
@@ -61,9 +62,11 @@ namespace cial::vm {
 
         [[nodiscard]] bool getZF() const { return _zf; }
 
-        void setPC(const u64 label) const {
+        void setPC0(const u64 pc) const { _currentFrame->pc = pc; }
+
+        void setPC(const u64 pc) const {
             // because run() pc will auto plus one so - 1
-            _currentFrame->pc = label - 1;
+            _currentFrame->pc = pc - 1;
         }
 
         [[nodiscard]] u64 getPC() const { return _currentFrame->pc; }
@@ -96,10 +99,6 @@ namespace cial::vm {
         }
 
         [[nodiscard]] size_t getRegPoolTop() const { return context.regPool().used(); }
-
-        [[nodiscard]] const Vec<Box<inter::Instruction>> &instructions() const noexcept {
-            return _currentFrame->chunk->getInstVec();
-        }
 
         [[nodiscard]] CallFrame *curFrame() noexcept { return _currentFrame; }
         [[nodiscard]] const CallFrame *curFrame() const noexcept { return _currentFrame; }

@@ -35,7 +35,7 @@ namespace cial::vm {
 
     [[nodiscard]] String Chunk::dumpConstants(const Runtime *rt) const {
         std::stringstream ss{ "" };
-        size_t i{};
+        u16 i{};
         while(i < _constants.size()) {
             ConstIdx idx{ i };
             ss << fmt::format("{: <6} = {}", idx, dumpConstant(rt, idx));

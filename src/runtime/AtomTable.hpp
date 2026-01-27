@@ -85,5 +85,5 @@ namespace cial {
 
 template <>
 struct std::hash<cial::Atom> {
-    size_t operator()(const cial::Atom v) const noexcept { return v.v; }
+    size_t operator()(const cial::Atom v) const noexcept { return std::hash<cial::u64>{}(v.v); }
 };

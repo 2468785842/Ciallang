@@ -185,7 +185,6 @@ namespace cial::inter {
 
     void LoadImm::execute(VMState &vmState) { vmState.regRef(dst().index()) = Value{ value() }; }
 
-
     void DGlobal::execute(VMState &vmState) {
         const Value &srcVal = vmState.regRef(src().index());
         if(vmState.globalHas(atom()) && propObjectSet(vmState, srcVal, vmState.global(atom()))) {
@@ -529,7 +528,7 @@ namespace cial::inter {
         DumpComment c;
         std::string out = fmt::format("{: <10}", name);
         auto d = [&out, &c, &vm](const Operand &operand) {
-            if(operand.type() != Operand::Type::None)
+            if(operand.type() == Operand::Type::None)
                 return;
             out += " ";
             out += dumpOperand(operand).toStdStr();
@@ -550,7 +549,7 @@ namespace cial::inter {
 
     // 基础加载与推栈
     DEF_AUTO_DUMP(Load, "load");
-    DEF_AUTO_DUMP(LoadImm, "iload");
+    DEF_AUTO_DUMP(LoadImm, "load_imm");
     DEF_AUTO_DUMP(Push, "push");
     DEF_AUTO_DUMP(PopN, "pop_n");
     DEF_AUTO_DUMP(Mov, "mov");
@@ -621,32 +620,4 @@ namespace cial::inter {
     DEF_AUTO_DUMP(ChgSign, "chg_sign");
     DEF_AUTO_DUMP(Throw, "throw");
     DEF_AUTO_DUMP(Debugger, "debugger");
-
-    // void dispatch(const uint8_t* pc, size_t remaining) {
-    //     Opcode op = static_cast<Opcode>(*pc++);
-    //     remaining--;
-    //
-    //     switch (op) {
-    //         case Opcode::ADD_REG_REG_REG: {
-    //             if (remaining < 6) throw std::runtime_error("truncated");
-    //             uint16_t dst  = read_u16(pc); pc += 2;
-    //             uint16_t src1 = read_u16(pc); pc += 2;
-    //             uint16_t src2 = read_u16(pc); pc += 2;
-    //             // 执行 add regs[dst] = regs[src1] + regs[src2];
-    //             break;
-    //         }
-    //         case Opcode::ADD_REG_REG_IMM: {
-    //             if (remaining < 4) throw std::runtime_error("truncated");
-    //             uint16_t dst = read_u16(pc); pc += 2;
-    //             uint16_t src = read_u16(pc); pc += 2;
-    //             remaining -= 4;
-    //
-    //             auto [imm, len] = decode_sleb128(pc, remaining);
-    //             pc += len;
-    //             // 执行 regs[dst] = regs[src] + imm;
-    //             break;
-    //         }
-    //             // ...
-    //     }
-    // }
 } // namespace cial::inter

@@ -22,7 +22,7 @@ namespace cial::vm {
         const size_t curStackTop = _stackTop;
         for(;;) {
             u64 &pc = _currentFrame->pc;
-            const auto &instList = instructions();
+            const auto &instList = _currentFrame->chunk->getInstVec();
 
             if(pc >= instList.size())
                 break;
@@ -44,6 +44,31 @@ namespace cial::vm {
                     break;
             }
             ++pc;
+        }
+    }
+
+    void VMState::run0() {
+        const size_t curStackTop = _stackTop;
+        for(;;) {
+            const auto &bc = _currentFrame->chunk->toBytecode();
+
+            if(_currentFrame->pc >= bc.getSize())
+                break;
+
+            if(_stackTop == 0 || curStackTop > _stackTop)
+                break;
+
+            const size_t cnt = bc.dispatch(this);
+
+            switch(_pending) {
+                case PendingCF::Throw:
+                    unwind();
+                    break;
+                case PendingCF::None:
+                    break;
+            }
+
+            _currentFrame->pc += cnt;
         }
     }
 

@@ -89,13 +89,17 @@ namespace cial::vm {
         }
 
         ConstIdx addConstant(Constant value) {
-            for(size_t i = 1; i < _constants.size(); ++i) {
+            if(_constants.size() >= std::numeric_limits<u16>::max()) {
+                throw std::runtime_error("too many constants");
+            }
+            const u16 size = static_cast<u16>(_constants.size());
+            for(u16 i = 1; i < size; ++i) {
                 if(_constants[i] == value) {
                     return ConstIdx{ i };
                 }
             }
             _constants.emplace_back(value);
-            return ConstIdx{ _constants.size() - 1 };
+            return ConstIdx{ size };
         }
 
         [[nodiscard]] const Constant &getConstant(const ConstIdx index) const {
@@ -127,9 +131,7 @@ namespace cial::vm {
 
         Bytecode &toBytecode() {
             if(!_isBytecode) {
-                for(const auto &inst : _instructions) {
-                    inst->accept(&_bc);
-                }
+                _bc.compile(_instructions);
                 _isBytecode = true;
             }
             return _bc;

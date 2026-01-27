@@ -133,22 +133,57 @@ namespace cial::vm {
         return { zigzagDecode(uval), bytes };
     }
 
-    // 写 u16（小端）
+    // LE
     inline void writeU16(Vec<u8> &buffer, const u16 value) {
         buffer.push_back(static_cast<u8>(value & 0xFF));
         buffer.push_back(static_cast<u8>(value >> 8));
     }
 
-    // 读 u16（小端）
     inline u16 readU16(const u8 *ptr) { return static_cast<u16>(ptr[0]) | (static_cast<u16>(ptr[1]) << 8); }
+
+    inline void writeU32(Vec<u8> &buffer, const u32 value) {
+        buffer.push_back(static_cast<u8>(value & 0xFF));
+        buffer.push_back(static_cast<u8>((value >> 8) & 0xFF));
+        buffer.push_back(static_cast<u8>((value >> 16) & 0xFF));
+        buffer.push_back(static_cast<u8>((value >> 24) & 0xFF));
+    }
+
+    inline u32 readU32(const u8 *ptr) {
+        return static_cast<u32>(ptr[0]) | (static_cast<u32>(ptr[1]) << 8) | (static_cast<u32>(ptr[2]) << 16) |
+            (static_cast<u32>(ptr[3]) << 24);
+    }
+    // LE END
 
     class Bytecode : public inter::Instruction::Visitor {
 #define DECLARE_TAC_OPCODE_VISIT(name) void visit(const inter::name *tac);
         CIAL_TAC_OPCODE_ENUMS(DECLARE_TAC_OPCODE_VISIT)
 #undef DECLARE_TAC_OPCODE_VISIT
-        size_t dispatch(const VMState *vmState) const;
+    public:
+        void compile(const Vec<Box<inter::Instruction>> &instructions) {
+            for(u32 i = 0; i < instructions.size(); ++i) {
+                if(_tacPosToBcPos.contains(i)) {
+                    _jmpTagetPos[_tacPosToBcPos[i]] = static_cast<u32>(_code.size());
+                }
+                instructions[i]->accept(this);
+            }
+
+            // update jmp target address
+            for(auto &[tp, bp] : _jmpTagetPos) {
+                // LE
+                _code[tp] = static_cast<u8>(bp & 0xFF);
+                _code[tp + 1] = static_cast<u8>((bp >> 8) & 0xFF);
+                _code[tp + 2] = static_cast<u8>((bp >> 16) & 0xFF);
+                _code[tp + 3] = static_cast<u8>((bp >> 24) & 0xFF);
+            }
+        }
+
+        size_t dispatch(VMState *vmState) const;
+
+        size_t getSize() const { return _code.size(); }
 
     private:
         Vec<u8> _code{};
+        Map<u32, u32> _tacPosToBcPos{};
+        Map<u32, u32> _jmpTagetPos{};
     };
 } // namespace cial::vm

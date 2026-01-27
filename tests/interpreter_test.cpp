@@ -42,39 +42,64 @@ TEST_CASE("解释器 - 执行测试") {
     vm.eval(String(TEST_FILES_PATH R"(/startup.tjs)"), true);
 }
 
+int fib(const int n) {
+    if(n < 2)
+        return n;
+    return fib(n - 2) + fib(n - 1);
+}
+
 TEST_CASE("解释器 - 脚本执行性能") {
-    // @1    : cp         %0   %1
-    // @2    : load       %2   *1
-    // @3    : lt         %1   %2
-    // @4    : test       %2
-    // @5    : jmp_ne     @8
-    // @6    : cp         %0   %3
-    // @7    : ret        %3
-    // @8    : g_this     atom_5 %4
-    // @9    : cp         %0   %5
-    // @10   : load       %6   *1
-    // @11   : sub        %5   %6
-    // @12   : push_reg   %6
-    // @13   : call       %4   %2   1
-    // @14   : g_this     atom_5 %7
-    // @15   : cp         %0   %8
-    // @16   : load       %9   *2
-    // @17   : sub        %8   %9
-    // @18   : push_reg   %9
-    // @19   : call       %7   %4   1
-    // @20   : add        %2   %4
-    // @21   : ret        %4
-    BENCHMARK("fib 10") {
-        Runtime rt{};
-        Context context{ rt };
-        vm::VMState vmState{ context };
-        const VM vm{ &vmState };
-        vm.eval(R"(
+    const int correct = fib(15);
+    Runtime rt{};
+    Context context{ rt };
+    vm::VMState vmState{ context };
+
+    Common::Result r{};
+    Common::SourceFile sourceFile;
+    sourceFile.load(r, R"(
             function fib(n) {
                 if(n < 2) return n;
                 return fib(n - 2) + fib(n - 1);
             }
-            fib(10);
-        )"_str);
-    };
+            return fib(15);
+        )");
+
+    assert(!r.isFailed());
+
+    syntax::Parser parser{ sourceFile, vmState.context.pp() };
+
+    syntax::AstNode *node = parser.parse(r);
+    assert(!r.isFailed());
+
+    inter::IRGenerator codeGen{ r, rt, sourceFile };
+
+    OptReg ignoreReg{};
+    Opt<vm::Chunk> chunk = codeGen.parseAst(node, ignoreReg);
+
+    assert(!r.isFailed());
+    assert(chunk);
+    assert(chunk->getRegCount() != 0);
+    assert(!chunk->getInstVec().empty());
+
+    auto *evalChunk = vmState.rt.create<vm::Chunk>(std::move(*chunk)).get();
+
+    u16 retReg{ 0 };
+    vm::Chunk tmpChunk{};
+    tmpChunk.setRegCount(1); // accept ret val
+
+    vmState.allocCallFrame(&tmpChunk);
+    vmState.makeClosure();
+    vmState.allocCallFrame(evalChunk, retReg);
+    vmState.makeClosure();
+
+    u32 stackTop = vmState.context.stackTop();
+    BENCHMARK("fib 15") { vmState.run0(); };
+    Value ret = vmState.reg(retReg);
+
+    REQUIRE(ret.asInteger().value() == correct);
+
+    if(stackTop - 1 != vmState.context.stackTop()) {
+        vmState.freeCallFrame();
+    }
+    vmState.freeCallFrame();
 }

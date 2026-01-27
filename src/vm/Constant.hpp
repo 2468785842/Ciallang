@@ -31,12 +31,12 @@ namespace cial {
 namespace cial {
     class [[nodiscard]] ConstIdx {
     public:
-        explicit ConstIdx(const size_t index) : _index(index) {}
+        explicit ConstIdx(const u16 index) : _index(index) {}
 
-        [[nodiscard]] size_t index() const noexcept { return _index; }
+        [[nodiscard]] u16 index() const noexcept { return _index; }
 
     private:
-        size_t _index;
+        u16 _index;
 
         friend std::ostream &operator<<(std::ostream &os, const ConstIdx &reg) { return os << '*' << reg._index; }
     };
