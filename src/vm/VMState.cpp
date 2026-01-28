@@ -254,14 +254,18 @@ namespace cial::vm {
 
         for(;;) {
         L1:
-            const Vec<u8> &bc = _currentFrame->chunk->getBytecode().code();
-            size_t bcSize = bc.size();
-            u64 pc = _currentFrame->pc;
-            const u8 *code = bc.data();
+            CallFrame *cur = _currentFrame;
+            Chunk *chunk = cur->chunk;
+            u64 pc = cur->pc;
+            Value *regs = cur->regs();
+
+            const Vec<u8> &codeVec = chunk->code();
+            const u8 *ip = codeVec.data();
+            size_t bcSize = codeVec.size();
 
             while(pc < bcSize) {
 
-                switch(static_cast<VmOpCode>(code[pc++])) {
+                switch(static_cast<VmOpCode>(ip[pc++])) {
                     case VmOpCode::NOP: {
                         break;
                     }
@@ -270,8 +274,8 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Push: {
-                        u16 r1 = read<u16>(code, pc);
-                        push(reg(r1));
+                        u16 r1 = read<u16>(ip, pc);
+                        push(regs[r1]);
                         break;
                     }
                     case VmOpCode::PopN: {
@@ -291,8 +295,8 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Test: {
-                        u16 r1 = read<u16>(code, pc);
-                        setZF(reg(r1).asBool());
+                        u16 r1 = read<u16>(ip, pc);
+                        setZF(regs[r1].asBool());
                         break;
                     }
                     case VmOpCode::Inv: {
@@ -304,11 +308,10 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Ret: {
-                        u16 r1 = read<u16>(code, pc);
-                        const auto value = reg(r1);
-                        const auto *frame = curFrame();
-                        CLL_ASSERT(frame->ret, "frame.ret val is empty");
-                        prevFrame()->getReg(*frame->ret) = value;
+                        u16 r1 = read<u16>(ip, pc);
+                        const auto value = regs[r1];
+                        CLL_ASSERT(cur->ret, "frame.ret val is empty");
+                        prevFrame()->getReg(*cur->ret) = value;
                         pc = bcSize;
                         break;
                     }
@@ -321,7 +324,7 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::JmpNE: {
-                        const u32 addr = read<u32>(code, pc);
+                        const u32 addr = read<u32>(ip, pc);
                         if(!getZF())
                             pc = addr;
                         break;
@@ -359,22 +362,22 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Load: {
-                        u16 r1 = read<u16>(code, pc);
-                        u16 cIdx = read<u16>(code, pc);
-                        regRef(r1) = curFrame()->chunk->getConstant(ConstIdx{ cIdx }).createValue(&rt);
+                        u16 r1 = read<u16>(ip, pc);
+                        u16 cIdx = read<u16>(ip, pc);
+                        regs[r1] = chunk->getConstant(ConstIdx{ cIdx }).createValue(&rt);
                         break;
                     }
                     case VmOpCode::LoadImm: {
-                        u16 r1 = read<u16>(code, pc);
-                        i64 imm = decodeSleb128(code, pc, 8);
-                        regRef(r1) = Value{ imm };
+                        u16 r1 = read<u16>(ip, pc);
+                        i64 imm = decodeSleb128(ip, pc, 8);
+                        regs[r1] = Value{ imm };
                         break;
                     }
                     case VmOpCode::DGlobal: {
-                        u32 atom = read<u32>(code, pc);
-                        u16 r1 = read<u16>(code, pc);
+                        u32 atom = read<u32>(ip, pc);
+                        u16 r1 = read<u16>(ip, pc);
                         Atom a{ atom };
-                        const Value &srcVal = regRef(r1);
+                        const Value &srcVal = regs[r1];
                         if(globalHas(a) && propObjectSet(*this, srcVal, global(a))) {
                             break;
                         }
@@ -382,19 +385,19 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::GGlobal: {
-                        u32 atom = read<u32>(code, pc);
-                        u16 r1 = read<u16>(code, pc);
+                        u32 atom = read<u32>(ip, pc);
+                        u16 r1 = read<u16>(ip, pc);
                         Value srcVal = global(Atom{ atom });
                         propObjectGet(*this, srcVal, srcVal);
-                        regRef(r1) = srcVal;
+                        regs[r1] = srcVal;
                         break;
                     }
                     case VmOpCode::GThis: {
-                        u32 atom = read<u32>(code, pc);
-                        u16 r1 = read<u16>(code, pc);
+                        u32 atom = read<u32>(ip, pc);
+                        u16 r1 = read<u16>(ip, pc);
                         Value srcVal = getThis({ atom });
                         propObjectGet(*this, srcVal, srcVal);
-                        regRef(r1) = srcVal;
+                        regs[r1] = srcVal;
                         break;
                     }
                     case VmOpCode::DThis: {
@@ -402,36 +405,35 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Mov: {
-                        u16 r1 = read<u16>(code, pc);
-                        u16 r2 = read<u16>(code, pc);
-                        Value srcVal = reg(r1);
-                        if(!propObjectSet(*this, srcVal, regRef(r2))) {
-                            regRef(r2) = srcVal;
+                        u16 r1 = read<u16>(ip, pc);
+                        u16 r2 = read<u16>(ip, pc);
+                        Value srcVal = regs[r1];
+                        if(!propObjectSet(*this, srcVal, regs[r2])) {
+                            regs[r2] = srcVal;
                         }
                         break;
                     }
                     case VmOpCode::CP: {
-                        u16 r1 = read<u16>(code, pc);
-                        u16 r2 = read<u16>(code, pc);
-                        Value srcVal = reg(r1);
+                        u16 r1 = read<u16>(ip, pc);
+                        u16 r2 = read<u16>(ip, pc);
+                        Value srcVal = regs[r1];
                         propObjectGet(*this, srcVal, srcVal);
-                        regRef(r2) = srcVal;
+                        regs[r2] = srcVal;
                         break;
                     }
                     case VmOpCode::Add: {
-                        u16 r1 = read<u16>(code, pc);
-                        u16 r2 = read<u16>(code, pc);
-                        const Value r1v = reg(r1);
-                        Value &r2v = regRef(r2);
+                        u16 r1 = read<u16>(ip, pc);
+                        u16 r2 = read<u16>(ip, pc);
+                        const Value r1v = regs[r1];
+                        Value &r2v = regs[r2];
                         r2v = r1v.add(r2v).unwrap();
                         break;
                     }
                     case VmOpCode::Sub: {
-
-                        u16 r1 = read<u16>(code, pc);
-                        u16 r2 = read<u16>(code, pc);
-                        const Value r1v = reg(r1);
-                        Value &r2v = regRef(r2);
+                        u16 r1 = read<u16>(ip, pc);
+                        u16 r2 = read<u16>(ip, pc);
+                        const Value r1v = regs[r1];
+                        Value &r2v = regs[r2];
                         r2v = r1v.sub(r2v).unwrap();
                         break;
                     }
@@ -492,10 +494,10 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::LT: {
-                        u16 r1 = read<u16>(code, pc);
-                        u16 r2 = read<u16>(code, pc);
-                        const Value r1v = reg(r1);
-                        Value &r2v = regRef(r2);
+                        u16 r1 = read<u16>(ip, pc);
+                        u16 r2 = read<u16>(ip, pc);
+                        const Value r1v = regs[r1];
+                        Value &r2v = regs[r2];
                         const bool r = r1v.littlerThan(r2v).unwrap();
                         r2v = Value{ r };
                         break;
@@ -521,10 +523,10 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Call: {
-                        u16 r1 = read<u16>(code, pc);
-                        u16 r2 = read<u16>(code, pc);
-                        i64 imm = decodeSleb128(code, pc, 8);
-                        const auto &object = reg(r2).asObject().unwrap();
+                        u16 r1 = read<u16>(ip, pc);
+                        u16 r2 = read<u16>(ip, pc);
+                        i64 imm = decodeSleb128(ip, pc, 8);
+                        const auto &object = regs[r2].asObject().unwrap();
                         _currentFrame->pc = pc;
                         object->call(*this, r1, imm);
                         goto L1;

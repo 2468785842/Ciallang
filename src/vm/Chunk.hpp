@@ -136,11 +136,11 @@ namespace cial::vm {
             _isBytecode = true;
         }
 
-        Bytecode &getBytecode() {
+        [[nodiscard]] const Vec<u8> &code() const {
             if(!_isBytecode) {
                 throw std::runtime_error("chunk is not compiled to bytecode");
             }
-            return _bc;
+            return _bc.code();
         }
 
     private:

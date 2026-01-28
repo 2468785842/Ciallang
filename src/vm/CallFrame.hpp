@@ -70,6 +70,8 @@ namespace cial {
 
         [[nodiscard]] const Value &getReg(const u16 reg) const { return *_pool->ptrAt(_sp + reg); }
 
+        [[nodiscard]] Value *regs() const { return _pool->ptrAt(_sp); }
+
     private:
         friend class vm::VMState;
         vm::FastRegisterPool *_pool{};
