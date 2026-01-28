@@ -33,7 +33,7 @@ namespace cial::inter {
             return {};
         _chunk->setRegCount(_regNextIndex);
         const auto chunk = std::move(_chunk);
-        // chunk->toBytecode();
+        chunk->toBytecode();
         // ===
         // OptimizerManager optimizerManager(*chunk);
         // optimizerManager.addOptimizer(std::make_unique<LoadSubOptimizer>());

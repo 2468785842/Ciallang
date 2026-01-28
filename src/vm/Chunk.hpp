@@ -129,10 +129,16 @@ namespace cial::vm {
             }
         }
 
-        Bytecode &toBytecode() {
+        void toBytecode() {
+            if(_isBytecode)
+                return;
+            _bc.compile(_instructions);
+            _isBytecode = true;
+        }
+
+        Bytecode &getBytecode() {
             if(!_isBytecode) {
-                _bc.compile(_instructions);
-                _isBytecode = true;
+                throw std::runtime_error("chunk is not compiled to bytecode");
             }
             return _bc;
         }

@@ -50,15 +50,20 @@ namespace cial::vm {
     void VMState::run0() {
         const size_t curStackTop = _stackTop;
         for(;;) {
-            const auto &bc = _currentFrame->chunk->toBytecode();
+            const auto &bc = _currentFrame->chunk->getBytecode();
 
-            if(_currentFrame->pc >= bc.getSize())
+            u64 &pc = _currentFrame->pc;
+
+            if(pc >= bc.getSize())
                 break;
 
-            if(_stackTop == 0 || curStackTop > _stackTop)
+            if(_stackTop == 0)
                 break;
 
-            const size_t cnt = bc.dispatch(this);
+            if(curStackTop > _stackTop)
+                break;
+
+            Bytecode::dispatch(bc.decode(pc), this);
 
             switch(_pending) {
                 case PendingCF::Throw:
@@ -67,8 +72,6 @@ namespace cial::vm {
                 case PendingCF::None:
                     break;
             }
-
-            _currentFrame->pc += cnt;
         }
     }
 

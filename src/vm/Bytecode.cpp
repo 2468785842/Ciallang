@@ -228,310 +228,371 @@ namespace cial::vm {
         return false;
     }
 
-    size_t Bytecode::dispatch(VMState *vmState) const {
-        if(vmState->getPC() >= _code.size())
-            return 0;
-
-        // auto instTable = vmState->curFrame()->chunk->dumpInstructions().toStdStr();
-        u16 count = 1;
-        const u8 *pc = _code.data() + vmState->getPC();
-        const size_t remaining{ _code.size() - vmState->getPC() };
-        const auto op = static_cast<VmOpCode>(*pc++);
-
-#define MV_CUR(n)                                                                                                      \
-    do {                                                                                                               \
-        count += n;                                                                                                    \
-        pc += n;                                                                                                       \
-    } while(false)
-
+    DecodedInst Bytecode::decode(u64 &pc) const {
 #define CHECK(n)                                                                                                       \
     do {                                                                                                               \
         if(remaining < n)                                                                                              \
-            throw std::runtime_error(fmt::format("truncated opcode: {}", static_cast<u8>(op)));                        \
+            throw std::runtime_error("truncated");                                                                     \
     } while(false)
 
-        switch(op) {
+        const size_t remaining{ _code.size() - pc };
+
+        DecodedInst inst{ .op = static_cast<VmOpCode>(_code[pc++]) };
+
+        switch(inst.op) {
             case VmOpCode::NOP:
+            case VmOpCode::Debugger:
+                break;
+            case VmOpCode::PopN:
+                inst.imm = decodeSleb128(_code, pc, remaining - 1);
                 break;
 
-            case VmOpCode::Load: {
+            case VmOpCode::Push:
+            case VmOpCode::Global:
+            case VmOpCode::Super:
+            case VmOpCode::This:
+            case VmOpCode::Test:
+            case VmOpCode::Inv:
+            case VmOpCode::Throw:
+            case VmOpCode::Ret:
+                CHECK(2);
+                inst.r1 = readU16(_code, pc);
+                break;
+
+            case VmOpCode::Jmp:
+            case VmOpCode::JmpE:
+            case VmOpCode::JmpNE:
                 CHECK(4);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                const u16 cIdx = readU16(pc);
-                MV_CUR(2);
-                vmState->regRef(r1) =
-                    vmState->curFrame()->chunk->getConstant(ConstIdx{ cIdx }).createValue(&vmState->rt);
+                inst.target = readU32(_code, pc);
+                break;
+
+            case VmOpCode::Load:
+                CHECK(4);
+                inst.r1 = readU16(_code, pc);
+                inst.cIdx = readU16(_code, pc);
+                break;
+
+            case VmOpCode::LoadImm:
+                CHECK(2);
+                inst.r1 = readU16(_code, pc);
+                inst.imm = decodeSleb128(_code, pc, remaining - 3);
+                break;
+
+            case VmOpCode::DGlobal:
+            case VmOpCode::GGlobal:
+            case VmOpCode::GThis:
+            case VmOpCode::DThis:
+                CHECK(6);
+                inst.atom = readU32(_code, pc);
+                inst.r1 = readU16(_code, pc);
+                break;
+
+            case VmOpCode::ToInt:
+            case VmOpCode::ToReal:
+            case VmOpCode::ToString:
+            case VmOpCode::LNot:
+            case VmOpCode::ChgSign:
+            case VmOpCode::ChgThis:
+            case VmOpCode::ChkInv:
+            case VmOpCode::ChkIns:
+            case VmOpCode::Mov:
+            case VmOpCode::CP:
+            case VmOpCode::Add:
+            case VmOpCode::Sub:
+            case VmOpCode::Mul:
+            case VmOpCode::Div:
+            case VmOpCode::Idiv:
+            case VmOpCode::Mod:
+            case VmOpCode::BXor:
+            case VmOpCode::BOr:
+            case VmOpCode::BAnd:
+            case VmOpCode::BlShift:
+            case VmOpCode::BrShift:
+            case VmOpCode::BurShift:
+            case VmOpCode::EQ:
+            case VmOpCode::NEQ:
+            case VmOpCode::AbsEQ:
+            case VmOpCode::AbsNEQ:
+            case VmOpCode::LT:
+            case VmOpCode::LE:
+            case VmOpCode::GT:
+            case VmOpCode::GE:
+            case VmOpCode::LAnd:
+            case VmOpCode::LOr:
+                CHECK(4);
+                inst.r1 = readU16(_code, pc);
+                inst.r2 = readU16(_code, pc);
+                break;
+
+            case VmOpCode::Call:
+                CHECK(4);
+                inst.r1 = readU16(_code, pc);
+                inst.r2 = readU16(_code, pc);
+                inst.imm = decodeSleb128(_code, pc, remaining - 5);
+                break;
+
+            case VmOpCode::GProp:
+            case VmOpCode::DProp:
+                CHECK(4);
+                inst.r1 = readU16(_code, pc);
+                inst.r2 = readU16(_code, pc);
+                inst.r3 = readU16(_code, pc);
+                break;
+        }
+        return inst;
+    }
+
+    void Bytecode::dispatch(const DecodedInst &decodedInst, VMState *vmState) {
+        // auto instTable = vmState->curFrame()->chunk->dumpInstructions().toStdStr();
+        switch(decodedInst.op) {
+            case VmOpCode::NOP: {
                 break;
             }
-            case VmOpCode::LoadImm: {
-                CHECK(2);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                const auto [imm, len] = decodeSleb128(pc, remaining - count);
-                MV_CUR(len);
-                vmState->regRef(r1) = Value{ imm };
+            case VmOpCode::Debugger: {
+                assert(false);
                 break;
             }
             case VmOpCode::Push: {
-                CHECK(2);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                vmState->push(vmState->reg(r1));
+                vmState->push(vmState->reg(decodedInst.r1));
                 break;
             }
             case VmOpCode::PopN: {
                 assert(false);
-            }
-            case VmOpCode::CP: {
-                CHECK(4);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                const u16 r2 = readU16(pc);
-                MV_CUR(2);
-                Value srcVal = vmState->reg(r1);
-                propObjectGet(*vmState, srcVal, srcVal);
-                vmState->regRef(r2) = srcVal;
                 break;
             }
-
+            case VmOpCode::Global: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::Super: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::This: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::Test: {
+                vmState->setZF(vmState->reg(decodedInst.r1).asBool());
+                break;
+            }
+            case VmOpCode::Inv: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::Throw: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::Ret: {
+                const auto value = vmState->reg(decodedInst.r1);
+                const auto *frame = vmState->curFrame();
+                CLL_ASSERT(frame->ret, "frame.ret val is empty");
+                vmState->prevFrame()->getReg(*frame->ret) = value;
+                vmState->freeCallFrame();
+                break;
+            }
+            case VmOpCode::Jmp: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::JmpE: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::JmpNE: {
+                if(!vmState->getZF()) {
+                    vmState->setPC0(decodedInst.target);
+                }
+                break;
+            }
+            case VmOpCode::ToInt: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::ToReal: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::ToString: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::LNot: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::ChgSign: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::ChgThis: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::ChkInv: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::ChkIns: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::Load: {
+                vmState->regRef(decodedInst.r1) =
+                    vmState->curFrame()->chunk->getConstant(ConstIdx{ decodedInst.cIdx }).createValue(&vmState->rt);
+                break;
+            }
+            case VmOpCode::LoadImm: {
+                vmState->regRef(decodedInst.r1) = Value{ decodedInst.imm };
+                break;
+            }
+            case VmOpCode::DGlobal: {
+                Atom a{ decodedInst.atom };
+                const Value &srcVal = vmState->regRef(decodedInst.r1);
+                if(vmState->globalHas(a) && propObjectSet(*vmState, srcVal, vmState->global(a))) {
+                    break;
+                }
+                vmState->global(a, Value{ srcVal });
+                break;
+            }
+            case VmOpCode::GGlobal: {
+                Value srcVal = vmState->global(Atom{ decodedInst.atom });
+                propObjectGet(*vmState, srcVal, srcVal);
+                vmState->regRef(decodedInst.r1) = srcVal;
+                break;
+            }
+            case VmOpCode::GThis: {
+                Value srcVal = vmState->getThis({ decodedInst.atom });
+                propObjectGet(*vmState, srcVal, srcVal);
+                vmState->regRef(decodedInst.r1) = srcVal;
+                break;
+            }
+            case VmOpCode::DThis: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::Mov: {
+                Value srcVal = vmState->reg(decodedInst.r1);
+                if(!propObjectSet(*vmState, srcVal, vmState->regRef(decodedInst.r2))) {
+                    vmState->regRef(decodedInst.r2) = srcVal;
+                }
+                break;
+            }
+            case VmOpCode::CP: {
+                Value srcVal = vmState->reg(decodedInst.r1);
+                propObjectGet(*vmState, srcVal, srcVal);
+                vmState->regRef(decodedInst.r2) = srcVal;
+                break;
+            }
             case VmOpCode::Add: {
-                CHECK(4);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                const u16 r2 = readU16(pc);
-                MV_CUR(2);
-                const Value r1v = vmState->reg(r1);
-                Value &r2v = vmState->regRef(r2);
+                const Value r1v = vmState->reg(decodedInst.r1);
+                Value &r2v = vmState->regRef(decodedInst.r2);
                 r2v = r1v.add(r2v).unwrap();
                 break;
             }
             case VmOpCode::Sub: {
-                CHECK(4);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                const u16 r2 = readU16(pc);
-                MV_CUR(2);
-                const Value r1v = vmState->reg(r1);
-                Value &r2v = vmState->regRef(r2);
+                const Value r1v = vmState->reg(decodedInst.r1);
+                Value &r2v = vmState->regRef(decodedInst.r2);
                 r2v = r1v.sub(r2v).unwrap();
                 break;
             }
             case VmOpCode::Mul: {
                 assert(false);
+                break;
             }
             case VmOpCode::Div: {
                 assert(false);
+                break;
             }
             case VmOpCode::Idiv: {
                 assert(false);
+                break;
             }
             case VmOpCode::Mod: {
                 assert(false);
-            }
-            case VmOpCode::Mov: {
-                CHECK(4);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                const u16 r2 = readU16(pc);
-                MV_CUR(2);
-                Value srcVal = vmState->reg(r1);
-                if(!propObjectSet(*vmState, srcVal, vmState->regRef(r2))) {
-                    vmState->regRef(r2) = srcVal;
-                }
                 break;
             }
-            case VmOpCode::DGlobal: {
-                CHECK(6);
-                const u32 atom = readU32(pc);
-                MV_CUR(4);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                const Value &srcVal = vmState->regRef(r1);
-                if(vmState->globalHas(Atom{ atom }) && propObjectSet(*vmState, srcVal, vmState->global(Atom{ atom }))) {
-                    break;
-                }
-                vmState->global(Atom{ atom }, Value{ srcVal });
+            case VmOpCode::BXor: {
+                assert(false);
                 break;
             }
-            case VmOpCode::GGlobal: {
-                CHECK(6);
-                const u32 atom = readU32(pc);
-                MV_CUR(4);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                Value srcVal = vmState->global(Atom{ atom });
-                propObjectGet(*vmState, srcVal, srcVal);
-                vmState->regRef(r1) = srcVal;
+            case VmOpCode::BOr: {
+                assert(false);
                 break;
             }
-            case VmOpCode::Global: {
+            case VmOpCode::BAnd: {
                 assert(false);
+                break;
             }
-            case VmOpCode::Super: {
+            case VmOpCode::BlShift: {
                 assert(false);
+                break;
             }
-            case VmOpCode::This: {
+            case VmOpCode::BrShift: {
                 assert(false);
+                break;
             }
-            case VmOpCode::ToInt: {
+            case VmOpCode::BurShift: {
                 assert(false);
-            }
-            case VmOpCode::ToReal: {
-                assert(false);
-            }
-            case VmOpCode::ToString: {
-                assert(false);
-            }
-            case VmOpCode::ChgThis: {
-                assert(false);
-            }
-            case VmOpCode::Inv: {
-                assert(false);
-            }
-            case VmOpCode::ChkInv: {
-                assert(false);
-            }
-            case VmOpCode::ChkIns: {
-                assert(false);
-            }
-            case VmOpCode::Test: {
-                CHECK(2);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                vmState->setZF(vmState->reg(r1).asBool());
                 break;
             }
             case VmOpCode::EQ: {
                 assert(false);
+                break;
             }
             case VmOpCode::NEQ: {
                 assert(false);
+                break;
+            }
+            case VmOpCode::AbsEQ: {
+                assert(false);
+                break;
+            }
+            case VmOpCode::AbsNEQ: {
+                assert(false);
+                break;
             }
             case VmOpCode::LT: {
-                CHECK(4);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                const u16 r2 = readU16(pc);
-                MV_CUR(2);
-                const Value r1v = vmState->reg(r1);
-                Value &r2v = vmState->regRef(r2);
+                const Value r1v = vmState->reg(decodedInst.r1);
+                Value &r2v = vmState->regRef(decodedInst.r2);
                 const bool r = r1v.littlerThan(r2v).unwrap();
                 r2v = Value{ r };
                 break;
             }
             case VmOpCode::LE: {
                 assert(false);
+                break;
             }
             case VmOpCode::GT: {
                 assert(false);
+                break;
             }
             case VmOpCode::GE: {
                 assert(false);
-            }
-            case VmOpCode::AbsEQ: {
-                assert(false);
-            }
-            case VmOpCode::AbsNEQ: {
-                assert(false);
-            }
-            case VmOpCode::Jmp: {
-                assert(false);
-            }
-            case VmOpCode::JmpE: {
-                assert(false);
-            }
-            case VmOpCode::JmpNE: {
-                CHECK(4);
-                const u32 addr = readU32(pc);
-                MV_CUR(4);
-                if(!vmState->getZF()) {
-                    vmState->setPC0(addr);
-                    return 0;
-                }
                 break;
-            }
-            case VmOpCode::Call: {
-                CHECK(4);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                const u16 r2 = readU16(pc);
-                MV_CUR(2);
-                auto [imm, len] = decodeSleb128(pc, remaining - count);
-                MV_CUR(len);
-                const auto &object = vmState->reg(r2).asObject().unwrap();
-                vmState->setPC0(vmState->getPC() + count);
-                object->call(*vmState, r1, imm);
-                return 0;
-            }
-            case VmOpCode::GProp: {
-                assert(false);
-            }
-            case VmOpCode::DProp: {
-                assert(false);
-            }
-            case VmOpCode::GThis: {
-                CHECK(6);
-                const u32 atom = readU32(pc);
-                MV_CUR(4);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                Value srcVal = vmState->getThis({ atom });
-                propObjectGet(*vmState, srcVal, srcVal);
-                vmState->regRef(r1) = srcVal;
-                break;
-            }
-            case VmOpCode::DThis: {
-                assert(false);
-            }
-            case VmOpCode::LNot: {
-                assert(false);
             }
             case VmOpCode::LAnd: {
                 assert(false);
+                break;
             }
             case VmOpCode::LOr: {
                 assert(false);
+                break;
             }
-            case VmOpCode::BXor: {
+            case VmOpCode::Call: {
+                const auto &object = vmState->reg(decodedInst.r2).asObject().unwrap();
+                object->call(*vmState, decodedInst.r1, decodedInst.imm);
+                break;
+            }
+            case VmOpCode::GProp: {
                 assert(false);
+                break;
             }
-            case VmOpCode::BOr: {
+            case VmOpCode::DProp: {
                 assert(false);
-            }
-            case VmOpCode::BAnd: {
-                assert(false);
-            }
-            case VmOpCode::BlShift: {
-                assert(false);
-            }
-            case VmOpCode::BrShift: {
-                assert(false);
-            }
-            case VmOpCode::BurShift: {
-                assert(false);
-            }
-            case VmOpCode::ChgSign: {
-                assert(false);
-            }
-            case VmOpCode::Debugger: {
-                assert(false);
-            }
-            case VmOpCode::Throw: {
-                assert(false);
-            }
-            case VmOpCode::Ret: {
-                CHECK(2);
-                const u16 r1 = readU16(pc);
-                MV_CUR(2);
-                const auto value = vmState->reg(r1);
-                const auto *frame = vmState->curFrame();
-                CLL_ASSERT(frame->ret, "frame.ret val is empty");
-                vmState->prevFrame()->getReg(*frame->ret) = value;
-                vmState->freeCallFrame();
-                return 0;
+                break;
             }
         }
-        return count;
     }
 } // namespace cial::vm

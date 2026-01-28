@@ -92,6 +92,20 @@ if(${BUILD_EXECUTABLE})
             PRIVATE
             fmt::fmt utf8proc frozen::frozen argparse::argparse spdlog::spdlog
     )
+
+    add_executable(cial_bc
+            src/main0.cpp
+            ${SOURCE_FILES}
+    )
+
+    set_target_properties(cial_bc PROPERTIES COMPILE_WARNING_AS_ERROR ON)
+
+    #    target_precompile_headers(cial PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/pch.h")
+    target_link_libraries(
+            cial_bc
+            PRIVATE
+            fmt::fmt utf8proc frozen::frozen argparse::argparse spdlog::spdlog
+    )
 endif()
 
 if (${ENABLE_TESTS})
