@@ -255,8 +255,9 @@ namespace cial::vm {
         for(;;) {
         L1:
             CallFrame *cur = _currentFrame;
-            Chunk *chunk = cur->chunk;
             u64 pc = cur->pc;
+            Chunk *chunk = cur->chunk;
+            Constant *constants = chunk->getConstants().data();
             Value *regs = cur->regs();
 
             const Vec<u8> &codeVec = chunk->code();
@@ -364,7 +365,7 @@ namespace cial::vm {
                     case VmOpCode::Load: {
                         u16 r1 = read<u16>(ip, pc);
                         u16 cIdx = read<u16>(ip, pc);
-                        regs[r1] = chunk->getConstant(ConstIdx{ cIdx }).createValue(&rt);
+                        regs[r1] = constants[cIdx].createValue(&rt);
                         break;
                     }
                     case VmOpCode::LoadImm: {
