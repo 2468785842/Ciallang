@@ -70,15 +70,15 @@ namespace cial::vm {
         [[nodiscard]] u64 getPC() const { return _currentFrame->pc; }
 
         void pushVoid(const size_t n) const {
-            const size_t base = context.regPool().allocFrame(n);
+            const size_t base = _pool.allocFrame(n);
             for(size_t i = 0; i < n; i++) {
-                *context.regPool().ptrAt(base + i) = Value{};
+                *_pool.ptrAt(base + i) = Value{};
             }
         }
 
-        void push(const Value &v) const { *context.regPool().ptrAt(context.regPool().allocFrame(1)) = v; }
+        void push(const Value &v) const { *_pool.ptrAt(_pool.allocFrame(1)) = v; }
 
-        void pop(const size_t count) const { context.regPool().freeFrame(count); }
+        void pop(const size_t count) const { _pool.freeFrame(count); }
 
         void makeClosure() { _currentFrame->closure = _stackTop > 1 ? prevFrame() : nullptr; }
 
@@ -86,7 +86,7 @@ namespace cial::vm {
         void allocCallFrame(T *arg, const Opt<u16> ret = {}) {
             if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
-            _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, context.regPool() };
+            _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, _pool };
         }
 
         void freeCallFrame() {
@@ -96,7 +96,7 @@ namespace cial::vm {
             _callStack[_stackTop].~CallFrame();
         }
 
-        [[nodiscard]] size_t getRegPoolTop() const { return context.regPool().used(); }
+        [[nodiscard]] size_t getRegPoolTop() const { return _pool.used(); }
 
         [[nodiscard]] CallFrame *curFrame() noexcept { return _currentFrame; }
         [[nodiscard]] const CallFrame *curFrame() const noexcept { return _currentFrame; }
@@ -110,20 +110,20 @@ namespace cial::vm {
             _pending = PendingCF::Throw;
             _exValue = v;
             if(_exValue.isObject()) {
-                context.rt().addHandleVal(_exValue.asObject().value());
+                rt.addHandleVal(_exValue.asObject().value());
             }
         }
 
         void clearException() {
             if(_exValue.isObject()) {
-                context.rt().removeHandleVal(_exValue.asObject().value());
+                rt.removeHandleVal(_exValue.asObject().value());
             }
             _pending = PendingCF::None;
             _exValue = Value{};
         }
 
         [[nodiscard]] std::string dumpCurConstants() const {
-            return _currentFrame->chunk->dumpConstants(&context.rt()).toStdStr();
+            return _currentFrame->chunk->dumpConstants(&rt).toStdStr();
         }
 
         [[nodiscard]] std::string dumpCurInstructions() const {
@@ -140,7 +140,7 @@ namespace cial::vm {
                 for(const auto &[identifier, reg, startPC, endPC] : call.funcMeta->localVars) {
                     if(startPC.address() <= getPC() && getPC() < endPC.address())
                         continue;
-                    const auto *entry = context.rt().atomTable.get(identifier);
+                    const auto *entry = rt.atomTable.get(identifier);
                     auto varName = "?unknow_var_name?"_str;
                     if(entry)
                         varName = *entry->str;
@@ -159,6 +159,7 @@ namespace cial::vm {
         }
 
     private:
+        FastRegisterPool &_pool{ context.regPool() };
         CallFrame *_currentFrame{ context.callStack() };
         CallFrame *_callStack{ context.callStack() };
         size_t &_stackTop{ context.stackTop() }; // callFrame count
