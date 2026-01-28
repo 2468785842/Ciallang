@@ -15,6 +15,7 @@
 
 #include "../gen/Instruction.hpp"
 #include "types/Class.hpp"
+#include "types/Property.hpp"
 
 namespace cial::vm {
 
@@ -44,34 +45,6 @@ namespace cial::vm {
                     break;
             }
             ++pc;
-        }
-    }
-
-    void VMState::run0() {
-        const size_t curStackTop = _stackTop;
-        for(;;) {
-            const auto &bc = _currentFrame->chunk->getBytecode();
-
-            u64 &pc = _currentFrame->pc;
-
-            if(pc >= bc.getSize())
-                break;
-
-            if(_stackTop == 0)
-                break;
-
-            if(curStackTop > _stackTop)
-                break;
-
-            Bytecode::dispatch(bc.decode(pc), this);
-
-            switch(_pending) {
-                case PendingCF::Throw:
-                    unwind();
-                    break;
-                case PendingCF::None:
-                    break;
-            }
         }
     }
 
@@ -249,6 +222,358 @@ namespace cial::vm {
             setPC(th->tryEnd);
             clearException();
             return;
+        }
+    }
+
+
+    static bool propObjectSet(VMState &vmState, const Value &src, const Value &dst) {
+        if(dst.isObject()) {
+            if(const auto *prop = dynamic_cast<Property *>(dst.asObject().value())) {
+                prop->invokeSet(vmState, src);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool propObjectGet(VMState &vmState, const Value &src, Value &dst) {
+        if(src.isObject()) {
+            if(const auto object = src.asObject().unwrap()) {
+                if(const auto *prop = dynamic_cast<Property *>(object)) {
+                    dst = prop->invokeGet(vmState);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    void VMState::run0() {
+        if(_stackTop == 0)
+            return;
+
+        for(;;) {
+        L1:
+            const Vec<u8> &bc = _currentFrame->chunk->getBytecode().code();
+            size_t bcSize = bc.size();
+            u64 &pc = _currentFrame->pc;
+            const size_t remaining{ bcSize - pc };
+            const u8 *code = bc.data();
+
+            while(pc < bcSize) {
+                if(_insertCallFrame) {
+                    _insertCallFrame = false;
+                    goto L1;
+                }
+
+#define CHECK(n)                                                                                                       \
+    do {                                                                                                               \
+        if(remaining < n)                                                                                              \
+            throw std::runtime_error("truncated");                                                                     \
+    } while(false)
+
+                switch(static_cast<VmOpCode>(code[pc++])) {
+                    case VmOpCode::NOP: {
+                        break;
+                    }
+                    case VmOpCode::Debugger: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Push: {
+                        CHECK(2);
+                        u16 r1 = read<u16>(code, pc);
+                        push(reg(r1));
+                        break;
+                    }
+                    case VmOpCode::PopN: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Global: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Super: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::This: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Test: {
+                        CHECK(2);
+                        u16 r1 = read<u16>(code, pc);
+                        setZF(reg(r1).asBool());
+                        break;
+                    }
+                    case VmOpCode::Inv: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Throw: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Ret: {
+                        CHECK(2);
+                        u16 r1 = read<u16>(code, pc);
+                        const auto value = reg(r1);
+                        const auto *frame = curFrame();
+                        CLL_ASSERT(frame->ret, "frame.ret val is empty");
+                        prevFrame()->getReg(*frame->ret) = value;
+                        pc = bcSize;
+                        break;
+                    }
+                    case VmOpCode::Jmp: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::JmpE: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::JmpNE: {
+                        const u32 addr = read<u32>(code, pc);
+                        if(!getZF()) {
+                            setPC0(addr);
+                        }
+                        break;
+                    }
+                    case VmOpCode::ToInt: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::ToReal: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::ToString: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::LNot: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::ChgSign: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::ChgThis: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::ChkInv: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::ChkIns: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Load: {
+                        u16 r1 = read<u16>(code, pc);
+                        u16 cIdx = read<u16>(code, pc);
+                        regRef(r1) = curFrame()->chunk->getConstant(ConstIdx{ cIdx }).createValue(&rt);
+                        break;
+                    }
+                    case VmOpCode::LoadImm: {
+                        CHECK(2);
+                        u16 r1 = read<u16>(code, pc);
+                        i64 imm = decodeSleb128(code, pc, remaining - 3);
+                        regRef(r1) = Value{ imm };
+                        break;
+                    }
+                    case VmOpCode::DGlobal: {
+                        CHECK(6);
+                        u32 atom = read<u32>(code, pc);
+                        u16 r1 = read<u16>(code, pc);
+                        Atom a{ atom };
+                        const Value &srcVal = regRef(r1);
+                        if(globalHas(a) && propObjectSet(*this, srcVal, global(a))) {
+                            break;
+                        }
+                        global(a, Value{ srcVal });
+                        break;
+                    }
+                    case VmOpCode::GGlobal: {
+                        CHECK(6);
+                        u32 atom = read<u32>(code, pc);
+                        u16 r1 = read<u16>(code, pc);
+                        Value srcVal = global(Atom{ atom });
+                        propObjectGet(*this, srcVal, srcVal);
+                        regRef(r1) = srcVal;
+                        break;
+                    }
+                    case VmOpCode::GThis: {
+                        CHECK(6);
+                        u32 atom = read<u32>(code, pc);
+                        u16 r1 = read<u16>(code, pc);
+                        Value srcVal = getThis({ atom });
+                        propObjectGet(*this, srcVal, srcVal);
+                        regRef(r1) = srcVal;
+                        break;
+                    }
+                    case VmOpCode::DThis: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Mov: {
+                        CHECK(4);
+                        u16 r1 = read<u16>(code, pc);
+                        u16 r2 = read<u16>(code, pc);
+                        Value srcVal = reg(r1);
+                        if(!propObjectSet(*this, srcVal, regRef(r2))) {
+                            regRef(r2) = srcVal;
+                        }
+                        break;
+                    }
+                    case VmOpCode::CP: {
+                        CHECK(4);
+                        u16 r1 = read<u16>(code, pc);
+                        u16 r2 = read<u16>(code, pc);
+                        Value srcVal = reg(r1);
+                        propObjectGet(*this, srcVal, srcVal);
+                        regRef(r2) = srcVal;
+                        break;
+                    }
+                    case VmOpCode::Add: {
+                        CHECK(4);
+                        u16 r1 = read<u16>(code, pc);
+                        u16 r2 = read<u16>(code, pc);
+                        const Value r1v = reg(r1);
+                        Value &r2v = regRef(r2);
+                        r2v = r1v.add(r2v).unwrap();
+                        break;
+                    }
+                    case VmOpCode::Sub: {
+                        CHECK(4);
+                        u16 r1 = read<u16>(code, pc);
+                        u16 r2 = read<u16>(code, pc);
+                        const Value r1v = reg(r1);
+                        Value &r2v = regRef(r2);
+                        r2v = r1v.sub(r2v).unwrap();
+                        break;
+                    }
+                    case VmOpCode::Mul: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Div: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Idiv: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Mod: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::BXor: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::BOr: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::BAnd: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::BlShift: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::BrShift: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::BurShift: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::EQ: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::NEQ: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::AbsEQ: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::AbsNEQ: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::LT: {
+                        CHECK(4);
+                        u16 r1 = read<u16>(code, pc);
+                        u16 r2 = read<u16>(code, pc);
+                        const Value r1v = reg(r1);
+                        Value &r2v = regRef(r2);
+                        const bool r = r1v.littlerThan(r2v).unwrap();
+                        r2v = Value{ r };
+                        break;
+                    }
+                    case VmOpCode::LE: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::GT: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::GE: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::LAnd: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::LOr: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::Call: {
+                        CHECK(4);
+                        u16 r1 = read<u16>(code, pc);
+                        u16 r2 = read<u16>(code, pc);
+                        i64 imm = decodeSleb128(code, pc, remaining - 5);
+                        const auto &object = reg(r2).asObject().unwrap();
+                        object->call(*this, r1, imm);
+                        break;
+                    }
+                    case VmOpCode::GProp: {
+                        assert(false);
+                        break;
+                    }
+                    case VmOpCode::DProp: {
+                        assert(false);
+                        break;
+                    }
+                }
+
+                switch(_pending) {
+                    case PendingCF::Throw:
+                        unwind();
+                        break;
+                    case PendingCF::None:
+                        break;
+                }
+            }
+            if(_stackTop > 1)
+                freeCallFrame();
+            else if(pc >= bcSize)
+                break;
         }
     }
 

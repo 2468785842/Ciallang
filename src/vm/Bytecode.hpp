@@ -88,90 +88,66 @@ namespace cial::vm {
     }
 
     // 解码：从 pc 位置读取 uLEB128，返回值 + 消耗的字节数
-    inline u64 decodeUleb128(const Vec<u8> &ptr, u64 &pc, const size_t maxLen) {
+    inline u64 decodeUleb128(const u8 *ptr, u64 &pc, const size_t maxLen) {
         u64 result = 0;
         size_t shift = 0;
         size_t bytes = 0;
+        const u8 *p = ptr + pc;
         while(true) {
             if(bytes >= maxLen) {
                 throw std::runtime_error("ULEB128 overflow or truncated");
             }
-            const u8 byte = ptr[pc++];
-            ++bytes;
+            const u8 byte = p[bytes++];
             result |= static_cast<u64>(byte & 0x7F) << shift;
             if((byte & 0x80) == 0)
                 break;
             shift += 7;
-            if(shift >= 64) {
+            if(shift >= sizeof(u64)) {
                 throw std::runtime_error("ULEB128 too large for u64");
             }
         }
+        pc += bytes;
         return result;
     }
 
     // ---------------------- 有符号 LEB128 (sLEB128) ----------------------
 
-    // ZigZag 编码：把 int64_t 转为无符号表示（负数变奇数，正数变偶数）
-    inline u64 zigzagEncode(const i64 value) {
-        if(value >= 0)
-            return static_cast<u64>(value) << 1;
-        return (static_cast<u64>(-value) << 1) | 1;
-    }
+    // ZigZag 编码
+    inline u64 zigzagEncode(const i64 v) noexcept { return (static_cast<u64>(v) << 1) ^ static_cast<u64>(v >> 63); }
 
     // ZigZag 解码
-    inline i64 zigzagDecode(const u64 value) {
-        return (value & 1) ? -(static_cast<i64>(value >> 1)) : static_cast<i64>(value >> 1);
+    inline i64 zigzagDecode(const u64 v) noexcept {
+        return (v & 1) ? -(static_cast<i64>(v >> 1)) : static_cast<i64>(v >> 1);
     }
 
     // 编码有符号数
     inline size_t encodeSleb128(const i64 value, Vec<u8> &buffer) { return encodeUleb128(zigzagEncode(value), buffer); }
 
     // 解码有符号数
-    inline i64 decodeSleb128(const Vec<u8> &ptr, u64 &pc, const size_t maxLen) {
+    inline i64 decodeSleb128(const u8 *ptr, u64 &pc, const size_t maxLen) {
         const u64 uval = decodeUleb128(ptr, pc, maxLen);
         return zigzagDecode(uval);
     }
 
-    // LE
-    inline void writeU16(Vec<u8> &buffer, const u16 value) {
-        buffer.push_back(static_cast<u8>(value & 0xFF));
-        buffer.push_back(static_cast<u8>(value >> 8));
+    template <typename T>
+    inline constexpr bool is_number_v = sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 6 || sizeof(T) == 8;
+
+    template <typename T>
+        requires is_number_v<T>
+    void write(Vec<u8> &buffer, const T value) noexcept {
+        const size_t oldSize = buffer.size();
+        buffer.resize(oldSize + sizeof(T));
+        std::memcpy(&buffer[oldSize], &value, sizeof(T));
     }
 
-    inline u16 readU16(const Vec<u8> &ptr, u64 &pc) {
-        u16 v{ ptr[pc++] };
-        v |= (static_cast<u16>(ptr[pc++]) << 8);
+    template <typename T>
+        requires is_number_v<T>
+    T read(const u8 *ptr, u64 &pc) noexcept {
+        T v{};
+        std::memcpy(&v, ptr + pc, sizeof(T));
+        pc += sizeof(T);
         return v;
     }
-
-    inline void writeU32(Vec<u8> &buffer, const u32 value) {
-        buffer.push_back(static_cast<u8>(value & 0xFF));
-        buffer.push_back(static_cast<u8>((value >> 8) & 0xFF));
-        buffer.push_back(static_cast<u8>((value >> 16) & 0xFF));
-        buffer.push_back(static_cast<u8>((value >> 24) & 0xFF));
-    }
-
-    inline u32 readU32(const Vec<u8> &ptr, u64 &pc) {
-        u16 v{ ptr[pc++] };
-        v |= (static_cast<u16>(ptr[pc++]) << 8);
-        v |= (static_cast<u16>(ptr[pc++]) << 16);
-        v |= (static_cast<u16>(ptr[pc++]) << 24);
-        return v;
-    }
-    // LE END
-
-    struct DecodedInst {
-        VmOpCode op{};
-        u16 r1{};
-        u16 r2{};
-        union {
-            u16 r3{};
-            u16 cIdx;
-            i64 imm;
-            u32 target;
-            u32 atom;
-        };
-    };
 
     class Bytecode : public inter::Instruction::Visitor {
 #define DECLARE_TAC_OPCODE_VISIT(name) void visit(const inter::name *tac);
@@ -188,18 +164,12 @@ namespace cial::vm {
 
             // update jmp target address
             for(auto &[tp, bp] : _jmpTagetPos) {
-                // LE
-                _code[tp] = static_cast<u8>(bp & 0xFF);
-                _code[tp + 1] = static_cast<u8>((bp >> 8) & 0xFF);
-                _code[tp + 2] = static_cast<u8>((bp >> 16) & 0xFF);
-                _code[tp + 3] = static_cast<u8>((bp >> 24) & 0xFF);
+                std::memcpy(&_code[tp], &bp, sizeof(bp));
             }
         }
 
-        DecodedInst decode(u64 &pc) const;
-        static void dispatch(const DecodedInst &decodedInst, VMState *vmState);
-
         [[nodiscard]] size_t getSize() const { return _code.size(); }
+        [[nodiscard]] const Vec<u8> &code() const { return _code; }
 
     private:
         Vec<u8> _code{};

@@ -89,6 +89,7 @@ namespace cial::vm {
             if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
             _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, context.regPool() };
+            _insertCallFrame = true;
         }
 
         void freeCallFrame() {
@@ -166,6 +167,7 @@ namespace cial::vm {
         size_t &_stackTop{ context.stackTop() }; // callFrame count
         bool _zf{ false };
         PendingCF _pending{};
+        bool _insertCallFrame{ false };
         Value _exValue{};
     };
 } // namespace cial::vm
