@@ -256,21 +256,10 @@ namespace cial::vm {
         L1:
             const Vec<u8> &bc = _currentFrame->chunk->getBytecode().code();
             size_t bcSize = bc.size();
-            u64 &pc = _currentFrame->pc;
-            const size_t remaining{ bcSize - pc };
+            u64 pc = _currentFrame->pc;
             const u8 *code = bc.data();
 
             while(pc < bcSize) {
-                if(_insertCallFrame) {
-                    _insertCallFrame = false;
-                    goto L1;
-                }
-
-#define CHECK(n)                                                                                                       \
-    do {                                                                                                               \
-        if(remaining < n)                                                                                              \
-            throw std::runtime_error("truncated");                                                                     \
-    } while(false)
 
                 switch(static_cast<VmOpCode>(code[pc++])) {
                     case VmOpCode::NOP: {
@@ -281,7 +270,6 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Push: {
-                        CHECK(2);
                         u16 r1 = read<u16>(code, pc);
                         push(reg(r1));
                         break;
@@ -303,7 +291,6 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Test: {
-                        CHECK(2);
                         u16 r1 = read<u16>(code, pc);
                         setZF(reg(r1).asBool());
                         break;
@@ -317,7 +304,6 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Ret: {
-                        CHECK(2);
                         u16 r1 = read<u16>(code, pc);
                         const auto value = reg(r1);
                         const auto *frame = curFrame();
@@ -336,9 +322,8 @@ namespace cial::vm {
                     }
                     case VmOpCode::JmpNE: {
                         const u32 addr = read<u32>(code, pc);
-                        if(!getZF()) {
-                            setPC0(addr);
-                        }
+                        if(!getZF())
+                            pc = addr;
                         break;
                     }
                     case VmOpCode::ToInt: {
@@ -380,14 +365,12 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::LoadImm: {
-                        CHECK(2);
                         u16 r1 = read<u16>(code, pc);
-                        i64 imm = decodeSleb128(code, pc, remaining - 3);
+                        i64 imm = decodeSleb128(code, pc, 8);
                         regRef(r1) = Value{ imm };
                         break;
                     }
                     case VmOpCode::DGlobal: {
-                        CHECK(6);
                         u32 atom = read<u32>(code, pc);
                         u16 r1 = read<u16>(code, pc);
                         Atom a{ atom };
@@ -399,7 +382,6 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::GGlobal: {
-                        CHECK(6);
                         u32 atom = read<u32>(code, pc);
                         u16 r1 = read<u16>(code, pc);
                         Value srcVal = global(Atom{ atom });
@@ -408,7 +390,6 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::GThis: {
-                        CHECK(6);
                         u32 atom = read<u32>(code, pc);
                         u16 r1 = read<u16>(code, pc);
                         Value srcVal = getThis({ atom });
@@ -421,7 +402,6 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Mov: {
-                        CHECK(4);
                         u16 r1 = read<u16>(code, pc);
                         u16 r2 = read<u16>(code, pc);
                         Value srcVal = reg(r1);
@@ -431,7 +411,6 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::CP: {
-                        CHECK(4);
                         u16 r1 = read<u16>(code, pc);
                         u16 r2 = read<u16>(code, pc);
                         Value srcVal = reg(r1);
@@ -440,7 +419,6 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Add: {
-                        CHECK(4);
                         u16 r1 = read<u16>(code, pc);
                         u16 r2 = read<u16>(code, pc);
                         const Value r1v = reg(r1);
@@ -449,7 +427,7 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Sub: {
-                        CHECK(4);
+
                         u16 r1 = read<u16>(code, pc);
                         u16 r2 = read<u16>(code, pc);
                         const Value r1v = reg(r1);
@@ -514,7 +492,6 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::LT: {
-                        CHECK(4);
                         u16 r1 = read<u16>(code, pc);
                         u16 r2 = read<u16>(code, pc);
                         const Value r1v = reg(r1);
@@ -544,13 +521,13 @@ namespace cial::vm {
                         break;
                     }
                     case VmOpCode::Call: {
-                        CHECK(4);
                         u16 r1 = read<u16>(code, pc);
                         u16 r2 = read<u16>(code, pc);
-                        i64 imm = decodeSleb128(code, pc, remaining - 5);
+                        i64 imm = decodeSleb128(code, pc, 8);
                         const auto &object = reg(r2).asObject().unwrap();
+                        _currentFrame->pc = pc;
                         object->call(*this, r1, imm);
-                        break;
+                        goto L1;
                     }
                     case VmOpCode::GProp: {
                         assert(false);
@@ -562,13 +539,9 @@ namespace cial::vm {
                     }
                 }
 
-                switch(_pending) {
-                    case PendingCF::Throw:
-                        unwind();
-                        break;
-                    case PendingCF::None:
-                        break;
-                }
+                _currentFrame->pc = pc;
+                if(_pending == PendingCF::Throw)
+                    unwind();
             }
             if(_stackTop > 1)
                 freeCallFrame();
