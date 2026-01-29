@@ -132,7 +132,8 @@ namespace cial::vm {
         void toBytecode() {
             if(_isBytecode)
                 return;
-            _bc.compile(_instructions);
+
+            _code = Bytecode::compile(_instructions);
             _isBytecode = true;
         }
 
@@ -140,14 +141,14 @@ namespace cial::vm {
             if(!_isBytecode) {
                 throw std::runtime_error("chunk is not compiled to bytecode");
             }
-            return _bc.code();
+            return _code;
         }
 
     private:
         Vec<Box<inter::Instruction>> _instructions{};
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
-        Bytecode _bc{};
+        Vec<u8> _code{};
         u32 _registerCount{};
         bool _isBytecode{ false };
     };

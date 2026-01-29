@@ -37,40 +37,10 @@ namespace cial::vm {
     // ---------------------- 无符号 LEB128 (uLEB128) ----------------------
 
     // 编码：把 uint64_t 值写到 vector<uint8_t> 的末尾，返回写入的字节数
-    inline size_t encodeUleb128(u64 value, Vec<u8> &buffer) {
-        const size_t start = buffer.size();
-        do {
-            u8 byte = value & 0x7F;
-            value >>= 7;
-            if(value != 0)
-                byte |= 0x80; // 延续位
-            buffer.push_back(byte);
-        } while(value != 0);
-        return buffer.size() - start;
-    }
+    size_t encodeUleb128(u64 value, Vec<u8> &buffer);
 
     // 解码：从 pc 位置读取 uLEB128，返回值 + 消耗的字节数
-    inline u64 decodeUleb128(const u8 *ptr, u64 &pc, const size_t maxLen) {
-        u64 result = 0;
-        size_t shift = 0;
-        size_t bytes = 0;
-        const u8 *p = ptr + pc;
-        while(true) {
-            if(bytes >= maxLen) {
-                throw std::runtime_error("ULEB128 overflow or truncated");
-            }
-            const u8 byte = p[bytes++];
-            result |= static_cast<u64>(byte & 0x7F) << shift;
-            if((byte & 0x80) == 0)
-                break;
-            shift += 7;
-            if(shift >= sizeof(u64)) {
-                throw std::runtime_error("ULEB128 too large for u64");
-            }
-        }
-        pc += bytes;
-        return result;
-    }
+    u64 decodeUleb128(const u8 *ptr, u64 &pc, size_t maxLen);
 
     // ---------------------- 有符号 LEB128 (sLEB128) ----------------------
 
@@ -85,10 +55,12 @@ namespace cial::vm {
     }
 
     // 编码有符号数
-    inline size_t encodeSleb128(const i64 value, Vec<u8> &buffer) { return encodeUleb128(zigzagEncode(value), buffer); }
+    CIAL_INLINE size_t encodeSleb128(const i64 value, Vec<u8> &buffer) {
+        return encodeUleb128(zigzagEncode(value), buffer);
+    }
 
     // 解码有符号数
-    inline i64 decodeSleb128(const u8 *ptr, u64 &pc, const size_t maxLen) {
+    CIAL_INLINE i64 decodeSleb128(const u8 *ptr, u64 &pc, const size_t maxLen) {
         const u64 uval = decodeUleb128(ptr, pc, maxLen);
         return zigzagDecode(uval);
     }
@@ -113,31 +85,43 @@ namespace cial::vm {
         return v;
     }
 
-    class Bytecode : public inter::Instruction::Visitor {
-#define DECLARE_TAC_OPCODE_VISIT(name) void visit(const inter::name *tac);
-        CIAL_TAC_OPCODE_ENUMS(DECLARE_TAC_OPCODE_VISIT)
-#undef DECLARE_TAC_OPCODE_VISIT
+    class Bytecode {
+        struct Info {
+            Vec<u8> code{};
+            Map<u32, u32> tacPosToBcPos{};
+            Map<u32, u32> jmpTagetPos{};
+        };
+
     public:
-        void compile(const Vec<Box<inter::Instruction>> &instructions) {
+        static Vec<u8> compile(const Vec<Box<inter::Instruction>> &instructions) {
+            Info info{};
+            auto &[code, tacPosToBcPos, jmpTagetPos] = info;
             for(u32 i = 0; i < instructions.size(); ++i) {
-                if(_tacPosToBcPos.contains(i)) {
-                    _jmpTagetPos[_tacPosToBcPos[i]] = static_cast<u32>(_code.size());
+                if(tacPosToBcPos.contains(i)) {
+                    jmpTagetPos[tacPosToBcPos[i]] = static_cast<u32>(code.size());
                 }
-                instructions[i]->accept(this);
+
+                switch(inter::Instruction *inst = instructions[i].get(); inst->opcode()) {
+#define ENCODE_CASE(op)                                                                                                \
+    case inter::TacOpCode::op:                                                                                         \
+        encode(info, dynamic_cast<inter::op *>(inst));                                                                 \
+        break;
+                    CIAL_TAC_OPCODE_ENUMS(ENCODE_CASE)
+#undef ENCODE_CASE
+                }
             }
 
             // update jmp target address
-            for(auto &[tp, bp] : _jmpTagetPos) {
-                std::memcpy(&_code[tp], &bp, sizeof(bp));
+            for(auto &[tp, bp] : jmpTagetPos) {
+                std::memcpy(&code[tp], &bp, sizeof(bp));
             }
+
+            return std::move(code);
         }
 
-        [[nodiscard]] size_t getSize() const { return _code.size(); }
-        [[nodiscard]] const Vec<u8> &code() const { return _code; }
-
     private:
-        Vec<u8> _code{};
-        Map<u32, u32> _tacPosToBcPos{};
-        Map<u32, u32> _jmpTagetPos{};
+#define ENCODE_METHOD(name) static void encode(Info &info, const inter::name *tac);
+        CIAL_TAC_OPCODE_ENUMS(ENCODE_METHOD)
+#undef ENCODE_METHOD
     };
 } // namespace cial::vm

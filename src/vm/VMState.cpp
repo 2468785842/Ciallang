@@ -265,7 +265,7 @@ namespace cial::vm {
             const size_t bcSize = codeVec.size();
 
             while(pc < bcSize) {
-                auto r = DispatchRet::Continue;
+                DispatchRet r{};
                 switch(static_cast<VmOpCode>(ip[pc++])) {
 #define DISPATCH_CASE(op)                                                                                              \
     case VmOpCode::op:                                                                                                 \

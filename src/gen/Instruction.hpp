@@ -121,7 +121,6 @@ namespace cial::inter {
 
     class Instruction {
     public:
-        struct Visitor;
         explicit Instruction() = default;
 
         virtual ~Instruction() = default;
@@ -135,8 +134,6 @@ namespace cial::inter {
         Instruction &operator=(Instruction &&) = default;
 
         [[nodiscard]] virtual TacOpCode opcode() const = 0;
-
-        virtual void accept(Visitor *visitor) const = 0;
 
         [[nodiscard]] auto getOp1() const { return _ops[0]; }
         [[nodiscard]] auto getOp2() const { return _ops[1]; }
@@ -187,13 +184,6 @@ namespace cial::inter {
     CIAL_TAC_OPCODE_ENUMS(DECLARE_TAC_OPCODE_CLASS)
 #undef DECLARE_TAC_OPCODE_CLASS
 
-    struct Instruction::Visitor {
-        virtual ~Visitor() = default;
-#define DECLARE_TAC_OPCODE_VISIT(name) virtual void visit(const name *) = 0;
-        CIAL_TAC_OPCODE_ENUMS(DECLARE_TAC_OPCODE_VISIT)
-#undef DECLARE_TAC_OPCODE_VISIT
-    };
-
 // 操作码
 #define OP_GET1(name, type)                                                                                            \
     type name() const { return getOp1Val<type>(); }
@@ -225,7 +215,6 @@ namespace cial::inter {
     struct className : Instruction {                                                                                   \
         DEF_CTOR_##N(className) virtual ~className() = default;                                                        \
         [[nodiscard]] TacOpCode opcode() const override { return TacOpCode::className; }                               \
-        void accept(Visitor *visitor) const override { visitor->visit(this); }                                         \
         getters void execute(vm::VMState &vmState) override;                                                           \
         [[nodiscard]] std::string dump(const vm::VMState *vmState) override;                                           \
         void encode(Vec<u8> &code) override {}                                                                         \
