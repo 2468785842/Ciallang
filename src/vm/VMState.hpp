@@ -30,6 +30,12 @@ namespace cial::vm {
 
     enum class PendingCF { None, Throw };
 
+    enum class DispatchRet {
+        Continue,
+        Call,
+        Return,
+    };
+
     class VMState {
     public:
         Runtime &rt;
@@ -166,5 +172,10 @@ namespace cial::vm {
         bool _zf{ false };
         PendingCF _pending{};
         Value _exValue{};
+
+#define DISPATCH_OP_METHOD(op)                                                                                         \
+    CIAL_INLINE DispatchRet dispatch##op(const Constant *constants, Value *regs, const u8 *ip, u64 &pc);
+        CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_OP_METHOD)
+#undef DISPATCH_OP_METHOD
     };
 } // namespace cial::vm

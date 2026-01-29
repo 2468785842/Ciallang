@@ -253,304 +253,178 @@ namespace cial::vm {
             return;
 
         for(;;) {
-        L1:
-            CallFrame *cur = _currentFrame;
+        FETCH_NEW_FRAME:
+            const CallFrame *cur = _currentFrame;
             u64 pc = cur->pc;
             Chunk *chunk = cur->chunk;
-            Constant *constants = chunk->getConstants().data();
+            const Constant *constants = chunk->getConstants().data();
             Value *regs = cur->regs();
 
             const Vec<u8> &codeVec = chunk->code();
             const u8 *ip = codeVec.data();
-            size_t bcSize = codeVec.size();
+            const size_t bcSize = codeVec.size();
 
             while(pc < bcSize) {
-
+                auto r = DispatchRet::Continue;
                 switch(static_cast<VmOpCode>(ip[pc++])) {
-                    case VmOpCode::NOP: {
-                        break;
-                    }
-                    case VmOpCode::Debugger: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Push: {
-                        u16 r1 = read<u16>(ip, pc);
-                        push(regs[r1]);
-                        break;
-                    }
-                    case VmOpCode::PopN: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Global: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Super: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::This: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Test: {
-                        u16 r1 = read<u16>(ip, pc);
-                        setZF(regs[r1].asBool());
-                        break;
-                    }
-                    case VmOpCode::Inv: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Throw: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Ret: {
-                        u16 r1 = read<u16>(ip, pc);
-                        const auto value = regs[r1];
-                        CLL_ASSERT(cur->ret, "frame.ret val is empty");
-                        prevFrame()->getReg(*cur->ret) = value;
-                        pc = bcSize;
-                        break;
-                    }
-                    case VmOpCode::Jmp: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::JmpE: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::JmpNE: {
-                        const u32 addr = read<u32>(ip, pc);
-                        if(!getZF())
-                            pc = addr;
-                        break;
-                    }
-                    case VmOpCode::ToInt: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::ToReal: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::ToString: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::LNot: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::ChgSign: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::ChgThis: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::ChkInv: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::ChkIns: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Load: {
-                        u16 r1 = read<u16>(ip, pc);
-                        u16 cIdx = read<u16>(ip, pc);
-                        regs[r1] = constants[cIdx].createValue(&rt);
-                        break;
-                    }
-                    case VmOpCode::LoadImm: {
-                        u16 r1 = read<u16>(ip, pc);
-                        i64 imm = decodeSleb128(ip, pc, 8);
-                        regs[r1] = Value{ imm };
-                        break;
-                    }
-                    case VmOpCode::DGlobal: {
-                        u32 atom = read<u32>(ip, pc);
-                        u16 r1 = read<u16>(ip, pc);
-                        Atom a{ atom };
-                        const Value &srcVal = regs[r1];
-                        if(globalHas(a) && propObjectSet(*this, srcVal, global(a))) {
-                            break;
-                        }
-                        global(a, Value{ srcVal });
-                        break;
-                    }
-                    case VmOpCode::GGlobal: {
-                        u32 atom = read<u32>(ip, pc);
-                        u16 r1 = read<u16>(ip, pc);
-                        Value srcVal = global(Atom{ atom });
-                        propObjectGet(*this, srcVal, srcVal);
-                        regs[r1] = srcVal;
-                        break;
-                    }
-                    case VmOpCode::GThis: {
-                        u32 atom = read<u32>(ip, pc);
-                        u16 r1 = read<u16>(ip, pc);
-                        Value srcVal = getThis({ atom });
-                        propObjectGet(*this, srcVal, srcVal);
-                        regs[r1] = srcVal;
-                        break;
-                    }
-                    case VmOpCode::DThis: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Mov: {
-                        u16 r1 = read<u16>(ip, pc);
-                        u16 r2 = read<u16>(ip, pc);
-                        Value srcVal = regs[r1];
-                        if(!propObjectSet(*this, srcVal, regs[r2])) {
-                            regs[r2] = srcVal;
-                        }
-                        break;
-                    }
-                    case VmOpCode::CP: {
-                        u16 r1 = read<u16>(ip, pc);
-                        u16 r2 = read<u16>(ip, pc);
-                        Value srcVal = regs[r1];
-                        propObjectGet(*this, srcVal, srcVal);
-                        regs[r2] = srcVal;
-                        break;
-                    }
-                    case VmOpCode::Add: {
-                        u16 r1 = read<u16>(ip, pc);
-                        u16 r2 = read<u16>(ip, pc);
-                        const Value r1v = regs[r1];
-                        Value &r2v = regs[r2];
-                        r2v = r1v.add(r2v).unwrap();
-                        break;
-                    }
-                    case VmOpCode::Sub: {
-                        u16 r1 = read<u16>(ip, pc);
-                        u16 r2 = read<u16>(ip, pc);
-                        const Value r1v = regs[r1];
-                        Value &r2v = regs[r2];
-                        r2v = r1v.sub(r2v).unwrap();
-                        break;
-                    }
-                    case VmOpCode::Mul: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Div: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Idiv: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Mod: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::BXor: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::BOr: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::BAnd: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::BlShift: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::BrShift: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::BurShift: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::EQ: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::NEQ: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::AbsEQ: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::AbsNEQ: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::LT: {
-                        u16 r1 = read<u16>(ip, pc);
-                        u16 r2 = read<u16>(ip, pc);
-                        const Value r1v = regs[r1];
-                        Value &r2v = regs[r2];
-                        const bool r = r1v.littlerThan(r2v).unwrap();
-                        r2v = Value{ r };
-                        break;
-                    }
-                    case VmOpCode::LE: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::GT: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::GE: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::LAnd: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::LOr: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::Call: {
-                        u16 r1 = read<u16>(ip, pc);
-                        u16 r2 = read<u16>(ip, pc);
-                        i64 imm = decodeSleb128(ip, pc, 8);
-                        const auto &object = regs[r2].asObject().unwrap();
-                        _currentFrame->pc = pc;
-                        object->call(*this, r1, imm);
-                        goto L1;
-                    }
-                    case VmOpCode::GProp: {
-                        assert(false);
-                        break;
-                    }
-                    case VmOpCode::DProp: {
-                        assert(false);
-                        break;
-                    }
+#define DISPATCH_CASE(op)                                                                                              \
+    case VmOpCode::op:                                                                                                 \
+        r = dispatch##op(constants, regs, ip, pc);                                                                     \
+        break;
+                    CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_CASE)
+#undef DISPATCH_CASE
                 }
 
-                _currentFrame->pc = pc;
+                if(r == DispatchRet::Call) {
+                    goto FETCH_NEW_FRAME;
+                }
+
+                if(r == DispatchRet::Return) {
+                    break;
+                }
+
                 if(_pending == PendingCF::Throw)
                     unwind();
             }
+
             if(_stackTop > 1)
                 freeCallFrame();
             else if(pc >= bcSize)
                 break;
         }
+    }
+
+#define DISPATCH_OP_METHOD(op)                                                                                         \
+    DispatchRet VMState::dispatch##op(const Constant *constants, Value *regs, const u8 *ip, u64 &pc)
+
+    DISPATCH_OP_METHOD(NOP) { return DispatchRet::Continue; }
+
+    DISPATCH_OP_METHOD(Push) {
+        const u16 r1 = read<u16>(ip, pc);
+        push(regs[r1]);
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(Test) {
+        const u16 r1 = read<u16>(ip, pc);
+        setZF(regs[r1].asBool());
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(Ret) {
+        const u16 r1 = read<u16>(ip, pc);
+        const auto value = regs[r1];
+        CLL_ASSERT(cur->ret, "frame.ret val is empty");
+        prevFrame()->getReg(*curFrame()->ret) = value;
+        return DispatchRet::Return;
+    }
+
+    DISPATCH_OP_METHOD(JmpNE) {
+        const u32 addr = read<u32>(ip, pc);
+        if(!getZF())
+            pc = addr;
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(Load) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 cIdx = read<u16>(ip, pc);
+        regs[r1] = constants[cIdx].createValue(&rt);
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(LoadImm) {
+        const u16 r1 = read<u16>(ip, pc);
+        const i64 imm = decodeSleb128(ip, pc, 8);
+        regs[r1] = Value{ imm };
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(DGlobal) {
+        const u32 atom = read<u32>(ip, pc);
+        const u16 r1 = read<u16>(ip, pc);
+        const Atom a{ atom };
+        const Value &srcVal = regs[r1];
+        if(globalHas(a) && propObjectSet(*this, srcVal, global(a))) {
+        } else {
+            global(a, Value{ srcVal });
+        }
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(GGlobal) {
+        const u32 atom = read<u32>(ip, pc);
+        const u16 r1 = read<u16>(ip, pc);
+        Value srcVal = global(Atom{ atom });
+        propObjectGet(*this, srcVal, srcVal);
+        regs[r1] = srcVal;
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(GThis) {
+        const u32 atom = read<u32>(ip, pc);
+        const u16 r1 = read<u16>(ip, pc);
+        Value srcVal = getThis({ atom });
+        propObjectGet(*this, srcVal, srcVal);
+        regs[r1] = srcVal;
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(Mov) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        Value srcVal = regs[r1];
+        if(!propObjectSet(*this, srcVal, regs[r2])) {
+            regs[r2] = srcVal;
+        }
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(CP) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        Value srcVal = regs[r1];
+        propObjectGet(*this, srcVal, srcVal);
+        regs[r2] = srcVal;
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(Add) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        const Value r1v = regs[r1];
+        Value &r2v = regs[r2];
+        r2v = r1v.add(r2v).unwrap();
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(Sub) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        const Value r1v = regs[r1];
+        Value &r2v = regs[r2];
+        r2v = r1v.sub(r2v).unwrap();
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(LT) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        const Value r1v = regs[r1];
+        Value &r2v = regs[r2];
+        const bool r = r1v.littlerThan(r2v).unwrap();
+        r2v = Value{ r };
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(Call) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        const i64 imm = decodeSleb128(ip, pc, 8);
+        const auto &object = regs[r2].asObject().unwrap();
+        curFrame()->pc = pc;
+        object->call(*this, r1, imm);
+        return DispatchRet::Call;
     }
 
 } // namespace cial::vm

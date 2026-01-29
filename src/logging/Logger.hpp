@@ -18,13 +18,14 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include "config.h"
 
 #define CLL_LOG_INFO(fmt, ...) ::cial::logFmt(::cial::Level::kInfo, fmt, ##__VA_ARGS__)
 #define CLL_LOG_WARN(fmt, ...) ::cial::logFmt(::cial::Level::kWarn, fmt, ##__VA_ARGS__)
 #define CLL_LOG_ERROR(fmt, ...) ::cial::logFmt(::cial::Level::kError, fmt, ##__VA_ARGS__)
 #define CLL_LOG_FATAL(fmt, ...) ::cial::logFmt(::cial::Level::kFatal, fmt, ##__VA_ARGS__)
 
-#if defined(DEBUG) || defined(_DEBUG) || !defined(NDEBUG)
+#if CIAL_DEBUG
 #define CLL_ASSERT(cond, fmt, ...)                                                                                     \
     do {                                                                                                               \
         if(!(cond)) {                                                                                                  \

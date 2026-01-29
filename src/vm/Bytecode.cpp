@@ -10,7 +10,10 @@
 namespace cial::vm {
     void Bytecode::visit(const inter::NOP *) { _code.push_back(static_cast<u8>(VmOpCode::NOP)); }
 
-    void Bytecode::visit(const inter::Debugger *) { _code.push_back(static_cast<u8>(VmOpCode::Debugger)); }
+    void Bytecode::visit(const inter::Debugger *) {
+        assert(false);
+        // _code.push_back(static_cast<u8>(VmOpCode::Debugger));
+    }
 
     void Bytecode::visit(const inter::Push *tac) {
         const u16 dst = tac->src().index();
@@ -19,9 +22,10 @@ namespace cial::vm {
     }
 
     void Bytecode::visit(const inter::PopN *tac) {
-        const i64 imm = tac->getOp1Val<Integer>();
-        _code.push_back(static_cast<u8>(VmOpCode::PopN));
-        encodeSleb128(imm, _code);
+        assert(false);
+        // const i64 imm = tac->getOp1Val<Integer>();
+        // _code.push_back(static_cast<u8>(VmOpCode::PopN));
+        // encodeSleb128(imm, _code);
     }
 
     void Bytecode::visit(const inter::Global *tac) { assert(false); }

@@ -3,6 +3,7 @@
 //
 #pragma once
 
+#include "config.h"
 #include "gen/Instruction.hpp"
 #include "types/Types.hpp"
 
@@ -11,56 +12,17 @@
     O(Load)                                                                                                            \
     O(LoadImm)                                                                                                         \
     O(Push)                                                                                                            \
-    O(PopN)                                                                                                            \
     O(CP)                                                                                                              \
     O(Add)                                                                                                             \
     O(Sub)                                                                                                             \
-    O(Mul)                                                                                                             \
-    O(Div)                                                                                                             \
-    O(Idiv)                                                                                                            \
-    O(Mod)                                                                                                             \
     O(Mov)                                                                                                             \
     O(DGlobal)                                                                                                         \
     O(GGlobal)                                                                                                         \
-    O(Global)                                                                                                          \
-    O(Super)                                                                                                           \
-    O(This)                                                                                                            \
-    O(ToInt)                                                                                                           \
-    O(ToReal)                                                                                                          \
-    O(ToString)                                                                                                        \
-    O(ChgThis)                                                                                                         \
-    O(Inv)                                                                                                             \
-    O(ChkInv)                                                                                                          \
-    O(ChkIns)                                                                                                          \
     O(Test)                                                                                                            \
-    O(EQ)                                                                                                              \
-    O(NEQ)                                                                                                             \
     O(LT)                                                                                                              \
-    O(LE)                                                                                                              \
-    O(GT)                                                                                                              \
-    O(GE)                                                                                                              \
-    O(AbsEQ)                                                                                                           \
-    O(AbsNEQ)                                                                                                          \
-    O(Jmp)                                                                                                             \
-    O(JmpE)                                                                                                            \
     O(JmpNE)                                                                                                           \
     O(Call)                                                                                                            \
-    O(GProp)                                                                                                           \
-    O(DProp)                                                                                                           \
     O(GThis)                                                                                                           \
-    O(DThis)                                                                                                           \
-    O(LNot)                                                                                                            \
-    O(LAnd)                                                                                                            \
-    O(LOr)                                                                                                             \
-    O(BXor)                                                                                                            \
-    O(BOr)                                                                                                             \
-    O(BAnd)                                                                                                            \
-    O(BlShift)                                                                                                         \
-    O(BrShift)                                                                                                         \
-    O(BurShift)                                                                                                        \
-    O(ChgSign)                                                                                                         \
-    O(Debugger)                                                                                                        \
-    O(Throw)                                                                                                           \
     O(Ret)
 
 namespace cial::vm {
@@ -113,10 +75,12 @@ namespace cial::vm {
     // ---------------------- 有符号 LEB128 (sLEB128) ----------------------
 
     // ZigZag 编码
-    inline u64 zigzagEncode(const i64 v) noexcept { return (static_cast<u64>(v) << 1) ^ static_cast<u64>(v >> 63); }
+    CIAL_INLINE u64 zigzagEncode(const i64 v) noexcept {
+        return (static_cast<u64>(v) << 1) ^ static_cast<u64>(v >> 63);
+    }
 
     // ZigZag 解码
-    inline i64 zigzagDecode(const u64 v) noexcept {
+    CIAL_INLINE i64 zigzagDecode(const u64 v) noexcept {
         return (v & 1) ? -(static_cast<i64>(v >> 1)) : static_cast<i64>(v >> 1);
     }
 
@@ -134,7 +98,7 @@ namespace cial::vm {
 
     template <typename T>
         requires is_number_v<T>
-    void write(Vec<u8> &buffer, const T value) noexcept {
+    CIAL_INLINE void write(Vec<u8> &buffer, const T value) noexcept {
         const size_t oldSize = buffer.size();
         buffer.resize(oldSize + sizeof(T));
         std::memcpy(&buffer[oldSize], &value, sizeof(T));
@@ -142,8 +106,8 @@ namespace cial::vm {
 
     template <typename T>
         requires is_number_v<T>
-    T read(const u8 *ptr, u64 &pc) noexcept {
-        T v{};
+    CIAL_INLINE T read(const u8 *ptr, u64 &pc) noexcept {
+        T v;
         std::memcpy(&v, ptr + pc, sizeof(T));
         pc += sizeof(T);
         return v;
