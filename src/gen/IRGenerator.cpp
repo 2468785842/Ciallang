@@ -144,7 +144,7 @@ namespace cial::inter {
                 lVarReg = allocateRegister();
                 _chunk->emit<GGlobal>(lVarName, *lVarReg);
             }
-            _chunk->emit<Mov>(*lVarReg, dst);
+            _chunk->emit<DLocal>(*lVarReg, dst);
             OptReg rVarReg{};
 
             if(rVar) {
@@ -155,13 +155,13 @@ namespace cial::inter {
             }
 
             if(lVar) {
-                _chunk->emit<Mov>(*rVarReg, *lVarReg);
+                _chunk->emit<DLocal>(*rVarReg, *lVarReg);
             } else {
                 _chunk->emit<DGlobal>(lVarName, *rVarReg);
             }
 
             if(rVar) {
-                _chunk->emit<Mov>(dst, rVar->reg);
+                _chunk->emit<DLocal>(dst, rVar->reg);
             } else {
                 _chunk->emit<DGlobal>(rVarName, dst);
             }
@@ -478,7 +478,7 @@ namespace cial::inter {
 
             if(const auto variable = resolveLocalVariable(identifier)) {
                 Register dst = variable->reg;
-                _chunk->emit<Mov>(src, dst);
+                _chunk->emit<DLocal>(src, dst);
                 freeRegister(src);
                 optReg = dst;
                 return;
@@ -586,7 +586,7 @@ namespace cial::inter {
             // already have this variable, in same scope
             if(const auto variable = resolveLocalVariable(identifier)) {
                 freeRegister(src);
-                _chunk->emit<Mov>(src, variable->reg);
+                _chunk->emit<DLocal>(src, variable->reg);
                 return;
             }
 
@@ -762,7 +762,7 @@ namespace cial::inter {
         const auto identifier = getAtomFromToken(node->token);
 
         if(const auto variable = resolveLocalVariable(identifier)) {
-            _chunk->emit<CP>(variable->reg, dst);
+            _chunk->emit<GLocal>(variable->reg, dst);
             optReg = dst;
             return;
         }
@@ -1066,7 +1066,7 @@ namespace cial::inter {
             return;
         }
 
-        _chunk->emit<Mov>(lhsReg, dst);
+        _chunk->emit<DLocal>(lhsReg, dst);
 
         const size_t jmpIdx = _chunk->emit<NOP>();
         _chunk->repl<JmpNE>(jmpNeIdx, makeLabel());
@@ -1076,7 +1076,7 @@ namespace cial::inter {
             return;
         }
 
-        _chunk->emit<Mov>(rhsReg, dst);
+        _chunk->emit<DLocal>(rhsReg, dst);
 
         _chunk->repl<Jmp>(jmpIdx, makeLabel());
         freeRegister(testReg);

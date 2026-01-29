@@ -370,7 +370,7 @@ namespace cial::vm {
         return DispatchRet::Continue;
     }
 
-    DISPATCH_OP_METHOD(Mov) {
+    DISPATCH_OP_METHOD(DLocal) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
         Value srcVal = regs[r1];
@@ -380,7 +380,7 @@ namespace cial::vm {
         return DispatchRet::Continue;
     }
 
-    DISPATCH_OP_METHOD(CP) {
+    DISPATCH_OP_METHOD(GLocal) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
         Value srcVal = regs[r1];

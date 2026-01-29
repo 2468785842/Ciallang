@@ -47,8 +47,8 @@
     O(GGlobal)                                                                                                         \
     O(GThis)                                                                                                           \
     O(DThis)                                                                                                           \
-    O(Mov)                                                                                                             \
-    O(CP)                                                                                                              \
+    O(GLocal)                                                                                                          \
+    O(DLocal)                                                                                                          \
     O(Add)                                                                                                             \
     O(Sub)                                                                                                             \
     O(Mul)                                                                                                             \
@@ -264,8 +264,8 @@ namespace cial::inter {
     DEF_INST(GThis, 2, OP_GET1(atom, Atom) OP_GET2(dst, Register));
     DEF_INST(DThis, 2, OP_GET1(atom, Atom) OP_GET2(src, Register));
 
-    DEF_INST(Mov, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
-    DEF_INST(CP, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(DLocal, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(GLocal, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     DEF_INST(Add, 3, OP_GET1(src1, Register) OP_GET2(src2, Register) OP_GET3(dst, Register));
     DEF_INST(Sub, 3, OP_GET1(src1, Register) OP_GET2(src2, Register) OP_GET3(dst, Register));

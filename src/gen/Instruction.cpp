@@ -218,7 +218,7 @@ namespace cial::inter {
         vmState.setThis(atom(), srcVal);
     }
 
-    void Mov::execute(VMState &vmState) {
+    void DLocal::execute(VMState &vmState) {
         const Value &srcVal = vmState.reg(src().index());
         if(propObjectSet(vmState, srcVal, vmState.regRef(dst().index()))) {
             return;
@@ -226,7 +226,7 @@ namespace cial::inter {
         vmState.regRef(dst().index()) = srcVal;
     }
 
-    void CP::execute(VMState &vmState) {
+    void GLocal::execute(VMState &vmState) {
         Value srcVal = vmState.reg(src().index());
         propObjectGet(vmState, srcVal, srcVal);
         vmState.regRef(dst().index()) = srcVal;
@@ -552,10 +552,11 @@ namespace cial::inter {
     DEF_AUTO_DUMP(LoadImm, "load_imm");
     DEF_AUTO_DUMP(Push, "push");
     DEF_AUTO_DUMP(PopN, "pop_n");
-    DEF_AUTO_DUMP(Mov, "mov");
+
+    DEF_AUTO_DUMP(DLocal, "d_local");
+    DEF_AUTO_DUMP(GLocal, "g_local");
 
     // 算术运算 (带状态输出)
-    DEF_AUTO_DUMP(CP, "cp");
     DEF_AUTO_DUMP(Add, "add");
     DEF_AUTO_DUMP(Sub, "sub");
     DEF_AUTO_DUMP(Mul, "mul");

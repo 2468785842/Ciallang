@@ -12,10 +12,10 @@
     O(Load)                                                                                                            \
     O(LoadImm)                                                                                                         \
     O(Push)                                                                                                            \
-    O(CP)                                                                                                              \
+    O(GLocal)                                                                                                          \
     O(Add)                                                                                                             \
     O(Sub)                                                                                                             \
-    O(Mov)                                                                                                             \
+    O(DLocal)                                                                                                          \
     O(DGlobal)                                                                                                         \
     O(GGlobal)                                                                                                         \
     O(Test)                                                                                                            \

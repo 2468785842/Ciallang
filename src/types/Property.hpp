@@ -21,13 +21,13 @@
 namespace cial {
 
     /**
-     * mov r1, r2
+     * dLocal r1, r2
      * dThis r1, r2
      * dGlobal r1, r2
      * When this instruction is executed, it checks whether r2 is a Property object.
      * If so, invokeSet is called on r2, with r1 passed as the argument.
      *
-     * cp r1, r2
+     * gLocal r1, r2
      * gThis r1, r2
      * gGlobal r1, r2
      * When this instruction is executed, it checks whether r1 is a Property object.

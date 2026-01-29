@@ -144,12 +144,12 @@ namespace cial::vm {
     }
     void Bytecode::encode(Info &info, const inter::DThis *tac) { assert(false); }
 
-    void Bytecode::encode(Info &info, const inter::Mov *tac) { assert(false); }
+    void Bytecode::encode(Info &info, const inter::DLocal *tac) { assert(false); }
 
-    void Bytecode::encode(Info &info, const inter::CP *tac) {
+    void Bytecode::encode(Info &info, const inter::GLocal *tac) {
         const u16 r1 = tac->src().index();
         const u16 r2 = tac->dst().index();
-        info.code.push_back(static_cast<u8>(VmOpCode::CP));
+        info.code.push_back(static_cast<u8>(VmOpCode::GLocal));
         write<u16>(info.code, r1);
         write<u16>(info.code, r2);
     }
@@ -163,7 +163,7 @@ namespace cial::vm {
             write<u16>(info.code, r1);
             write<u16>(info.code, r3);
         } else {
-            info.code.push_back(static_cast<u8>(VmOpCode::Mov));
+            info.code.push_back(static_cast<u8>(VmOpCode::DLocal));
             write<u16>(info.code, r2);
             write<u16>(info.code, r3);
 
@@ -178,7 +178,7 @@ namespace cial::vm {
         const u16 r2 = tac->src2().index();
         const u16 r3 = tac->dst().index();
         if(r2 != r3) {
-            info.code.push_back(static_cast<u8>(VmOpCode::Mov));
+            info.code.push_back(static_cast<u8>(VmOpCode::DLocal));
             write<u16>(info.code, r2);
             write<u16>(info.code, r3);
         }
@@ -213,7 +213,7 @@ namespace cial::vm {
             write<u16>(info.code, r1);
             write<u16>(info.code, r3);
         } else {
-            info.code.push_back(static_cast<u8>(VmOpCode::Mov));
+            info.code.push_back(static_cast<u8>(VmOpCode::DLocal));
             write<u16>(info.code, r2);
             write<u16>(info.code, r3);
 
