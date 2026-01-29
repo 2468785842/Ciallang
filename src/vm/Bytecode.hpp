@@ -9,6 +9,7 @@
 
 #define CIAL_BYTECODE_OPCODE_ENUMS(O)                                                                                  \
     O(NOP)                                                                                                             \
+    O(Debugger)                                                                                                        \
     O(Load)                                                                                                            \
     O(LoadImm)                                                                                                         \
     O(Push)                                                                                                            \

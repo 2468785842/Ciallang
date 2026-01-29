@@ -14,6 +14,7 @@
 #include "VMState.hpp"
 
 #include "../gen/Instruction.hpp"
+#include "VMDebug.hpp"
 #include "types/Class.hpp"
 #include "types/Property.hpp"
 
@@ -298,6 +299,27 @@ namespace cial::vm {
     DispatchRet VMState::dispatch##op(CallFrame *cur, const Constant *constants, Value *regs, const u8 *ip, u64 &pc)
 
     DISPATCH_OP_METHOD(NOP) { return DispatchRet::Continue; }
+
+    DISPATCH_OP_METHOD(Debugger) {
+        std::string regsDump = dumpCurRegisters();
+        std::string localVarDump = dumpCurLocalVars();
+        std::string instructionsDump = dumpCurInstructions();
+        std::string constantsDump = dumpCurConstants();
+
+        fmt::println("========================");
+        fmt::println("========= Dump =========");
+        fmt::println("========================");
+        fmt::println("========= reg =========");
+        fmt::println("{}", regsDump);
+        fmt::println("======= local var =======");
+        fmt::println("{}", localVarDump);
+        fmt::println("========= const =========");
+        fmt::println("{}", constantsDump);
+        fmt::println("========= inst =========");
+        fmt::println("{}", instructionsDump);
+        DEBUG_BREAK();
+        return DispatchRet::Continue;
+    }
 
     DISPATCH_OP_METHOD(Push) {
         const u16 r1 = read<u16>(ip, pc);

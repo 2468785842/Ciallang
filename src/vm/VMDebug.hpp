@@ -13,23 +13,10 @@
  */
 #pragma once
 
+#include "config.h"
 #include "logging/Logger.hpp"
 
-// #ifdef VM_DEBUG
-#define VM_ASSERT(condition, vmState)                                                                                  \
-    CLL_ASSERT(condition, R"([VM_ASSERT]
-__asm__start
-%s
-__asm__end
-PC: 0x%x
-Frame depth: %d)",                                                                                                     \
-               (vmState)->curFrame()->chunk->dumpInstruction().getData(), (vmState)->curFrame()->pc - 1,               \
-               (vmState)->context.stackTop);
-// #else
-// #define VM_ASSERT(x) ((void)0)
-// #endif
-
-#if defined(DEBUG) || defined(_DEBUG) || !defined(NDEBUG)
+#if CIAL_DEBUG
 #if defined(_MSC_VER)
 // Windows 平台 (MSVC)
 #define DEBUG_BREAK() __debugbreak()

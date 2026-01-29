@@ -46,8 +46,7 @@ namespace cial::vm {
     void Bytecode::encode(Info &info, const inter::NOP *) { info.code.push_back(static_cast<u8>(VmOpCode::NOP)); }
 
     void Bytecode::encode(Info &info, const inter::Debugger *) {
-        assert(false);
-        // info.code.push_back(static_cast<u8>(VmOpCode::Debugger));
+        info.code.push_back(static_cast<u8>(VmOpCode::Debugger));
     }
 
     void Bytecode::encode(Info &info, const inter::Push *tac) {
