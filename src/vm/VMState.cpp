@@ -22,8 +22,8 @@ namespace cial::vm {
     void VMState::run() {
         const size_t curStackTop = _stackTop;
         for(;;) {
-            u64 &pc = _currentFrame->pc;
-            const auto &instList = _currentFrame->chunk->getInstVec();
+            u64 &pc = _curFrame->pc;
+            const auto &instList = _curFrame->chunk->getInstVec();
 
             if(pc >= instList.size())
                 break;
@@ -69,22 +69,22 @@ namespace cial::vm {
         context.global()->setProp(atom, value);
     }
 
-    Value VMState::reg(const u16 reg) const { return _currentFrame->getReg(reg); }
+    Value VMState::reg(const u16 reg) const { return _curFrame->getReg(reg); }
 
-    Value &VMState::regRef(const u16 reg) const { return _currentFrame->getReg(reg); }
+    Value &VMState::regRef(const u16 reg) const { return _curFrame->getReg(reg); }
 
     bool VMState::hasThis(const Atom atom) const {
 
         // current thisObj
-        if(_currentFrame->thisObj.isObject()) {
-            if(auto *instanceObject = dynamic_cast<DataObject *>(_currentFrame->thisObj.asObject().value())) {
+        if(_curFrame->thisObj.isObject()) {
+            if(auto *instanceObject = dynamic_cast<DataObject *>(_curFrame->thisObj.asObject().value())) {
                 if(instanceObject->hasProp(atom)) {
                     return true;
                 }
             }
         }
 
-        if(auto *callFrame = _currentFrame->closure; callFrame) {
+        if(auto *callFrame = _curFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
                 for(const auto &localVar : callFrame->funcMeta->localVars) {
                     if(localVar.endPC.address() > callFrame->pc)
@@ -110,15 +110,15 @@ namespace cial::vm {
     Value VMState::getThis(const Atom atom) const {
 
         // current thisObj
-        if(_currentFrame->thisObj.isObject()) {
-            if(auto *instanceObject = dynamic_cast<DataObject *>(_currentFrame->thisObj.asObject().value())) {
+        if(_curFrame->thisObj.isObject()) {
+            if(auto *instanceObject = dynamic_cast<DataObject *>(_curFrame->thisObj.asObject().value())) {
                 if(instanceObject->hasProp(atom)) {
                     return instanceObject->getProp(atom);
                 }
             }
         }
 
-        if(auto *callFrame = _currentFrame->closure; callFrame) {
+        if(auto *callFrame = _curFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
                 for(const auto &[identifier, reg, startPC, endPC] : callFrame->funcMeta->localVars) {
                     if(startPC.address() <= callFrame->pc && callFrame->pc < endPC.address())
@@ -144,8 +144,8 @@ namespace cial::vm {
 
     void VMState::setThis(const Atom atom, const Value &v) const {
         // current thisObj
-        if(_currentFrame->thisObj.isObject()) {
-            if(auto *instanceObject = dynamic_cast<DataObject *>(_currentFrame->thisObj.asObject().value())) {
+        if(_curFrame->thisObj.isObject()) {
+            if(auto *instanceObject = dynamic_cast<DataObject *>(_curFrame->thisObj.asObject().value())) {
                 if(instanceObject->hasProp(atom)) {
                     instanceObject->setProp(atom, v);
                     return;
@@ -153,7 +153,7 @@ namespace cial::vm {
             }
         }
 
-        if(auto *callFrame = _currentFrame->closure; callFrame) {
+        if(auto *callFrame = _curFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
                 for(const auto &localVar : callFrame->funcMeta->localVars) {
                     if(localVar.endPC.address() > callFrame->pc)
@@ -171,8 +171,8 @@ namespace cial::vm {
     Value VMState::getUpVal(const Atom atom) const {
 
         // current context
-        if(_currentFrame->thisObj.isObject()) {
-            if(auto *instanceObject = dynamic_cast<DataObject *>(_currentFrame->thisObj.asObject().value())) {
+        if(_curFrame->thisObj.isObject()) {
+            if(auto *instanceObject = dynamic_cast<DataObject *>(_curFrame->thisObj.asObject().value())) {
                 return instanceObject->getProp(atom);
             }
         }
@@ -191,7 +191,7 @@ namespace cial::vm {
 
             // prev context
             if(callFrame.thisObj.isObject()) {
-                if(auto *instanceObject = dynamic_cast<DataObject *>(_currentFrame->thisObj.asObject().value())) {
+                if(auto *instanceObject = dynamic_cast<DataObject *>(_curFrame->thisObj.asObject().value())) {
                     return instanceObject->getProp(atom);
                 }
             }
@@ -204,7 +204,7 @@ namespace cial::vm {
 
     void VMState::unwind() {
         while(true) {
-            const CallFrame *cFrame = _currentFrame;
+            const CallFrame *cFrame = _curFrame;
             const Opt<ThrowHandler> th = cFrame->chunk->findThrowHandler(getPC());
             if(!th) {
                 if(cFrame->ret)
@@ -254,7 +254,7 @@ namespace cial::vm {
 
         for(;;) {
         FETCH_NEW_FRAME:
-            const CallFrame *cur = _currentFrame;
+            CallFrame *cur = _curFrame;
             u64 pc = cur->pc;
             Chunk *chunk = cur->chunk;
             const Constant *constants = chunk->getConstants().data();
@@ -269,7 +269,7 @@ namespace cial::vm {
                 switch(static_cast<VmOpCode>(ip[pc++])) {
 #define DISPATCH_CASE(op)                                                                                              \
     case VmOpCode::op:                                                                                                 \
-        r = dispatch##op(constants, regs, ip, pc);                                                                     \
+        r = dispatch##op(cur, constants, regs, ip, pc);                                                                \
         break;
                     CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_CASE)
 #undef DISPATCH_CASE
@@ -295,7 +295,7 @@ namespace cial::vm {
     }
 
 #define DISPATCH_OP_METHOD(op)                                                                                         \
-    DispatchRet VMState::dispatch##op(const Constant *constants, Value *regs, const u8 *ip, u64 &pc)
+    DispatchRet VMState::dispatch##op(CallFrame *cur, const Constant *constants, Value *regs, const u8 *ip, u64 &pc)
 
     DISPATCH_OP_METHOD(NOP) { return DispatchRet::Continue; }
 
@@ -307,21 +307,21 @@ namespace cial::vm {
 
     DISPATCH_OP_METHOD(Test) {
         const u16 r1 = read<u16>(ip, pc);
-        setZF(regs[r1].asBool());
+        _zf = regs[r1].asBool();
         return DispatchRet::Continue;
     }
 
     DISPATCH_OP_METHOD(Ret) {
         const u16 r1 = read<u16>(ip, pc);
-        const auto value = regs[r1];
+        const Value &value = regs[r1];
         CLL_ASSERT(cur->ret, "frame.ret val is empty");
-        prevFrame()->getReg(*curFrame()->ret) = value;
+        (cur - 1)->getReg(*cur->ret) = value;
         return DispatchRet::Return;
     }
 
     DISPATCH_OP_METHOD(JmpNE) {
         const u32 addr = read<u32>(ip, pc);
-        if(!getZF())
+        if(!_zf)
             pc = addr;
         return DispatchRet::Continue;
     }
@@ -422,7 +422,7 @@ namespace cial::vm {
         const u16 r2 = read<u16>(ip, pc);
         const i64 imm = decodeSleb128(ip, pc, 8);
         const auto &object = regs[r2].asObject().unwrap();
-        curFrame()->pc = pc;
+        cur->pc = pc;
         object->call(*this, r1, imm);
         return DispatchRet::Call;
     }

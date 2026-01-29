@@ -70,10 +70,10 @@ namespace cial::vm {
 
         void setPC(const u64 pc) const {
             // because run() pc will auto plus one so - 1
-            _currentFrame->pc = pc - 1;
+            _curFrame->pc = pc - 1;
         }
 
-        [[nodiscard]] u64 getPC() const { return _currentFrame->pc; }
+        [[nodiscard]] u64 getPC() const { return _curFrame->pc; }
 
         void pushVoid(const size_t n) const {
             const size_t base = _pool.allocFrame(n);
@@ -86,29 +86,29 @@ namespace cial::vm {
 
         void pop(const size_t count) const { _pool.freeFrame(count); }
 
-        void makeClosure() { _currentFrame->closure = _stackTop > 1 ? prevFrame() : nullptr; }
+        void makeClosure() { _curFrame->closure = _stackTop > 1 ? prevFrame() : nullptr; }
 
         template <typename T>
         void allocCallFrame(T *arg, const Opt<u16> ret = {}) {
             if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
-            _currentFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, _pool };
+            _curFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, _pool };
         }
 
         void freeCallFrame() {
             if(_stackTop == 0)
                 throw std::runtime_error("Call stack underflow");
-            _currentFrame = _stackTop > 0 ? &_callStack[--_stackTop - 1] : nullptr;
+            _curFrame = _stackTop > 0 ? &_callStack[--_stackTop - 1] : nullptr;
             _callStack[_stackTop].~CallFrame();
         }
 
         [[nodiscard]] size_t getRegPoolTop() const { return _pool.used(); }
 
-        [[nodiscard]] CallFrame *curFrame() noexcept { return _currentFrame; }
-        [[nodiscard]] const CallFrame *curFrame() const noexcept { return _currentFrame; }
+        [[nodiscard]] CallFrame *curFrame() noexcept { return _curFrame; }
+        [[nodiscard]] const CallFrame *curFrame() const noexcept { return _curFrame; }
 
-        [[nodiscard]] CallFrame *prevFrame() noexcept { return _currentFrame - 1; }
-        [[nodiscard]] const CallFrame *prevFrame() const noexcept { return _currentFrame - 1; }
+        [[nodiscard]] CallFrame *prevFrame() noexcept { return _curFrame - 1; }
+        [[nodiscard]] const CallFrame *prevFrame() const noexcept { return _curFrame - 1; }
 
         void unwind();
 
@@ -128,12 +128,10 @@ namespace cial::vm {
             _exValue = Value{};
         }
 
-        [[nodiscard]] std::string dumpCurConstants() const {
-            return _currentFrame->chunk->dumpConstants(&rt).toStdStr();
-        }
+        [[nodiscard]] std::string dumpCurConstants() const { return _curFrame->chunk->dumpConstants(&rt).toStdStr(); }
 
         [[nodiscard]] std::string dumpCurInstructions() const {
-            return _currentFrame->chunk->dumpInstructions(this).toStdStr();
+            return _curFrame->chunk->dumpInstructions(this).toStdStr();
         }
 
         [[nodiscard]] std::string dumpCurLocalVars() const {
@@ -158,15 +156,15 @@ namespace cial::vm {
 
         [[nodiscard]] std::string dumpCurRegisters() const {
             std::stringstream ss{};
-            for(u32 j = 0; j < _currentFrame->chunk->getRegCount(); j++) {
-                ss << fmt::format("(%{}): {}\n", j, _currentFrame->getReg(j));
+            for(u32 j = 0; j < _curFrame->chunk->getRegCount(); j++) {
+                ss << fmt::format("(%{}): {}\n", j, _curFrame->getReg(j));
             }
             return ss.str();
         }
 
     private:
         FastRegisterPool &_pool{ context.regPool() };
-        CallFrame *_currentFrame{ context.callStack() };
+        CallFrame *_curFrame{ context.callStack() };
         CallFrame *_callStack{ context.callStack() };
         size_t &_stackTop{ context.stackTop() }; // callFrame count
         bool _zf{ false };
@@ -174,7 +172,7 @@ namespace cial::vm {
         Value _exValue{};
 
 #define DISPATCH_OP_METHOD(op)                                                                                         \
-    CIAL_INLINE DispatchRet dispatch##op(const Constant *constants, Value *regs, const u8 *ip, u64 &pc);
+    CIAL_INLINE DispatchRet dispatch##op(CallFrame *cur, const Constant *constants, Value *regs, const u8 *ip, u64 &pc);
         CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_OP_METHOD)
 #undef DISPATCH_OP_METHOD
     };
