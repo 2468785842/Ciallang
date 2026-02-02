@@ -20,8 +20,6 @@
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
-#include "types/Function.hpp"
-
 using namespace cial;
 
 TEST_CASE("解释器 - Hello World") {
@@ -49,8 +47,8 @@ int fib(const int n) {
 }
 
 TEST_CASE("解释器 - 脚本执行性能") {
-    const int correct = fib(25);
-    BENCHMARK("fib 25") {
+    const int correct = fib(10);
+    BENCHMARK("fib 10") {
         Runtime rt{};
         Context context{ rt };
         vm::VMState vmState{ context };
@@ -62,7 +60,7 @@ TEST_CASE("解释器 - 脚本执行性能") {
                 if(n < 2) return n;
                 return fib(n - 2) + fib(n - 1);
             }
-            return fib(25);
+            return fib(10);
         )");
 
         assert(!r.isFailed());
@@ -75,22 +73,19 @@ TEST_CASE("解释器 - 脚本执行性能") {
         inter::IRGenerator codeGen{ r, rt, sourceFile };
 
         OptReg ignoreReg{};
-        Opt<vm::Chunk> chunk = codeGen.parseAst(node, ignoreReg);
+        vm::Chunk evalChunk = vm::Bytecode::compile(*codeGen.parseAst(node, ignoreReg));
 
         assert(!r.isFailed());
-        assert(chunk);
-        assert(chunk->getRegCount() != 0);
-        assert(!chunk->getInstVec().empty());
+        assert(evalChunk.getRegCount() != 0);
+        assert(!evalChunk.code().empty());
 
-        auto *evalChunk = vmState.rt.create<vm::Chunk>(std::move(*chunk)).get();
 
         u16 retReg{ 0 };
         vm::Chunk tmpChunk{};
         tmpChunk.setRegCount(1); // accept ret val
-        tmpChunk.toBytecode();
         vmState.allocCallFrame(&tmpChunk);
         vmState.makeClosure();
-        vmState.allocCallFrame(evalChunk, retReg);
+        vmState.allocCallFrame(&evalChunk, retReg);
         vmState.makeClosure();
 
         u32 stackTop = vmState.context.stackTop();

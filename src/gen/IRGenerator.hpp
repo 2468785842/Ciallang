@@ -14,10 +14,13 @@
 
 #include "Label.hpp"
 #include "Register.hpp"
+#include "TacChunk.hpp"
+
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
 #include "parser/ast/AstNode.hpp"
-#include "vm/Chunk.hpp"
+
+#include "vm/Constant.hpp"
 
 namespace cial::inter {
 
@@ -27,32 +30,17 @@ namespace cial::inter {
         explicit IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile) :
             _rt(rt), _sourceFile(sourceFile), _r(r) {}
 
-        Opt<vm::Chunk> parseAst(const syntax::AstNode *node, OptReg &optReg);
-
-        void addLocalVar(LocalVariable variable) { _localVars.emplace_back(variable); }
+        Opt<TacChunk> parseAst(const syntax::AstNode *node, OptReg &optReg);
 
         /**
          * allocate a temp register in this chunk
          * @return register
          */
-        Register allocateRegister() {
-            if(!_freeRegisters.empty()) {
-                const Register reg = _freeRegisters.back();
-                _freeRegisters.pop_back();
-                return reg;
-            }
-            const Register reg{ _regNextIndex++ };
-            if(reg.index() >= std::numeric_limits<u16>::max()) {
-                throw std::runtime_error("too many registers");
-            }
-            return reg;
-        }
-
-        void freeRegister(const Register reg) { _freeRegisters.push_back(reg); }
+        Register allocateRegister() { return Register{ _regNextIndex++ }; }
 
         /**
          * create a global scope
-         * ensue we don't get variable from the global scope
+         * ensure we don't get variable from the global scope
          */
         void makeVirtualGlobalScope() { _scopeStartPC.emplace_back(0); }
 
@@ -61,15 +49,13 @@ namespace cial::inter {
 #undef DECLARE_AST_NODE_VISIT
 
     private:
-        Box<vm::Chunk> _chunk = std::make_unique<vm::Chunk>();
+        Box<TacChunk> _chunk = std::make_unique<TacChunk>();
 
         Runtime &_rt;
         Common::SourceFile &_sourceFile;
         Common::Result &_r;
 
         OptReg _empty{};
-
-        Vec<Register> _freeRegisters{};
 
         using BreakContext = Vec<size_t>;
         Vec<BreakContext> _breakStack{};
@@ -82,9 +68,8 @@ namespace cial::inter {
         Vec<ContinueContext> _continueStack{};
 
         Vec<u32> _scopeStartPC{};
-        Vec<LocalVariable> _localVars{};
 
-        u16 _regNextIndex{};
+        i64 _regNextIndex{};
 
         [[nodiscard]] u32 getNextInstPos() const { return static_cast<u32>(this->_chunk->getInstVec().size()); }
 
@@ -95,27 +80,27 @@ namespace cial::inter {
         void beginScope() { _scopeStartPC.emplace_back(getNextInstPos()); }
 
         void endScope() {
-            for(auto &localVar : _localVars) {
+            for(auto &localVar : _chunk->getLocalVars()) {
                 if(localVar.startPC.address() > _scopeStartPC.back()) {
-                    freeRegister(Register{ localVar.reg });
                     localVar.endPC = Label{ getNextInstPos() };
                 }
             }
             _scopeStartPC.pop_back();
         }
 
-        LocalVariable *resolveLocalVariable(Atom identifier);
-
         Register loadVoidReg();
 
         FuncMeta *generateFuncMeta(const syntax::Parameters &parameters, const syntax::BlockStmtNode *body) const;
 
+        bool expectValue(const syntax::ExprNode *node);
         bool expectValue(const syntax::ExprNode *node, Register &ret);
 
         void error(const std::string &message, const Common::SourceLocation &location) const {
             _sourceFile.error(_r, message, location);
         }
+
         [[nodiscard]] Atom getAtomFromToken(const syntax::Token &token) const;
-        void genTokenValueLoadInst(Register reg, const syntax::Token &token) const;
+
+        void genTokenValueLoadInst(Register reg, const syntax::Token &token);
     };
 } // namespace cial::inter

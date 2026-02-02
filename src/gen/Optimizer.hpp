@@ -3,9 +3,14 @@
 //
 #pragma once
 
+#include <algorithm>
+#include <map>
+#include <set>
+#include <vector>
+
 #include "ControlFlowGraph.hpp"
 #include "Instruction.hpp"
-#include "vm/Chunk.hpp"
+#include "TacChunk.hpp"
 
 namespace cial::inter {
 
@@ -29,17 +34,17 @@ namespace cial::inter {
 
     class Optimizer {
     public:
-        virtual void optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) = 0;
+        virtual void optimize(TacChunk &chunk, const Vec<BasicBlock> &blocks) = 0;
 
         virtual ~Optimizer() = default;
 
     protected:
-        static void removeNopInst(Vec<Instruction> &instVec);
+        static void removeNopInst(Vec<Box<Instruction>> &instVec);
     };
 
     class OptimizerManager {
     public:
-        explicit OptimizerManager(vm::Chunk &chunk) : chunk(chunk) {}
+        explicit OptimizerManager(TacChunk &chunk) : chunk(chunk) {}
 
         // 添加优化器
         void addOptimizer(Box<Optimizer> optimizer) { optimizers.push_back(std::move(optimizer)); }
@@ -55,8 +60,40 @@ namespace cial::inter {
         }
 
     private:
-        vm::Chunk &chunk;
+        TacChunk &chunk;
         Vec<Box<Optimizer>> optimizers;
     };
 
+    struct Interval {
+        Register vReg; // 虚拟寄存器 ID
+        int start; // 起始指令索引
+        int end; // 结束指令索引
+        Register pReg{ -1 }; // 分配后的物理寄存器 ID
+
+        bool operator<(const Interval &other) const { return start < other.start; }
+    };
+
+    class RegisterAllocator : public Optimizer {
+    public:
+        void optimize(TacChunk &chunk, const Vec<BasicBlock> &blocks) override {
+            // 1. 计算活跃区间
+            auto intervals = computeIntervals(chunk);
+
+            // 2. 线性扫描分配
+            allocate(intervals);
+
+            // 3. 重写指令中的寄存器 ID
+            rewriteInstructions(chunk, intervals);
+
+            removeNopInst(chunk.getInstVec());
+        }
+
+    private:
+        // 计算每个寄存器的生存周期 [first_seen, last_seen]
+        Vec<Interval> computeIntervals(TacChunk &chunk);
+
+        void allocate(Vec<Interval> &intervals);
+
+        void rewriteInstructions(TacChunk &chunk, const Vec<Interval> &intervals);
+    };
 } // namespace cial::inter

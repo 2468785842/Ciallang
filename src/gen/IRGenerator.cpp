@@ -12,8 +12,7 @@
 
 #include "IRGenerator.hpp"
 
-#include <ranges>
-
+#include "Instruction.hpp"
 #include "Optimizer.hpp"
 #include "common/Defer.hpp"
 #include "runtime/Runtime.hpp"
@@ -22,26 +21,33 @@
 #include "parser/ast/ExprNode.hpp"
 #include "parser/ast/StmtNode.hpp"
 
-#include "Instruction.hpp"
+#include "vm/Bytecode.hpp"
 
 namespace cial::inter {
 
-    Opt<vm::Chunk> IRGenerator::parseAst(const syntax::AstNode *node, OptReg &optReg) {
+    Opt<TacChunk> IRGenerator::parseAst(const syntax::AstNode *node, OptReg &optReg) {
         if(node)
             node->generateBytecode(this, optReg);
         if(_r.isFailed())
             return {};
+
         _chunk->setRegCount(_regNextIndex);
-        const auto chunk = std::move(_chunk);
-        chunk->toBytecode();
+        DEFER { _chunk = std::make_unique<TacChunk>(); };
+
+        // vm::Chunk chunk = vm::Bytecode::compile(_constants, *_chunk);
         // ===
         // OptimizerManager optimizerManager(*chunk);
         // optimizerManager.addOptimizer(std::make_unique<LoadSubOptimizer>());
         // optimizerManager.applyOptimizations();
         // ===
 
-        _chunk = std::make_unique<vm::Chunk>();
-        return vm::Chunk{ std::move(*chunk) };
+        // return std::make_optional<vm::Chunk>(std::move(chunk));
+        return std::move(*_chunk);
+    }
+
+    bool IRGenerator::expectValue(const syntax::ExprNode *node) {
+        Register reg{};
+        return expectValue(node, reg);
     }
 
     bool IRGenerator::expectValue(const syntax::ExprNode *node, Register &ret) {
@@ -74,17 +80,17 @@ namespace cial::inter {
 
             const Atom varName = getAtomFromToken(node->catchErr->token);
             const Register exValue = allocateRegister();
-            addLocalVar(LocalVariable{ varName, exValue, tryEndIp });
+            _chunk->addLocalVar(varName, exValue, tryEndIp);
 
             node->catchBlock->generateBytecode(this, optReg);
             _chunk->repl<Jmp>(jmpIdx, makeLabel());
 
-            _chunk->addThrowHandler({ tryStartIp.address(), tryEndIp.address(), exValue.index() });
+            _chunk->addThrowHandler(tryStartIp, tryEndIp, exValue);
             endScope();
         } else {
             node->catchBlock->generateBytecode(this, optReg);
             _chunk->repl<Jmp>(jmpIdx, makeLabel());
-            _chunk->addThrowHandler({ tryStartIp.address(), tryEndIp.address() });
+            _chunk->addThrowHandler(tryStartIp, tryEndIp);
         }
 
         optReg = {};
@@ -134,8 +140,8 @@ namespace cial::inter {
             }
             const Atom lVarName = getAtomFromToken(lVarExpr->token);
             const Atom rVarName = getAtomFromToken(rVarExpr->token);
-            auto *lVar = resolveLocalVariable(lVarName);
-            auto *rVar = resolveLocalVariable(rVarName);
+            auto *lVar = _chunk->resolveLocalVariable(lVarName);
+            auto *rVar = _chunk->resolveLocalVariable(rVarName);
             auto dst = allocateRegister();
             OptReg lVarReg{};
             if(lVar) {
@@ -356,20 +362,20 @@ namespace cial::inter {
                     return;
                 }
                 _chunk->emit<ChkInv>(src, *optReg);
-                freeRegister(src);
+
                 break;
             }
             case Increment: {
                 if(const auto *expr = dynamic_cast<const syntax::IdentifierExprNode *>(node->lhs)) {
                     const Atom identifier = getAtomFromToken(expr->token);
 
-                    if(const auto variable = resolveLocalVariable(identifier)) {
+                    if(const auto variable = _chunk->resolveLocalVariable(identifier)) {
                         Register src2 = variable->reg;
                         auto src1 = allocateRegister();
                         Register dst = allocateRegister();
                         _chunk->emit<LoadImm>(src1, 1);
                         _chunk->emit<Add>(src1, src2, dst);
-                        freeRegister(src1);
+
                         optReg = dst;
                         return;
                     }
@@ -390,7 +396,7 @@ namespace cial::inter {
                         _chunk->emit<Add>(src2, src1, dst);
                         _chunk->emit<DThis>(identifier, dst);
                     }
-                    freeRegister(src2);
+
                     optReg = dst;
                     return;
                 }
@@ -402,13 +408,13 @@ namespace cial::inter {
                 if(const auto *expr = dynamic_cast<const syntax::IdentifierExprNode *>(node->lhs)) {
                     const Atom identifier = getAtomFromToken(expr->token);
 
-                    if(const auto variable = resolveLocalVariable(identifier)) {
+                    if(const auto variable = _chunk->resolveLocalVariable(identifier)) {
                         Register src2 = variable->reg;
                         auto src1 = allocateRegister();
                         auto dst = allocateRegister();
                         _chunk->emit<LoadImm>(src1, 1);
                         _chunk->emit<Sub>(src1, src2, dst);
-                        freeRegister(src1);
+
                         optReg = dst;
                         return;
                     }
@@ -429,7 +435,7 @@ namespace cial::inter {
                         _chunk->emit<Sub>(src2, src1, dst);
                         _chunk->emit<DThis>(identifier, dst);
                     }
-                    freeRegister(src2);
+
                     optReg = dst;
                     return;
                 }
@@ -460,7 +466,7 @@ namespace cial::inter {
                 _chunk->emit<Push>(reg);
             }
         }
-        freeRegister(memberReg);
+
         _chunk->emit<Call>(dst, memberReg, static_cast<Integer>(node->arguments.size()));
         // if(!node->arguments.empty()) {
         //     _chunk->emit<PopN>(node->arguments.size());
@@ -476,10 +482,10 @@ namespace cial::inter {
             if(!expectValue(node->rhs, src))
                 return;
 
-            if(const auto variable = resolveLocalVariable(identifier)) {
+            if(const auto variable = _chunk->resolveLocalVariable(identifier)) {
                 Register dst = variable->reg;
                 _chunk->emit<DLocal>(src, dst);
-                freeRegister(src);
+
                 optReg = dst;
                 return;
             }
@@ -512,7 +518,7 @@ namespace cial::inter {
                     auto tmpR = allocateRegister();
                     genTokenValueLoadInst(tmpR, identifierExpr->token);
                     _chunk->emit<DProp>(lhsR, tmpR, src);
-                    freeRegister(tmpR);
+
 
                     optReg = src;
                     return;
@@ -554,12 +560,12 @@ namespace cial::inter {
         _chunk->emit<Load>(propReg, _chunk->addConstant(propMeta));
 
         if(isTopScope()) {
-            freeRegister(propReg);
+
             _chunk->emit<DGlobal>(identifier, propReg);
             return;
         }
 
-        addLocalVar(LocalVariable{ identifier, propReg, makeLabel() });
+        _chunk->addLocalVar(identifier, propReg, makeLabel());
     }
 
     void IRGenerator::generate(const syntax::VarDeclNode *node, OptReg &) {
@@ -578,20 +584,20 @@ namespace cial::inter {
                 return;
 
             if(isTopScope()) {
-                freeRegister(src);
+
                 _chunk->emit<DGlobal>(identifier, src);
                 return;
             }
 
             // already have this variable, in same scope
-            if(const auto variable = resolveLocalVariable(identifier)) {
-                freeRegister(src);
+            if(const auto variable = _chunk->resolveLocalVariable(identifier)) {
+
                 _chunk->emit<DLocal>(src, variable->reg);
                 return;
             }
 
             // not found but can init
-            addLocalVar(LocalVariable{ identifier, src, makeLabel() });
+            _chunk->addLocalVar(identifier, src, makeLabel());
             return;
         }
 
@@ -602,7 +608,7 @@ namespace cial::inter {
         }
 
         // not found and can't init
-        addLocalVar(LocalVariable{ identifier, loadVoidReg(), makeLabel() });
+        _chunk->addLocalVar(identifier, loadVoidReg(), makeLabel());
     }
 
     void IRGenerator::generate(const syntax::FunctionDeclNode *node, OptReg &) {
@@ -619,12 +625,12 @@ namespace cial::inter {
         _chunk->emit<Load>(funReg, _chunk->addConstant(funcMeta));
 
         if(isTopScope()) {
-            freeRegister(funReg);
+
             _chunk->emit<DGlobal>(identifier, funReg);
             return;
         }
 
-        addLocalVar(LocalVariable{ identifier, funReg, makeLabel() });
+        _chunk->addLocalVar(identifier, funReg, makeLabel());
     }
 
 
@@ -693,8 +699,9 @@ namespace cial::inter {
             auto funChunk = gen.parseAst(nullptr, ignoreReg);
             assert(funChunk);
 
-            auto *chunk = _rt.createNoGC<vm::Chunk>(std::move(*funChunk));
-            auto *initFuncMeta = _rt.createNoGC<FuncMeta>(0, chunk, std::move(gen._localVars));
+            auto *chunk = _rt.createNoGC<vm::Chunk>(vm::Bytecode::compile(*funChunk));
+
+            auto *initFuncMeta = _rt.createNoGC<FuncMeta>(0, chunk);
             classMeta->initDefaultVal = initFuncMeta;
         }
 
@@ -717,7 +724,7 @@ namespace cial::inter {
                     } else {
                         paramReg = gen.allocateRegister();
                     }
-                    gen.addLocalVar(LocalVariable{ varName, paramReg.value(), gen.makeLabel() });
+                    gen._chunk->addLocalVar(varName, paramReg.value(), gen.makeLabel());
                 }
             }
 
@@ -727,14 +734,9 @@ namespace cial::inter {
                 auto funChunk = gen.parseAst(node->constructor->body, ignoreReg);
                 assert(funChunk);
 
-                // the last patch one ret
-                auto voidReg = gen.loadVoidReg();
-                funChunk->emit<Ret>(voidReg);
-
-                auto *chunk = _rt.createNoGC<vm::Chunk>(std::move(*funChunk));
+                auto *chunk = _rt.createNoGC<vm::Chunk>(vm::Bytecode::compile(*funChunk));
                 const size_t paramCount = node->constructor->parameters.size();
-                auto *initFuncMeta =
-                    _rt.createNoGC<FuncMeta>(static_cast<u32>(paramCount), chunk, std::move(gen._localVars));
+                auto *initFuncMeta = _rt.createNoGC<FuncMeta>(static_cast<u32>(paramCount), chunk);
                 initFuncMeta->name = identifier;
                 classMeta->setConstructor(initFuncMeta);
             }
@@ -745,23 +747,19 @@ namespace cial::inter {
             OptReg ignoreReg{};
             IRGenerator genFinalize{ _r, _rt, _sourceFile };
             genFinalize.makeVirtualGlobalScope();
-            auto funChunk = _rt.createNoGC<vm::Chunk>(*genFinalize.parseAst(nullptr, ignoreReg));
-
-            auto voidReg = genFinalize.loadVoidReg();
-            funChunk->emit<Ret>(voidReg);
+            auto *chunk = _rt.createNoGC<vm::Chunk>(vm::Bytecode::compile(*genFinalize.parseAst(nullptr, ignoreReg)));
 
             classMeta->setMember(MemberShapeMeta{ .name = finalizeAtom, .isMethod = true },
-                                 ClassFieldMeta{ _rt.createNoGC<FuncMeta>(0, funChunk, Vec<LocalVariable>{}) });
+                                 ClassFieldMeta{ _rt.createNoGC<FuncMeta>(0, chunk) });
         }
         endScope();
-        freeRegister(classReg);
     }
 
     void IRGenerator::generate(const syntax::IdentifierExprNode *node, OptReg &optReg) {
         auto dst = allocateRegister();
         const auto identifier = getAtomFromToken(node->token);
 
-        if(const auto variable = resolveLocalVariable(identifier)) {
+        if(const auto variable = _chunk->resolveLocalVariable(identifier)) {
             _chunk->emit<GLocal>(variable->reg, dst);
             optReg = dst;
             return;
@@ -838,8 +836,6 @@ namespace cial::inter {
             node->elseBody->generateBytecode(this, ignore);
             _chunk->repl<JmpNE>(jmpIdx, makeLabel());
         }
-
-        freeRegister(testReg);
     }
 
     void IRGenerator::generate(const syntax::SwitchStmtNode *node, OptReg &) {
@@ -870,7 +866,7 @@ namespace cial::inter {
                 Register dst = allocateRegister();
                 _chunk->emit<EQ>(testReg, matchReg, dst);
                 _chunk->emit<Test>(dst);
-                freeRegister(dst);
+
                 jmpEIdxVec.push_back(_chunk->emit<NOP>());
             }
 
@@ -934,8 +930,6 @@ namespace cial::inter {
         for(const size_t idx : _breakStack.back()) {
             _chunk->repl<Jmp>(idx, exitLabel);
         }
-
-        freeRegister(testReg);
     }
 
     void IRGenerator::generate(const syntax::ForStmtNode *node, OptReg &) {
@@ -974,7 +968,6 @@ namespace cial::inter {
             if(!expectValue(node->step, stepReg)) {
                 return;
             }
-            freeRegister(stepReg);
         }
 
         _chunk->emit<Jmp>(testLabel);
@@ -985,9 +978,6 @@ namespace cial::inter {
         for(const size_t idx : _breakStack.back()) {
             _chunk->repl<Jmp>(idx, exitLabel);
         }
-
-        if(node->test)
-            freeRegister(testReg);
     }
 
     void IRGenerator::generate(const syntax::WhileStmtNode *node, OptReg &) {
@@ -1025,8 +1015,6 @@ namespace cial::inter {
         for(const size_t idx : _breakStack.back()) {
             _chunk->repl<Jmp>(idx, exitLabel);
         }
-
-        freeRegister(testReg);
     }
 
     void IRGenerator::generate(const syntax::BreakStmtNode *node, OptReg &) {
@@ -1079,7 +1067,7 @@ namespace cial::inter {
         _chunk->emit<DLocal>(rhsReg, dst);
 
         _chunk->repl<Jmp>(jmpIdx, makeLabel());
-        freeRegister(testReg);
+
         optReg = dst;
     }
 
@@ -1096,15 +1084,6 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::DebuggerStmtNode *, OptReg &) { _chunk->emit<Debugger>(); }
-
-    LocalVariable *IRGenerator::resolveLocalVariable(const Atom identifier) {
-        for(auto &var : std::ranges::reverse_view(_localVars)) {
-            if(var.endPC.address() == 0 && var.identifier.v == identifier.v) {
-                return &var;
-            }
-        }
-        return nullptr;
-    }
 
     FuncMeta *IRGenerator::generateFuncMeta(const syntax::Parameters &parameters,
                                             const syntax::BlockStmtNode *body) const {
@@ -1125,20 +1104,15 @@ namespace cial::inter {
             } else {
                 paramReg = gen.allocateRegister();
             }
-            gen.addLocalVar(LocalVariable{ varName, paramReg.value(), gen.makeLabel() });
+            gen._chunk->addLocalVar(varName, paramReg.value(), gen.makeLabel());
         }
 
         OptReg ignoreReg{};
         auto funChunk = gen.parseAst(body, ignoreReg);
         assert(funChunk);
+        auto *chunk = _rt.createNoGC<vm::Chunk>(vm::Bytecode::compile(*funChunk));
 
-        // the last instruction is not ret, patch one ret
-        if(auto &instVec = funChunk->getInstVec(); instVec.empty() || instVec.back()->opcode() != TacOpCode::Ret) {
-            funChunk->emit<Ret>(gen.loadVoidReg());
-        }
-
-        auto *chunk = _rt.createNoGC<vm::Chunk>(std::move(*funChunk));
-        return _rt.createNoGC<FuncMeta>(static_cast<u32>(parameters.size()), chunk, std::move(gen._localVars));
+        return _rt.createNoGC<FuncMeta>(static_cast<u32>(parameters.size()), chunk);
     }
 
     Register IRGenerator::loadVoidReg() {
@@ -1153,7 +1127,7 @@ namespace cial::inter {
         return _rt.atomTable.intern(token.getString());
     }
 
-    void IRGenerator::genTokenValueLoadInst(Register reg, const syntax::Token &token) const {
+    void IRGenerator::genTokenValueLoadInst(Register reg, const syntax::Token &token) {
         switch(token.valueType()) {
             case syntax::TokenValueType::Real:
                 _chunk->emit<Load>(reg, _chunk->addConstant(token.getReal()));

@@ -3,8 +3,10 @@
 //
 #pragma once
 
+#include "Chunk.hpp"
 #include "config.h"
 #include "gen/Instruction.hpp"
+#include "gen/TacChunk.hpp"
 #include "types/Types.hpp"
 
 #define CIAL_BYTECODE_OPCODE_ENUMS(O)                                                                                  \
@@ -89,17 +91,41 @@ namespace cial::vm {
     class Bytecode {
         struct Info {
             Vec<u8> code{};
-            Map<u32, u32> tacPosToBcPos{};
+            Map<inter::Label, u32> tacPosToBcPos{};
             Map<u32, u32> jmpTagetPos{};
         };
 
     public:
-        static Vec<u8> compile(const Vec<Box<inter::Instruction>> &instructions) {
+        static Chunk compile(const inter::TacChunk &tacChunk) {
             Info info{};
-            auto &[code, tacPosToBcPos, jmpTagetPos] = info;
-            for(u32 i = 0; i < instructions.size(); ++i) {
-                if(tacPosToBcPos.contains(i)) {
-                    jmpTagetPos[tacPosToBcPos[i]] = static_cast<u32>(code.size());
+            const auto &instructions = tacChunk.getInstVec();
+
+            Map<inter::Label, u32> localVarsPosToBcPos{};
+            Map<inter::Label, u32> throwHandlersPosToBcPos{};
+
+            for(const auto &localVar : tacChunk.getLocalVars()) {
+                localVarsPosToBcPos[localVar.startPC] = 0;
+                localVarsPosToBcPos[localVar.endPC] = 0;
+            }
+
+            for(const auto &th : tacChunk.getThrowHandlers()) {
+                localVarsPosToBcPos[th.tryStart] = 0;
+                localVarsPosToBcPos[th.tryEnd] = 0;
+            }
+
+            for(i64 i = 0; i < instructions.size(); ++i) {
+                inter::Label curLabel{ i };
+
+                if(localVarsPosToBcPos.contains(curLabel)) {
+                    localVarsPosToBcPos[curLabel] = static_cast<u32>(info.code.size());
+                }
+
+                if(throwHandlersPosToBcPos.contains(curLabel)) {
+                    throwHandlersPosToBcPos[curLabel] = static_cast<u32>(info.code.size());
+                }
+
+                if(info.tacPosToBcPos.contains(curLabel)) {
+                    info.jmpTagetPos[info.tacPosToBcPos[curLabel]] = static_cast<u32>(info.code.size());
                 }
 
                 switch(inter::Instruction *inst = instructions[i].get(); inst->opcode()) {
@@ -113,11 +139,32 @@ namespace cial::vm {
             }
 
             // update jmp target address
-            for(auto &[tp, bp] : jmpTagetPos) {
-                std::memcpy(&code[tp], &bp, sizeof(bp));
+            for(auto &[tp, bp] : info.jmpTagetPos) {
+                std::memcpy(&info.code[tp], &bp, sizeof(bp));
             }
 
-            return std::move(code);
+            Vec<Chunk::LocalVariable> localVars{};
+            for(const auto &[identifier, reg, startPC, endPC] : tacChunk.getLocalVars()) {
+                if(reg.index() >= std::numeric_limits<u16>::max()) {
+                    throw std::runtime_error("local var register index out of range");
+                }
+                localVars.emplace_back(Chunk::LocalVariable{ identifier, static_cast<u16>(reg.index()),
+                                                             localVarsPosToBcPos[startPC],
+                                                             localVarsPosToBcPos[endPC] });
+            }
+
+            Vec<Chunk::ThrowHandler> throwHandlers{};
+            for(const auto &[tryStart, tryEnd, exValueReg] : tacChunk.getThrowHandlers()) {
+                if(exValueReg.index() >= std::numeric_limits<u16>::max()) {
+                    throw std::runtime_error("local var register index out of range");
+                }
+                throwHandlers.emplace_back(Chunk::ThrowHandler{ throwHandlersPosToBcPos[tryStart],
+                                                                throwHandlersPosToBcPos[tryEnd],
+                                                                static_cast<u16>(exValueReg.index()) });
+            }
+
+            return Chunk{ std::move(localVars), tacChunk.getConstants(), std::move(throwHandlers), std::move(info.code),
+                          tacChunk.getRegCount() };
         }
 
     private:

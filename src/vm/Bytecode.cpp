@@ -86,7 +86,7 @@ namespace cial::vm {
 
     void Bytecode::encode(Info &info, const inter::JmpNE *tac) {
         info.code.push_back(static_cast<u8>(VmOpCode::JmpNE));
-        info.tacPosToBcPos[static_cast<u32>(tac->label().address())] = info.code.size();
+        info.tacPosToBcPos[tac->label()] = info.code.size();
         write<u32>(info.code, 0);
     }
 
@@ -141,6 +141,7 @@ namespace cial::vm {
         write<u32>(info.code, atom);
         write<u16>(info.code, dst);
     }
+
     void Bytecode::encode(Info &info, const inter::DThis *tac) { assert(false); }
 
     void Bytecode::encode(Info &info, const inter::DLocal *tac) { assert(false); }

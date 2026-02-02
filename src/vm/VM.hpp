@@ -153,14 +153,13 @@ namespace cial {
             inter::IRGenerator codeGen{ r, rt, sourceFile };
 
             OptReg ignoreReg{};
-            Opt<vm::Chunk> chunk = codeGen.parseAst(node, ignoreReg);
+            vm::Chunk chunk = vm::Bytecode::compile(*codeGen.parseAst(node, ignoreReg));
 
             assert(!r.isFailed());
-            assert(chunk);
-            assert(chunk->getRegCount() != 0);
-            assert(!chunk->getInstVec().empty());
+            assert(chunk.getRegCount() != 0);
+            assert(!chunk.code().empty());
 
-            auto *evalChunk = _vmState->rt.create<vm::Chunk>(std::move(*chunk)).get();
+            auto *evalChunk = _vmState->rt.create<vm::Chunk>(std::move(chunk)).get();
 
             u16 retReg{ 0 };
             vm::Chunk tmpChunk{};
@@ -204,15 +203,14 @@ namespace cial {
             inter::IRGenerator codeGen{ r, rt, sourceFile };
 
             OptReg retReg{};
-            Opt<vm::Chunk> chunk = codeGen.parseAst(node, retReg);
+            vm::Chunk chunk = vm::Bytecode::compile(*codeGen.parseAst(node, retReg));
 
             assert(!r.isFailed());
-            assert(chunk);
             assert(retReg);
-            assert(chunk->getRegCount() != 0);
-            assert(!chunk->getInstVec().empty());
+            assert(chunk.getRegCount() != 0);
+            assert(!chunk.code().empty());
 
-            _vmState->allocCallFrame(&*chunk);
+            _vmState->allocCallFrame(&chunk);
             _vmState->makeClosure();
             _vmState->run();
 
@@ -225,7 +223,7 @@ namespace cial {
         void eval(const String &str, const bool filepath = false) const { auto h = eval<Value>(str, filepath); }
         void evalExpr(const String &expr) const { auto h = evalExpr<Value>(expr); }
 
-        [[nodiscard]] String dumpCurCallFrameInst() const { return _vmState->curFrame()->chunk->dumpInstructions(); }
+        // [[nodiscard]] String dumpCurCallFrameInst() const { return _vmState->curFrame()->chunk->dumpInstructions(); }
 
     private:
         vm::VMState *_vmState;

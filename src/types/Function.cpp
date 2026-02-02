@@ -36,7 +36,7 @@ namespace cial {
         //
         // if(cnt > 0)
         //     vmState.pop(cnt);
-        // assert(meta->chunk->getInstVec().back().opcode == inter::OpCode::Ret);
+        // assert(meta->chunk->code().back().opcode == inter::OpCode::Ret);
     }
 
     void NativeFunction::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {

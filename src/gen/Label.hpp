@@ -15,18 +15,20 @@
 
 #include <fmt/ostream.h>
 
+#include "types/Types.hpp"
+
 namespace cial::inter {
     class [[nodiscard]] Label {
     public:
         explicit Label() = default;
-        explicit Label(const size_t address) : _address(address) {}
+        explicit Label(const i64 address) : _address(address) {}
 
-        [[nodiscard]] size_t address() const noexcept { return _address; }
+        [[nodiscard]] i64 address() const noexcept { return _address; }
 
-        bool operator==(const Label &) const noexcept = default;
+        auto operator<=>(const Label &rhs) const = default;
 
     private:
-        size_t _address;
+        i64 _address;
 
         friend std::ostream &operator<<(std::ostream &os, const Label &label) { return os << '@' << label._address; }
     };
@@ -34,3 +36,8 @@ namespace cial::inter {
 
 template <>
 struct fmt::formatter<cial::inter::Label> : ostream_formatter {};
+
+template <>
+struct std::hash<cial::inter::Label> {
+    size_t operator()(const cial::inter::Label &l) const noexcept { return std::hash<size_t>{}(l.address()); }
+};

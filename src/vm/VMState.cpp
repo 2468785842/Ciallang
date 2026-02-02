@@ -13,40 +13,40 @@
  */
 #include "VMState.hpp"
 
-#include "../gen/Instruction.hpp"
 #include "VMDebug.hpp"
+#include "gen/Instruction.hpp"
 #include "types/Class.hpp"
 #include "types/Property.hpp"
 
 namespace cial::vm {
 
     void VMState::run() {
-        const size_t curStackTop = _stackTop;
-        for(;;) {
-            u64 &pc = _curFrame->pc;
-            const auto &instList = _curFrame->chunk->getInstVec();
-
-            if(pc >= instList.size())
-                break;
-
-            if(_stackTop == 0)
-                break;
-
-            if(curStackTop > _stackTop)
-                break;
-
-            const auto &instruction = instList[pc];
-            // fmt::println("{}\n", Instruction::dump(*instruction, this));
-            instruction->execute(*this);
-            switch(_pending) {
-                case PendingCF::Throw:
-                    unwind();
-                    break;
-                case PendingCF::None:
-                    break;
-            }
-            ++pc;
-        }
+        // const size_t curStackTop = _stackTop;
+        // for(;;) {
+        //     u64 &pc = _curFrame->pc;
+        //     const auto &instList = _curFrame->chunk->code();
+        //
+        //     if(pc >= instList.size())
+        //         break;
+        //
+        //     if(_stackTop == 0)
+        //         break;
+        //
+        //     if(curStackTop > _stackTop)
+        //         break;
+        //
+        //     const auto &instruction = instList[pc];
+        //     // fmt::println("{}\n", Instruction::dump(*instruction, this));
+        //     instruction->execute(*this);
+        //     switch(_pending) {
+        //         case PendingCF::Throw:
+        //             unwind();
+        //             break;
+        //         case PendingCF::None:
+        //             break;
+        //     }
+        //     ++pc;
+        // }
     }
 
     [[nodiscard]] bool VMState::globalHas(const Atom atom) const { return context.global()->hasProp(atom); }
@@ -87,8 +87,8 @@ namespace cial::vm {
 
         if(auto *callFrame = _curFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
-                for(const auto &localVar : callFrame->funcMeta->localVars) {
-                    if(localVar.endPC.address() > callFrame->pc)
+                for(const auto &localVar : callFrame->funcMeta->chunk->getLocalVars()) {
+                    if(localVar.endPC > callFrame->pc)
                         continue;
                     if(localVar.identifier == atom)
                         return true;
@@ -121,11 +121,11 @@ namespace cial::vm {
 
         if(auto *callFrame = _curFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
-                for(const auto &[identifier, reg, startPC, endPC] : callFrame->funcMeta->localVars) {
-                    if(startPC.address() <= callFrame->pc && callFrame->pc < endPC.address())
+                for(const auto &[identifier, reg, startPC, endPC] : callFrame->funcMeta->chunk->getLocalVars()) {
+                    if(startPC <= callFrame->pc && callFrame->pc < endPC)
                         continue;
                     if(identifier == atom)
-                        return callFrame->getReg(reg.index());
+                        return callFrame->getReg(reg);
                 }
             }
 
@@ -156,11 +156,11 @@ namespace cial::vm {
 
         if(auto *callFrame = _curFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
-                for(const auto &localVar : callFrame->funcMeta->localVars) {
-                    if(localVar.endPC.address() > callFrame->pc)
+                for(const auto &localVar : callFrame->funcMeta->chunk->getLocalVars()) {
+                    if(localVar.endPC > callFrame->pc)
                         continue;
                     if(localVar.identifier == atom)
-                        callFrame->getReg(localVar.reg.index()) = v;
+                        callFrame->getReg(localVar.reg) = v;
                 }
             }
         }
@@ -182,11 +182,11 @@ namespace cial::vm {
             const auto &callFrame = _callStack[i - 1];
             // prev local scope
             if(callFrame.funcMeta) {
-                for(const auto &localVar : callFrame.funcMeta->localVars) {
-                    if(localVar.endPC.address() > callFrame.pc)
+                for(const auto &localVar : callFrame.funcMeta->chunk->getLocalVars()) {
+                    if(localVar.endPC > callFrame.pc)
                         continue;
                     if(localVar.identifier == atom)
-                        return callFrame.getReg(localVar.reg.index());
+                        return callFrame.getReg(localVar.reg);
                 }
             }
 
@@ -206,7 +206,7 @@ namespace cial::vm {
     void VMState::unwind() {
         while(true) {
             const CallFrame *cFrame = _curFrame;
-            const Opt<ThrowHandler> th = cFrame->chunk->findThrowHandler(getPC());
+            const Opt<Chunk::ThrowHandler> th = cFrame->chunk->findThrowHandler(getPC());
             if(!th) {
                 if(cFrame->ret)
                     prevFrame()->getReg(*cFrame->ret) = Value{};
@@ -303,7 +303,7 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(Debugger) {
         std::string regsDump = dumpCurRegisters();
         std::string localVarDump = dumpCurLocalVars();
-        std::string instructionsDump = dumpCurInstructions();
+        // std::string instructionsDump = dumpCurInstructions();
         std::string constantsDump = dumpCurConstants();
 
         fmt::println("========================");
@@ -315,8 +315,8 @@ namespace cial::vm {
         fmt::println("{}", localVarDump);
         fmt::println("========= const =========");
         fmt::println("{}", constantsDump);
-        fmt::println("========= inst =========");
-        fmt::println("{}", instructionsDump);
+        // fmt::println("========= inst =========");
+        // fmt::println("{}", instructionsDump);
         DEBUG_BREAK();
         return DispatchRet::Continue;
     }
@@ -445,6 +445,7 @@ namespace cial::vm {
         const i64 imm = decodeSleb128(ip, pc, 8);
         const auto &object = regs[r2].asObject().unwrap();
         cur->pc = pc;
+        regRef(r1) = Value{};
         object->call(*this, r1, imm);
         return DispatchRet::Call;
     }

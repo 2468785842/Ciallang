@@ -29,6 +29,31 @@ namespace cial {
         chunk->marked();
     }
 
+    [[nodiscard]] String Constant::dumpConstant(const Runtime *rt) const {
+        std::stringstream ss{ "" };
+        switch(type()) {
+            case ConstantType::None:
+                ss << "Void";
+                break;
+            case ConstantType::Real:
+                ss << value<Real>().value();
+                break;
+            case ConstantType::Atom:
+                ss << '"' << *rt->atomTable.get(value<Atom>())->str << '"';
+                break;
+            case ConstantType::FuncMeta:
+                ss << "Ptr<FuncMeta>";
+                break;
+            case ConstantType::ClassMeta:
+                ss << "Ptr<ClassMeta>";
+                break;
+            case ConstantType::PropMeta:
+                ss << "Ptr<PropMeta>";
+                break;
+        }
+        return String{ ss.str() };
+    }
+
     Value Constant::createValue(Runtime *rt) const noexcept {
         switch(type()) {
             case ConstantType::None:
@@ -48,5 +73,20 @@ namespace cial {
                 return Value{ rt->create<Property>(nullptr, value<PropMeta *>()).get() };
         }
         return Value{};
+    }
+
+    [[nodiscard]] String dumpConstants(const Vec<Constant> &constants, const Runtime *rt) {
+        std::stringstream ss{ "" };
+        u16 i{};
+        const size_t len = constants.size();
+        while(i < len) {
+            ConstIdx idx{ i };
+            ss << fmt::format("{: <6} = {}", idx, constants[i].dumpConstant(rt));
+            if(i != len - 1) {
+                ss << '\n';
+            }
+            ++i;
+        }
+        return String{ ss.str() };
     }
 } // namespace cial

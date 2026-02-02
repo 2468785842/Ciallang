@@ -48,7 +48,7 @@ int main(const int argc, char **argv) {
     assert(!r.isFailed());
     assert(chunk);
     assert(chunk->getRegCount() != 0);
-    assert(!chunk->getInstVec().empty());
+    assert(!chunk->code().empty());
 
     auto *evalChunk = vmState.rt.create<vm::Chunk>(std::move(*chunk)).get();
 

@@ -15,26 +15,41 @@
 
 #include <ranges>
 
-#include "Bytecode.hpp"
 #include "Constant.hpp"
 
 #include "gen/Instruction.hpp"
-#include "logging/Logger.hpp"
 
 namespace cial::vm {
     class VMState;
 
-    struct ThrowHandler {
-        u64 tryStart;
-        u64 tryEnd;
-        u16 exValueReg;
-    };
-
     class Chunk : public MarkSweepHeader {
     public:
-        explicit Chunk() {
-            _constants.emplace_back(); // Void
-        }
+        struct ThrowHandler {
+            u64 tryStart;
+            u64 tryEnd;
+            u16 exValueReg;
+        };
+
+        struct LocalVariable {
+            Atom identifier = ATOM_INVALID;
+            u16 reg{};
+            // when (var.startPC <= inst.pc) you can use
+            u64 startPC{}; // Effective start PC
+            // when (var.endPC > inst.pc) you can't use
+            u64 endPC{}; // Invalid PC (scope ended)
+        };
+        explicit Chunk() = default;
+
+        explicit Chunk(Vec<LocalVariable> localVars, Vec<Constant> constants, Vec<ThrowHandler> throwHandlers,
+                       Vec<u8> code, const u32 regCount) :
+            _localVars(std::move(localVars)), _constants(std::move(constants)),
+            _throwHandlers(std::move(throwHandlers)), _code(std::move(code)), _regCount(regCount) {}
+
+        Chunk(const Chunk &) = delete;
+        Chunk &operator=(const Chunk &) = delete;
+
+        Chunk(Chunk &&chunk) = default;
+        Chunk &operator=(Chunk &&chunk) = default;
 
         void addThrowHandler(const ThrowHandler &tHandler) { _throwHandlers.push_back(tHandler); }
 
@@ -47,40 +62,8 @@ namespace cial::vm {
             return {};
         }
 
-        /**
-         * @tparam Args 指令的值类型
-         * @param args 值数组
-         * @return 指令在内存的索引
-         */
-        template <typename T, typename... Args>
-            requires std::is_base_of_v<inter::Instruction, T>
-        size_t emit(Args &&...args) {
-            const size_t index = _instructions.size();
-            _instructions.push_back(std::make_unique<T>(inter::Operand(std::forward<Args>(args))...));
-            return index;
-        }
-
-        template <typename T, typename... Args>
-            requires std::is_base_of_v<inter::Instruction, T>
-        void repl(const size_t index, Args &&...args) {
-            if(index > _instructions.size()) {
-                throw std::runtime_error("instruction index out of range");
-            }
-            _instructions[index] = std::make_unique<T>(inter::Operand(std::forward<Args>(args))...);
-        }
-
-        [[nodiscard]] inter::Instruction *inst(const size_t index) const { return _instructions[index].get(); }
-
-        Chunk(const Chunk &) = delete;
-        Chunk &operator=(const Chunk &) = delete;
-
-        Chunk(Chunk &&chunk) = default;
-        Chunk &operator=(Chunk &&chunk) = default;
-
-        [[nodiscard]] auto &getInstVec() noexcept { return _instructions; }
-
-        void setRegCount(const u32 count) noexcept { _registerCount = count; }
-        [[nodiscard]] u32 getRegCount() const noexcept { return _registerCount; }
+        void setRegCount(const u32 count) noexcept { _regCount = count; }
+        [[nodiscard]] u32 getRegCount() const noexcept { return _regCount; }
 
         template <typename... Args>
         ConstIdx addConstant(Args &&...args) {
@@ -102,21 +85,11 @@ namespace cial::vm {
             return ConstIdx{ size };
         }
 
-        [[nodiscard]] const Constant &getConstant(const ConstIdx index) const {
-            CLL_ASSERT(index.index() < _constants.size() && "constant index out of range",
-                       this->dumpInstructions().getData());
-            return _constants[index.index()];
-        }
+        [[nodiscard]] const Constant &getConstant(const ConstIdx index) const { return _constants[index.index()]; }
 
-        Vec<Constant> &getConstants() noexcept { return _constants; }
+        // [[nodiscard]] String dumpInstructions() const;
 
-        [[nodiscard]] String dumpConstant(const Runtime *rt, ConstIdx idx) const;
-
-        [[nodiscard]] String dumpConstants(const Runtime *rt) const;
-
-        [[nodiscard]] String dumpInstructions() const;
-
-        [[nodiscard]] String dumpInstructions(const VMState *vmState) const;
+        // [[nodiscard]] String dumpInstructions(const VMState *vmState) const;
 
         void marked() noexcept override {
             MarkSweepHeader::marked();
@@ -129,27 +102,17 @@ namespace cial::vm {
             }
         }
 
-        void toBytecode() {
-            if(_isBytecode)
-                return;
+        [[nodiscard]] const Vec<u8> &code() const { return _code; }
 
-            _code = Bytecode::compile(_instructions);
-            _isBytecode = true;
-        }
+        [[nodiscard]] const Vec<LocalVariable> &getLocalVars() const { return _localVars; }
 
-        [[nodiscard]] const Vec<u8> &code() const {
-            if(!_isBytecode) {
-                throw std::runtime_error("chunk is not compiled to bytecode");
-            }
-            return _code;
-        }
+        [[nodiscard]] const Vec<Constant> &getConstants() noexcept { return _constants; }
 
     private:
-        Vec<Box<inter::Instruction>> _instructions{};
+        Vec<LocalVariable> _localVars;
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
         Vec<u8> _code{};
-        u32 _registerCount{};
-        bool _isBytecode{ false };
+        u32 _regCount{};
     };
 } // namespace cial::vm

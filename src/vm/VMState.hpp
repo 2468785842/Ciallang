@@ -16,15 +16,15 @@
 #include <cstdlib>
 #include <fmt/format.h>
 
+#include "Bytecode.hpp"
 #include "CallFrame.hpp"
 #include "Chunk.hpp"
 #include "FastRegisterPool.hpp"
 #include "runtime/Context.hpp"
 #include "runtime/Runtime.hpp"
 
-#include "types/Value.hpp"
-
 #include "gen/Register.hpp"
+#include "types/Value.hpp"
 
 namespace cial::vm {
 
@@ -128,11 +128,14 @@ namespace cial::vm {
             _exValue = Value{};
         }
 
-        [[nodiscard]] std::string dumpCurConstants() const { return _curFrame->chunk->dumpConstants(&rt).toStdStr(); }
-
-        [[nodiscard]] std::string dumpCurInstructions() const {
-            return _curFrame->chunk->dumpInstructions(this).toStdStr();
+        [[nodiscard]] std::string dumpCurConstants() const {
+            return dumpConstants(_curFrame->chunk->getConstants(), &rt).toStdStr();
         }
+
+        // TODO:
+        // [[nodiscard]] std::string dumpCurInstructions() const {
+        //     return _curFrame->chunk->dumpInstructions(this).toStdStr();
+        // }
 
         [[nodiscard]] std::string dumpCurLocalVars() const {
             std::stringstream ss{};
@@ -141,14 +144,14 @@ namespace cial::vm {
                 if(!call.funcMeta)
                     continue;
 
-                for(const auto &[identifier, reg, startPC, endPC] : call.funcMeta->localVars) {
-                    if(startPC.address() <= getPC() && getPC() < endPC.address())
+                for(const auto &[identifier, reg, startPC, endPC] : call.funcMeta->chunk->getLocalVars()) {
+                    if(startPC <= getPC() && getPC() < endPC)
                         continue;
                     const auto *entry = rt.atomTable.get(identifier);
                     auto varName = "?unknow_var_name?"_str;
                     if(entry)
                         varName = *entry->str;
-                    ss << fmt::format("{} = {}\n", varName, call.getReg(reg.index()));
+                    ss << fmt::format("{} = {}\n", varName, call.getReg(reg));
                 }
             }
             return ss.str();

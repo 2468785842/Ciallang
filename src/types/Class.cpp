@@ -123,7 +123,6 @@ namespace cial {
 
             if(cnt > 0)
                 vmState.pop(cnt);
-            assert(constructor.meta->chunk->getInstVec().back()->opcode() == inter::TacOpCode::Ret);
         }
     } // namespace
 
@@ -160,7 +159,6 @@ namespace cial {
 
                         if(cnt > 0)
                             vmState.pop(cnt);
-                        assert(constructor.meta->chunk->getInstVec().back()->opcode() == inter::TacOpCode::Ret);
                         const Value extVal = vmState.global(extName);
                         assert(extVal.isObject());
                         auto *clazzObject = dynamic_cast<ClassObject *>(extVal.asObject().unwrap());

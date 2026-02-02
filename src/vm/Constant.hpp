@@ -15,8 +15,7 @@
 
 #include <fmt/ostream.h>
 
-#include "../gen/Register.hpp"
-#include "gen/LocalVariable.hpp"
+#include "gen/Register.hpp"
 
 #include "runtime/AtomTable.hpp"
 #include "types/Value.hpp"
@@ -45,7 +44,6 @@ namespace cial {
         Atom name = ATOM_INVALID;
         u32 arity;
         vm::Chunk *chunk; // manager for gc
-        Vec<inter::LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
 
         explicit FuncMeta(FuncMeta &&funcMeta) = delete;
         FuncMeta &operator=(FuncMeta &&funcMeta) = delete;
@@ -58,8 +56,7 @@ namespace cial {
 
     private:
         friend class Runtime;
-        explicit FuncMeta(const u32 arity, vm::Chunk *chunk, Vec<inter::LocalVariable> localVars) :
-            arity(arity), chunk(chunk), localVars(std::move(localVars)) {}
+        explicit FuncMeta(const u32 arity, vm::Chunk *chunk) : arity(arity), chunk(chunk) {}
     };
 
     struct MemberShapeMeta {
@@ -208,9 +205,13 @@ namespace cial {
 
         [[nodiscard]] Value createValue(Runtime *rt) const noexcept;
 
+        [[nodiscard]] String dumpConstant(const Runtime *rt) const;
+
     private:
         ConstantValue _value;
     };
+
+    [[nodiscard]] String dumpConstants(const Vec<Constant> &constants, const Runtime *rt);
 
 } // namespace cial
 

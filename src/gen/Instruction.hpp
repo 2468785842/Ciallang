@@ -135,45 +135,15 @@ namespace cial::inter {
 
         [[nodiscard]] virtual TacOpCode opcode() const = 0;
 
-        [[nodiscard]] auto getOp1() const { return _ops[0]; }
-        [[nodiscard]] auto getOp2() const { return _ops[1]; }
-        [[nodiscard]] auto getOp3() const { return _ops[2]; }
-
-        template <typename T>
-        void setOp1Val(T &&v) {
-            _ops[0] = Operand{ std::forward<T>(v) };
-        }
-
-        template <typename T>
-        void setOp2Val(T &&v) {
-            _ops[1] = Operand{ std::forward<T>(v) };
-        }
-
-        template <typename T>
-        void setOp3Val(T &&v) {
-            _ops[2] = Operand{ std::forward<T>(v) };
-        }
-
-        template <typename T>
-        [[nodiscard]] constexpr T getOp1Val() const {
-            return _ops[0].value<T>();
-        }
-
-        template <typename T>
-        [[nodiscard]] constexpr T getOp2Val() const {
-            return _ops[1].value<T>();
-        }
-
-        template <typename T>
-        [[nodiscard]] constexpr T getOp3Val() const {
-            return _ops[2].value<T>();
-        }
-
         virtual void execute(vm::VMState &vmState) = 0;
 
         virtual std::string dump(const vm::VMState *vmState) = 0;
 
         virtual void encode(Vec<u8> &code) = 0;
+
+        Operand (&ops())[3] { return _ops; }
+
+        [[nodiscard]] const Operand (&ops() const)[3] { return _ops; }
 
     protected:
         Operand _ops[3];
@@ -186,11 +156,11 @@ namespace cial::inter {
 
 // 操作码
 #define OP_GET1(name, type)                                                                                            \
-    type name() const { return getOp1Val<type>(); }
+    type name() const { return _ops[0].value<type>(); }
 #define OP_GET2(name, type)                                                                                            \
-    type name() const { return getOp2Val<type>(); }
+    type name() const { return _ops[1].value<type>(); }
 #define OP_GET3(name, type)                                                                                            \
-    type name() const { return getOp3Val<type>(); }
+    type name() const { return _ops[2].value<type>(); }
 
 #define DEF_CTOR_0(className)                                                                                          \
     explicit className() : Instruction() {}

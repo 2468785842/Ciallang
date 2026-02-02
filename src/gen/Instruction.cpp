@@ -54,7 +54,7 @@ namespace cial::inter {
     void Debugger::execute(VMState &vmState) {
         std::string regs = vmState.dumpCurRegisters();
         std::string localVarInfo = vmState.dumpCurLocalVars();
-        std::string chunk = vmState.dumpCurInstructions();
+        // std::string chunk = vmState.dumpCurInstructions();
         std::string constants = vmState.dumpCurConstants();
 
         fmt::println("{}", regs);
@@ -62,8 +62,8 @@ namespace cial::inter {
         fmt::println("{}", localVarInfo);
         fmt::println("====================");
         fmt::println("{}", constants);
-        fmt::println("====================");
-        fmt::println("{}", chunk);
+        // fmt::println("====================");
+        // fmt::println("{}", chunk);
         DEBUG_BREAK();
     }
 
@@ -508,7 +508,7 @@ namespace cial::inter {
                 }
                 case Operand::Type::ConstIndex: {
                     auto idx = operand.value<ConstIdx>();
-                    auto s = vm->curFrame()->chunk->dumpConstant(&vm->context.rt(), idx);
+                    auto s = vm->curFrame()->chunk->getConstants()[idx.index()].dumpConstant(&vm->context.rt());
                     c.add(fmt::format("{} = {}", idx, s));
                     break;
                 }
@@ -528,16 +528,15 @@ namespace cial::inter {
         DumpComment c;
         std::string out = fmt::format("{: <10}", name);
         auto d = [&out, &c, &vm](const Operand &operand) {
-            if(operand.type() == Operand::Type::None)
-                return;
             out += " ";
             out += dumpOperand(operand).toStdStr();
             dumpOperandComment(c, operand, vm);
         };
 
-        d(inst.getOp1());
-        d(inst.getOp2());
-        d(inst.getOp3());
+        for(auto &operand : inst._ops) {
+            if(operand.type() != Operand::Type::None)
+                d(operand);
+        }
 
         return dumpWithComment(out, c);
     }
