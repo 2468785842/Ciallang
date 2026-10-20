@@ -54,6 +54,10 @@ namespace cial::Common {
 
         [[nodiscard]] size_t pos() const;
 
+        // 最近一次 next() 实际消耗的字节数；EOF 时为 0，
+        // 供回溯判断是否有字符可退
+        [[nodiscard]] size_t lastWidth() const { return _lastWidth; }
+
         [[nodiscard]] bool empty() const;
 
         [[nodiscard]] size_t length() const;
@@ -90,6 +94,7 @@ namespace cial::Common {
         void buildLines(Result &r);
 
         size_t _index = 0;
+        size_t _lastWidth = 0;
         std::filesystem::path _path;
         std::vector<u8> _buffer;
         std::stack<size_t> _markStack{};

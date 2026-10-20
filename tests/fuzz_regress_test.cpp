@@ -3,6 +3,7 @@
 //
 // tests/test_fuzz_regress.cpp
 #include <catch2/catch_test_macros.hpp>
+#include <crtdbg.h>
 #include <filesystem>
 #include <fstream>
 #include "common/SourceFile.hpp"
@@ -10,6 +11,15 @@
 #include "runtime/Context.hpp"
 #include "runtime/Runtime.hpp"
 #include "test_config.h"
+
+// 把 Debug 断言从弹窗重定向到 stderr，终端/CI 下可见
+static const bool g_redirectCrtReport = [] {
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+    return true;
+}();
 
 using namespace cial;
 namespace fs = std::filesystem;

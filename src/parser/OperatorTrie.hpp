@@ -47,14 +47,19 @@ namespace cial::syntax {
 
             for(const u8 b : op) {
                 assert(b < 0x80);
-                int &next = _opTrie[node].next[b];
+                const int next = _opTrie[node].next[b];
                 if(next == -1) {
-                    next = static_cast<int>(_opTrie.size());
+                    const int newNode = static_cast<int>(_opTrie.size());
                     _opTrie.emplace_back();
                     _opTrie.back().token = TokenType::Invalid;
                     _opTrie.back().next.fill(-1);
+                    // emplace_back 可能重新分配存储：不能持有指向 vector 内部的
+                    // 引用跨越它，必须先拷贝值再回写
+                    _opTrie[node].next[b] = newNode;
+                    node = newNode;
+                } else {
+                    node = next;
                 }
-                node = next;
             }
 
             _opTrie[node].token = type;

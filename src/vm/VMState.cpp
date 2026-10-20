@@ -258,6 +258,9 @@ namespace cial::vm {
             CallFrame *cur = _curFrame;
             u64 pc = cur->pc;
             Chunk *chunk = cur->chunk;
+            // 字节码按需编译（幂等）：进入字节码路径的 chunk 才编译，
+            // 走多态指令路径（run）的 chunk 无需付出这份开销
+            chunk->toBytecode();
             const Constant *constants = chunk->getConstants().data();
             Value *regs = cur->regs();
 

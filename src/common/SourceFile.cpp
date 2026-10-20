@@ -17,6 +17,7 @@
 
 #include "SourceFile.hpp"
 
+
 #include "Colorizer.hpp"
 #include "Defer.hpp"
 #include "UTF8.hpp"
@@ -177,10 +178,17 @@ namespace cial::Common {
     i32 SourceFile::next(Result &r) {
         size_t width = 1;
 
-        DEFER { _index += width; };
+        DEFER {
+            _index += width;
+            _lastWidth = width;
+        };
 
-        if(_buffer.empty() || _index >= _buffer.size())
+        if(_buffer.empty() || _index >= _buffer.size()) {
+            // EOF 时不能推进 _index，否则 pos 会越过缓冲区末尾，
+            // 后续按下标回溯（rewindOneChar）将越界访问
+            width = 0;
             return runeEof;
+        }
 
         const auto ch = _buffer[_index];
         i32 rune = ch;

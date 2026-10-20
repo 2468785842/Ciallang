@@ -16,6 +16,7 @@
 
 #include "OperatorTrie.hpp"
 
+
 #include "common/Defer.hpp"
 #include "common/UTF8.hpp"
 
@@ -32,6 +33,10 @@ namespace cial::syntax {
      * 回溯一个字符
      */
     void Lexer::rewindOneChar() const {
+        // 最近一次读取是 EOF（未消耗字节）时无可回退
+        if(_sourceFile.lastWidth() == 0)
+            return;
+
         const size_t pos = _sourceFile.pos();
         if(pos == 0)
             return;
