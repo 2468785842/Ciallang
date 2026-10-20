@@ -82,19 +82,20 @@ namespace cial {
 
         [[nodiscard]] const Err &getErr() const {
             assert(!_ok);
-            return _error;
+            return *_error;
         }
 
         T unwrap() {
             if(isFailed())
-                throw getErr();
-            return value();
+                throw *_error;
+            return std::move(*_value);
         }
 
     private:
         bool _ok = false;
         Opt<T> _value;
-        Err _error{};
+        // 惰性构造：成功路径不创建 Err（Err 含 vptr 与 String，逐指令构造/析构代价高）
+        Opt<Err> _error;
     };
 
     template <>
@@ -125,12 +126,12 @@ namespace cial {
 
         [[nodiscard]] Err getErr() const {
             assert(!_ok);
-            return _error;
+            return *_error;
         }
 
     private:
         bool _ok = false;
-        Err _error;
+        Opt<Err> _error;
     };
 
 } // namespace cial

@@ -22,7 +22,7 @@ namespace cial::vm {
     // FIFO Model
     class FastRegisterPool {
     public:
-        explicit FastRegisterPool(const size_t blockSize = 1 << 12) : _blockSize(blockSize), _sp(0) { allocateBlock(); }
+        explicit FastRegisterPool() : _sp(0) { allocateBlock(); }
 
         // 分配连续的寄存器帧
         size_t allocFrame(const size_t n) {
@@ -54,8 +54,10 @@ namespace cial::vm {
         }
 
         [[nodiscard]] Value *ptrAt(const u64 globalIndex) const {
-            const size_t blockIndex = globalIndex / _blockSize; // 第几个块
-            const size_t offset = globalIndex % _blockSize; // 块内偏移
+            static_assert((_blockSize & (_blockSize - 1)) == 0, "blockSize must be a power of two");
+            // 编译期常量块大小：除法/取模优化为移位与掩码
+            const size_t blockIndex = globalIndex >> _blockShift;
+            const size_t offset = globalIndex & (_blockSize - 1);
             return _blocks[blockIndex].data + offset;
         }
 
@@ -81,9 +83,11 @@ namespace cial::vm {
             ~Block() { delete[] data; }
         };
 
+        static constexpr size_t _blockSize = 1 << 12;
+        static constexpr size_t _blockShift = 12;
+
         Vec<Block> _blocks;
-        size_t _blockSize;
-        size_t _sp; // 全局栈指针（相对于首块）
+        size_t _sp{ 0 }; // 全局栈指针（相对于首块）
 
         void allocateBlock() { _blocks.emplace_back(_blockSize); }
 

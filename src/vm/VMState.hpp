@@ -46,7 +46,7 @@ namespace cial::vm {
         void run();
         void run0();
 
-        [[nodiscard]] Value reg(u16 reg) const;
+        [[nodiscard]] const Value &reg(u16 reg) const;
 
         [[nodiscard]] Value &regRef(u16 reg) const;
 

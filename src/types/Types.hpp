@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include <cstdint>
 #include <optional>
 #include <unordered_map>

@@ -293,24 +293,26 @@ namespace cial {
     }
 
     Ret<Value> Value::add(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `+`"_str };
+        // 整数快路径：避开字符串检查与类型转换往返
+        if(_type == ValueType::Integer && value._type == ValueType::Integer)
+            return Ret<Value>::ok(Value{ _integer + value._integer });
 
         if(this->isString() || value.isString()) {
             Value lhs = *this;
             if(auto lhsR = lhs.toString(); lhsR.isFailed())
-                return Ret<Value>::err(err);
+                return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `+`"_str);
 
             Value rhs = value;
             if(auto rhsR = rhs.toString(); rhsR.isFailed())
-                return Ret<Value>::err(err);
+                return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `+`"_str);
 
             auto s1 = lhs.asString();
             if(s1.isFailed())
-                return Ret<Value>::err(err);
+                return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `+`"_str);
 
             auto s2 = rhs.asString();
             if(s2.isFailed())
-                return Ret<Value>::err(err);
+                return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `+`"_str);
 
             String result{ *s1.value() };
             result.append(*s2.value());
@@ -328,11 +330,11 @@ namespace cial {
 
                 const auto lhs = this->asInteger();
                 if(lhs.isFailed())
-                    return Ret<Value>::err(err);
+                    return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `+`"_str);
 
                 const auto rhs = value.asInteger();
                 if(rhs.isFailed())
-                    return Ret<Value>::err(err);
+                    return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `+`"_str);
 
                 return Ret<Value>::ok(Value{ lhs.value() + rhs.value() });
             }
@@ -352,17 +354,18 @@ namespace cial {
 
         const auto lhs = this->asReal();
         if(lhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `+`"_str);
 
         const auto rhs = value.asReal();
         if(rhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `+`"_str);
 
         return Ret<Value>::ok(Value{ lhs.value() + rhs.value() });
     }
 
     Ret<Value> Value::sub(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `-`"_str };
+        if(_type == ValueType::Integer && value._type == ValueType::Integer)
+            return Ret<Value>::ok(Value{ _integer - value._integer });
         if(!this->isReal() && !value.isReal()) {
             const auto lhs = this->asInteger();
             const auto rhs = value.asInteger();
@@ -373,15 +376,16 @@ namespace cial {
 
         const auto lhs = this->asReal();
         if(lhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `-`"_str);
         const auto rhs = value.asReal();
         if(rhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `-`"_str);
         return Ret<Value>::ok(Value{ lhs.value() - rhs.value() });
     }
 
     Ret<Value> Value::mul(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `*`"_str };
+        if(_type == ValueType::Integer && value._type == ValueType::Integer)
+            return Ret<Value>::ok(Value{ _integer * value._integer });
         if(!this->isReal() && !value.isReal()) {
             const auto lhs = this->asInteger();
             const auto rhs = value.asInteger();
@@ -392,97 +396,88 @@ namespace cial {
 
         const auto lhs = this->asReal();
         if(lhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `*`"_str);
         const auto rhs = value.asReal();
         if(rhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `*`"_str);
         return Ret<Value>::ok(Value{ lhs.value() * rhs.value() });
     }
 
     Ret<Value> Value::div(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `/`"_str };
         const auto lhs = this->asReal();
         const auto rhs = value.asReal();
         if(rhs.isFailed() || lhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `/`"_str);
         if(rhs.value().value() == 0)
             return Ret<Value>::err(ErrCode::DivideByZero, "Divide by zero"_str);
         return Ret<Value>::ok(Value{ lhs.value() / rhs.value() });
     }
 
     Ret<Value> Value::idiv(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `\\`"_str };
         const auto lhs = this->asInteger();
         const auto rhs = value.asInteger();
         if(rhs.isFailed() || lhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `\\`"_str);
         if(rhs.value() == 0)
             return Ret<Value>::err(ErrCode::DivideByZero, "Divide by zero"_str);
         return Ret<Value>::ok(Value{ lhs.value() / rhs.value() });
     }
 
     Ret<Value> Value::mod(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `%`"_str };
         const auto lhs = this->asInteger();
         const auto rhs = value.asInteger();
         if(rhs.isFailed() || lhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `%`"_str);
         if(rhs.value() == 0)
             return Ret<Value>::err(ErrCode::DivideByZero, "Divide by zero"_str);
         return Ret<Value>::ok(Value{ lhs.value() % rhs.value() });
     }
 
     Ret<Value> Value::bitwiseXor(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `^`"_str };
         const auto lhs = this->asInteger();
         const auto rhs = value.asInteger();
         if(lhs.isFailed() || rhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `^`"_str);
         return Ret<Value>::ok(Value{ lhs.value() ^ rhs.value() });
     }
 
     Ret<Value> Value::bitwiseAnd(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `&`"_str };
         const auto lhs = this->asInteger();
         const auto rhs = value.asInteger();
         if(lhs.isFailed() || rhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `&`"_str);
         return Ret<Value>::ok(Value{ lhs.value() & rhs.value() });
     }
 
     Ret<Value> Value::bitwiseOr(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `|`"_str };
         const auto lhs = this->asInteger();
         const auto rhs = value.asInteger();
         if(lhs.isFailed() || rhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `|`"_str);
         return Ret<Value>::ok(Value{ lhs.value() | rhs.value() });
     }
 
     Ret<Value> Value::bitwiseLeftShift(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `<<`"_str };
         const auto lhs = this->asInteger();
         const auto rhs = value.asInteger();
         if(lhs.isFailed() || rhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `<<`"_str);
         return Ret<Value>::ok(Value{ lhs.value() << rhs.value() });
     }
 
     Ret<Value> Value::bitwiseRightShift(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for >>`"_str };
         const auto lhs = this->asInteger();
         const auto rhs = value.asInteger();
         if(lhs.isFailed() || rhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for >>`"_str);
         return Ret<Value>::ok(Value{ lhs.value() >> rhs.value() });
     }
 
     Ret<Value> Value::bitwiseUnsignedRightShift(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for >>>`"_str };
         const auto lhs = this->asInteger();
         const auto rhs = value.asInteger();
         if(lhs.isFailed() || rhs.isFailed())
-            return Ret<Value>::err(err);
+            return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for >>>`"_str);
         return Ret<Value>::ok(Value{ static_cast<Integer>(static_cast<UInteger>(lhs.value()) >> rhs.value()) });
     }
 
@@ -649,7 +644,6 @@ namespace cial {
     bool Value::logicalOr(const Value &value) const noexcept { return this->asBool() || value.asBool(); }
 
     Ret<bool> Value::littlerThan(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `<`"_str };
 
         if(!this->isString() || !value.isString()) {
             if(this->isInteger() && value.isInteger()) {
@@ -658,19 +652,18 @@ namespace cial {
             const auto lhs = this->asReal();
             const auto rhs = value.asReal();
             if(lhs.isFailed() || rhs.isFailed())
-                return Ret<bool>::err(err);
+                return Ret<bool>::err(ErrCode::TypeError, "unsupported operand types for `<`"_str);
             return Ret<bool>::ok(lhs.value() < rhs.value());
         }
         const auto lhs = this->asString();
         const auto rhs = value.asString();
         if(lhs.isFailed() || rhs.isFailed())
-            return Ret<bool>::err(err);
+            return Ret<bool>::err(ErrCode::TypeError, "unsupported operand types for `<`"_str);
 
         return Ret<bool>::ok(std::strcmp(lhs.value()->getData(), rhs.value()->getData()) < 0);
     }
 
     Ret<bool> Value::greaterThan(const Value &value) const noexcept {
-        const Err err{ ErrCode::TypeError, "unsupported operand types for `>`"_str };
 
         if(!this->isString() || !value.isString()) {
             if(this->isInteger() && value.isInteger()) {
@@ -679,14 +672,14 @@ namespace cial {
             const auto lhs = this->asReal();
             const auto rhs = value.asReal();
             if(lhs.isFailed() || rhs.isFailed())
-                return Ret<bool>::err(err);
+                return Ret<bool>::err(ErrCode::TypeError, "unsupported operand types for `>`"_str);
             return Ret<bool>::ok(lhs.value() > rhs.value());
         }
 
         const auto lhs = this->asString();
         const auto rhs = value.asString();
         if(lhs.isFailed() || rhs.isFailed())
-            return Ret<bool>::err(err);
+            return Ret<bool>::err(ErrCode::TypeError, "unsupported operand types for `>`"_str);
 
         return Ret<bool>::ok(std::strcmp(lhs.value()->getData(), rhs.value()->getData()) > 0);
     }

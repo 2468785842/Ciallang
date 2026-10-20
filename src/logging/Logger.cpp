@@ -15,6 +15,7 @@
 //
 
 #include "Logger.hpp"
+#include <cstdarg>
 #include <cstdio>
 #include <map>
 #include <memory>

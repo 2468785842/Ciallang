@@ -112,7 +112,7 @@ namespace cial::inter {
     }
 
     void ToInt::execute(VMState &vmState) {
-        const Value srcReg = vmState.reg(src().index());
+        const Value &srcReg = vmState.regRef(src().index());
         Value &dstReg = vmState.regRef(dst().index());
         dstReg = srcReg;
         const auto r = dstReg.toInteger();
@@ -122,7 +122,7 @@ namespace cial::inter {
     }
 
     void ToReal::execute(VMState &vmState) {
-        const Value srcReg = vmState.reg(src().index());
+        const Value &srcReg = vmState.regRef(src().index());
         Value &dstReg = vmState.regRef(dst().index());
         dstReg = srcReg;
         const auto r = dstReg.toReal();
@@ -132,7 +132,7 @@ namespace cial::inter {
     }
 
     void ToString::execute(VMState &vmState) {
-        const Value srcReg = vmState.reg(src().index());
+        const Value &srcReg = vmState.regRef(src().index());
         Value &dstReg = vmState.regRef(dst().index());
         dstReg = srcReg;
         const auto r = dstReg.toString();
@@ -142,7 +142,7 @@ namespace cial::inter {
     }
 
     void LNot::execute(VMState &vmState) {
-        const Value srcReg = vmState.reg(src().index());
+        const Value &srcReg = vmState.regRef(src().index());
         Value &dstReg = vmState.regRef(dst().index());
         dstReg = srcReg;
         dstReg.toLogicalNot();
@@ -155,7 +155,7 @@ namespace cial::inter {
     }
 
     void ChgSign::execute(VMState &vmState) {
-        const Value srcReg = vmState.reg(src().index());
+        const Value &srcReg = vmState.regRef(src().index());
         Value &dstReg = vmState.regRef(dst().index());
         dstReg = srcReg;
         const auto r = dstReg.toSignChange();
@@ -173,10 +173,10 @@ namespace cial::inter {
         Value &dstVal = vmState.regRef(dst().index());
         if(const Value &srcVal = vmState.reg(src().index()); srcVal.isString()) {
             const Atom atom = vmState.context.rt().atomTable.intern(*srcVal.asString().value());
-            dstVal = Value{ dstVal.asObject().unwrap()->instanceOf(atom) };
+            dstVal = Value{ Integer{ dstVal.asObject().unwrap()->instanceOf(atom) } };
             return;
         }
-        dstVal = Value{ false };
+        dstVal = Value{ Integer{ false } };
     }
 
     void Load::execute(VMState &vmState) {
@@ -233,168 +233,168 @@ namespace cial::inter {
     }
 
     void Add::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         r3 = r1.add(r2).unwrap();
     }
 
     void Sub::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         r3 = r1.sub(r2).unwrap();
     }
 
     void Mul::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         auto r = r1.mul(r2);
         r3 = r.unwrap();
     }
 
     void Div::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         auto r = r1.div(r2);
         r3 = r.unwrap();
     }
 
     void Idiv::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         auto r = r1.idiv(r2);
         r3 = r.unwrap();
     }
 
     void Mod::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         auto r = r1.mod(r2);
         r3 = r.unwrap();
     }
 
     void BXor::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         r3 = r1.bitwiseXor(r2).unwrap();
     }
 
     void BOr::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         r3 = r1.bitwiseOr(r2).unwrap();
     }
 
     void BAnd::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         r3 = r1.bitwiseAnd(r2).unwrap();
     }
 
     void BlShift::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         r3 = r1.bitwiseLeftShift(r2).unwrap();
     }
 
     void BrShift::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         r3 = r1.bitwiseRightShift(r2).unwrap();
     }
 
     void BurShift::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         r3 = r1.bitwiseUnsignedRightShift(r2).unwrap();
     }
 
     void EQ::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         const bool r = r1.equals(r2);
         r3 = Value{ r };
     }
 
     void NEQ::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         const bool r = !r1.equals(r2);
         r3 = Value{ r };
     }
 
     void AbsEQ::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         const bool r = r1.discernEquals(r2);
         r3 = Value{ r };
     }
 
     void AbsNEQ::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         const bool r = !r1.discernEquals(r2);
         r3 = Value{ r };
     }
 
     void LT::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         const bool r = r1.littlerThan(r2).unwrap();
         r3 = Value{ r };
     }
 
     void LE::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         const bool r = !r1.greaterThan(r2).unwrap();
         r3 = Value{ r };
     }
 
     void GT::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         const bool r = r1.greaterThan(r2).unwrap();
         r3 = Value{ r };
     }
 
     void GE::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         const bool r = !r1.littlerThan(r2).unwrap();
         r3 = Value{ r };
     }
 
     void LAnd::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         const bool r = r1.logicalAnd(r2);
         r3 = Value{ r };
     }
 
     void LOr::execute(VMState &vmState) {
-        const Value r1 = vmState.reg(src1().index());
-        const Value r2 = vmState.reg(src2().index());
+        const Value &r1 = vmState.regRef(src1().index());
+        const Value &r2 = vmState.regRef(src2().index());
         Value &r3 = vmState.regRef(dst().index());
         const bool r = r1.logicalOr(r2);
         r3 = Value{ r };

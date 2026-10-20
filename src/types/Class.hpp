@@ -121,7 +121,9 @@ namespace cial {
 
         void invalidate() {
             if(_isValid) {
-                static const Atom finalizeAtom = _vmState->context.rt().atomTable.intern("finalize"_str);
+                // 不能缓存为 static：Atom 依赖每个 Runtime 实例的 atomTable，
+                // 跨测试/跨 Runtime 复用旧 ID 会导致成员查找失败
+                const Atom finalizeAtom = _vmState->context.rt().atomTable.intern("finalize"_str);
                 const size_t abs = _vmState->getRegPoolTop() - _vmState->curFrame()->getSP();
                 _vmState->pushVoid(1);
                 // if not found finalize, may ignore??

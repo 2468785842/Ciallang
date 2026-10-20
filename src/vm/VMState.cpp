@@ -70,7 +70,7 @@ namespace cial::vm {
         context.global()->setProp(atom, value);
     }
 
-    Value VMState::reg(const u16 reg) const { return _curFrame->getReg(reg); }
+    const Value &VMState::reg(const u16 reg) const { return _curFrame->getReg(reg); }
 
     Value &VMState::regRef(const u16 reg) const { return _curFrame->getReg(reg); }
 

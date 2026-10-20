@@ -13,6 +13,8 @@
  */
 #pragma once
 
+#include <variant>
+
 #include <fmt/ostream.h>
 
 #include "../gen/Register.hpp"

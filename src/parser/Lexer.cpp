@@ -512,12 +512,12 @@ namespace cial::syntax {
     bool Lexer::numberConstVal(Token *&token) {
         std::stringstream stream{ "" };
         auto ch = read();
-        constexpr std::string valid = ".0123456789Ee";
+        constexpr std::string_view valid = ".0123456789Ee";
         i32 shifting = 0;
         auto hasActualDigits = false;
         auto valueType = ValueType::Integer;
 
-        while(valid.find_first_of(static_cast<char>(ch)) != std::string::npos) {
+        while(valid.find_first_of(static_cast<char>(ch)) != std::string_view::npos) {
             if(ch == '.') {
                 if(valueType == ValueType::Real) {
                     token = makeToken(TokenType::Error, "unexpected second decimal point"_str);
