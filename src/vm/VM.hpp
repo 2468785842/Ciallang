@@ -143,22 +143,33 @@ namespace cial {
             } else {
                 sourceFile.load(r, str.toStdStr());
             }
-            assert(!r.isFailed());
+            if(r.isFailed()) {
+                reportEvalError(r);
+                return Handle<T>{ &rt, Value{} };
+            }
 
             syntax::Parser parser{ sourceFile, _vmState->context.pp() };
 
             syntax::AstNode *node = parser.parse(r);
-            assert(!r.isFailed());
+            if(r.isFailed()) {
+                reportEvalError(r);
+                return Handle<T>{ &rt, Value{} };
+            }
 
             inter::IRGenerator codeGen{ r, rt, sourceFile };
 
             OptReg ignoreReg{};
             Opt<vm::Chunk> chunk = codeGen.parseAst(node, ignoreReg);
 
-            assert(!r.isFailed());
-            assert(chunk);
-            assert(chunk->getRegCount() != 0);
-            assert(!chunk->getInstVec().empty());
+            // 解析/生成失败或产出空代码时直接报错返回，
+            // 不能靠 assert 兜底（Release 下不存在）继续执行
+            if(r.isFailed() || !chunk || chunk->getRegCount() == 0 || chunk->getInstVec().empty()) {
+                if(!r.isFailed())
+                    reportEvalError(str.isEmpty() ? "empty script" : "script produced no code");
+                else
+                    reportEvalError(r);
+                return Handle<T>{ &rt, Value{} };
+            }
 
             auto *evalChunk = _vmState->rt.create<vm::Chunk>(std::move(*chunk)).get();
 
@@ -194,23 +205,31 @@ namespace cial {
             Common::Result r{};
 
             sourceFile.load(r, expr.toStdStr());
-            assert(!r.isFailed());
+            if(r.isFailed()) {
+                reportEvalError(r);
+                return Handle<T>{ &rt, Value{} };
+            }
 
             syntax::Parser parser{ sourceFile, _vmState->context.pp() };
 
             syntax::ExprNode *node = parser.parseExpression(r, true);
-            assert(!r.isFailed());
+            if(r.isFailed()) {
+                reportEvalError(r);
+                return Handle<T>{ &rt, Value{} };
+            }
 
             inter::IRGenerator codeGen{ r, rt, sourceFile };
 
             OptReg retReg{};
             Opt<vm::Chunk> chunk = codeGen.parseAst(node, retReg);
 
-            assert(!r.isFailed());
-            assert(chunk);
-            assert(retReg);
-            assert(chunk->getRegCount() != 0);
-            assert(!chunk->getInstVec().empty());
+            if(r.isFailed() || !chunk || !retReg || chunk->getRegCount() == 0 || chunk->getInstVec().empty()) {
+                if(!r.isFailed())
+                    reportEvalError("expression produced no code");
+                else
+                    reportEvalError(r);
+                return Handle<T>{ &rt, Value{} };
+            }
 
             _vmState->allocCallFrame(&*chunk);
             _vmState->makeClosure();
@@ -229,6 +248,15 @@ namespace cial {
 
     private:
         vm::VMState *_vmState;
+
+        static void reportEvalError(const Common::Result &r) {
+            for(const auto &m : r.messages()) {
+                if(m.isError())
+                    fmt::println(stderr, "cial: error: {} (line {})", m.message(), m.location().start().line);
+            }
+        }
+
+        static void reportEvalError(const char *message) { fmt::println(stderr, "cial: error: {}", message); }
     };
 
 } // namespace cial

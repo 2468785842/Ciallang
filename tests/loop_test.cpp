@@ -36,4 +36,33 @@ TEST_CASE("循环 - 执行") {
         )"_str);
         REQUIRE(*vm.evalExpr<Integer>("k"_str) == 3);
     }
+
+    SECTION("for首子句var声明") {
+        vm.eval(R"(
+            var sum = 0;
+            for(var i = 0; i < 5; i = i + 1) { sum = sum + i; }
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("sum"_str) == 10);
+    }
+
+    SECTION("函数内for与后缀递增递减") {
+        vm.eval(R"(
+            function f() {
+                var sum = 0;
+                for(var i = 0; i < 5; i++) { sum = sum + i; }
+                return sum;
+            }
+            var r1 = f();
+
+            function g() {
+                var n = 5;
+                var cnt = 0;
+                while(n > 0) { n--; cnt = cnt + 1; }
+                return cnt;
+            }
+            var r2 = g();
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r1"_str) == 10);
+        REQUIRE(*vm.evalExpr<Integer>("r2"_str) == 5);
+    }
 }

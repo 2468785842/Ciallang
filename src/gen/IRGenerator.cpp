@@ -370,6 +370,8 @@ namespace cial::inter {
                         Register dst = allocateRegister();
                         _chunk->emit<LoadImm>(src1, 1);
                         _chunk->emit<Add>(src1, src2, dst);
+                        // 局部变量必须写回，否则 i++ 永远不生效
+                        _chunk->emit<DLocal>(dst, src2);
                         freeRegister(src1);
                         optReg = dst;
                         return;
@@ -408,7 +410,10 @@ namespace cial::inter {
                         auto src1 = allocateRegister();
                         auto dst = allocateRegister();
                         _chunk->emit<LoadImm>(src1, 1);
-                        _chunk->emit<Sub>(src1, src2, dst);
+                        // 注意操作数顺序：变量 - 1，而非 1 - 变量
+                        _chunk->emit<Sub>(src2, src1, dst);
+                        // 局部变量必须写回，否则 i-- 永远不生效
+                        _chunk->emit<DLocal>(dst, src2);
                         freeRegister(src1);
                         optReg = dst;
                         return;
@@ -421,13 +426,15 @@ namespace cial::inter {
                         // global maybe
                         _chunk->emit<LoadImm>(src2, 1);
                         _chunk->emit<GGlobal>(identifier, src1);
-                        _chunk->emit<Sub>(src2, src1, dst);
+                        // 注意操作数顺序：变量 - 1，而非 1 - 变量
+                        _chunk->emit<Sub>(src1, src2, dst);
                         _chunk->emit<DGlobal>(identifier, dst);
                     } else {
                         // find on context
                         _chunk->emit<LoadImm>(src2, 1);
                         _chunk->emit<GThis>(identifier, src1);
-                        _chunk->emit<Sub>(src2, src1, dst);
+                        // 注意操作数顺序：变量 - 1，而非 1 - 变量
+                        _chunk->emit<Sub>(src1, src2, dst);
                         _chunk->emit<DThis>(identifier, dst);
                     }
                     freeRegister(src2);

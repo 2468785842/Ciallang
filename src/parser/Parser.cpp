@@ -917,13 +917,24 @@ namespace cial::syntax {
             return nullptr;
 
         DeclNode *initDecl{ nullptr };
+        bool initAteSemiColon = false;
         if(!parser->peek(r, TokenType::SemiColon)) {
-            auto *expr = parser->parseExpression(r, true);
-            if(!expr)
-                return nullptr;
-            initDecl = parser->astBuilder()->makeNode<StmtDeclNode>(parser->astBuilder()->makeNode<ExprStmtNode>(expr));
+            // TJS2 语法（tjs.y for_first_clause）：for 首子句可以是 var 声明或表达式；
+            // var 声明解析会连同结尾的 ';' 一起消费
+            if(parser->peek(r, TokenType::Var)) {
+                initDecl = parser->parseDeclaration(r);
+                initAteSemiColon = true;
+                if(!initDecl)
+                    return nullptr;
+            } else {
+                auto *expr = parser->parseExpression(r, true);
+                if(!expr)
+                    return nullptr;
+                initDecl = parser->astBuilder()->makeNode<StmtDeclNode>(
+                    parser->astBuilder()->makeNode<ExprStmtNode>(expr));
+            }
         }
-        if(!parser->expect(r, TokenType::SemiColon))
+        if(!initAteSemiColon && !parser->expect(r, TokenType::SemiColon))
             return nullptr;
 
         ExprNode *condExpr{ nullptr };
