@@ -65,4 +65,41 @@ TEST_CASE("循环 - 执行") {
         REQUIRE(*vm.evalExpr<Integer>("r1"_str) == 10);
         REQUIRE(*vm.evalExpr<Integer>("r2"_str) == 5);
     }
+
+    SECTION("顶层后缀递减操作数顺序") {
+        // 回归：后缀 -- 曾生成 1-n 而非 n-1（++ 因交换律未暴露）
+        vm.eval("var a = 5; a--; var b = 5; b++;"_str);
+        REQUIRE(*vm.evalExpr<Integer>("a"_str) == 4);
+        REQUIRE(*vm.evalExpr<Integer>("b"_str) == 6);
+    }
+
+    SECTION("for首子句多变量声明") {
+        // tjs.y: for_first_clause -> variable_def_inner -> var variable_id_list
+        vm.eval(R"(
+            var r = 0;
+            for(var i = 0, j = 5; i < j; i = i + 1) { r = r + 1; }
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r"_str) == 5);
+    }
+
+    SECTION("for空子句与break") {
+        vm.eval(R"(
+            var n = 0;
+            for(;;) { n = n + 1; if(n == 3) break; }
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("n"_str) == 3);
+    }
+
+    SECTION("for嵌套与break") {
+        vm.eval(R"(
+            var count = 0;
+            for(var i = 0; i < 3; i++) {
+                for(var j = 0; j < 5; j++) {
+                    if(j == 2) break;
+                    count = count + 1;
+                }
+            }
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("count"_str) == 6);
+    }
 }
