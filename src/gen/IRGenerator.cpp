@@ -699,7 +699,9 @@ namespace cial::inter {
             }
             OptReg ignoreReg{};
             auto funChunk = gen.parseAst(nullptr, ignoreReg);
-            assert(funChunk);
+            if(!funChunk) {
+                return; // parseAst(nullptr) 不应失败,防御性判空(空 Opt 解引用是 UB)
+            }
 
             auto *chunk = _rt.createNoGC<vm::Chunk>(std::move(*funChunk));
             auto *initFuncMeta = _rt.createNoGC<FuncMeta>(0, chunk, std::move(gen._localVars));
@@ -733,7 +735,9 @@ namespace cial::inter {
             if(node->constructor) {
                 OptReg ignoreReg{};
                 auto funChunk = gen.parseAst(node->constructor->body, ignoreReg);
-                assert(funChunk);
+                if(!funChunk) {
+                    return; // 函数体生成失败(错误已记录在 _r),调用方以 nullptr 处理
+                }
 
                 // the last patch one ret
                 auto voidReg = gen.loadVoidReg();
@@ -1140,7 +1144,12 @@ namespace cial::inter {
 
         OptReg ignoreReg{};
         auto funChunk = gen.parseAst(body, ignoreReg);
-        assert(funChunk);
+        // 函数体含不支持语法(如前缀 &/*)时 parseAst 因 _r 失败而返回空 Opt;
+        // 旧代码在此 assert——Debug 中止、Release 对空 Opt 解引用段错误。
+        // 返回 nullptr 交给调用方走既有的优雅报错路径
+        if(!funChunk) {
+            return nullptr;
+        }
 
         // the last instruction is not ret, patch one ret
         if(auto &instVec = funChunk->getInstVec(); instVec.empty() || instVec.back()->opcode() != TacOpCode::Ret) {

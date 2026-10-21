@@ -78,6 +78,17 @@ TEST_CASE("解释器 - 边界与错误路径") {
     SECTION("evalExpr空表达式") {
         REQUIRE_NOTHROW(vm.evalExpr(""_str));
     }
+
+    SECTION("函数体含不支持语法不崩溃") {
+        // 回归:前缀 &/*/未支持时 generateFuncMeta 曾对空 Opt 解引用段错误
+        // (顶层 chunk 有判空,函数级只有 assert,Release 下直接崩)
+        REQUIRE_NOTHROW(vm.eval("function f() { var p = 1; *p = 30; }"_str));
+        REQUIRE_NOTHROW(vm.eval("function g() { var p = &property1; }"_str));
+        // 运行期未捕获异常:unwind 抛 C++ 异常穿过 eval(由宿主捕获,见 main.cpp)
+        REQUIRE_THROWS_AS(vm.eval("throw \"boom\";"_str), std::exception);
+        // 失败后状态未破坏,后续求值正常
+        REQUIRE(*vm.evalExpr<Integer>("40 + 2"_str) == 42);
+    }
 }
 
 int fib(const int n) {

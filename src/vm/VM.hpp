@@ -182,7 +182,14 @@ namespace cial {
             _vmState->allocCallFrame(evalChunk, retReg);
             _vmState->makeClosure();
             u32 stackTop = _vmState->context.stackTop();
-            _vmState->run0();
+            try {
+                _vmState->run0();
+            } catch(...) {
+                // 未捕获脚本异常经 unwind 以 C++ 异常逃逸:
+                // 清理挂起状态(_pending/_exValue),否则毒害宿主的后续 eval
+                _vmState->clearException();
+                throw;
+            }
             Value ret = _vmState->reg(retReg);
 
             // when evalChunk include `ret` inst, `ret` will call freeCallFrame, so we need check
@@ -233,7 +240,12 @@ namespace cial {
 
             _vmState->allocCallFrame(&*chunk);
             _vmState->makeClosure();
-            _vmState->run0();
+            try {
+                _vmState->run0();
+            } catch(...) {
+                _vmState->clearException();
+                throw;
+            }
 
             Value ret = _vmState->reg(retReg->index());
             _vmState->freeCallFrame();

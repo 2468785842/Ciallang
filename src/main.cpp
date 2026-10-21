@@ -35,7 +35,13 @@ int main(const int argc, char **argv) {
     context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
     vm::VMState vmState{ context };
     const VM vm{ &vmState };
-    vm.eval(String(argv[1]), true);
+    try {
+        vm.eval(String(argv[1]), true);
+    } catch(const std::exception &e) {
+        // 脚本运行期异常(未捕获 throw、未定义标识符等)——报告而非静默终止
+        fmt::println(stderr, "cial: runtime error: {}", e.what());
+        return 1;
+    }
 
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration = duration_cast<std::chrono::nanoseconds>(end - start);
