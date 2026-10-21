@@ -151,6 +151,17 @@
 
 ---
 
+### 📖 文档索引
+
+- **[AGENTS.md](AGENTS.md)** — AI 协作规范与项目导航（目录地图/构建测试/代码风格/已知坑位），新成员与 AI 的第一入口
+- **[doc/README.md](doc/README.md)** — 全部文档索引，含：
+  - [架构设计](doc/architecture.md)（流水线/模块/与旧版 TJSCompiler 对照）
+  - 字节码规范：[旧版 TJS2](doc/bytecode/tjs2-bytecode.md) · [本项目](doc/bytecode/ciallang-bytecode.md) · [转译设计](doc/bytecode/mapping.md)
+  - [TJS2 语法参考与实现状态](doc/syntax.md) · [兼容性矩阵与路线图](doc/compatibility.md)
+- **[TODO.md](TODO.md)** — 后续任务清单
+
+---
+
 **许可证**  
 MIT License
 

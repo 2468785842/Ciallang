@@ -1,38 +1,44 @@
 # 后续任务清单
 
-> 基于 2026-10 性能分析与 Debug 修复会话的结论整理。
-> 当前状态：fib(25) 比旧版 TJSCompiler 慢约 2.3~2.5 倍（性能优化前为 4~5 倍）。
+> 基于 2026-10 性能分析与 Debug 修复会话的结论整理；一节已于 2026-10-21 完成并更新。
+> 当前状态：run0 扁平字节码为唯一执行路径；Release 下 fib(25) ≈ 58ms、300 万次整数循环 ≈ 412ms
+> （本次优化前分别为 ≈ 77ms / ≈ 547ms，提升约 25%）。
+> 与原版 TJS2 对拍（TJSCompiler Release，三方 wall-time 交替实测，2026-10-21）：
+> fib(25) TJS≈54ms / 旧 Ciallang≈88ms / 新 Ciallang≈75ms（新差距从 1.63x 缩到 1.39x）；
+> 3M 循环 TJS≈670ms / 旧≈1080ms / 新≈793ms（从 1.61x 缩到 **1.18x**）。
+> TJSCompiler Release 构建方法：cmake -DBUILD_SHARED_LIBS=OFF（否则 onig 链接失败），
+> 产物另存 bin/Windows/TJSCompiler-release.exe。
 
-## 一、性能（按预期收益排序）
+## 一、性能（✅ 全部完成 2026-10-21）
 
-- [ ] **补全 run0 扁平字节码解释器**（预期收益最大，目标追平/超越旧版）
-  - `src/vm/Bytecode.cpp` 的 `encode()` 有 38/55 个操作码未实现（`assert(false)` 占位，如 `DThis`/`DLocal` 等）
-  - `VMState::run0()` 的 `CIAL_BYTECODE_OPCODE_ENUMS` 只覆盖 17 个操作码
-  - 已就绪的基础设施：`IRGenerator` 已按需调用 `toBytecode()`（惰性编译在 `run0` 取帧点，幂等）；
-    `while` 循环在 run0 下曾崩溃，需排查编码正确性
-  - 完成后将 `src/vm/VM.hpp` 的 `eval()` 从 `run()` 切换到 `run0()`，删除多态指令执行路径
-  - 验证基准：`fib(25)`、300 万次整数循环（基准脚本在分析会话的 bench 目录）
-  - 旧版参照：`D:\Users\LiDon\CLionProjects\TJSCompiler`（原版 Kirikiri TJS2）
-
-- [ ] **性能测试偶发段错误**（约 1/8 概率，基线同样存在）
-  - `tests/interpreter_test.cpp` 的 fib25 Catch2 benchmark 偶发 SIGSEGV
-  - 怀疑方向：`Runtime::create` 返回的临时 `RootGuard` 析构后句柄即移除，
-    期间 GC sweep 可能回收仍在使用的对象（`src/runtime/Runtime.hpp` + `src/gc/gc.cpp`）
-  - 修复后才能在 CI 开压力模式
-
-- [ ] **Value 字符串布局优化**
-  - 现状三层间接：`Value → 堆RefCountPointer → 堆RefCountBox → 堆String`，
-    每次字符串 Value 拷贝一次堆分配（`src/types/Value.cpp` 拷贝构造）
-  - 目标：引用计数直接挂在 String 头上（单层间接）
-  - 注意：字符串路径目前已比旧版快 3.7 倍，此项优先级可放低
-
-- [ ] **编译期解析变量访问**
-  - `VMState::getThis`（`src/vm/VMState.cpp`）每次访问 `dynamic_cast` + 线性扫描
-    closure 的 `localVars` + 全局哈希查找；应在 IRGenerator 阶段解析为寄存器
+> 简要留痕（细节见 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、
+> [AGENTS.md](AGENTS.md) 坑位、以及对应提交信息）：
+>
+> - **run0 扁平字节码补全为唯一执行路径**：55/55 编码器与 dispatch；跳转回填列表化；
+>   try 表换算到字节码 pc 空间；删除 `run()`/`Instruction::execute` 多态路径。
+>   顺带修复 while 崩溃根因（`decodeUleb128` 位移单位 bug，≥8192 立即数误抛）与
+>   IfStmtNode else 跳转误用 JmpNE。
+> - **偶发段错误根除**（8 连跑全量测试无失败）：执行期 GC 此前只标记 RootGuard 句柄——
+>   引入 `MarkRootProvider` 接入寄存器池/调用栈/全局对象；另修 `freeCallFrame` 越界写、
+>   以及 GC 真正工作后暴露的 6 处标记协议缺陷（漏标 constructor/initDefaultVal/PropMeta、
+>   `Property::marked` 漏调基类、marked() 缺幂等守卫、寄存器扫描类型不判、
+>   sweep 中 finalize 重入压僵尸帧）。
+> - **Value 字符串/字节串共享负载块**（`SharedPayload`）：拷贝零堆分配，取代三层
+>   RefCountPointer。
+> - **变量访问热路径**：`CallFrame::thisData` 缓存消除 getThis/setThis 的 dynamic_cast；
+>   完整编译期解析需类系统静态化后再做。
+> - **基准（Release，三方 wall-time 交替对拍）**：fib(25) 旧 88ms→新 75ms
+>   （与 TJSCompiler Release 54ms 差距 1.63x→1.39x）；3M 循环 旧 1080ms→新 793ms
+>   （与 TJS 670ms 差距 1.61x→**1.18x**）。
 
 ## 二、正确性（已知未修）
 
-- [ ] `解释器 - 脚本执行性能` 偶发段错误（同上，性能节的 GC 问题）
+- [x] `解释器 - 脚本执行性能` 偶发段错误（已修，见一节；CI 可开压力模式）
+- [ ] GC 期 finalize 不再触发（~DataObject 已禁止重入解释器）；
+      若需 TJS2 完整语义（GC 回收对象也调 finalize），需实现"回收队列 + 安全区 drain"
+- [ ] 二元 `^ | &` 运算符 Parser 未注册（IRGenerator 的 BXor/BOr/BAnd 不可达，
+      报 "isn't support assign operator"）；`str.length` 属性未实现（仅方法表）
+- [x] IfStmtNode else 跳转误用 JmpNE（已修 2026-10-21：真假分支曾都会执行）
 - [ ] 前缀 `++`/`--` 未实现（会报 "unknow prefix unary operator"）；
       README 中前缀单目运算符 `~ -- ++ delete typeof # $ + & *` 大部分未实现
 - [ ] `for(var ...)` 已支持，但 `for(const ...)` 未支持（tjs.y 的 variable_def_inner 含 const）
@@ -53,7 +59,17 @@
       文档中补充手动拷贝说明或改用静态链接 vcpkg triplet
 - [ ] `CiallangTests` 已将 CRT 断言重定向到 stderr（`tests/fuzz_regress_test.cpp`），
       CI 里可直接跑 Debug 配置
-- [ ] 基准脚本与旧版对照方法沉淀（bench 目录会话结束后未入库，可按需重建）
+- [ ] 基准脚本与旧版对照方法沉淀（bench 目录会话结束后未入库，可按需重建；
+      本次会话验证方法：`cial.exe fib.tjs`/`循环.tjs` 各取 5 次中位数；
+      TJSCompiler 侧 `bin/Windows/TJSCompiler.exe` 为 Debug 构建，严格对拍需先补其 Release）
+- [x] CMakeUserPresets.json 固化本机工具链路径（clang/rc/ninja 完整路径，
+      无 VS 环境变量的终端可直接 `cmake --preset "Windows Local Release"`；
+      文件已加入 .gitignore 不入库）
+
+## 已完成（2026-10-21 性能会话）
+
+- [x] 一节四项全部完成（摘要见上）；另：main.cpp 补 initNativeMethod 与 stdout 无缓冲、
+      CMakeUserPresets.json 固化本机工具链（不入库）
 
 ## 已完成（2026-10 会话）
 

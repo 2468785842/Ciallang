@@ -1,5 +1,7 @@
 # 类（Class）
 
+> 原文：TJS2 リファレンス「Class」章（[镜像 class.html](https://a-rabin.github.io/krkr2doc-en/tjs2doc/contents/class.html)），本文在其原译基础上整理补全。
+
 “类”是创建“对象”时使用的**模型**。
 
 * 类中的变量称为 **成员变量**
@@ -303,6 +305,11 @@ var obj = new Class2();
 obj.method1();
 ```
 
+说明：
+
+* 子类构造函数 / finalize 内**必须显式调用**超类对应的构造函数 / finalize（如 `super.Class1()`、`super.finalize()`）；不调用时行为未定义（当前版本不检查是否调用过）。
+* `super` 关键字只能在子类内部使用，表示超类；在**多重继承**中使用会报错。
+
 ---
 
 ## 继承时的初始化顺序
@@ -338,7 +345,8 @@ class SubClass extends ClassA, ClassB
 
 * 多重继承中 **不能使用 `super`**
 * 必须显式使用 `global.ClassName`
-* 若存在同名成员，**后写的类优先**
+* 若存在同名成员，**后写的类优先**（方法/属性的注册顺序就是 extends 后书写的顺序）
+* 被隐藏的超类成员仍可通过 `global.ClassA.hiddenMethod()` 这样**显式写类名**访问
 
 ---
 
