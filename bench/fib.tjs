@@ -1,0 +1,7 @@
+// 递归调用开销基准: fib(25) = 75025
+function fib(n) {
+    if(n < 2) return n;
+    return fib(n - 2) + fib(n - 1);
+}
+var r = fib(25);
+if(r != 75025) throw "fib mismatch";

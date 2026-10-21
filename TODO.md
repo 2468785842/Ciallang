@@ -38,6 +38,11 @@
       若需 TJS2 完整语义（GC 回收对象也调 finalize），需实现"回收队列 + 安全区 drain"
 - [ ] 二元 `^ | &` 运算符 Parser 未注册（IRGenerator 的 BXor/BOr/BAnd 不可达，
       报 "isn't support assign operator"）；`str.length` 属性未实现（仅方法表）
+- [ ] `tests/test_files/tjs2/test_class.tjs` 在 Ciallang 下确定段错误（新旧代码均复现，
+      conformance 对拍发现；含前缀 `&property1` / `(*p)` 解引用语法——预期应优雅报
+      "unknow prefix unary operator"而非崩溃，解析/生成路径需排查）
+- [ ] conformance 升级方向：完整 stdout 语义对拍（需双引擎统一输出函数：
+      TJSCompiler 侧注册 println 或 Ciallang 实现 Debug.message，二选一）
 - [x] IfStmtNode else 跳转误用 JmpNE（已修 2026-10-21：真假分支曾都会执行）
 - [ ] 前缀 `++`/`--` 未实现（会报 "unknow prefix unary operator"）；
       README 中前缀单目运算符 `~ -- ++ delete typeof # $ + & *` 大部分未实现
@@ -59,9 +64,15 @@
       文档中补充手动拷贝说明或改用静态链接 vcpkg triplet
 - [ ] `CiallangTests` 已将 CRT 断言重定向到 stderr（`tests/fuzz_regress_test.cpp`），
       CI 里可直接跑 Debug 配置
-- [ ] 基准脚本与旧版对照方法沉淀（bench 目录会话结束后未入库，可按需重建；
-      本次会话验证方法：`cial.exe fib.tjs`/`循环.tjs` 各取 5 次中位数；
-      TJSCompiler 侧 `bin/Windows/TJSCompiler.exe` 为 Debug 构建，严格对拍需先补其 Release）
+- [x] 基准与对拍设施入库（CMake 化，2026-10-21）：
+      `bench/*.tjs` 双引擎基准脚本（throw 自校验）、`cmake/Bench.cmake`（`cmake -E time`
+      交替对拍，min/mean 报告落盘 bench/results/）、`cmake/Conformance.cmake`
+      （tjs2 语料双引擎成败对拍报告）。用法：`cmake --preset "Windows Local Bench" &&
+      cmake --build --preset "Windows Local Bench"`（bench 目标）；
+      `--target conformance-report` 出兼容性报告。TJS 路径经 UserPresets 的
+      CIAL_TJS_ROOT 环境变量注入
+- [ ] 基准暴露的新优化信号：string_concat Ciallang/TJS ≈ 236%（字符串拼接路径），
+      fib ≈ 165%（调用开销），class ≈ 121%、loop_int ≈ 129%
 - [x] CMakeUserPresets.json 固化本机工具链路径（clang/rc/ninja 完整路径，
       无 VS 环境变量的终端可直接 `cmake --preset "Windows Local Release"`；
       文件已加入 .gitignore 不入库）

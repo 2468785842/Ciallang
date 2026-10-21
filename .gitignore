@@ -13,6 +13,7 @@ CMakeUserPresets.json
 
 # 日志与临时文件
 *.log
+bench/results/
 
 # AI 会话工作目录
 .zcode/

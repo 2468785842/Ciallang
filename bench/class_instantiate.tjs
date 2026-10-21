@@ -1,0 +1,16 @@
+// 类实例化/成员访问/property getter 基准: 2000 次构造 + 方法调用
+// getX = x + 2x = 3x; sum = 3 * (0+1+...+1999) = 5997000
+class A {
+    var x = 0;
+    property p { getter { return x * 2; } }
+    function A(v) { x = v; }
+    function getX() { return x + p; }
+}
+var i = 0;
+var sum = 0;
+while(i < 2000) {
+    var a = new A(i);
+    sum = sum + a.getX();
+    i = i + 1;
+}
+if(sum != 5997000) throw "class mismatch";

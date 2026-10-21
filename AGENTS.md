@@ -33,7 +33,6 @@ Ciallang/
 │   │   ├─ tjs2-bytecode.md     旧版 TJS2 字节码规范（128 操作码/序列化格式）
 │   │   ├─ ciallang-bytecode.md 本项目指令集规范（TAC 55 + 扁平字节码 17）
 │   │   └─ mapping.md           TJS2→Ciallang 转译设计（后续实现字节码兼容的蓝本）
-│   ├─ TJS2_OPCODE.md           （历史）TJS2 VM ISA 学习笔记，写作时的原始参考
 │   ├─ grammar/                 原版 bison 语法副本（tjs.y / tjsdate.y / tjspp.y）
 │   └─ language/                类语义/表达式运算符笔记
 ├─ src/                 ← 源码（模块职责见下表）

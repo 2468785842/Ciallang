@@ -1,0 +1,8 @@
+// 字符串拼接基准: 5 万次 int->string 转换 + 拼接
+var s = "";
+var i = 0;
+while(i < 50000) {
+    s = "item-" + i;
+    i = i + 1;
+}
+if(s != "item-49999") throw "string mismatch";
