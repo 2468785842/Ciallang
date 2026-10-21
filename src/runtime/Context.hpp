@@ -16,6 +16,7 @@
 #include <ranges>
 
 #include "parser/PreProcessor.hpp"
+#include "runtime/Runtime.hpp"
 #include "stdlib/NativeRegister.hpp"
 #include "vm/FastRegisterPool.hpp"
 
@@ -23,13 +24,16 @@ namespace cial {
     class GlobalObject;
     struct CallFrame;
 
-    class Context {
+    class Context : public MarkRootProvider {
     public:
         // Stack Max Depth Is 1024
         static constexpr auto maxCallDepth = 1024;
 
         explicit Context(Runtime &rt) noexcept;
         ~Context() noexcept;
+
+        // GC 运行时根入口：供 Runtime 在分配触发回收时调用
+        void collectMark() const override;
 
         void initNativeMethod();
 
@@ -43,8 +47,6 @@ namespace cial {
         }
 
         void registryGlobalFunc(const String &name, NativeFunction *func) const noexcept;
-
-        void collectMark() const;
 
         [[nodiscard]] CallFrame *callStack() const;
 

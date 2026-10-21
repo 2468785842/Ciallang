@@ -13,6 +13,7 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <ranges>
 
 #include "AtomTable.hpp"
@@ -29,6 +30,18 @@ namespace cial {
 
     template <typename T>
     class RootGuard;
+
+    /**
+     * GC 额外根的提供方。Runtime 自身只追踪 RootGuard 句柄，
+     * 寄存器池/调用栈/全局对象等运行时根由 Context 注册提供。
+     * 没有它，执行期任何一次 GC 都会把活对象当垃圾回收。
+     */
+    class MarkRootProvider {
+    public:
+        virtual ~MarkRootProvider() = default;
+
+        virtual void collectMark() const = 0;
+    };
 
     class Runtime {
     public:
@@ -63,11 +76,28 @@ namespace cial {
             }
         }
 
+        void addMarkRoot(const MarkRootProvider *provider) { _markRoots.push_back(provider); }
+
+        void removeMarkRoot(const MarkRootProvider *provider) {
+            if(const auto it = std::find(_markRoots.begin(), _markRoots.end(), provider); it != _markRoots.end()) {
+                _markRoots.erase(it);
+            }
+        }
+
+        /** 标记全部根：RootGuard 句柄 + 注册进来的运行时根（寄存器池/调用栈/全局对象等） */
+        void collectAllMark() const {
+            collectMark();
+            for(const auto *provider : _markRoots) {
+                provider->collectMark();
+            }
+        }
+
     private:
+        std::vector<const MarkRootProvider *> _markRoots{};
+
         template <typename T, typename... Args>
             requires std::is_base_of_v<MarkSweepHeader, T>
         T *allocate(Args &&...args) {
-
             static_assert(sizeof(T) <= NODE_SIZE, "GC NODE_SIZE too small for object type");
 
             MarkSweepHeader *next = markSweep._nextFree->_next;
@@ -85,7 +115,7 @@ namespace cial {
             requires std::is_base_of_v<MarkSweepHeader, T>
         RootGuard<T> create(Args &&...args) {
             if(!markSweep._nextFree || !markSweep._nextFree->_isFree) {
-                markSweep.findIdleNode([this] { collectMark(); });
+                markSweep.findIdleNode([this] { collectAllMark(); });
             }
 
             return RootGuard<T>{ this, allocate<T>(std::forward<Args>(args)...) };

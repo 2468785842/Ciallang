@@ -75,7 +75,8 @@ namespace cial {
             Function getFunc{ propMeta->getFunc };
             getFunc.thisObj = thisObj;
             getFunc.call(vmState, ret, 0);
-            vmState.run();
+            // 嵌套执行 getter 帧直至其返回（栈回落到入口之下即返回）
+            vmState.run0();
             return vmState.reg(ret);
         }
 
@@ -84,6 +85,9 @@ namespace cial {
         }
 
         void marked() noexcept override {
+            if(_marked)
+                return;
+            MarkSweepHeader::marked(); // 旧实现漏了基类调用，自身永远不会被标记
             if(thisObj)
                 thisObj->marked();
             if(propMeta)

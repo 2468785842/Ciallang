@@ -25,8 +25,12 @@ namespace cial {
         explicit Impl(Runtime &rt) noexcept : rt(rt) {}
     };
 
-    Context::Context(Runtime &rt) noexcept : _impl(new Impl{ rt }) {}
-    Context::~Context() noexcept { delete _impl; }
+    Context::Context(Runtime &rt) noexcept : MarkRootProvider(), _impl(new Impl{ rt }) { rt.addMarkRoot(this); }
+
+    Context::~Context() noexcept {
+        _impl->rt.removeMarkRoot(this);
+        delete _impl;
+    }
 
     void Context::initNativeMethod() {
         registerMethod<String>("charAt"_str, &stdlib::stringCharAt);
@@ -68,7 +72,9 @@ namespace cial {
         // scan stack
         const u32 used = _impl->regPool.used();
         for(u32 i = 0; i < used; ++i) {
-            if(const Value *val = _impl->regPool.ptrAt(i)) {
+            const Value *val = _impl->regPool.ptrAt(i);
+            // 槽位可能是任意类型（整数/字符串/void），必须先判类型再取对象指针
+            if(val->isObject()) {
                 if(auto *msHeader = val->asObject().value()) {
                     msHeader->marked();
                     if(msHeader->_name != ATOM_INVALID) {

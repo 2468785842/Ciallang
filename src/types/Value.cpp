@@ -22,19 +22,23 @@ namespace cial {
 
     Value::Value(const Real value) : _real(value), _type(ValueType::Real) {}
 
-    Value::Value(String value) : _type(ValueType::String) { _string = new RefCountPointer<String>{ std::move(value) }; }
+    Value::Value(String value) : _type(ValueType::String) {
+        _string = SharedPayload<String>::make(new String{ std::move(value) });
+    }
 
-    Value::Value(Octet value) : _type(ValueType::Octet) { _octet = new RefCountPointer<Octet>{ std::move(value) }; }
+    Value::Value(Octet value) : _type(ValueType::Octet) {
+        _octet = SharedPayload<Octet>::make(new Octet{ std::move(value) });
+    }
 
     Value::Value(Object *value) : _object(value), _type(ValueType::Object) {}
 
     Value::~Value() {
         switch(_type) {
             case ValueType::String:
-                delete _string;
+                SharedPayload<String>::release(_string);
                 break;
             case ValueType::Octet:
-                delete _octet;
+                SharedPayload<Octet>::release(_octet);
                 break;
             default:;
         }
@@ -79,10 +83,12 @@ namespace cial {
 
         switch(v._type) {
             case ValueType::String:
-                _string = new RefCountPointer{ *v._string };
+                _string = v._string;
+                SharedPayload<String>::retain(_string);
                 break;
             case ValueType::Octet:
-                _octet = new RefCountPointer{ *v._octet };
+                _octet = v._octet;
+                SharedPayload<Octet>::retain(_octet);
                 break;
             case ValueType::Integer:
                 _integer = v._integer;
@@ -115,7 +121,7 @@ namespace cial {
             case ValueType::Real:
                 return Ret<Integer>::ok(static_cast<Integer>(_real.value()));
             case ValueType::String:
-                return TypeConverter::stringToInteger(*_string->getValue());
+                return TypeConverter::stringToInteger(*_string->data);
             case ValueType::Object:
             case ValueType::Octet:
                 break;
@@ -132,7 +138,7 @@ namespace cial {
             case ValueType::Real:
                 return Ret<Real>::ok(_real);
             case ValueType::String:
-                return TypeConverter::stringToReal(*_string->getValue());
+                return TypeConverter::stringToReal(*_string->data);
             case ValueType::Object:
             case ValueType::Octet:
                 break;
@@ -142,14 +148,14 @@ namespace cial {
 
     Ret<String *> Value::asString() const noexcept {
         if(_type == ValueType::String) {
-            return Ret<String *>::ok(_string->getValue());
+            return Ret<String *>::ok(_string->data);
         }
         return Ret<String *>::err(ErrCode::TypeError, "Invalid type get as String"_str);
     }
 
     Ret<Octet *> Value::asOctet() const noexcept {
         if(_type == ValueType::Octet) {
-            return Ret<Octet *>::ok(_octet->getValue());
+            return Ret<Octet *>::ok(_octet->data);
         }
         return Ret<Octet *>::err(ErrCode::TypeError, "Invalid type get as Octet"_str);
     }
@@ -322,7 +328,7 @@ namespace cial {
 
         if(this->_type == value._type) {
             if(this->_type == ValueType::Octet) {
-                Octet oct{ *this->_octet->getValue(), *value._octet->getValue() };
+                Octet oct{ *this->_octet->data, *value._octet->data };
                 return Ret<Value>::ok(Value{ std::move(oct) });
             }
 

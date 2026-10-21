@@ -24,9 +24,13 @@ int main(const int argc, char **argv) {
         return 0;
     }
 
+    // 无缓冲输出：崩溃时不丢失已执行的打印，便于定位
+    setvbuf(stdout, nullptr, _IONBF, 0);
+
     const auto start = std::chrono::high_resolution_clock::now();
     Runtime rt{};
     Context context{ rt };
+    context.initNativeMethod();
     context.registryGlobalFunc("print"_str, &stdlib::S_PrintFunction);
     context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
     vm::VMState vmState{ context };

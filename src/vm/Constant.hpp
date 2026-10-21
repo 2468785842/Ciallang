@@ -78,6 +78,8 @@ namespace cial {
         FuncMeta *getFunc;
 
         void marked() noexcept override {
+            if(_marked)
+                return;
             MarkSweepHeader::marked();
             if(setFunc) {
                 setFunc->marked();
@@ -154,7 +156,15 @@ namespace cial {
         void setConstructor(FuncMeta *funcMeta) { this->constructor = funcMeta; }
 
         void marked() noexcept override {
+            if(_marked)
+                return;
             MarkSweepHeader::marked();
+            // constructor/initDefaultVal 不在成员表里，必须单独标记，
+            // 否则 GC 触发时被回收，后续 new 将使用脏内存
+            if(constructor)
+                constructor->marked();
+            if(initDefaultVal)
+                initDefaultVal->marked();
             const size_t len = memberShapeMetas.size();
             for(size_t i = 0; i < len; ++i) {
                 if(memberShapeMetas[i].isMethod) {

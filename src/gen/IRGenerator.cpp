@@ -844,7 +844,9 @@ namespace cial::inter {
 
         if(node->elseBody) {
             node->elseBody->generateBytecode(this, ignore);
-            _chunk->repl<JmpNE>(jmpIdx, makeLabel());
+            // then 分支执行完应无条件跳过 else 分支；
+            // 此处曾是 JmpNE（依赖陈旧的 ZF，导致真假两个分支都执行）
+            _chunk->repl<Jmp>(jmpIdx, makeLabel());
         }
 
         freeRegister(testReg);

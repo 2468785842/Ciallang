@@ -88,9 +88,7 @@ namespace cial::inter {
     };
 
     class Instruction;
-
-    using ExecuteCallback = void (*)(const Instruction &, vm::VMState &);
-    using DumpCallback = std::string (*)(const Instruction &, const vm::VMState &, bool);
+    class DumpInst;
 
     struct Operand {
         enum class Type { None, Register, Label, ConstIndex, Number, Atom };
@@ -169,11 +167,9 @@ namespace cial::inter {
             return _ops[2].value<T>();
         }
 
-        virtual void execute(vm::VMState &vmState) = 0;
-
+        // 多态执行路径(run)与 encode 虚函数已删除：TAC 指令仅作为 IR 载体与 dump 来源，
+        // 执行统一走 VMState::run0 的扁平字节码
         virtual std::string dump(const vm::VMState *vmState) = 0;
-
-        virtual void encode(Vec<u8> &code) = 0;
 
     protected:
         Operand _ops[3];
@@ -215,9 +211,7 @@ namespace cial::inter {
     struct className : Instruction {                                                                                   \
         DEF_CTOR_##N(className) virtual ~className() = default;                                                        \
         [[nodiscard]] TacOpCode opcode() const override { return TacOpCode::className; }                               \
-        getters void execute(vm::VMState &vmState) override;                                                           \
-        [[nodiscard]] std::string dump(const vm::VMState *vmState) override;                                           \
-        void encode(Vec<u8> &code) override {}                                                                         \
+        getters [[nodiscard]] std::string dump(const vm::VMState *vmState) override;                                   \
     }
 
     // ────────────────────────────────────────────────

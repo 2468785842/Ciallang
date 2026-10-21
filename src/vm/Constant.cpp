@@ -25,6 +25,8 @@
 namespace cial {
 
     void FuncMeta::marked() noexcept {
+        if(_marked)
+            return;
         MarkSweepHeader::marked();
         chunk->marked();
     }

@@ -22,6 +22,34 @@
 #include "gc/gc.hpp"
 
 namespace cial {
+
+    /**
+     * 字符串/字节串的共享负载块：引用计数 + 堆上 T。
+     * Value 持有 SharedPayload*，拷贝只递增计数（零堆分配、单层间接）；
+     * 取代旧的 Value→堆RefCountPointer→堆RefCountBox→堆String 三层布局。
+     */
+    template <typename T>
+    struct SharedPayload {
+        u32 ref{ 1 };
+        T *data;
+
+        explicit SharedPayload(T *d) : data(d) {}
+
+        SharedPayload(const SharedPayload &) = delete;
+        SharedPayload &operator=(const SharedPayload &) = delete;
+
+        static SharedPayload *make(T *d) { return new SharedPayload{ d }; }
+
+        static void retain(SharedPayload *p) noexcept { ++p->ref; }
+
+        static void release(SharedPayload *p) noexcept {
+            if(--p->ref == 0) {
+                delete p->data;
+                delete p;
+            }
+        }
+    };
+
     class Value {
 
     public:
@@ -123,8 +151,8 @@ namespace cial {
         union {
             Integer _integer{};
             Real _real;
-            RefCountPointer<String> *_string;
-            RefCountPointer<Octet> *_octet;
+            SharedPayload<String> *_string;
+            SharedPayload<Octet> *_octet;
             Object *_object;
         };
 

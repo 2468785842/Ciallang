@@ -19,50 +19,6 @@
 
 namespace cial {
 
-    template <typename T>
-    class RefCountPointer {
-    public:
-        template <typename... Args>
-        explicit RefCountPointer(Args... args) : _box(new RefCountBox{ std::forward<Args>(args)... }) {}
-
-        RefCountPointer(RefCountPointer &&) = delete;
-        RefCountPointer &operator=(RefCountPointer &&) = delete;
-
-        RefCountPointer(const RefCountPointer &other) : _box(other._box) { ++_box->_ref; }
-
-        RefCountPointer &operator=(const RefCountPointer &other) {
-            if(this != &other) {
-                release();
-                _box = other._box;
-                ++_box->_ref;
-            }
-            return *this;
-        }
-
-        T *getValue() noexcept { return _box->_data; }
-        const T *getValue() const noexcept { return _box->_data; }
-
-        ~RefCountPointer() noexcept { release(); }
-
-    private:
-        struct RefCountBox {
-            T *_data{ nullptr };
-            u32 _ref{ 1 };
-
-            template <typename... Args>
-            explicit RefCountBox(Args... args) : _data(new T{ std::forward<Args>(args)... }) {}
-
-            ~RefCountBox() noexcept { delete _data; }
-        };
-
-        RefCountBox *_box;
-
-        void release() noexcept {
-            if(--_box->_ref == 0)
-                delete _box;
-        }
-    };
-
     class MarkSweepHeader {
         friend class MarkSweep;
         friend class Runtime;
@@ -70,14 +26,20 @@ namespace cial {
     public:
         MarkSweepHeader() = default;
         virtual ~MarkSweepHeader() = default;
+
         virtual void marked() noexcept {
             if(!_marked)
                 _marked = true;
         }
 
+    protected:
+        // 派生类 marked() 必须以 "if(alreadyMarked()) return;" 开头：
+        // 对象图存在环（FuncMeta↔Chunk、DataObject↔ClassObject 等），
+        // 不检查标志会在环上无限递归
+        bool _marked{ false };
+
     private:
         MarkSweepHeader *_next{ nullptr };
-        bool _marked{ false };
         bool _isFree{ false };
     };
 

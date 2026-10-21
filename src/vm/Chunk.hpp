@@ -15,6 +15,7 @@
 
 #include <ranges>
 
+#include <fmt/format.h>
 #include "Bytecode.hpp"
 #include "Constant.hpp"
 
@@ -24,12 +25,6 @@
 namespace cial::vm {
     class VMState;
 
-    struct ThrowHandler {
-        u64 tryStart;
-        u64 tryEnd;
-        u16 exValueReg;
-    };
-
     class Chunk : public MarkSweepHeader {
     public:
         explicit Chunk() {
@@ -38,8 +33,19 @@ namespace cial::vm {
 
         void addThrowHandler(const ThrowHandler &tHandler) { _throwHandlers.push_back(tHandler); }
 
+        // TAC pc 空间的 try 区间表（供指令 dump 等使用）
         [[nodiscard]] Opt<ThrowHandler> findThrowHandler(const u64 pc) const {
             for(const auto &h : _throwHandlers) {
+                if(h.tryStart <= pc && pc < h.tryEnd) {
+                    return h;
+                }
+            }
+            return {};
+        }
+
+        // 扁平字节码 pc 空间的 try 区间表（run0 使用）
+        [[nodiscard]] Opt<ThrowHandler> findBcThrowHandler(const u64 pc) const {
+            for(const auto &h : _bcThrowHandlers) {
                 if(h.tryStart <= pc && pc < h.tryEnd) {
                     return h;
                 }
@@ -119,12 +125,16 @@ namespace cial::vm {
         [[nodiscard]] String dumpInstructions(const VMState *vmState) const;
 
         void marked() noexcept override {
+            if(_marked)
+                return;
             MarkSweepHeader::marked();
             for(auto &inst : _constants) {
                 if(inst.type() == ConstantType::FuncMeta) {
                     inst.value<FuncMeta *>()->marked();
                 } else if(inst.type() == ConstantType::ClassMeta) {
                     inst.value<ClassMeta *>()->marked();
+                } else if(inst.type() == ConstantType::PropMeta) {
+                    inst.value<PropMeta *>()->marked();
                 }
             }
         }
@@ -133,7 +143,9 @@ namespace cial::vm {
             if(_isBytecode)
                 return;
 
-            _code = Bytecode::compile(_instructions);
+            auto result = Bytecode::compile(_instructions, _throwHandlers);
+            _code = std::move(result.code);
+            _bcThrowHandlers = std::move(result.handlers);
             _isBytecode = true;
         }
 
@@ -148,6 +160,7 @@ namespace cial::vm {
         Vec<Box<inter::Instruction>> _instructions{};
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
+        Vec<ThrowHandler> _bcThrowHandlers{}; // try 区间已换算到扁平字节码 pc 空间
         Vec<u8> _code{};
         u32 _registerCount{};
         bool _isBytecode{ false };

@@ -43,7 +43,6 @@ namespace cial::vm {
 
         explicit VMState(Context &context) : rt(context.rt()), context(context) {}
 
-        void run();
         void run0();
 
         [[nodiscard]] const Value &reg(u16 reg) const;
@@ -68,10 +67,9 @@ namespace cial::vm {
 
         [[nodiscard]] bool getZF() const { return _zf; }
 
-        void setPC(const u64 pc) const {
-            // because run() pc will auto plus one so - 1
-            _curFrame->pc = pc - 1;
-        }
+        // pc 语义：下一条待执行指令的偏移（扁平字节码空间）。
+        // 多态执行路径(run)删除后，唯一调用方是 unwind 的异常恢复
+        void setPC(const u64 pc) const { _curFrame->pc = pc; }
 
         [[nodiscard]] u64 getPC() const { return _curFrame->pc; }
 
@@ -98,7 +96,10 @@ namespace cial::vm {
         void freeCallFrame() {
             if(_stackTop == 0)
                 throw std::runtime_error("Call stack underflow");
-            _curFrame = _stackTop > 0 ? &_callStack[--_stackTop - 1] : nullptr;
+            // 先出栈再取新栈顶；栈清空时 _curFrame 置空，
+            // 不能写 &_callStack[-1]（会越界踩坏相邻成员）
+            --_stackTop;
+            _curFrame = _stackTop > 0 ? &_callStack[_stackTop - 1] : nullptr;
             _callStack[_stackTop].~CallFrame();
         }
 

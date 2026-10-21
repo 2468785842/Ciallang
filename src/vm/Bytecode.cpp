@@ -2,6 +2,7 @@
 // Created by LiDong on 2026/1/27.
 //
 
+#include <fmt/format.h>
 #include "Bytecode.hpp"
 
 #include "VMState.hpp"
@@ -35,7 +36,8 @@ namespace cial::vm {
             if((byte & 0x80) == 0)
                 break;
             shift += 7;
-            if(shift >= sizeof(u64)) {
+            // shift 的单位是 bit（不是字节），u64 上限 64 bit
+            if(shift >= sizeof(u64) * 8) {
                 throw std::runtime_error("ULEB128 too large for u64");
             }
         }
@@ -43,201 +45,228 @@ namespace cial::vm {
         return result;
     }
 
+    // ── 无操作数 ─────────────────────────────────────────────
     void Bytecode::encode(Info &info, const inter::NOP *) { info.code.push_back(static_cast<u8>(VmOpCode::NOP)); }
 
     void Bytecode::encode(Info &info, const inter::Debugger *) {
         info.code.push_back(static_cast<u8>(VmOpCode::Debugger));
     }
 
+    // ── 栈操作 ───────────────────────────────────────────────
     void Bytecode::encode(Info &info, const inter::Push *tac) {
-        const u16 dst = tac->src().index();
         info.code.push_back(static_cast<u8>(VmOpCode::Push));
-        write<u16>(info.code, dst);
+        write<u16>(info.code, tac->src().index());
     }
 
     void Bytecode::encode(Info &info, const inter::PopN *tac) {
-        assert(false);
-        // const i64 imm = tac->getOp1Val<Integer>();
-        // info.code.push_back(static_cast<u8>(VmOpCode::PopN));
-        // encodeSleb128(imm, info.code);
+        info.code.push_back(static_cast<u8>(VmOpCode::PopN));
+        encodeSleb128(tac->count(), info.code);
     }
 
-    void Bytecode::encode(Info &info, const inter::Global *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::Super *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::This *tac) { assert(false); }
+    // ── 上下文对象 ───────────────────────────────────────────
+    void Bytecode::encode(Info &info, const inter::Global *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::Global));
+        write<u16>(info.code, tac->dst().index());
+    }
 
+    void Bytecode::encode(Info &info, const inter::Super *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::Super));
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::This *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::This));
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    // ── 标志/失效 ────────────────────────────────────────────
     void Bytecode::encode(Info &info, const inter::Test *tac) {
-        const u16 r = tac->src().index();
         info.code.push_back(static_cast<u8>(VmOpCode::Test));
-        write<u16>(info.code, r);
+        write<u16>(info.code, tac->src().index());
     }
 
-    void Bytecode::encode(Info &info, const inter::Inv *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::Throw *tac) { assert(false); }
+    void Bytecode::encode(Info &info, const inter::Inv *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::Inv));
+        write<u16>(info.code, tac->src().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::Throw *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::Throw));
+        write<u16>(info.code, tac->src().index());
+    }
 
     void Bytecode::encode(Info &info, const inter::Ret *tac) {
-        const u16 r1 = tac->src().index();
         info.code.push_back(static_cast<u8>(VmOpCode::Ret));
-        write<u16>(info.code, r1);
+        write<u16>(info.code, tac->src().index());
     }
 
-    void Bytecode::encode(Info &info, const inter::Jmp *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::JmpE *tac) { assert(false); }
+    // ── 跳转（目标 u32 占位，编译结束后回填） ────────────────
+    void Bytecode::encode(Info &info, const inter::Jmp *tac) {
+        encodeJmp(info, VmOpCode::Jmp, tac->label().address());
+    }
+
+    void Bytecode::encode(Info &info, const inter::JmpE *tac) {
+        encodeJmp(info, VmOpCode::JmpE, tac->label().address());
+    }
 
     void Bytecode::encode(Info &info, const inter::JmpNE *tac) {
-        info.code.push_back(static_cast<u8>(VmOpCode::JmpNE));
-        info.tacPosToBcPos[static_cast<u32>(tac->label().address())] = info.code.size();
-        write<u32>(info.code, 0);
+        encodeJmp(info, VmOpCode::JmpNE, tac->label().address());
     }
 
-    void Bytecode::encode(Info &info, const inter::ToInt *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::ToReal *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::ToString *tac) { assert(false); }
+    // ── 类型转换/单目 ─────────────────────────────────────────
+    void Bytecode::encode(Info &info, const inter::ToInt *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::ToInt));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
 
-    void Bytecode::encode(Info &info, const inter::LNot *tac) { assert(false); }
+    void Bytecode::encode(Info &info, const inter::ToReal *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::ToReal));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
 
-    void Bytecode::encode(Info &info, const inter::ChgSign *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::ChgThis *tac) { assert(false); }
+    void Bytecode::encode(Info &info, const inter::ToString *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::ToString));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
 
-    void Bytecode::encode(Info &info, const inter::ChkInv *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::ChkIns *tac) { assert(false); }
+    void Bytecode::encode(Info &info, const inter::LNot *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::LNot));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
 
+    void Bytecode::encode(Info &info, const inter::ChgSign *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::ChgSign));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::ChgThis *tac) {
+        // 注意操作数顺序：op1=函数寄存器(dst)，op2=新 this(src)
+        info.code.push_back(static_cast<u8>(VmOpCode::ChgThis));
+        write<u16>(info.code, tac->dst().index());
+        write<u16>(info.code, tac->src().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::ChkInv *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::ChkInv));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::ChkIns *tac) {
+        // op1=dst（同时是输入对象与输出 bool），op2=src（类名字符串）
+        info.code.push_back(static_cast<u8>(VmOpCode::ChkIns));
+        write<u16>(info.code, tac->dst().index());
+        write<u16>(info.code, tac->src().index());
+    }
+
+    // ── 装载 ─────────────────────────────────────────────────
     void Bytecode::encode(Info &info, const inter::Load *tac) {
-        const u16 dst = tac->dst().index();
-        const u16 val = tac->value().index();
         info.code.push_back(static_cast<u8>(VmOpCode::Load));
-        write<u16>(info.code, dst);
-        write<u16>(info.code, val);
+        write<u16>(info.code, tac->dst().index());
+        write<u16>(info.code, tac->value().index());
     }
 
     void Bytecode::encode(Info &info, const inter::LoadImm *tac) {
-        const u16 dst = tac->dst().index();
-        const i64 val = tac->value();
         info.code.push_back(static_cast<u8>(VmOpCode::LoadImm));
-        write<u16>(info.code, dst);
-        encodeSleb128(val, info.code);
+        write<u16>(info.code, tac->dst().index());
+        encodeSleb128(tac->value(), info.code);
     }
 
+    // ── 全局/this/局部变量访问 ────────────────────────────────
     void Bytecode::encode(Info &info, const inter::DGlobal *tac) {
-        const u32 atom = static_cast<u32>(tac->atom().v);
-        const u16 dst = tac->src().index();
         info.code.push_back(static_cast<u8>(VmOpCode::DGlobal));
-        write<u32>(info.code, atom);
-        write<u16>(info.code, dst);
+        write<u32>(info.code, static_cast<u32>(tac->atom().v));
+        write<u16>(info.code, tac->src().index());
     }
 
     void Bytecode::encode(Info &info, const inter::GGlobal *tac) {
-        const u32 atom = static_cast<u32>(tac->atom().v);
-        const u16 dst = tac->dst().index();
         info.code.push_back(static_cast<u8>(VmOpCode::GGlobal));
-        write<u32>(info.code, atom);
-        write<u16>(info.code, dst);
+        write<u32>(info.code, static_cast<u32>(tac->atom().v));
+        write<u16>(info.code, tac->dst().index());
     }
 
     void Bytecode::encode(Info &info, const inter::GThis *tac) {
-        const u32 atom = static_cast<u32>(tac->atom().v);
-        const u16 dst = tac->dst().index();
         info.code.push_back(static_cast<u8>(VmOpCode::GThis));
-        write<u32>(info.code, atom);
-        write<u16>(info.code, dst);
+        write<u32>(info.code, static_cast<u32>(tac->atom().v));
+        write<u16>(info.code, tac->dst().index());
     }
-    void Bytecode::encode(Info &info, const inter::DThis *tac) { assert(false); }
 
-    void Bytecode::encode(Info &info, const inter::DLocal *tac) { assert(false); }
+    void Bytecode::encode(Info &info, const inter::DThis *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::DThis));
+        write<u32>(info.code, static_cast<u32>(tac->atom().v));
+        write<u16>(info.code, tac->src().index());
+    }
 
     void Bytecode::encode(Info &info, const inter::GLocal *tac) {
-        const u16 r1 = tac->src().index();
-        const u16 r2 = tac->dst().index();
         info.code.push_back(static_cast<u8>(VmOpCode::GLocal));
-        write<u16>(info.code, r1);
-        write<u16>(info.code, r2);
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
     }
 
-    void Bytecode::encode(Info &info, const inter::Add *tac) {
-        const u16 r1 = tac->src1().index();
-        const u16 r2 = tac->src2().index();
-        const u16 r3 = tac->dst().index();
-        if(r2 == r3) {
-            info.code.push_back(static_cast<u8>(VmOpCode::Add));
-            write<u16>(info.code, r1);
-            write<u16>(info.code, r3);
-        } else {
-            info.code.push_back(static_cast<u8>(VmOpCode::DLocal));
-            write<u16>(info.code, r2);
-            write<u16>(info.code, r3);
-
-            info.code.push_back(static_cast<u8>(VmOpCode::Add));
-            write<u16>(info.code, r1);
-            write<u16>(info.code, r3);
-        }
+    void Bytecode::encode(Info &info, const inter::DLocal *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::DLocal));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
     }
 
-    void Bytecode::encode(Info &info, const inter::Sub *tac) {
-        const u16 r1 = tac->src1().index();
-        const u16 r2 = tac->src2().index();
-        const u16 r3 = tac->dst().index();
-        if(r2 != r3) {
-            info.code.push_back(static_cast<u8>(VmOpCode::DLocal));
-            write<u16>(info.code, r2);
-            write<u16>(info.code, r3);
-        }
-        info.code.push_back(static_cast<u8>(VmOpCode::Sub));
-        write<u16>(info.code, r1);
-        write<u16>(info.code, r3);
+    // ── 算术/位运算/比较：统一三寄存器原生编码 ────────────────
+#define ENCODE_RRR(op, getter1, getter2, getter3)                                                                       \
+    void Bytecode::encode(Info &info, const inter::op *tac) {                                                           \
+        info.code.push_back(static_cast<u8>(VmOpCode::op));                                                             \
+        write<u16>(info.code, tac->getter1().index());                                                                  \
+        write<u16>(info.code, tac->getter2().index());                                                                  \
+        write<u16>(info.code, tac->getter3().index());                                                                  \
     }
 
-    void Bytecode::encode(Info &info, const inter::Mul *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::Div *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::Idiv *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::Mod *tac) { assert(false); }
+    ENCODE_RRR(Add, src1, src2, dst)
+    ENCODE_RRR(Sub, src1, src2, dst)
+    ENCODE_RRR(Mul, src1, src2, dst)
+    ENCODE_RRR(Div, src1, src2, dst)
+    ENCODE_RRR(Idiv, src1, src2, dst)
+    ENCODE_RRR(Mod, src1, src2, dst)
 
-    void Bytecode::encode(Info &info, const inter::BXor *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::BOr *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::BAnd *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::BlShift *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::BrShift *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::BurShift *tac) { assert(false); }
+    ENCODE_RRR(BXor, src1, src2, dst)
+    ENCODE_RRR(BOr, src1, src2, dst)
+    ENCODE_RRR(BAnd, src1, src2, dst)
+    ENCODE_RRR(BlShift, src1, src2, dst)
+    ENCODE_RRR(BrShift, src1, src2, dst)
+    ENCODE_RRR(BurShift, src1, src2, dst)
 
-    void Bytecode::encode(Info &info, const inter::EQ *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::NEQ *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::AbsEQ *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::AbsNEQ *tac) { assert(false); }
+    ENCODE_RRR(EQ, src1, src2, dst)
+    ENCODE_RRR(NEQ, src1, src2, dst)
+    ENCODE_RRR(AbsEQ, src1, src2, dst)
+    ENCODE_RRR(AbsNEQ, src1, src2, dst)
+    ENCODE_RRR(LT, src1, src2, dst)
+    ENCODE_RRR(LE, src1, src2, dst)
+    ENCODE_RRR(GT, src1, src2, dst)
+    ENCODE_RRR(GE, src1, src2, dst)
+    ENCODE_RRR(LAnd, src1, src2, dst)
+    ENCODE_RRR(LOr, src1, src2, dst)
 
-    void Bytecode::encode(Info &info, const inter::LT *tac) {
-        const u16 r1 = tac->src1().index();
-        const u16 r2 = tac->src2().index();
-        const u16 r3 = tac->dst().index();
-        if(r2 == r3) {
-            info.code.push_back(static_cast<u8>(VmOpCode::LT));
-            write<u16>(info.code, r1);
-            write<u16>(info.code, r3);
-        } else {
-            info.code.push_back(static_cast<u8>(VmOpCode::DLocal));
-            write<u16>(info.code, r2);
-            write<u16>(info.code, r3);
-
-            info.code.push_back(static_cast<u8>(VmOpCode::LT));
-            write<u16>(info.code, r1);
-            write<u16>(info.code, r3);
-        }
-    }
-
-    void Bytecode::encode(Info &info, const inter::LE *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::GT *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::GE *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::LAnd *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::LOr *tac) { assert(false); }
-
+    // ── 调用/属性 ────────────────────────────────────────────
     void Bytecode::encode(Info &info, const inter::Call *tac) {
-        const u16 r1 = tac->dst().index();
-        const u16 r2 = tac->memberReg().index();
-        const i64 imm = tac->argCount();
         info.code.push_back(static_cast<u8>(VmOpCode::Call));
-        write<u16>(info.code, r1);
-        write<u16>(info.code, r2);
-        encodeSleb128(imm, info.code);
+        write<u16>(info.code, tac->dst().index());
+        write<u16>(info.code, tac->memberReg().index());
+        encodeSleb128(tac->argCount(), info.code);
     }
 
-    void Bytecode::encode(Info &info, const inter::GProp *tac) { assert(false); }
-    void Bytecode::encode(Info &info, const inter::DProp *tac) { assert(false); }
+    void Bytecode::encode(Info &info, const inter::GProp *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::GProp));
+        write<u16>(info.code, tac->obj().index());
+        write<u16>(info.code, tac->memberReg().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::DProp *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::DProp));
+        write<u16>(info.code, tac->obj().index());
+        write<u16>(info.code, tac->memberReg().index());
+        write<u16>(info.code, tac->src().index());
+    }
 } // namespace cial::vm

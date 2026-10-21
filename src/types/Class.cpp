@@ -63,9 +63,9 @@ namespace cial {
                 init.thisObj = dataObject;
                 vmState.allocCallFrame(init.meta);
                 auto *currentCallFrame = vmState.curFrame();
-                currentCallFrame->thisObj = Value{ init.thisObj };
-                vmState.run();
-                vmState.freeCallFrame();
+                currentCallFrame->setThisObj(Value{ init.thisObj });
+                // run0 执行到帧结束（Ret 或代码耗尽）时自行释放该帧
+                vmState.run0();
 
                 // 标记为已处理
                 visited.insert(currentClass);
@@ -103,9 +103,9 @@ namespace cial {
                 init.thisObj = dataObject;
                 vmState.allocCallFrame(init.meta);
                 auto *currentCallFrame = vmState.curFrame();
-                currentCallFrame->thisObj = Value{ init.thisObj };
-                vmState.run();
-                vmState.freeCallFrame();
+                currentCallFrame->setThisObj(Value{ init.thisObj });
+                // run0 执行到帧结束时自行释放该帧
+                vmState.run0();
             }
 
             Function constructor{ clazz->meta->constructor };
@@ -117,12 +117,14 @@ namespace cial {
 
             vmState.allocCallFrame(constructor.meta, ret);
             auto *currentCallFrame = vmState.curFrame();
-            currentCallFrame->thisObj = Value{ constructor.thisObj };
+            currentCallFrame->setThisObj(Value{ constructor.thisObj });
 
-            vmState.run();
+            // 构造函数块保证以 Ret 结尾，run0 执行完自行释放帧
+            vmState.run0();
 
             if(cnt > 0)
                 vmState.pop(cnt);
+            for(auto &i : constructor.meta->chunk->getInstVec())
             assert(constructor.meta->chunk->getInstVec().back()->opcode() == inter::TacOpCode::Ret);
         }
     } // namespace
@@ -133,10 +135,10 @@ namespace cial {
     void ClassObject::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {
 
         if(!meta)
-            throw std::runtime_error("can't new");
+            throw std::runtime_error("The current class cannot be initialized.");
 
         if(!meta->constructor) {
-            throw std::runtime_error("can't new no have constructor");
+            throw std::runtime_error("The current class without a constructor cannot be initialized.");
         }
 
         // call super class constructor function?
@@ -154,9 +156,9 @@ namespace cial {
 
                         vmState.allocCallFrame(constructor.meta, ret);
                         auto *currentCallFrame = vmState.curFrame();
-                        currentCallFrame->thisObj = Value{ constructor.thisObj };
+                        currentCallFrame->setThisObj(Value{ constructor.thisObj });
 
-                        vmState.run();
+                        vmState.run0();
 
                         if(cnt > 0)
                             vmState.pop(cnt);
@@ -177,7 +179,7 @@ namespace cial {
 
         for(const Atom extName : meta->extends) {
             if(!dataObject->getSuperClass(extName)) {
-                throw std::runtime_error("super class not init in Derived class constructor");
+                throw std::runtime_error("The super class is not initialized in the derived class constructor.");
             }
         }
 

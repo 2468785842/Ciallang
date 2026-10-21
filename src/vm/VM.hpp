@@ -182,7 +182,7 @@ namespace cial {
             _vmState->allocCallFrame(evalChunk, retReg);
             _vmState->makeClosure();
             u32 stackTop = _vmState->context.stackTop();
-            _vmState->run();
+            _vmState->run0();
             Value ret = _vmState->reg(retReg);
 
             // when evalChunk include `ret` inst, `ret` will call freeCallFrame, so we need check
@@ -233,7 +233,7 @@ namespace cial {
 
             _vmState->allocCallFrame(&*chunk);
             _vmState->makeClosure();
-            _vmState->run();
+            _vmState->run0();
 
             Value ret = _vmState->reg(retReg->index());
             _vmState->freeCallFrame();

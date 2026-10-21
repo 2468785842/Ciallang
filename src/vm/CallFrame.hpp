@@ -19,13 +19,20 @@
 #include "types/Value.hpp"
 
 namespace cial {
+    class DataObject;
+
     struct CallFrame {
         CallFrame *closure{};
         vm::Chunk *chunk{};
         FuncMeta *funcMeta{}; // funcMeta != nullptr is function call
         Value thisObj{};
+        DataObject *thisData{}; // thisObj 为 DataObject 时的缓存，否则 nullptr（消除热路径 dynamic_cast）
         Opt<u16> ret{};
         u64 pc{};
+
+        // thisObj 的赋值入口：同步刷新 thisData 缓存（定义在 VMState.cpp，需要完整 DataObject 类型）。
+        // 不要绕过它直接写 thisObj，否则缓存失效。
+        void setThisObj(Value v);
 
         explicit CallFrame() = default;
 

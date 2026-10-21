@@ -31,7 +31,7 @@ namespace cial {
 
         vmState.allocCallFrame(meta, ret);
         auto *currentCallFrame = vmState.curFrame();
-        currentCallFrame->thisObj = Value{ thisObj };
+        currentCallFrame->setThisObj(Value{ thisObj });
         // vmState.run();
         //
         // if(cnt > 0)

@@ -32,6 +32,8 @@ namespace cial {
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
+            if(_marked)
+                return;
             Object::marked();
             if(meta)
                 meta->marked();
@@ -76,15 +78,21 @@ namespace cial {
 
         explicit DataObject(vm::VMState *vmState, ClassObject *klass) : _vmState(vmState), _class(klass) {}
 
-        ~DataObject() noexcept override { invalidate(); }
+        // GC sweep 批量析构时不能触发 finalize：那会在回收器内部向解释器压入
+        // 无人执行的调用帧（旧多态执行路径恰好会被外层循环顺带执行，掩盖了问题）。
+        // finalize 仅在脚本显式 invalidate 时调用。
+        ~DataObject() noexcept override = default;
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         [[nodiscard]] ClassObject *klass() const noexcept { return _class; }
 
         void marked() noexcept override {
+            if(_marked)
+                return;
             Object::marked();
-            _class->marked();
+            if(_class)
+                _class->marked();
 
             for(auto &v : _props | std::views::values) {
                 if(v.isObject()) {
@@ -121,20 +129,21 @@ namespace cial {
 
         void invalidate() {
             if(_isValid) {
-                // 不能缓存为 static：Atom 依赖每个 Runtime 实例的 atomTable，
-                // 跨测试/跨 Runtime 复用旧 ID 会导致成员查找失败
+                // 先复位，finalize 回调期间再次进入也不会重复执行
+                _isValid = false;
                 const Atom finalizeAtom = _vmState->context.rt().atomTable.intern("finalize"_str);
-                const size_t abs = _vmState->getRegPoolTop() - _vmState->curFrame()->getSP();
-                _vmState->pushVoid(1);
-                // if not found finalize, may ignore??
+                // 没有 finalize 成员的类不能碰寄存器池：
+                // 旧实现无条件 pushVoid(1) 却只在有 finalize 时 pop(1)，
+                // GC sweep 批量析构时池指针会被逐个顶穿
                 if(const i64 idx = _class->meta->hasMember(finalizeAtom); idx > -1) {
+                    const size_t abs = _vmState->getRegPoolTop() - _vmState->curFrame()->getSP();
+                    _vmState->pushVoid(1);
                     Function finalizeFun{ _class->meta->getMember(idx).funcMeta };
                     finalizeFun.thisObj = this;
                     finalizeFun.call(*_vmState, static_cast<u32>(abs), 0);
                     _vmState->pop(1);
                 }
             }
-            _isValid = false;
         }
 
         [[nodiscard]] bool isValid() const noexcept { return _isValid; }
@@ -155,6 +164,8 @@ namespace cial {
         explicit GlobalObject(Runtime *rt) : ClassObject(nullptr, rt) {}
 
         void marked() noexcept override {
+            if(_marked)
+                return;
             ClassObject::marked();
             if(proxy)
                 proxy->marked();

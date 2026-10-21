@@ -33,6 +33,8 @@ namespace cial {
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
+            if(_marked)
+                return;
             Object::marked();
             meta->marked();
             if(thisObj)
@@ -69,6 +71,8 @@ namespace cial {
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
+            if(_marked)
+                return;
             Object::marked();
             if(_thisObj.isObject())
                 _thisObj.asObject().value()->marked();
