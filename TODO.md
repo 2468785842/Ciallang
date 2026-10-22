@@ -38,11 +38,12 @@
       若需 TJS2 完整语义（GC 回收对象也调 finalize），需实现"回收队列 + 安全区 drain"
 - [ ] 二元 `^ | &` 运算符 Parser 未注册（IRGenerator 的 BXor/BOr/BAnd 不可达，
       报 "isn't support assign operator"）；`str.length` 属性未实现（仅方法表）
-- [ ] `tests/test_files/tjs2/test_class.tjs` 在 Ciallang 下确定段错误（新旧代码均复现，
-      conformance 对拍发现；含前缀 `&property1` / `(*p)` 解引用语法——预期应优雅报
-      "unknow prefix unary operator"而非崩溃，解析/生成路径需排查）
-- [ ] conformance 升级方向：完整 stdout 语义对拍（需双引擎统一输出函数：
-      TJSCompiler 侧注册 println 或 Ciallang 实现 Debug.message，二选一）
+- [x] `tests/test_files/tjs2/test_class.tjs` 段错误（已修 2026-10-22：generateFuncMeta
+      对 parseAst 失败只 assert，Release 下空 Opt 解引用；另修未捕获运行期异常
+      静默 terminate 与异常后 VM 状态残留，`9123362`）
+- [x] conformance stdout 语义对拍（已通 2026-10-22：cial 注入 Debug 垫片 +
+      Conformance.cmake 归一化逐行比对，`22eb483`；tjs2 语料基线 MATCH=2/DIFF=4；
+      TJSCompiler 侧 DebugInterface 控制台补换行——在其工作区未提交）
 - [x] IfStmtNode else 跳转误用 JmpNE（已修 2026-10-21：真假分支曾都会执行）
 - [ ] 前缀 `++`/`--` 未实现（会报 "unknow prefix unary operator"）；
       README 中前缀单目运算符 `~ -- ++ delete typeof # $ + & *` 大部分未实现
@@ -71,8 +72,9 @@
       cmake --build --preset "Windows Local Bench"`（bench 目标）；
       `--target conformance-report` 出兼容性报告。TJS 路径经 UserPresets 的
       CIAL_TJS_ROOT 环境变量注入
-- [ ] 基准暴露的新优化信号：string_concat Ciallang/TJS ≈ 236%（字符串拼接路径），
-      fib ≈ 165%（调用开销），class ≈ 121%、loop_int ≈ 129%
+- [ ] 基准暴露的优化信号（2026-10-22 字符串优化后更新）：
+      string_concat ≈ 183%（已从 228% 降；下一步：payload+String 单块分配、Value 内联 SSO）、
+      fib ≈ 162%（调用开销：帧分配/GGlobal 哈希）、loop ≈ 123%、class ≈ 113%
 - [x] CMakeUserPresets.json 固化本机工具链路径（clang/rc/ninja 完整路径，
       无 VS 环境变量的终端可直接 `cmake --preset "Windows Local Release"`；
       文件已加入 .gitignore 不入库）
