@@ -95,6 +95,11 @@ namespace cial {
 
         [[nodiscard]] Ret<Integer> asInteger() const noexcept;
 
+        // 热路径直取:调用方保证 isInteger() 为真(如 dispatch 整数特化),
+        // 绕过 Ret<T> optional 装配
+        [[nodiscard]] Integer asIntegerUnsafe() const noexcept { return _integer; }
+        [[nodiscard]] bool isIntegerFast() const noexcept { return _type == ValueType::Integer; }
+
         [[nodiscard]] Ret<Real> asReal() const noexcept;
 
         [[nodiscard]] Ret<String *> asString() const noexcept;

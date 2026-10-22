@@ -176,5 +176,12 @@ namespace cial {
                 return it->second;
             throw std::runtime_error("in global object Not found property");
         }
+
+        // 热路径只读访问:命中时零拷贝返回内部槽引用
+        [[nodiscard]] const Value *findPropRef(const Atom a) const noexcept {
+            if(const auto it = _props.find(a); it != _props.end())
+                return &it->second;
+            return nullptr;
+        }
     };
 } // namespace cial

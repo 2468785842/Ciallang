@@ -501,10 +501,20 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(GGlobal) {
         const u32 atom = read<u32>(ip, pc);
         const u16 r1 = read<u16>(ip, pc);
-        Value srcVal = global(Atom{ atom });
-        propObjectGet(*this, srcVal, srcVal);
-        regs[r1] = srcVal;
-        return DispatchRet::Continue;
+        if(const Value *g = context.global()->findPropRef(Atom{ atom })) {
+            // Property 触发 getter 的慢路径之外,直接从槽位零拷贝取值。
+            // 注意寄存器写入可能触发 setter 语义无关,只读安全;
+            // Property 调用可能修改 _props(重入),先拷出再降级慢路径
+            if(g->isObject() && dynamic_cast<const Property *>(g->asObject().unwrap()) != nullptr) {
+                Value srcVal = *g;
+                propObjectGet(*this, srcVal, srcVal);
+                regs[r1] = srcVal;
+                return DispatchRet::Continue;
+            }
+            regs[r1] = *g;
+            return DispatchRet::Continue;
+        }
+        throw std::runtime_error("in global object Not found property");
     }
 
     DISPATCH_OP_METHOD(GThis) {
@@ -555,6 +565,23 @@ namespace cial::vm {
     }
 
     // ── 算术/位运算（三寄存器） ───────────────────────────────
+    // 整数特化：双 int 时绕开 Ret<Value> 装配（optional 构造/析构），
+    // 直接写寄存器槽——循环体算术的主路径
+#define DISPATCH_RRR_INT(op, optr, method) \
+    DISPATCH_OP_METHOD(op) { \
+        const u16 r1 = read<u16>(ip, pc); \
+        const u16 r2 = read<u16>(ip, pc); \
+        const u16 r3 = read<u16>(ip, pc); \
+        Value &a = regs[r1]; \
+        Value &b = regs[r2]; \
+        if(a.isIntegerFast() && b.isIntegerFast()) { \
+            regs[r3] = Value{ a.asIntegerUnsafe() optr b.asIntegerUnsafe() }; \
+            return DispatchRet::Continue; \
+        } \
+        regs[r3] = (a.method(b)).unwrap(); \
+        return DispatchRet::Continue; \
+    }
+
 #define DISPATCH_RRR(op, expr)                                                                                          \
     DISPATCH_OP_METHOD(op) {                                                                                            \
         const u16 r1 = read<u16>(ip, pc);                                                                               \
@@ -564,9 +591,9 @@ namespace cial::vm {
         return DispatchRet::Continue;                                                                                    \
     }
 
-    DISPATCH_RRR(Add, (regs[r1].add(regs[r2]).unwrap()))
-    DISPATCH_RRR(Sub, (regs[r1].sub(regs[r2]).unwrap()))
-    DISPATCH_RRR(Mul, (regs[r1].mul(regs[r2]).unwrap()))
+    DISPATCH_RRR_INT(Add, +, add)
+    DISPATCH_RRR_INT(Sub, -, sub)
+    DISPATCH_RRR_INT(Mul, *, mul)
     DISPATCH_RRR(Div, (regs[r1].div(regs[r2]).unwrap()))
     DISPATCH_RRR(Idiv, (regs[r1].idiv(regs[r2]).unwrap()))
     DISPATCH_RRR(Mod, (regs[r1].mod(regs[r2]).unwrap()))
@@ -592,7 +619,19 @@ namespace cial::vm {
     DISPATCH_CMP(NEQ, !regs[r1].equals(regs[r2]))
     DISPATCH_CMP(AbsEQ, regs[r1].discernEquals(regs[r2]))
     DISPATCH_CMP(AbsNEQ, !regs[r1].discernEquals(regs[r2]))
-    DISPATCH_CMP(LT, regs[r1].littlerThan(regs[r2]).unwrap())
+    DISPATCH_OP_METHOD(LT) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        const u16 r3 = read<u16>(ip, pc);
+        const Value &a = regs[r1];
+        const Value &b = regs[r2];
+        if(a.isIntegerFast() && b.isIntegerFast()) {
+            regs[r3] = Value{ Integer{ a.asIntegerUnsafe() < b.asIntegerUnsafe() } };
+            return DispatchRet::Continue;
+        }
+        regs[r3] = Value{ a.littlerThan(b).unwrap() };
+        return DispatchRet::Continue;
+    }
     DISPATCH_CMP(LE, !regs[r1].greaterThan(regs[r2]).unwrap())
     DISPATCH_CMP(GT, regs[r1].greaterThan(regs[r2]).unwrap())
     DISPATCH_CMP(GE, !regs[r1].littlerThan(regs[r2]).unwrap())

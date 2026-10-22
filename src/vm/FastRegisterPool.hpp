@@ -40,7 +40,12 @@ namespace cial::vm {
         }
 
         void maybeShrink(const u64 sp) {
+            // 高频调用路径(每次帧析构):
+            // 水位没有低于上次标记时只更新 _sp 后立即返回——同深度反复
+            // 调用/递归的 pop 零成本,只有真回落后才走 pop_back
             _sp = sp;
+            if(sp >= _shrinkMark && _blocks.size() == _blocksAtMark)
+                return;
             const size_t totalUsed = _sp;
             size_t totalCapacity = (_blocks.size() - 1) * _blockSize;
 
@@ -51,6 +56,8 @@ namespace cial::vm {
                 _blocks.pop_back();
                 totalCapacity -= _blockSize;
             }
+            _shrinkMark = totalUsed;
+            _blocksAtMark = _blocks.size();
         }
 
         [[nodiscard]] Value *ptrAt(const u64 globalIndex) const {
@@ -88,6 +95,8 @@ namespace cial::vm {
 
         Vec<Block> _blocks;
         size_t _sp{ 0 }; // 全局栈指针（相对于首块）
+        size_t _shrinkMark{ 0 };      // 上次收缩时的水位
+        size_t _blocksAtMark{ 0 };    // 上次收缩时的块数
 
         void allocateBlock() { _blocks.emplace_back(_blockSize); }
 
