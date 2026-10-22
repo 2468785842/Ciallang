@@ -72,9 +72,14 @@
       cmake --build --preset "Windows Local Bench"`（bench 目标）；
       `--target conformance-report` 出兼容性报告。TJS 路径经 UserPresets 的
       CIAL_TJS_ROOT 环境变量注入
-- [ ] 基准暴露的优化信号（2026-10-22 字符串优化后更新）：
-      string_concat ≈ 183%（已从 228% 降；下一步：payload+String 单块分配、Value 内联 SSO）、
-      fib ≈ 162%（调用开销：帧分配/GGlobal 哈希）、loop ≈ 123%、class ≈ 113%
+- [x] 第二轮热点优化（2026-10-22，commit 序列见 git log）：
+      GGlobal 零拷贝（findPropRef）、池水位线收缩、dispatch 层整数特化
+      （Add/Sub/Mul/LT 绕开 Ret 装配）、Ret 整数直写、全局函数 this 快通道。
+      比值演进：loop 123%→113%、fib 165%→148%、class 113%→111%、string 228%→178%
+- [ ] 剩余 fib 差距（148%）：微基准定位每层调用的实参 Push 拷贝与指令条数
+      （TJS 为密集指令编码）；可选方向：参数直传被调帧窗口（免 Push/读回）、
+      调用点内联缓存（CIC 缓存 Function 指针）
+- [ ] string_concat 剩余（178%）：payload+String 单块分配、Value 内联 SSO
 - [x] CMakeUserPresets.json 固化本机工具链路径（clang/rc/ninja 完整路径，
       无 VS 环境变量的终端可直接 `cmake --preset "Windows Local Release"`；
       文件已加入 .gitignore 不入库）
