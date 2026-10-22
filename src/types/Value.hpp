@@ -148,6 +148,8 @@ namespace cial {
         [[nodiscard]] Ret<bool> greaterThan(const Value &value) const noexcept;
 
     private:
+        friend struct Constant; // 常量字符串负载缓存直接装配 Value
+
         union {
             Integer _integer{};
             Real _real;

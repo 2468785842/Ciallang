@@ -251,14 +251,16 @@ namespace cial {
                 this->_shortStr[i++] = c;
             }
         } else {
-            auto *buf = new char[this->_len + str._len + 1];
+            auto *buf = new char[newLen + 1];
             std::memcpy(buf, this->getData(), this->_len);
             delete[] this->_longStr;
             this->_longStr = buf;
+            _lenCap = newLen;
             std::memcpy(this->_longStr + this->_len, str.getData(), str._len);
         }
 
-        this->getBuffer()[newLen + 1] = '\0';
+        // 终止符写在 newLen 处(旧代码写 newLen+1:越界一位且真正终止符位置留垃圾)
+        this->getBuffer()[newLen] = '\0';
         this->_len = newLen;
     }
 

@@ -41,6 +41,39 @@ namespace cial {
 
         void append(const String &str);
 
+        // 一次性拼接(单次分配,两段均拷贝并正确终止);热路径用这个而非 copy+append
+        [[nodiscard]] static String concat(const String &a, const String &b) {
+            const u32 total = a._len + b._len;
+            if(total < SHORT_STR_LEN) {
+                String r{};
+                std::memcpy(r._shortStr, a.getData(), a._len);
+                std::memcpy(r._shortStr + a._len, b.getData(), b._len);
+                r._shortStr[total] = '\0';
+                r._len = total;
+                return r;
+            }
+            String r{ a };
+            r.reserveExact(total);
+            std::memcpy(r.getBuffer() + a._len, b.getData(), b._len);
+            r.getBuffer()[total] = '\0';
+            r._len = total;
+            return r;
+        }
+
+        // 保证长字符串缓冲至少可容纳 cap 字节(不含终止符);短串超限则转长串
+        void reserveExact(const u32 cap) {
+            if(cap < SHORT_STR_LEN)
+                return; // 短串足够
+            if(_longStr && cap < _lenCap)
+                return; // 容量已够
+            auto *buf = new char[cap + 1];
+            std::memcpy(buf, getData(), _len);
+            buf[_len] = 0;
+            delete[] _longStr;
+            _longStr = buf;
+            _lenCap = cap;
+        }
+
         [[nodiscard]] u32 length() const { return _len; }
 
         [[nodiscard]] char *getBuffer() { return _longStr ? _longStr : _shortStr; }
@@ -73,6 +106,7 @@ namespace cial {
         char *_longStr = nullptr;
         char _shortStr[SHORT_STR_LEN + 1]{};
         u32 _len;
+        u32 _lenCap{}; // 长字符串已分配容量(不含终止符);短串恒 0
 
     public:
         using iterator = char *;

@@ -38,8 +38,16 @@ namespace cial {
             case ConstantType::Real:
                 return Value{ value<Real>() };
             case ConstantType::Atom: {
-                const auto *str = rt->atomTable.get(value<Atom>())->str;
-                return Value{ String{ str->getData(), str->length() } };
+                // 字符串字面量:负载缓存后重复 Load 零分配(retain 即可)
+                if(!_strPayload) {
+                    const auto *str = rt->atomTable.get(value<Atom>())->str;
+                    _strPayload = SharedPayload<String>::make(new String{ str->getData(), str->length() });
+                }
+                SharedPayload<String>::retain(_strPayload);
+                Value v{};
+                v._type = ValueType::String;
+                v._string = _strPayload;
+                return v;
             }
             case ConstantType::FuncMeta: {
                 return Value{ rt->create<Function>(value<FuncMeta *>()).get() };

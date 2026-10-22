@@ -320,10 +320,7 @@ namespace cial {
             if(s2.isFailed())
                 return Ret<Value>::err(ErrCode::TypeError, "unsupported operand types for `+`"_str);
 
-            String result{ *s1.value() };
-            result.append(*s2.value());
-
-            return Ret<Value>::ok(Value{ std::move(result) });
+            return Ret<Value>::ok(Value{ String::concat(*s1.value(), *s2.value()) });
         }
 
         if(this->_type == value._type) {

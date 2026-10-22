@@ -200,13 +200,33 @@ namespace cial {
         template <typename T>
         explicit Constant(T value) : _value{ value } {}
 
+        // 字符串负载缓存指针随对象所有权走:拷贝不带缓存(目标自己惰性建),
+        // 移动 steals,析构释放——因此不能用默认拷贝/移动
         Constant(const Constant &constant) noexcept = default;
 
-        Constant &operator=(const Constant &constant) noexcept = default;
+        Constant &operator=(const Constant &constant) noexcept {
+            if(this != &constant) {
+                releaseStrPayload();
+                _value = constant._value;
+            }
+            return *this;
+        }
 
-        Constant(Constant &&constant) noexcept = default;
+        Constant(Constant &&constant) noexcept : _value(std::move(constant._value)), _strPayload(constant._strPayload) {
+            constant._strPayload = nullptr;
+        }
 
-        Constant &operator=(Constant &&constant) noexcept = default;
+        Constant &operator=(Constant &&constant) noexcept {
+            if(this != &constant) {
+                releaseStrPayload();
+                _value = std::move(constant._value);
+                _strPayload = constant._strPayload;
+                constant._strPayload = nullptr;
+            }
+            return *this;
+        }
+
+        ~Constant() { releaseStrPayload(); }
 
         [[nodiscard]] ConstantType type() const noexcept { return static_cast<ConstantType>(_value.index()); }
 
@@ -222,6 +242,16 @@ namespace cial {
 
     private:
         ConstantValue _value;
+        // Atom 常量(脚本字符串字面量)的 Value 负载缓存:
+        // 旧实现每次 Load 执行都新建 payload+String,字符串密集循环按次堆分配
+        mutable SharedPayload<String> *_strPayload{};
+
+        void releaseStrPayload() noexcept {
+            if(_strPayload) {
+                SharedPayload<String>::release(_strPayload);
+                _strPayload = nullptr;
+            }
+        }
     };
 
 } // namespace cial
