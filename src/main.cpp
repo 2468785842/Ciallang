@@ -35,6 +35,14 @@ int main(const int argc, char **argv) {
     context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
     vm::VMState vmState{ context };
     const VM vm{ &vmState };
+    // Debug.message 垫片:对拍语料(tests/test_files/tjs2)用 TJS2 的 Debug.message
+    // 输出,Ciallang 以等价对象承接,保证同一脚本双引擎可原样运行
+    vm.eval(R"(class __DebugShim {
+    function __DebugShim() {}
+    function message(s) { println(s); }
+}
+var Debug = new __DebugShim();
+)"_str);
     try {
         vm.eval(String(argv[1]), true);
     } catch(const std::exception &e) {
