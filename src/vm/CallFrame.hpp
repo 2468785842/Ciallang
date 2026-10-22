@@ -34,6 +34,12 @@ namespace cial {
         // 不要绕过它直接写 thisObj，否则缓存失效。
         void setThisObj(Value v);
 
+        // thisObj 为空(全局函数调用)的快速通道:整体清零,无 dynamic_cast
+        void setThisObjNull() {
+            thisObj = Value{};
+            thisData = nullptr;
+        }
+
         explicit CallFrame() = default;
 
         explicit CallFrame(vm::Chunk *chunk, const Opt<u16> ret, vm::FastRegisterPool &pool) :

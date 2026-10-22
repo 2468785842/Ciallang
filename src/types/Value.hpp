@@ -99,6 +99,8 @@ namespace cial {
         // 绕过 Ret<T> optional 装配
         [[nodiscard]] Integer asIntegerUnsafe() const noexcept { return _integer; }
         [[nodiscard]] bool isIntegerFast() const noexcept { return _type == ValueType::Integer; }
+        // 整数直写(调用方负责先把 type 置 Integer,避免覆盖堆持有类型的联合体)
+        void asIntegerStore(const Integer v) noexcept { _integer = v; }
 
         [[nodiscard]] Ret<Real> asReal() const noexcept;
 

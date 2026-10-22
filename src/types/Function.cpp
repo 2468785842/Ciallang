@@ -31,7 +31,12 @@ namespace cial {
 
         vmState.allocCallFrame(meta, ret);
         auto *currentCallFrame = vmState.curFrame();
-        currentCallFrame->setThisObj(Value{ thisObj });
+        if(thisObj) {
+            currentCallFrame->setThisObj(Value{ thisObj });
+        } else {
+            // 全局函数调用(绝大多数):免 Value 装配与 dynamic_cast
+            currentCallFrame->setThisObjNull();
+        }
         // vmState.run();
         //
         // if(cnt > 0)

@@ -358,10 +358,17 @@ namespace cial::vm {
 
     DISPATCH_OP_METHOD(Ret) {
         const u16 r1 = read<u16>(ip, pc);
-        const Value &value = regs[r1];
         // 顶层帧（无父帧/无返回寄存器）直接结束，不回写
         if(_stackTop > 1 && cur->ret) {
-            (cur - 1)->getReg(*cur->ret) = value;
+            Value &value = regs[r1];
+            Value &dst = (cur - 1)->getReg(*cur->ret);
+            if(value.isIntegerFast()) {
+                // 整数直写:跳过 Value 拷贝构造/析构(数值递归的返回主路径)
+                dst.type(ValueType::Integer);
+                dst.asIntegerStore(value.asIntegerUnsafe());
+            } else {
+                dst = value;
+            }
         }
         return DispatchRet::Return;
     }
