@@ -1,11 +1,10 @@
 # 后续任务清单
 
-> 基于 2026-10 性能分析与 Debug 修复会话的结论整理；一节已于 2026-10-21 完成并更新。
-> 当前状态：run0 扁平字节码为唯一执行路径；Release 下 fib(25) ≈ 58ms、300 万次整数循环 ≈ 412ms
-> （本次优化前分别为 ≈ 77ms / ≈ 547ms，提升约 25%）。
-> 与原版 TJS2 对拍（TJSCompiler Release，三方 wall-time 交替实测，2026-10-21）：
-> fib(25) TJS≈54ms / 旧 Ciallang≈88ms / 新 Ciallang≈75ms（新差距从 1.63x 缩到 1.39x）；
-> 3M 循环 TJS≈670ms / 旧≈1080ms / 新≈793ms（从 1.61x 缩到 **1.18x**）。
+> 基于 2026-10 性能分析与 Debug 修复会话的结论整理；性能一节与二轮热点优化于 2026-10-22 完成。
+> 当前状态：run0 扁平字节码为唯一执行路径。
+> 与原版 TJS2（TJSCompiler Release）wall-time 交替实测的最新比值（Ciallang/TJS，2026-10-22）：
+> 类实例化 111% / 整数循环 111-115% / fib(25) 148-153% / 字符串拼接 175-183%
+> （会话起步时为 113%/123%/165%/228%，演进过程见一节留痕与各条目。）
 > TJSCompiler Release 构建方法：cmake -DBUILD_SHARED_LIBS=OFF（否则 onig 链接失败），
 > 产物另存 bin/Windows/TJSCompiler-release.exe。
 
