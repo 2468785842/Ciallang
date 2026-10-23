@@ -8,7 +8,7 @@
 > - TAC 指令定义：`src/gen/Instruction.hpp`（X-macro）、`Instruction.cpp`（dump；execute 多态执行路径已删除）
 > - 扁平字节码：`src/vm/Bytecode.hpp`（X-macro）、`Bytecode.cpp`（encode）、`src/vm/VMState.cpp`（dispatch）
 > - Chunk 结构：`src/vm/Chunk.hpp`、`src/vm/Constant.hpp`
-> - 历史参考笔记：[../TJS2_OPCODE.md](../TJS2_OPCODE.md)
+> - 旧版 TJS2 指令集参考：[tjs2-bytecode.md](tjs2-bytecode.md)
 
 ---
 

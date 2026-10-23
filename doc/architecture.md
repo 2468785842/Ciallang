@@ -111,7 +111,7 @@
 |---|---|
 | 自研 Pratt 解析器而非 bison | 无生成器依赖、错误恢复可控；产生式以 `doc/grammar/tjs.y` 为对齐基准 |
 | TAC（多态对象）+ 扁平字节码两级 IR | TAC 便于实现优化 Pass；扁平字节码是热路径；惰性编译使慢路径零开销 |
-| 寄存器机（非栈机） | 对标 TJS2 VM（[TJS2_OPCODE.md](TJS2_OPCODE.md)），也为字节码转译铺路（[bytecode/mapping.md](bytecode/mapping.md)） |
+| 寄存器机（非栈机） | 对标 TJS2 VM（[bytecode/tjs2-bytecode.md](bytecode/tjs2-bytecode.md)），也为字节码转译铺路（[bytecode/mapping.md](bytecode/mapping.md)） |
 | 实参经寄存器池顶传递，被调帧 %0..arity-1 即实参 | 免独立实参栈；与 TJS "ra[-3] 向下"的对应关系在转译 prologue 解决 |
 | GC 标记清除 + RootGuard | 简单可控；已知句柄生命周期坑位（TODO.md） |
 | 常量池 index 0 恒 Void | 空/void 语义有免费表达；TJS 转译时 VOID/OBJECT(null) 直接映射 *0 |
