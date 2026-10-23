@@ -36,8 +36,15 @@
 - [x] `解释器 - 脚本执行性能` 偶发段错误（已修，见一节；CI 可开压力模式）
 - [ ] GC 期 finalize 不再触发（~DataObject 已禁止重入解释器）；
       若需 TJS2 完整语义（GC 回收对象也调 finalize），需实现"回收队列 + 安全区 drain"
-- [ ] 二元 `^ | &` 运算符 Parser 未注册（IRGenerator 的 BXor/BOr/BAnd 不可达，
-      报 "isn't support assign operator"）；`str.length` 属性未实现（仅方法表）
+- [x] 二元 `^ | &` 与复合赋值 `^= |= &=`、后缀 `expr if cond`、下标 `s[i]`、
+      `typeof`、`(int)x` 转型、前缀 `+`/`~`、octet 字面量、函数提升、`catch()`
+      （2026-10-22 语法批次，`du8x9k` 附近提交）；期间修复 zigzagDecode 负立即数差 1、
+      Constant 拷贝释放唯一 Octet 引用、octet 词法递归吞 token
+- [ ] 剩余语法/运行期缺口（conformance DIFF 收敛清单）：
+      `&property1`/`*p` 引用语义（test_class，需 property 引用透传设计）、
+      正则字面量 `/re/`（test_string，依赖 RegExp）、
+      `Exception` 内建类（test_misc/test_class 运行期）、`str.length` 属性
+- [ ] `str.length` 属性未实现（仅方法表）
 - [x] `tests/test_files/tjs2/test_class.tjs` 段错误（已修 2026-10-22：generateFuncMeta
       对 parseAst 失败只 assert，Release 下空 Opt 解引用；另修未捕获运行期异常
       静默 terminate 与异常后 VM 状态残留，`9123362`）
