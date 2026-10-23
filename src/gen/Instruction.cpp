@@ -149,6 +149,7 @@ namespace cial::inter {
     DEF_AUTO_DUMP(ToInt, "int");
     DEF_AUTO_DUMP(ToReal, "real");
     DEF_AUTO_DUMP(ToString, "string");
+    DEF_AUTO_DUMP(TypeOf, "type_of");
 
     // 逻辑与比较
     DEF_AUTO_DUMP(Inv, "inv");

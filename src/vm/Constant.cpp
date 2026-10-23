@@ -56,6 +56,15 @@ namespace cial {
                 return Value{ rt->create<ClassObject>(value<ClassMeta *>(), rt).get() };
             case ConstantType::PropMeta:
                 return Value{ rt->create<Property>(nullptr, value<PropMeta *>()).get() };
+            case ConstantType::Octet: {
+                // 字面量 octet:variant 槽位持有 payload 所有权,装载时 retain
+                auto *p = std::get<SharedPayload<Octet> *>(_value);
+                SharedPayload<Octet>::retain(p);
+                Value v{};
+                v.type(ValueType::Octet);
+                v.octetStore(p);
+                return v;
+            }
         }
         return Value{};
     }

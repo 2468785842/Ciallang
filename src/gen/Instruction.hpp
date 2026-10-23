@@ -36,6 +36,7 @@
     O(ToInt)                                                                                                           \
     O(ToReal)                                                                                                          \
     O(ToString)                                                                                                        \
+    O(TypeOf)                                                                                                           \
     O(LNot)                                                                                                            \
     O(ChgSign)                                                                                                         \
     O(ChgThis)                                                                                                         \
@@ -241,6 +242,8 @@ namespace cial::inter {
     DEF_INST(ToInt, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
     DEF_INST(ToReal, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
     DEF_INST(ToString, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
+
+    DEF_INST(TypeOf, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     DEF_INST(LNot, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 

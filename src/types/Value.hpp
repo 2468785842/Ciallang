@@ -17,6 +17,7 @@
 #include "Types.hpp"
 
 #include "Real.hpp"
+#include "Octet.hpp"
 
 #include "common/Ret.hpp"
 #include "gc/gc.hpp"
@@ -101,6 +102,9 @@ namespace cial {
         [[nodiscard]] bool isIntegerFast() const noexcept { return _type == ValueType::Integer; }
         // 整数直写(调用方负责先把 type 置 Integer,避免覆盖堆持有类型的联合体)
         void asIntegerStore(const Integer v) noexcept { _integer = v; }
+
+        // octet 负载直装(Constant 常量缓存路径;调用方负责 retain 与置 type)
+        void octetStore(SharedPayload<Octet> *p) noexcept { _octet = p; }
 
         [[nodiscard]] Ret<Real> asReal() const noexcept;
 

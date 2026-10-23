@@ -314,6 +314,35 @@ namespace cial::inter {
                 optReg = dst;
                 break;
             }
+            case syntax::TokenType::Plus: {
+                // 前缀 +:恒等(数值不变),TJS 语义为"确保数值",字符串会被转换——
+                // 当前按恒等透传
+                node->rhs->generateBytecode(this, optReg);
+                break;
+            }
+            case syntax::TokenType::Tilde: {
+                // ~x 降糖为 x ^ -1(整数按位取反),零新指令
+                Register reg{};
+                if(!expectValue(node->rhs, reg)) {
+                    return;
+                }
+                Register neg1 = allocateRegister();
+                _chunk->emit<LoadImm>(neg1, -1);
+                _chunk->emit<BXor>(reg, neg1, dst);
+                freeRegister(neg1);
+                optReg = dst;
+                break;
+            }
+            case syntax::TokenType::Typeof: {
+                // typeof expr -> 类型名字符串(运行期按 Value 类型分派,与 TJS 语义一致)
+                Register reg{};
+                if(!expectValue(node->rhs, reg)) {
+                    return;
+                }
+                _chunk->emit<TypeOf>(reg, dst);
+                optReg = dst;
+                break;
+            }
             case syntax::TokenType::Int: {
                 Register reg{};
                 if(!expectValue(node->rhs, reg)) {
@@ -817,11 +846,27 @@ namespace cial::inter {
         return node->statement->generateBytecode(this, optReg);
     }
 
+    void IRGenerator::emitFunctionHoisting(const syntax::BlockStmtNode *node) {
+        if(!node)
+            return;
+        OptReg ignore{};
+        for(const auto children : node->childrens) {
+            if(const auto *fn = dynamic_cast<const syntax::FunctionDeclNode *>(children)) {
+                fn->generateBytecode(this, ignore);
+            }
+        }
+    }
+
     void IRGenerator::generate(const syntax::BlockStmtNode *node, OptReg &) {
         // block statement never return value
         beginScope();
         OptReg ignore{};
+        // TJS 语义: 函数声明在块内任何代码执行前注册 (hoisting),
+        // 允许先调用后声明的写法 (test_misc.tjs 第 1-2 行即此形态)
+        emitFunctionHoisting(node);
         for(const auto children : node->childrens) {
+            if(dynamic_cast<const syntax::FunctionDeclNode *>(children))
+                continue; // 已提升, 避免重复注册
             children->generateBytecode(this, ignore);
         }
         endScope();
@@ -1180,9 +1225,12 @@ namespace cial::inter {
             case syntax::TokenValueType::String:
                 _chunk->emit<Load>(reg, _chunk->addConstant(getAtomFromToken(token)));
                 break;
-            case syntax::TokenValueType::Octet:
-                throw std::runtime_error("Unsupported token type octet");
-                // return Constant { token.getOctet() };
+            case syntax::TokenValueType::Octet: {
+                // octet 字面量走常量池(payload 所有权随 Constant)
+                auto *payload = SharedPayload<Octet>::make(new Octet{ token.getOctet() });
+                _chunk->emit<Load>(reg, _chunk->addConstant(Constant{ payload }));
+                break;
+            }
             case syntax::TokenValueType::Integer:
                 _chunk->emit<LoadImm>(reg, token.getInteger());
                 break;

@@ -711,19 +711,24 @@ namespace cial::syntax {
         IdentifierExprNode *catchErr{};
         if(parser->peek(r, TokenType::LParenthesis)) {
             parser->consume(r);
-            auto *exprNode = parser->parseExpression(r, false);
-            if(!exprNode)
-                return nullptr;
+            // catch() 空参数列表合法(无异常变量绑定)
+            if(parser->peek(r, TokenType::RParenthesis)) {
+                parser->consume(r);
+            } else {
+                auto *exprNode = parser->parseExpression(r, false);
+                if(!exprNode)
+                    return nullptr;
 
-            catchErr = dynamic_cast<IdentifierExprNode *>(exprNode);
+                catchErr = dynamic_cast<IdentifierExprNode *>(exprNode);
 
-            if(!catchErr) {
-                parser->error(r, "catch() only is identifier", exprNode->location);
-                return nullptr;
-            }
+                if(!catchErr) {
+                    parser->error(r, "catch() only is identifier", exprNode->location);
+                    return nullptr;
+                }
 
-            if(!parser->expect(r, TokenType::RParenthesis)) {
-                return nullptr;
+                if(!parser->expect(r, TokenType::RParenthesis)) {
+                    return nullptr;
+                }
             }
         }
 
@@ -1138,6 +1143,43 @@ namespace cial::syntax {
     }
 
     ExprNode *ParenthesizedPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
+        // (int)x / (real)x / (string)x —— TJS 的括号内类型转换写法;
+        // 语料中亦有 (int x) 无括号变体(test_variant.tjs),两种都接受
+        if(parser->peek(r, TokenType::Int) || parser->peek(r, TokenType::Real) ||
+           parser->peek(r, TokenType::String)) {
+            Token castToken;
+            parser->consume(r, castToken);
+            // TJS 语法为 (int)expr —— 右括号在目标表达式之前;
+            // 若括号内直接跟表达式((int tmp)),则右括号在表达式之后
+            if(!parser->peek(r, TokenType::RParenthesis) &&
+               !parser->peek(r, TokenType::LParenthesis)) {
+                // (int expr) 形态:表达式在括号内
+                const auto *inner = parser->parseExpression(r, true, Precedence::type);
+                if(!inner) {
+                    parser->error(r, "type cast expects expression", token->location);
+                    return nullptr;
+                }
+                if(!parser->expect(r, TokenType::RParenthesis)) {
+                    return nullptr;
+                }
+                auto *castNode = parser->astBuilder()->makeNode<PrefixUnaryExprNode>(castToken, inner);
+                castNode->location = token->location;
+                return castNode;
+            }
+            // (int)expr 形态:右括号在目标表达式之前
+            if(!parser->expect(r, TokenType::RParenthesis)) {
+                return nullptr;
+            }
+            const auto *rhs = parser->parseExpression(r, true, Precedence::type);
+            if(!rhs) {
+                parser->error(r, "type cast expects expression", token->location);
+                return nullptr;
+            }
+            auto *castNode = parser->astBuilder()->makeNode<PrefixUnaryExprNode>(castToken, rhs);
+            castNode->location = token->location;
+            return castNode;
+        }
+
         // 解析括号内的表达式
         auto *expr = parser->parseExpression(r, true);
         if(!expr) {
@@ -1193,6 +1235,45 @@ namespace cial::syntax {
 
         auto *suffixUnaryExprNode = parser->astBuilder()->makeNode<SuffixUnaryExprNode>(*token, lhs);
         return suffixUnaryExprNode;
+    }
+
+    ExprNode *SuffixIfInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
+        // TJS 后缀条件: `lhs if cond`。语义(参考旧版 tjsInterCodeGen T_IF):
+        // cond 为真才求值 lhs,整个表达式值为 void;降糖为 cond ? lhs : void
+        const auto *cond = parser->parseExpression(r, true);
+        if(!cond) {
+            parser->error(r, "suffix if expects condition expression", token->location);
+            return nullptr;
+        }
+
+        // else 分支为 void(默认构造 Token 为 None 值类型,生成 void)
+        const auto *voidValue = parser->astBuilder()->makeNode<ValueExprNode>(Token{});
+        return parser->astBuilder()->makeNode<TernaryExprNode>(cond, lhs, voidValue);
+    }
+
+    ExprNode *IndexInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
+        // 下标访问 expr[index]:当前支持字符串(降糖为 .charAt(index)),
+        // Array/Dictionary 字面量落地后切换为通用取成员路径
+        const auto *index = parser->parseExpression(r, true);
+        if(!index) {
+            parser->error(r, "index access expects an expression", token->location);
+            return nullptr;
+        }
+
+        if(!parser->expect(r, TokenType::RBracket)) {
+            return nullptr;
+        }
+
+        // lhs.charAt(index) —— 复用既有过程调用 AST
+        auto *charAtName =
+            parser->astBuilder()->makeNode<ValueExprNode>(Token{ TokenType::ConstVal, String{ "charAt" } });
+        auto *member = parser->astBuilder()->makeNode<BinaryExprNode>(Token{ TokenType::Dot }, lhs, charAtName);
+        auto *call = parser->astBuilder()->makeNode<ProcCallExprNode>(member);
+        call->arguments.push_back(const_cast<ExprNode *>(index));
+        charAtName->location = token->location;
+        member->location = token->location;
+        call->location = token->location;
+        return call;
     }
 
 

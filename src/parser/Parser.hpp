@@ -329,6 +329,7 @@ namespace cial::syntax {
     static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>(
         { { TokenType::Null, &S_ConstValPrefixParser },
           { TokenType::ConstVal, &S_ConstValPrefixParser },
+          { TokenType::Void, &S_ConstValPrefixParser }, // void 字面值
           { TokenType::Minus, &S_NegatePrefixParser }, // "-"
           { TokenType::Identifier, &S_IdentifierPrefixParser },
           { TokenType::Exclamation, &S_PrefixParser }, // "!"
@@ -401,12 +402,36 @@ namespace cial::syntax {
         [[nodiscard]] Precedence precedence() const override { return Precedence::postfix; }
     };
 
+    // TJS 后缀条件表达式: `expr if cond`(cond 为真才求值 lhs,否则 void)。
+    // 降糖为 TernaryExprNode(cond, lhs, void)
+    struct SuffixIfInfixParser final : InfixParser {
+        explicit SuffixIfInfixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const override;
+
+        [[nodiscard]] Precedence precedence() const override { return Precedence::keyword; }
+    };
+
+    // 下标访问 `expr[index]`:当前先支持字符串(降糖为 .charAt(index) 调用)
+    struct IndexInfixParser final : InfixParser {
+        explicit IndexInfixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const override;
+
+        [[nodiscard]] Precedence precedence() const override { return Precedence::postfix; }
+    };
+
     static constinit BinaryOperatorInfixParser S_SumSubBinOpInfixParser{ Precedence::sum_sub, false },
         S_ProductBinOpParser{ Precedence::product, false }, S_AssignBinOpParser{ Precedence::assignment, true, true },
         S_BitwiseShiftOrRollBinOpParser{ Precedence::bitwise_shift_or_roll, false },
         S_BitwiseOrWithAssignBinOpParser{ Precedence::bitwise_or, false, true },
         S_BitwiseAndWithAssignBinOpParser{ Precedence::bitwise_and, false, true },
         S_BitwiseXorWithAssignBinOpParser{ Precedence::bitwise_xor, false, true },
+        // 普通(非复合赋值)位运算:& | ^ 曾被绑到 WithAssign 解析器,
+        // 而 AssignToken::support 不认裸符号,导致被无条件包装成 AssignExprNode
+        S_BitwiseOrBinOpParser{ Precedence::bitwise_or, false },
+        S_BitwiseAndBinOpParser{ Precedence::bitwise_and, false },
+        S_BitwiseXorBinOpParser{ Precedence::bitwise_xor, false },
         S_EqualityBinOpParser{ Precedence::equality, false }, S_RelationalBinOpParser{ Precedence::relational, false },
         S_LogicalOrBinOpParser{ Precedence::logical_or, false }, S_SwapBinOpParser{ Precedence::swap, false },
         S_LogicalAndBinOpParser{ Precedence::logical_and, false }, S_OrderBinOpParser{ Precedence::comma, false },
@@ -415,6 +440,8 @@ namespace cial::syntax {
     static constinit ProcCallInfixParser S_ProcCallInfixParser{};
     static constinit TernaryInfixParser S_ConditionalTernaryBinOpParser{};
     static constinit UnaryInfixParser S_UnaryInfixParser{};
+    static constinit SuffixIfInfixParser S_SuffixIfInfixParser{};
+    static constinit IndexInfixParser S_IndexInfixParser{};
 
     static constinit auto S_InfixParsers = frozen::make_unordered_map<TokenType, const InfixParser *>({
         { TokenType::Comma, &S_OrderBinOpParser }, // ,
@@ -445,9 +472,9 @@ namespace cial::syntax {
         { TokenType::NotEqual, &S_EqualityBinOpParser }, // !=
         { TokenType::DiscEqual, &S_EqualityBinOpParser }, // ===
         { TokenType::DiscNotEqual, &S_EqualityBinOpParser }, // !==
-        { TokenType::Ampersand, &S_BitwiseAndWithAssignBinOpParser }, // &
-        { TokenType::VertLine, &S_BitwiseOrWithAssignBinOpParser }, // |
-        { TokenType::Chevron, &S_BitwiseXorWithAssignBinOpParser }, // ^
+        { TokenType::Ampersand, &S_BitwiseAndBinOpParser }, // &
+        { TokenType::VertLine, &S_BitwiseOrBinOpParser }, // |
+        { TokenType::Chevron, &S_BitwiseXorBinOpParser }, // ^
         { TokenType::AmpersandEqual, &S_AssignBinOpParser }, // "&="
         { TokenType::VertLineEqual, &S_AssignBinOpParser }, // "|="
         { TokenType::ChevronEqual, &S_AssignBinOpParser }, // "^="
@@ -464,6 +491,8 @@ namespace cial::syntax {
         { TokenType::Decrement, &S_UnaryInfixParser }, // "--"
         { TokenType::Increment, &S_UnaryInfixParser }, // "++"
         { TokenType::Question, &S_ConditionalTernaryBinOpParser }, // cond ? expr : expr
-        { TokenType::LParenthesis, &S_ProcCallInfixParser } // ()
+        { TokenType::If, &S_SuffixIfInfixParser }, // expr if cond(TJS 后缀条件)
+        { TokenType::LParenthesis, &S_ProcCallInfixParser }, // ()
+        { TokenType::LBracket, &S_IndexInfixParser } // expr[index]
     });
 } // namespace cial::syntax

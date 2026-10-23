@@ -427,6 +427,47 @@ namespace cial::vm {
         return DispatchRet::Continue;
     }
 
+    DISPATCH_OP_METHOD(TypeOf) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        // 与 TJS 一致的类型名:Integer/Real/String/Object/void/Octet
+        const Value &src = regs[r1];
+        switch(src.type()) {
+            case ValueType::Integer:
+                regs[r2] = Value{ String{ "Integer" } };
+                break;
+            case ValueType::Real:
+                regs[r2] = Value{ String{ "Real" } };
+                break;
+            case ValueType::String:
+                regs[r2] = Value{ String{ "String" } };
+                break;
+            case ValueType::Octet:
+                regs[r2] = Value{ String{ "Octet" } };
+                break;
+            case ValueType::Object: {
+                // TJS 中对象返回类名(全局对象为 "Object")
+                const auto objR = src.asObject();
+                if(objR.isOk() && objR.value()) {
+                    const Atom name = objR.value()->getName();
+                    if(const auto *entry = rt.atomTable.get(name);
+                       entry && entry->str && entry->str->length() > 0) {
+                        regs[r2] = Value{ String{ entry->str->getData(), entry->str->length() } };
+                    } else {
+                        regs[r2] = Value{ String{ "Object" } };
+                    }
+                } else {
+                    regs[r2] = Value{ String{ "Object" } };
+                }
+                break;
+            }
+            case ValueType::Void:
+                regs[r2] = Value{ String{ "void" } };
+                break;
+        }
+        return DispatchRet::Continue;
+    }
+
     DISPATCH_OP_METHOD(LNot) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);

@@ -189,9 +189,10 @@ namespace cial {
         FuncMeta,
         ClassMeta,
         PropMeta,
+        Octet,
     };
 
-    using ConstantValue = std::variant<std::monostate, Real, Atom, FuncMeta *, ClassMeta *, PropMeta *>;
+    using ConstantValue = std::variant<std::monostate, Real, Atom, FuncMeta *, ClassMeta *, PropMeta *, SharedPayload<Octet> *>;
 
     struct Constant {
 
@@ -200,20 +201,35 @@ namespace cial {
         template <typename T>
         explicit Constant(T value) : _value{ value } {}
 
-        // 字符串负载缓存指针随对象所有权走:拷贝不带缓存(目标自己惰性建),
-        // 移动 steals,析构释放——因此不能用默认拷贝/移动
-        Constant(const Constant &constant) noexcept = default;
+        // 拷贝:字符串缓存不带走(目标惰性重建);Octet payload 是引用计数的
+        // SharedPayload,拷贝即 retain(此前 =default 拷贝后临时对象析构把
+        // 唯一引用释放,Load 读到已释放内存段错误)
+        Constant(const Constant &constant) noexcept : _value(constant._value), _strPayload(constant._strPayload) {
+            if(type() == ConstantType::Octet) {
+                SharedPayload<Octet>::retain(std::get<SharedPayload<Octet> *>(_value));
+            }
+        }
 
         Constant &operator=(const Constant &constant) noexcept {
             if(this != &constant) {
                 releaseStrPayload();
                 _value = constant._value;
+                _strPayload = constant._strPayload;
+                if(type() == ConstantType::Octet) {
+                    SharedPayload<Octet>::retain(std::get<SharedPayload<Octet> *>(_value));
+                }
             }
             return *this;
         }
 
-        Constant(Constant &&constant) noexcept : _value(std::move(constant._value)), _strPayload(constant._strPayload) {
+        Constant(Constant &&constant) noexcept :
+            _value(std::move(constant._value)), _strPayload(constant._strPayload) {
             constant._strPayload = nullptr;
+            if(type() == ConstantType::Octet) {
+                // variant 已随移动接管所有权,防止源析构释放:
+                // 源 releaseStrPayload 看到 Octet 槽位会 release,先置空其槽位
+                constant._value = std::monostate{};
+            }
         }
 
         Constant &operator=(Constant &&constant) noexcept {
@@ -222,6 +238,9 @@ namespace cial {
                 _value = std::move(constant._value);
                 _strPayload = constant._strPayload;
                 constant._strPayload = nullptr;
+                if(type() == ConstantType::Octet) {
+                    constant._value = std::monostate{};
+                }
             }
             return *this;
         }
@@ -250,6 +269,14 @@ namespace cial {
             if(_strPayload) {
                 SharedPayload<String>::release(_strPayload);
                 _strPayload = nullptr;
+            }
+            // Octet payload 由 variant 槽位直接持有:析构/覆盖时释放
+            if(type() == ConstantType::Octet) {
+                auto *p = std::get<SharedPayload<Octet> *>(_value);
+                if(p) {
+                    SharedPayload<Octet>::release(p);
+                    _value = std::monostate{};
+                }
             }
         }
     };

@@ -1096,34 +1096,40 @@ namespace cial::syntax {
             u8 oct = 0;
 
             for(;;) {
-                skipComment();
+                // 注意:这里不能调 skipComment()——它会递归进入完整 next() 词法分发,
+                // 把 octet 字面量中间的数字当独立 token 吞掉;空白由下方循环自跳
                 i32 ch = read(false);
                 if(ch == '%') {
                     ch = read(false);
                     if(ch == '>') {
+                        // 奇数个 hex 字符:最后半字节还在 oct 里,收尾入 buf
+                        // (旧实现丢弃,如 <% 5 %> 得到空 octet)
+                        if(!newSec)
+                            buf.push_back(oct);
                         token = makeToken(TokenType::ConstVal, Octet{ buf.data(), static_cast<u32>(buf.size()) });
                         return true;
                     }
                     break;
                 }
 
+                // 空白/分隔符跳过(TJS 允许 <% 5 6 7 %>、<% 5,6 %> 等写法)
+                if(ch == ' ' || ch == 9 || ch == 13 || ch == 10 || ch == ',')
+                    continue;
+
                 const i8 n = getHexNum(static_cast<char>(ch));
-                ch = static_cast<u8>(n);
                 if(n != -1) {
+                    ch = static_cast<u8>(n);
                     if(newSec) {
                         oct = ch;
-                        newSec = ch == ',';
-
-                        if(newSec)
-                            buf.push_back(oct);
+                        newSec = false;
                     } else {
                         oct <<= 4;
                         oct += ch;
-
                         buf.push_back(oct);
                         newSec = true;
                     }
                 } else {
+                    // 未知字符:若紧跟 %> 由上方 '%>' 分支正常收尾,否则报错
                     break;
                 }
             }
