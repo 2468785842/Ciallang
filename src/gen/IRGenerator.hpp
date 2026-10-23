@@ -106,6 +106,10 @@ namespace cial::inter {
 
         LocalVariable *resolveLocalVariable(Atom identifier);
 
+        // TJS 函数提升:把块内(顶层/函数体)的 FunctionDeclNode 声明注册
+        // (Load + DGlobal)前置到块代码之前,调用先于声明文本位置也能命中
+        void emitFunctionHoisting(const syntax::BlockStmtNode *node);
+
         Register loadVoidReg();
 
         FuncMeta *generateFuncMeta(const syntax::Parameters &parameters, const syntax::BlockStmtNode *body) const;

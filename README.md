@@ -37,8 +37,8 @@
 * [x] `do while`
 * [x] `for`
 * [x] `switch`
-* [x] `try-catch`
-* [x] `function` 函数定义与调用
+* [x] `try-catch`（含 `catch()` 空参数列表）
+* [x] `function` 函数定义与调用（块内提升，先调用后声明）
 * [x] `property`
 * [x] `class`
 * [ ] `with`
@@ -63,13 +63,14 @@
 * [x] `@"xx"` 模版字符串声明
 * [ ] `[]` Array 声明
 * [ ] `%[]` Dictionary 声明
-* [ ] `<% xx xx ... %>` Octet 声明
+* [x] `<% xx xx ... %>` Octet 声明
 
 #### 表达式
 * [x] `A,B` 顺序表达式
 * [x] `A <-> B` 交换表达式
 * [x] `A operator B` 赋值表达式 `=  &=  |=  ^=  -=  +=  %=  /=  \=  *=  ||=  &&=  >>=  <<=  >>>=`
 * [x] `A ? B : C` 条件运算符
+* [x] `A if B` 后缀条件表达式（B 为真才求值 A，否则 void）
 * [x] `A || B` 逻辑或
 * [x] `A && B` 逻辑与
 * [x] `A | B` 按位或
@@ -81,10 +82,12 @@
 * [x] `A operator B` 加减运算符 `+ -`
 * [x] `A operator B` 乘除运算符 `% / \ *`
 * [x] `operator A` 前缀单目运算符 `! new invalidate isvalid -`
-* [ ] `operator A` 前缀单目运算符 `~ -- ++ delete typeof # $ + & *`
+* [x] `operator A` 前缀单目运算符 `~ typeof + &`
+* [ ] `operator A` 前缀单目运算符 `-- ++ delete # $ *`
 * [x] `operator A` 类型转换运算符 `int real string`
 * [x] `A operator` 后缀单目运算符 `() . -- ++`
-* [ ] `A operator` 后缀单目运算符 `[] !`
+* [x] `A operator` 后缀单目运算符 `[]`（字符串下标）
+* [ ] `A operator` 后缀单目运算符 `!`
 * [x] `A instanceof B` 实例判断运算符
 * [x] `A incontextof B` 上下文替换运算符
 
@@ -122,6 +125,24 @@
    ```sh
    ./cial <script-file>
    ```
+
+### ⚡ 基准与 TJS2 对拍
+
+内置双引擎基准与兼容性对拍设施（TJSCompiler 参考实现路径经
+`CMakeUserPresets.json` 的 `CIAL_TJS_ROOT` 注入，或兄弟目录自动探测）：
+
+```sh
+# 基准（bench/*.tjs 内置 throw 自校验，TJS→Ciallang 交替执行取 min/mean）。
+# 本机预设 "Windows Local Bench" 定义在 CMakeUserPresets.json（不入库）；
+# 也可手动：cmake -B build/Windows/Bench -DCIAL_BUILD_BENCH=ON 后构建
+cmake --preset "Windows Local Bench" && cmake --build --preset "Windows Local Bench"
+
+# TJS2 兼容性对拍报告（tests/test_files/tjs2 语料双引擎 stdout 语义比对）
+cmake --build build/Windows/Bench --target conformance-report
+```
+
+报告落盘 `bench/results/`。当前与原版 TJS2（Release）wall-time 比值：
+整数循环 ≈113%、类实例化 ≈111%、fib(25) ≈153%、字符串拼接 ≈178%。
 
 ---
 

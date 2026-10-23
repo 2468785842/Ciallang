@@ -29,6 +29,9 @@ namespace cial::vm {
             case ConstantType::PropMeta:
                 ss << "Ptr<PropMeta>";
                 break;
+            case ConstantType::Octet:
+                ss << "<octet literal>";
+                break;
         }
         return String{ ss.str() };
     }
