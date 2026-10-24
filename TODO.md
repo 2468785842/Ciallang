@@ -1,11 +1,12 @@
 # 后续任务清单
 
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
-> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-24，55bea90 后）——
-> 类实例化 105% / 整数循环 124% / fib(25) 128% / 字符串拼接 184%。
+> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-24，563d20d 后）——
+> 类实例化 114% / 整数循环 123% / fib(25) 136% / 字符串拼接 185%。
 > TJS2 语料对拍（2026-10-24）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
 > DIFF 3（test_misc、test_variant 为异常消息格式差异，Ciallang 行为正确；
-> test_string 卡正则字面量）/ CIAL_ONLY 1（参考实现自身崩溃）。
+> test_string 双方干净通过，Ciallang 侧无输出、参考实现多 25 行引擎转储）/
+> CIAL_ONLY 1（参考实现自身崩溃）。
 
 ## 一、正确性（已知未修）
 
@@ -13,15 +14,16 @@
       property 声明槽位无法区分；语料中引用均为局部变量，暂记已知限制）
 - [ ] GC 期 finalize 语义：当前 ~DataObject 禁止 sweep 中重入解释器；
       若需 TJS2 完整语义需"回收队列 + 安全区 drain"
-- [ ] 正则字面量 `/re/`（依赖 RegExp 标准库；test_string 卡点）
 - [ ] `main0.cpp`（cial_bc）对空脚本仍会走到 assert（未验证）
 - [ ] 未捕获的原生 C++ 异常顶层报错走 unwind 路径，无源码行号（Rlc 未接线）
 
 ## 二、性能（剩余方向）
 
-- [ ] fib 剩余差距（~150%）：实参 Push 拷贝与指令条数（TJS 为密集指令编码）；
+- [ ] fib 剩余差距（136%）：实参 Push 拷贝与指令条数（TJS 为密集指令编码）；
       可选：参数直传被调帧窗口、调用点内联缓存
-- [ ] string_concat 剩余（~180%）：payload+String 单块分配、Value 内联 SSO
+- [ ] string_concat 剩余差距（185%）：payload+String 单块分配、Value 内联 SSO
+- [ ] loop_int（123%）与类实例化（114%）的小幅差距：词法器 token 判别等
+      本轮新增热路径开销的复核
 
 ## 三、语言特性缺口（对照 README）
 
@@ -29,9 +31,9 @@
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
 - [ ] `(const)[...]` / `(const)%[...]` 的只读共享实例语义（当前按运行时新建处理，行为兼容）
 - [ ] 十六进制浮点字面量 `0x1.07CCp14`、二进制浮点 `0b1.1`（test.tjs 后段依赖）
-- [ ] 标准库：Date / Math / RegExp
-      （String 已部分实现：replace/split 待 RegExp；
-       Array/Dictionary 已支持字面量、下标读写与核心方法，sort/split 待补）
+- [ ] 标准库：Date / Math / RegExp 完整 API
+      （RegExp 已支持 /pattern/ 字面量 + String.replace；match/exec/compile 待补；
+       Array.sort 待脚本回调调用支持；String.split 待 RegExp match API）
 - [ ] const 只读性检查（当前 const 与 var 等价，仅语法接入）
 - [ ] with 块内 try/catch 穿越 WithPush 的栈截断（当前仅帧级恢复；语料未覆盖）
 
@@ -75,6 +77,7 @@
   原生异常转脚本可捕获异常（包装为 Exception 对象）、
   未初始化 `var a,b,c;` 寄存器别名修复、函数默认参数 TestVoid 守卫（修实参覆盖）+
   构造器 arity 用 FuncMeta::arity 的修复、sLEB128 maxLen 8→10（i64 字面量）
+
 - 2026-10-22 语法批次：`^ | &` 及复合赋值、后缀 `expr if cond`、下标 `s[i]`、`typeof`（新增 TypeOf 指令）、`(int)x` 转型、前缀 `+`/`~`、octet 字面量、函数提升、`catch()`；连带修复 zigzagDecode 负立即数差 1、Constant 拷贝语义、octet 词法
 - 2026-10-22 二轮热点：GGlobal 零拷贝、池水位线收缩、dispatch 整数特化、Ret 整数直写、this 快通道
 - 2026-10-22 崩溃修复：generateFuncMeta 空 Opt 段错误、未捕获异常静默 terminate、异常后 VM 状态残留
