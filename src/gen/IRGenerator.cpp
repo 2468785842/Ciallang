@@ -46,10 +46,12 @@ namespace cial::inter {
     }
 
     bool IRGenerator::expectValue(const syntax::ExprNode *node, Register &ret) {
-        OptReg reg{};
+        // 哨兵寄存器（0xFFFF 不会被正常分配）：告知表达式生成器"调用方需要值"，
+        // 后缀 ++/-- 据此决定是否发射旧值拷贝；语句链传入的空 OptReg 则不拷贝
+        OptReg reg{ Register{ 0xFFFF } };
         node->generateBytecode(this, reg);
 
-        if(!reg) {
+        if(!reg || reg->index() == 0xFFFF) {
             error("except a return value of expression", node->location);
             return false;
         }
@@ -519,7 +521,7 @@ namespace cial::inter {
                 if(const auto *member = dynamic_cast<const syntax::BinaryExprNode *>(node->lhs);
                    member && member->token.type() == Dot) {
                     // obj.member++/--（旧版 INCGETP/SUBGETP 语义）：getter 读旧值 →
-                    // 加减 → setter 写新值；表达式值为旧值（postfix）
+                    // 加减 → setter 写新值；表达式值为旧值（仅调用方需要时拷贝）
                     const auto *identifierExpr = dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs);
                     if(!identifierExpr) {
                         error("suffix ++/-- member must be identifier", node->location);
@@ -533,8 +535,11 @@ namespace cial::inter {
 
                     Register curReg = allocateRegister();
                     _chunk->emit<GProp>(objReg, memberReg, curReg); // 触发 getter
-                    const Register oldReg = allocateRegister();
-                    _chunk->emit<DLocal>(curReg, oldReg);
+                    Register oldReg{};
+                    if(optReg) {
+                        oldReg = allocateRegister();
+                        _chunk->emit<DLocal>(curReg, oldReg);
+                    }
                     const Register one = allocateRegister();
                     _chunk->emit<LoadImm>(one, 1);
                     const Register nv = allocateRegister();
@@ -551,7 +556,8 @@ namespace cial::inter {
                     freeRegister(curReg);
                     freeRegister(memberReg);
                     freeRegister(objReg);
-                    optReg = oldReg;
+                    if(optReg)
+                        optReg = oldReg;
                     return;
                 }
                 error("current not support dot chain call", node->location);
@@ -564,12 +570,15 @@ namespace cial::inter {
 
     void IRGenerator::generateIncDec(const Atom identifier, const bool isIncrement, OptReg &optReg,
                                      const bool postfix) {
+        // 后缀旧值拷贝仅在调用方需要表达式值时发射（语句上下文 optReg 为空，
+        // i++; 不付拷贝成本）
+        const bool needOld = postfix && static_cast<bool>(optReg);
         if(const auto variable = resolveLocalVariable(identifier)) {
             Register src2 = variable->reg;
             auto src1 = allocateRegister();
             Register dst = allocateRegister();
             Register oldReg{};
-            if(postfix) {
+            if(needOld) {
                 // TJS2 后缀语义：表达式值为自增/自减前的旧值
                 oldReg = allocateRegister();
                 _chunk->emit<DLocal>(src2, oldReg);
@@ -585,7 +594,13 @@ namespace cial::inter {
             _chunk->emit<DLocal>(dst, src2);
             freeRegister(src1);
             freeRegister(dst);
-            optReg = postfix ? oldReg : dst;
+            // 前缀值=新值 dst；后缀仅在需要时给出旧值
+            if(needOld)
+                optReg = oldReg;
+            else if(postfix)
+                optReg = {};
+            else
+                optReg = dst;
             return;
         }
 
@@ -593,14 +608,14 @@ namespace cial::inter {
         auto src2 = allocateRegister();
         auto dst = allocateRegister();
         Register oldReg{};
-        if(postfix) {
+        if(needOld) {
             oldReg = allocateRegister();
         }
         _chunk->emit<LoadImm>(src2, 1);
         if(isTopScope()) {
             // global maybe
             _chunk->emit<GGlobal>(identifier, src1);
-            if(postfix) {
+            if(needOld) {
                 _chunk->emit<DLocal>(src1, oldReg);
             }
             if(isIncrement) {
@@ -613,7 +628,7 @@ namespace cial::inter {
         } else {
             // find on context
             _chunk->emit<GThis>(identifier, src1);
-            if(postfix) {
+            if(needOld) {
                 _chunk->emit<DLocal>(src1, oldReg);
             }
             if(isIncrement) {
@@ -626,7 +641,12 @@ namespace cial::inter {
         }
         freeRegister(src2);
         freeRegister(dst);
-        optReg = postfix ? oldReg : dst;
+        if(needOld)
+            optReg = oldReg;
+        else if(postfix)
+            optReg = {};
+        else
+            optReg = dst;
     }
 
     void IRGenerator::generate(const syntax::ProcCallExprNode *node, OptReg &optReg) {
