@@ -347,7 +347,6 @@ namespace cial::syntax {
         }
         rewindOneChar();
 
-
         // ---------- 普通脚本 ----------
         if(!_preProcessor.isEnabled()) {
             read();
@@ -611,7 +610,10 @@ namespace cial::syntax {
             if(valueType == ValueType::Integer) {
                 Integer val = 0;
                 stream >> val;
-                val = static_cast<Integer>(fixValue(static_cast<double>(val)));
+                // 无科学计数法位移时不得经 double 往返:|val| > 2^53 会失真
+                // (如 9223372036854775807 会回绕成 i64min)
+                if(shifting != 0)
+                    val = static_cast<Integer>(fixValue(static_cast<double>(val)));
                 token = makeToken(TokenType::ConstVal, val);
             }
             return true;

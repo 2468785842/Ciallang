@@ -69,8 +69,8 @@
 | 11 | 移位 `<< >> >>>`（`>>>` 无符号右移） | ✅ |
 | 12 | 加减 `+ -`（`+` 对字符串为连接） | ✅ |
 | 13 | 乘除类 `% / \ *`（`\` 整除；`*` 与前缀属性访问歧义经专门产生式 `mul_div_expr_and_asterisk` 消解） | ✅ |
-| 14 | **一元前缀** `! ~ ++ -- new invalidate isvalid delete typeof # $ + - & *` | ◐：`! new invalidate isvalid -` ✅；`~ ++ -- delete typeof # $ + & *` ❌ |
-| 14′ | **一元中缀式** `A instanceof B`（B 为类名）、`A in B`（成员存在判断） | ◐：instanceof ✅；`in` ❌ |
+| 14 | **一元前缀** `! ~ ++ -- new invalidate isvalid delete typeof # $ + - & *` | ◐：`! new invalidate isvalid - ~ ++ -- delete typeof # $ +` ✅；`& *` ❌ |
+| 14′ | **一元中缀式** `A instanceof B`（B 为类名）、`A in B`（成员存在判断） | ◐：instanceof ✅（基础类型按类型名匹配，Number 覆盖 Integer/Real）；`in` ❌ |
 | 15 | `A isvalid`（**后缀**形态，与前缀并存）、`A incontextof B`（**右结合**，替换函数闭包的 this） | ◐：incontextof ✅；后缀 isvalid ✅ |
 | 16 | **类型转换** `(int)A (real)A (string)A` 或裸 `int A real A string A` | ✅ |
 | 17 | **后缀**：调用 `f(args)`、成员 `.sym`（含 `.` 起始的裸词链）、下标 `a[i]`、后缀 `++ --`、**即时求值 `A !`**（把 A 的字符串值作为 TJS 表达式编译执行） | ◐：`() . -- ++` ✅；`[] !` ❌（下标依赖 Array/String 成员访问语义） |
@@ -78,11 +78,15 @@
 
 前缀一元语义速查（原版）：
 
-- `#n`：字符码 → 单字符字符串；`$"c"`：首字符 → 字符码（对应字节码 ASC/CHR）
+- `#s`：字符串取首字符的字符码（ASC，非字符串先字符串化；octet 报错）；`$n`：字符码 → 单字符字符串（CHR，对应新增字节码 Asc/Chr）
 - `&expr`：忽略属性访问（属性当普通值取）；`*expr`：强制属性访问（当 property 取）
-- `+expr`：数值规范化（int/real 归一，对应 NUM）
-- `delete expr`：删除成员，返回 bool
+- `+expr`：数值规范化（字符串转数值、octet 报错，对应 NUM；降糖为 ToReal）
+- `delete expr`：删除成员，返回 bool（仅删实例自有成员）
 - `typeof expr`：类型名字符串
+
+后缀条件 `expr if cond`（tjs.y `expr → comma_expr "if" expr`）：绑定比逗号更松，
+假条件时**整个赋值不发生**（`tmp = a if c` 的 lhs 是整个赋值表达式）——已实现 ✅。
+成员只读属性：`str.length`（字节长度）✅。
 
 ## 5. 语句（tjs.y:222-243）
 
@@ -90,11 +94,11 @@
 |---|---|---|
 | 空语句 `;` | | ✅ |
 | 表达式语句 | | ✅ |
-| `var` 声明 | `var a, b = expr;`；可带类型注解 `var a:int`（注解仅文档性） | ◐：核心 ✅；`const` 与注解 ❌ |
+| `var` 声明 | `var a, b = expr;`；可带类型注解 `var a:int`（注解仅文档性） | ◐：核心与 `const` 声明 ✅（const 与 var 等价，只读性不强制）；注解 ❌ |
 | `if (e) s [else s]` | | ✅ |
 | `while (e) s` | | ✅ |
 | `do s while (e);` | | ✅ |
-| `for (init; cond; step) s` | 三段均可空；首子句可为 `var` 声明或表达式（`for_first_clause`） | ◐：`for(var …)` ✅；`for(const …)` ❌ |
+| `for (init; cond; step) s` | 三段均可空；首子句可为 `var`/`const` 声明或表达式（`for_first_clause`） | ✅ |
 | `break` / `continue` | | ✅ |
 | `switch (e) { case 常量: … default: … }` | case 标签为**编译期常量**（整数/字符串） | ✅ |
 | `try { } catch (v) { }` | 捕获值为异常对象（Exception 类实例） | ✅ |

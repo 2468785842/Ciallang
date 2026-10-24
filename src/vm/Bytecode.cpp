@@ -132,6 +132,18 @@ namespace cial::vm {
         write<u16>(info.code, tac->dst().index());
     }
 
+    void Bytecode::encode(Info &info, const inter::Asc *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::Asc));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::Chr *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::Chr));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
     void Bytecode::encode(Info &info, const inter::TypeOf *tac) {
         info.code.push_back(static_cast<u8>(VmOpCode::TypeOf));
         write<u16>(info.code, tac->src().index());
@@ -168,6 +180,12 @@ namespace cial::vm {
         info.code.push_back(static_cast<u8>(VmOpCode::ChkIns));
         write<u16>(info.code, tac->dst().index());
         write<u16>(info.code, tac->src().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::TestVoid *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::TestVoid));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
     }
 
     // ── 装载 ─────────────────────────────────────────────────
@@ -274,5 +292,12 @@ namespace cial::vm {
         write<u16>(info.code, tac->obj().index());
         write<u16>(info.code, tac->memberReg().index());
         write<u16>(info.code, tac->src().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::DelProp *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::DelProp));
+        write<u16>(info.code, tac->obj().index());
+        write<u16>(info.code, tac->memberReg().index());
+        write<u16>(info.code, tac->dst().index());
     }
 } // namespace cial::vm

@@ -111,11 +111,38 @@ namespace cial::TypeConverter {
         return result;
     }
 
+    // 字符串→数值的公共解析：词法器把 '-'/'+' 产出为 Minus/Plus token 而非数值，
+    // 需在词法前剥掉符号（TJS2 语义:"-1"、"+1.5" 均可转数值）。
+    // 返回: 1=正 -1=负 0=无符号且首字符非数字(调用方报错)
+    static int stripSign(const String &str, String &out) {
+        const char *s = str.getData();
+        u32 len = str.length();
+        u32 i = 0;
+        while(i < len && static_cast<unsigned char>(s[i]) <= 0x20)
+            ++i;
+        int sign = 1;
+        if(i < len && (s[i] == '-' || s[i] == '+')) {
+            if(s[i] == '-')
+                sign = -1;
+            ++i;
+        }
+        if(i >= len || !std::isdigit(static_cast<unsigned char>(s[i])))
+            return 0;
+        out = String(s + i, len - i);
+        return sign;
+    }
+
     Ret<Integer> stringToInteger(const String &str) {
         auto retErr = Ret<Integer>::err(ErrCode::InvalidCast, String{ str.toStdStr() + " can't covert to integer" });
+
+        String body{};
+        const int sign = stripSign(str, body);
+        if(sign == 0)
+            return retErr;
+
         Common::SourceFile sf{};
         Common::Result r{};
-        sf.load(r, str.getData());
+        sf.load(r, body.getData());
         if(r.isFailed())
             return retErr;
         PreProcessor pp{};
@@ -124,17 +151,32 @@ namespace cial::TypeConverter {
         syntax::Token *t;
         lexer.next(t, false);
 
-        if(t->type() != syntax::TokenType::ConstVal || t->valueType() != syntax::TokenValueType::Integer)
+        if(t->type() != syntax::TokenType::ConstVal)
+            return retErr;
+        // TJS2 语义:字符串到数值的转换不区分整数/小数写法("10" 与 "1.5" 均可),
+        // 小数转整数截断
+        Integer value = 0;
+        if(t->valueType() == syntax::TokenValueType::Integer)
+            value = t->getInteger();
+        else if(t->valueType() == syntax::TokenValueType::Real)
+            value = static_cast<Integer>(t->getReal().value());
+        else
             return retErr;
 
-        return Ret<Integer>::ok(t->getInteger());
+        return Ret<Integer>::ok(sign * value);
     }
 
     Ret<Real> stringToReal(const String &str) {
         auto retErr = Ret<Real>::err(ErrCode::InvalidCast, String{ str.toStdStr() + " can't covert to real" });
+
+        String body{};
+        const int sign = stripSign(str, body);
+        if(sign == 0)
+            return retErr;
+
         Common::SourceFile sf{};
         Common::Result r{};
-        sf.load(r, str.getData());
+        sf.load(r, body.getData());
         if(r.isFailed())
             return retErr;
         PreProcessor pp{};
@@ -143,10 +185,18 @@ namespace cial::TypeConverter {
         syntax::Token *t;
         lexer.next(t, false);
 
-        if(t->type() != syntax::TokenType::ConstVal || t->valueType() != syntax::TokenValueType::Real)
+        if(t->type() != syntax::TokenType::ConstVal)
+            return retErr;
+        // 同 stringToInteger:整数写法("10")也接受,升为 Real
+        double value = 0.0;
+        if(t->valueType() == syntax::TokenValueType::Real)
+            value = t->getReal().value();
+        else if(t->valueType() == syntax::TokenValueType::Integer)
+            value = static_cast<double>(t->getInteger());
+        else
             return retErr;
 
-        return Ret<Real>::ok(t->getReal());
+        return Ret<Real>::ok(Real{ sign * value });
     }
 
 } // namespace cial::TypeConverter

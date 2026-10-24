@@ -96,3 +96,15 @@ TEST_CASE("本地函数声明 - 字符串成员方法定义") {
         REQUIRE(**vm.evalExpr<String *>(R"("ab".repeat(-1))"_str) == ""_str);
     }
 }
+TEST_CASE("本地函数声明 - 字符串 length 只读属性") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    const VM vm{ &vmState };
+
+    SECTION("Property - length") {
+        REQUIRE(*vm.evalExpr<Integer>(R"("hello".length)"_str) == 5);
+        REQUIRE(*vm.evalExpr<Integer>(R"("".length)"_str) == 0);
+    }
+}

@@ -184,6 +184,9 @@ namespace cial::syntax {
     static constinit auto S_DeclParsers =
         frozen::make_unordered_map<TokenType, const DeclParser *>({ { TokenType::Property, &S_PropertyDeclParser },
                                                                     { TokenType::Var, &S_VarDeclParser },
+                                                                    // const 与 var 声明语法相同（const x = expr;），
+                                                                    // 复用 VarDeclParser；只读性暂不强制
+                                                                    { TokenType::Const, &S_VarDeclParser },
                                                                     { TokenType::Function, &S_FunctionDeclParser },
                                                                     { TokenType::Class, &S_ClassDeclParser } });
 
@@ -391,7 +394,10 @@ namespace cial::syntax {
 
         ExprNode *parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const override;
 
-        [[nodiscard]] Precedence precedence() const override { return Precedence::postfix; }
+        // TJS 语法(tjs.y): cond_expr -> logor_expr "?" expr ":" cond_expr —— 三元介于
+        // 赋值与逻辑或之间(高于赋值,低于全部双目运算),否则 `a == b ? x : y` 会
+        // 解析成 `a == (b ? x : y)`
+        [[nodiscard]] Precedence precedence() const override { return Precedence::keyword; }
     };
 
     struct UnaryInfixParser final : InfixParser {
@@ -404,12 +410,14 @@ namespace cial::syntax {
 
     // TJS 后缀条件表达式: `expr if cond`(cond 为真才求值 lhs,否则 void)。
     // 降糖为 TernaryExprNode(cond, lhs, void)
+    // 语法层级(tjs.y): expr -> comma_expr "if" expr —— 后缀 if 绑定比赋值/逗号更松,
+    // `tmp = int8 if cond` 的 lhs 是整个赋值(假条件时赋值整体不发生)
     struct SuffixIfInfixParser final : InfixParser {
         explicit SuffixIfInfixParser() = default;
 
         ExprNode *parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const override;
 
-        [[nodiscard]] Precedence precedence() const override { return Precedence::keyword; }
+        [[nodiscard]] Precedence precedence() const override { return Precedence::lowest; }
     };
 
     // 下标访问 `expr[index]`:当前先支持字符串(降糖为 .charAt(index) 调用)
@@ -491,7 +499,8 @@ namespace cial::syntax {
         { TokenType::Decrement, &S_UnaryInfixParser }, // "--"
         { TokenType::Increment, &S_UnaryInfixParser }, // "++"
         { TokenType::Question, &S_ConditionalTernaryBinOpParser }, // cond ? expr : expr
-        { TokenType::If, &S_SuffixIfInfixParser }, // expr if cond(TJS 后缀条件)
+        // `expr if cond` 后缀条件不入 infix 表:其绑定比逗号更松(tjs.y expr 层级),
+        // 由 parseExpression 的循环外后缀绑定统一处理
         { TokenType::LParenthesis, &S_ProcCallInfixParser }, // ()
         { TokenType::LBracket, &S_IndexInfixParser } // expr[index]
     });

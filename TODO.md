@@ -3,18 +3,17 @@
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
 > 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS，2026-10-22）——
 > 类实例化 111% / 整数循环 111-115% / fib(25) 148-153% / 字符串拼接 175-183%。
+> TJS2 语料对拍（2026-10-24）：TJS_ONLY 0 / MATCH 2 / DIFF 4（其中 test_misc、test_variant
+> 为异常消息格式差异，Ciallang 行为正确）/ CIAL_ONLY 1（参考实现自身崩溃）。
 
 ## 一、正确性（已知未修）
 
-- [ ] `Exception` 内建类（test_misc/test_class 运行期依赖；含 `e.message`）
-- [ ] `&property1` / `*p` 引用语义（test_class；需 property 引用透传设计）
+- [ ] `&property1` / `*p` 引用语义（test_class 卡点；需 property 引用透传设计）
 - [ ] GC 期 finalize 语义：当前 ~DataObject 禁止 sweep 中重入解释器；
       若需 TJS2 完整语义需"回收队列 + 安全区 drain"
-- [ ] 前缀 `-- ++ delete # $ *` 未实现
-- [ ] `for(const ...)` 未支持
-- [ ] 正则字面量 `/re/`（依赖 RegExp 标准库）
-- [ ] `str.length` 属性（当前仅方法表）
+- [ ] 正则字面量 `/re/`（依赖 RegExp 标准库；test_string 卡点）
 - [ ] `main0.cpp`（cial_bc）对空脚本仍会走到 assert（未验证）
+- [ ] 未捕获的原生 C++ 异常顶层报错走 unwind 路径，无源码行号（Rlc 未接线）
 
 ## 二、性能（剩余方向）
 
@@ -26,9 +25,10 @@
 
 - [ ] `[]` Array 声明、`%[]` Dictionary 声明
 - [ ] `with` 语句
-- [ ] 后缀单目 `!`
-- [ ] 标准库：Exception / Array / Dictionary / Date / Math / RegExp
+- [ ] 标准库：Array / Dictionary / Date / Math / RegExp
       （String 已部分实现：replace/split 待 RegExp 和 Array）
+- [ ] const 只读性检查（当前 const 与 var 等价，仅语法接入）
+- [ ] 后缀 `i++` 表达式值语义（当前返回自增后的新值，TJS2 返回旧值）
 
 ## 四、工程化
 
@@ -37,6 +37,14 @@
 
 ## 已完成（摘要）
 
+- 2026-10-24 兼容性批次：前缀 `++ -- # $ delete`、`const` 声明与 `for(const)`、
+  `str.length` 原生属性、后缀 if 绑定修正（假条件整体不赋值）、三元优先级修正、
+  `#` 对非字符串先字符串化、octet 算术改为报错、一元 `+` 转数值、
+  字符串→数值支持负号与小数写法、`void` 字面量发射、instanceof 基础类型匹配、
+  大整数字面量不经 double 往返、Exception 内建类（TJS 源自举）、
+  原生异常转脚本可捕获异常（包装为 Exception 对象）、
+  未初始化 `var a,b,c;` 寄存器别名修复、函数默认参数 TestVoid 守卫（修实参覆盖）+
+  构造器 arity 用 FuncMeta::arity 的修复、sLEB128 maxLen 8→10（i64 字面量）
 - 2026-10-22 语法批次：`^ | &` 及复合赋值、后缀 `expr if cond`、下标 `s[i]`、`typeof`（新增 TypeOf 指令）、`(int)x` 转型、前缀 `+`/`~`、octet 字面量、函数提升、`catch()`；连带修复 zigzagDecode 负立即数差 1、Constant 拷贝语义、octet 词法
 - 2026-10-22 二轮热点：GGlobal 零拷贝、池水位线收缩、dispatch 整数特化、Ret 整数直写、this 快通道
 - 2026-10-22 崩溃修复：generateFuncMeta 空 Opt 段错误、未捕获异常静默 terminate、异常后 VM 状态残留

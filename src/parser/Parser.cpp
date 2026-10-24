@@ -309,6 +309,17 @@ namespace cial::syntax {
             if(lhs == nullptr)
                 break;
         }
+
+        // 后缀 if(`expr if cond`,tjs.y expr 层级):绑定比逗号更松,
+        // Pratt 主循环的 lowest 门槛(while pre < prec)在顶层入口拦不住它,
+        // 在此统一绑定。仅 lowest 入口生效:嵌套调用(优先级 > lowest)不得消费 if,
+        // 否则 `x = a if b` 的 lhs 会退化为 a 而非整个赋值
+        if(pre == Precedence::lowest && peek(r, TokenType::If)) {
+            Token ifToken{};
+            if(consume(r, ifToken)) {
+                lhs = S_SuffixIfInfixParser.parse(r, this, lhs, &ifToken);
+            }
+        }
         return lhs;
     }
 
@@ -924,9 +935,9 @@ namespace cial::syntax {
         DeclNode *initDecl{ nullptr };
         bool initAteSemiColon = false;
         if(!parser->peek(r, TokenType::SemiColon)) {
-            // TJS2 语法（tjs.y for_first_clause）：for 首子句可以是 var 声明或表达式；
-            // var 声明解析会连同结尾的 ';' 一起消费
-            if(parser->peek(r, TokenType::Var)) {
+            // TJS2 语法（tjs.y for_first_clause）：for 首子句可以是 var/const 声明或表达式；
+            // var/const 声明解析会连同结尾的 ';' 一起消费
+            if(parser->peek(r, TokenType::Var) || parser->peek(r, TokenType::Const)) {
                 initDecl = parser->parseDeclaration(r);
                 initAteSemiColon = true;
                 if(!initDecl)

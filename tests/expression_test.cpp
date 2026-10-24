@@ -268,3 +268,83 @@ TEST_CASE("类型转换") {
 
     SECTION("convert string") { REQUIRE((**vm.evalExpr<String *>(R"(string 1)"_str)) == "1"_str); }
 }
+TEST_CASE("表达式 - 前缀递增递减 / # / $ / delete") {
+    Runtime rt{};
+    Context context{ rt };
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("前缀 ++/-- 顶层与函数内") {
+        vm.eval(R"(
+            var i = 5;
+            var r1 = ++i; var r2 = --i;
+            function f() { var n = 10; ++n; --n; return n; }
+            var r3 = f();
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("i"_str) == 5);
+        REQUIRE(*vm.evalExpr<Integer>("r1"_str) == 6);
+        REQUIRE(*vm.evalExpr<Integer>("r2"_str) == 5);
+        REQUIRE(*vm.evalExpr<Integer>("r3"_str) == 10);
+    }
+
+    SECTION("#s 取首字符码(含字符串化)") {
+        REQUIRE(*vm.evalExpr<Integer>(R"(#"A")"_str) == 65);
+        // TJS2 语义:整数先字符串化再取首字符(#65 == '6' == 54)
+        REQUIRE(*vm.evalExpr<Integer>(R"(#65)"_str) == 54);
+    }
+
+    SECTION("$n 字符码转单字符字符串") {
+        REQUIRE((**vm.evalExpr<String *>(R"($66)"_str)) == "B"_str);
+    }
+
+    SECTION("delete 成员") {
+        vm.eval(R"(
+            class Foo { var a; function Foo() {} }
+            var o = new Foo();
+            o.a = 3;
+            var r1 = delete o.a;
+            var r2 = delete o.a;
+            var r3 = delete o.nosuch;
+        )"_str);
+        REQUIRE(*vm.evalExpr<bool>("r1"_str) == true);
+        REQUIRE(*vm.evalExpr<bool>("r2"_str) == false);
+        REQUIRE(*vm.evalExpr<bool>("r3"_str) == false);
+    }
+}
+
+TEST_CASE("表达式 - 三元与后缀 if 优先级") {
+    Runtime rt{};
+    Context context{ rt };
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("cond ? a : b") {
+        REQUIRE(*vm.evalExpr<Integer>("1 == 1 ? 7 : 9"_str) == 7);
+        REQUIRE(*vm.evalExpr<Integer>("1 != 1 ? 7 : 9"_str) == 9);
+    }
+
+    SECTION("后缀 if 绑定整个赋值") {
+        // tjs.y: expr -> comma_expr "if" expr —— 假条件时赋值整体不发生
+        vm.eval(R"(
+            var t = 5;
+            t = 8 if 1 != 1;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("t"_str) == 5);
+        vm.eval("t = 8 if 1 == 1;"_str);
+        REQUIRE(*vm.evalExpr<Integer>("t"_str) == 8);
+    }
+}
+
+TEST_CASE("表达式 - instanceof 基础类型") {
+    Runtime rt{};
+    Context context{ rt };
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("Number/String 匹配") {
+        REQUIRE(*vm.evalExpr<bool>(R"(10 instanceof "Number")"_str) == true);
+        REQUIRE(*vm.evalExpr<bool>(R"(1.5 instanceof "Number")"_str) == true);
+        REQUIRE(*vm.evalExpr<bool>(R"("s" instanceof "String")"_str) == true);
+        REQUIRE(*vm.evalExpr<bool>(R"("s" instanceof "Number")"_str) == false);
+    }
+}

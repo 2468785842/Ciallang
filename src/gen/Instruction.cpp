@@ -149,12 +149,15 @@ namespace cial::inter {
     DEF_AUTO_DUMP(ToInt, "int");
     DEF_AUTO_DUMP(ToReal, "real");
     DEF_AUTO_DUMP(ToString, "string");
+    DEF_AUTO_DUMP(Asc, "asc");
+    DEF_AUTO_DUMP(Chr, "chr");
     DEF_AUTO_DUMP(TypeOf, "type_of");
 
     // 逻辑与比较
     DEF_AUTO_DUMP(Inv, "inv");
     DEF_AUTO_DUMP(ChkInv, "chk_inv");
     DEF_AUTO_DUMP(ChkIns, "chk_ins");
+    DEF_AUTO_DUMP(TestVoid, "test_void");
     DEF_AUTO_DUMP(Test, "test");
     DEF_AUTO_DUMP(EQ, "eq");
     DEF_AUTO_DUMP(NEQ, "neq");
@@ -186,6 +189,7 @@ namespace cial::inter {
     // 属性操作
     DEF_AUTO_DUMP(GProp, "g_prop");
     DEF_AUTO_DUMP(DProp, "d_prop");
+    DEF_AUTO_DUMP(DelProp, "del_prop");
 
     // 其他
     DEF_AUTO_DUMP(ChgSign, "chg_sign");

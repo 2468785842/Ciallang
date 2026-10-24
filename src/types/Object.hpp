@@ -45,6 +45,9 @@ namespace cial {
 
         [[nodiscard]] virtual bool hasProp(Atom a) const { throw std::runtime_error("Not support"); }
 
+        // delete obj.member（TJS2 DeleteMember）：返回是否删除了成员
+        [[nodiscard]] virtual bool delProp(Atom a) { throw std::runtime_error("Not support"); }
+
     private:
         Atom _name = ATOM_INVALID;
     };

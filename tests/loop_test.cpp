@@ -103,3 +103,39 @@ TEST_CASE("循环 - 执行") {
         REQUIRE(*vm.evalExpr<Integer>("count"_str) == 6);
     }
 }
+TEST_CASE("循环 - const 声明与 for(const) 首子句") {
+    Runtime rt{};
+    Context context{ rt };
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("const 顶层声明") {
+        vm.eval("const K = 42;"_str);
+        REQUIRE(*vm.evalExpr<Integer>("K"_str) == 42);
+    }
+
+    SECTION("for 首子句 const 声明") {
+        vm.eval(R"(
+            var sum = 0;
+            for(const i = 0; i < 4; i = i + 1) { sum = sum + i; }
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("sum"_str) == 6);
+    }
+}
+
+TEST_CASE("循环 - 未初始化多变量声明相互独立") {
+    // 回归:var a, b, c; 曾共享同一 void 寄存器,赋值互相覆盖
+    Runtime rt{};
+    Context context{ rt };
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    vm.eval(R"(
+        function f() { var a, b, c; a = 1; b = 2; c = 3; return a + b * 10 + c * 100; }
+        var r = f();
+        var x, y; x = 7; y = 8;
+    )"_str);
+    REQUIRE(*vm.evalExpr<Integer>("r"_str) == 321);
+    REQUIRE(*vm.evalExpr<Integer>("x"_str) == 7);
+    REQUIRE(*vm.evalExpr<Integer>("y"_str) == 8);
+}

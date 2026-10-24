@@ -315,9 +315,16 @@ namespace cial::inter {
                 break;
             }
             case syntax::TokenType::Plus: {
-                // 前缀 +:恒等(数值不变),TJS 语义为"确保数值",字符串会被转换——
-                // 当前按恒等透传
-                node->rhs->generateBytecode(this, optReg);
+                // 前缀 +:TJS 语义为"确保数值"——字符串转数值(+str5 == 5),
+                // octet 无法转数值则报错(语料 test_variant 期望 +oct5 被 catch)。
+                // 降糖为 ToReal(宽松比较下整数/实数等价)
+                Register reg{};
+                if(!expectValue(node->rhs, reg)) {
+                    return;
+                }
+                _chunk->emit<ToReal>(reg, dst);
+                freeRegister(reg);
+                optReg = dst;
                 break;
             }
             case syntax::TokenType::Tilde: {
@@ -370,6 +377,63 @@ namespace cial::inter {
                 optReg = dst;
                 break;
             }
+            case syntax::TokenType::Increment:
+            case syntax::TokenType::Decrement: {
+                // 前缀 ++/--：表达式值为自增/自减后的新值
+                const auto *identifier = dynamic_cast<const syntax::IdentifierExprNode *>(node->rhs);
+                if(!identifier) {
+                    error("prefix ++/-- expects identifier operand", node->location);
+                    return;
+                }
+                generateIncDec(getAtomFromToken(identifier->token),
+                               node->token.type() == syntax::TokenType::Increment, optReg);
+                break;
+            }
+            case syntax::TokenType::Sharp: {
+                // #s：字符串首字符的字符码（旧版 VM_ASC）
+                Register reg{};
+                if(!expectValue(node->rhs, reg)) {
+                    return;
+                }
+                _chunk->emit<Asc>(reg, dst);
+                freeRegister(reg);
+                optReg = dst;
+                break;
+            }
+            case syntax::TokenType::Dollar: {
+                // $n：字符码转 1 字符字符串（旧版 VM_CHR）
+                Register reg{};
+                if(!expectValue(node->rhs, reg)) {
+                    return;
+                }
+                _chunk->emit<Chr>(reg, dst);
+                freeRegister(reg);
+                optReg = dst;
+                break;
+            }
+            case syntax::TokenType::Delete: {
+                // delete obj.member：仅支持成员访问形式（TJS2 delete 作用于对象成员）
+                const auto *member = dynamic_cast<const syntax::BinaryExprNode *>(node->rhs);
+                if(!member || member->token.type() != syntax::TokenType::Dot) {
+                    error("delete expects member access (obj.member)", node->location);
+                    return;
+                }
+                Register objReg{};
+                if(!expectValue(member->lhs, objReg)) {
+                    return;
+                }
+                const auto *identifierExpr = dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs);
+                if(!identifierExpr) {
+                    error("delete member must be identifier", node->location);
+                    return;
+                }
+                auto memberReg = allocateRegister();
+                genTokenValueLoadInst(memberReg, identifierExpr->token);
+                _chunk->emit<DelProp>(objReg, memberReg, dst);
+                freeRegister(memberReg);
+                optReg = dst;
+                break;
+            }
             default:
                 error("unknow prefix unary operator", node->location);
         }
@@ -377,7 +441,6 @@ namespace cial::inter {
 
 
     void IRGenerator::generate(const syntax::SuffixUnaryExprNode *node, OptReg &optReg) {
-        // TODO:
         using enum syntax::TokenType;
         switch(node->token.type()) {
             case Isvalid: {
@@ -389,85 +452,10 @@ namespace cial::inter {
                 freeRegister(src);
                 break;
             }
-            case Increment: {
-                if(const auto *expr = dynamic_cast<const syntax::IdentifierExprNode *>(node->lhs)) {
-                    const Atom identifier = getAtomFromToken(expr->token);
-
-                    if(const auto variable = resolveLocalVariable(identifier)) {
-                        Register src2 = variable->reg;
-                        auto src1 = allocateRegister();
-                        Register dst = allocateRegister();
-                        _chunk->emit<LoadImm>(src1, 1);
-                        _chunk->emit<Add>(src1, src2, dst);
-                        // 局部变量必须写回，否则 i++ 永远不生效
-                        _chunk->emit<DLocal>(dst, src2);
-                        freeRegister(src1);
-                        optReg = dst;
-                        return;
-                    }
-
-                    auto src1 = allocateRegister();
-                    auto src2 = allocateRegister();
-                    auto dst = allocateRegister();
-                    if(isTopScope()) {
-                        // global maybe
-                        _chunk->emit<LoadImm>(src2, 1);
-                        _chunk->emit<GGlobal>(identifier, src1);
-                        _chunk->emit<Add>(src2, src1, dst);
-                        _chunk->emit<DGlobal>(identifier, dst);
-                    } else {
-                        // find on context
-                        _chunk->emit<LoadImm>(src2, 1);
-                        _chunk->emit<GThis>(identifier, src1);
-                        _chunk->emit<Add>(src2, src1, dst);
-                        _chunk->emit<DThis>(identifier, dst);
-                    }
-                    freeRegister(src2);
-                    optReg = dst;
-                    return;
-                }
-                error("current not support dot chain call", node->location);
-                return;
-            }
+            case Increment:
             case Decrement: {
-
                 if(const auto *expr = dynamic_cast<const syntax::IdentifierExprNode *>(node->lhs)) {
-                    const Atom identifier = getAtomFromToken(expr->token);
-
-                    if(const auto variable = resolveLocalVariable(identifier)) {
-                        Register src2 = variable->reg;
-                        auto src1 = allocateRegister();
-                        auto dst = allocateRegister();
-                        _chunk->emit<LoadImm>(src1, 1);
-                        // 注意操作数顺序：变量 - 1，而非 1 - 变量
-                        _chunk->emit<Sub>(src2, src1, dst);
-                        // 局部变量必须写回，否则 i-- 永远不生效
-                        _chunk->emit<DLocal>(dst, src2);
-                        freeRegister(src1);
-                        optReg = dst;
-                        return;
-                    }
-
-                    auto src1 = allocateRegister();
-                    auto src2 = allocateRegister();
-                    auto dst = allocateRegister();
-                    if(isTopScope()) {
-                        // global maybe
-                        _chunk->emit<LoadImm>(src2, 1);
-                        _chunk->emit<GGlobal>(identifier, src1);
-                        // 注意操作数顺序：变量 - 1，而非 1 - 变量
-                        _chunk->emit<Sub>(src1, src2, dst);
-                        _chunk->emit<DGlobal>(identifier, dst);
-                    } else {
-                        // find on context
-                        _chunk->emit<LoadImm>(src2, 1);
-                        _chunk->emit<GThis>(identifier, src1);
-                        // 注意操作数顺序：变量 - 1，而非 1 - 变量
-                        _chunk->emit<Sub>(src1, src2, dst);
-                        _chunk->emit<DThis>(identifier, dst);
-                    }
-                    freeRegister(src2);
-                    optReg = dst;
+                    generateIncDec(getAtomFromToken(expr->token), node->token.type() == Increment, optReg);
                     return;
                 }
                 error("current not support dot chain call", node->location);
@@ -476,6 +464,54 @@ namespace cial::inter {
             default:
                 error("unknow suffix unary operator", node->location);
         }
+    }
+
+    void IRGenerator::generateIncDec(const Atom identifier, const bool isIncrement, OptReg &optReg) {
+        if(const auto variable = resolveLocalVariable(identifier)) {
+            Register src2 = variable->reg;
+            auto src1 = allocateRegister();
+            Register dst = allocateRegister();
+            _chunk->emit<LoadImm>(src1, 1);
+            if(isIncrement) {
+                _chunk->emit<Add>(src1, src2, dst);
+            } else {
+                // 注意操作数顺序：变量 - 1，而非 1 - 变量
+                _chunk->emit<Sub>(src2, src1, dst);
+            }
+            // 局部变量必须写回，否则 ++/-- 永远不生效
+            _chunk->emit<DLocal>(dst, src2);
+            freeRegister(src1);
+            optReg = dst;
+            return;
+        }
+
+        auto src1 = allocateRegister();
+        auto src2 = allocateRegister();
+        auto dst = allocateRegister();
+        _chunk->emit<LoadImm>(src2, 1);
+        if(isTopScope()) {
+            // global maybe
+            _chunk->emit<GGlobal>(identifier, src1);
+            if(isIncrement) {
+                _chunk->emit<Add>(src2, src1, dst);
+            } else {
+                // 注意操作数顺序：变量 - 1，而非 1 - 变量
+                _chunk->emit<Sub>(src1, src2, dst);
+            }
+            _chunk->emit<DGlobal>(identifier, dst);
+        } else {
+            // find on context
+            _chunk->emit<GThis>(identifier, src1);
+            if(isIncrement) {
+                _chunk->emit<Add>(src2, src1, dst);
+            } else {
+                // 注意操作数顺序：变量 - 1，而非 1 - 变量
+                _chunk->emit<Sub>(src1, src2, dst);
+            }
+            _chunk->emit<DThis>(identifier, dst);
+        }
+        freeRegister(src2);
+        optReg = dst;
     }
 
     void IRGenerator::generate(const syntax::ProcCallExprNode *node, OptReg &optReg) {
@@ -639,7 +675,11 @@ namespace cial::inter {
         }
 
         // not found and can't init
-        addLocalVar(LocalVariable{ identifier, loadVoidReg(), makeLabel() });
+        // 每个未初始化局部变量必须持有独立寄存器并实体化 void：
+        // 共享 loadVoidReg() 会让 var a, b, c; 别名同一槽位，后续赋值互相覆盖
+        const Register voidReg = allocateRegister();
+        _chunk->emit<Load>(voidReg, ConstIdx{ 0 });
+        addLocalVar(LocalVariable{ identifier, voidReg, makeLabel() });
     }
 
     void IRGenerator::generate(const syntax::FunctionDeclNode *node, OptReg &) {
@@ -743,20 +783,32 @@ namespace cial::inter {
 
             // must init var in begin state
             if(node->constructor) {
+                // 与 generateFuncMeta 相同：实参按位置落入帧寄存器，
+                // 默认参数守卫在全部参数分配后发射
+                Vec<std::pair<Register, const syntax::ExprNode *>> defaultParams{};
                 for(auto &[token, exprNode] : node->constructor->parameters) {
                     const auto varName = getAtomFromToken(token);
-                    OptReg paramReg{};
+                    const Register paramReg = gen.allocateRegister();
+                    gen.addLocalVar(LocalVariable{ varName, paramReg, gen.makeLabel() });
+                    if(exprNode)
+                        defaultParams.emplace_back(paramReg, exprNode);
+                }
 
-                    if(exprNode) {
-                        Register defaultParamReg{ 0 };
-                        if(!gen.expectValue(exprNode, defaultParamReg)) {
-                            return;
-                        }
-                        paramReg = defaultParamReg;
-                    } else {
-                        paramReg = gen.allocateRegister();
+                for(const auto &[paramReg, exprNode] : defaultParams) {
+                    // 仅当实参为 void(未传)时才以默认值覆盖
+                    const Register voidFlag = gen.allocateRegister();
+                    gen._chunk->emit<TestVoid>(paramReg, voidFlag);
+                    gen._chunk->emit<Test>(voidFlag);
+                    const size_t jmpIdx = gen._chunk->emit<NOP>();
+                    Register defaultParamReg{ 0 };
+                    if(!gen.expectValue(exprNode, defaultParamReg)) {
+                        return;
                     }
-                    gen.addLocalVar(LocalVariable{ varName, paramReg.value(), gen.makeLabel() });
+                    gen._chunk->emit<DLocal>(defaultParamReg, paramReg);
+                    const auto skipLabel = gen.makeLabel();
+                    gen._chunk->repl<JmpNE>(jmpIdx, skipLabel);
+                    gen.freeRegister(voidFlag);
+                    gen.freeRegister(defaultParamReg);
                 }
             }
 
@@ -1171,20 +1223,33 @@ namespace cial::inter {
         auto gen = IRGenerator{ _r, _rt, _sourceFile };
         gen.makeVirtualGlobalScope();
 
+        // 调用约定：实参按位置落入帧寄存器 0..arity-1，参数寄存器必须连续分配，
+        // 默认参数的守卫代码只能在全部参数分配完之后发射
+        Vec<std::pair<Register, const syntax::ExprNode *>> defaultParams{};
         for(auto &[token, exprNode] : parameters) {
             const auto varName = getAtomFromToken(token);
-            OptReg paramReg{};
+            const Register paramReg = gen.allocateRegister();
+            gen.addLocalVar(LocalVariable{ varName, paramReg, gen.makeLabel() });
+            if(exprNode)
+                defaultParams.emplace_back(paramReg, exprNode);
+        }
 
-            if(exprNode) {
-                Register defaultParamReg{ 0 };
-                if(!gen.expectValue(exprNode, defaultParamReg)) {
-                    return nullptr;
-                }
-                paramReg = defaultParamReg;
-            } else {
-                paramReg = gen.allocateRegister();
+        for(const auto &[paramReg, exprNode] : defaultParams) {
+            // 默认参数语义（TJS2）：仅当对应实参为 void(未传)时才以默认值覆盖，
+            // 否则实参已占据参数寄存器。降糖为 TestVoid + 条件跳过
+            const Register voidFlag = gen.allocateRegister();
+            gen._chunk->emit<TestVoid>(paramReg, voidFlag);
+            gen._chunk->emit<Test>(voidFlag);
+            const size_t jmpIdx = gen._chunk->emit<NOP>();
+            Register defaultParamReg{ 0 };
+            if(!gen.expectValue(exprNode, defaultParamReg)) {
+                return nullptr;
             }
-            gen.addLocalVar(LocalVariable{ varName, paramReg.value(), gen.makeLabel() });
+            gen._chunk->emit<DLocal>(defaultParamReg, paramReg);
+            const auto skipLabel = gen.makeLabel();
+            gen._chunk->repl<JmpNE>(jmpIdx, skipLabel);
+            gen.freeRegister(voidFlag);
+            gen.freeRegister(defaultParamReg);
         }
 
         OptReg ignoreReg{};
@@ -1235,8 +1300,10 @@ namespace cial::inter {
                 _chunk->emit<LoadImm>(reg, token.getInteger());
                 break;
             case syntax::TokenValueType::None:
-                // loadVoidReg();
-                // this is void
+                // void 值（void 字面量 / 缺省 else 分支）：常量池 0 号约定为 Void。
+                // 旧实现什么都不发射，目标寄存器保留陈旧值——`x === void` 等比较
+                // 因此读到垃圾而非 void
+                _chunk->emit<Load>(reg, ConstIdx{ 0 });
                 break;
         }
     }

@@ -46,16 +46,22 @@ namespace cial {
         registerMethod<String>("trim"_str, &stdlib::stringTrim);
         registerMethod<String>("reverse"_str, &stdlib::stringReverse);
         registerMethod<String>("repeat"_str, &stdlib::stringRepeat);
+
+        // 只读属性（str.length；与 charAt 一致的字节长度语义）
+        registerProperty<String>("length"_str, [](const Value &thisObj) {
+            return Value{ Integer{ thisObj.asString().unwrap()->length() } };
+        });
     }
 
     void Context::collectMark() const {
         _impl->rt.collectMark();
         _impl->globalObject.marked();
 
-        for(const auto &[instanceMethods] : _impl->nativeRegister.tables | std::views::values) {
+        for(const auto &[instanceMethods, instanceProperties] : _impl->nativeRegister.tables | std::views::values) {
             for(const auto &method : instanceMethods | std::views::values) {
                 method->marked();
             }
+            // instanceProperties 是原生函数指针（非 GC 对象），无需标记
         }
 
         for(const auto &val : _impl->globalObject.props() | std::views::values) {

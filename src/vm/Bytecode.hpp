@@ -30,6 +30,8 @@
     O(JmpNE)                                                                                                           \
     O(ToInt)                                                                                                           \
     O(ToReal)                                                                                                          \
+    O(Asc)                                                                                                             \
+    O(Chr)                                                                                                              \
     O(ToString)                                                                                                        \
     O(TypeOf)                                                                                                           \
     O(LNot)                                                                                                            \
@@ -37,6 +39,7 @@
     O(ChgThis)                                                                                                         \
     O(ChkInv)                                                                                                          \
     O(ChkIns)                                                                                                          \
+    O(TestVoid)                                                                                                        \
     O(Load)                                                                                                            \
     O(LoadImm)                                                                                                         \
     O(DGlobal)                                                                                                         \
@@ -69,7 +72,8 @@
     O(LOr)                                                                                                             \
     O(Call)                                                                                                            \
     O(GProp)                                                                                                           \
-    O(DProp)
+    O(DProp)                                                                                                           \
+    O(DelProp)
 
 namespace cial::vm {
     class VMState;

@@ -167,6 +167,16 @@ namespace cial::vm {
                     prevFrame()->getReg(*cFrame->ret) = Value{};
                 freeCallFrame();
                 if(_stackTop == 0) {
+                    // 未捕获异常：Exception 对象优先输出 message（与 TJS2 行为一致，
+                    // 否则只显示 <object> 无法定位语料失败点）
+                    if(_exValue.isObject()) {
+                        if(auto *obj = _exValue.asObject().unwrap(); dynamic_cast<DataObject *>(obj)) {
+                            const Atom msgAtom = rt.atomTable.intern("message"_str);
+                            if(obj->hasProp(msgAtom)) {
+                                throw std::runtime_error(fmt::format("{}", obj->getProp(msgAtom)));
+                            }
+                        }
+                    }
                     throw std::runtime_error(fmt::format("{}", _exValue));
                 }
                 continue;
@@ -231,13 +241,40 @@ namespace cial::vm {
 
             while(pc < bcSize) {
                 DispatchRet r{};
-                switch(static_cast<VmOpCode>(ip[pc++])) {
+                try {
+                    switch(static_cast<VmOpCode>(ip[pc++])) {
 #define DISPATCH_CASE(op)                                                                                              \
     case VmOpCode::op:                                                                                                 \
         r = dispatch##op(cur, constants, regs, ip, pc);                                                                \
         break;
-                    CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_CASE)
+                        CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_CASE)
 #undef DISPATCH_CASE
+                    }
+                } catch(const std::exception &e) {
+                    if(_pending != PendingCF::None) {
+                        throw; // 脚本异常传播中,不吞噬
+                    }
+                    // 原生异常(属性缺失/操作数类型错误等)转脚本异常:
+                    // 有 catch 处理器则被脚本 try/catch 捕获(TJS2 语义),
+                    // 无则最终仍向上报告。
+                    // 包装为 Exception 实例(语料 catch(e) 后访问 e.message):
+                    // 直接构造 DataObject 挂 message 槽位,不执行 TJS 构造器
+                    _pending = PendingCF::Throw;
+                    const Atom excAtom = rt.atomTable.intern("Exception"_str);
+                    bool wrapped = false;
+                    if(const Value *klassVal = context.global()->findPropRef(excAtom); klassVal && klassVal->isObject()) {
+                        if(auto *klass = dynamic_cast<ClassObject *>(klassVal->asObject().unwrap())) {
+                            auto *obj = rt.create<DataObject>(this, klass).get();
+                            obj->setProp(rt.atomTable.intern("message"_str), Value{ String{ e.what() } });
+                            _exValue = Value{ obj };
+                            rt.addHandleVal(obj); // 根保护至 clearException
+                            wrapped = true;
+                        }
+                    }
+                    if(!wrapped) {
+                        _exValue = Value{ String{ e.what() } };
+                    }
+                    cur->pc = pc;
                 }
 
                 if(r == DispatchRet::Call) {
@@ -306,7 +343,7 @@ namespace cial::vm {
     }
 
     DISPATCH_OP_METHOD(PopN) {
-        const i64 count = decodeSleb128(ip, pc, 8);
+        const i64 count = decodeSleb128(ip, pc, 10);
         pop(static_cast<size_t>(count));
         return DispatchRet::Continue;
     }
@@ -427,6 +464,40 @@ namespace cial::vm {
         return DispatchRet::Continue;
     }
 
+    // #s：取操作数字符串化后首字符的字符码（空串为 0）。TJS2 语义:整数 65 → "65"
+    // → '6' → 54;octet 无字符串转换,抛错(语料 test_variant 期望其进入 catch)
+    DISPATCH_OP_METHOD(Asc) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        Value strVal = regs[r1];
+        if(strVal.isOctet()) {
+            throw std::runtime_error("'#' operator expects a string operand");
+        }
+        if(!strVal.isString()) {
+            if(const auto r = strVal.toString(); r.isFailed()) {
+                throw r.getErr();
+            }
+        }
+        const String *str = strVal.asString().unwrap();
+        regs[r2] =
+            Value{ Integer{ str->isEmpty() ? 0 : static_cast<Integer>(static_cast<unsigned char>(str->getData()[0])) } };
+        return DispatchRet::Continue;
+    }
+
+    // $n：字符码转 1 字符字符串（与 charAt 一致的字节语义）
+    DISPATCH_OP_METHOD(Chr) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        const Value &src = regs[r1];
+        if(!src.isInteger() && !src.isReal()) {
+            throw std::runtime_error("'$' operator expects an integer operand");
+        }
+        const auto code = static_cast<unsigned char>(
+            src.isInteger() ? src.asIntegerUnsafe() : static_cast<Integer>(src.asReal().unwrap().value()));
+        regs[r2] = Value{ String{ static_cast<char>(code) } };
+        return DispatchRet::Continue;
+    }
+
     DISPATCH_OP_METHOD(TypeOf) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
@@ -503,15 +574,39 @@ namespace cial::vm {
     }
 
     DISPATCH_OP_METHOD(ChkIns) {
-        const u16 r1 = read<u16>(ip, pc); // dst（输入对象/输出 bool）
+        const u16 r1 = read<u16>(ip, pc); // 值(任意类型),同时是输出 bool 的槽位
         const u16 r2 = read<u16>(ip, pc); // 类名字符串
         Value &dst = regs[r1];
         if(const Value &src = regs[r2]; src.isString()) {
-            const Atom atom = rt.atomTable.intern(*src.asString().value());
-            dst = Value{ Integer{ dst.asObject().unwrap()->instanceOf(atom) } };
+            const String &name = *src.asString().unwrap();
+            // TJS2 语义:基础类型用类型名匹配(Integer/Real 同属 "Number"),
+            // 其余走对象的类名 instanceOf
+            bool result = false;
+            if(name == "Number") {
+                result = dst.isInteger() || dst.isReal();
+            } else if(name == "Integer") {
+                result = dst.isInteger();
+            } else if(name == "Real") {
+                result = dst.isReal();
+            } else if(name == "String") {
+                result = dst.isString();
+            } else if(name == "Octet") {
+                result = dst.isOctet();
+            } else if(dst.isObject()) {
+                const Atom atom = rt.atomTable.intern(name);
+                result = dst.asObject().unwrap()->instanceOf(atom);
+            }
+            dst = Value{ Integer{ result } };
             return DispatchRet::Continue;
         }
         dst = Value{ Integer{ false } };
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(TestVoid) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        regs[r2] = Value{ Integer{ regs[r1].isVoid() } };
         return DispatchRet::Continue;
     }
 
@@ -525,7 +620,7 @@ namespace cial::vm {
 
     DISPATCH_OP_METHOD(LoadImm) {
         const u16 r1 = read<u16>(ip, pc);
-        const i64 imm = decodeSleb128(ip, pc, 8);
+        const i64 imm = decodeSleb128(ip, pc, 10);
         regs[r1] = Value{ imm };
         return DispatchRet::Continue;
     }
@@ -690,7 +785,7 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(Call) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
-        const i64 imm = decodeSleb128(ip, pc, 8);
+        const i64 imm = decodeSleb128(ip, pc, 10);
         const auto &object = regs[r2].asObject().unwrap();
         cur->pc = pc;
         object->call(*this, r1, imm);
@@ -734,11 +829,20 @@ namespace cial::vm {
             return DispatchRet::Continue;
         }
 
-        // Native method
+        // Native property（如 str.length / octet.length）
         const TypeId tId = ValueToTypeId::getId(val);
         assert(tId != TypeId::None);
+        if(auto *getter = context.findProperty(tId, atom)) {
+            regs[r3] = getter(val);
+            return DispatchRet::Continue;
+        }
+
+        // Native method
         NativeFunction *nativeFn = context.findMethod(tId, atom);
-        assert(nativeFn != nullptr);
+        if(!nativeFn) {
+            // 成员不存在:脚本可捕获的运行期异常(与对象成员缺失同语义)
+            throw std::runtime_error("in native object Not found property: " + name.toStdStr());
+        }
         nativeFn = rt.create<NativeFunction>(*nativeFn).get();
         nativeFn->setThisObj(val);
         regs[r3] = Value{ nativeFn };
@@ -754,6 +858,22 @@ namespace cial::vm {
         const String &name = *regs[r2].asString().unwrap();
         const Atom atom = rt.atomTable.intern(name);
         objVal.asObject().unwrap()->setProp(atom, regs[r3]);
+        return DispatchRet::Continue;
+    }
+
+    // delete obj.member：删除成员，dst 写入是否删除成功（bool，TJS2 DeleteMember 语义）
+    DISPATCH_OP_METHOD(DelProp) {
+        const u16 r1 = read<u16>(ip, pc); // obj
+        const u16 r2 = read<u16>(ip, pc); // member
+        const u16 r3 = read<u16>(ip, pc); // dst
+        const auto &objVal = regs[r1];
+        if(!objVal.isObject()) {
+            regs[r3] = Value{ Integer{ false } };
+            return DispatchRet::Continue;
+        }
+        const String &name = *regs[r2].asString().unwrap();
+        const Atom atom = rt.atomTable.intern(name);
+        regs[r3] = Value{ Integer{ objVal.asObject().unwrap()->delProp(atom) } };
         return DispatchRet::Continue;
     }
 

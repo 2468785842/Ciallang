@@ -53,8 +53,12 @@ namespace cial {
         }
     };
 
+    // 原生只读属性 getter：thisObj 为宿主值（如 String），返回属性值（如 str.length）
+    using NativePropGetter = Value (*)(const Value &thisObj);
+
     struct MethodTable {
         Map<Atom, NativeFunction *> instanceMethods; // instance method，like `arr.push()`
+        Map<Atom, NativePropGetter> instanceProperties; // 只读属性，like `str.length`
     };
 
     class NativeRegister {
@@ -63,9 +67,8 @@ namespace cial {
 
         template <typename Callable>
         void registerMethod(const TypeId typeId, const Atom name, Callable &&fn) {
-            auto &[instanceMethods] = tables[typeId];
             auto *nativeFn = _rt.create<NativeFunction>(std::forward<Callable>(fn)).get();
-            instanceMethods[name] = nativeFn;
+            tables[typeId].instanceMethods[name] = nativeFn;
         }
 
         template <typename T, typename Callable>
@@ -80,13 +83,31 @@ namespace cial {
             return registerMethod<T>(a, std::forward<Callable>(fn));
         }
 
+        void registerProperty(const TypeId typeId, const Atom name, const NativePropGetter getter) {
+            tables[typeId].instanceProperties[name] = getter;
+        }
+
+        template <typename T>
+        void registerProperty(const String &name, const NativePropGetter getter) {
+            registerProperty(TypeTraits<T>::id, _rt.atomTable.intern(name), getter);
+        }
+
         [[nodiscard]] NativeFunction *findMethod(const TypeId typeId, const Atom name) const {
             const auto it = tables.find(typeId);
             if(it == tables.end())
                 return nullptr;
-            const auto &[instanceMethods] = it->second;
-            const auto fnIt = instanceMethods.find(name);
-            return fnIt != instanceMethods.end() ? fnIt->second : nullptr;
+            const auto &methods = it->second.instanceMethods;
+            const auto fnIt = methods.find(name);
+            return fnIt != methods.end() ? fnIt->second : nullptr;
+        }
+
+        [[nodiscard]] NativePropGetter findProperty(const TypeId typeId, const Atom name) const {
+            const auto it = tables.find(typeId);
+            if(it == tables.end())
+                return nullptr;
+            const auto &props = it->second.instanceProperties;
+            const auto propIt = props.find(name);
+            return propIt != props.end() ? propIt->second : nullptr;
         }
 
         template <typename T>

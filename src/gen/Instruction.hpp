@@ -35,6 +35,8 @@
     O(JmpNE)                                                                                                           \
     O(ToInt)                                                                                                           \
     O(ToReal)                                                                                                          \
+    O(Asc)                                                                                                            \
+    O(Chr)                                                                                                             \
     O(ToString)                                                                                                        \
     O(TypeOf)                                                                                                           \
     O(LNot)                                                                                                            \
@@ -42,6 +44,7 @@
     O(ChgThis)                                                                                                         \
     O(ChkInv)                                                                                                          \
     O(ChkIns)                                                                                                          \
+    O(TestVoid)                                                                                                        \
     O(Load)                                                                                                            \
     O(LoadImm)                                                                                                         \
     O(DGlobal)                                                                                                         \
@@ -74,7 +77,8 @@
     O(LOr)                                                                                                             \
     O(Call)                                                                                                            \
     O(GProp)                                                                                                           \
-    O(DProp)
+    O(DProp)                                                                                                          \
+    O(DelProp)
 
 namespace cial::vm {
     class VMState;
@@ -245,6 +249,10 @@ namespace cial::inter {
 
     DEF_INST(TypeOf, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
+    // #s: 字符串首字符的字符码(旧版 VM_ASC);$n: 字符码转 1 字符字符串(旧版 VM_CHR)
+    DEF_INST(Asc, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
+    DEF_INST(Chr, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
+
     DEF_INST(LNot, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     DEF_INST(ChgSign, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
@@ -252,6 +260,9 @@ namespace cial::inter {
 
     DEF_INST(ChkInv, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
     DEF_INST(ChkIns, 2, OP_GET1(dst, Register) OP_GET2(src, Register));
+
+    // src 是否为 void → dst(bool)；默认参数守卫用（实参未传时才求值默认表达式）
+    DEF_INST(TestVoid, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     DEF_INST(Load, 2, OP_GET1(dst, Register) OP_GET2(value, ConstIdx));
     DEF_INST(LoadImm, 2, OP_GET1(dst, Register) OP_GET2(value, Integer));
@@ -292,6 +303,8 @@ namespace cial::inter {
     DEF_INST(Call, 3, OP_GET1(dst, Register) OP_GET2(memberReg, Register) OP_GET3(argCount, Integer));
     DEF_INST(GProp, 3, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(dst, Register));
     DEF_INST(DProp, 3, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(src, Register));
+    // delete obj.member:删除成员,dst 写入是否删除成功(bool)
+    DEF_INST(DelProp, 3, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(dst, Register));
 
     struct DumpInst {
         [[nodiscard]] static String dumpOperand(const Operand &operand);

@@ -65,6 +65,8 @@ namespace cial {
 
         [[nodiscard]] bool hasProp(Atom a) const override;
 
+        [[nodiscard]] bool delProp(Atom a) override;
+
         [[nodiscard]] const Map<Atom, Value> &props() const noexcept { return _props; }
 
     protected:
@@ -112,6 +114,8 @@ namespace cial {
         Value getProp(Atom a) override;
 
         [[nodiscard]] bool hasProp(Atom a) const override;
+
+        [[nodiscard]] bool delProp(Atom a) override;
 
         void setSuperClass(const Atom a, ClassObject *clazz) {
             if(!_superClass.contains(a))

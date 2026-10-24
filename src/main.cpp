@@ -12,6 +12,7 @@
  *
  */
 
+#include "stdlib/ExceptionLib.hpp"
 #include "stdlib/Print.hpp"
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
@@ -34,7 +35,7 @@ int main(const int argc, char **argv) {
     context.registryGlobalFunc("print"_str, &stdlib::S_PrintFunction);
     context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
     vm::VMState vmState{ context };
-    const VM vm{ &vmState };
+    VM vm{ &vmState };
     // Debug.message 垫片:对拍语料(tests/test_files/tjs2)用 TJS2 的 Debug.message
     // 输出,Ciallang 以等价对象承接,保证同一脚本双引擎可原样运行
     vm.eval(R"(class __DebugShim {
@@ -43,6 +44,8 @@ int main(const int argc, char **argv) {
 }
 var Debug = new __DebugShim();
 )"_str);
+    // Exception 内建类(语料中 throw new Exception(...) 高频依赖)
+    stdlib::initExceptionClass(vm);
     try {
         vm.eval(String(argv[1]), true);
     } catch(const std::exception &e) {

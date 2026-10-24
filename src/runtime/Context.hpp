@@ -42,8 +42,17 @@ namespace cial {
             return nativeRegister().registerMethod<T>(name, std::forward<Callable>(fn));
         }
 
+        template <typename T>
+        void registerProperty(const String &name, const NativePropGetter getter) {
+            return nativeRegister().registerProperty<T>(name, getter);
+        }
+
         [[nodiscard]] NativeFunction *findMethod(const TypeId typeId, const Atom a) const {
             return nativeRegister().findMethod(typeId, a);
+        }
+
+        [[nodiscard]] NativePropGetter findProperty(const TypeId typeId, const Atom a) const {
+            return nativeRegister().findProperty(typeId, a);
         }
 
         void registryGlobalFunc(const String &name, NativeFunction *func) const noexcept;

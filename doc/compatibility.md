@@ -13,19 +13,23 @@
 | 预处理 | @set / @if / @endif | ✅ |
 | 语句 | var/if/while/do-while/for/switch/try-catch/return/break/continue/function/property/class/debugger | ✅ |
 | 语句 | with | ❌ |
-| 语句 | for(const …) 、var 类型注解/const | ❌ |
+| 语句 | for(const …)、var 类型注解 | ◐ for(const) ✅；const 声明 ✅（只读性不强制）；类型注解 ❌ |
 | 表达式 | 赋值全家（含 `<->`、`\|\|=`、`&&=`、`>>>=`）、?:、逻辑/位/比较/严格相等/移位/乘除整除 | ✅ |
-| 一元前缀 | `!` `new` `invalidate` `-`（及前后缀 `isvalid`） | ✅ |
-| 一元前缀 | `~` `++` `--` `delete` `typeof` `#` `$` `+` `&` `*` | ❌（前缀 ++/-- 报错，TODO 二节） |
+| 一元前缀 | `!` `new` `invalidate` `-` `~` `++` `--` `delete` `typeof` `#` `$` `+`（及前后缀 `isvalid`） | ✅ |
+| 一元前缀 | `&`（忽略属性访问）`*`（强制属性访问） | ❌ |
 | 一元后缀 | `()` `.` `++` `--` | ✅ |
 | 一元后缀 | `[]`（下标，依赖 Array/String 成员语义）与 `!`（eval 即时求值） | ❌ |
-| 中缀 | instanceof / incontextof | ✅ / ✅；`in` ❌ |
-| 字面量 | 全部标量 + 函数表达式 + @"…" 模板串 | ✅ |
-| 字面量 | `[...]` Array、`%[...]` Dictionary、`<%%>` Octet、`(const)` 常量形 | ❌ |
-| 函数 | 默认参数 | ✅ |
+| 中缀 | instanceof / incontextof | ✅（instanceof 基础类型按类型名匹配）/ ✅；`in` ❌ |
+| 字面量 | 全部标量（含 i64 大整数字面量精确解析）+ 函数表达式 + @"…" 模板串 | ✅ |
+| 字面量 | `[...]` Array、`%[...]` Dictionary、`<%%>` Octet、`(const)` 常量形 | ◐ Octet ✅；其余 ❌ |
+| 后缀条件 | `expr if cond`（假条件整体不赋值，tjs.y expr 层级绑定） | ✅ |
+| 函数 | 默认参数（TestVoid 守卫，实参优先） | ✅ |
 | 函数 | 收拢 `*args`、省略调用 `...`、展开调用 `*expr` | ❌ |
 | 类 | 多继承/slot 链/super/构造函数/property（29 个语义测试） | ✅ |
 | 类 | static / finalize 触发语义 | ◐ |
+| 成员 | `delete obj.member`（实例自有成员） | ✅ |
+| 成员 | `str.length` 只读属性 | ✅ |
+| 异常 | Exception 类（message 成员）+ 原生错误转脚本可捕获异常 | ✅ |
 
 ## 2. 字节码兼容（TJSCompiler 编译产物 `"TJS2" "100\0"` 文件）
 
@@ -50,7 +54,7 @@
 | String 内建成员 | length/charAt/indexOf/toUpperCase/…/sprintf/replace/split/escape/trim | ◐ replace/split 待 RegExp+Array |
 | Array | 数字下标数组；load/save(BinarySerializer)/sort/join/split/pack… | ❌ |
 | Dictionary | 哈希字典；load/save/assign/clear | ❌ |
-| Exception | 异常类（message 成员），脚本异常载体 | ❌（try-catch 机制已有，类缺失） |
+| Exception | 异常类（message 成员），脚本异常载体 | ✅（TJS 源自举，main.cpp 注入；原生错误自动包装为 Exception 实例） |
 | Math / Math.RandomGenerator | abs/floor/…；Xorshift / MT19937 | ❌ |
 | Date | get/set 系列 + 字符串 parse（tjsdate.y 文法） | ❌ |
 | RegExp | compile/test/match/exec/replace/split（oniguruma） | ❌ |
@@ -62,10 +66,13 @@
 |---|---|---|---|
 | 内存管理 | 纯引用计数（tTJSVariant CopyRef） | 标记清除 GC + 引用计数混合 | 行为等价；GC 句柄坑位见 AGENTS.md |
 | 性能 | fib(25) 基准 | 约慢 2.3~2.5×（优化前 4~5×） | TODO.md 一节任务 |
-| 字符串内部编码 | UTF-16（tjs_char） | UTF-8 | 字节码转译处做转换（代理对） |
+| 字符串内部编码 | UTF-16（tjs_char） | UTF-8 | 字节码转译处做转换（代理对）；str.length 为字节长度 |
 | 调用栈深度 | 无同值上限 | 1024 | 记录差异 |
 | 局部变量名（字节码态） | 序列化不含 Namespace | 同样无 | 一致 |
 | 随机序列 | Math.random Xorshift；RandomGenerator MT19937 | 无 | 实现时注意原版注释"序列不保证一致" |
+| 原生错误报告 | 未捕获异常打印 VM 转储（含 ip） | 顶层打印 Exception.message 文本 | 语料对拍报告的 DIFF 部分由此产生，语义等价 |
+| `#`/`$` 操作数 | 严格类型（字符串/整数） | `#` 对非字符串先字符串化（`#65 == 54`，对齐 kirikiri 语料期望） | 记录差异 |
+| 后缀 `i++` 表达式值 | 返回自增前旧值 | 返回自增后新值（前后缀一致） | TODO 三节待修 |
 
 ## 5. 路线图（建议顺序）
 

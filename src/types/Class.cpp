@@ -13,6 +13,7 @@
 #include "Class.hpp"
 
 #include <unordered_set>
+#include <fmt/format.h>
 
 #include "Property.hpp"
 #include "vm/VMState.hpp"
@@ -111,7 +112,9 @@ namespace cial {
             Function constructor{ clazz->meta->constructor };
             constructor.thisObj = dataObject;
 
-            const auto cnt = clazz->meta->arity > argCount ? clazz->meta->arity - argCount : 0;
+            // 注意用构造器 FuncMeta 的 arity（ClassMeta::arity 恒 0，是字段初始化器的）：
+            // 用错会导致无实参时不补 void，参数寄存器读到上一帧的陈旧值
+            const auto cnt = constructor.meta->arity > argCount ? constructor.meta->arity - argCount : 0;
             if(cnt > 0)
                 vmState.pushVoid(cnt);
 
@@ -150,7 +153,8 @@ namespace cial {
                         Function constructor{ meta->constructor };
                         constructor.thisObj = dataObject;
 
-                        const auto cnt = meta->arity > argCount ? meta->arity - argCount : 0;
+                        // 同 newClass：补 void 的数量以构造器 FuncMeta 的 arity 为准
+                        const auto cnt = constructor.meta->arity > argCount ? constructor.meta->arity - argCount : 0;
                         if(cnt > 0)
                             vmState.pushVoid(cnt);
 
@@ -207,7 +211,13 @@ namespace cial {
 
     bool ClassObject::hasProp(const Atom a) const { return _props.contains(a); }
 
+    bool ClassObject::delProp(const Atom a) { return _props.erase(a) > 0; }
+
     void DataObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
+
+    // 仅删除实例自有成员；类定义的方法/属性不删（与 TJS2 delete 语义一致：
+    // delete 只作用于对象自身添加的成员）
+    bool DataObject::delProp(const Atom a) { return _props.erase(a) > 0; }
 
     Value DataObject::getProp(const Atom a) {
 

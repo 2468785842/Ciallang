@@ -15,17 +15,17 @@
 ## 1. 两级结构总览
 
 ```
-AST ──IRGenerator──▶ TAC 指令序列（55 种，Instruction 对象）
+AST ──IRGenerator──▶ TAC 指令序列（59 种，Instruction 对象）
                         │  存于 Chunk::_instructions
                         ▼  Chunk::toBytecode()（幂等、惰性）
-                     扁平字节码 Vec<u8>（55 种 VmOpCode，与 TAC 一一对应）
+                     扁平字节码 Vec<u8>（59 种 VmOpCode，与 TAC 一一对应）
                         │  存于 Chunk::_code
                         ▼
                      VMState::run0() switch 解释（唯一执行路径）
 ```
 
 - 早期的 `run()` 多态执行路径（逐条虚调用 `Instruction::execute`）已删除；
-  语义全部收敛到 `run0()` 的 55 个 `dispatchXXX`。
+  语义全部收敛到 `run0()` 的 59 个 `dispatchXXX`。
 - `Instruction` 子类只作为 IR 载体与 dump 来源保留。
 
 ## 2. 执行模型
@@ -43,7 +43,7 @@ AST ──IRGenerator──▶ TAC 指令序列（55 种，Instruction 对象）
 - **this**：`CallFrame::thisObj`；`Function::call` 设为函数对象的 `thisObj` 字段（可被
   `ChgThis`/`GProp` 的方法绑定改写）。`GThis`/`DThis` 做名字查找（thisObj → closure 局部 → global）。
 
-## 3. TAC 指令全表（55 条）
+## 3. TAC 指令全表（59 条）
 
 枚举值 = 表中顺序（X-macro `CIAL_TAC_OPCODE_ENUMS`）。操作数记号：
 `%r`=寄存器、`@l`=标签（TAC 指令下标）、`*c`=常量池下标、`imm`=立即整数、`atom`=驻留名。
@@ -111,7 +111,10 @@ AST ──IRGenerator──▶ TAC 指令序列（55 种，Instruction 对象）
 | 16 | ToString | `%src, %dst` | 转字符串 |
 | 17 | LNot | `%src, %dst` | 逻辑非 |
 | 18 | ChgSign | `%src, %dst` | 变号 |
-| 21 | ChkIns | `%name, %obj` | `obj = (obj instanceof name)`（name 为类名字符串，结果原地写回 obj 槽） |
+| 19 | Asc | `%src, %dst` | `#s`：字符串化后取首字符码（octet 报错） |
+| 20 | Chr | `%src, %dst` | `$n`：字符码转 1 字符字符串 |
+| 21 | ChkIns | `%name, %obj` | `obj = (obj instanceof name)`（基础类型按类型名匹配：Number 覆盖 Integer/Real；结果原地写回 obj 槽） |
+| 22 | TestVoid | `%src, %dst` | `dst = (src is void)`；函数默认参数守卫用 |
 
 ### 3.8 算术/位/比较（三操作数，dst ← src1 op src2）
 
@@ -135,8 +138,9 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 
 | # | 指令 | 操作数 | 语义 |
 |---|---|---|---|
-| 54 | GProp | `%obj, %name, %dst` | `dst = obj[name]`；特判 GlobalObject/ClassObject（方法绑定 this）/非对象走原生方法表 |
+| 54 | GProp | `%obj, %name, %dst` | `dst = obj[name]`；特判 GlobalObject/ClassObject（方法绑定 this）/非对象先查原生属性表（`str.length`）再查方法表 |
 | 55 | DProp | `%obj, %name, %src` | `obj[name] = src` |
+| 56 | DelProp | `%obj, %name, %dst` | `dst = delete obj[name]`（仅删实例自有成员，TJS2 DeleteMember 语义） |
 
 ⚠️ 与 TJS 不同：Ciallang 的 GProp/DProp **只有 indirect 形态**（名字来自寄存器），
 没有 direct（常量池名字）与 P（无成员闭包）变体；也没有 IGNOREPROP/MEMBERENSURE 标志位
@@ -166,10 +170,10 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 
 ## 5. 扁平字节码（`run0()` 路径）
 
-### 5.1 操作码（55 个，`VmOpCode : u8`）
+### 5.1 操作码（59 个，`VmOpCode : u8`）
 
 与 TAC 指令一一对应、编号一致（同一个 X-macro 序表 `CIAL_BYTECODE_OPCODE_ENUMS`，
-顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 55 条，无占位断言。
+顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 59 条，无占位断言。
 
 ### 5.2 立即数编码
 
@@ -179,14 +183,14 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 - 操作数宽度约定：寄存器 `u16`、Atom `u32`（Atom.v 是顺序索引，远小于 2^32）、
   跳转目标 `u32`（编译期回填的绝对偏移）。
 
-### 5.3 指令编码表（55 条全覆盖）
+### 5.3 指令编码表（59 条全覆盖）
 
 | 类别 | 指令 | 编码 |
 |---|---|---|
 | 无操作数 | NOP / Debugger | `op(1B)` |
 | 单寄存器 | Push / PopN 前的 Test / Inv / Throw / Ret / Global / Super / This | `op + u16`（PopN 为 `op + sLEB128 count`） |
 | 跳转 | Jmp / JmpE / JmpNE | `op + u32 目标`（占位 + 回填，§5.5） |
-| 二寄存器 | ToInt/ToReal/ToString/LNot/ChgSign/ChkInv（`src,dst`）、ChgThis（`函数,新this`）、ChkIns（`dst,src`）、GLocal/DLocal（`src,dst`） | `op + u16 + u16` |
+| 二寄存器 | ToInt/ToReal/ToString/Asc/Chr/LNot/ChgSign/ChkInv/TestVoid（`src,dst`）、ChgThis（`函数,新this`）、ChkIns（`dst,src`）、GLocal/DLocal（`src,dst`） | `op + u16 + u16` |
 | 装载 | Load（`dst, constIdx`）、LoadImm（`dst, imm`） | `op + u16 + u16` / `op + u16 + sLEB128` |
 | 名字访问 | DGlobal/GGlobal/GThis/DThis | `op + u32 atom + u16 reg` |
 | 算术/位/比较 | Add..LOr 全部 22 条（§3.8） | `op + u16 src1 + u16 src2 + u16 dst`（**三寄存器非破坏性**） |

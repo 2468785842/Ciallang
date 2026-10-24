@@ -5,6 +5,7 @@
 #include <catch.hpp>
 
 #include "vm/VM.hpp"
+#include "stdlib/ExceptionLib.hpp"
 #include "vm/VMState.hpp"
 
 using namespace cial;
@@ -99,5 +100,38 @@ TEST_CASE("异常处理 - 执行") {
         REQUIRE_THROWS(vm.eval(R"(
                 throw "fatal";
             )"_str));
+    }
+}
+
+TEST_CASE("Exception 内建类与原生异常包装") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+    stdlib::initExceptionClass(vm);
+
+    SECTION("throw new Exception 带 message") {
+        vm.eval(R"(
+            var m;
+            try { throw new Exception("custom"); } catch(e) { m = e.message; }
+        )"_str);
+        REQUIRE((**vm.evalExpr<String *>("m"_str)) == "custom"_str);
+    }
+
+    SECTION("缺省 message") {
+        vm.eval(R"(
+            var m;
+            try { throw new Exception(); } catch(e) { m = e.message; }
+        )"_str);
+        REQUIRE((**vm.evalExpr<String *>("m"_str)) == "Exception"_str);
+    }
+
+    SECTION("原生异常可被 catch 且包装为 Exception") {
+        vm.eval(R"(
+            var m;
+            try { var x = <% 10 %> / <% 5 %>; } catch(e) { m = e.message; }
+        )"_str);
+        REQUIRE((**vm.evalExpr<String *>("m"_str)).length() > 0);
     }
 }
