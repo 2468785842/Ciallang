@@ -41,10 +41,14 @@ namespace cial {
 
         void append(const String &str);
 
-        // 一次性拼接(单次分配,两段均拷贝并正确终止);热路径用这个而非 copy+append
+        // 一次性拼接(单次分配,两段均拷贝并正确终止);热路径用这个而非 copy+append。
+        // SSO 阈值必须与构造/析构/move 的长串判据(len > SHORT_STR_LEN)一致:
+        // total == SHORT_STR_LEN 仍是短串(_shortStr 容量 22=21字符+NUL)。
+        // 旧判据 total < SHORT_STR_LEN 把恰好 21 字符的结果送进长串分支,
+        // _longStr 分配后 move/析构按短串处理——丢尾字符并泄漏缓冲
         [[nodiscard]] static String concat(const String &a, const String &b) {
             const u32 total = a._len + b._len;
-            if(total < SHORT_STR_LEN) {
+            if(total <= SHORT_STR_LEN) {
                 String r{};
                 std::memcpy(r._shortStr, a.getData(), a._len);
                 std::memcpy(r._shortStr + a._len, b.getData(), b._len);
@@ -62,8 +66,8 @@ namespace cial {
 
         // 保证长字符串缓冲至少可容纳 cap 字节(不含终止符);短串超限则转长串
         void reserveExact(const u32 cap) {
-            if(cap < SHORT_STR_LEN)
-                return; // 短串足够
+            if(cap <= SHORT_STR_LEN)
+                return; // 短串足够(与 concat 的 SSO 阈值一致)
             if(_longStr && cap < _lenCap)
                 return; // 容量已够
             auto *buf = new char[cap + 1];

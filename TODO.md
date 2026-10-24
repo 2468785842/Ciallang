@@ -1,8 +1,8 @@
 # 后续任务清单
 
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
-> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-24，563d20d 后）——
-> 类实例化 114% / 整数循环 123% / fib(25) 136% / 字符串拼接 185%。
+> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-24，RegExp 批次后）——
+> 类实例化 110% / 整数循环 121% / fib(25) 127% / 字符串拼接 185%。
 > TJS2 语料对拍（2026-10-24）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
 > DIFF 3（test_misc、test_variant 为异常消息格式差异，Ciallang 行为正确；
 > test_string 双方干净通过，Ciallang 侧无输出、参考实现多 25 行引擎转储）/
@@ -27,13 +27,13 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] Array 标准库剩余：sort/split/save/load/pack 系/Assignment 联动
+- [ ] 标准库：Date / Math 完整 API；RegExp 剩余（`new RegExp(...)` 构造器、
+      replace 函数回调（依赖脚本回调调用支持，同 Array.sort）、静态属性 `RegExp.last`、
+      匹配位置改 UTF-8 码点语义——当前为字节偏移）
+- [ ] Array 标准库剩余：sort（依赖脚本回调调用支持）/save/load/pack 系/Assignment 联动
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
 - [ ] `(const)[...]` / `(const)%[...]` 的只读共享实例语义（当前按运行时新建处理，行为兼容）
 - [ ] 十六进制浮点字面量 `0x1.07CCp14`、二进制浮点 `0b1.1`（test.tjs 后段依赖）
-- [ ] 标准库：Date / Math / RegExp 完整 API
-      （RegExp 已支持 /pattern/ 字面量 + String.replace；match/exec/compile 待补；
-       Array.sort 待脚本回调调用支持；String.split 待 RegExp match API）
 - [ ] const 只读性检查（当前 const 与 var 等价，仅语法接入）
 - [ ] with 块内 try/catch 穿越 WithPush 的栈截断（当前仅帧级恢复；语料未覆盖）
 
@@ -43,6 +43,17 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-24 RegExp 完整 API 批次：`/pattern/flags` 字面量 flags 接入（g=全局/i=忽略大小写/l=忽略，
+  lexer 捕获、token 编码 "pattern\nflags"、NewRegExp 处解码）+ RegExp 方法
+  test/match/exec/compile/replace/split（对齐 tjsRegExp.cpp：exec 更新 index/lastIndex/lastMatch/
+  lastParen/leftContext/rightContext/input 与 matches 数组、g 推进 start、match 无副作用）+
+  实例属性协议（matches/start 可写/其余只读，走 RegExp::getProp/setProp）+ TypeId::RegExp 接入
+  NativeRegister/GProp + String.replace 改 g 全局语义 + String.split/Array.split（正则/分隔字符集
+  双模式，TJS2 split 字符集语义）+ VM::create 沉睡 bug 修复（RootGuard 无法隐式转 T*）；
+  连带修复 String SSO 边界 bug：concat/append/reserveExact 的短串阈值（< 21）与构造/析构/move 的
+  长串判据（> 21）不一致——恰好 21 字符的结果丢尾字符+泄漏缓冲（glm-5.3-flash 所写热路径 helpers
+  未吃透 String SSO 不变量，已统一为 <= / > 并在 String.hpp 记注不变量；补 20/21/22 边界回归测试）
 
 - 2026-10-24 RegExp 批次：`/pattern/` 正则字面量（lexer 按前 token 判别除法 vs 正则，
   JS lexer 标准做法；TokenType::RegExp + NewRegExp 指令 71→72；std::regex ECMAScript）+

@@ -7,6 +7,7 @@
 #include "stdlib/ArrayLib.hpp"
 #include "common/UTF8.hpp"
 #include "stdlib/DictLib.hpp"
+#include "stdlib/RegExpLib.hpp"
 #include "stdlib/StringLib.hpp"
 #include "types/Array.hpp"
 #include "types/Dictionary.hpp"
@@ -46,9 +47,8 @@ namespace cial {
         registerMethod<String>("substr"_str, &stdlib::stringSubstring);
         registerMethod<String>("sprintf"_str, &stdlib::stringSprintf);
         registerMethod<String>("replace"_str, &stdlib::stringReplace);
-        // registerMethod<String>("replace"_str, &stdlib::stringReplace);
+        registerMethod<String>("split"_str, &stdlib::stringSplitWith);
         registerMethod<String>("escape"_str, &stdlib::stringEscape);
-        // registerMethod<String>("split"_str, &stringSplit);
         registerMethod<String>("trim"_str, &stdlib::stringTrim);
         registerMethod<String>("reverse"_str, &stdlib::stringReverse);
         registerMethod<String>("repeat"_str, &stdlib::stringRepeat);
@@ -70,6 +70,8 @@ namespace cial {
         nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("erase"_str), &stdlib::arrayErase);
         nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("reverse"_str), &stdlib::arrayReverse);
         nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("join"_str), &stdlib::arrayJoin);
+        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("split"_str),
+                                        &stdlib::arraySplitWith);
         // count/length 属性（get；写走 Array::setProp）
         nativeRegister().registerProperty(TypeId::Array, _impl->rt.atomTable.intern("count"_str), [](const Value &thisObj) {
             return Value{ Integer{ static_cast<Integer>(dynamic_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };
@@ -88,6 +90,20 @@ namespace cial {
                 return Value{ Integer{ static_cast<Integer>(
                     dynamic_cast<Dictionary &>(*thisObj.asObject().unwrap()).members.size()) } };
             });
+
+        // RegExp 方法（TJS2 tjsRegExp.cpp 对齐）；matches/start/index 等状态属性走 RegExp::getProp
+        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("test"_str),
+                                        &stdlib::regexpTest);
+        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("match"_str),
+                                        &stdlib::regexpMatch);
+        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("exec"_str),
+                                        &stdlib::regexpExec);
+        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("compile"_str),
+                                        &stdlib::regexpCompile);
+        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("replace"_str),
+                                        &stdlib::regexpReplace);
+        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("split"_str),
+                                        &stdlib::regexpSplit);
 
         // Array/Dictionary "类对象"注册到全局：承载静态方法命名空间（语料惯用法
         // Dictionary.assign incontextof obj——取未绑定方法后 ChgThis 换 this）
@@ -122,9 +138,8 @@ namespace cial {
         // scan stack
         const u32 used = _impl->regPool.used();
         for(u32 i = 0; i < used; ++i) {
-            const Value *val = _impl->regPool.ptrAt(i);
             // 槽位可能是任意类型（整数/字符串/void），必须先判类型再取对象指针
-            if(val->isObject()) {
+            if(const Value *val = _impl->regPool.ptrAt(i); val->isObject()) {
                 if(auto *msHeader = val->asObject().value()) {
                     msHeader->marked();
                     if(msHeader->_name != ATOM_INVALID) {

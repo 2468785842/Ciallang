@@ -260,7 +260,10 @@ namespace cial {
 
         const u32 newLen = _len + str._len;
 
-        if(newLen < SHORT_STR_LEN) {
+        // SSO 阈值与构造/析护/move 的长串判据(len > SHORT_STR_LEN)一致:
+        // newLen == SHORT_STR_LEN(21 字符+NUL 恰满 _shortStr)走 SSO。
+        // 旧判据 < 会在 21 时分配 _longStr,随后析构/move 按短串处理——泄漏缓冲
+        if(newLen <= SHORT_STR_LEN) {
             auto i = this->_len;
             for(const char c : str) {
                 this->_shortStr[i++] = c;

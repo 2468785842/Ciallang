@@ -12,6 +12,7 @@
 
 #include <regex>
 
+#include "RegExpLib.hpp"
 #include "StringLib.hpp"
 #include "types/RegExp.hpp"
 #include "vm/VM.hpp"
@@ -95,15 +96,17 @@ namespace cial::stdlib {
         return formatString(*thisObj.asString().unwrap(), argCount, args);
     }
 
+    // TJS2 语义：委托 pattern.replace(target, replacement)——g 标志全局替换、否则仅第一处；
+    // 函数回调（TJS2 支持以函数为替换串）待脚本回调调用机制
     String stringReplace(VM *, const Value &thisObj, size_t, const Value &reVal, const Value &replacement) {
         const String *str = thisObj.asString().unwrap();
-        auto *re = dynamic_cast<const RegExp *>(reVal.asObject().unwrap());
+        if(!reVal.isObject())
+            throw std::runtime_error("replace expects a regexp");
+        const auto *re = dynamic_cast<const RegExp *>(reVal.asObject().unwrap());
         if(!re)
             throw std::runtime_error("replace expects a regexp");
-        const std::string in(str->getData(), str->length());
-        std::smatch m;
-        if(!std::regex_search(in, m, re->re))
-            return *str; // 无匹配原样返回
+        if(replacement.isObject())
+            throw std::runtime_error("replace with callback function is not supported yet");
         String rep{};
         if(replacement.isString()) {
             rep = *replacement.asString().unwrap();
@@ -112,55 +115,12 @@ namespace cial::stdlib {
             if(const auto r = t.toString(); !r.isFailed() && t.isString())
                 rep = *t.asString().unwrap();
         }
-        std::string out = m.prefix().str();
-        out.append(rep.getData(), rep.length());
-        out += m.suffix().str();
-        return String(out.c_str(), static_cast<u32>(out.size()));
+        return regexpReplaceIn(re, *str, rep);
     }
 
     String stringEscape(VM *, const Value &thisObj, size_t) { return thisObj.asString().unwrap()->escapeBackSlash(); }
-    // TODO: need impl Array class
-    // split(pattern, reserved, purgeempty)
-    // Array stringSplit(VM *, const Value &thisObj, size_t, const String *pattern, const Value &vReserved, const Value
-    // &vPurgeEmpty) {
-    //     const String *str = thisObj.toString();
-    //     Array result;
-    //
-    //     if (!pattern || pattern->isEmpty()) {
-    //         // split by empty string -> split into single chars
-    //         for (char c : *str)
-    //             result.push(String(c));
-    //         return result;
-    //     }
-    //
-    //     const char *s = str->getData();
-    //     const char *patt = pattern->getData();
-    //     size_t pattLen = pattern->length();
-    //     size_t i = 0;
-    //
-    //     while (i < str->length()) {
-    //         const char *found = std::strstr(s + i, patt);
-    //         if (!found) {
-    //             // no more matches, push the rest
-    //             String part(s + i, str->length() - i);
-    //             if (!vPurgeEmpty.isVoid() && vPurgeEmpty.toBool() && part.isEmpty())
-    //                 break;
-    //             result.push(part);
-    //             break;
-    //         }
-    //
-    //         size_t index = found - s;
-    //         String part(s + i, index - i);
-    //         if (!vPurgeEmpty.isVoid() && vPurgeEmpty.toBool() && part.isEmpty()) {
-    //             // skip empty
-    //         } else {
-    //             result.push(part);
-    //         }
-    //         i = index + pattLen;
-    //     }
-    //
-    //     return result;
-    // }
+
+    // split(pattern, reserved, purgeempty)：实现在 RegExpLib（正则/分隔字符集双模式）
 
     // trim()
     String stringTrim(VM *, const Value &thisObj, size_t) {

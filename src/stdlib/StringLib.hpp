@@ -34,15 +34,12 @@ namespace cial::stdlib {
 
     String stringSprintf(VM *, const Value &thisObj, size_t argCount, Value *args);
 
-    // replace(regexp, replacement)：替换第一处匹配（TJS2 语义）
+    // replace(regexp, replacement)：g 标志全局替换、否则仅第一处（TJS2 语义；
+    // 实现委托 RegExpLib::regexpReplaceIn）；split 见 RegExpLib::stringSplitWith
     String stringReplace(VM *, const Value &thisObj, size_t argCount, const Value &re,
                          const Value &replacement);
 
     String stringEscape(VM *, const Value &thisObj, size_t argCount);
-
-    // TODO: need impl Array class
-    // String Array stringSplit(VM *, const Value &thisObj, size_t, const String *pattern, const Value &vReserved, const
-    // Value &vPurgeEmpty);
 
     String stringTrim(VM *, const Value &thisObj, size_t);
 

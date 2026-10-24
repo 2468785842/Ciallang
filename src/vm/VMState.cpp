@@ -823,8 +823,10 @@ namespace cial::vm {
         const Atom atom = rt.atomTable.intern(name);
 
         if(val.isObject()) {
-            // Array/Dictionary 的原生成员（方法 / count 属性）：与字符串原生表同机制
-            if(const TypeId tid = ValueToTypeId::getId(val); tid == TypeId::Array || tid == TypeId::Dictionary) {
+            // Array/Dictionary/RegExp 的原生成员（方法 / count 属性）：与字符串原生表同机制；
+            // 未命中落到对象自身 getProp（RegExp 的 matches/index 等状态属性走此路径）
+            if(const TypeId tid = ValueToTypeId::getId(val);
+               tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp) {
                 const Atom memberAtom = rt.atomTable.intern(name);
                 if(auto *getter = context.findProperty(tid, memberAtom)) {
                     regs[r3] = getter(val);
@@ -1167,13 +1169,22 @@ namespace cial::vm {
         return DispatchRet::Continue;
     }
 
-    // /pattern/ 正则字面量：String 常量（模式）→ RegExp 对象（构造时编译，非法模式抛脚本异常）
+    // /pattern/flags 正则字面量：常量为 lexer 编码的 "pattern\nflags"（无 flags 时尾随 '\n'）
+    // → RegExp 对象（构造时编译，非法模式抛脚本异常）
     DISPATCH_OP_METHOD(NewRegExp) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 cIdx = read<u16>(ip, pc);
         const auto &constant = constants[cIdx];
-        const String &pattern = *constant.createValue(&rt).asString().unwrap();
-        regs[r1] = Value{ rt.create<RegExp>(&rt, pattern).get() };
+        const String &encoded = *constant.createValue(&rt).asString().unwrap();
+        const char *data = encoded.getData();
+        const u32 len = encoded.length();
+        u32 sep = 0;
+        while(sep < len && data[sep] != '\n')
+            ++sep;
+        // 模式段 [0, sep) + flags 段 (sep, len)；无 flags 时空串
+        const String pattern{ data, sep };
+        const String flags{ sep + 1 < len ? data + sep + 1 : "", sep + 1 < len ? len - sep - 1 : 0 };
+        regs[r1] = Value{ rt.create<RegExp>(&rt, pattern, flags).get() };
         return DispatchRet::Continue;
     }
 

@@ -18,7 +18,7 @@
 | 实数字面量 | `1.5`、`1e3`、`1.5e-3` | ✅ |
 | 字符串 `"..."` / `'...'` | 单双等价；`\` 转义（`\n \t \\ \"` 等） | ✅ |
 | 模板/逐字字符串 `@"..."` | 逐字转义；**内嵌表达式** `&expr;`（求值嵌入）与 `$expr;`（表达式结果再作为内嵌表达式求值） | ◐（模板串已实现；内嵌表达式语义对齐中） |
-| 正则字面量 `/re/flags` | 与除法 `/` 的歧义由语法状态消解（`SetStartOfRegExp`，tjs.y/词法配合） | ❌（依赖 RegExp） |
+| 正则字面量 `/re/flags` | 与除法 `/` 的歧义由语法状态消解（`SetStartOfRegExp`，tjs.y/词法配合） | ✅（lexer 按前 token 判别；flags g/i 生效，`l` 忽略——对齐 TJS2） |
 | 保留字 | `var const if else while do for continue break switch case default function return class extends property setter getter try catch throw debugger new invalidate isvalid delete typeof void null true false global this super int real string incontextof instanceof in` 等 | 词法层 ✅ |
 
 ## 2. 预处理（条件编译）
@@ -163,4 +163,6 @@ class 类名 extends 父类1, 父类2 … {   // 多继承，后面的覆盖前�
 Xorshift 与 `Math.RandomGenerator` MT19937）`Date`（bison 日期文法 `tjsdate.y`）`RegExp`
 （oniguruma）`String 内建成员`（length/charAt/indexOf/sprintf/replace/split/escape…）`Octet pack 系`。
 
-Ciallang 现状：`print/println` ✅、String 部分 ✅（replace/split 待 RegExp/Array），其余 ❌。
+Ciallang 现状：`print/println` ✅、String 大部 ✅（replace/split/escape/trim/…，见 compatibility.md）、
+Array/Dictionary 字面量+主要方法 ✅、RegExp `/pattern/flags` 字面量+全部方法/实例属性 ✅、
+Exception ✅；Math/Date/Octet pack 系 ❌。

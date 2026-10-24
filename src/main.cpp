@@ -12,6 +12,8 @@
  *
  */
 
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "stdlib/ExceptionLib.hpp"
 #include "stdlib/Print.hpp"
 #include "vm/VM.hpp"
@@ -52,6 +54,20 @@ var Debug = new __DebugShim();
         // 脚本运行期异常(未捕获 throw、未定义标识符等)——报告而非静默终止
         fmt::println(stderr, "cial: runtime error: {}", e.what());
         return 1;
+    }
+
+    // CIAL_DUMP=1:重跑编译管线打印 TAC 指令(调试用)
+    if(const char *dp = std::getenv("CIAL_DUMP"); dp && *dp) {
+        Common::Result r{};
+        Common::SourceFile sf{ argv[1] };
+        sf.load(r);
+        syntax::Parser parser{ sf, context.pp() };
+        syntax::AstNode *node = parser.parse(r);
+        inter::IRGenerator codeGen{ r, rt, sf };
+        OptReg ir{};
+        const auto chunk = codeGen.parseAst(node, ir);
+        if(chunk)
+            fmt::println("--- dump ---\n{}", chunk->dumpInstructions());
     }
 
     const auto end = std::chrono::high_resolution_clock::now();

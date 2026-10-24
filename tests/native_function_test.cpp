@@ -177,3 +177,129 @@ TEST_CASE("本地函数声明 - Array/Dictionary 内建方法") {
         REQUIRE(*vm.evalExpr<Integer>("c2"_str) == 1);
     }
 }
+
+TEST_CASE("本地函数声明 - RegExp 内建方法") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("Method - test/match") {
+        REQUIRE(*vm.evalExpr<Integer>(R"(/a.c/.test("abc"))"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>(R"(/a.c/.test("abd"))"_str) == 0);
+        // i 标志：忽略大小写
+        REQUIRE(*vm.evalExpr<Integer>(R"(/ABC/i.test("xabcx"))"_str) == 1);
+        // match 不改状态：组捕获 [整体, 组1, 组2]，未命中为空数组
+        REQUIRE(*vm.evalExpr<Integer>(R"(/:(\d+):(\d+):/.match("time :12:34: ok").count)"_str) == 3);
+        REQUIRE((**vm.evalExpr<String *>(R"(/:(\d+):(\d+):/.match("time :12:34: ok")[1])"_str)) == "12"_str);
+        REQUIRE(*vm.evalExpr<Integer>(R"(/zzz/.match("abc").count)"_str) == 0);
+    }
+
+    SECTION("Method - exec 与匹配状态") {
+        vm.eval(R"(
+            var g = /x(\d+)x/g;
+            var first = g.exec("a1x22x b x333x c");
+            var f0 = first[0];
+            var f1 = first[1];
+            var idx1 = g.index;
+            var last1 = g.lastIndex;
+            var second = g.exec("a1x22x b x333x c");
+            var s0 = second[0];
+            var idx2 = g.index;
+            var miss = g.exec("a1x22x b x333x c");
+            var missCount = miss.count;
+            var lastMatch = g.lastMatch;
+        )"_str);
+        REQUIRE((**vm.evalExpr<String *>("f0"_str)) == "x22x"_str);
+        REQUIRE((**vm.evalExpr<String *>("f1"_str)) == "22"_str);
+        REQUIRE(*vm.evalExpr<Integer>("idx1"_str) == 2);
+        REQUIRE(*vm.evalExpr<Integer>("last1"_str) == 6);
+        REQUIRE((**vm.evalExpr<String *>("s0"_str)) == "x333x"_str);
+        REQUIRE(*vm.evalExpr<Integer>("idx2"_str) == 9);
+        // 无 g 的 exec 不推进 start：重复 exec 结果不变
+        REQUIRE(*vm.evalExpr<Integer>("missCount"_str) == 0);
+    }
+
+    SECTION("exec 无 g 重复执行不推进") {
+        vm.eval(R"(
+            var e = /b/;
+            var m1 = e.exec("abcb");
+            var i1 = e.index;
+            var m2 = e.exec("abcb");
+            var i2 = e.index;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("i1"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("i2"_str) == 1);
+    }
+
+    SECTION("状态属性 lastMatch/lastParen/leftContext/rightContext/start") {
+        vm.eval(R"(
+            var e = /(a)(b)?/;
+            e.exec("za");
+        )"_str);
+        REQUIRE((**vm.evalExpr<String *>("e.lastMatch"_str)) == "a"_str);
+        REQUIRE((**vm.evalExpr<String *>("e.lastParen"_str)) == ""_str); // 末组未参与匹配
+        REQUIRE((**vm.evalExpr<String *>("e.leftContext"_str)) == "z"_str);
+        REQUIRE((**vm.evalExpr<String *>("e.rightContext"_str)) == ""_str);
+        // start 可写：指定搜索起点
+        REQUIRE(*vm.evalExpr<Integer>(R"((function(){ var m = /b/; m.start = 3; return m.match("abcb").count; })())"_str) == 1);
+        // 读写往返
+        REQUIRE(*vm.evalExpr<Integer>(R"((function(){ var m = /b/; m.start = 3; return m.start; })())"_str) == 3);
+    }
+
+    SECTION("Method - compile") {
+        vm.eval(R"(
+            var pat = /foo/;
+            pat.compile("b(a)r", "i");
+            var t = pat.test("BAR");
+            var lm = pat.lastMatch;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("t"_str) == 1);
+        REQUIRE((**vm.evalExpr<String *>("lm"_str)) == "BAR"_str);
+    }
+
+    SECTION("Method - replace（g 全局/单次）") {
+        REQUIRE((**vm.evalExpr<String *>(R"("a1b22c333d".replace(/\d+/, "N"))"_str)) == "aNb22c333d"_str);
+        REQUIRE((**vm.evalExpr<String *>(R"("a1b22c333d".replace(/\d+/g, "N"))"_str)) == "aNbNcNd"_str);
+        REQUIRE((**vm.evalExpr<String *>(R"("no digits".replace(/\d+/g, "N"))"_str)) == "no digits"_str);
+        // RegExp.replace 形态：/re/.replace(target, to)
+        REQUIRE((**vm.evalExpr<String *>(R"(/o/.replace("foo bar", "0"))"_str)) == "f0o bar"_str);
+    }
+
+    SECTION("Method - split") {
+        // 字符串模式：分隔字符集（每个字符都是分隔符，TJS2 语义）
+        vm.eval(R"(
+            var p1 = "a,b;c".split(",;");
+            var p2 = "a,,b".split(",", void, true);
+            var p3 = "a1b22c".split(/\d+/);
+            var a4 = [].split(/,/, "x,y,z");
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("p1.count"_str) == 3);
+        REQUIRE((**vm.evalExpr<String *>("p1[2]"_str)) == "c"_str);
+        REQUIRE(*vm.evalExpr<Integer>("p2.count"_str) == 2); // purgeempty 去空段
+        REQUIRE(*vm.evalExpr<Integer>("p3.count"_str) == 3);
+        REQUIRE((**vm.evalExpr<String *>("p3[1]"_str)) == "b"_str);
+        REQUIRE(*vm.evalExpr<Integer>("a4.count"_str) == 3); // Array.split 形态
+    }
+}
+
+TEST_CASE("字符串拼接 SSO 边界回归（SHORT_STR_LEN 一致性）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // 修复：concat 的 SSO 阈值(total <= 21)曾与构造/析构/move 的长串判据(len > 21)
+    // 不一致——恰好 21 字符的结果丢尾字符并泄漏缓冲
+    SECTION("链式拼接跨 20/21/22 字符边界") {
+        REQUIRE((**vm.evalExpr<String *>(R"("1234567890123456789" + "0")"_str)) == "12345678901234567890"_str); // 20
+        REQUIRE((**vm.evalExpr<String *>(R"("1234567890123456789" + "01")"_str)) == "123456789012345678901"_str); // 21
+        REQUIRE((**vm.evalExpr<String *>(R"("1234567890123456789" + "012")"_str)) == "1234567890123456789012"_str); // 22
+        REQUIRE((**vm.evalExpr<String *>(R"("hit: " + "x22x" + " idx=" + 2 + " zzz=" + "6")"_str))
+            == "hit: x22x idx=2 zzz=6"_str);
+        REQUIRE(*vm.evalExpr<Integer>(R"(("hit: " + "x22x" + " idx=" + 2 + " zzz=" + "6").length)"_str) == 21);
+    }
+}
+

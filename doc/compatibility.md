@@ -52,13 +52,13 @@
 | 库 | 原版能力（概要） | 状态 |
 |---|---|---|
 | （宿主）print | 控制台输出 | ✅ print/println |
-| String 内建成员 | length/charAt/indexOf/toUpperCase/…/sprintf/replace/split/escape/trim | ◐ replace ✅；split 待 RegExp 完整 API；length 为码点计数（其余方法字节语义） |
-| Array | 数字下标数组；load/save(BinarySerializer)/sort/join/split/pack… | ◐ 字面量/下标/push/pop/unshift/shift/insert/remove/erase/reverse/join/count ✅；sort/split/save/load/pack ❌ |
+| String 内建成员 | length/charAt/indexOf/toUpperCase/…/sprintf/replace/split/escape/trim | ◐ replace（g 全局）/split ✅；length 为码点计数（其余方法字节语义） |
+| Array | 数字下标数组；load/save(BinarySerializer)/sort/join/split/pack… | ◐ 字面量/下标/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/count ✅；sort/save/load/pack ❌ |
 | Dictionary | 哈希字典；load/save/assign/clear | ◐ 字面量/下标/assign/clear/erase/count ✅；save/load ❌ |
 | Exception | 异常类（message 成员），脚本异常载体 | ✅（TJS 源自举，main.cpp 注入；原生错误自动包装为 Exception 实例） |
 | Math / Math.RandomGenerator | abs/floor/…；Xorshift / MT19937 | ❌ |
 | Date | get/set 系列 + 字符串 parse（tjsdate.y 文法） | ❌ |
-| RegExp | compile/test/match/exec/replace/split（oniguruma） | ◐ /pattern/ 字面量 + String.replace ✅（std::regex ECMAScript）；match/exec/compile ❌ |
+| RegExp | compile/test/match/exec/replace/split（oniguruma）；属性 matches/start/index/lastIndex/input/lastMatch/lastParen/leftContext/rightContext | ◐ /pattern/flags 字面量（g/i）+ 全部方法 + 全部实例属性 ✅（std::regex ECMAScript）；缺：`new RegExp(...)` 构造器、replace 函数回调、静态属性 `RegExp.last`；匹配位置为字节偏移（TJS2 为 UTF-16 码元） |
 | Octet | 字节流 + pack 系 | ❌（类型有，库无） |
 
 ## 4. 运行时行为差异（已知，须保持记录）

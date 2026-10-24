@@ -547,7 +547,9 @@ namespace cial::syntax {
         }
     }
 
-    // /pattern/flags 正则字面量：'/' 已读，读到未转义的 '/'；flags 当前忽略（TJS2 gimsx 记 TODO）
+    // /pattern/flags 正则字面量：'/' 已读，读到未转义的 '/'，再读 [a-z]* flags。
+    // token 文本编码为 "pattern\nflags"（'\n' 作分隔符；模式内裸换行视为未终结，
+    // 保证编码无歧义），NewRegExp 处解码。TJS2 flags：g=全局、i=忽略大小写、l=忽略
     bool Lexer::regexConstVal(Token *&token) {
         std::string pattern;
         // case '/' 的 peek+双 rewind 把 '/' 退了回来：这里先消费它
@@ -558,7 +560,7 @@ namespace cial::syntax {
         }
         while(!_sourceFile.eof()) {
             const i32 rune = read(false);
-            if(rune == runeEof || rune == runeInvalid) {
+            if(rune == runeEof || rune == runeInvalid || rune == '\n') {
                 token = makeToken(TokenType::Error, "unterminated regex literal"_str);
                 return false;
             }
@@ -588,16 +590,19 @@ namespace cial::syntax {
             }
         }
 
-        // flags（g/i/m/s/x）：读标识符尾巴，当前仅跳过（语义记 TODO）
+        // flags（TJS2: g/i/l）：读标识符尾巴，未知字母忽略（与 TJS2 一致）
+        std::string flags;
         while(!_sourceFile.eof()) {
-            const u32 ch = _sourceFile[_sourceFile.pos()];
-            if((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+            if(const u32 ch = _sourceFile[_sourceFile.pos()]; (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+                flags.push_back(static_cast<char>(ch));
                 _sourceFile.seek(_sourceFile.pos() + 1);
                 continue;
             }
             break;
         }
 
+        pattern.push_back('\n');
+        pattern.append(flags);
         token = makeToken(TokenType::RegExp, String{ pattern.c_str(), static_cast<u32>(pattern.size()) });
         return true;
     }
@@ -1150,8 +1155,7 @@ namespace cial::syntax {
                     break;
                 }
                 if(ch == '$') {
-                    i32 nextCh = read(false);
-                    if(nextCh == '{') {
+                    if(i32 nextCh = read(false); nextCh == '{') {
                         strPsState = TemplateStringContext::State::Dollar;
                         break;
                     }
@@ -1207,8 +1211,7 @@ namespace cial::syntax {
                 if(ch == ' ' || ch == 9 || ch == 13 || ch == 10 || ch == ',')
                     continue;
 
-                const i8 n = getHexNum(static_cast<char>(ch));
-                if(n != -1) {
+                if(const i8 n = getHexNum(static_cast<char>(ch)); n != -1) {
                     ch = static_cast<u8>(n);
                     if(newSec) {
                         oct = ch;

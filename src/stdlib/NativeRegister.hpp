@@ -7,6 +7,7 @@
 #include "types/Array.hpp"
 #include "types/Dictionary.hpp"
 #include "types/Function.hpp"
+#include "types/RegExp.hpp"
 
 namespace cial {
 
@@ -19,6 +20,7 @@ namespace cial {
         String,
         Array,
         Dictionary,
+        RegExp,
     };
 
     template <typename T>
@@ -52,12 +54,14 @@ namespace cial {
             if(v.isString())
                 return TypeTraits<String>::id;
             if(v.isObject()) {
-                // 容器对象（Array/Dictionary 的原生方法表分派）
+                // 容器对象（Array/Dictionary/RegExp 的原生方法表分派）
                 const auto *obj = v.asObject().unwrap();
-                if(dynamic_cast<const class Array *>(obj) != nullptr)
+                if(dynamic_cast<const Array *>(obj) != nullptr)
                     return TypeId::Array;
-                if(dynamic_cast<const class Dictionary *>(obj) != nullptr)
+                if(dynamic_cast<const Dictionary *>(obj) != nullptr)
                     return TypeId::Dictionary;
+                if(dynamic_cast<const RegExp *>(obj) != nullptr)
+                    return TypeId::RegExp;
                 return TypeId::Object;
             }
             return TypeId::None;

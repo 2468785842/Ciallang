@@ -123,7 +123,7 @@ namespace cial {
 
         template <typename T, typename... Args>
         T *create(Args &&...args) {
-            return _vmState->rt.create<T>(std::forward<Args>(args)...);
+            return _vmState->rt.create<T>(std::forward<Args>(args)...).get();
         }
 
         template <typename T>
