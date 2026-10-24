@@ -83,7 +83,11 @@
     O(GRefRaw)                                                                                                         \
     O(DPropRaw)                                                                                                        \
     O(DerefGet)                                                                                                        \
-    O(DerefSet)
+    O(DerefSet)                                                                                                        \
+    O(NewArray)                                                                                                        \
+    O(NewDict)                                                                                                         \
+    O(GetIndex)                                                                                                        \
+    O(SetIndex)
 
 namespace cial::vm {
     class VMState;
@@ -320,6 +324,15 @@ namespace cial::inter {
     DEF_INST(DerefGet, 2, OP_GET1(prop, Register) OP_GET2(dst, Register));
     // *p = v 写:强制属性访问(调 setter,旧版 SETP);setter 压帧,需 Call 接管
     DEF_INST(DerefSet, 2, OP_GET1(prop, Register) OP_GET2(src, Register));
+
+    // [a, b, ...] 字面量:分配 count 长度的新 Array,元素随后逐个 SetIndex
+    DEF_INST(NewArray, 2, OP_GET1(dst, Register) OP_GET2(count, Integer));
+    // %[...] 字面量:新建空 Dictionary
+    DEF_INST(NewDict, 1, OP_GET1(dst, Register));
+    // a[i] 读:数组整数下标(负=从尾)、字典键、字符串字符(旧 charAt 语义)
+    DEF_INST(GetIndex, 3, OP_GET1(obj, Register) OP_GET2(idxReg, Register) OP_GET3(dst, Register));
+    // a[i] = v 写:数组越界自动扩展补 void;字典键写入
+    DEF_INST(SetIndex, 3, OP_GET1(obj, Register) OP_GET2(idxReg, Register) OP_GET3(src, Register));
 
     struct DumpInst {
         [[nodiscard]] static String dumpOperand(const Operand &operand);

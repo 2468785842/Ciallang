@@ -332,4 +332,29 @@ namespace cial::vm {
         write<u16>(info.code, tac->prop().index());
         write<u16>(info.code, tac->src().index());
     }
+
+    void Bytecode::encode(Info &info, const inter::NewArray *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::NewArray));
+        write<u16>(info.code, tac->dst().index());
+        encodeSleb128(tac->count(), info.code);
+    }
+
+    void Bytecode::encode(Info &info, const inter::NewDict *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::NewDict));
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::GetIndex *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::GetIndex));
+        write<u16>(info.code, tac->obj().index());
+        write<u16>(info.code, tac->idxReg().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::SetIndex *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::SetIndex));
+        write<u16>(info.code, tac->obj().index());
+        write<u16>(info.code, tac->idxReg().index());
+        write<u16>(info.code, tac->src().index());
+    }
 } // namespace cial::vm

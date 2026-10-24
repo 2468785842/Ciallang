@@ -348,3 +348,65 @@ TEST_CASE("表达式 - instanceof 基础类型") {
         REQUIRE(*vm.evalExpr<bool>(R"("s" instanceof "Number")"_str) == false);
     }
 }
+
+TEST_CASE("表达式 - Array/Dictionary 字面量与下标") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("数组字面量与下标读写") {
+        vm.eval(R"(
+            var a = [1, 2, 3];
+            var c0 = a.count;
+            var v0 = a[0];
+            a[1] = 20;
+            var v1 = a[1];
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("c0"_str) == 3);
+        REQUIRE(*vm.evalExpr<Integer>("v0"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("v1"_str) == 20);
+    }
+
+    SECTION("字典字面量（sym: 与 \"k\" >= v 两种键形式）") {
+        vm.eval(R"(
+            var d = %["k" >= 1, num : 2];
+            var c = d.count;
+            var vk = d["k"];
+            var vn = d.num;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("c"_str) == 2);
+        REQUIRE(*vm.evalExpr<Integer>("vk"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("vn"_str) == 2);
+    }
+
+    SECTION("嵌套字面量") {
+        vm.eval(R"(
+            var n = [[1, 2], [3, 4]];
+            var v = n[1][0];
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("v"_str) == 3);
+    }
+
+    SECTION("下标写越界自动扩展") {
+        vm.eval(R"(
+            var a = [];
+            a[2] = 9;
+            var c = a.count;
+            var v = a[2];
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("c"_str) == 3);
+        REQUIRE(*vm.evalExpr<Integer>("v"_str) == 9);
+    }
+
+    SECTION("字符串下标保持 charAt 语义") {
+        vm.eval(R"(
+            var s = "abc";
+            var c0 = s[0];
+            var c9 = s[9];
+        )"_str);
+        REQUIRE((**vm.evalExpr<String *>("c0"_str)) == "a"_str);
+        REQUIRE((**vm.evalExpr<String *>("c9"_str)) == ""_str);
+    }
+}

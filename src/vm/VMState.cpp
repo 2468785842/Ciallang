@@ -16,7 +16,9 @@
 #include "../gen/Instruction.hpp"
 #include "VMDebug.hpp"
 #include "stdlib/NativeRegister.hpp"
+#include "types/Array.hpp"
 #include "types/Class.hpp"
+#include "types/Dictionary.hpp"
 #include "types/Function.hpp"
 #include "types/Property.hpp"
 
@@ -576,7 +578,14 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(ChgThis) {
         const u16 r1 = read<u16>(ip, pc); // 函数
         const u16 r2 = read<u16>(ip, pc); // 新 this
-        dynamic_cast<Function *>(regs[r1].asObject().unwrap())->thisObj = regs[r2].asObject().unwrap();
+        // incontextof 的对象可为脚本函数或原生函数（如 Dictionary.assign）
+        if(auto *fn = dynamic_cast<Function *>(regs[r1].asObject().unwrap())) {
+            fn->thisObj = regs[r2].asObject().unwrap();
+        } else if(auto *nativeFn = dynamic_cast<NativeFunction *>(regs[r1].asObject().unwrap())) {
+            nativeFn->setThisObj(regs[r2]);
+        } else {
+            throw std::runtime_error("incontextof expects a function");
+        }
         return DispatchRet::Continue;
     }
 
@@ -813,6 +822,22 @@ namespace cial::vm {
         const Atom atom = rt.atomTable.intern(name);
 
         if(val.isObject()) {
+            // Array/Dictionary 的原生成员（方法 / count 属性）：与字符串原生表同机制
+            if(const TypeId tid = ValueToTypeId::getId(val); tid == TypeId::Array || tid == TypeId::Dictionary) {
+                const Atom memberAtom = rt.atomTable.intern(name);
+                if(auto *getter = context.findProperty(tid, memberAtom)) {
+                    regs[r3] = getter(val);
+                    return DispatchRet::Continue;
+                }
+                if(auto *nativeFn = context.findMethod(tid, memberAtom)) {
+                    nativeFn = rt.create<NativeFunction>(*nativeFn).get();
+                    nativeFn->setThisObj(val);
+                    regs[r3] = Value{ nativeFn };
+                    return DispatchRet::Continue;
+                }
+                // 未命中落到对象自身 getProp（count 读在 Array::getProp 有兜底）
+            }
+
             auto *obj = val.asObject().value();
 
             if(auto *global = dynamic_cast<GlobalObject *>(obj)) {
@@ -984,6 +1009,121 @@ namespace cial::vm {
             cur->pc = pc;
             return DispatchRet::Call;
         }
+        return DispatchRet::Continue;
+    }
+
+    // [a, b, ...]：分配 count 长度的新 Array（元素 void，随后逐个 SetIndex 填充）
+    DISPATCH_OP_METHOD(NewArray) {
+        const u16 r1 = read<u16>(ip, pc);
+        const i64 count = decodeSleb128(ip, pc, 10);
+        regs[r1] = Value{ rt.create<Array>(&rt, static_cast<size_t>(count < 0 ? 0 : count)).get() };
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(NewDict) {
+        const u16 r1 = read<u16>(ip, pc);
+        regs[r1] = Value{ rt.create<Dictionary>().get() };
+        return DispatchRet::Continue;
+    }
+
+    namespace {
+        // 下标 → Array 的 0 基位置；负数从尾数（-1 = 末元素）；越界返回 npos
+        constexpr size_t npos = static_cast<size_t>(-1);
+        size_t arrayIndex(const i64 idx, const size_t n) {
+            if(idx >= 0)
+                return static_cast<u64>(idx) < n ? static_cast<size_t>(idx) : npos;
+            const auto u = static_cast<u64>(-idx);
+            return u <= n && u > 0 ? n - static_cast<size_t>(u) : npos;
+        }
+    } // namespace
+
+    // a[i] 读：数组整数下标（负=从尾，越界报脚本异常）、字典键（字符串化）、
+    // 字符串字符（保持旧 charAt 字节语义：越界得空串）、其余对象按成员名访问
+    DISPATCH_OP_METHOD(GetIndex) {
+        const u16 r1 = read<u16>(ip, pc); // obj
+        const u16 r2 = read<u16>(ip, pc); // idx
+        const u16 r3 = read<u16>(ip, pc); // dst
+        const Value &obj = regs[r1];
+        const Value &idx = regs[r2];
+        if(obj.isObject()) {
+            if(auto *arr = dynamic_cast<Array *>(obj.asObject().unwrap())) {
+                const auto i = idx.isVoid() ? 0 : idx.asInteger().unwrap();
+                const size_t pos = arrayIndex(i, arr->elements.size());
+                if(pos == npos)
+                    throw std::runtime_error("array index out of range");
+                regs[r3] = arr->elements[pos];
+                return DispatchRet::Continue;
+            }
+            if(dynamic_cast<Dictionary *>(obj.asObject().unwrap()) != nullptr) {
+                Value key = idx;
+                if(key.isVoid()) {
+                    throw std::runtime_error("dictionary key is void");
+                }
+                if(const auto r = key.toString(); r.isFailed()) {
+                    throw std::runtime_error("dictionary key must be convertible to string");
+                }
+                const Atom atom = rt.atomTable.intern(*key.asString().unwrap());
+                regs[r3] = obj.asObject().unwrap()->getProp(atom);
+                return DispatchRet::Continue;
+            }
+            // 其余对象：成员名访问
+            Value key = idx;
+            if(const auto r = key.toString(); r.isFailed()) {
+                throw std::runtime_error("index must be convertible to string");
+            }
+            const Atom atom = rt.atomTable.intern(*key.asString().unwrap());
+            regs[r3] = obj.asObject().unwrap()->getProp(atom);
+            return DispatchRet::Continue;
+        }
+        if(obj.isString()) {
+            const String *str = obj.asString().unwrap();
+            const auto i = idx.isVoid() ? 0 : idx.asInteger().unwrap();
+            const size_t pos = arrayIndex(i, str->length());
+            if(pos == npos) {
+                regs[r3] = Value{ String(""_str) };
+                return DispatchRet::Continue;
+            }
+            regs[r3] = Value{ String(str->getData()[pos]) };
+            return DispatchRet::Continue;
+        }
+        throw std::runtime_error("value is not indexable");
+    }
+
+    // a[i] = v 写：数组越界自动扩展补 void（TJS2 行为）；负下标从尾；
+    // 字典键写入；其余对象按成员名写入
+    DISPATCH_OP_METHOD(SetIndex) {
+        const u16 r1 = read<u16>(ip, pc); // obj
+        const u16 r2 = read<u16>(ip, pc); // idx
+        const u16 r3 = read<u16>(ip, pc); // src
+        const Value &obj = regs[r1];
+        const Value &idx = regs[r2];
+        if(!obj.isObject()) {
+            throw std::runtime_error("value is not indexable");
+        }
+        if(auto *arr = dynamic_cast<Array *>(obj.asObject().unwrap())) {
+            const auto i = idx.isVoid() ? 0 : idx.asInteger().unwrap();
+            if(i >= 0) {
+                const auto u = static_cast<u64>(i);
+                if(u >= arr->elements.size())
+                    arr->elements.resize(static_cast<size_t>(u) + 1);
+                arr->elements[static_cast<size_t>(u)] = regs[r3];
+                return DispatchRet::Continue;
+            }
+            const auto u = static_cast<u64>(-i);
+            if(u == 0 || u > arr->elements.size())
+                throw std::runtime_error("array index out of range");
+            arr->elements[arr->elements.size() - static_cast<size_t>(u)] = regs[r3];
+            return DispatchRet::Continue;
+        }
+        Value key = idx;
+        if(key.isVoid()) {
+            throw std::runtime_error("index is void");
+        }
+        if(const auto r = key.toString(); r.isFailed()) {
+            throw std::runtime_error("index must be convertible to string");
+        }
+        const Atom atom = rt.atomTable.intern(*key.asString().unwrap());
+        obj.asObject().unwrap()->setProp(atom, regs[r3]);
         return DispatchRet::Continue;
     }
 

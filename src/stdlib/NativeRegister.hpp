@@ -4,6 +4,8 @@
 #pragma once
 
 #include "runtime/Runtime.hpp"
+#include "types/Array.hpp"
+#include "types/Dictionary.hpp"
 #include "types/Function.hpp"
 
 namespace cial {
@@ -15,6 +17,8 @@ namespace cial {
         Object,
         Octet,
         String,
+        Array,
+        Dictionary,
     };
 
     template <typename T>
@@ -43,12 +47,19 @@ namespace cial {
                 return TypeTraits<Integer>::id;
             if(v.isReal())
                 return TypeTraits<Real>::id;
-            if(v.isObject())
-                return TypeTraits<Object>::id;
             if(v.isOctet())
                 return TypeTraits<Octet>::id;
             if(v.isString())
                 return TypeTraits<String>::id;
+            if(v.isObject()) {
+                // 容器对象（Array/Dictionary 的原生方法表分派）
+                const auto *obj = v.asObject().unwrap();
+                if(dynamic_cast<const class Array *>(obj) != nullptr)
+                    return TypeId::Array;
+                if(dynamic_cast<const class Dictionary *>(obj) != nullptr)
+                    return TypeId::Dictionary;
+                return TypeId::Object;
+            }
             return TypeId::None;
         }
     };

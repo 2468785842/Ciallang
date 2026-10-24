@@ -4,7 +4,11 @@
 #include "Context.hpp"
 
 #include "AtomTable.hpp"
+#include "stdlib/ArrayLib.hpp"
+#include "stdlib/DictLib.hpp"
 #include "stdlib/StringLib.hpp"
+#include "types/Array.hpp"
+#include "types/Dictionary.hpp"
 #include "types/Class.hpp"
 #include "vm/CallFrame.hpp"
 
@@ -51,6 +55,42 @@ namespace cial {
         registerProperty<String>("length"_str, [](const Value &thisObj) {
             return Value{ Integer{ thisObj.asString().unwrap()->length() } };
         });
+
+        // Array 方法
+        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("push"_str), &stdlib::arrayPush);
+        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("pop"_str), &stdlib::arrayPop);
+        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("unshift"_str), &stdlib::arrayUnshift);
+        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("shift"_str), &stdlib::arrayShift);
+        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("insert"_str), &stdlib::arrayInsert);
+        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("remove"_str), &stdlib::arrayRemove);
+        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("erase"_str), &stdlib::arrayErase);
+        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("reverse"_str), &stdlib::arrayReverse);
+        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("join"_str), &stdlib::arrayJoin);
+        // count/length 属性（get；写走 Array::setProp）
+        nativeRegister().registerProperty(TypeId::Array, _impl->rt.atomTable.intern("count"_str), [](const Value &thisObj) {
+            return Value{ Integer{ static_cast<Integer>(dynamic_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };
+        });
+        nativeRegister().registerProperty(TypeId::Array, _impl->rt.atomTable.intern("length"_str), [](const Value &thisObj) {
+            return Value{ Integer{ static_cast<Integer>(dynamic_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };
+        });
+
+        // Dictionary 方法
+        nativeRegister().registerMethod(TypeId::Dictionary, _impl->rt.atomTable.intern("assign"_str), &stdlib::dictAssign);
+        nativeRegister().registerMethod(TypeId::Dictionary, _impl->rt.atomTable.intern("clear"_str), &stdlib::dictClear);
+        nativeRegister().registerMethod(TypeId::Dictionary, _impl->rt.atomTable.intern("erase"_str), &stdlib::dictErase);
+        // count 属性
+        nativeRegister().registerProperty(
+            TypeId::Dictionary, _impl->rt.atomTable.intern("count"_str), [](const Value &thisObj) {
+                return Value{ Integer{ static_cast<Integer>(
+                    dynamic_cast<Dictionary &>(*thisObj.asObject().unwrap()).members.size()) } };
+            });
+
+        // Array/Dictionary "类对象"注册到全局：承载静态方法命名空间（语料惯用法
+        // Dictionary.assign incontextof obj——取未绑定方法后 ChgThis 换 this）
+        _impl->globalObject.setProp(_impl->rt.atomTable.intern("Array"_str),
+                                    Value{ _impl->rt.create<Array>(&_impl->rt).get() });
+        _impl->globalObject.setProp(_impl->rt.atomTable.intern("Dictionary"_str),
+                                    Value{ _impl->rt.create<Dictionary>().get() });
     }
 
     void Context::collectMark() const {

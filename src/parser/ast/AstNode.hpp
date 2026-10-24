@@ -42,6 +42,9 @@
     O(ReturnStmtNode)                                                                                                  \
     O(DebuggerStmtNode)                                                                                                \
     O(TernaryExprNode)                                                                                                 \
+    O(IndexExprNode)                                                                                                   \
+    O(ArrayLiteralNode)                                                                                                \
+    O(DictLiteralNode)                                                                                                 \
     O(PropertyDeclNode)                                                                                                \
     O(VarDeclNode)                                                                                                     \
     O(FunctionDeclNode)                                                                                                \

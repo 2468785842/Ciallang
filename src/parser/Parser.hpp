@@ -115,6 +115,9 @@ namespace cial::syntax {
 
         bool peek(Result &r, TokenType tokenType);
 
+        // 第 count 个 token 是否为 type（1 基；peek=1）
+        bool peekAt(Result &r, size_t count, TokenType tokenType);
+
         void synchronize(Result &r);
 
         AstNode *parse(Result &r);
@@ -320,6 +323,20 @@ namespace cial::syntax {
         ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    // [e1, e2, ...] 内联数组字面量（tjs.y inline_array）
+    struct ArrayLiteralPrefixParser final : PrefixParser {
+        ArrayLiteralPrefixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
+    // %["k" => v, sym : v2, ...] 内联字典字面量（tjs.y inline_dic；% 仅为前导记号）
+    struct DictLiteralPrefixParser final : PrefixParser {
+        DictLiteralPrefixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     static constinit ConstValPrefixParser S_ConstValPrefixParser{};
     static constinit UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
     static constinit IdentifierPrefixParser S_IdentifierPrefixParser;
@@ -328,6 +345,8 @@ namespace cial::syntax {
     static constinit ParenthesizedPrefixParser S_ParenthesizedPrefixParser{};
     static constinit FunctionPrefixParser S_FunctionPrefixParser;
     static constinit UnaryOperatorPrefixParser S_TypeCastPrefixParser{ Precedence::type };
+    static constinit ArrayLiteralPrefixParser S_ArrayLiteralPrefixParser;
+    static constinit DictLiteralPrefixParser S_DictLiteralPrefixParser;
 
     static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>(
         { { TokenType::Null, &S_ConstValPrefixParser },
@@ -357,6 +376,8 @@ namespace cial::syntax {
           { TokenType::Int, &S_TypeCastPrefixParser }, // "int" unary_expr
           { TokenType::Real, &S_TypeCastPrefixParser }, // "real" unary_expr
           { TokenType::String, &S_TypeCastPrefixParser }, // "string" unary_expr
+          { TokenType::LBracket, &S_ArrayLiteralPrefixParser }, // "[" 内联数组
+          { TokenType::Percent, &S_DictLiteralPrefixParser }, // "%[" 内联字典（% 仅为前导记号）
           { TokenType::Throw, &S_PrefixParser } });
 
     /**

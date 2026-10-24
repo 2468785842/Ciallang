@@ -56,10 +56,14 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/types/Value.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/types/String.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/types/TypeConverter.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/types/Array.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/types/Dictionary.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/NativeRegister.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/Debug.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/StringLib.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/ArrayLib.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/DictLib.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc.cpp
 

@@ -17,10 +17,12 @@
 | 表达式 | 赋值全家（含 `<->`、`\|\|=`、`&&=`、`>>>=`）、?:、逻辑/位/比较/严格相等/移位/乘除整除 | ✅ |
 | 一元前缀 | `!` `new` `invalidate` `-` `~` `++` `--` `delete` `typeof` `#` `$` `+` `&` `*`（及前后缀 `isvalid`） | ✅ |
 | 一元后缀 | `()` `.` `++` `--` | ✅ |
-| 一元后缀 | `[]`（下标，依赖 Array/String 成员语义）与 `!`（eval 即时求值） | ❌ |
+| 一元后缀 | `[]`（下标读写：数组/字典/字符串） | ✅ |
+| 一元后缀 | `!`（eval 即时求值） | ❌ |
+| 容器成员 | Array：push/pop/unshift/shift/insert/remove/erase/reverse/join + count/length（可写）；Dictionary：assign/clear/erase + count | ✅（sort/split/save/load/pack 系 ❌） |
 | 中缀 | instanceof / incontextof | ✅（instanceof 基础类型按类型名匹配）/ ✅；`in` ❌ |
 | 字面量 | 全部标量（含 i64 大整数字面量精确解析）+ 函数表达式 + @"…" 模板串 | ✅ |
-| 字面量 | `[...]` Array、`%[...]` Dictionary、`<%%>` Octet、`(const)` 常量形 | ◐ Octet ✅；其余 ❌ |
+| 字面量 | `[...]` Array、`%[...]` Dictionary、`<%%>` Octet、`(const)` 常量形 | ◐ Array/Dictionary/Octet ✅；`(const)` 按运行时新建（只读共享语义 ❌） |
 | 后缀条件 | `expr if cond`（假条件整体不赋值，tjs.y expr 层级绑定） | ✅ |
 | 函数 | 默认参数（TestVoid 守卫，实参优先） | ✅ |
 | 函数 | 收拢 `*args`、省略调用 `...`、展开调用 `*expr` | ❌ |
@@ -51,8 +53,8 @@
 |---|---|---|
 | （宿主）print | 控制台输出 | ✅ print/println |
 | String 内建成员 | length/charAt/indexOf/toUpperCase/…/sprintf/replace/split/escape/trim | ◐ replace/split 待 RegExp+Array |
-| Array | 数字下标数组；load/save(BinarySerializer)/sort/join/split/pack… | ❌ |
-| Dictionary | 哈希字典；load/save/assign/clear | ❌ |
+| Array | 数字下标数组；load/save(BinarySerializer)/sort/join/split/pack… | ◐ 字面量/下标/push/pop/unshift/shift/insert/remove/erase/reverse/join/count ✅；sort/split/save/load/pack ❌ |
+| Dictionary | 哈希字典；load/save/assign/clear | ◐ 字面量/下标/assign/clear/erase/count ✅；save/load ❌ |
 | Exception | 异常类（message 成员），脚本异常载体 | ✅（TJS 源自举，main.cpp 注入；原生错误自动包装为 Exception 实例） |
 | Math / Math.RandomGenerator | abs/floor/…；Xorshift / MT19937 | ❌ |
 | Date | get/set 系列 + 字符串 parse（tjsdate.y 文法） | ❌ |

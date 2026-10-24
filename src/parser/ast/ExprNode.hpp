@@ -192,4 +192,53 @@ namespace cial::syntax {
             return gen->generate(this, retReg);
         }
     };
+
+    // a[index] 下标访问（数组/字典/字符串/对象成员通读）；写入由 Assign lhs 分支处理
+    class IndexExprNode final : public ExprNode {
+    public:
+        const ExprNode *lhs;
+        const ExprNode *index;
+
+        IndexExprNode() = delete;
+
+        explicit IndexExprNode(const ExprNode *lhs, const ExprNode *index) :
+            ExprNode("index_access"), lhs(lhs), index(index) {
+            location = lhs->location;
+            location.end(index->location.end());
+        }
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
+
+    // [e1, e2, ...] 数组字面量（每次求值新建 Array）
+    class ArrayLiteralNode final : public ExprNode {
+    public:
+        Vec<ExprNode *> elements{};
+
+        explicit ArrayLiteralNode() : ExprNode("array_literal") {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
+
+    // %["k" => v, sym : v2, ...] 字典字面量（每次求值新建 Dictionary）
+    class DictLiteralNode final : public ExprNode {
+    public:
+        Vec<std::pair<ExprNode *, ExprNode *>> pairs{};
+
+        explicit DictLiteralNode() : ExprNode("dict_literal") {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
 } // namespace cial::syntax

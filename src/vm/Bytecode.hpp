@@ -78,7 +78,11 @@
     O(GRefRaw)                                                                                                         \
     O(DPropRaw)                                                                                                        \
     O(DerefGet)                                                                                                        \
-    O(DerefSet)
+    O(DerefSet)                                                                                                        \
+    O(NewArray)                                                                                                        \
+    O(NewDict)                                                                                                         \
+    O(GetIndex)                                                                                                        \
+    O(SetIndex)
 
 namespace cial::vm {
     class VMState;

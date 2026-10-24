@@ -146,6 +146,14 @@ namespace cial::syntax {
         return token->type() == tokenType;
     }
 
+    bool Parser::peekAt(Result &r, const size_t count, const TokenType tokenType) {
+        if(!lookAhead(r, count))
+            return false;
+        Token *token;
+        _lexer.peekTokenAt(token, count);
+        return token->type() == tokenType;
+    }
+
     bool Parser::consume(Result &r) {
         Token token{};
         return consume(r, token);
@@ -1154,6 +1162,15 @@ namespace cial::syntax {
     }
 
     ExprNode *ParenthesizedPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
+        // (const)[...] / (const)%[...] —— 常量形字面量（tjs.y const_inline_array/dic）。
+        // const 性暂不强制（每次求值新建实例，语义差异已记录 TODO），此处吞掉前缀后
+        // 交回常规表达式解析，后续 [ / %[ 自然命中字面量解析器
+        if(parser->peek(r, TokenType::Const)) {
+            parser->consume(r);
+            if(!parser->expect(r, TokenType::RParenthesis))
+                return nullptr;
+            return parser->parseExpression(r, true, Precedence::prefix);
+        }
         // (int)x / (real)x / (string)x —— TJS 的括号内类型转换写法;
         // 语料中亦有 (int x) 无括号变体(test_variant.tjs),两种都接受
         if(parser->peek(r, TokenType::Int) || parser->peek(r, TokenType::Real) ||
@@ -1263,8 +1280,8 @@ namespace cial::syntax {
     }
 
     ExprNode *IndexInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
-        // 下标访问 expr[index]:当前支持字符串(降糖为 .charAt(index)),
-        // Array/Dictionary 字面量落地后切换为通用取成员路径
+        // 下标访问 expr[index]：通用路径（数组整数下标/字典键/字符串字符），
+        // 由 GetIndex/SetIndex 指令按操作数类型分派
         const auto *index = parser->parseExpression(r, true);
         if(!index) {
             parser->error(r, "index access expects an expression", token->location);
@@ -1275,16 +1292,111 @@ namespace cial::syntax {
             return nullptr;
         }
 
-        // lhs.charAt(index) —— 复用既有过程调用 AST
-        auto *charAtName =
-            parser->astBuilder()->makeNode<ValueExprNode>(Token{ TokenType::ConstVal, String{ "charAt" } });
-        auto *member = parser->astBuilder()->makeNode<BinaryExprNode>(Token{ TokenType::Dot }, lhs, charAtName);
-        auto *call = parser->astBuilder()->makeNode<ProcCallExprNode>(member);
-        call->arguments.push_back(const_cast<ExprNode *>(index));
-        charAtName->location = token->location;
-        member->location = token->location;
-        call->location = token->location;
-        return call;
+        auto *indexNode = parser->astBuilder()->makeNode<IndexExprNode>(lhs, index);
+        indexNode->location = token->location;
+        return indexNode;
+    }
+
+    ExprNode *ArrayLiteralPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
+        // [e1, e2, ...]（tjs.y inline_array）：元素为 expr_no_comma，允许空元素
+        // （占 void）与尾逗号
+        auto *arrayNode = parser->astBuilder()->makeNode<ArrayLiteralNode>();
+        arrayNode->location = token->location;
+
+        if(parser->peek(r, TokenType::RBracket)) {
+            parser->consume(r);
+            return arrayNode;
+        }
+
+        while(true) {
+            if(parser->peek(r, TokenType::Comma)) {
+                // 空元素（占位 void）
+                arrayNode->elements.push_back(nullptr);
+                parser->consume(r);
+            } else if(parser->peek(r, TokenType::RBracket)) {
+                arrayNode->elements.push_back(nullptr);
+            } else {
+                auto *elm = parser->parseExpression(r, false);
+                if(!elm) {
+                    parser->error(r, "array literal expects element expression", token->location);
+                    return nullptr;
+                }
+                arrayNode->elements.push_back(elm);
+                if(!parser->peek(r, TokenType::Comma))
+                    break;
+                parser->consume(r);
+            }
+        }
+
+        if(!parser->expect(r, TokenType::RBracket)) {
+            return nullptr;
+        }
+        return arrayNode;
+    }
+
+    ExprNode *DictLiteralPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
+        // %[k1 => v1, sym : v2, ...]（tjs.y inline_dic）：键值对支持
+        // "expr => expr"（TJS2 新写法）与 "symbol : expr"（旧写法），允许尾逗号
+        if(!parser->expect(r, TokenType::LBracket)) {
+            return nullptr;
+        }
+        auto *dictNode = parser->astBuilder()->makeNode<DictLiteralNode>();
+        dictNode->location = token->location;
+
+        if(parser->peek(r, TokenType::RBracket)) {
+            parser->consume(r);
+            return dictNode;
+        }
+
+        while(true) {
+            bool consumedSeparator = false;
+            // "sym : v" 形式（tjs.y dic_elm 的 T_SYMBOL ":" 分支）：symbol 直接作为
+            // 键字符串字面量，不解析为变量引用（双 token 前瞻区分）
+            ExprNode *key{};
+            if(parser->peek(r, TokenType::Identifier) && parser->peekAt(r, 2, TokenType::Colon)) {
+                Token sym{};
+                parser->consume(r, sym);
+                parser->consume(r); // ':'
+                consumedSeparator = true;
+                key = parser->astBuilder()->makeNode<ValueExprNode>(
+                    Token{ TokenType::ConstVal, sym.getString() });
+            }
+            if(!key) {
+                // "k >= v" 形式（=> 的词形即 >=）：key 解析 floor 用 relational，
+                // 阻止 k 后的 >= 被当作比较运算符吸进 key 表达式
+                key = parser->parseExpression(r, false, Precedence::relational);
+                if(!key) {
+                    parser->error(r, "dictionary literal expects a key", token->location);
+                    return nullptr;
+                }
+            }
+
+            if(!consumedSeparator) {
+                // "k >= v" 分隔——TJS2 中 => 在词法上就是 >=（GtOrEqual），
+                // 由字典字面量上下文区分
+                if(!parser->expect(r, TokenType::GtOrEqual)) {
+                    return nullptr;
+                }
+            }
+
+            auto *value = parser->parseExpression(r, false);
+            if(!value) {
+                parser->error(r, "dictionary literal expects a value", token->location);
+                return nullptr;
+            }
+            dictNode->pairs.emplace_back(key, value);
+
+            if(!parser->peek(r, TokenType::Comma))
+                break;
+            parser->consume(r); // 允许尾逗号
+            if(parser->peek(r, TokenType::RBracket))
+                break;
+        }
+
+        if(!parser->expect(r, TokenType::RBracket)) {
+            return nullptr;
+        }
+        return dictNode;
     }
 
 

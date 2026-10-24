@@ -119,6 +119,8 @@ namespace cial {
 
         explicit VM(vm::VMState *vmState) : _vmState(vmState) {}
 
+        [[nodiscard]] Runtime &rt() const { return _vmState->rt; }
+
         template <typename T, typename... Args>
         T *create(Args &&...args) {
             return _vmState->rt.create<T>(std::forward<Args>(args)...);

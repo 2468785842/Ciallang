@@ -772,6 +772,25 @@ namespace cial::inter {
             return;
         }
 
+        if(const auto *expr = dynamic_cast<const syntax::IndexExprNode *>(node->lhs)) {
+            // a[i] = v：下标写（数组越界自动扩展/字典键写入，SetIndex 分派）
+            Register objReg{ 0 };
+            if(!expectValue(expr->lhs, objReg))
+                return;
+            Register idxReg{ 0 };
+            if(!expectValue(expr->index, idxReg))
+                return;
+            Register src{ 0 };
+            if(!expectValue(node->rhs, src))
+                return;
+            _chunk->emit<SetIndex>(objReg, idxReg, src);
+            freeRegister(idxReg);
+            freeRegister(objReg);
+            freeRegister(src);
+            optReg = src;
+            return;
+        }
+
         error("isn't support assign operator", node->location);
     }
 
@@ -1370,6 +1389,56 @@ namespace cial::inter {
 
         _chunk->repl<Jmp>(jmpIdx, makeLabel());
         freeRegister(testReg);
+        optReg = dst;
+    }
+
+    void IRGenerator::generate(const syntax::IndexExprNode *node, OptReg &optReg) {
+        Register objReg{ 0 };
+        if(!expectValue(node->lhs, objReg))
+            return;
+        Register idxReg{ 0 };
+        if(!expectValue(node->index, idxReg))
+            return;
+        Register dst = allocateRegister();
+        _chunk->emit<GetIndex>(objReg, idxReg, dst);
+        freeRegister(idxReg);
+        freeRegister(objReg);
+        optReg = dst;
+    }
+
+    void IRGenerator::generate(const syntax::ArrayLiteralNode *node, OptReg &optReg) {
+        Register dst = allocateRegister();
+        _chunk->emit<NewArray>(dst, static_cast<Integer>(node->elements.size()));
+        for(size_t i = 0; i < node->elements.size(); ++i) {
+            auto *elm = node->elements[i];
+            if(!elm)
+                continue; // 空元素保持 void
+            Register valReg{ 0 };
+            if(!expectValue(elm, valReg))
+                return;
+            Register idxReg = allocateRegister();
+            _chunk->emit<LoadImm>(idxReg, static_cast<Integer>(i));
+            _chunk->emit<SetIndex>(dst, idxReg, valReg);
+            freeRegister(idxReg);
+            freeRegister(valReg);
+        }
+        optReg = dst;
+    }
+
+    void IRGenerator::generate(const syntax::DictLiteralNode *node, OptReg &optReg) {
+        Register dst = allocateRegister();
+        _chunk->emit<NewDict>(dst);
+        for(const auto &[keyExpr, valueExpr] : node->pairs) {
+            Register keyReg{ 0 };
+            if(!expectValue(keyExpr, keyReg))
+                return;
+            Register valReg{ 0 };
+            if(!expectValue(valueExpr, valReg))
+                return;
+            _chunk->emit<SetIndex>(dst, keyReg, valReg);
+            freeRegister(keyReg);
+            freeRegister(valReg);
+        }
         optReg = dst;
     }
 

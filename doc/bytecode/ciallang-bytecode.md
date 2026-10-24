@@ -15,17 +15,17 @@
 ## 1. 两级结构总览
 
 ```
-AST ──IRGenerator──▶ TAC 指令序列（64 种，Instruction 对象）
+AST ──IRGenerator──▶ TAC 指令序列（68 种，Instruction 对象）
                         │  存于 Chunk::_instructions
                         ▼  Chunk::toBytecode()（幂等、惰性）
-                     扁平字节码 Vec<u8>（64 种 VmOpCode，与 TAC 一一对应）
+                     扁平字节码 Vec<u8>（68 种 VmOpCode，与 TAC 一一对应）
                         │  存于 Chunk::_code
                         ▼
                      VMState::run0() switch 解释（唯一执行路径）
 ```
 
 - 早期的 `run()` 多态执行路径（逐条虚调用 `Instruction::execute`）已删除；
-  语义全部收敛到 `run0()` 的 64 个 `dispatchXXX`。
+  语义全部收敛到 `run0()` 的 68 个 `dispatchXXX`。
 - `Instruction` 子类只作为 IR 载体与 dump 来源保留。
 
 ## 2. 执行模型
@@ -43,7 +43,7 @@ AST ──IRGenerator──▶ TAC 指令序列（64 种，Instruction 对象）
 - **this**：`CallFrame::thisObj`；`Function::call` 设为函数对象的 `thisObj` 字段（可被
   `ChgThis`/`GProp` 的方法绑定改写）。`GThis`/`DThis` 做名字查找（thisObj → closure 局部 → global）。
 
-## 3. TAC 指令全表（64 条）
+## 3. TAC 指令全表（68 条）
 
 枚举值 = 表中顺序（X-macro `CIAL_TAC_OPCODE_ENUMS`）。操作数记号：
 `%r`=寄存器、`@l`=标签（TAC 指令下标）、`*c`=常量池下标、`imm`=立即整数、`atom`=驻留名。
@@ -117,6 +117,10 @@ AST ──IRGenerator──▶ TAC 指令序列（64 种，Instruction 对象）
 | 22 | TestVoid | `%src, %dst` | `dst = (src is void)`；函数默认参数守卫用 |
 | 23 | DerefGet | `%prop, %dst` | `*p` 强制属性访问读：Property 调 getter（嵌套 run0），非 Property 报错 |
 | 24 | DerefSet | `%prop, %src` | `*p = v` 强制属性访问写：调 setter（压帧 → Call 接管），非 Property 报错 |
+| 25 | NewArray | `%dst, sLEB count` | `[...]` 字面量：新建 count 长度 Array（元素 void，随后逐个 SetIndex） |
+| 26 | NewDict | `%dst` | `%[...]` 字面量：新建空 Dictionary |
+| 27 | GetIndex | `%obj, %idx, %dst` | `a[i]` 读：数组整数下标（负=从尾，越界报脚本异常）/字典键（字符串化）/字符串字符（旧 charAt 语义）/对象成员名 |
+| 28 | SetIndex | `%obj, %idx, %src` | `a[i] = v` 写：数组越界自动扩展补 void；字典键写入 |
 
 ### 3.8 算术/位/比较（三操作数，dst ← src1 op src2）
 
@@ -179,10 +183,10 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 
 ## 5. 扁平字节码（`run0()` 路径）
 
-### 5.1 操作码（64 个，`VmOpCode : u8`）
+### 5.1 操作码（68 个，`VmOpCode : u8`）
 
 与 TAC 指令一一对应、编号一致（同一个 X-macro 序表 `CIAL_BYTECODE_OPCODE_ENUMS`，
-顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 64 条，无占位断言。
+顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 68 条，无占位断言。
 
 ### 5.2 立即数编码
 
@@ -192,7 +196,7 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 - 操作数宽度约定：寄存器 `u16`、Atom `u32`（Atom.v 是顺序索引，远小于 2^32）、
   跳转目标 `u32`（编译期回填的绝对偏移）。
 
-### 5.3 指令编码表（64 条全覆盖）
+### 5.3 指令编码表（68 条全覆盖）
 
 | 类别 | 指令 | 编码 |
 |---|---|---|
@@ -200,10 +204,11 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 | 单寄存器 | Push / PopN 前的 Test / Inv / Throw / Ret / Global / Super / This | `op + u16`（PopN 为 `op + sLEB128 count`） |
 | 跳转 | Jmp / JmpE / JmpNE | `op + u32 目标`（占位 + 回填，§5.5） |
 | 二寄存器 | ToInt/ToReal/ToString/Asc/Chr/LNot/ChgSign/ChkInv/TestVoid/DerefGet/DerefSet（`src,dst`）、ChgThis（`函数,新this`）、ChkIns（`dst,src`）、GLocal/DLocal（`src,dst`） | `op + u16 + u16` |
+| 装载扩展 | NewArray（`dst, sLEB count`）、NewDict（`dst`） | `op + u16 + sLEB` / `op + u16` |
 | 装载 | Load（`dst, constIdx`）、LoadImm（`dst, imm`） | `op + u16 + u16` / `op + u16 + sLEB128` |
 | 名字访问 | DGlobal/GGlobal/GThis/DThis/GRefRaw | `op + u32 atom + u16 reg` |
 | 算术/位/比较 | Add..LOr 全部 22 条（§3.8） | `op + u16 src1 + u16 src2 + u16 dst`（**三寄存器非破坏性**） |
-| 调用/属性 | Call（`dst, func, sLEB argc`）、GProp/DProp/DelProp/GPropRaw/DPropRaw（`obj, name, dst/src`） | 见括号内顺序 |
+| 调用/属性 | Call（`dst, func, sLEB argc`）、GProp/DProp/DelProp/GPropRaw/DPropRaw（`obj, name, dst/src`）、GetIndex/SetIndex（`obj, idx, dst/src`） | 见括号内顺序 |
 
 > 历史包袱说明：早期版本曾把三操作数算术展开为"DLocal 补拷贝 + 破坏性双操作数"
 > （且在 `r1 == r3` 时算错），现已改为原生三寄存器编码，展开逻辑删除。

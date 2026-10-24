@@ -90,6 +90,9 @@ namespace cial::syntax {
 
         void peekToken(Token *&token) const { token = _tokens.front(); }
 
+        // 第 count 个待消费 token（1 基，需先 lookAhead 预填充）
+        void peekTokenAt(Token *&token, const size_t count) const { token = _tokens[count - 1]; }
+
         ~Lexer() noexcept {
             for(const auto &item : _tokens)
                 delete item;

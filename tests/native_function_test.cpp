@@ -108,3 +108,70 @@ TEST_CASE("本地函数声明 - 字符串 length 只读属性") {
         REQUIRE(*vm.evalExpr<Integer>(R"("".length)"_str) == 0);
     }
 }
+
+TEST_CASE("本地函数声明 - Array/Dictionary 内建方法") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("Array push/pop/unshift/shift") {
+        vm.eval(R"(
+            var a = [1, 2];
+            var c1 = a.push(3, 4);
+            var p = a.pop();
+            var c2 = a.unshift(0);
+            var s = a.shift();
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("c1"_str) == 4);
+        REQUIRE(*vm.evalExpr<Integer>("p"_str) == 4);
+        REQUIRE(*vm.evalExpr<Integer>("c2"_str) == 4);
+        REQUIRE(*vm.evalExpr<Integer>("s"_str) == 0);
+    }
+
+    SECTION("Array insert/remove/erase/join/reverse") {
+        vm.eval(R"(
+            var a = [1, 2, 3];
+            a.insert(1, 9);
+            var j1 = a.join("-");
+            a.remove(1);
+            a.reverse();
+            var j2 = a.join(",");
+            a.erase();
+            var c = a.count;
+        )"_str);
+        REQUIRE((**vm.evalExpr<String *>("j1"_str)) == "1-9-2-3"_str);
+        REQUIRE((**vm.evalExpr<String *>("j2"_str)) == "3,2,1"_str);
+        REQUIRE(*vm.evalExpr<Integer>("c"_str) == 0);
+    }
+
+    SECTION("Dictionary assign/clear/erase") {
+        vm.eval(R"(
+            var d1 = %[a : 1, b : 2];
+            var d2 = %[];
+            (Dictionary.assign incontextof d2)(d1);
+            var c1 = d2.count;
+            var erased = d2.erase("a");
+            var c2 = d2.count;
+            d2.clear();
+            var c3 = d2.count;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("c1"_str) == 2);
+        REQUIRE(*vm.evalExpr<Integer>("erased"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("c2"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("c3"_str) == 0);
+    }
+
+    SECTION("count 属性可写（调整长度）") {
+        vm.eval(R"(
+            var a = [1, 2, 3];
+            a.count = 5;
+            var c1 = a.count;
+            a.length = 1;
+            var c2 = a.count;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("c1"_str) == 5);
+        REQUIRE(*vm.evalExpr<Integer>("c2"_str) == 1);
+    }
+}

@@ -195,6 +195,10 @@ namespace cial::inter {
     DEF_AUTO_DUMP(DPropRaw, "d_prop_raw");
     DEF_AUTO_DUMP(DerefGet, "deref_get");
     DEF_AUTO_DUMP(DerefSet, "deref_set");
+    DEF_AUTO_DUMP(NewArray, "new_array");
+    DEF_AUTO_DUMP(NewDict, "new_dict");
+    DEF_AUTO_DUMP(GetIndex, "get_index");
+    DEF_AUTO_DUMP(SetIndex, "set_index");
 
     // 其他
     DEF_AUTO_DUMP(ChgSign, "chg_sign");

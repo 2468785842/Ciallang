@@ -25,10 +25,14 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] `[]` Array 声明、`%[]` Dictionary 声明
+- [ ] Array 标准库剩余：sort/split/save/load/pack 系/Assignment 联动
+- [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
+- [ ] `(const)[...]` / `(const)%[...]` 的只读共享实例语义（当前按运行时新建处理，行为兼容）
+- [ ] 十六进制浮点字面量 `0x1.07CCp14`、二进制浮点 `0b1.1`（test.tjs 后段依赖）
 - [ ] `with` 语句
-- [ ] 标准库：Array / Dictionary / Date / Math / RegExp
-      （String 已部分实现：replace/split 待 RegExp 和 Array）
+- [ ] 标准库：Date / Math / RegExp
+      （String 已部分实现：replace/split 待 RegExp；
+       Array/Dictionary 已支持字面量、下标读写与核心方法，sort/split 待补）
 - [ ] const 只读性检查（当前 const 与 var 等价，仅语法接入）
 
 ## 四、工程化
@@ -37,6 +41,13 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-24 Array/Dictionary 批次：`[...]`/`%[...]` 字面量（sym: 与 "k" >= v 两种键形式，
+  => 词形即 >= 由上下文区分）、通用下标读写 `a[i]`（新增 NewArray/NewDict/GetIndex/SetIndex，
+  指令 64→68；数组负下标/越界写自动扩展/越界读报脚本异常；字符串下标保持 charAt 语义）、
+  Array/Dictionary 运行时容器（GC 接入）+ 方法表（push/pop/unshift/shift/insert/remove/
+  erase/reverse/join/assign/clear/erase + count/length 属性）、全局 Array/Dictionary
+  类对象（Dictionary.assign incontextof 惯用法）；连带修复 ChgThis 不认 NativeFunction 段错误
 
 - 2026-10-24 property 引用批次：前缀 `&`/`*`（新增 GPropRaw/GRefRaw/DPropRaw/DerefGet/DerefSet，
   指令 59→64）、成员后缀 `obj.prop++`（getter+setter 链）、后缀 `i++` 旧值语义；
