@@ -353,6 +353,13 @@ namespace cial::syntax {
         ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    // /pattern/ 正则字面量（lexer 已按上下文区分除法）
+    struct RegexLiteralPrefixParser final : PrefixParser {
+        RegexLiteralPrefixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     static constinit ConstValPrefixParser S_ConstValPrefixParser{};
     static constinit UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
     static constinit IdentifierPrefixParser S_IdentifierPrefixParser;
@@ -364,6 +371,7 @@ namespace cial::syntax {
     static constinit ArrayLiteralPrefixParser S_ArrayLiteralPrefixParser;
     static constinit DictLiteralPrefixParser S_DictLiteralPrefixParser;
     static constinit DotPrefixParser S_DotPrefixParser;
+    static constinit RegexLiteralPrefixParser S_RegexLiteralPrefixParser;
 
     static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>(
         { { TokenType::Null, &S_ConstValPrefixParser },
@@ -396,6 +404,7 @@ namespace cial::syntax {
           { TokenType::LBracket, &S_ArrayLiteralPrefixParser }, // "[" 内联数组
           { TokenType::Percent, &S_DictLiteralPrefixParser }, // "%[" 内联字典（% 仅为前导记号）
           { TokenType::Dot, &S_DotPrefixParser }, // ".member" 裸词链（with 上下文）
+          { TokenType::RegExp, &S_RegexLiteralPrefixParser }, // /pattern/ 正则字面量
           { TokenType::Throw, &S_PrefixParser } });
 
     /**

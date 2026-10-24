@@ -38,9 +38,11 @@ TEST_CASE("本地函数声明 - 字符串成员方法定义") {
     }
 
     SECTION("Method - to(Upper|Lower)Case") {
-        REQUIRE(**vm.eval<String *>(R"(var abc = "AbC"; abc.toUpperCase(); return abc;)"_str) == "ABC"_str);
-        REQUIRE(**vm.eval<String *>(R"(var abc = "AbC"; abc.toLowerCase(); return abc;)"_str) == "abc"_str);
-        REQUIRE(**vm.eval<String *>(R"(var empty = ""; empty.toUpperCase(); return empty;)"_str) == ""_str);
+        // TJS2 语义：返回新串，不改原串
+        REQUIRE(**vm.eval<String *>(R"(var abc = "AbC"; return abc.toUpperCase();)"_str) == "ABC"_str);
+        REQUIRE(**vm.eval<String *>(R"(var abc = "AbC"; return abc.toLowerCase();)"_str) == "abc"_str);
+        REQUIRE(**vm.eval<String *>(R"(var empty = ""; return empty.toUpperCase();)"_str) == ""_str);
+        REQUIRE(**vm.eval<String *>(R"(var abc = "AbC"; abc.toUpperCase(); return abc;)"_str) == "AbC"_str);
     }
 
     SECTION("Method - substring") {

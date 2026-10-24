@@ -143,7 +143,8 @@ namespace cial::syntax {
     X(LineComment, "line_comment")                                                                                     \
     X(BlockComment, "block_comment")                                                                                   \
     X(Identifier, "identifier")                                                                                        \
-    X(ConstVal, "const_val")
+    X(ConstVal, "const_val")                                                                                           \
+    X(RegExp, "regexp")
 
 #define CONSTANT_VAL_LIST(X)                                                                                           \
     X(ConstVal, "true", 1)                                                                                             \

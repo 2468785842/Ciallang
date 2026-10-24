@@ -90,7 +90,8 @@
     O(SetIndex)                                                                                                        \
     O(WithPush)                                                                                                        \
     O(WithPop)                                                                                                         \
-    O(GetWith)
+    O(GetWith)                                                                                                         \
+    O(NewRegExp)
 
 namespace cial::vm {
     class VMState;
@@ -343,6 +344,8 @@ namespace cial::inter {
     DEF_INST(WithPop, 0, );
     // 裸词链基座 .member:取 with 栈顶对象,空栈得 global
     DEF_INST(GetWith, 1, OP_GET1(dst, Register));
+    // /pattern/ 正则字面量:按 String 常量取模式,构造 RegExp 对象
+    DEF_INST(NewRegExp, 2, OP_GET1(dst, Register) OP_GET2(pattern, ConstIdx));
 
     struct DumpInst {
         [[nodiscard]] static String dumpOperand(const Operand &operand);

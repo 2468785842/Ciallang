@@ -1442,6 +1442,13 @@ namespace cial::inter {
         optReg = dst;
     }
 
+    void IRGenerator::generate(const syntax::RegexLiteralExprNode *node, OptReg &optReg) {
+        Register dst = allocateRegister();
+        // 模式文本按字符串字面量同路径入常量池（Atom 形态）
+        _chunk->emit<NewRegExp>(dst, _chunk->addConstant(getAtomFromToken(node->token)));
+        optReg = dst;
+    }
+
     void IRGenerator::generate(const syntax::WithBaseExprNode *node, OptReg &optReg) {
         Register dst = allocateRegister();
         _chunk->emit<GetWith>(dst);

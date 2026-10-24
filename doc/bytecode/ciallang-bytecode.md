@@ -15,17 +15,17 @@
 ## 1. 两级结构总览
 
 ```
-AST ──IRGenerator──▶ TAC 指令序列（71 种，Instruction 对象）
+AST ──IRGenerator──▶ TAC 指令序列（72 种，Instruction 对象）
                         │  存于 Chunk::_instructions
                         ▼  Chunk::toBytecode()（幂等、惰性）
-                     扁平字节码 Vec<u8>（71 种 VmOpCode，与 TAC 一一对应）
+                     扁平字节码 Vec<u8>（72 种 VmOpCode，与 TAC 一一对应）
                         │  存于 Chunk::_code
                         ▼
                      VMState::run0() switch 解释（唯一执行路径）
 ```
 
 - 早期的 `run()` 多态执行路径（逐条虚调用 `Instruction::execute`）已删除；
-  语义全部收敛到 `run0()` 的 71 个 `dispatchXXX`。
+  语义全部收敛到 `run0()` 的 72 个 `dispatchXXX`。
 - `Instruction` 子类只作为 IR 载体与 dump 来源保留。
 
 ## 2. 执行模型
@@ -43,7 +43,7 @@ AST ──IRGenerator──▶ TAC 指令序列（71 种，Instruction 对象）
 - **this**：`CallFrame::thisObj`；`Function::call` 设为函数对象的 `thisObj` 字段（可被
   `ChgThis`/`GProp` 的方法绑定改写）。`GThis`/`DThis` 做名字查找（thisObj → closure 局部 → global）。
 
-## 3. TAC 指令全表（71 条）
+## 3. TAC 指令全表（72 条）
 
 枚举值 = 表中顺序（X-macro `CIAL_TAC_OPCODE_ENUMS`）。操作数记号：
 `%r`=寄存器、`@l`=标签（TAC 指令下标）、`*c`=常量池下标、`imm`=立即整数、`atom`=驻留名。
@@ -124,6 +124,7 @@ AST ──IRGenerator──▶ TAC 指令序列（71 种，Instruction 对象）
 | 29 | WithPush | `%src` | with 语句：压入 with 上下文栈（对象挂 Runtime handle 保 GC） |
 | 30 | WithPop | | 弹出 with 上下文栈（块结束配对；异常穿越随帧截断） |
 | 31 | GetWith | `%dst` | 裸词链 `.member` 基座：取 with 栈顶对象，空栈得 global（TJS2 顶层裸词链语义） |
+| 32 | NewRegExp | `%dst, %pattern(ConstIdx)` | `/pattern/` 字面量：String 常量（模式）→ RegExp 对象（std::regex ECMAScript 编译） |
 
 ### 3.8 算术/位/比较（三操作数，dst ← src1 op src2）
 
@@ -186,10 +187,10 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 
 ## 5. 扁平字节码（`run0()` 路径）
 
-### 5.1 操作码（71 个，`VmOpCode : u8`）
+### 5.1 操作码（72 个，`VmOpCode : u8`）
 
 与 TAC 指令一一对应、编号一致（同一个 X-macro 序表 `CIAL_BYTECODE_OPCODE_ENUMS`，
-顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 71 条，无占位断言。
+顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 72 条，无占位断言。
 
 ### 5.2 立即数编码
 
@@ -199,7 +200,7 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 - 操作数宽度约定：寄存器 `u16`、Atom `u32`（Atom.v 是顺序索引，远小于 2^32）、
   跳转目标 `u32`（编译期回填的绝对偏移）。
 
-### 5.3 指令编码表（71 条全覆盖）
+### 5.3 指令编码表（72 条全覆盖）
 
 | 类别 | 指令 | 编码 |
 |---|---|---|
@@ -207,7 +208,8 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 | 单寄存器 | Push / PopN 前的 Test / Inv / Throw / Ret / Global / Super / This | `op + u16`（PopN 为 `op + sLEB128 count`） |
 | 跳转 | Jmp / JmpE / JmpNE | `op + u32 目标`（占位 + 回填，§5.5） |
 | 二寄存器 | ToInt/ToReal/ToString/Asc/Chr/LNot/ChgSign/ChkInv/TestVoid/DerefGet/DerefSet（`src,dst`）、ChgThis（`函数,新this`）、ChkIns（`dst,src`）、GLocal/DLocal（`src,dst`） | `op + u16 + u16` |
-| 装载扩展 | NewArray（`dst, sLEB count`）、NewDict（`dst`）、WithPop（无操作数）、WithPush/GetWith（`src/dst`） | `op + u16 + sLEB` / `op + u16` 
+| 装载扩展 | NewArray（`dst, sLEB count`）、NewDict（`dst`）、WithPop（无操作数）、WithPush/GetWith（`src/dst`） | `op + u16 + sLEB` / `op + u16`
+| 正则 | NewRegExp（`dst, constIdx`） | `op + u16 + u16` | 
 | 装载 | Load（`dst, constIdx`）、LoadImm（`dst, imm`） | `op + u16 + u16` / `op + u16 + sLEB128` |
 | 名字访问 | DGlobal/GGlobal/GThis/DThis/GRefRaw | `op + u32 atom + u16 reg` |
 | 算术/位/比较 | Add..LOr 全部 22 条（§3.8） | `op + u16 src1 + u16 src2 + u16 dst`（**三寄存器非破坏性**） |

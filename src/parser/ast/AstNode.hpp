@@ -47,6 +47,7 @@
     O(DictLiteralNode)                                                                                                 \
     O(WithBaseExprNode)                                                                                                \
     O(WithStmtNode)                                                                                                    \
+    O(RegexLiteralExprNode)                                                                                            \
     O(PropertyDeclNode)                                                                                                \
     O(VarDeclNode)                                                                                                     \
     O(FunctionDeclNode)                                                                                                \

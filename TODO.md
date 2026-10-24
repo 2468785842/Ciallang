@@ -42,6 +42,12 @@
 
 ## 已完成（摘要）
 
+- 2026-10-24 RegExp 批次：`/pattern/` 正则字面量（lexer 按前 token 判别除法 vs 正则，
+  JS lexer 标准做法；TokenType::RegExp + NewRegExp 指令 71→72；std::regex ECMAScript）+
+  String.replace（替换第一处）+ 字符串下标 TJS2 越界语义（str[len] 空串、str[>len] 报错）+
+  str.length 改 UTF-8 码点计数（"abc漢字"==5）+ toUpperCase/toLowerCase 改返回新串（不改原串，
+  对齐 TJS2）+ sprintf 的 %c 接受字符串参数与 %04X 等整数宽度/填充生效
+
 - 2026-10-24 with 语句批次：`with(expr) stmt_or_block` + 裸词链 `.member`（新增
   WithPush/WithPop/GetWith，指令 68→71；withStack 上下文栈挂 Runtime handle 保 GC，
   帧/unwind 级截断；裸词链基座空栈得 global——顶层 `.gvarl = 7` 语义）；

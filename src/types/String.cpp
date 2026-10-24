@@ -108,8 +108,14 @@ namespace cial {
                 case 'c': {
                     if(in >= paramCount)
                         throw std::runtime_error("Insufficient parameters for %c");
-                    char ch = static_cast<char>(params[in++].asInteger().unwrap());
-                    result += ch;
+                    const Value &v = params[in++];
+                    // TJS2 语义：%c 接受字符码或单字符字符串（语料 "%c".sprintf('b') == "b"）
+                    if(v.isString()) {
+                        const String *sv = v.asString().unwrap();
+                        result += sv->isEmpty() ? ' ' : sv->getData()[0];
+                    } else {
+                        result += static_cast<char>(v.asInteger().unwrap());
+                    }
                     break;
                 }
 
@@ -146,14 +152,23 @@ namespace cial {
                 case 'X': {
                     if(in >= paramCount)
                         throw std::runtime_error("Insufficient parameters for integer format");
-                    long long val = params[in++].asInteger().unwrap();
-                    char fmtBuf[16];
+                    const long long val = params[in++].asInteger().unwrap();
+                    // 组装 printf 格式：%[flag][width][.prec]type（%04X 等 C 风格宽度/填充）
+                    std::string fmtSpec = "%";
+                    if(flag)
+                        fmtSpec += flag;
+                    if(width > 0)
+                        fmtSpec += std::to_string(width);
                     if(prec >= 0)
-                        std::snprintf(fmtBuf, sizeof(fmtBuf), "%%.%lldd", prec);
-                    else
-                        std::snprintf(fmtBuf, sizeof(fmtBuf), "%%d");
-                    std::snprintf(buffer, sizeof(buffer), fmtBuf, val);
-                    result += buffer;
+                        fmtSpec += "." + std::to_string(prec);
+                    fmtSpec += type;
+                    std::snprintf(buffer, sizeof(buffer), fmtSpec.c_str(), val);
+                    std::string num(buffer);
+                    // flag=='0' 时 width 已由 printf 处理；未处理的不足宽度补空格（右对齐）
+                    if(width > 0 && static_cast<int>(num.size()) < width && flag != '0' && flag != '-') {
+                        result.append(static_cast<size_t>(width) - num.size(), ' ');
+                    }
+                    result += num;
                     break;
                 }
 

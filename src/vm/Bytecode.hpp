@@ -85,7 +85,8 @@
     O(SetIndex)                                                                                                        \
     O(WithPush)                                                                                                        \
     O(WithPop)                                                                                                         \
-    O(GetWith)
+    O(GetWith)                                                                                                         \
+    O(NewRegExp)
 
 namespace cial::vm {
     class VMState;

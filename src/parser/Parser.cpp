@@ -1427,6 +1427,12 @@ namespace cial::syntax {
         return dictNode;
     }
 
+    ExprNode *RegexLiteralPrefixParser::parse(Result &, Parser *parser, Token *token) const {
+        // lexer 产出的 RegExp token 已携带模式文本
+        auto *node = parser->astBuilder()->makeNode<RegexLiteralExprNode>(*token);
+        return node;
+    }
+
     ExprNode *DotPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
         // .member 裸词链（with 上下文成员访问；无 with 时基座为 global——TJS2 顶层
         // 裸词链语义）。产出 Dot(WithBase, member)，后续 .b.c 由普通 Dot 中缀续链

@@ -12,6 +12,7 @@
  *
  */
 
+#include <fmt/format.h>
 #include "Lexer.hpp"
 
 #include "OperatorTrie.hpp"
@@ -82,7 +83,14 @@ namespace cial::syntax {
      */
     bool Lexer::next(Token *&token, const bool enablePreProcessor) {
 
-        DEFER { _hasNext = !_sourceFile.eof(); };
+        DEFER {
+            _hasNext = !_sourceFile.eof();
+            // 记录最近产出 token（注释不计），供 isRegexStart 判定除法 vs 正则
+            if(token != nullptr && token->type() != TokenType::LineComment &&
+               token->type() != TokenType::BlockComment) {
+                _lastTokenType = token->type();
+            }
+        };
 
         i32 rune = read(!tmplStrCtx.active);
 
@@ -221,6 +229,8 @@ namespace cial::syntax {
                         r = lineComment(token);
                     } else if(peek == '*') {
                         r = blockComment(token);
+                    } else if(isRegexStart()) {
+                        r = regexConstVal(token);
                     } else {
                         r = matchOperator(token);
                     }
@@ -511,6 +521,85 @@ namespace cial::syntax {
             return true;
         }
         return false;
+    }
+
+    // '/' 的二义性判据（除法 vs 正则字面量起始）：按前一个有效 token 判定——
+    // 操作数结尾（字面量/标识符/右括号等）之后是除法，其余（运算符/关键字/行首）
+    // 之后是正则（JS lexer 标准做法）。源字符回看无法区分 `x /= 4` 与 `x = /re/`
+    bool Lexer::isRegexStart() const {
+        switch(_lastTokenType) {
+            case TokenType::ConstVal: // 含数字/字符串/true/false 字面量
+            case TokenType::Identifier:
+            case TokenType::RegExp:
+            case TokenType::Octet:
+            case TokenType::RParenthesis:
+            case TokenType::RBracket:
+            case TokenType::RightCurlyBrace:
+            case TokenType::Increment:
+            case TokenType::Decrement:
+                return false; // 操作数结尾 → 除法
+            case TokenType::None:
+            case TokenType::LineComment:
+            case TokenType::BlockComment:
+                return true; // 文件头
+            default:
+                return true; // 运算符/关键字之后 → 正则
+        }
+    }
+
+    // /pattern/flags 正则字面量：'/' 已读，读到未转义的 '/'；flags 当前忽略（TJS2 gimsx 记 TODO）
+    bool Lexer::regexConstVal(Token *&token) {
+        std::string pattern;
+        // case '/' 的 peek+双 rewind 把 '/' 退了回来：这里先消费它
+        if(read(false) != '/') {
+            rewindOneChar();
+            token = makeToken(TokenType::Error, "expected regex start"_str);
+            return false;
+        }
+        while(!_sourceFile.eof()) {
+            const i32 rune = read(false);
+            if(rune == runeEof || rune == runeInvalid) {
+                token = makeToken(TokenType::Error, "unterminated regex literal"_str);
+                return false;
+            }
+            if(rune == '/') {
+                break;
+            }
+            if(rune == 0x5C) { // backslash：转义序列原样保留
+                pattern.push_back(0x5C);
+                const i32 esc = read(false);
+                if(esc == runeEof || esc == runeInvalid) {
+                    token = makeToken(TokenType::Error, "unterminated regex literal"_str);
+                    return false;
+                }
+                if(esc < 0x80) {
+                    pattern.push_back(static_cast<char>(esc));
+                } else {
+                    const auto encoded = utf8Encode(esc);
+                    pattern.append(reinterpret_cast<const char *>(encoded.data), encoded.width);
+                }
+                continue;
+            }
+            if(rune < 0x80) {
+                pattern.push_back(static_cast<char>(rune));
+            } else {
+                const auto encoded = utf8Encode(rune);
+                pattern.append(reinterpret_cast<const char *>(encoded.data), encoded.width);
+            }
+        }
+
+        // flags（g/i/m/s/x）：读标识符尾巴，当前仅跳过（语义记 TODO）
+        while(!_sourceFile.eof()) {
+            const u32 ch = _sourceFile[_sourceFile.pos()];
+            if((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+                _sourceFile.seek(_sourceFile.pos() + 1);
+                continue;
+            }
+            break;
+        }
+
+        token = makeToken(TokenType::RegExp, String{ pattern.c_str(), static_cast<u32>(pattern.size()) });
+        return true;
     }
 
     bool Lexer::numberConstVal(Token *&token) {

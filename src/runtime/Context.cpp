@@ -5,6 +5,7 @@
 
 #include "AtomTable.hpp"
 #include "stdlib/ArrayLib.hpp"
+#include "common/UTF8.hpp"
 #include "stdlib/DictLib.hpp"
 #include "stdlib/StringLib.hpp"
 #include "types/Array.hpp"
@@ -44,6 +45,7 @@ namespace cial {
         registerMethod<String>("substring"_str, &stdlib::stringSubstring);
         registerMethod<String>("substr"_str, &stdlib::stringSubstring);
         registerMethod<String>("sprintf"_str, &stdlib::stringSprintf);
+        registerMethod<String>("replace"_str, &stdlib::stringReplace);
         // registerMethod<String>("replace"_str, &stdlib::stringReplace);
         registerMethod<String>("escape"_str, &stdlib::stringEscape);
         // registerMethod<String>("split"_str, &stringSplit);
@@ -53,7 +55,9 @@ namespace cial {
 
         // 只读属性（str.length；与 charAt 一致的字节长度语义）
         registerProperty<String>("length"_str, [](const Value &thisObj) {
-            return Value{ Integer{ thisObj.asString().unwrap()->length() } };
+            // TJS2 语义：字符数（UTF-16 码元数）；UTF-8 下按码点计数（"abc漢字" == 5）
+            const String *str = thisObj.asString().unwrap();
+            return Value{ Integer{ Common::utf8Strlen(std::string(str->getData(), str->length())) } };
         });
 
         // Array 方法

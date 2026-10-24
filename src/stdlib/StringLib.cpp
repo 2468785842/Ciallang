@@ -10,7 +10,10 @@
 //                                                            \_/__/
 //
 
+#include <regex>
+
 #include "StringLib.hpp"
+#include "types/RegExp.hpp"
 #include "vm/VM.hpp"
 
 // TODO: UTF-8 support
@@ -46,24 +49,24 @@ namespace cial::stdlib {
         return p - str->getData();
     }
 
-    void stringToUpperCase(VM *, const Value &thisObj, size_t) {
-        String *str = thisObj.asString().unwrap();
-        if(str->isEmpty())
-            return;
-        for(char &c : *str) {
+    String stringToUpperCase(VM *, const Value &thisObj, size_t) {
+        const String *str = thisObj.asString().unwrap();
+        std::string out(str->getData(), str->length());
+        for(char &c : out) {
             if(c >= 'a' && c <= 'z')
                 c += 'Z' - 'z';
         }
+        return String(out.c_str(), static_cast<u32>(out.size()));
     }
 
-    void stringToLowerCase(VM *, const Value &thisObj, size_t) {
-        String *str = thisObj.asString().unwrap();
-        if(str->isEmpty())
-            return;
-        for(char &c : *str) {
+    String stringToLowerCase(VM *, const Value &thisObj, size_t) {
+        const String *str = thisObj.asString().unwrap();
+        std::string out(str->getData(), str->length());
+        for(char &c : out) {
             if(c >= 'A' && c <= 'Z')
                 c += 'z' - 'Z';
         }
+        return String(out.c_str(), static_cast<u32>(out.size()));
     }
 
     String stringSubstring(VM *, const Value &thisObj, size_t, const Integer start, const Value &vLength) {
@@ -92,10 +95,28 @@ namespace cial::stdlib {
         return formatString(*thisObj.asString().unwrap(), argCount, args);
     }
 
-    // TODO: need impl RegExp class
-    // String stringReplace(VM *, const Value &, size_t, const Value &) {
-    //     throw std::runtime_error("Not implemented");
-    // }
+    String stringReplace(VM *, const Value &thisObj, size_t, const Value &reVal, const Value &replacement) {
+        const String *str = thisObj.asString().unwrap();
+        auto *re = dynamic_cast<const RegExp *>(reVal.asObject().unwrap());
+        if(!re)
+            throw std::runtime_error("replace expects a regexp");
+        const std::string in(str->getData(), str->length());
+        std::smatch m;
+        if(!std::regex_search(in, m, re->re))
+            return *str; // 无匹配原样返回
+        String rep{};
+        if(replacement.isString()) {
+            rep = *replacement.asString().unwrap();
+        } else if(!replacement.isVoid()) {
+            Value t = replacement;
+            if(const auto r = t.toString(); !r.isFailed() && t.isString())
+                rep = *t.asString().unwrap();
+        }
+        std::string out = m.prefix().str();
+        out.append(rep.getData(), rep.length());
+        out += m.suffix().str();
+        return String(out.c_str(), static_cast<u32>(out.size()));
+    }
 
     String stringEscape(VM *, const Value &thisObj, size_t) { return thisObj.asString().unwrap()->escapeBackSlash(); }
     // TODO: need impl Array class

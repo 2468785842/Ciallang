@@ -4,6 +4,7 @@
 #pragma once
 
 #include "Octet.hpp"
+#include "RegExp.hpp"
 #include "String.hpp"
 #include "Value.hpp"
 

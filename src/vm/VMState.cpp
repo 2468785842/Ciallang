@@ -21,6 +21,7 @@
 #include "types/Dictionary.hpp"
 #include "types/Function.hpp"
 #include "types/Property.hpp"
+#include "types/RegExp.hpp"
 
 namespace cial {
     void CallFrame::setThisObj(Value v) {
@@ -1078,12 +1079,19 @@ namespace cial::vm {
         if(obj.isString()) {
             const String *str = obj.asString().unwrap();
             const auto i = idx.isVoid() ? 0 : idx.asInteger().unwrap();
-            const size_t pos = arrayIndex(i, str->length());
-            if(pos == npos) {
-                regs[r3] = Value{ String(""_str) };
+            const auto n = static_cast<i64>(str->length());
+            // TJS2 字符串下标语义（语料 test_string）：str[len] 得空串，str[>len] 报错，
+            // 负数从尾数（-1 = 末字符）
+            if(i >= 0) {
+                if(i > n)
+                    throw std::runtime_error("string index out of range");
+                regs[r3] = i == n ? Value{ String(""_str) } : Value{ String(str->getData()[static_cast<size_t>(i)]) };
                 return DispatchRet::Continue;
             }
-            regs[r3] = Value{ String(str->getData()[pos]) };
+            const auto u = -i;
+            if(u > n)
+                throw std::runtime_error("string index out of range");
+            regs[r3] = u == n ? Value{ String(""_str) } : Value{ String(str->getData()[static_cast<size_t>(n - u)]) };
             return DispatchRet::Continue;
         }
         throw std::runtime_error("value is not indexable");
@@ -1156,6 +1164,16 @@ namespace cial::vm {
             regs[r1] = Value{ context.global() };
         else
             regs[r1] = Value{ withStack.back() };
+        return DispatchRet::Continue;
+    }
+
+    // /pattern/ 正则字面量：String 常量（模式）→ RegExp 对象（构造时编译，非法模式抛脚本异常）
+    DISPATCH_OP_METHOD(NewRegExp) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 cIdx = read<u16>(ip, pc);
+        const auto &constant = constants[cIdx];
+        const String &pattern = *constant.createValue(&rt).asString().unwrap();
+        regs[r1] = Value{ rt.create<RegExp>(&rt, pattern).get() };
         return DispatchRet::Continue;
     }
 

@@ -371,4 +371,10 @@ namespace cial::vm {
         info.code.push_back(static_cast<u8>(VmOpCode::GetWith));
         write<u16>(info.code, tac->dst().index());
     }
+
+    void Bytecode::encode(Info &info, const inter::NewRegExp *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::NewRegExp));
+        write<u16>(info.code, tac->dst().index());
+        write<u16>(info.code, tac->pattern().index());
+    }
 } // namespace cial::vm

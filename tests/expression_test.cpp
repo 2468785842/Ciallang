@@ -400,13 +400,16 @@ TEST_CASE("表达式 - Array/Dictionary 字面量与下标") {
         REQUIRE(*vm.evalExpr<Integer>("v"_str) == 9);
     }
 
-    SECTION("字符串下标保持 charAt 语义") {
+    SECTION("字符串下标：str[len] 空串、str[>len] 报错（TJS2 语义）") {
         vm.eval(R"(
             var s = "abc";
             var c0 = s[0];
-            var c9 = s[9];
+            var c3 = s[3];
+            var oob = false;
+            try { var x = s[9]; } catch { oob = true; }
         )"_str);
         REQUIRE((**vm.evalExpr<String *>("c0"_str)) == "a"_str);
-        REQUIRE((**vm.evalExpr<String *>("c9"_str)) == ""_str);
+        REQUIRE((**vm.evalExpr<String *>("c3"_str)) == ""_str);
+        REQUIRE(*vm.evalExpr<bool>("oob"_str) == true);
     }
 }

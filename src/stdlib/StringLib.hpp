@@ -12,6 +12,7 @@
 #pragma once
 
 #include "types/String.hpp"
+#include "types/RegExp.hpp"
 #include "types/Value.hpp"
 
 namespace cial {
@@ -24,16 +25,18 @@ namespace cial::stdlib {
 
     Integer stringIndexOf(VM *, const Value &thisObj, size_t argCount, const String *subStr, const Value &vStart);
 
-    void stringToUpperCase(VM *, const Value &thisObj, size_t argCount);
+    // TJS2 语义：返回新串，不改原串（原实现原地修改与语料 test_string 冲突）
+    String stringToUpperCase(VM *, const Value &thisObj, size_t argCount);
 
-    void stringToLowerCase(VM *, const Value &thisObj, size_t argCount);
+    String stringToLowerCase(VM *, const Value &thisObj, size_t argCount);
 
     String stringSubstring(VM *, const Value &thisObj, size_t argCount, Integer start, const Value &vLength);
 
     String stringSprintf(VM *, const Value &thisObj, size_t argCount, Value *args);
 
-    // TODO: need impl RegExp class
-    // String stringReplace(VM *, const Value &thisObj, size_t argCount, const Value &p1);
+    // replace(regexp, replacement)：替换第一处匹配（TJS2 语义）
+    String stringReplace(VM *, const Value &thisObj, size_t argCount, const Value &re,
+                         const Value &replacement);
 
     String stringEscape(VM *, const Value &thisObj, size_t argCount);
 

@@ -147,6 +147,13 @@ namespace cial::syntax {
 
         bool stringConstVal(Token *&token);
 
+        bool regexConstVal(Token *&token);
+
+        [[nodiscard]] bool isRegexStart() const;
+
+        // 最近一次产出的有效 token 类型（正则字面量判据用；注释不更新）
+        TokenType _lastTokenType{ TokenType::None };
+
         bool templateStringConstVal(Token *&token);
 
         bool parseNonDecimalNumber(Token *&token, std::stringstream &, i8 (*)(char), i8);

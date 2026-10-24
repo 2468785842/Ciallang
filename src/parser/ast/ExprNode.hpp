@@ -242,6 +242,18 @@ namespace cial::syntax {
         }
     };
 
+    // /pattern/ 正则字面量：token 携带模式文本，生成 NewRegExp
+    class RegexLiteralExprNode final : public ExprNode {
+    public:
+        explicit RegexLiteralExprNode(const Token &token) : ExprNode(token, "regex_literal") {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
+
     // 裸词链基座 .member 的隐式对象（with 语句的上下文对象；无 with 时为 global），
     // 生成 GetWith 指令；后续 .b.c 由普通 Dot 中缀续链
     class WithBaseExprNode final : public ExprNode {

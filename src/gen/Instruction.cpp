@@ -202,6 +202,7 @@ namespace cial::inter {
     DEF_AUTO_DUMP(WithPush, "with_push");
     DEF_AUTO_DUMP(WithPop, "with_pop");
     DEF_AUTO_DUMP(GetWith, "get_with");
+    DEF_AUTO_DUMP(NewRegExp, "new_regexp");
 
     // 其他
     DEF_AUTO_DUMP(ChgSign, "chg_sign");
