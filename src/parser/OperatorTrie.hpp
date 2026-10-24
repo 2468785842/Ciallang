@@ -47,8 +47,7 @@ namespace cial::syntax {
 
             for(const u8 b : op) {
                 assert(b < 0x80);
-                const int next = _opTrie[node].next[b];
-                if(next == -1) {
+                if(const int next = _opTrie[node].next[b]; next == -1) {
                     const int newNode = static_cast<int>(_opTrie.size());
                     _opTrie.emplace_back();
                     _opTrie.back().token = TokenType::Invalid;

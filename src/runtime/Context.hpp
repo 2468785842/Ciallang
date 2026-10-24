@@ -30,7 +30,7 @@ namespace cial {
         static constexpr auto maxCallDepth = 1024;
 
         explicit Context(Runtime &rt) noexcept;
-        ~Context() noexcept;
+        ~Context() noexcept override;
 
         // GC 运行时根入口：供 Runtime 在分配触发回收时调用
         void collectMark() const override;

@@ -79,7 +79,7 @@ namespace cial {
         void addMarkRoot(const MarkRootProvider *provider) { _markRoots.push_back(provider); }
 
         void removeMarkRoot(const MarkRootProvider *provider) {
-            if(const auto it = std::find(_markRoots.begin(), _markRoots.end(), provider); it != _markRoots.end()) {
+            if(const auto it = std::ranges::find(_markRoots, provider); it != _markRoots.end()) {
                 _markRoots.erase(it);
             }
         }
