@@ -21,25 +21,14 @@
 namespace cial {
 
     /**
-     * dLocal r1, r2
-     * dThis r1, r2
-     * dGlobal r1, r2
-     * When this instruction is executed, it checks whether r2 is a Property object.
-     * If so, invokeSet is called on r2, with r1 passed as the argument.
-     *
-     * gLocal r1, r2
-     * gThis r1, r2
-     * gGlobal r1, r2
-     * When this instruction is executed, it checks whether r1 is a Property object.
-     * If so, invokeGet is called on r1, and the returned value is stored in r2.
-     *
-     * gProp r1, r2, r3
-     * When this instruction is executed, it checks whether r2 is a Property object.
-     * If so, invokeGet is called on r2, and the returned value is stored in r3.
-     *
-     * dProp r1, r2, r3
-     * When this instruction is executed, it checks whether r2 is a Property object.
-     * If so, invokeSet is called on r2, with r3 passed as the argument.
+     * property 触发协议（哪些指令在遇到 Property 对象时调 getter/setter）：
+     * - dThis/dGlobal：写 this/global 成员时，槽位为 Property 则 invokeSet
+     * - gThis/gGlobal：读 this/global 成员时，槽位为 Property 则 invokeGet
+     * - gProp：读对象成员时，槽位为 Property 则 invokeGet
+     * - dProp：写对象成员时，槽位为 Property 则 invokeSet
+     * - deref_get/deref_set：*p 解引用读写，显式调 getter/setter
+     * 纯读写（永不触发）：gLocal/dLocal（局部变量=寄存器拷贝，TJS2 VM_CP 语义）、
+     * g_prop_raw/d_prop_raw（& 取本体/绕过 setter 写，旧版 GPDS/SPDS）
      */
     class Property final : public Object {
     public:

@@ -434,6 +434,63 @@ namespace cial::inter {
                 optReg = dst;
                 break;
             }
+            case syntax::TokenType::Ampersand: {
+                // &obj.member / &identifier（旧版 T_IGNOREPROP/GPDS）：取成员本体，
+                // property 不触发 getter。
+                // identifier 形态：局部变量直接拷值；否则 GRefRaw 走 this/global 槽位
+                const syntax::Token *memberToken{};
+                const syntax::ExprNode *objExpr{};
+                if(const auto *identifier = dynamic_cast<const syntax::IdentifierExprNode *>(node->rhs)) {
+                    const Atom identifierAtom = getAtomFromToken(identifier->token);
+                    if(const auto variable = resolveLocalVariable(identifierAtom)) {
+                        // 局部变量无 property 包装，本体即值
+                        const Register dst2 = allocateRegister();
+                        _chunk->emit<DLocal>(variable->reg, dst2);
+                        optReg = dst2;
+                        break;
+                    }
+                    _chunk->emit<GRefRaw>(identifierAtom, dst);
+                    optReg = dst;
+                    break;
+                }
+                if(const auto *member = dynamic_cast<const syntax::BinaryExprNode *>(node->rhs);
+                   member && member->token.type() == syntax::TokenType::Dot) {
+                    objExpr = member->lhs;
+                    if(const auto *identifierExpr = dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs)) {
+                        memberToken = &identifierExpr->token;
+                    } else {
+                        error("'&' member must be identifier", node->location);
+                        return;
+                    }
+                } else {
+                    error("'&' expects identifier or member access", node->location);
+                    return;
+                }
+
+                Register objReg{};
+                if(!expectValue(objExpr, objReg)) {
+                    return;
+                }
+
+                auto memberReg = allocateRegister();
+                genTokenValueLoadInst(memberReg, *memberToken);
+                _chunk->emit<GPropRaw>(objReg, memberReg, dst);
+                freeRegister(memberReg);
+                freeRegister(objReg);
+                optReg = dst;
+                break;
+            }
+            case syntax::TokenType::Asterisk: {
+                // *p（旧版 T_PROPACCESS/GETP）：强制属性访问读，调 getter
+                Register reg{};
+                if(!expectValue(node->rhs, reg)) {
+                    return;
+                }
+                _chunk->emit<DerefGet>(reg, dst);
+                freeRegister(reg);
+                optReg = dst;
+                break;
+            }
             default:
                 error("unknow prefix unary operator", node->location);
         }
@@ -455,7 +512,46 @@ namespace cial::inter {
             case Increment:
             case Decrement: {
                 if(const auto *expr = dynamic_cast<const syntax::IdentifierExprNode *>(node->lhs)) {
-                    generateIncDec(getAtomFromToken(expr->token), node->token.type() == Increment, optReg);
+                    generateIncDec(getAtomFromToken(expr->token), node->token.type() == Increment, optReg,
+                                   /*postfix=*/true);
+                    return;
+                }
+                if(const auto *member = dynamic_cast<const syntax::BinaryExprNode *>(node->lhs);
+                   member && member->token.type() == Dot) {
+                    // obj.member++/--（旧版 INCGETP/SUBGETP 语义）：getter 读旧值 →
+                    // 加减 → setter 写新值；表达式值为旧值（postfix）
+                    const auto *identifierExpr = dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs);
+                    if(!identifierExpr) {
+                        error("suffix ++/-- member must be identifier", node->location);
+                        return;
+                    }
+                    Register objReg{ 0 };
+                    if(!expectValue(member->lhs, objReg))
+                        return;
+                    auto memberReg = allocateRegister();
+                    genTokenValueLoadInst(memberReg, identifierExpr->token);
+
+                    Register curReg = allocateRegister();
+                    _chunk->emit<GProp>(objReg, memberReg, curReg); // 触发 getter
+                    const Register oldReg = allocateRegister();
+                    _chunk->emit<DLocal>(curReg, oldReg);
+                    const Register one = allocateRegister();
+                    _chunk->emit<LoadImm>(one, 1);
+                    const Register nv = allocateRegister();
+                    if(node->token.type() == Increment) {
+                        _chunk->emit<Add>(one, curReg, nv);
+                    } else {
+                        // 注意操作数顺序：变量 - 1
+                        _chunk->emit<Sub>(curReg, one, nv);
+                    }
+                    _chunk->emit<DProp>(objReg, memberReg, nv); // 触发 setter（压帧 → Call）
+
+                    freeRegister(one);
+                    freeRegister(nv);
+                    freeRegister(curReg);
+                    freeRegister(memberReg);
+                    freeRegister(objReg);
+                    optReg = oldReg;
                     return;
                 }
                 error("current not support dot chain call", node->location);
@@ -466,11 +562,18 @@ namespace cial::inter {
         }
     }
 
-    void IRGenerator::generateIncDec(const Atom identifier, const bool isIncrement, OptReg &optReg) {
+    void IRGenerator::generateIncDec(const Atom identifier, const bool isIncrement, OptReg &optReg,
+                                     const bool postfix) {
         if(const auto variable = resolveLocalVariable(identifier)) {
             Register src2 = variable->reg;
             auto src1 = allocateRegister();
             Register dst = allocateRegister();
+            Register oldReg{};
+            if(postfix) {
+                // TJS2 后缀语义：表达式值为自增/自减前的旧值
+                oldReg = allocateRegister();
+                _chunk->emit<DLocal>(src2, oldReg);
+            }
             _chunk->emit<LoadImm>(src1, 1);
             if(isIncrement) {
                 _chunk->emit<Add>(src1, src2, dst);
@@ -481,17 +584,25 @@ namespace cial::inter {
             // 局部变量必须写回，否则 ++/-- 永远不生效
             _chunk->emit<DLocal>(dst, src2);
             freeRegister(src1);
-            optReg = dst;
+            freeRegister(dst);
+            optReg = postfix ? oldReg : dst;
             return;
         }
 
         auto src1 = allocateRegister();
         auto src2 = allocateRegister();
         auto dst = allocateRegister();
+        Register oldReg{};
+        if(postfix) {
+            oldReg = allocateRegister();
+        }
         _chunk->emit<LoadImm>(src2, 1);
         if(isTopScope()) {
             // global maybe
             _chunk->emit<GGlobal>(identifier, src1);
+            if(postfix) {
+                _chunk->emit<DLocal>(src1, oldReg);
+            }
             if(isIncrement) {
                 _chunk->emit<Add>(src2, src1, dst);
             } else {
@@ -502,6 +613,9 @@ namespace cial::inter {
         } else {
             // find on context
             _chunk->emit<GThis>(identifier, src1);
+            if(postfix) {
+                _chunk->emit<DLocal>(src1, oldReg);
+            }
             if(isIncrement) {
                 _chunk->emit<Add>(src2, src1, dst);
             } else {
@@ -511,7 +625,8 @@ namespace cial::inter {
             _chunk->emit<DThis>(identifier, dst);
         }
         freeRegister(src2);
-        optReg = dst;
+        freeRegister(dst);
+        optReg = postfix ? oldReg : dst;
     }
 
     void IRGenerator::generate(const syntax::ProcCallExprNode *node, OptReg &optReg) {
@@ -591,6 +706,50 @@ namespace cial::inter {
                     return;
                 }
             }
+        }
+
+        if(const auto *expr = dynamic_cast<const syntax::PrefixUnaryExprNode *>(node->lhs);
+           expr && expr->token.type() == syntax::TokenType::Asterisk) {
+            // *p = v（旧版 SETP）：通过 property 引用写，调 setter
+            Register propReg{ 0 };
+            if(!expectValue(expr->rhs, propReg))
+                return;
+
+            Register src{ 0 };
+            if(!expectValue(node->rhs, src))
+                return;
+
+            _chunk->emit<DerefSet>(propReg, src);
+            freeRegister(propReg);
+            freeRegister(src);
+            optReg = src;
+            return;
+        }
+
+        if(const auto *expr = dynamic_cast<const syntax::PrefixUnaryExprNode *>(node->lhs);
+           expr && expr->token.type() == syntax::TokenType::Ampersand) {
+            // &obj.member = v（旧版 SPDS）：绕过 setter 直接写槽位（注册 property 引用）
+            const auto *member = dynamic_cast<const syntax::BinaryExprNode *>(expr->rhs);
+            if(!member || member->token.type() != syntax::TokenType::Dot ||
+               !dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs)) {
+                error("'&' assignment expects member access lhs", node->location);
+                return;
+            }
+            Register objReg{ 0 };
+            if(!expectValue(member->lhs, objReg))
+                return;
+            Register src{ 0 };
+            if(!expectValue(node->rhs, src))
+                return;
+            auto memberReg = allocateRegister();
+            genTokenValueLoadInst(memberReg,
+                                  dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs)->token);
+            _chunk->emit<DPropRaw>(objReg, memberReg, src);
+            freeRegister(memberReg);
+            freeRegister(objReg);
+            freeRegister(src);
+            optReg = src;
+            return;
         }
 
         error("isn't support assign operator", node->location);

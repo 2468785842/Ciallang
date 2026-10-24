@@ -15,17 +15,17 @@
 ## 1. 两级结构总览
 
 ```
-AST ──IRGenerator──▶ TAC 指令序列（59 种，Instruction 对象）
+AST ──IRGenerator──▶ TAC 指令序列（64 种，Instruction 对象）
                         │  存于 Chunk::_instructions
                         ▼  Chunk::toBytecode()（幂等、惰性）
-                     扁平字节码 Vec<u8>（59 种 VmOpCode，与 TAC 一一对应）
+                     扁平字节码 Vec<u8>（64 种 VmOpCode，与 TAC 一一对应）
                         │  存于 Chunk::_code
                         ▼
                      VMState::run0() switch 解释（唯一执行路径）
 ```
 
 - 早期的 `run()` 多态执行路径（逐条虚调用 `Instruction::execute`）已删除；
-  语义全部收敛到 `run0()` 的 59 个 `dispatchXXX`。
+  语义全部收敛到 `run0()` 的 64 个 `dispatchXXX`。
 - `Instruction` 子类只作为 IR 载体与 dump 来源保留。
 
 ## 2. 执行模型
@@ -43,7 +43,7 @@ AST ──IRGenerator──▶ TAC 指令序列（59 种，Instruction 对象）
 - **this**：`CallFrame::thisObj`；`Function::call` 设为函数对象的 `thisObj` 字段（可被
   `ChgThis`/`GProp` 的方法绑定改写）。`GThis`/`DThis` 做名字查找（thisObj → closure 局部 → global）。
 
-## 3. TAC 指令全表（59 条）
+## 3. TAC 指令全表（64 条）
 
 枚举值 = 表中顺序（X-macro `CIAL_TAC_OPCODE_ENUMS`）。操作数记号：
 `%r`=寄存器、`@l`=标签（TAC 指令下标）、`*c`=常量池下标、`imm`=立即整数、`atom`=驻留名。
@@ -115,6 +115,8 @@ AST ──IRGenerator──▶ TAC 指令序列（59 种，Instruction 对象）
 | 20 | Chr | `%src, %dst` | `$n`：字符码转 1 字符字符串 |
 | 21 | ChkIns | `%name, %obj` | `obj = (obj instanceof name)`（基础类型按类型名匹配：Number 覆盖 Integer/Real；结果原地写回 obj 槽） |
 | 22 | TestVoid | `%src, %dst` | `dst = (src is void)`；函数默认参数守卫用 |
+| 23 | DerefGet | `%prop, %dst` | `*p` 强制属性访问读：Property 调 getter（嵌套 run0），非 Property 报错 |
+| 24 | DerefSet | `%prop, %src` | `*p = v` 强制属性访问写：调 setter（压帧 → Call 接管），非 Property 报错 |
 
 ### 3.8 算术/位/比较（三操作数，dst ← src1 op src2）
 
@@ -138,13 +140,20 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 
 | # | 指令 | 操作数 | 语义 |
 |---|---|---|---|
-| 54 | GProp | `%obj, %name, %dst` | `dst = obj[name]`；特判 GlobalObject/ClassObject（方法绑定 this）/非对象先查原生属性表（`str.length`）再查方法表 |
-| 55 | DProp | `%obj, %name, %src` | `obj[name] = src` |
+| 54 | GProp | `%obj, %name, %dst` | `dst = obj[name]`；特判 GlobalObject/ClassObject（方法绑定 this；构造器名返回类对象）/非对象先查原生属性表（`str.length`）再查方法表 |
+| 55 | DProp | `%obj, %name, %src` | `obj[name] = src`；槽位为 Property 则调 setter（压帧 → Call 接管），普通成员纯写 |
 | 56 | DelProp | `%obj, %name, %dst` | `dst = delete obj[name]`（仅删实例自有成员，TJS2 DeleteMember 语义） |
+| 57 | GPropRaw | `%obj, %name, %dst` | `&obj[name]`：取成员本体，property 不触发 getter（旧版 GPDS） |
+| 58 | GRefRaw | `%atom, %dst` | `&name`：取 this/global 槽位本体，不触发 getter（旧版 GPDS 符号形态） |
+| 59 | DPropRaw | `%obj, %name, %src` | `&obj[name] = src`：绕过 setter 直接写槽位（旧版 SPDS），& 作赋值左值 |
 
 ⚠️ 与 TJS 不同：Ciallang 的 GProp/DProp **只有 indirect 形态**（名字来自寄存器），
-没有 direct（常量池名字）与 P（无成员闭包）变体；也没有 IGNOREPROP/MEMBERENSURE 标志位
-（见 mapping.md §6 缺口清单）。
+没有 direct（常量池名字）与 P（无成员闭包）变体；IGNOREPROP/MEMBERENSURE 标志位
+由独立的 *Raw 指令承担（见 mapping.md §6 缺口清单）。
+
+**property 触发协议**：GProp/DProp/GThis/GGlobal/DThis/DGlobal 在槽位为 Property 时
+调 getter/setter；GLocal/DLocal（局部变量=寄存器拷贝，TJS2 VM_CP 语义）与
+*Raw 系列永不触发——这是 `&` 引用能作为一等值传递的前提。
 
 ## 4. Chunk 结构（`src/vm/Chunk.hpp`）
 
@@ -170,10 +179,10 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 
 ## 5. 扁平字节码（`run0()` 路径）
 
-### 5.1 操作码（59 个，`VmOpCode : u8`）
+### 5.1 操作码（64 个，`VmOpCode : u8`）
 
 与 TAC 指令一一对应、编号一致（同一个 X-macro 序表 `CIAL_BYTECODE_OPCODE_ENUMS`，
-顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 59 条，无占位断言。
+顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 64 条，无占位断言。
 
 ### 5.2 立即数编码
 
@@ -183,18 +192,18 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 - 操作数宽度约定：寄存器 `u16`、Atom `u32`（Atom.v 是顺序索引，远小于 2^32）、
   跳转目标 `u32`（编译期回填的绝对偏移）。
 
-### 5.3 指令编码表（59 条全覆盖）
+### 5.3 指令编码表（64 条全覆盖）
 
 | 类别 | 指令 | 编码 |
 |---|---|---|
 | 无操作数 | NOP / Debugger | `op(1B)` |
 | 单寄存器 | Push / PopN 前的 Test / Inv / Throw / Ret / Global / Super / This | `op + u16`（PopN 为 `op + sLEB128 count`） |
 | 跳转 | Jmp / JmpE / JmpNE | `op + u32 目标`（占位 + 回填，§5.5） |
-| 二寄存器 | ToInt/ToReal/ToString/Asc/Chr/LNot/ChgSign/ChkInv/TestVoid（`src,dst`）、ChgThis（`函数,新this`）、ChkIns（`dst,src`）、GLocal/DLocal（`src,dst`） | `op + u16 + u16` |
+| 二寄存器 | ToInt/ToReal/ToString/Asc/Chr/LNot/ChgSign/ChkInv/TestVoid/DerefGet/DerefSet（`src,dst`）、ChgThis（`函数,新this`）、ChkIns（`dst,src`）、GLocal/DLocal（`src,dst`） | `op + u16 + u16` |
 | 装载 | Load（`dst, constIdx`）、LoadImm（`dst, imm`） | `op + u16 + u16` / `op + u16 + sLEB128` |
-| 名字访问 | DGlobal/GGlobal/GThis/DThis | `op + u32 atom + u16 reg` |
+| 名字访问 | DGlobal/GGlobal/GThis/DThis/GRefRaw | `op + u32 atom + u16 reg` |
 | 算术/位/比较 | Add..LOr 全部 22 条（§3.8） | `op + u16 src1 + u16 src2 + u16 dst`（**三寄存器非破坏性**） |
-| 调用/属性 | Call（`dst, func, sLEB argc`）、GProp/DProp（`obj, name, dst/src`） | 见括号内顺序 |
+| 调用/属性 | Call（`dst, func, sLEB argc`）、GProp/DProp/DelProp/GPropRaw/DPropRaw（`obj, name, dst/src`） | 见括号内顺序 |
 
 > 历史包袱说明：早期版本曾把三操作数算术展开为"DLocal 补拷贝 + 破坏性双操作数"
 > （且在 `r1 == r3` 时算错），现已改为原生三寄存器编码，展开逻辑删除。

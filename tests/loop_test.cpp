@@ -139,3 +139,34 @@ TEST_CASE("循环 - 未初始化多变量声明相互独立") {
     REQUIRE(*vm.evalExpr<Integer>("x"_str) == 7);
     REQUIRE(*vm.evalExpr<Integer>("y"_str) == 8);
 }
+
+TEST_CASE("循环 - 后缀 ++/-- 表达式值为旧值（TJS2 语义）") {
+    Runtime rt{};
+    Context context{ rt };
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("局部变量") {
+        vm.eval(R"(
+            function f() {
+                var i = 5;
+                var a = i++;
+                var b = i--;
+                return a * 100 + b * 10 + i;
+            }
+            var r = f();
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r"_str) == 565);
+    }
+
+    SECTION("全局变量") {
+        vm.eval(R"(
+            var g = 7;
+            var a = g--;
+            var b = g++;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("a"_str) == 7);
+        REQUIRE(*vm.evalExpr<Integer>("b"_str) == 6);
+        REQUIRE(*vm.evalExpr<Integer>("g"_str) == 7);
+    }
+}

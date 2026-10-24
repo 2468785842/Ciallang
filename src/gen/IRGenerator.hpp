@@ -116,9 +116,9 @@ namespace cial::inter {
 
         bool expectValue(const syntax::ExprNode *node, Register &ret);
 
-        // ++/-- 公共生成（前缀与后缀共用）：identifier 解析为局部/全局/this 路径，
-        // 表达式值为自增后的新值（注意：TJS2 后缀形式应返回旧值，当前实现前后缀一致）
-        void generateIncDec(const Atom identifier, bool isIncrement, OptReg &optReg);
+        // ++/-- 公共生成（前缀与后缀共用）：identifier 解析为局部/全局/this 路径。
+        // 前缀表达式值为新值；postfix=true 时为旧值（TJS2 后缀语义）
+        void generateIncDec(const Atom identifier, bool isIncrement, OptReg &optReg, bool postfix = false);
 
         void error(const std::string &message, const Common::SourceLocation &location) const {
             _sourceFile.error(_r, message, location);

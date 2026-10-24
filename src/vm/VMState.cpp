@@ -357,8 +357,22 @@ namespace cial::vm {
 
     DISPATCH_OP_METHOD(Super) {
         const u16 r1 = read<u16>(ip, pc);
-        regs[r1] = Value{ dynamic_cast<DataObject *>(cur->thisObj.asObject().unwrap())->getSuperClass() };
-        return DispatchRet::Continue;
+        auto *dataObj = dynamic_cast<DataObject *>(cur->thisObj.asObject().unwrap());
+        // 方法内：_lastSuperClass = 构造链中最后初始化的基类（"后继承优先"语义）
+        if(dataObj->getSuperClass()) {
+            regs[r1] = Value{ dataObj->getSuperClass() };
+            return DispatchRet::Continue;
+        }
+        // 构造器内 super.<baseCtor>()：setSuperClass 尚未发生（基类构造完成时才记录），
+        // _lastSuperClass 为 null——按类定义的 extends 解析到最左（首个）基类
+        const auto &exts = dataObj->klass()->meta->extends;
+        for(const Atom extName : exts) {
+            if(globalHas(extName)) {
+                regs[r1] = global(extName);
+                return DispatchRet::Continue;
+            }
+        }
+        throw std::runtime_error("super used in class without base class");
     }
 
     DISPATCH_OP_METHOD(This) {
@@ -689,21 +703,19 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(GLocal) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
-        Value srcVal = regs[r1];
-        propObjectGet(*this, srcVal, srcVal);
-        regs[r2] = srcVal;
+        // 局部变量读取是纯拷贝（TJS2 对应 VM_CP）：不触发 property getter。
+        // 否则 &prop 引用存入局部变量后一读就被触发，Property 无法作为一等值传递；
+        // 属性触发只应发生在对象成员访问（GProp/GThis/GGlobal）
+        regs[r2] = regs[r1];
         return DispatchRet::Continue;
     }
 
     DISPATCH_OP_METHOD(DLocal) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
-        Value srcVal = regs[r1];
-        if(propObjectSet(*this, srcVal, regs[r2])) {
-            cur->pc = pc;
-            return DispatchRet::Call;
-        }
-        regs[r2] = srcVal;
+        // 局部变量写入是纯写：目标槽位即使持有 Property 对象（& 引用）也不调 setter，
+        // setter 只在写 this/global 成员（DThis/DGlobal）或 *p 解引用（DerefSet）时触发
+        regs[r2] = regs[r1];
         return DispatchRet::Continue;
     }
 
@@ -815,9 +827,11 @@ namespace cial::vm {
             if(const auto *classObject = dynamic_cast<ClassObject *>(obj)) {
                 auto tmp = obj->getProp(atom);
                 propObjectGet(*this, tmp, tmp);
+                // 构造器名访问返回 ClassObject 本身（super.<Ctor>() 路径），非 Function
                 if(tmp.isObject()) {
-                    auto *fun = dynamic_cast<Function *>(tmp.asObject().value());
-                    fun->thisObj = cur->thisObj.asObject().value();
+                    if(auto *fun = dynamic_cast<Function *>(tmp.asObject().value())) {
+                        fun->thisObj = cur->thisObj.asObject().value();
+                    }
                 }
                 regs[r3] = tmp;
                 return DispatchRet::Continue;
@@ -857,6 +871,38 @@ namespace cial::vm {
         CLL_ASSERT(objVal.isObject(), "dprop obj is not object");
         const String &name = *regs[r2].asString().unwrap();
         const Atom atom = rt.atomTable.intern(name);
+        // 成员写（旧版 SPD）：槽位当前值是 Property 对象则调 setter（invokeSet 只压
+        // 帧不执行，与 DGlobal 同款检测栈变化交还主循环）；普通成员纯写
+        auto *obj = objVal.asObject().unwrap();
+        Value curVal{};
+        bool hasCur = false;
+        if(dynamic_cast<GlobalObject *>(obj) == nullptr) {
+            // GlobalObject::hasProp 对缺失成员外的行为与 DataObject 一致；
+            // 但 property 触发不应作用于全局槽（全局写走 DGlobal），此处仅实例/类对象
+            hasCur = obj->hasProp(atom);
+            if(hasCur)
+                curVal = obj->getProp(atom);
+        }
+        if(hasCur && propObjectSet(*this, regs[r3], curVal)) {
+            cur->pc = pc;
+            return DispatchRet::Call;
+        }
+        obj->setProp(atom, regs[r3]);
+        return DispatchRet::Continue;
+    }
+
+    // &obj.member = v：写槽位本体，绕过 setter（旧版 SPDS）——& 作赋值左值，
+    // 用于注册/覆盖 property 引用成员
+    DISPATCH_OP_METHOD(DPropRaw) {
+        const u16 r1 = read<u16>(ip, pc); // obj
+        const u16 r2 = read<u16>(ip, pc); // member
+        const u16 r3 = read<u16>(ip, pc); // src
+        const auto &objVal = regs[r1];
+        if(!objVal.isObject()) {
+            throw std::runtime_error("'&' operand is not an object");
+        }
+        const String &name = *regs[r2].asString().unwrap();
+        const Atom atom = rt.atomTable.intern(name);
         objVal.asObject().unwrap()->setProp(atom, regs[r3]);
         return DispatchRet::Continue;
     }
@@ -874,6 +920,70 @@ namespace cial::vm {
         const String &name = *regs[r2].asString().unwrap();
         const Atom atom = rt.atomTable.intern(name);
         regs[r3] = Value{ Integer{ objVal.asObject().unwrap()->delProp(atom) } };
+        return DispatchRet::Continue;
+    }
+
+    // &obj.member：取成员本体（旧版 GPDS）——property 不触发 getter，直接得到
+    // Property 对象；普通成员与 GProp 等价
+    DISPATCH_OP_METHOD(GPropRaw) {
+        const u16 r1 = read<u16>(ip, pc); // obj
+        const u16 r2 = read<u16>(ip, pc); // member
+        const u16 r3 = read<u16>(ip, pc); // dst
+        const auto &val = regs[r1];
+        const String &name = *regs[r2].asString().unwrap();
+        const Atom atom = rt.atomTable.intern(name);
+        if(!val.isObject()) {
+            throw std::runtime_error("'&' operand is not an object");
+        }
+        regs[r3] = val.asObject().unwrap()->getProp(atom);
+        return DispatchRet::Continue;
+    }
+
+    // &identifier：取 this/global 槽位本体（旧版 GPDS 的符号形态）——
+    // 不触发 getter；getThis 内置 thisData→closure→global 的查找
+    DISPATCH_OP_METHOD(GRefRaw) {
+        const u32 atom = read<u32>(ip, pc);
+        const u16 r1 = read<u16>(ip, pc);
+        regs[r1] = getThis({ atom });
+        return DispatchRet::Continue;
+    }
+
+    // *p：强制属性访问读（旧版 GETP）——Property 调 getter（invokeGet 内嵌套 run0
+    // 同步完成）；非 Property 按 TJS2 语义报错
+    DISPATCH_OP_METHOD(DerefGet) {
+        const u16 r1 = read<u16>(ip, pc); // prop
+        const u16 r2 = read<u16>(ip, pc); // dst
+        const auto &propVal = regs[r1];
+        if(!propVal.isObject()) {
+            throw std::runtime_error("'*' operand is not a property");
+        }
+        auto *prop = dynamic_cast<Property *>(propVal.asObject().unwrap());
+        if(!prop) {
+            throw std::runtime_error("'*' operand is not a property");
+        }
+        regs[r2] = prop->invokeGet(*this);
+        return DispatchRet::Continue;
+    }
+
+    // *p = v：强制属性访问写（旧版 SETP）——Property 调 setter；invokeSet 只压帧
+    // 不执行，与 DGlobal 同款：检测栈变化后交还主循环（DispatchRet::Call）
+    DISPATCH_OP_METHOD(DerefSet) {
+        const u16 r1 = read<u16>(ip, pc); // prop
+        const u16 r2 = read<u16>(ip, pc); // src
+        const auto &propVal = regs[r1];
+        if(!propVal.isObject()) {
+            throw std::runtime_error("'*' operand is not a property");
+        }
+        auto *prop = dynamic_cast<Property *>(propVal.asObject().unwrap());
+        if(!prop) {
+            throw std::runtime_error("'*' operand is not a property");
+        }
+        const size_t top = _stackTop;
+        prop->invokeSet(*this, regs[r2]);
+        if(_stackTop != top) {
+            cur->pc = pc;
+            return DispatchRet::Call;
+        }
         return DispatchRet::Continue;
     }
 

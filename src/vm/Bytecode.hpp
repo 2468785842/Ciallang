@@ -73,7 +73,12 @@
     O(Call)                                                                                                            \
     O(GProp)                                                                                                           \
     O(DProp)                                                                                                           \
-    O(DelProp)
+    O(DelProp)                                                                                                         \
+    O(GPropRaw)                                                                                                        \
+    O(GRefRaw)                                                                                                         \
+    O(DPropRaw)                                                                                                        \
+    O(DerefGet)                                                                                                        \
+    O(DerefSet)
 
 namespace cial::vm {
     class VMState;

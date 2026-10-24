@@ -77,8 +77,13 @@
     O(LOr)                                                                                                             \
     O(Call)                                                                                                            \
     O(GProp)                                                                                                           \
-    O(DProp)                                                                                                          \
-    O(DelProp)
+    O(DProp)                                                                                                           \
+    O(DelProp)                                                                                                         \
+    O(GPropRaw)                                                                                                        \
+    O(GRefRaw)                                                                                                         \
+    O(DPropRaw)                                                                                                        \
+    O(DerefGet)                                                                                                        \
+    O(DerefSet)
 
 namespace cial::vm {
     class VMState;
@@ -305,6 +310,16 @@ namespace cial::inter {
     DEF_INST(DProp, 3, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(src, Register));
     // delete obj.member:删除成员,dst 写入是否删除成功(bool)
     DEF_INST(DelProp, 3, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(dst, Register));
+    // &obj.member:取成员本体(property 不触发 getter,旧版 GPDS)
+    DEF_INST(GPropRaw, 3, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(dst, Register));
+    // &obj.member = v:写槽位本体,绕过 setter(旧版 SPDS);& 作赋值左值时用
+    DEF_INST(DPropRaw, 3, OP_GET1(obj, Register) OP_GET2(memberReg, Register) OP_GET3(src, Register));
+    // &identifier:取 this/global 槽位本体,不触发 getter(旧版 GPDS 的符号形态)
+    DEF_INST(GRefRaw, 2, OP_GET1(atom, Atom) OP_GET2(dst, Register));
+    // *p 读:强制属性访问(调 getter,旧版 GETP);非 Property 报错
+    DEF_INST(DerefGet, 2, OP_GET1(prop, Register) OP_GET2(dst, Register));
+    // *p = v 写:强制属性访问(调 setter,旧版 SETP);setter 压帧,需 Call 接管
+    DEF_INST(DerefSet, 2, OP_GET1(prop, Register) OP_GET2(src, Register));
 
     struct DumpInst {
         [[nodiscard]] static String dumpOperand(const Operand &operand);

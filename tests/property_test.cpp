@@ -251,3 +251,70 @@ TEST_CASE("property - only setter") {
 // 👉 覆盖：
 //
 // setter / getter 内异常传播
+TEST_CASE("property - & 引用与 * 解引用（TJS2 &/* 语义）") {
+    Runtime rt{};
+    Context context{ rt };
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("全局 property 引用读写") {
+        vm.eval(R"(
+            var propvalue;
+            property property1 {
+                setter(v) { propvalue = v; }
+                getter { return propvalue; }
+            }
+            property1 = 5;
+            function proptest() {
+                var p = &property1;   // 取本体，不触发 getter
+                *p = 30;              // 通过本体调 setter
+                return (*p);          // 通过本体调 getter
+            }
+            var r = proptest();
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r"_str) == 30);
+        REQUIRE(*vm.evalExpr<Integer>("propvalue"_str) == 30);
+        REQUIRE(*vm.evalExpr<Integer>("property1"_str) == 30);
+    }
+
+    SECTION("&成员写入绕过 setter 注册引用") {
+        vm.eval(R"(
+            class test {
+                function test() { variable = 0; }
+                var variable;
+                property prop {
+                    getter() { return variable; }
+                    setter(v) { variable = v; }
+                }
+            }
+            var tmp = new test();
+            function f() {
+                tmp.prop = 4;
+                var p = &tmp.prop;   // 引用（不触发 getter；引用须存局部变量）
+                *p = 20;
+                return (*p) * 100 + tmp.prop;
+            }
+            var r = f();
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r"_str) == 2020);
+    }
+
+    SECTION("成员后缀 ++ 走 getter/setter 且返回旧值") {
+        vm.eval(R"(
+            class C {
+                function C() { a = 0; }
+                var a;
+                property x {
+                    getter() { return a; }
+                    setter(v) { a = v; }
+                }
+            }
+            var o = new C();
+            o.x = 5;
+            var old = o.x++;
+            var now = o.x;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("old"_str) == 5);
+        REQUIRE(*vm.evalExpr<Integer>("now"_str) == 6);
+    }
+}

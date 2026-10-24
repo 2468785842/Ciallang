@@ -69,11 +69,11 @@
 | 11 | 移位 `<< >> >>>`（`>>>` 无符号右移） | ✅ |
 | 12 | 加减 `+ -`（`+` 对字符串为连接） | ✅ |
 | 13 | 乘除类 `% / \ *`（`\` 整除；`*` 与前缀属性访问歧义经专门产生式 `mul_div_expr_and_asterisk` 消解） | ✅ |
-| 14 | **一元前缀** `! ~ ++ -- new invalidate isvalid delete typeof # $ + - & *` | ◐：`! new invalidate isvalid - ~ ++ -- delete typeof # $ +` ✅；`& *` ❌ |
+| 14 | **一元前缀** `! ~ ++ -- new invalidate isvalid delete typeof # $ + - & *` | ✅（`&` 取属性本体不触发 getter、`*` 解引用调 getter/setter，引用须存局部变量） |
 | 14′ | **一元中缀式** `A instanceof B`（B 为类名）、`A in B`（成员存在判断） | ◐：instanceof ✅（基础类型按类型名匹配，Number 覆盖 Integer/Real）；`in` ❌ |
 | 15 | `A isvalid`（**后缀**形态，与前缀并存）、`A incontextof B`（**右结合**，替换函数闭包的 this） | ◐：incontextof ✅；后缀 isvalid ✅ |
 | 16 | **类型转换** `(int)A (real)A (string)A` 或裸 `int A real A string A` | ✅ |
-| 17 | **后缀**：调用 `f(args)`、成员 `.sym`（含 `.` 起始的裸词链）、下标 `a[i]`、后缀 `++ --`、**即时求值 `A !`**（把 A 的字符串值作为 TJS 表达式编译执行） | ◐：`() . -- ++` ✅；`[] !` ❌（下标依赖 Array/String 成员访问语义） |
+| 17 | **后缀**：调用 `f(args)`、成员 `.sym`（含 `.` 起始的裸词链）、下标 `a[i]`、后缀 `++ --`（表达式值为旧值；成员形态走 getter/setter 链）、**即时求值 `A !`**（把 A 的字符串值作为 TJS 表达式编译执行） | ◐：`() . -- ++` ✅；`[] !` ❌（下标依赖 Array/String 成员访问语义） |
 | 18 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]` / 常量式 `(const)[...]` `(const)%[...]` | ◐：字面量与原子 ✅；`[...]` `%[...]` `(const)` 形 ❌ |
 
 前缀一元语义速查（原版）：

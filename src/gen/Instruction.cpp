@@ -190,6 +190,11 @@ namespace cial::inter {
     DEF_AUTO_DUMP(GProp, "g_prop");
     DEF_AUTO_DUMP(DProp, "d_prop");
     DEF_AUTO_DUMP(DelProp, "del_prop");
+    DEF_AUTO_DUMP(GPropRaw, "g_prop_raw");
+    DEF_AUTO_DUMP(GRefRaw, "g_ref_raw");
+    DEF_AUTO_DUMP(DPropRaw, "d_prop_raw");
+    DEF_AUTO_DUMP(DerefGet, "deref_get");
+    DEF_AUTO_DUMP(DerefSet, "deref_set");
 
     // 其他
     DEF_AUTO_DUMP(ChgSign, "chg_sign");

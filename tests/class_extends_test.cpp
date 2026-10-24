@@ -731,3 +731,43 @@ TEST_CASE("OOP - Legacy TJS2 Class/Slot/Constructor/Lookup 行为全集") {
     REQUIRE(*vm.evalExpr<Integer>("r10"_str) == 2);
     REQUIRE(*vm.evalExpr<Integer>("r11"_str) == 10);
 }
+TEST_CASE("TJS2 - super.<Ctor>() 显式基类构造调用") {
+    // 回归：构造器内 super.<Ctor>() 曾因 _lastSuperClass 未记录而段错误
+    Runtime rt{};
+    Context context{ rt };
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("单继承构造链") {
+        vm.eval(R"(
+            class base {
+                var v;
+                function base() { v = 3; }
+            }
+            class derived extends base {
+                function derived() { super.base(); }
+            }
+            var d = new derived();
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("d.v"_str) == 3);
+    }
+
+    SECTION("构造器内 super 调用后基类 property 可用") {
+        vm.eval(R"(
+            class test {
+                function test() { variable = 0; }
+                var variable;
+                property prop {
+                    getter() { return variable; }
+                    setter(v) { variable = v; }
+                }
+            }
+            class testInherited extends test {
+                function testInherited() { super.test(); }
+            }
+            var tmp2 = new testInherited();
+            tmp2.prop = 5;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("tmp2.prop"_str) == 5);
+    }
+}

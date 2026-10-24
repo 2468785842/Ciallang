@@ -300,4 +300,36 @@ namespace cial::vm {
         write<u16>(info.code, tac->memberReg().index());
         write<u16>(info.code, tac->dst().index());
     }
+
+    void Bytecode::encode(Info &info, const inter::GPropRaw *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::GPropRaw));
+        write<u16>(info.code, tac->obj().index());
+        write<u16>(info.code, tac->memberReg().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::GRefRaw *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::GRefRaw));
+        write<u32>(info.code, static_cast<u32>(tac->atom().v));
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::DPropRaw *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::DPropRaw));
+        write<u16>(info.code, tac->obj().index());
+        write<u16>(info.code, tac->memberReg().index());
+        write<u16>(info.code, tac->src().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::DerefGet *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::DerefGet));
+        write<u16>(info.code, tac->prop().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::DerefSet *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::DerefSet));
+        write<u16>(info.code, tac->prop().index());
+        write<u16>(info.code, tac->src().index());
+    }
 } // namespace cial::vm

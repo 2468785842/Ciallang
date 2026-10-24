@@ -3,12 +3,14 @@
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
 > 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS，2026-10-22）——
 > 类实例化 111% / 整数循环 111-115% / fib(25) 148-153% / 字符串拼接 175-183%。
-> TJS2 语料对拍（2026-10-24）：TJS_ONLY 0 / MATCH 2 / DIFF 4（其中 test_misc、test_variant
-> 为异常消息格式差异，Ciallang 行为正确）/ CIAL_ONLY 1（参考实现自身崩溃）。
+> TJS2 语料对拍（2026-10-24）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
+> DIFF 3（test_misc、test_variant 为异常消息格式差异，Ciallang 行为正确；
+> test_string 卡正则字面量）/ CIAL_ONLY 1（参考实现自身崩溃）。
 
 ## 一、正确性（已知未修）
 
-- [ ] `&property1` / `*p` 引用语义（test_class 卡点；需 property 引用透传设计）
+- [ ] `&` 引用存入全局变量后读取会触发 getter（GGlobal 对 Property 的触发与
+      property 声明槽位无法区分；语料中引用均为局部变量，暂记已知限制）
 - [ ] GC 期 finalize 语义：当前 ~DataObject 禁止 sweep 中重入解释器；
       若需 TJS2 完整语义需"回收队列 + 安全区 drain"
 - [ ] 正则字面量 `/re/`（依赖 RegExp 标准库；test_string 卡点）
@@ -28,7 +30,6 @@
 - [ ] 标准库：Array / Dictionary / Date / Math / RegExp
       （String 已部分实现：replace/split 待 RegExp 和 Array）
 - [ ] const 只读性检查（当前 const 与 var 等价，仅语法接入）
-- [ ] 后缀 `i++` 表达式值语义（当前返回自增后的新值，TJS2 返回旧值）
 
 ## 四、工程化
 
@@ -36,6 +37,13 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-24 property 引用批次：前缀 `&`/`*`（新增 GPropRaw/GRefRaw/DPropRaw/DerefGet/DerefSet，
+  指令 59→64）、成员后缀 `obj.prop++`（getter+setter 链）、后缀 `i++` 旧值语义；
+  连带修复 super.<Ctor>() 段错误（_lastSuperClass 未记录时按 extends 解析 + 构造器
+  经 getProp 可访问返回类对象）、GLocal/DLocal 改纯读写（局部变量=VM_CP 语义，
+  Property 可作一等值传递）、DProp 改 setter 感知（槽位为 Property 调 setter）；
+  test_class 语料 MATCH
 
 - 2026-10-24 兼容性批次：前缀 `++ -- # $ delete`、`const` 声明与 `for(const)`、
   `str.length` 原生属性、后缀 if 绑定修正（假条件整体不赋值）、三元优先级修正、

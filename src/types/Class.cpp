@@ -204,6 +204,12 @@ namespace cial {
                     return Value{ fun.get() };
                 }
             }
+            // 构造器不在成员表（Parser 单独分离），但 super.<Ctor>() 形态需要访问：
+            // 返回类对象本身（而非 Function），Call 时走 ClassObject::call 的
+            // super 构造分支完成 setSuperClass——与全局 A() 直调同路径
+            if(a == meta->className && meta->constructor) {
+                return Value{ this };
+            }
         }
 
         throw std::runtime_error("in class object Not found property");
