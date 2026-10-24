@@ -87,7 +87,10 @@
     O(NewArray)                                                                                                        \
     O(NewDict)                                                                                                         \
     O(GetIndex)                                                                                                        \
-    O(SetIndex)
+    O(SetIndex)                                                                                                        \
+    O(WithPush)                                                                                                        \
+    O(WithPop)                                                                                                         \
+    O(GetWith)
 
 namespace cial::vm {
     class VMState;
@@ -333,6 +336,13 @@ namespace cial::inter {
     DEF_INST(GetIndex, 3, OP_GET1(obj, Register) OP_GET2(idxReg, Register) OP_GET3(dst, Register));
     // a[i] = v 写:数组越界自动扩展补 void;字典键写入
     DEF_INST(SetIndex, 3, OP_GET1(obj, Register) OP_GET2(idxReg, Register) OP_GET3(src, Register));
+
+    // with(obj) 语句:压入 with 上下文栈(裸词链 .member 的查找基座);
+    // withStack 挂 Runtime handle 保 GC
+    DEF_INST(WithPush, 1, OP_GET1(src, Register));
+    DEF_INST(WithPop, 0, );
+    // 裸词链基座 .member:取 with 栈顶对象,空栈得 global
+    DEF_INST(GetWith, 1, OP_GET1(dst, Register));
 
     struct DumpInst {
         [[nodiscard]] static String dumpOperand(const Operand &operand);

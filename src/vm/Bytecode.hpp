@@ -82,7 +82,10 @@
     O(NewArray)                                                                                                        \
     O(NewDict)                                                                                                         \
     O(GetIndex)                                                                                                        \
-    O(SetIndex)
+    O(SetIndex)                                                                                                        \
+    O(WithPush)                                                                                                        \
+    O(WithPop)                                                                                                         \
+    O(GetWith)
 
 namespace cial::vm {
     class VMState;

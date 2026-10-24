@@ -995,6 +995,34 @@ namespace cial::syntax {
         return node;
     }
 
+    StmtNode *WithStmtParser::parse(Result &r, Parser *parser, Token *token) const {
+        if(!parser->expect(r, TokenType::LParenthesis))
+            return nullptr;
+
+        const auto *expr = parser->parseExpression(r, true);
+        if(!expr) {
+            parser->error(r, "with expects an object expression", token->location);
+            return nullptr;
+        }
+        if(!parser->expect(r, TokenType::RParenthesis))
+            return nullptr;
+
+        auto *body = parser->parseStatement(r, true);
+        if(!body)
+            return nullptr;
+
+        auto *bodyScope = dynamic_cast<BlockStmtNode *>(body);
+        if(!bodyScope) {
+            bodyScope = parser->astBuilder()->makeNode<BlockStmtNode>();
+            bodyScope->childrens.push_back(parser->astBuilder()->makeNode<StmtDeclNode>(body));
+        }
+
+        auto *withNode = parser->astBuilder()->makeNode<WithStmtNode>(expr, bodyScope);
+        withNode->location.start(token->location.start());
+        withNode->location.end(token->location.end());
+        return withNode;
+    }
+
     StmtNode *WhileStmtParser::parse(Result &r, Parser *parser, Token *token) const {
         const auto *test = createExpressionNode(r, parser);
         if(!test)
@@ -1397,6 +1425,25 @@ namespace cial::syntax {
             return nullptr;
         }
         return dictNode;
+    }
+
+    ExprNode *DotPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
+        // .member 裸词链（with 上下文成员访问；无 with 时基座为 global——TJS2 顶层
+        // 裸词链语义）。产出 Dot(WithBase, member)，后续 .b.c 由普通 Dot 中缀续链
+        auto *base = parser->astBuilder()->makeNode<WithBaseExprNode>(*token);
+        auto *member = parser->parseExpression(r, true, Precedence::postfix);
+        if(!member) {
+            parser->error(r, "with-dot expects member name", token->location);
+            return nullptr;
+        }
+        if(!dynamic_cast<const IdentifierExprNode *>(member)) {
+            parser->error(r, "with-dot expects identifier", token->location);
+            return nullptr;
+        }
+        auto *node = parser->astBuilder()->makeNode<BinaryExprNode>(Token{ TokenType::Dot }, base, member);
+        node->location = token->location;
+        node->location.end(member->location.end());
+        return node;
     }
 
 

@@ -206,4 +206,22 @@ namespace cial::syntax {
             return gen->generate(this, retReg);
         }
     };
+
+    // with(expr) stmt_or_block：裸词链 .member 的上下文对象（TJS2 with 语句）
+    class WithStmtNode final : public StmtNode {
+    public:
+        const ExprNode *expr;
+        const BlockStmtNode *body;
+
+        WithStmtNode() = delete;
+
+        explicit WithStmtNode(const ExprNode *expr, const BlockStmtNode *body) :
+            StmtNode("with_statement"), expr(expr), body(body) {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
 } // namespace cial::syntax

@@ -199,6 +199,9 @@ namespace cial::inter {
     DEF_AUTO_DUMP(NewDict, "new_dict");
     DEF_AUTO_DUMP(GetIndex, "get_index");
     DEF_AUTO_DUMP(SetIndex, "set_index");
+    DEF_AUTO_DUMP(WithPush, "with_push");
+    DEF_AUTO_DUMP(WithPop, "with_pop");
+    DEF_AUTO_DUMP(GetWith, "get_with");
 
     // 其他
     DEF_AUTO_DUMP(ChgSign, "chg_sign");

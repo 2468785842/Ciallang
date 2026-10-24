@@ -253,6 +253,12 @@ namespace cial::syntax {
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    // with(expr) stmt_or_block（TJS2 with 语句）：裸词链 .member 的上下文对象
+    struct WithStmtParser final : StmtParser {
+        WithStmtParser() = default;
+        StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     static constinit BlockStmtParser S_BlockStmtParser{};
     static constinit TryStmtParser S_TryStmtParser{};
     static constinit IfStmtParser S_IfStmtParser{};
@@ -264,6 +270,7 @@ namespace cial::syntax {
     static constinit ContinueStmtParser S_ContinueStmtParser{};
     static constinit ReturnStmtParser S_ReturnStmtParser{};
     static constinit DebuggerStmtParser S_DebuggerStmtParser{};
+    static constinit WithStmtParser S_WithStmtParser{};
 
     static constinit auto S_StmtParsers =
         frozen::make_unordered_map<TokenType, const StmtParser *>({ { TokenType::LeftCurlyBrace, &S_BlockStmtParser },
@@ -276,7 +283,8 @@ namespace cial::syntax {
                                                                     { TokenType::Break, &S_BreakStmtParser },
                                                                     { TokenType::Continue, &S_ContinueStmtParser },
                                                                     { TokenType::Return, &S_ReturnStmtParser },
-                                                                    { TokenType::Debugger, &S_DebuggerStmtParser } });
+                                                                    { TokenType::Debugger, &S_DebuggerStmtParser },
+                                                                    { TokenType::With, &S_WithStmtParser } });
 
     /**
      * +----------------------------------------------------------------------------+
@@ -337,6 +345,14 @@ namespace cial::syntax {
         ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    // .member 裸词链（with 上下文成员访问；无 with 时基座为 global）：
+    // 产出 Dot(WithBase, member)，后续 .b.c 由普通 Dot 中缀续链
+    struct DotPrefixParser final : PrefixParser {
+        DotPrefixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     static constinit ConstValPrefixParser S_ConstValPrefixParser{};
     static constinit UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
     static constinit IdentifierPrefixParser S_IdentifierPrefixParser;
@@ -347,6 +363,7 @@ namespace cial::syntax {
     static constinit UnaryOperatorPrefixParser S_TypeCastPrefixParser{ Precedence::type };
     static constinit ArrayLiteralPrefixParser S_ArrayLiteralPrefixParser;
     static constinit DictLiteralPrefixParser S_DictLiteralPrefixParser;
+    static constinit DotPrefixParser S_DotPrefixParser;
 
     static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>(
         { { TokenType::Null, &S_ConstValPrefixParser },
@@ -378,6 +395,7 @@ namespace cial::syntax {
           { TokenType::String, &S_TypeCastPrefixParser }, // "string" unary_expr
           { TokenType::LBracket, &S_ArrayLiteralPrefixParser }, // "[" 内联数组
           { TokenType::Percent, &S_DictLiteralPrefixParser }, // "%[" 内联字典（% 仅为前导记号）
+          { TokenType::Dot, &S_DotPrefixParser }, // ".member" 裸词链（with 上下文）
           { TokenType::Throw, &S_PrefixParser } });
 
     /**

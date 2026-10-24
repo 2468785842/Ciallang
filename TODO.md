@@ -29,11 +29,11 @@
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
 - [ ] `(const)[...]` / `(const)%[...]` 的只读共享实例语义（当前按运行时新建处理，行为兼容）
 - [ ] 十六进制浮点字面量 `0x1.07CCp14`、二进制浮点 `0b1.1`（test.tjs 后段依赖）
-- [ ] `with` 语句
 - [ ] 标准库：Date / Math / RegExp
       （String 已部分实现：replace/split 待 RegExp；
        Array/Dictionary 已支持字面量、下标读写与核心方法，sort/split 待补）
 - [ ] const 只读性检查（当前 const 与 var 等价，仅语法接入）
+- [ ] with 块内 try/catch 穿越 WithPush 的栈截断（当前仅帧级恢复；语料未覆盖）
 
 ## 四、工程化
 
@@ -41,6 +41,11 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-24 with 语句批次：`with(expr) stmt_or_block` + 裸词链 `.member`（新增
+  WithPush/WithPop/GetWith，指令 68→71；withStack 上下文栈挂 Runtime handle 保 GC，
+  帧/unwind 级截断；裸词链基座空栈得 global——顶层 `.gvarl = 7` 语义）；
+  连带修复 conformance 对 test_with 的 MATCH 假象（此前 cial 解析失败 rc 被忽略）
 
 - 2026-10-24 Array/Dictionary 批次：`[...]`/`%[...]` 字面量（sym: 与 "k" >= v 两种键形式，
   => 词形即 >= 由上下文区分）、通用下标读写 `a[i]`（新增 NewArray/NewDict/GetIndex/SetIndex，

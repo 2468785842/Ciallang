@@ -1442,6 +1442,27 @@ namespace cial::inter {
         optReg = dst;
     }
 
+    void IRGenerator::generate(const syntax::WithBaseExprNode *node, OptReg &optReg) {
+        Register dst = allocateRegister();
+        _chunk->emit<GetWith>(dst);
+        optReg = dst;
+    }
+
+    void IRGenerator::generate(const syntax::WithStmtNode *node, OptReg &) {
+        // with(obj) stmt：obj 求值一次压入 with 上下文栈，块结束弹出；
+        // 异常穿越时随帧截断（freeCallFrame）
+        Register objReg{ 0 };
+        if(!expectValue(node->expr, objReg))
+            return;
+        _chunk->emit<WithPush>(objReg);
+        freeRegister(objReg);
+
+        OptReg ignore{};
+        node->body->generateBytecode(this, ignore);
+
+        _chunk->emit<WithPop>();
+    }
+
     void IRGenerator::generate(const syntax::ReturnStmtNode *node, OptReg &) {
         if(node->expr) {
             Register reg{ 0 };

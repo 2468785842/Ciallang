@@ -12,7 +12,7 @@
 |---|---|---|
 | 预处理 | @set / @if / @endif | ✅ |
 | 语句 | var/if/while/do-while/for/switch/try-catch/return/break/continue/function/property/class/debugger | ✅ |
-| 语句 | with | ❌ |
+| 语句 | with | ✅（withStack 上下文栈，异常随帧截断）|
 | 语句 | for(const …)、var 类型注解 | ◐ for(const) ✅；const 声明 ✅（只读性不强制）；类型注解 ❌ |
 | 表达式 | 赋值全家（含 `<->`、`\|\|=`、`&&=`、`>>>=`）、?:、逻辑/位/比较/严格相等/移位/乘除整除 | ✅ |
 | 一元前缀 | `!` `new` `invalidate` `-` `~` `++` `--` `delete` `typeof` `#` `$` `+` `&` `*`（及前后缀 `isvalid`） | ✅ |

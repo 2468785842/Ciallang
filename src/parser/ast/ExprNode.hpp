@@ -241,4 +241,17 @@ namespace cial::syntax {
             return gen->generate(this, retReg);
         }
     };
+
+    // 裸词链基座 .member 的隐式对象（with 语句的上下文对象；无 with 时为 global），
+    // 生成 GetWith 指令；后续 .b.c 由普通 Dot 中缀续链
+    class WithBaseExprNode final : public ExprNode {
+    public:
+        explicit WithBaseExprNode(const Token &token) : ExprNode(token, "with_base") {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
 } // namespace cial::syntax

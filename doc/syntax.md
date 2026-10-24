@@ -104,7 +104,7 @@
 | `try { } catch (v) { }` | 捕获值为异常对象（Exception 类实例） | ✅ |
 | `throw e;` | 任意值可抛 | ✅ |
 | `return [e];` | | ✅ |
-| `with (e) s` | 把 e 的成员注入作用域查找链 | ❌ |
+| `with (e) s` | 把 e 的成员注入作用域查找链（裸词链 `.member` 基座取栈顶；无 with 时为 global） | ✅ |
 | `debugger;` | 断点 | ✅（TAC Debugger） |
 | 函数定义 | 见 §6 | ✅ |
 | `property` | 见 §7 | ✅ |

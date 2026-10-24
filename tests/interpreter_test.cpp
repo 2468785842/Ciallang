@@ -14,6 +14,7 @@
 
 #include <catch.hpp>
 
+#include "stdlib/ExceptionLib.hpp"
 #include "stdlib/Print.hpp"
 #include "test_config.h"
 
@@ -153,4 +154,71 @@ TEST_CASE("解释器 - 脚本执行性能") {
         }
         vmState.freeCallFrame();
     };
+}
+TEST_CASE("with 语句与裸词链") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+    stdlib::initExceptionClass(vm);
+
+    SECTION("with(obj) 块内裸词链读写与调用") {
+        vm.eval(R"(
+            class C {
+                var a, b;
+                function C() { a = b = 0; }
+                function bump() { a = a + 1; }
+            }
+            var o = new C();
+            with(o) {
+                .a = 5;
+                .b = .a + 1;
+                .bump();
+            }
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("o.a"_str) == 6);
+        REQUIRE(*vm.evalExpr<Integer>("o.b"_str) == 6);
+    }
+
+    SECTION("with 单语句形式") {
+        vm.eval(R"(
+            var o = %[x : 0];
+            with(o) .x = 7;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("o.x"_str) == 7);
+    }
+
+    SECTION("嵌套 with 栈顶优先") {
+        vm.eval(R"(
+            var d1 = %[v : 1];
+            var d2 = %[v : 2];
+            var hit1, hit2;
+            with(d1) {
+                with(d2) {
+                    hit2 = .v;
+                }
+                hit1 = .v;
+            }
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("hit1"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("hit2"_str) == 2);
+    }
+
+    SECTION("顶层裸词链写全局") {
+        vm.eval(R"(
+            .gvarl = 7;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("gvarl"_str) == 7);
+    }
+
+    SECTION("with 对象可为表达式且每次求值") {
+        vm.eval(R"(
+            var d = %[v : 3];
+            var r;
+            with(d) .v = .v + 1;
+            r = d.v;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r"_str) == 4);
+    }
 }

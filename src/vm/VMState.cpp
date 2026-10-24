@@ -1127,4 +1127,36 @@ namespace cial::vm {
         return DispatchRet::Continue;
     }
 
+    // with(obj)：压入 with 上下文栈（裸词链 .member 的查找基座）；
+    // 对象挂 Runtime handle 保 GC，帧释放/异常 unwind 时随帧截断
+    DISPATCH_OP_METHOD(WithPush) {
+        const u16 r1 = read<u16>(ip, pc);
+        if(!regs[r1].isObject()) {
+            throw std::runtime_error("with expects an object");
+        }
+        auto *obj = regs[r1].asObject().unwrap();
+        rt.addHandleVal(obj);
+        withStack.push_back(obj);
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(WithPop) {
+        if(!withStack.empty()) {
+            rt.removeHandleVal(withStack.back());
+            withStack.pop_back();
+        }
+        return DispatchRet::Continue;
+    }
+
+    // 裸词链基座 .member：取 with 栈顶对象；空栈（无 with 包裹）得 global——
+    // TJS2 顶层裸词链语义（语料 test_with 的 .gvarl = 7 写全局）
+    DISPATCH_OP_METHOD(GetWith) {
+        const u16 r1 = read<u16>(ip, pc);
+        if(withStack.empty())
+            regs[r1] = Value{ context.global() };
+        else
+            regs[r1] = Value{ withStack.back() };
+        return DispatchRet::Continue;
+    }
+
 } // namespace cial::vm

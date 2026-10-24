@@ -91,14 +91,20 @@ namespace cial::vm {
             if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
             _curFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, _pool };
+            _curFrame->withDepth = withStack.size();
         }
 
         void freeCallFrame() {
             if(_stackTop == 0)
                 throw std::runtime_error("Call stack underflow");
+            --_stackTop;
+            // with 上下文随帧截断（unwind / 正常返回共用此路径）
+            while(withStack.size() > _callStack[_stackTop].withDepth) {
+                rt.removeHandleVal(withStack.back());
+                withStack.pop_back();
+            }
             // 先出栈再取新栈顶；栈清空时 _curFrame 置空，
             // 不能写 &_callStack[-1]（会越界踩坏相邻成员）
-            --_stackTop;
             _curFrame = _stackTop > 0 ? &_callStack[_stackTop - 1] : nullptr;
             _callStack[_stackTop].~CallFrame();
         }
@@ -171,6 +177,9 @@ namespace cial::vm {
         bool _zf{ false };
         PendingCF _pending{};
         Value _exValue{};
+        // with 语句上下文栈（裸词链 .member 的查找基座）；对象挂 Runtime handle 保 GC，
+        // 帧释放时截断到 CallFrame::withDepth（unwind/正常返回共用 freeCallFrame）
+        Vec<Object *> withStack{};
 
 #define DISPATCH_OP_METHOD(op)                                                                                         \
     CIAL_INLINE DispatchRet dispatch##op(CallFrame *cur, const Constant *constants, Value *regs, const u8 *ip, u64 &pc);

@@ -29,6 +29,9 @@ namespace cial {
         DataObject *thisData{}; // thisObj 为 DataObject 时的缓存，否则 nullptr（消除热路径 dynamic_cast）
         Opt<u16> ret{};
         u64 pc{};
+        // 进入帧时的 with 上下文栈深（VMState::allocCallFrame 填写）：
+        // 帧释放时 withStack 截断到此深度（unwind/正常返回共用 freeCallFrame）
+        size_t withDepth{};
 
         // thisObj 的赋值入口：同步刷新 thisData 缓存（定义在 VMState.cpp，需要完整 DataObject 类型）。
         // 不要绕过它直接写 thisObj，否则缓存失效。

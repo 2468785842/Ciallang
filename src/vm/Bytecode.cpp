@@ -357,4 +357,18 @@ namespace cial::vm {
         write<u16>(info.code, tac->idxReg().index());
         write<u16>(info.code, tac->src().index());
     }
+
+    void Bytecode::encode(Info &info, const inter::WithPush *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::WithPush));
+        write<u16>(info.code, tac->src().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::WithPop *) {
+        info.code.push_back(static_cast<u8>(VmOpCode::WithPop));
+    }
+
+    void Bytecode::encode(Info &info, const inter::GetWith *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::GetWith));
+        write<u16>(info.code, tac->dst().index());
+    }
 } // namespace cial::vm
