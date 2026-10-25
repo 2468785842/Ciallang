@@ -15,8 +15,6 @@
       property 声明槽位无法区分；语料中引用均为局部变量，暂记已知限制）
 - [ ] GC 期 finalize 语义：当前 ~DataObject 禁止 sweep 中重入解释器；
       若需 TJS2 完整语义需"回收队列 + 安全区 drain"
-- [ ] `main0.cpp`（cial_bc）对空脚本仍会走到 assert（未验证）
-- [ ] 未捕获的原生 C++ 异常顶层报错走 unwind 路径，无源码行号（Rlc 未接线）
 
 ## 二、性能（剩余方向）
 
@@ -46,6 +44,14 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 Rlc 行号接线批次：未捕获异常的顶层报错与原生错误包装（Exception.message）带
+  源码行号——Chunk 挂 Rlc 行号表（IRGen 15 个语句级 generate 入口记录，语句粒度）、
+  toBytecode 时 TAC 下标换算为 bc 偏移（CompileResult 暴露 tacStartPos）、unwind 终态与
+  run0 catch 两处查询拼接（AST 行号 0-based，输出 +1）。连带修复：GProp 对 void 取属性
+  Debug 下 assert 崩溃（改报脚本异常，与 Release 一致）、Rlc::find 尾部误告警、
+  上批构造器测试 raw string 含 )" 提前终止导致的编译错误（跑的一直是旧测试二进制）；
+  main0 空脚本项核实关闭（内嵌脚本硬编码非空、无脚本入参，路径不存在）
 
 - 2026-10-25 原生类构造批次：new 编译为透明调用（IRGenerator 对 New 直接求值 rhs）——
   原生类构造只需把全局类对象的 call() 从抛错升级为构造。RegExp(pattern, flags?) /

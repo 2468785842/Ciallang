@@ -36,8 +36,7 @@ namespace cial::vm {
                 return preSIndex;
         }
 
-        CLL_LOG_WARN("chunk bytecode map to source line, not found");
-        return preSIndex;
+        return preSIndex; // target 超出末条记录：归属最后一行（正常，非告警）
     }
 
     [[nodiscard]] bool Rlc::contains(const Common::SourceLocation sourceLine) const {

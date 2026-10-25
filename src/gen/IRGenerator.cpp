@@ -61,10 +61,12 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::ExprStmtNode *node, OptReg &optReg) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         return node->expression->generateBytecode(this, optReg);
     }
 
     void IRGenerator::generate(const syntax::TryStmtNode *node, OptReg &optReg) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         const auto tryStartIp = makeLabel(); // closed interval
         node->tryBlock->generateBytecode(this, optReg);
 
@@ -834,6 +836,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::VarDeclNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         const auto identifier = getAtomFromToken(node->token);
 
         DEFER {
@@ -881,6 +884,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::FunctionDeclNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         auto funReg = allocateRegister();
         auto *funcMeta = generateFuncMeta(node->parameters, node->body);
 
@@ -904,6 +908,7 @@ namespace cial::inter {
 
 
     void IRGenerator::generate(const syntax::ClassDeclNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         const auto identifier = getAtomFromToken(node->token);
 
         auto classReg = allocateRegister();
@@ -1108,6 +1113,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::BlockStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         // block statement never return value
         beginScope();
         OptReg ignore{};
@@ -1123,6 +1129,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::IfStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         OptReg ignore{};
         Register testReg{ 0 };
         if(!expectValue(node->test, testReg)) {
@@ -1152,6 +1159,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::SwitchStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         using namespace vm;
 
         _breakStack.emplace_back();
@@ -1210,6 +1218,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::DoWhileStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         _breakStack.emplace_back();
         _continueStack.emplace_back();
 
@@ -1248,6 +1257,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::ForStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         _breakStack.emplace_back();
         _continueStack.emplace_back();
 
@@ -1300,6 +1310,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::WhileStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         _breakStack.emplace_back();
         _continueStack.emplace_back();
 
@@ -1339,6 +1350,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::BreakStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         if(_breakStack.empty()) {
             error("break keyword must in loop or switch scope", node->location);
             return;
@@ -1348,6 +1360,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::ContinueStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         if(_continueStack.empty()) {
             error("continue keyword must in loop or switch scope", node->location);
             return;
@@ -1456,6 +1469,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::WithStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         // with(obj) stmt：obj 求值一次压入 with 上下文栈，块结束弹出；
         // 异常穿越时随帧截断（freeCallFrame）
         Register objReg{ 0 };
@@ -1471,6 +1485,7 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::ReturnStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         if(node->expr) {
             Register reg{ 0 };
             if(!expectValue(node->expr, reg)) {

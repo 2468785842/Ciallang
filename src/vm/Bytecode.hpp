@@ -172,6 +172,7 @@ namespace cial::vm {
         struct CompileResult {
             Vec<u8> code{};
             Vec<ThrowHandler> handlers{}; // 已换算到扁平字节码 pc 空间的 try 区间表
+            Vec<u32> tacStartPos{}; // tacIdx -> bc 偏移（Rlc 行号换算用）
         };
 
         static CompileResult compile(const Vec<Box<inter::Instruction>> &instructions,
@@ -203,6 +204,7 @@ namespace cial::vm {
 
             CompileResult result{};
             result.code = std::move(code);
+            result.tacStartPos = tacStartPos;
             for(const auto &h : tacHandlers) {
                 result.handlers.push_back(ThrowHandler{ tacStartPos[static_cast<u32>(h.tryStart)],
                                                         tacStartPos[static_cast<u32>(h.tryEnd)], h.exValueReg });

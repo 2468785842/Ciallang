@@ -161,6 +161,8 @@ namespace cial::vm {
     }
 
     void VMState::unwind() {
+        Chunk *lastChunk{}; // 弹空前最后的帧（终态报错带行号用）
+        u64 lastPc{};
         while(true) {
             const CallFrame *cFrame = _curFrame;
             // run0 的 pc 是扁平字节码偏移，因此这里查询字节码空间的 try 区间表
@@ -168,19 +170,28 @@ namespace cial::vm {
             if(!th) {
                 if(cFrame->ret)
                     prevFrame()->getReg(*cFrame->ret) = Value{};
+                lastChunk = cFrame->chunk;
+                lastPc = getPC();
                 freeCallFrame();
                 if(_stackTop == 0) {
+                    // 终态报错的行号后缀（Rlc 未记录时省略）
+                    std::string suffix;
+                    if(lastChunk) {
+                        if(const auto loc = lastChunk->lineAtBc(lastPc))
+                            suffix = fmt::format(" (line {})", loc->start().line + 1); // AST 行号 0-based
+                    }
                     // 未捕获异常：Exception 对象优先输出 message（与 TJS2 行为一致，
                     // 否则只显示 <object> 无法定位语料失败点）
                     if(_exValue.isObject()) {
                         if(auto *obj = _exValue.asObject().unwrap(); dynamic_cast<DataObject *>(obj)) {
                             const Atom msgAtom = rt.atomTable.intern("message"_str);
                             if(obj->hasProp(msgAtom)) {
-                                throw std::runtime_error(fmt::format("{}", obj->getProp(msgAtom)));
+                                throw std::runtime_error(
+                                    fmt::format("{}{}", obj->getProp(msgAtom), suffix));
                             }
                         }
                     }
-                    throw std::runtime_error(fmt::format("{}", _exValue));
+                    throw std::runtime_error(fmt::format("{}{}", _exValue, suffix));
                 }
                 continue;
             }
@@ -285,6 +296,23 @@ namespace cial::vm {
                     }
                     if(!wrapped) {
                         _exValue = Value{ String{ e.what() } };
+                    }
+                    // 原生错误消息带行号（Rlc 未记录时省略）；经 setProp 重建消息，
+                    // 不原地改共享 String payload
+                    if(const auto loc = cur->chunk->lineAtBc(pc)) {
+                        const Atom msgAtom = rt.atomTable.intern("message"_str);
+                        if(_exValue.isObject()) {
+                            auto *obj = _exValue.asObject().unwrap();
+                            if(obj->hasProp(msgAtom)) {
+                                obj->setProp(msgAtom, Value{ String{
+                                    fmt::format("{} (line {})", obj->getProp(msgAtom),
+                                                loc->start().line + 1) // AST 行号 0-based
+                                        .c_str() } });
+                            }
+                        } else {
+                            _exValue = Value{
+                                String{ fmt::format("{} (line {})", _exValue, loc->start().line + 1) } };
+                        }
                     }
                     cur->pc = pc;
                 }
@@ -881,8 +909,11 @@ namespace cial::vm {
         }
 
         // Native property（如 str.length / octet.length）
+        // void 等无方法表的值：直接报脚本异常（旧实现 Debug 下 assert 崩溃，
+        // Release 走 findProperty/None 落空后 throw——两配置行为不一致）
+        if(val.isVoid())
+            throw std::runtime_error("cannot access member of void");
         const TypeId tId = ValueToTypeId::getId(val);
-        assert(tId != TypeId::None);
         if(auto *getter = context.findProperty(tId, atom)) {
             regs[r3] = getter(val);
             return DispatchRet::Continue;

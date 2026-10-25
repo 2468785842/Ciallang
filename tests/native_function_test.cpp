@@ -452,7 +452,7 @@ TEST_CASE("Math 标准库") {
     }
 
     SECTION("原生类构造器（new 编译为透明调用）") {
-        vm.eval(R"(
+        vm.eval(R"tjs(
             var re = new RegExp("([0-9]+)-([0-9]+)", "g");
             var m = re.exec("a 12-34 b");
             var g1 = m[1];
@@ -467,7 +467,7 @@ TEST_CASE("Math 标准库") {
             d["k"] = 5;
             var dc = d.count;
             var dv = d["k"];
-        )"_str);
+        )tjs"_str);
         REQUIRE(*vm.evalExpr<Integer>("g1"_str) == 12);
         REQUIRE(*vm.evalExpr<Integer>("g2"_str) == 34);
         REQUIRE(*vm.evalExpr<Integer>("t1"_str) == 1);

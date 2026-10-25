@@ -17,6 +17,7 @@
 
 #include <fmt/format.h>
 #include "Bytecode.hpp"
+#include "Rlc.hpp"
 #include "Constant.hpp"
 
 #include "gen/Instruction.hpp"
@@ -146,8 +147,25 @@ namespace cial::vm {
             auto result = Bytecode::compile(_instructions, _throwHandlers);
             _code = std::move(result.code);
             _bcThrowHandlers = std::move(result.handlers);
+            // 行号表换算：IRGen 记录的是 TAC 下标，run0 的 pc 是 bc 偏移
+            for(auto &[idx, loc] : _rlc.rawEntries())
+                idx = result.tacStartPos[idx];
             _isBytecode = true;
         }
+
+        // 语句级行号记录（IRGen 各语句 generate 入口调用；Rlc 内部合并连续同位置）
+        void addLine(const Common::SourceLocation &loc) {
+            _rlc.addBytecodeLine(_instructions.size(), loc);
+        }
+
+        // bc 偏移 -> 源码位置（toBytecode 后有效；无记录返回空 Opt）
+        [[nodiscard]] Opt<Common::SourceLocation> lineAtBc(const u64 bcPc) const {
+            if(_rlc.empty())
+                return {};
+            return _rlc.find(static_cast<size_t>(bcPc));
+        }
+
+        [[nodiscard]] Rlc &rlc() noexcept { return _rlc; }
 
         [[nodiscard]] const Vec<u8> &code() const {
             if(!_isBytecode) {
@@ -158,6 +176,7 @@ namespace cial::vm {
 
     private:
         Vec<Box<inter::Instruction>> _instructions{};
+        Rlc _rlc{};
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
         Vec<ThrowHandler> _bcThrowHandlers{}; // try 区间已换算到扁平字节码 pc 空间
