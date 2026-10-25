@@ -18,8 +18,8 @@
 
 ## 二、性能（剩余方向）
 
-- [ ] fib 剩余差距（132%）：实参 Push 拷贝与指令条数（TJS 为密集指令编码）；
-      可选：参数直传被调帧窗口、调用点内联缓存
+- [ ] fib 剩余差距（130%，本机噪声主导）：值拷贝仍在（CallV 压栈同 N×Push 的
+      pool 写）——进一步需实参直写被调帧窗口（跳过中转）；调用点内联缓存
 - [ ] string_concat 剩余差距（179%）：payload+String 单块分配、Value 内联 SSO
 - [ ] loop_int 小幅差距（127%）：词法器 token 判别等新增热路径复核；指令条数
 - [ ] 方法访问 NativeFunction 每次分配（GProp 绑定拷贝）：正确修法是调用约定
@@ -30,6 +30,8 @@
 
 ## 三、语言特性缺口（对照 README）
 
+- [ ] `new` 无构造器类应走默认构造（TJS2 语义；当前 ClassObject::call 直接
+      报错"without a constructor"，冒烟发现，非本批引入）
 - [ ] 标准库剩余：Math.RandomGenerator（MT19937 类）；Date.parse 完整文法
       （tjsdate.y：英文月名/相对表达等，当前仅 "YYYY/MM/DD HH:MM[:SS]" 子集）；
       RegExp 剩余（静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
@@ -45,6 +47,12 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 CallV 变长实参调用批次：新指令 CallV（寄存器列表内嵌，语义 = N×Push+Call，
+  消逐参派发轮次；fib 每次调用 3 派发→1）——X-macro/手写子类（Operand 三槽装不下列表，
+  Chunk 增 emitRaw 原生发射）/dump/encode/IRGen ProcCall 全链路；dispatch 先读全寄存器号
+  再压栈（push 扩池可能迁移寄存器窗口）。基准 fib 130%（本机噪声 ±10% 掩盖单指令收益，
+  指令条数结构性下降：fib(10) 顶层调用 5→4 条、递归点 3→1 指令）
 
 - 2026-10-25 Date 批次：Date 标准库全量（对齐 tjsDate.cpp）——构造（now/分量 mktime/字符串
   解析子集）、get 系 8 个（localtime 字段，month 0-based 对齐原版）、set 系 7 个

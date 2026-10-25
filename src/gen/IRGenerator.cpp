@@ -659,19 +659,22 @@ namespace cial::inter {
             return;
         }
 
+        std::vector<Register> argRegs{};
         for(const auto *exprNode : node->arguments) {
             if(!exprNode) {
-                _chunk->emit<Push>(loadVoidReg());
+                argRegs.push_back(loadVoidReg()); // 缺位实参：void 常量寄存器
             } else {
                 Register reg{ 0 };
                 if(!expectValue(exprNode, reg)) {
                     return;
                 }
-                _chunk->emit<Push>(reg);
+                argRegs.push_back(reg);
             }
         }
         freeRegister(memberReg);
-        _chunk->emit<Call>(dst, memberReg, static_cast<Integer>(node->arguments.size()));
+        // 变长实参单指令调用（消逐参 Push 派发；语义等价）
+        _chunk->emitRaw<CallV>(dst, memberReg, static_cast<Integer>(node->arguments.size()),
+                               std::move(argRegs));
         // if(!node->arguments.empty()) {
         //     _chunk->emit<PopN>(node->arguments.size());
         // }

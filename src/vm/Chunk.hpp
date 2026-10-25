@@ -67,6 +67,15 @@ namespace cial::vm {
             return index;
         }
 
+        // 非 Operand 操作数指令（如 CallV 的寄存器列表）的原生发射
+        template <typename T, typename... Args>
+            requires std::is_base_of_v<inter::Instruction, T>
+        size_t emitRaw(Args &&...args) {
+            const size_t index = _instructions.size();
+            _instructions.push_back(std::make_unique<T>(std::forward<Args>(args)...));
+            return index;
+        }
+
         template <typename T, typename... Args>
             requires std::is_base_of_v<inter::Instruction, T>
         void repl(const size_t index, Args &&...args) {

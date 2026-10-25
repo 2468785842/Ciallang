@@ -91,7 +91,7 @@
     O(WithPush)                                                                                                        \
     O(WithPop)                                                                                                         \
     O(GetWith)                                                                                                         \
-    O(NewRegExp)
+    O(NewRegExp)                                                                                                            O(CallV)
 
 namespace cial::vm {
     class VMState;
@@ -346,6 +346,24 @@ namespace cial::inter {
     DEF_INST(GetWith, 1, OP_GET1(dst, Register));
     // /pattern/ 正则字面量:按 String 常量取模式,构造 RegExp 对象
     DEF_INST(NewRegExp, 2, OP_GET1(dst, Register) OP_GET2(pattern, ConstIdx));
+
+    // 变长实参调用：语义 = N×Push + Call（消逐参派发轮次）。Operand 三槽装不下
+    // 寄存器列表，手写子类；args 为实参寄存器（缺位实参为 void 常量寄存器）
+    struct CallV : Instruction {
+        Register dst{};
+        Register func{};
+        Integer argCount{};
+        Vec<Register> args{};
+
+        CallV(const Register d, const Register f, const Integer n, Vec<Register> a) :
+            dst(d), func(f), argCount(n), args(std::move(a)) {}
+
+        ~CallV() override = default;
+
+        [[nodiscard]] TacOpCode opcode() const override { return TacOpCode::CallV; }
+
+        [[nodiscard]] std::string dump(const vm::VMState *vmState) override;
+    };
 
     struct DumpInst {
         [[nodiscard]] static String dumpOperand(const Operand &operand);

@@ -86,7 +86,7 @@
     O(WithPush)                                                                                                        \
     O(WithPop)                                                                                                         \
     O(GetWith)                                                                                                         \
-    O(NewRegExp)
+    O(NewRegExp)                                                                                                            O(CallV)
 
 namespace cial::vm {
     class VMState;

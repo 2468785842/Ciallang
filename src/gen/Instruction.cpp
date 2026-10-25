@@ -184,6 +184,14 @@ namespace cial::inter {
     DEF_AUTO_DUMP(JmpE, "jmp_e");
     DEF_AUTO_DUMP(JmpNE, "jmp_ne");
     DEF_AUTO_DUMP(Call, "call");
+
+    std::string CallV::dump(const VMState *vm) {
+        std::string out = fmt::format("call_v     {:<4} {:<4} {}  ", func.index(), dst.index(),
+                                      static_cast<i64>(argCount));
+        for(const auto &r : args)
+            out += fmt::format("%{} ", r.index());
+        return out;
+    }
     DEF_AUTO_DUMP(Ret, "ret");
 
     // 属性操作

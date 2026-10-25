@@ -850,6 +850,24 @@ namespace cial::vm {
         return DispatchRet::Call;
     }
 
+    // 变长实参调用：等价 N×Push + Call。寄存器号先读全再压栈——push 扩池可能
+    // 迁移寄存器窗口，边读边用 regs 会读到悬空指针
+    DISPATCH_OP_METHOD(CallV) {
+        const u16 dst = read<u16>(ip, pc);
+        const u16 func = read<u16>(ip, pc);
+        const u64 argc = decodeUleb128(ip, pc, 10);
+        u16 argRegs[16]{};
+        const u64 n = argc < 16 ? argc : 16;
+        for(u64 i = 0; i < n; ++i)
+            argRegs[i] = read<u16>(ip, pc);
+        for(u64 i = 0; i < n; ++i)
+            push(regs[argRegs[i]]);
+        const auto &object = regs[func].asObject().unwrap();
+        cur->pc = pc;
+        object->call(*this, dst, argc);
+        return DispatchRet::Call;
+    }
+
     DISPATCH_OP_METHOD(GProp) {
         const u16 r1 = read<u16>(ip, pc); // obj
         const u16 r2 = read<u16>(ip, pc); // member

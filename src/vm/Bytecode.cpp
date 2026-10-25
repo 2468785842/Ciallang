@@ -372,6 +372,15 @@ namespace cial::vm {
         write<u16>(info.code, tac->dst().index());
     }
 
+    void Bytecode::encode(Info &info, const inter::CallV *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CallV));
+        write<u16>(info.code, tac->dst.index());
+        write<u16>(info.code, tac->func.index());
+        encodeUleb128(static_cast<u64>(tac->argCount), info.code);
+        for(const auto &r : tac->args)
+            write<u16>(info.code, r.index());
+    }
+
     void Bytecode::encode(Info &info, const inter::NewRegExp *tac) {
         info.code.push_back(static_cast<u8>(VmOpCode::NewRegExp));
         write<u16>(info.code, tac->dst().index());
