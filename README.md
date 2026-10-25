@@ -31,17 +31,17 @@
 * [x] `@if` `@endif`
 
 #### 语法结构
-* [x] `var` 变量声明与使用
+* [x] `var` / `const` 变量声明与使用（const 只读性检查未实现，当前与 var 等价）
 * [x] `if`
 * [x] `while`
 * [x] `do while`
-* [x] `for`
+* [x] `for`（含 `for(const)`）
 * [x] `switch`
 * [x] `try-catch`（含 `catch()` 空参数列表）
 * [x] `function` 函数定义与调用（块内提升，先调用后声明）
 * [x] `property`
 * [x] `class`
-* [ ] `with`
+* [x] `with`（含块内 `.member` 裸词链访问）
 
 #### 数据类型
 * [x] `Void` 空
@@ -61,9 +61,10 @@
 * [x] `this`
 * [x] `function` 函数表达式声明
 * [x] `@"xx"` 模版字符串声明
-* [ ] `[]` Array 声明
-* [ ] `%[]` Dictionary 声明
+* [x] `[]` Array 声明
+* [x] `%[]` Dictionary 声明（键形式 `"k" => v` 与 `sym: v`）
 * [x] `<% xx xx ... %>` Octet 声明
+* [x] `/pattern/flags` 正则字面量（flags：`g` 全局 / `i` 忽略大小写）
 
 #### 表达式
 * [x] `A,B` 顺序表达式
@@ -83,10 +84,10 @@
 * [x] `A operator B` 乘除运算符 `% / \ *`
 * [x] `operator A` 前缀单目运算符 `! new invalidate isvalid -`
 * [x] `operator A` 前缀单目运算符 `~ typeof + &`
-* [ ] `operator A` 前缀单目运算符 `-- ++ delete # $ *`
+* [x] `operator A` 前缀单目运算符 `-- ++ delete # $ * &`
 * [x] `operator A` 类型转换运算符 `int real string`
 * [x] `A operator` 后缀单目运算符 `() . -- ++`
-* [x] `A operator` 后缀单目运算符 `[]`（字符串下标）
+* [x] `A operator` 后缀单目运算符 `[]`（数组/字典/字符串通用下标读写）
 * [ ] `A operator` 后缀单目运算符 `!`
 * [x] `A instanceof B` 实例判断运算符
 * [x] `A incontextof B` 上下文替换运算符
@@ -94,13 +95,13 @@
 ---
 
 ### 📚 标准库
-* [ ] Exception
-* [ ] Array
-* [ ] Dictionary
+* [x] Exception // message 成员；原生错误自动包装为 Exception 实例
+* [ ] Array // ◐ 字面量/下标读写/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/count；sort/save/load/pack 未实现
+* [ ] Dictionary // ◐ 字面量/下标读写/assign/clear/erase/count；save/load 未实现
 * [ ] Date
 * [ ] Math
-* [ ] RegExp
-* [x] String // replace, split, 未实现，需要先实现RegExp和Array
+* [ ] RegExp // ◐ /pattern/flags 字面量 + test/match/exec/compile/replace/split + 匹配状态属性（start/index/lastIndex/matches/lastMatch/...）；new RegExp 构造器、replace 函数回调未实现
+* [x] String // charAt/indexOf/toUpperCase/toLowerCase/substring/sprintf/replace(g 全局)/split/escape/trim/reverse/repeat/length
 
 ## 编译与运行
 
@@ -142,7 +143,7 @@ cmake --build build/Windows/Bench --target conformance-report
 ```
 
 报告落盘 `bench/results/`。当前与原版 TJS2（Release）wall-time 比值：
-整数循环 ≈113%、类实例化 ≈111%、fib(25) ≈153%、字符串拼接 ≈178%。
+类实例化 ≈110%、整数循环 ≈121%、fib(25) ≈127%、字符串拼接 ≈185%（2026-10-24）。
 
 ---
 
