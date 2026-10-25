@@ -10,6 +10,7 @@
 #include "AtomTable.hpp"
 #include "stdlib/ArrayLib.hpp"
 #include "common/UTF8.hpp"
+#include "stdlib/DateLib.hpp"
 #include "stdlib/DictLib.hpp"
 #include "stdlib/MathLib.hpp"
 #include "stdlib/RegExpLib.hpp"
@@ -144,6 +145,28 @@ namespace cial {
         // RegExp 类对象：空模式占位实例，RegExp(pattern, flags?) 构造入口
         _impl->globalObject.setProp(_impl->rt.atomTable.intern("RegExp"_str),
                                     Value{ _impl->rt.create<RegExp>(&_impl->rt, ""_str).get() });
+
+        // Date 方法（TJS2 tjsDate.cpp 对齐；get 系 localtime、set 系读改 mktime）
+        registerMethod<DateNS>("getYear"_str, &stdlib::dateGetYear);
+        registerMethod<DateNS>("getMonth"_str, &stdlib::dateGetMonth);
+        registerMethod<DateNS>("getDate"_str, &stdlib::dateGetDate);
+        registerMethod<DateNS>("getDay"_str, &stdlib::dateGetDay);
+        registerMethod<DateNS>("getHours"_str, &stdlib::dateGetHours);
+        registerMethod<DateNS>("getMinutes"_str, &stdlib::dateGetMinutes);
+        registerMethod<DateNS>("getSeconds"_str, &stdlib::dateGetSeconds);
+        registerMethod<DateNS>("getTime"_str, &stdlib::dateGetTime);
+        registerMethod<DateNS>("setYear"_str, &stdlib::dateSetYear);
+        registerMethod<DateNS>("setMonth"_str, &stdlib::dateSetMonth);
+        registerMethod<DateNS>("setDate"_str, &stdlib::dateSetDate);
+        registerMethod<DateNS>("setHours"_str, &stdlib::dateSetHours);
+        registerMethod<DateNS>("setMinutes"_str, &stdlib::dateSetMinutes);
+        registerMethod<DateNS>("setSeconds"_str, &stdlib::dateSetSeconds);
+        registerMethod<DateNS>("setTime"_str, &stdlib::dateSetTime);
+        registerMethod<DateNS>("parse"_str, &stdlib::dateParse);
+        registerMethod<DateNS>("getTimezoneOffset"_str, &stdlib::dateGetTimezoneOffset);
+        // Date 类对象：占位实例（call 即构造：new Date()/分量/字符串）
+        _impl->globalObject.setProp(_impl->rt.atomTable.intern("Date"_str),
+                                    Value{ _impl->rt.create<DateNS>().get() });
     }
 
     void Context::collectMark() const {

@@ -430,6 +430,49 @@ TEST_CASE("数字字面量——进制/浮点/科学计数法") {
     }
 }
 
+TEST_CASE("Date 标准库") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    vm.eval(R"tjs(
+        var d = new Date(2023, 0, 15, 10, 30, 5);
+        var y = d.getYear(); var mo = d.getMonth(); var da = d.getDate();
+        var h = d.getHours(); var mi = d.getMinutes(); var se = d.getSeconds();
+        d.setMonth(11); d.setDate(25);
+        var mo2 = d.getMonth(); var da2 = d.getDate();
+        var now = new Date();
+        var nowOk = now.getYear() >= 2026;
+        var p = new Date("2024/6/1 12:30:00");
+        var py = p.getYear(); var pmo = p.getMonth(); var pd = p.getDate(); var ph = p.getHours();
+        var q = new Date(2023, 0, 1);
+        q.setTime(1700000000000);
+        var qy = q.getYear();
+    )tjs"_str);
+    SECTION("分量构造与 get 系") {
+        REQUIRE(*vm.evalExpr<Integer>("y"_str) == 2023);
+        REQUIRE(*vm.evalExpr<Integer>("mo"_str) == 0); // 0-based，对齐 TJS2
+        REQUIRE(*vm.evalExpr<Integer>("da"_str) == 15);
+        REQUIRE(*vm.evalExpr<Integer>("h"_str) == 10);
+        REQUIRE(*vm.evalExpr<Integer>("mi"_str) == 30);
+        REQUIRE(*vm.evalExpr<Integer>("se"_str) == 5);
+    }
+    SECTION("set 系") {
+        REQUIRE(*vm.evalExpr<Integer>("mo2"_str) == 11);
+        REQUIRE(*vm.evalExpr<Integer>("da2"_str) == 25);
+    }
+    SECTION("now/字符串解析/setTime") {
+        REQUIRE(*vm.evalExpr<Integer>("nowOk"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("py"_str) == 2024);
+        REQUIRE(*vm.evalExpr<Integer>("pmo"_str) == 6);
+        REQUIRE(*vm.evalExpr<Integer>("pd"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("ph"_str) == 12);
+        REQUIRE(*vm.evalExpr<Integer>("qy"_str) == 2023); // 1700000000000ms = 2023-11-14
+    }
+}
+
 TEST_CASE("Math 标准库") {
     Runtime rt{};
     Context context{ rt };

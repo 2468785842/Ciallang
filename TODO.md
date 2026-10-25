@@ -30,8 +30,9 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] 标准库：Date 完整 API；Math.RandomGenerator（MT19937 类）；RegExp 剩余
-      （静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
+- [ ] 标准库剩余：Math.RandomGenerator（MT19937 类）；Date.parse 完整文法
+      （tjsdate.y：英文月名/相对表达等，当前仅 "YYYY/MM/DD HH:MM[:SS]" 子集）；
+      RegExp 剩余（静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
 - [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
 - [ ] `(const)[...]` / `(const)%[...]` 的只读共享实例语义（当前按运行时新建处理，行为兼容）
@@ -44,6 +45,11 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 Date 批次：Date 标准库全量（对齐 tjsDate.cpp）——构造（now/分量 mktime/字符串
+  解析子集）、get 系 8 个（localtime 字段，month 0-based 对齐原版）、set 系 7 个
+  （读改 mktime，DateField 枚举助手）、getTime(ms)/setTime(ms)、getTimezoneOffset；
+  DateNS 走 TypeId::Date（call 即构造，同 RegExp/Array 模板）。91 用例双配置全绿
 
 - 2026-10-25 Rlc 行号接线批次：未捕获异常的顶层报错与原生错误包装（Exception.message）带
   源码行号——Chunk 挂 Rlc 行号表（IRGen 15 个语句级 generate 入口记录，语句粒度）、
