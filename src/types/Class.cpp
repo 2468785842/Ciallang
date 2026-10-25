@@ -22,8 +22,9 @@ namespace cial {
 
     ClassObject::ClassObject(ClassMeta *classMeta, Runtime *rt) : meta(classMeta), _rt(rt) {}
     namespace {
-        void newClass(DataObject *dataObject, const ClassObject *clazz, vm::VMState &vmState, const u32 ret,
-                      const size_t argCount) {
+        // 成员字段初始化（newClass 前半段，对构造器无依赖）：基类递归 + 当前类
+        // 覆盖 + initDefaultVal 默认值脚本；无构造器类的 new（TJS2 语义）单走此段
+        void initClassFields(DataObject *dataObject, const ClassObject *clazz, vm::VMState &vmState) {
             // 1. 定义一个用于追踪已访问类的集合
             std::unordered_set<ClassObject *> visited;
 
@@ -108,6 +109,11 @@ namespace cial {
                 // run0 执行到帧结束时自行释放该帧
                 vmState.run0();
             }
+        }
+
+        void newClass(DataObject *dataObject, const ClassObject *clazz, vm::VMState &vmState, const u32 ret,
+                      const size_t argCount) {
+            initClassFields(dataObject, clazz, vmState);
 
             Function constructor{ clazz->meta->constructor };
             constructor.thisObj = dataObject;
@@ -141,7 +147,13 @@ namespace cial {
             throw std::runtime_error("The current class cannot be initialized.");
 
         if(!meta->constructor) {
-            throw std::runtime_error("The current class without a constructor cannot be initialized.");
+            // TJS2 语义：无构造器 → 仅成员字段初始化（递归含基类），不调用基类
+            // 构造器（对拍：class C extends B {} new C() 中 B.b 保持字段默认值，
+            // B() 构造器不执行）；super 解析走 extends 兜底（Super dispatch 已有）
+            const auto dataObject = vmState.rt.create<DataObject>(&vmState, this);
+            initClassFields(dataObject.get(), this, vmState);
+            vmState.regRef(ret) = Value{ dataObject.get() };
+            return;
         }
 
         // call super class constructor function?

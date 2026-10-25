@@ -771,3 +771,33 @@ TEST_CASE("TJS2 - super.<Ctor>() 显式基类构造调用") {
         REQUIRE(*vm.evalExpr<Integer>("tmp2.prop"_str) == 5);
     }
 }
+
+TEST_CASE("无构造器类 new 走默认构造（TJS2 语义）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // 对拍 TJSCompiler：字段初始化照常（递归含基类），基类构造器不调用
+    // （C 无构造器 extends B：B.b 保持字段默认值 1 而非构造器里的 2）
+    vm.eval(R"tjs(
+        class B { var b = 1; function B() { b = 2; } }
+        class C extends B { var c = 3; }
+        class D { var d = 4; }
+        class E { property p { getter { return 55; } } }
+        var d1 = new D();
+        var dv = d1.d;
+        var c1 = new C();
+        var bv = c1.b;
+        var cv = c1.c;
+        var e1 = new E();
+        var ev = e1.p;
+        var eok = isvalid e1;
+    )tjs"_str);
+    REQUIRE(*vm.evalExpr<Integer>("dv"_str) == 4);
+    REQUIRE(*vm.evalExpr<Integer>("bv"_str) == 1); // 基类构造器未执行
+    REQUIRE(*vm.evalExpr<Integer>("cv"_str) == 3);
+    REQUIRE(*vm.evalExpr<Integer>("ev"_str) == 55); // property 成员照常
+    REQUIRE(*vm.evalExpr<Integer>("eok"_str) == 1);
+}

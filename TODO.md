@@ -30,8 +30,6 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] `new` 无构造器类应走默认构造（TJS2 语义；当前 ClassObject::call 直接
-      报错"without a constructor"，冒烟发现，非本批引入）
 - [ ] 标准库剩余：Math.RandomGenerator（MT19937 类）；Date.parse 完整文法
       （tjsdate.y：英文月名/相对表达等，当前仅 "YYYY/MM/DD HH:MM[:SS]" 子集）；
       RegExp 剩余（静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
@@ -47,6 +45,11 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 默认构造批次：new 无构造器类走 TJS2 语义——仅成员字段初始化（递归含
+  基类 + initDefaultVal 默认值 + property 成员），基类构造器不调用（对拍证据：C 无
+  构造器 extends B 时 B.b 保持字段默认值 1 而非构造器里的 2）；newClass 前半段
+  提取为 initClassFields 复用。92 用例双配置全绿
 
 - 2026-10-25 CallV 变长实参调用批次：新指令 CallV（寄存器列表内嵌，语义 = N×Push+Call，
   消逐参派发轮次；fib 每次调用 3 派发→1）——X-macro/手写子类（Operand 三槽装不下列表，
