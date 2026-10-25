@@ -32,6 +32,7 @@ namespace cial {
     template <typename T>
     struct SharedPayload {
         u32 ref{ 1 };
+        u8 embedded{ 0 }; // 1 = data 与 payload 同块（makeSingle），析构只 operator delete 本块
         T *data;
 
         explicit SharedPayload(T *d) : data(d) {}
@@ -41,12 +42,28 @@ namespace cial {
 
         static SharedPayload *make(T *d) { return new SharedPayload{ d }; }
 
+        // 单块分配：payload 头 + T 紧随其后就地构造。String/Octet 构造是拼接
+        // 热路径（原 make(new T) 每次两次堆分配），string_concat 差距主因之一
+        static SharedPayload *makeSingle(T &&v) {
+            auto *p = static_cast<SharedPayload *>(::operator new(sizeof(SharedPayload) + sizeof(T)));
+            p->ref = 1;
+            p->embedded = 1;
+            p->data = reinterpret_cast<T *>(p + 1);
+            new(p->data) T(std::move(v));
+            return p;
+        }
+
         static void retain(SharedPayload *p) noexcept { ++p->ref; }
 
         static void release(SharedPayload *p) noexcept {
             if(--p->ref == 0) {
-                delete p->data;
-                delete p;
+                p->data->~T();
+                if(p->embedded) {
+                    ::operator delete(p);
+                } else {
+                    delete p->data;
+                    delete p;
+                }
             }
         }
     };

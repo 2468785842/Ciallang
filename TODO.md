@@ -1,9 +1,9 @@
 # 后续任务清单
 
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
-> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-25，Math 批次后）——
-> 类实例化 112% / 整数循环 121% / fib(25) 125% / 字符串拼接 194%
->（本机波动 ±10%，多轮区间 110~159%，无系统性回归）。
+> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-25，payload 单块批次后）——
+> 类实例化 112% / 整数循环 127% / fib(25) 114% / 字符串拼接 155%
+>（本机波动 ±10%；string_concat 自 194% 显著回落，payload 单块分配见效）。
 > TJS2 语料对拍（2026-10-25）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
 > DIFF 3（test_misc、test_variant 为异常消息格式差异，Ciallang 行为正确；
 > test_string 双方干净通过，Ciallang 侧无输出、参考实现多 25 行引擎转储）/
@@ -23,9 +23,7 @@
 - [ ] fib 剩余差距（132%）：实参 Push 拷贝与指令条数（TJS 为密集指令编码）；
       可选：参数直传被调帧窗口、调用点内联缓存
 - [ ] string_concat 剩余差距（179%）：payload+String 单块分配、Value 内联 SSO
-- [ ] 类实例化/loop_int 小幅差距（115%/122%）：GProp 通用对象分支仍有
-      GlobalObject/ClassObject 两次 dynamic_cast（可扩 typeId()）；
-      词法器 token 判别等新增热路径复核
+- [ ] loop_int 小幅差距（127%）：词法器 token 判别等新增热路径复核；指令条数
 - [ ] 方法访问 NativeFunction 每次分配（GProp 绑定拷贝）：正确修法是调用约定
       携带 objthis（TJS2 同款），属调用点内联缓存的前置；现有基准不敏感
       （stdlib 密集脚本受益）
@@ -48,6 +46,12 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 性能小组合批：TypeId 扩 Global/Class 专用值（不进方法表，仅分派标识），
+  GlobalObject/ClassObject 覆写 typeId()——GProp/DProp 对象分支的 Global/Class 两次
+  dynamic_cast 全部消除；SharedPayload::makeSingle 单块分配（payload 头+T 就地构造，
+  Value(String/Octet)/Constant 字面量负载/IRGen octet 字面量四处切换，拼接路径每次
+  省一次堆分配）——string_concat 基准 194%→155%。90 用例双配置全绿，对拍一致
 
 - 2026-10-25 Math+数字字面量批次：Math 标准库（16 方法+8 常量+Xorshift random，对齐 tjsMath.cpp；
   MathNS 承载对象走 TypeId::Math/NativeRegister 分派，max/min 含 NaN 传播与 ±0 位级语义、

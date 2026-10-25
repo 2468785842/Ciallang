@@ -851,8 +851,9 @@ namespace cial::vm {
                 // 未命中落到对象自身 getProp（count 读在 Array::getProp 有兜底）
             }
 
-            if(auto *global = dynamic_cast<GlobalObject *>(obj)) {
+            if(tid == TypeId::Global) {
                 // for global, proxy object, maybe get extends object in dataObject?
+                auto *global = static_cast<GlobalObject *>(obj);
                 if(global->proxy) {
                     throw std::runtime_error("Not implemented");
                 }
@@ -860,7 +861,7 @@ namespace cial::vm {
                 return DispatchRet::Continue;
             }
 
-            if(const auto *classObject = dynamic_cast<ClassObject *>(obj)) {
+            if(tid == TypeId::Class) {
                 auto tmp = obj->getProp(atom);
                 propObjectGet(*this, tmp, tmp);
                 // 构造器名访问返回 ClassObject 本身（super.<Ctor>() 路径），非 Function
@@ -912,7 +913,7 @@ namespace cial::vm {
         auto *obj = objVal.asObject().unwrap();
         Value curVal{};
         bool hasCur = false;
-        if(dynamic_cast<GlobalObject *>(obj) == nullptr) {
+        if(obj->typeId() != TypeId::Global) {
             // GlobalObject::hasProp 对缺失成员外的行为与 DataObject 一致；
             // 但 property 触发不应作用于全局槽（全局写走 DGlobal），此处仅实例/类对象
             hasCur = obj->hasProp(atom);

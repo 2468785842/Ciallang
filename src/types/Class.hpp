@@ -46,6 +46,8 @@ namespace cial {
 
         bool instanceOf(const Atom a) override { return a == Runtime::ATOM_CLASS; }
 
+        [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Class; }
+
         [[nodiscard]] FuncMeta *getFunc(const Atom a) const {
             const i64 i = this->meta->hasMember(a);
             if(i < 0)
@@ -166,6 +168,9 @@ namespace cial {
         DataObject *proxy{};
 
         explicit GlobalObject(Runtime *rt) : ClassObject(nullptr, rt) {}
+
+        // Global 判定优先于 Class（继承链上 Global ⊂ Class，dynamic_cast 语义等价）
+        [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Global; }
 
         void marked() noexcept override {
             if(_marked)

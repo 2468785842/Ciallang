@@ -41,7 +41,7 @@ namespace cial {
                 // 字符串字面量:负载缓存后重复 Load 零分配(retain 即可)
                 if(!_strPayload) {
                     const auto *str = rt->atomTable.get(value<Atom>())->str;
-                    _strPayload = SharedPayload<String>::make(new String{ str->getData(), str->length() });
+                    _strPayload = SharedPayload<String>::makeSingle(String{ str->getData(), str->length() });
                 }
                 SharedPayload<String>::retain(_strPayload);
                 Value v{};

@@ -1568,7 +1568,7 @@ namespace cial::inter {
                 break;
             case syntax::TokenValueType::Octet: {
                 // octet 字面量走常量池(payload 所有权随 Constant)
-                auto *payload = SharedPayload<Octet>::make(new Octet{ token.getOctet() });
+                auto *payload = SharedPayload<Octet>::makeSingle(Octet{ token.getOctet() });
                 _chunk->emit<Load>(reg, _chunk->addConstant(Constant{ payload }));
                 break;
             }

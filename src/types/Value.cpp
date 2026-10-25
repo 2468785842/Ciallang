@@ -23,11 +23,11 @@ namespace cial {
     Value::Value(const Real value) : _real(value), _type(ValueType::Real) {}
 
     Value::Value(String value) : _type(ValueType::String) {
-        _string = SharedPayload<String>::make(new String{ std::move(value) });
+        _string = SharedPayload<String>::makeSingle(std::move(value));
     }
 
     Value::Value(Octet value) : _type(ValueType::Octet) {
-        _octet = SharedPayload<Octet>::make(new Octet{ std::move(value) });
+        _octet = SharedPayload<Octet>::makeSingle(std::move(value));
     }
 
     Value::Value(Object *value) : _object(value), _type(ValueType::Object) {}
