@@ -836,7 +836,8 @@ namespace cial::vm {
             // Array/Dictionary/RegExp 的原生成员（方法 / count 属性）：与字符串原生表同机制；
             // 未命中落到对象自身 getProp（RegExp 的 matches/index 等状态属性走此路径）
             const TypeId tid = obj->typeId();
-            if(tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp) {
+            if(tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp ||
+               tid == TypeId::Math) {
                 if(auto *getter = context.findProperty(tid, atom)) {
                     regs[r3] = getter(val);
                     return DispatchRet::Continue;

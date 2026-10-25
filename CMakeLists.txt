@@ -66,6 +66,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/ArrayLib.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/DictLib.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/RegExpLib.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/MathLib.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc.cpp
 

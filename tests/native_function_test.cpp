@@ -392,4 +392,72 @@ TEST_CASE("原生回调脚本函数（VM::callValue 底座）") {
     }
 }
 
+TEST_CASE("数字字面量——进制/浮点/科学计数法") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // 修复回归：extractNumber 循环条件用十进制字符集（十六进制字母不在其中，
+    // 0x1.07CCp14 解析到 'C' 中断）；p 指数符号分支吃掉指数数字；八进制 peek
+    // 吞首位数字（010 得 0）；parseNonDecimalReal 位组装边界算错（0x1p-2 得 4）；
+    // 科学计数法 1e3 词法报错、1e-12 整数截断为 0
+    SECTION("进制前缀整数") {
+        REQUIRE(*vm.evalExpr<Integer>(R"(0x10)"_str) == 16);
+        REQUIRE(*vm.evalExpr<Integer>(R"(0xFF)"_str) == 255);
+        REQUIRE(*vm.evalExpr<Integer>(R"(0b101)"_str) == 5);
+        REQUIRE(*vm.evalExpr<Integer>(R"(010)"_str) == 8); // 八进制
+    }
+
+    SECTION("十六进制/二进制浮点（p 指数）") {
+        REQUIRE((*vm.evalExpr<Real>(R"(0x1p4)"_str)).value() == 16.0);
+        REQUIRE((*vm.evalExpr<Real>(R"(0x1p-2)"_str)).value() == 0.25);
+        REQUIRE((*vm.evalExpr<Real>(R"(0x1.8p1)"_str)).value() == 3.0);
+        REQUIRE((*vm.evalExpr<Real>(R"(0X1.8P1)"_str)).value() == 3.0);
+        REQUIRE((*vm.evalExpr<Real>(R"(0x1.07CCp14)"_str)).value() == 16883.0); // 精确整除
+        REQUIRE((*vm.evalExpr<Real>(R"(0b1.1)"_str)).value() == 1.5);
+        REQUIRE((*vm.evalExpr<Real>(R"(0b1p-1)"_str)).value() == 0.5);
+    }
+
+    SECTION("科学计数法（符号可选/整数底数）") {
+        REQUIRE((*vm.evalExpr<Real>(R"(1e3)"_str)).value() == 1000.0);
+        REQUIRE((*vm.evalExpr<Real>(R"(2E2)"_str)).value() == 200.0);
+        REQUIRE((*vm.evalExpr<Real>(R"(1e-3)"_str)).value() == 0.001);
+        REQUIRE((*vm.evalExpr<Real>(R"(1e-12 < 1e-11 ? 1e-12 : 0.0)"_str)).value() < 1e-11);
+        REQUIRE((*vm.evalExpr<Real>(R"(1.5e-3)"_str)).value() == 0.0015);
+        REQUIRE(**vm.evalExpr<String *>(R"((1e-1 + 1) + "")"_str) != ""_str); // 拼接场景终止符不吞
+    }
+}
+
+TEST_CASE("Math 标准库") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("方法") {
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.abs(-3.5))"_str)).value() == 3.5);
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.floor(2.7))"_str)).value() == 2.0);
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.ceil(2.1))"_str)).value() == 3.0);
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.round(2.5))"_str)).value() == 3.0);
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.round(-2.5))"_str)).value() == -2.0); // floor(x+0.5) 语义
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.sqrt(16))"_str)).value() == 4.0);
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.pow(2, 10))"_str)).value() == 1024.0);
+        REQUIRE(*vm.evalExpr<Integer>(R"(Math.max(1, 5, 3))"_str) == 5);
+        REQUIRE(*vm.evalExpr<Integer>(R"(Math.min(4, 2))"_str) == 2);
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.cos(0))"_str)).value() == 1.0);
+        REQUIRE(*vm.evalExpr<Integer>(R"(Math.sin(0))"_str) == 0);
+    }
+
+    SECTION("常量与 random") {
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.PI)"_str)).value() == Catch::Approx(3.141592653589793).epsilon(1e-15));
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.E)"_str)).value() == Catch::Approx(2.718281828459045).epsilon(1e-15));
+        REQUIRE((*vm.evalExpr<Real>(R"(Math.SQRT2 * Math.SQRT2)"_str)).value() == Catch::Approx(2.0));
+        REQUIRE(*vm.evalExpr<Integer>(R"((Math.random() >= 0 && Math.random() < 1) ? 1 : 0)"_str) == 1);
+    }
+}
+
+
 

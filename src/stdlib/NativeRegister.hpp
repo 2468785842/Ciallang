@@ -4,6 +4,7 @@
 #pragma once
 
 #include "runtime/Runtime.hpp"
+#include "stdlib/MathLib.hpp"
 #include "types/Array.hpp"
 #include "types/Dictionary.hpp"
 #include "types/Function.hpp"
@@ -31,6 +32,8 @@ namespace cial {
                 return TypeId::Dictionary;
             } else if constexpr(std::is_same_v<T, RegExp>) {
                 return TypeId::RegExp;
+            } else if constexpr(std::is_same_v<T, MathNS>) {
+                return TypeId::Math;
             } else {
                 static_assert(!std::is_same_v<T, T> && "type is not support");
                 return TypeId::None;

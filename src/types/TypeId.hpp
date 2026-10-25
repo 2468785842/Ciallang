@@ -18,6 +18,7 @@ namespace cial {
         Array,
         Dictionary,
         RegExp,
+        Math,
     };
 
 } // namespace cial

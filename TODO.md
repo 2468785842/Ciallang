@@ -34,12 +34,11 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] 标准库：Date / Math 完整 API；RegExp 剩余（`new RegExp(...)` 构造器、静态属性
-      `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
+- [ ] 标准库：Date 完整 API；Math 剩余（Math.RandomGenerator MT19937 类）；RegExp 剩余
+      （`new RegExp(...)` 构造器、静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
 - [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
 - [ ] `(const)[...]` / `(const)%[...]` 的只读共享实例语义（当前按运行时新建处理，行为兼容）
-- [ ] 十六进制浮点字面量 `0x1.07CCp14`、二进制浮点 `0b1.1`（test.tjs 后段依赖）
 - [ ] const 只读性检查（当前 const 与 var 等价，仅语法接入）
 - [ ] with 块内 try/catch 穿越 WithPush 的栈截断（当前仅帧级恢复；语料未覆盖）
 
@@ -49,6 +48,14 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 Math+数字字面量批次：Math 标准库（16 方法+8 常量+Xorshift random，对齐 tjsMath.cpp；
+  MathNS 承载对象走 TypeId::Math/NativeRegister 分派，max/min 含 NaN 传播与 ±0 位级语义、
+  round=floor(x+0.5)）+ 数字字面量五处修复：extractNumber 循环条件改以 validDigits 为权威
+  （旧十进制字符集致 0x1.07CCp14 在 'C' 处中断）/退出时统一回退终止符（旧吞 ')'）/p 指数符号
+  分支直接读完指数（旧的跳空白+break 留下空指数从未工作）/八进制 peek 回退（010 旧得 0）/
+  parseNonDecimalReal 弃 IEEE 位组装改朴素求值（旧的 0x1p-2 得 4）/科学计数法符号可选
+  （1e3 旧词法报错）且指数非零强制 Real（1e-12 旧截断 0）。90 用例双配置全绿
 
 - 2026-10-25 脚本回调机制批次：VM::callValue（原生层同步调用脚本函数，TJS2 FuncCall 对应物；
   tmp 宿主帧承接返回值 + 全区哨兵 throwHandler 截住 unwind + ScriptExceptionCarrier 专用载体

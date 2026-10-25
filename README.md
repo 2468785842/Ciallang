@@ -56,6 +56,7 @@
 * [x] `void`
 * [x] `null`
 * [x] `Infinity` `-Infinity`
+* [x] `0x1.07CCp14` 十六进制浮点 / `0b1.1` 二进制浮点 / `1e3` 无符号科学计数法
 * [x] `super`
 * [x] `global`
 * [x] `this`
@@ -99,7 +100,7 @@
 * [ ] Array // ◐ 字面量/下标读写/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/sort(含比较器回调)/count；save/load/pack 未实现
 * [ ] Dictionary // ◐ 字面量/下标读写/assign/clear/erase/count；save/load 未实现
 * [ ] Date
-* [ ] Math
+* [ ] Math // ◐ abs/acos/asin/atan/atan2/ceil/exp/floor/log/pow/max/min/random/round/sin/cos/sqrt/tan + E/PI/LN2/... 常量；RandomGenerator 未实现
 * [ ] RegExp // ◐ /pattern/flags 字面量 + test/match/exec/compile/replace(含函数回调)/split + 匹配状态属性（start/index/lastIndex/matches/lastMatch/...）；new RegExp 构造器未实现
 * [x] String // charAt/indexOf/toUpperCase/toLowerCase/substring/sprintf/replace(g 全局)/split/escape/trim/reverse/repeat/length
 

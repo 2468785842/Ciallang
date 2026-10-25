@@ -1,12 +1,17 @@
 //
 // Created by LiDong on 2026/1/15.
 //
+#define _USE_MATH_DEFINES
+
 #include "Context.hpp"
+
+#include <cmath>
 
 #include "AtomTable.hpp"
 #include "stdlib/ArrayLib.hpp"
 #include "common/UTF8.hpp"
 #include "stdlib/DictLib.hpp"
+#include "stdlib/MathLib.hpp"
 #include "stdlib/RegExpLib.hpp"
 #include "stdlib/StringLib.hpp"
 #include "types/Array.hpp"
@@ -96,6 +101,37 @@ namespace cial {
         registerMethod<RegExp>("compile"_str, &stdlib::regexpCompile);
         registerMethod<RegExp>("replace"_str, &stdlib::regexpReplace);
         registerMethod<RegExp>("split"_str, &stdlib::regexpSplit);
+
+        // Math 静态方法与常量（TJS2 tjsMath.cpp 对齐；参数 AsReal、返回 Real）
+        registerMethod<MathNS>("abs"_str, &stdlib::mathAbs);
+        registerMethod<MathNS>("acos"_str, &stdlib::mathAcos);
+        registerMethod<MathNS>("asin"_str, &stdlib::mathAsin);
+        registerMethod<MathNS>("atan"_str, &stdlib::mathAtan);
+        registerMethod<MathNS>("atan2"_str, &stdlib::mathAtan2);
+        registerMethod<MathNS>("ceil"_str, &stdlib::mathCeil);
+        registerMethod<MathNS>("exp"_str, &stdlib::mathExp);
+        registerMethod<MathNS>("floor"_str, &stdlib::mathFloor);
+        registerMethod<MathNS>("log"_str, &stdlib::mathLog);
+        registerMethod<MathNS>("pow"_str, &stdlib::mathPow);
+        registerMethod<MathNS>("max"_str, &stdlib::mathMax);
+        registerMethod<MathNS>("min"_str, &stdlib::mathMin);
+        registerMethod<MathNS>("random"_str, &stdlib::mathRandom);
+        registerMethod<MathNS>("round"_str, &stdlib::mathRound);
+        registerMethod<MathNS>("sin"_str, &stdlib::mathSin);
+        registerMethod<MathNS>("cos"_str, &stdlib::mathCos);
+        registerMethod<MathNS>("sqrt"_str, &stdlib::mathSqrt);
+        registerMethod<MathNS>("tan"_str, &stdlib::mathTan);
+        // 常量属性 getter 须为无捕获 lambda（NativePropGetter 是裸函数指针）
+        registerProperty<MathNS>("E"_str, [](const Value &) { return Value{ Real{ M_E } }; });
+        registerProperty<MathNS>("LOG2E"_str, [](const Value &) { return Value{ Real{ M_LOG2E } }; });
+        registerProperty<MathNS>("LOG10E"_str, [](const Value &) { return Value{ Real{ M_LOG10E } }; });
+        registerProperty<MathNS>("LN10"_str, [](const Value &) { return Value{ Real{ M_LN10 } }; });
+        registerProperty<MathNS>("LN2"_str, [](const Value &) { return Value{ Real{ M_LN2 } }; });
+        registerProperty<MathNS>("PI"_str, [](const Value &) { return Value{ Real{ M_PI } }; });
+        registerProperty<MathNS>("SQRT1_2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 / 2 } }; });
+        registerProperty<MathNS>("SQRT2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 } }; });
+        _impl->globalObject.setProp(_impl->rt.atomTable.intern("Math"_str),
+                                    Value{ _impl->rt.create<MathNS>().get() });
 
         // Array/Dictionary "类对象"注册到全局：承载静态方法命名空间（语料惯用法
         // Dictionary.assign incontextof obj——取未绑定方法后 ChgThis 换 this）

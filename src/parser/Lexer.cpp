@@ -641,9 +641,12 @@ namespace cial::syntax {
                     ch = tCh;
                     continue;
                 }
-                if(isdigit(tCh) && tCh >= '0' && tCh <= '7')
-                    // octal, 八进制
+                if(isdigit(tCh) && tCh >= '0' && tCh <= '7') {
+                    // octal, 八进制——无前缀字母，peek 消费的数字本身须回退
+                    // （此前不回退：010 被解析成 0）
+                    rewindOneChar();
                     return parseNonDecimalNumber(token, stream, getOctNum, 3);
+                }
 
                 rewindOneChar();
             }
@@ -651,23 +654,28 @@ namespace cial::syntax {
             // 科学计数法
             if(ch == 'e' || ch == 'E') {
                 const auto flag = read(false);
-
-                if(flag != '-' && flag != '+') {
-                    token = makeToken(TokenType::Error, "scientific notation expected character '-' or '+'"_str);
-                    return false;
+                i32 sign = 1;
+                if(flag == '-') {
+                    sign = -1;
+                } else if(flag != '+') {
+                    rewindOneChar(); // 指数符号可选：1e3 合法（旧实现直接词法报错）
                 }
 
                 i32 bit = 0;
                 auto num = read(false);
+                if(!isdigit(num)) {
+                    token = makeToken(TokenType::Error, "scientific notation expected digits"_str);
+                    return false;
+                }
                 while(isdigit(num)) {
                     bit *= 10;
                     bit += num - '0';
                     num = read(false);
                 }
-                if(flag == '-')
-                    shifting = -bit;
-                if(flag == '+')
-                    shifting = bit;
+                // 终止符不在此回退：break 出循环后函数末尾有统一 rewindOneChar
+                shifting = sign * bit;
+                // 指数非零时值域必为实数（1e-12 旧实现走 Integer 路径截断为 0）
+                valueType = ValueType::Real;
                 break;
             }
 
@@ -740,112 +748,40 @@ namespace cial::syntax {
 
     void Lexer::parseNonDecimalReal(Token *&token, const std::string &decimalStr, i8 (*validDigits)(char),
                                     const i8 baseBits) {
-        // parse non-decimal(hex decimal, octal or binary) floating-point number.
-        // this routine heavily depends on IEEE double floating-point number expression.
-        u64 main = 0ull; // significand
-        i32 exp = 0; // 2^n exponential
-        i32 numSignIf = 0; // significand bit count (including leading left-most '1') in "main"
+        // 朴素求值：mantissa × base^(−小数位数) × 2^p指数（base = 2^baseBits）。
+        // 旧实现直接组装 IEEE double 位域，前导零/负指数偏置等边界多处算错
+        // （0x1p-2 得 4、0X1.8P1 得 5.3e-15）；词法冷路径，朴素算法即可
+        const double base = static_cast<double>(1ull << baseBits);
+        double mant = 0.0;
+        int fracDigits = 0;
+        int exp2 = 0;
         bool pointPassed = false;
 
-        // scan input
-        for(size_t i = 0; i < decimalStr.length(); i++) {
-            if(const auto decimal = decimalStr[i]; decimal == '.') {
+        for(size_t i = 0; i < decimalStr.length(); ++i) {
+            const char c = decimalStr[i];
+            if(c == '.') {
                 pointPassed = true;
-            } else if(decimal == 'p' || decimal == 'P') {
-                // 匹配到p,指针向前移动,如果已经到末尾,退出
-                if(decimalStr.length() - 1 < ++i)
-                    break;
-
-                const auto flag = decimalStr[++i];
-
-                bool biAssign = false;
-                if(flag == '+')
-                    biAssign = false;
-
-                if(flag == '-')
-                    biAssign = true;
-
-                i32 bias = 0;
-                while(true) {
-                    bias *= 10;
-                    bias += decimalStr[i++] - '0';
-                    if(decimalStr.length() - 1 < i)
-                        break;
+            } else if(c == 'p' || c == 'P') {
+                ++i;
+                bool neg = false;
+                if(i < decimalStr.length() && (decimalStr[i] == '+' || decimalStr[i] == '-')) {
+                    neg = decimalStr[i] == '-';
+                    ++i;
                 }
-                if(biAssign)
-                    bias = -bias;
-                exp += bias;
+                int e = 0;
+                for(; i < decimalStr.length() && isdigit(static_cast<unsigned char>(decimalStr[i])); ++i)
+                    e = e * 10 + (decimalStr[i] - '0');
+                exp2 = neg ? -e : e;
                 break;
             } else {
-                const auto n = validDigits(decimal);
-                if(numSignIf == 0) {
-                    // find msb flag bit
-                    i32 b = baseBits - 1;
-                    while(b >= 0) {
-                        if(1 << b & n)
-                            break;
-                        b--;
-                    }
-
-                    b++;
-                    if(b) {
-                        // n is not zero
-                        // place it to the main's msb
-                        numSignIf = b;
-                        main |= static_cast<u64>(n) << (64 - numSignIf);
-                        if(pointPassed)
-                            exp -= baseBits - b + 1;
-                        else
-                            exp = b - 1;
-                    } else {
-                        // n is zero
-                        if(pointPassed)
-                            exp -= baseBits;
-                    }
-                } else {
-                    // append to main
-                    if(numSignIf + baseBits < 64) {
-                        numSignIf += baseBits;
-                        main |= static_cast<u64>(n) << (64 - numSignIf);
-                    }
-                    if(!pointPassed)
-                        exp += baseBits;
-                }
+                mant = mant * base + validDigits(c);
+                if(pointPassed)
+                    ++fracDigits;
             }
         }
 
-        main >>= 64 - 1 - SIGNIFICAND_BITS;
-
-        if(main == 0) {
-            // zero
-            token = makeToken(TokenType::ConstVal, Real(0.0));
-            return;
-        }
-
-        main &= (1ull << SIGNIFICAND_BITS) - 1ull;
-
-        if(exp < EXP_MIN) {
-            // informal
-            // treat as zero
-            token = makeToken(TokenType::ConstVal, Real(0.0));
-            return;
-        }
-
-        if(exp > EXP_MAX) {
-            // too large
-            // treat as infinity
-
-            token = makeToken(TokenType::ConstVal, Real(P_INF));
-            return;
-        }
-
-        Real temp{ 0.0 };
-
-        // compose IEEE double
-        *reinterpret_cast<Integer *>(&temp) =
-            static_cast<Integer>(makeSign(false) | makeExponent(exp) | makeSignificand(main));
-
-        token = makeToken(TokenType::ConstVal, temp);
+        const double value = mant * std::pow(base, -fracDigits) * std::pow(2.0, static_cast<double>(exp2));
+        token = makeToken(TokenType::ConstVal, Real(value));
     }
 
     bool Lexer::parseNonDecimalInteger(Token *&token, const std::string &decimalStr, i8 (*validDigits)(char),
@@ -866,6 +802,9 @@ namespace cial::syntax {
         bool pointFound = false;
         // 指数
         bool expFound = false;
+        // 指数符号分支已自行回退时为 true——避免与函数末尾的统一回退叠加多退一个字符
+        // （曾因此吞掉终止符：0x10) 的 ')' 被消费未回退，后续解析整体错位）
+        bool rewound = false;
 
         const std::string valid = "+-.0123456789" + expMark;
         auto ch = static_cast<char>(read(false));
@@ -880,17 +819,22 @@ namespace cial::syntax {
                     expFound = true;
                     ss << ch;
                     ch = static_cast<char>(read());
-                    if(valid.find_first_of(ch) == std::string::npos)
+                    if(valid.find_first_of(ch) == std::string_view::npos)
                         break;
                     if(ch == '+' || ch == '-') {
                         ss << ch;
-                        // 跳过操作符,后面的所有空格
-                        while(isRuneWhitespace(read())) {
+                        // 指数数字（十进制）直接跟在符号后；旧实现"跳空白+回退+break"
+                        // 把指数数字留在流里（ss 形如 "1p-"，指数为空，从未正确工作过）
+                        ch = static_cast<char>(read(false));
+                        while(isdigit(ch)) {
+                            ss << ch;
+                            ch = static_cast<char>(read(false));
                         }
-                        // 多读一个,回溯
-                        rewindOneChar();
+                        rewindOneChar(); // 终止符回退（最终回退，末尾不再统一回退）
+                        rewound = true;
                         break;
                     }
+                    // 中途回退（循环继续），末尾退出时仍需统一回退终止符
                     rewindOneChar();
                 }
             } else if(isdigit(ch)) {
@@ -899,7 +843,13 @@ namespace cial::syntax {
                 break;
             }
             ch = static_cast<char>(read(false));
-        } while(valid.find_first_of(ch) != std::string::npos);
+        } while(validDigits(ch) != -1 || ch == expMark[0] || ch == expMark[1] ||
+                (!expFound && ch == '.') || (expFound && isdigit(ch)));
+        // 循环条件以 validDigits 为权威：旧条件用固定十进制字符集（+".Pp"），
+        // 十六进制字母 A-F/a-f 不在其中——0x1.07CCp14 解析到 'C' 即中断变标识符
+
+        if(!rewound)
+            rewindOneChar(); // 退出时多读的一个字符（终止符）回退
 
         isReal = pointFound || expFound;
     }
