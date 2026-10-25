@@ -35,7 +35,6 @@
       RegExp 剩余（静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
 - [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
-- [ ] `(const)[...]` / `(const)%[...]` 的只读共享实例语义（当前按运行时新建处理，行为兼容）
 - [ ] with 块内 try/catch 穿越 WithPush 的栈截断（当前仅帧级恢复；语料未覆盖）
 
 ## 四、工程化
@@ -44,6 +43,12 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 (const) 内联形态批次：查证定论——原版 `(const)[...]`/`(const)%[...]` 无只读
+  也无共享实例语义（tjs.y:795 产生式 = TJSCreateArrayObject 新建 + T_CONSTVAL 节点，
+  代码生成仅 VM_CONST 常量池装载；实测写入 a[1]=99 成功；原版 (const)%[...] 甚至解析
+  报错）。TODO 原「只读共享实例」条目预期错误，更正关闭；行为锁定测试补齐
+  （含嵌套/字典形态，字典形态我们比原版更可用）。95 用例双配置全绿
 
 - 2026-10-25 const 语义批次：原版 const 仅在编译期要求初始化（const E; 报错），
   赋值/自增/复合赋值/for 递增全部放行——**官方语法定稿依据**：tjs.y:319-321 原作者注释

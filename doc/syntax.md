@@ -74,7 +74,7 @@
 | 15 | `A isvalid`（**后缀**形态，与前缀并存）、`A incontextof B`（**右结合**，替换函数闭包的 this） | ◐：incontextof ✅；后缀 isvalid ✅ |
 | 16 | **类型转换** `(int)A (real)A (string)A` 或裸 `int A real A string A` | ✅ |
 | 17 | **后缀**：调用 `f(args)`、成员 `.sym`（含 `.` 起始的裸词链）、下标 `a[i]`（通用路径：数组/字典/字符串；可写，越界扩展）、后缀 `++ --`（表达式值为旧值；成员形态走 getter/setter 链）、**即时求值 `A !`**（把 A 的字符串值作为 TJS 表达式编译执行） | ◐：`() . -- ++ []` ✅；`!` ❌ |
-| 18 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]`（键形式 `sym :` 与 `"k" >= v`，=> 词形即 >=）/ 正则 `/pattern/` / 常量式 `(const)[...]` `(const)%[...]` | ✅（`(const)` 按运行时新建，只读共享语义未实现） |
+| 18 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]`（键形式 `sym :` 与 `"k" >= v`，=> 词形即 >=）/ 正则 `/pattern/` / 常量式 `(const)[...]` `(const)%[...]` | ✅（`(const)` 无只读/无共享语义——tjs.y:795 产生式即新建对象，实测原版写入放行，行为已对齐） |
 
 前缀一元语义速查（原版）：
 

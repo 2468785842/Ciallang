@@ -430,6 +430,35 @@ TEST_CASE("数字字面量——进制/浮点/科学计数法") {
     }
 }
 
+TEST_CASE("(const)[...] / (const)%[...] 常量内联形态（对齐原版：无只读/无共享）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // tjs.y:795 产生式 = TJSCreateArrayObject 新建 + T_CONSTVAL 节点；代码生成
+    // 只是 VM_CONST 常量池装载——无只读保护、无跨求值共享（每次新建）。
+    // 原版 (const)%[...] 甚至解析报错（旧版缺陷），此处行为超出原版（可用），
+    // 其余逐项对齐。
+    vm.eval(R"tjs(
+        var a = (const)[1, 2, 3];
+        var b = (const)[1, 2, 3];
+        var eq = a[1] === b[1];
+        a[1] = 99;
+        var w = a[1];
+        var nested = (const)[1, (const)%[k: 7]];
+        var nk = nested[1]["k"];
+        var d = (const)%[x: 1, y: 2];
+        d["x"] = 5;
+        var dx = d["x"];
+    )tjs"_str);
+    REQUIRE(*vm.evalExpr<Integer>("eq"_str) == 1);
+    REQUIRE(*vm.evalExpr<Integer>("w"_str) == 99); // 可写（原版同）
+    REQUIRE(*vm.evalExpr<Integer>("nk"_str) == 7); // 嵌套常量形态
+    REQUIRE(*vm.evalExpr<Integer>("dx"_str) == 5); // 字典形态可写
+}
+
 TEST_CASE("const 语义（对齐原版实测：必须初始化，赋值不强制）") {
     Runtime rt{};
     Context context{ rt };
