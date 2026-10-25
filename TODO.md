@@ -45,10 +45,11 @@
 
 ## 已完成（摘要）
 
-- 2026-10-25 const 语义批次：对拍实测原版行为后落地——原版 const 仅在编译期要求
-  初始化（const E; 报错），赋值/自增/复合赋值/for 递增全部放行（无只读强制）；
-  据此实现 VarDeclParser 的 const 必须初始化检查（逗号链逐个查），只读强制不实现
-  （与原版一致）。94 用例双配置全绿。TODO 原「只读性检查」条目基于错误预期，已更正关闭
+- 2026-10-25 const 语义批次：原版 const 仅在编译期要求初始化（const E; 报错），
+  赋值/自增/复合赋值/for 递增全部放行——**官方语法定稿依据**：tjs.y:319-321 原作者注释
+  "const: note that current version does not actually disallow re-assigning new value"
+  （非未定义行为，是官方明确声明的设计现状；社区共识同）。据此实现 VarDeclParser 的
+  const 必须初始化检查（逗号链逐个查），只读强制不实现。94 用例双配置全绿
 
 - 2026-10-25 RandomGenerator 批次：Math.RandomGenerator（MT19937 类，对齐 tjsMT19937ar-cok
   与 tjsRandomGenerator.cpp）——randomize 三形态（0 参=time 单值播种/整数=(低32,高32)
