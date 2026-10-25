@@ -136,11 +136,11 @@ namespace cial::stdlib {
                                : std::string{});
     }
 
-    Value regexpReplace(VM *, const Value &thisObj, const size_t argCount, Value *args) {
+    Value regexpReplace(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
         const auto *re = asRegExp(thisObj);
         if(argCount < 2)
             throw std::runtime_error("RegExp.replace expects (target, replacement)");
-        return Value{ regexpReplaceIn(re, valueToString(args[0]), valueToString(args[1])) };
+        return Value{ regexpReplaceIn(vm, re, valueToString(args[0]), args[1]) };
     }
 
     Value regexpSplit(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
@@ -154,7 +154,22 @@ namespace cial::stdlib {
         return Value{ arr };
     }
 
-    String regexpReplaceIn(const RegExp *re, const String &targetStr, const String &rep) {
+    // TJS2 replace_regex：replacement 为字符串直接拼接；为函数则每次匹配回调
+    // （参数=匹配数组 [整体,组...]，返回值字符串化后拼接）。忽略 start、不改状态。
+    // 回调 this 绑定差异记 TODO：TJS2 以 regexp 作 objthis，这里沿用函数自身绑定
+    String regexpReplaceIn(VM *vm, const RegExp *re, const String &targetStr, const Value &replacement) {
+        const bool isFunc = replacement.isObject();
+        String rep{};
+        if(!isFunc) {
+            if(replacement.isString()) {
+                rep = *replacement.asString().unwrap();
+            } else if(!replacement.isVoid()) {
+                Value t = replacement;
+                if(const auto r = t.toString(); !r.isFailed() && t.isString())
+                    rep = *t.asString().unwrap();
+            }
+        }
+
         const std::string target(targetStr.getData(), targetStr.length());
         std::string out;
         out.reserve(target.size());
@@ -165,7 +180,16 @@ namespace cial::stdlib {
             const size_t pos = static_cast<size_t>(m.position(0));
             const size_t end = pos + static_cast<size_t>(m.length(0));
             out.append(target, last, pos - last);
-            out.append(rep.getData(), rep.length());
+            if(isFunc) {
+                auto *arr = vm->create<Array>(&vm->rt());
+                for(size_t i = 0; i < m.size(); ++i)
+                    pushString(arr, m[i].str()); // 与 GetResultArray 同：全组填充，未匹配组空串
+                const Value argVal{ arr };
+                const String piece = valueToString(vm->callValue(replacement, 1, &argVal));
+                out.append(piece.getData(), piece.length());
+            } else {
+                out.append(rep.getData(), rep.length());
+            }
             last = end;
             if(!re->flagGlobal)
                 break; // TJS2：无 g 仅替换第一处

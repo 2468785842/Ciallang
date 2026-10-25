@@ -71,6 +71,7 @@ namespace cial {
         registerMethod<Array>("reverse"_str, &stdlib::arrayReverse);
         registerMethod<Array>("join"_str, &stdlib::arrayJoin);
         registerMethod<Array>("split"_str, &stdlib::arraySplitWith);
+        registerMethod<Array>("sort"_str, &stdlib::arraySort);
         // count/length 属性（get；写走 Array::setProp）
         const auto arrayCount = [](const Value &thisObj) {
             return Value{ Integer{ static_cast<Integer>(dynamic_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };

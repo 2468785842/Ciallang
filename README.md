@@ -96,11 +96,11 @@
 
 ### 📚 标准库
 * [x] Exception // message 成员；原生错误自动包装为 Exception 实例
-* [ ] Array // ◐ 字面量/下标读写/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/count；sort/save/load/pack 未实现
+* [ ] Array // ◐ 字面量/下标读写/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/sort(含比较器回调)/count；save/load/pack 未实现
 * [ ] Dictionary // ◐ 字面量/下标读写/assign/clear/erase/count；save/load 未实现
 * [ ] Date
 * [ ] Math
-* [ ] RegExp // ◐ /pattern/flags 字面量 + test/match/exec/compile/replace/split + 匹配状态属性（start/index/lastIndex/matches/lastMatch/...）；new RegExp 构造器、replace 函数回调未实现
+* [ ] RegExp // ◐ /pattern/flags 字面量 + test/match/exec/compile/replace(含函数回调)/split + 匹配状态属性（start/index/lastIndex/matches/lastMatch/...）；new RegExp 构造器未实现
 * [x] String // charAt/indexOf/toUpperCase/toLowerCase/substring/sprintf/replace(g 全局)/split/escape/trim/reverse/repeat/length
 
 ## 编译与运行

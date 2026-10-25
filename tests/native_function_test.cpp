@@ -303,3 +303,93 @@ TEST_CASE("字符串拼接 SSO 边界回归（SHORT_STR_LEN 一致性）") {
     }
 }
 
+TEST_CASE("原生回调脚本函数（VM::callValue 底座）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("Array.sort 排序字母") {
+        vm.eval(R"(
+            var a = [3, 1, 2];
+            a.sort();
+            var s1 = a.join(",");
+            a.sort("-");
+            var s2 = a.join(",");
+            var b = [10, 9, 100];
+            b.sort("0");
+            var s3 = b.join(",");
+            var c = ["b10", "a2", "c1"];
+            c.sort("a");
+            var s4 = c.join(",");
+        )"_str);
+        REQUIRE((**vm.evalExpr<String *>("s1"_str)) == "1,2,3"_str);
+        REQUIRE((**vm.evalExpr<String *>("s2"_str)) == "3,2,1"_str);
+        REQUIRE((**vm.evalExpr<String *>("s3"_str)) == "9,10,100"_str); // 数值序而非字典序
+        REQUIRE((**vm.evalExpr<String *>("s4"_str)) == "a2,b10,c1"_str);
+    }
+
+    SECTION("Array.sort 比较器回调（含闭包引用）") {
+        vm.eval(R"(
+            var d = [5, 2, 8, 1];
+            d.sort(function(x, y) { return x > y; });
+            var s1 = d.join(",");
+            d.sort(function(x, y) { return x < y; });
+            var s2 = d.join(",");
+            var bias = 10;
+            var e = [1, 2, 3];
+            e.sort(function(x, y) { return (x % bias) < (y % bias); });
+            var s3 = e.join(",");
+        )"_str);
+        REQUIRE((**vm.evalExpr<String *>("s1"_str)) == "8,5,2,1"_str);
+        REQUIRE((**vm.evalExpr<String *>("s2"_str)) == "1,2,5,8"_str);
+        REQUIRE((**vm.evalExpr<String *>("s3"_str)) == "1,2,3"_str);
+    }
+
+    SECTION("RegExp.replace 函数回调") {
+        REQUIRE((**vm.evalExpr<String *>(R"("a1b22c".replace(/\d+/g, function(m) { return "<" + m[0] + ">"; }))"_str))
+            == "a<1>b<22>c"_str);
+        REQUIRE((**vm.evalExpr<String *>(R"("x7y".replace(/(\d)/, function(m) { return m[1] + m[1]; }))"_str))
+            == "x77y"_str);
+    }
+
+    SECTION("回调异常：中断 native 并被外层脚本 catch") {
+        vm.eval(R"(
+            var caught = 0;
+            var after = 0;
+            try {
+                var f = [1, 2, 3];
+                f.sort(function(x, y) { throw "boom"; });
+            } catch(e) {
+                caught = 1;
+            }
+            after = 1 + 2;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("caught"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("after"_str) == 3); // 中断后 VM 状态正常
+    }
+
+    SECTION("回调内部 try 自行消化（不中断 native）") {
+        vm.eval(R"(
+            var ok = 0;
+            var e2 = [3, 1];
+            e2.sort(function(a, b) {
+                try { throw "inner"; } catch(ex) { ok = 1; }
+                return a < b;
+            });
+            var s = e2.join(",");
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("ok"_str) == 1);
+        REQUIRE((**vm.evalExpr<String *>("s"_str)) == "1,3"_str);
+    }
+
+    SECTION("回调无 handler 时终态报错") {
+        REQUIRE_THROWS(vm.eval(R"(
+            var d = [1, 2];
+            d.sort(function(x, y) { throw "fatal-boom"; });
+        )"_str));
+    }
+}
+
+

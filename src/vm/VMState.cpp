@@ -253,6 +253,15 @@ namespace cial::vm {
                         CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_CASE)
 #undef DISPATCH_CASE
                     }
+                } catch(ScriptExceptionCarrier &carried) {
+                    // 回调异常（VM::callValue 哨兵截获）：转入脚本异常协议，
+                    // 由下方 unwind 恢复外层脚本 try/catch（栈空时 unwind 抛终态）
+                    _pending = PendingCF::Throw;
+                    _exValue = carried.value;
+                    if(_exValue.isObject())
+                        rt.addHandleVal(_exValue.asObject().value());
+                    carried.value = Value{}; // 所有权移交 _exValue，防析构减引用
+                    cur->pc = pc;
                 } catch(const std::exception &e) {
                     if(_pending != PendingCF::None) {
                         throw; // 脚本异常传播中,不吞噬
@@ -303,9 +312,8 @@ namespace cial::vm {
             // 内层循环退出：Return / 帧代码执行到末尾
             if(_stackTop > 1) {
                 freeCallFrame();
-                if(_stackTop < entryStackTop) {
+                if(_stackTop < entryStackTop)
                     return; // 嵌套进入：目标帧已完成，交还原调用方
-                }
                 continue; // 取父帧，从其保存的 pc 继续
             }
             break; // 最底层帧执行完毕

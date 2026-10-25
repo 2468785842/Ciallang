@@ -40,7 +40,8 @@ namespace cial::stdlib {
     // [].split(pattern, string, reserved, purgeempty)：清空并填充 this 数组，返回 this
     Value arraySplitWith(VM *vm, const Value &thisObj, size_t argCount, Value *args);
 
-    // String.replace / RegExp.replace 共用替换核心（TJS2 replace_regex；忽略 start）
-    String regexpReplaceIn(const RegExp *re, const String &target, const String &replacement);
+    // String.replace / RegExp.replace 共用替换核心（TJS2 replace_regex；忽略 start）。
+    // replacement 为字符串或函数（函数每次匹配收到 [整体,组...] 数组，返回替换串）
+    String regexpReplaceIn(VM *vm, const RegExp *re, const String &target, const Value &replacement);
 
 } // namespace cial::stdlib

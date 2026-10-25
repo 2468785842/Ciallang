@@ -39,4 +39,7 @@ namespace cial::stdlib {
     // join(delim = ",")：字符串连接
     Value arrayJoin(VM *vm, const Value &thisObj, size_t argCount, Value *args);
 
+    // sort(order|comparator = '+', stable = false)：原地排序，无返回值（TJS2 语义）
+    Value arraySort(VM *vm, const Value &thisObj, size_t argCount, Value *args);
+
 } // namespace cial::stdlib

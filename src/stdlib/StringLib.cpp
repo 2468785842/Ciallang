@@ -97,25 +97,15 @@ namespace cial::stdlib {
     }
 
     // TJS2 语义：委托 pattern.replace(target, replacement)——g 标志全局替换、否则仅第一处；
-    // 函数回调（TJS2 支持以函数为替换串）待脚本回调调用机制
-    String stringReplace(VM *, const Value &thisObj, size_t, const Value &reVal, const Value &replacement) {
+    // replacement 可为函数（回调收到匹配数组，返回替换串，见 regexpReplaceIn）
+    String stringReplace(VM *vm, const Value &thisObj, size_t, const Value &reVal, const Value &replacement) {
         const String *str = thisObj.asString().unwrap();
         if(!reVal.isObject())
             throw std::runtime_error("replace expects a regexp");
         const auto *re = dynamic_cast<const RegExp *>(reVal.asObject().unwrap());
         if(!re)
             throw std::runtime_error("replace expects a regexp");
-        if(replacement.isObject())
-            throw std::runtime_error("replace with callback function is not supported yet");
-        String rep{};
-        if(replacement.isString()) {
-            rep = *replacement.asString().unwrap();
-        } else if(!replacement.isVoid()) {
-            Value t = replacement;
-            if(const auto r = t.toString(); !r.isFailed() && t.isString())
-                rep = *t.asString().unwrap();
-        }
-        return regexpReplaceIn(re, *str, rep);
+        return regexpReplaceIn(vm, re, *str, replacement);
     }
 
     String stringEscape(VM *, const Value &thisObj, size_t) { return thisObj.asString().unwrap()->escapeBackSlash(); }

@@ -1,10 +1,14 @@
 // Copyright (c) 2026/10/24
 //
 
+#include <algorithm>
+#include <cstring>
+
 #include "ArrayLib.hpp"
 
 #include "types/Array.hpp"
 #include "types/TypeConverter.hpp"
+#include "vm/VM.hpp"
 
 namespace cial::stdlib {
 
@@ -109,6 +113,116 @@ namespace cial::stdlib {
             out.append(s.getData(), s.length());
         }
         return Value{ String(out.c_str(), static_cast<u32>(out.size())) };
+    }
+
+    // TJS2 sort（tjsArray.cpp）：参数0 为排序字母 '+'（默认升序）'-'（降序）
+    // '0'/'9'（数值升/降）'a'/'z'（字符串升/降）或比较函数对象（回调返回真值 → lhs 在前）；
+    // 参数1 为是否稳定排序；无返回值（原地排序）
+    Value arraySort(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
+        auto *arr = asArray(thisObj);
+        char method = '+';
+        bool stable = false;
+        Value comparator{};
+
+        if(argCount >= 1 && !args[0].isVoid()) {
+            if(args[0].isObject()) {
+                comparator = args[0];
+                method = 0;
+            } else {
+                const String m = elementToString(args[0]);
+                method = m.isEmpty() ? '+' : m.getData()[0];
+                switch(method) {
+                    case '+':
+                    case '-':
+                    case '0':
+                    case '9':
+                    case 'a':
+                    case 'z':
+                        break;
+                    default:
+                        method = '+';
+                        break;
+                }
+            }
+        }
+        if(argCount >= 2 && !args[1].isVoid())
+            stable = args[1].asBool();
+
+        auto &items = arr->elements;
+        const auto normalAsc = [](const Value &l, const Value &r) { return l.littlerThan(r).unwrap(); };
+        const auto normalDesc = [](const Value &l, const Value &r) { return l.greaterThan(r).unwrap(); };
+        // 数值序：双字符串先转数值再比（TJS2 tonumber 语义），其余按常规序
+        const auto numAsc = [](const Value &l, const Value &r) {
+            if(l.isString() && r.isString()) {
+                const auto lr = l.asReal(), rr = r.asReal();
+                if(!lr.isFailed() && !rr.isFailed())
+                    return lr.value() < rr.value();
+            }
+            return l.littlerThan(r).unwrap();
+        };
+        const auto numDesc = [](const Value &l, const Value &r) {
+            if(l.isString() && r.isString()) {
+                const auto lr = l.asReal(), rr = r.asReal();
+                if(!lr.isFailed() && !rr.isFailed())
+                    return lr.value() > rr.value();
+            }
+            return l.greaterThan(r).unwrap();
+        };
+        // 字符串序：非字符串对按字符串化后比较（memcmp 字典序，String 无 operator<）
+        const auto strCmp = [](const String &a, const String &b) {
+            const size_t n = std::min(a.length(), b.length());
+            const int c = n ? std::memcmp(a.getData(), b.getData(), n) : 0;
+            if(c != 0)
+                return c;
+            return a.length() < b.length() ? -1 : a.length() > b.length() ? 1 : 0;
+        };
+        const auto strAsc = [&](const Value &l, const Value &r) {
+            if(l.isString() && r.isString())
+                return l.littlerThan(r).unwrap();
+            return strCmp(elementToString(l), elementToString(r)) < 0;
+        };
+        const auto strDesc = [&](const Value &l, const Value &r) {
+            if(l.isString() && r.isString())
+                return l.greaterThan(r).unwrap();
+            return strCmp(elementToString(r), elementToString(l)) < 0;
+        };
+        // 比较函数：回调返回真值 → lhs 在前（TJS2 tTJSArraySortCompare_Functional）
+        const auto functional = [vm, &comparator](const Value &l, const Value &r) {
+            const Value params[2] = { l, r };
+            return vm->callValue(comparator, 2, params).asBool();
+        };
+
+        switch(method) {
+            case '+':
+                stable ? std::stable_sort(items.begin(), items.end(), normalAsc)
+                       : std::sort(items.begin(), items.end(), normalAsc);
+                break;
+            case '-':
+                stable ? std::stable_sort(items.begin(), items.end(), normalDesc)
+                       : std::sort(items.begin(), items.end(), normalDesc);
+                break;
+            case '0':
+                stable ? std::stable_sort(items.begin(), items.end(), numAsc)
+                       : std::sort(items.begin(), items.end(), numAsc);
+                break;
+            case '9':
+                stable ? std::stable_sort(items.begin(), items.end(), numDesc)
+                       : std::sort(items.begin(), items.end(), numDesc);
+                break;
+            case 'a':
+                stable ? std::stable_sort(items.begin(), items.end(), strAsc)
+                       : std::sort(items.begin(), items.end(), strAsc);
+                break;
+            case 'z':
+                stable ? std::stable_sort(items.begin(), items.end(), strDesc)
+                       : std::sort(items.begin(), items.end(), strDesc);
+                break;
+            case 0:
+                stable ? std::stable_sort(items.begin(), items.end(), functional)
+                       : std::sort(items.begin(), items.end(), functional);
+                break;
+        }
+        return Value{};
     }
 
 } // namespace cial::stdlib

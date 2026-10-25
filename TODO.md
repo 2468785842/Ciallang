@@ -1,8 +1,9 @@
 # 后续任务清单
 
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
-> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-25，热路径优化批次后）——
-> 类实例化 115% / 整数循环 122% / fib(25) 132% / 字符串拼接 179%。
+> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-25，回调机制批次后）——
+> 类实例化 125% / 整数循环 124% / fib(25) 121% / 字符串拼接 184%
+>（本机连续构建后波动加大 ±10%，多轮区间 110~159%，无系统性回归）。
 > TJS2 语料对拍（2026-10-25）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
 > DIFF 3（test_misc、test_variant 为异常消息格式差异，Ciallang 行为正确；
 > test_string 双方干净通过，Ciallang 侧无输出、参考实现多 25 行引擎转储）/
@@ -33,10 +34,9 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] 标准库：Date / Math 完整 API；RegExp 剩余（`new RegExp(...)` 构造器、
-      replace 函数回调（依赖脚本回调调用支持，同 Array.sort）、静态属性 `RegExp.last`、
-      匹配位置改 UTF-8 码点语义——当前为字节偏移）
-- [ ] Array 标准库剩余：sort（依赖脚本回调调用支持）/save/load/pack 系/Assignment 联动
+- [ ] 标准库：Date / Math 完整 API；RegExp 剩余（`new RegExp(...)` 构造器、静态属性
+      `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
+- [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
 - [ ] `(const)[...]` / `(const)%[...]` 的只读共享实例语义（当前按运行时新建处理，行为兼容）
 - [ ] 十六进制浮点字面量 `0x1.07CCp14`、二进制浮点 `0b1.1`（test.tjs 后段依赖）
@@ -49,6 +49,15 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 脚本回调机制批次：VM::callValue（原生层同步调用脚本函数，TJS2 FuncCall 对应物；
+  tmp 宿主帧承接返回值 + 全区哨兵 throwHandler 截住 unwind + ScriptExceptionCarrier 专用载体
+  转回脚本异常协议）——两个关键陷阱均已踩平并记注释：① 压栈顺序必须 tmp 帧→实参→func 帧
+  （CallFrame 以 allocFrame-arity 回退对齐参数寄存器，实参先压会把 tmp 槽夹进参数区整体错位）；
+  ② 哨兵必须显式 toBytecode（bc 层 handlers 惰性编译由 FETCH_NEW_FRAME 触发，tmp 帧永不被
+  派发执行）。基于此底座：Array.sort（排序字母 + - 0 9 a z / 比较器回调 / 稳定开关，对齐
+  tjsArray.cpp）+ RegExp.replace 函数回调（对齐 replace_regex，回调收匹配数组）；main.cpp
+  Debug CRT 断言重定向 stderr（断言弹窗在无交互环境表现为"挂起"）。88 用例双配置全绿
 
 - 2026-10-25 热路径优化批次：GProp 消同指令双重 intern + 对象分支直取 typeId()（一次虚调用
   替代 ValueToTypeId 的 3 连 dynamic_cast；TypeId 枚举提取 types/TypeId.hpp 破循环依赖，

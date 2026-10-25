@@ -36,6 +36,14 @@ namespace cial::vm {
         Return,
     };
 
+    // 脚本异常载体：VM::callValue 的回调异常（哨兵截获后）以此 C++ 异常解开
+    // native 调用链（std::sort 等），主循环接住后转 _pending+unwind 恢复脚本
+    // try/catch——不走 throwException+runtime_error 组合（那会被主循环
+    // 「传播中不吞噬」分支直接重抛出 run0，外层脚本 handler 永远接不到）
+    struct ScriptExceptionCarrier {
+        Value value{};
+    };
+
     class VMState {
     public:
         Runtime &rt;
@@ -110,6 +118,9 @@ namespace cial::vm {
         }
 
         [[nodiscard]] size_t getRegPoolTop() const { return _pool.used(); }
+
+        // 读池内任意槽（VM::callValue 取哨兵异常值等；槽须仍在已分配窗口内）
+        [[nodiscard]] Value poolAt(const size_t globalIndex) const { return *_pool.ptrAt(globalIndex); }
 
         [[nodiscard]] CallFrame *curFrame() noexcept { return _curFrame; }
         [[nodiscard]] const CallFrame *curFrame() const noexcept { return _curFrame; }

@@ -13,6 +13,7 @@
  */
 #pragma once
 
+
 #include "VMState.hpp"
 #include "runtime/Runtime.hpp"
 
@@ -20,6 +21,7 @@
 #include "parser/Parser.hpp"
 #include "parser/ast/ExprNode.hpp"
 
+#include "types/Function.hpp"
 #include "types/Value.hpp"
 
 namespace cial {
@@ -124,6 +126,68 @@ namespace cial {
         template <typename T, typename... Args>
         T *create(Args &&...args) {
             return _vmState->rt.create<T>(std::forward<Args>(args)...).get();
+        }
+
+        // 原生代码同步调用脚本函数（TJS2 FuncCall 对应物）：Array.sort 比较器、
+        // RegExp.replace 回调等"原生方法回调脚本"的统一底座。
+        // 结构仿 eval：tmp 宿主帧承接返回值（reg0），不占用当前脚本帧的寄存器窗口；
+        // 嵌套 run0（entryStackTop 语义）。
+        // 回调异常：tmp 帧挂全区哨兵 throwHandler 截住 unwind（否则异常会恢复调用方
+        // 帧的 pc、在本次 run0 内执行其 catch 块，native 调用方控制流错乱）——
+        // 异常值落入哨兵 exValueReg(reg0)，func/tmp 帧由 run0 弹出（栈深比正常少 1，
+        // 以此判定），此处经 throwException 重新进入脚本异常协议向上传播
+        Value callValue(const Value &callee, const size_t argCount, const Value *args) {
+            if(!callee.isObject())
+                throw std::runtime_error("value is not callable");
+            auto *obj = callee.asObject().unwrap();
+
+            // 原生函数：无帧直调（callProc 同步返回）
+            if(auto *native = dynamic_cast<NativeFunction *>(obj)) {
+                Vec<Value> argv{ args, args + argCount };
+                return native->callProc(this, argCount, argv.data());
+            }
+
+            auto *fn = dynamic_cast<Function *>(obj);
+            if(!fn)
+                throw std::runtime_error("value is not callable");
+
+            constexpr u16 retReg = 0;
+            vm::Chunk tmpChunk{};
+            tmpChunk.setRegCount(1); // reg0 = 返回值槽 / 哨兵异常值槽
+            tmpChunk.emit<inter::NOP>(); // 哨兵区间 [0,1) 覆盖的 1 字节指令
+            tmpChunk.addThrowHandler({ 0, 1, retReg }); // 全区哨兵：截住 unwind
+
+            // 压栈顺序必须是 tmp 帧 → 实参 → func 帧：CallFrame 构造以
+            // allocFrame(regCount) - arity 回退对齐参数寄存器，前提是实参
+            // 紧贴 func 帧窗口（先 push 实参会把 tmp 帧的槽夹进参数区，整体错位 1 槽）
+            tmpChunk.toBytecode(); // 哨兵必须落进 bc 层 handlers 表：unwind 只查 bc 表，
+                                   // 而哨兵表惰性编译由 FETCH_NEW_FRAME 触发、tmp 帧永不
+                                   // 被派发执行——不显式编译哨兵形同虚设，异常会穿透直达
+                                   // 调用方帧的 handler（嵌套 run0 内执行其 catch，控制流错乱）
+            _vmState->allocCallFrame(&tmpChunk);
+            _vmState->makeClosure();
+            for(size_t i = 0; i < argCount; ++i)
+                _vmState->push(args[i]);
+            const size_t tmpSp = _vmState->getRegPoolTop() - argCount; // tmp 帧窗口起点（异常值落点）
+
+            fn->call(*_vmState, retReg, argCount);
+            _vmState->makeClosure();
+            const u32 stackTop = _vmState->context.stackTop();
+            _vmState->run0();
+
+            // 哨兵路径：func/tmp 帧均已被 run0 弹出（栈深 = 进入时 - 2）；
+            // 正常路径 Ret 只弹 func 帧（栈深 = 进入时 - 1，tmp 帧由 eval 同款平衡逻辑弹）
+            if(_vmState->context.stackTop() == stackTop - 2) {
+                // 以专用载体解开 native 调用链（std::sort 等）；主循环 catch 接住后
+                // 转 _pending + unwind，外层脚本 try/catch 正常接续
+                throw vm::ScriptExceptionCarrier{ _vmState->poolAt(tmpSp) };
+            }
+
+            Value ret = _vmState->reg(retReg);
+            if(stackTop - 1 != _vmState->context.stackTop())
+                _vmState->freeCallFrame();
+            _vmState->freeCallFrame();
+            return ret;
         }
 
         template <typename T>

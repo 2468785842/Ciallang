@@ -14,12 +14,26 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
+#include <crtdbg.h>
+
 #include "stdlib/ExceptionLib.hpp"
 #include "stdlib/Print.hpp"
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
 using namespace cial;
+
+#ifdef _DEBUG
+// 把 Debug 断言从弹窗重定向到 stderr，终端/CI 下可见（Windows 断言弹窗在
+// 无交互环境表现为"挂起"）；与 tests/fuzz_regress_test.cpp 同款
+static const bool g_redirectCrtReport = [] {
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+    return true;
+}();
+#endif
 
 int main(const int argc, char **argv) {
     if(argc < 2) {
