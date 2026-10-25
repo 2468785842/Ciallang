@@ -144,7 +144,7 @@ cmake --build build/Windows/Bench --target conformance-report
 ```
 
 报告落盘 `bench/results/`。当前与原版 TJS2（Release）wall-time 比值：
-类实例化 ≈110%、整数循环 ≈121%、fib(25) ≈127%、字符串拼接 ≈185%（2026-10-24）。
+类实例化 ≈112%、整数循环 ≈121%、fib(25) ≈125%、字符串拼接 ≈194%（2026-10-25）。
 
 ---
 
