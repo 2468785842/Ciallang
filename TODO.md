@@ -1,9 +1,9 @@
 # 后续任务清单
 
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
-> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-25，原生类构造批次后）——
-> 类实例化 112% / 整数循环 127% / fib(25) 114% / 字符串拼接 155%
->（本机波动 ±10%；string_concat 自 194% 显著回落，payload 单块分配见效）。
+> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-25）——
+> 类实例化 112% / 整数循环 121~127% / fib(25) 114~130% / 字符串拼接 151~155%
+>（本机多轮波动 ±10%，区间为多轮实测；string_concat 自 194% 回落，payload 单块分配+CallV 见效）。
 > TJS2 语料对拍（2026-10-25）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
 > DIFF 3（test_misc、test_variant 为异常消息格式差异，Ciallang 行为正确；
 > test_string 双方干净通过，Ciallang 侧无输出、参考实现多 25 行引擎转储）/
@@ -20,8 +20,9 @@
 
 - [ ] fib 剩余差距（130%，本机噪声主导）：值拷贝仍在（CallV 压栈同 N×Push 的
       pool 写）——进一步需实参直写被调帧窗口（跳过中转）；调用点内联缓存
-- [ ] string_concat 剩余差距（179%）：payload+String 单块分配、Value 内联 SSO
-- [ ] loop_int 小幅差距（127%）：词法器 token 判别等新增热路径复核；指令条数
+- [ ] string_concat 剩余差距（151~155%）：payload 单块分配已做，剩余为 Value 内联 SSO
+      （小串零堆分配）
+- [ ] loop_int 小幅差距（121~127%）：词法器 token 判别等热路径复核；指令条数
 - [ ] 方法访问 NativeFunction 每次分配（GProp 绑定拷贝）：正确修法是调用约定
       携带 objthis（TJS2 同款），属调用点内联缓存的前置；现有基准不敏感
       （stdlib 密集脚本受益）
@@ -38,7 +39,9 @@
 
 ## 四、工程化
 
-- [ ] vcpkg 无 dumpbin 环境无法自动部署 DLL：补手动拷贝说明或改静态 triplet
+- [ ] vcpkg 无 dumpbin 环境无法自动部署 DLL：Release tests 需手动
+      `cp build/Windows/Release/*.dll build/Windows/Release/tests/`（当前实践）；
+      长期改静态 triplet
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）

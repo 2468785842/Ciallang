@@ -31,7 +31,7 @@
 * [x] `@if` `@endif`
 
 #### 语法结构
-* [x] `var` / `const` 变量声明与使用（const 只读性检查未实现，当前与 var 等价）
+* [x] `var` / `const` 变量声明与使用（const 须初始化；赋值放行——对齐原版 tjs.y 设计现状）
 * [x] `if`
 * [x] `while`
 * [x] `do while`
@@ -83,9 +83,7 @@
 * [x] `A operator B` 位移运算符 `>> << >>>`
 * [x] `A operator B` 加减运算符 `+ -`
 * [x] `A operator B` 乘除运算符 `% / \ *`
-* [x] `operator A` 前缀单目运算符 `! new invalidate isvalid -`
-* [x] `operator A` 前缀单目运算符 `~ typeof + &`
-* [x] `operator A` 前缀单目运算符 `-- ++ delete # $ * &`
+* [x] `operator A` 前缀单目运算符 `! new invalidate isvalid - ~ typeof + & -- ++ delete # $ *`
 * [x] `operator A` 类型转换运算符 `int real string`
 * [x] `A operator` 后缀单目运算符 `() . -- ++`
 * [x] `A operator` 后缀单目运算符 `[]`（数组/字典/字符串通用下标读写）
@@ -96,11 +94,12 @@
 ---
 
 ### 📚 标准库
+
 * [x] Exception // message 成员；原生错误自动包装为 Exception 实例
 * [ ] Array // ◐ 字面量/new Array()/下标读写/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/sort(含比较器回调)/count；save/load/pack 未实现
 * [ ] Dictionary // ◐ 字面量/new Dictionary()/下标读写/assign/clear/erase/count；save/load 未实现
 * [ ] Date // ◐ new Date(now/分量/字符串) + get/set 系 + getTimezoneOffset；parse 仅常用格式子集
-* [ ] Math // ◐ 静态方法 16 个+常量 8 个+random(Xorshift) ✅；Math.RandomGenerator ✅（MT19937 与原版序列逐位一致、serialize 互认）
+* [x] Math // 静态方法 16 个+常量 8 个+random(Xorshift)+Math.RandomGenerator（MT19937 与原版序列逐位一致、serialize 互认）
 * [ ] RegExp // ◐ /pattern/flags 字面量 + test/match/exec/compile/replace(含函数回调)/split + 匹配状态属性 + new RegExp(pattern, flags) 构造器；RegExp.last 未实现
 * [x] String // charAt/indexOf/toUpperCase/toLowerCase/substring/sprintf/replace(g 全局)/split/escape/trim/reverse/repeat/length
 
@@ -143,17 +142,19 @@ cmake --preset "Windows Local Bench" && cmake --build --preset "Windows Local Be
 cmake --build build/Windows/Bench --target conformance-report
 ```
 
-报告落盘 `bench/results/`。当前与原版 TJS2（Release）wall-time 比值：
-类实例化 ≈112%、整数循环 ≈127%、fib(25) ≈114%、字符串拼接 ≈155%（2026-10-25，payload 单块分配后）。
+报告落盘 `bench/results/`。当前与原版 TJS2（Release）wall-time 比值（2026-10-25，
+本机多轮波动 ±10%）：
+类实例化 ≈112%、整数循环 ≈121~127%、fib(25) ≈114~130%、字符串拼接 ≈151~155%。
 
 ---
 
 ### 未来计划
 
-* 提升解释器性能与调试可视化能力
+* 完整实现 **TJS2 标准库**（剩余：Array/Dictionary 的 save/load/pack、Date.parse 完整文法、RegExp.last）
+* 性能追平原版（当前 112~155%，方向见 [TODO.md](TODO.md)：实参直写被调帧窗口、Value 内联 SSO、调用点内联缓存）
+* 编译优化 Pass 接线（CFG/Optimizer 已建成未启用：LoadSub、常量传播、DCE）
 * 集成 **LSP (Language Server Protocol)**，支持 VSCode / IDEA 智能提示
-* 完整实现 **TJS2 标准库**
-* 增加更多编译优化 Pass（如 DCE、常量传播、循环展开）
+* 字节码兼容（加载 TJS2 编译产物，转译路线设计已定稿，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)）
 
 ---
 
