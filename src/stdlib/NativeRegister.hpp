@@ -36,6 +36,12 @@ namespace cial {
                 return TypeId::Octet;
             } else if constexpr(std::is_same_v<T, String>) {
                 return TypeId::String;
+            } else if constexpr(std::is_same_v<T, Array>) {
+                return TypeId::Array;
+            } else if constexpr(std::is_same_v<T, Dictionary>) {
+                return TypeId::Dictionary;
+            } else if constexpr(std::is_same_v<T, RegExp>) {
+                return TypeId::RegExp;
             } else {
                 static_assert(!std::is_same_v<T, T> && "type is not support");
                 return TypeId::None;

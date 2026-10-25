@@ -61,49 +61,40 @@ namespace cial {
         });
 
         // Array 方法
-        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("push"_str), &stdlib::arrayPush);
-        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("pop"_str), &stdlib::arrayPop);
-        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("unshift"_str), &stdlib::arrayUnshift);
-        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("shift"_str), &stdlib::arrayShift);
-        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("insert"_str), &stdlib::arrayInsert);
-        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("remove"_str), &stdlib::arrayRemove);
-        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("erase"_str), &stdlib::arrayErase);
-        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("reverse"_str), &stdlib::arrayReverse);
-        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("join"_str), &stdlib::arrayJoin);
-        nativeRegister().registerMethod(TypeId::Array, _impl->rt.atomTable.intern("split"_str),
-                                        &stdlib::arraySplitWith);
+        registerMethod<Array>("push"_str, &stdlib::arrayPush);
+        registerMethod<Array>("pop"_str, &stdlib::arrayPop);
+        registerMethod<Array>("unshift"_str, &stdlib::arrayUnshift);
+        registerMethod<Array>("shift"_str, &stdlib::arrayShift);
+        registerMethod<Array>("insert"_str, &stdlib::arrayInsert);
+        registerMethod<Array>("remove"_str, &stdlib::arrayRemove);
+        registerMethod<Array>("erase"_str, &stdlib::arrayErase);
+        registerMethod<Array>("reverse"_str, &stdlib::arrayReverse);
+        registerMethod<Array>("join"_str, &stdlib::arrayJoin);
+        registerMethod<Array>("split"_str, &stdlib::arraySplitWith);
         // count/length 属性（get；写走 Array::setProp）
-        nativeRegister().registerProperty(TypeId::Array, _impl->rt.atomTable.intern("count"_str), [](const Value &thisObj) {
+        const auto arrayCount = [](const Value &thisObj) {
             return Value{ Integer{ static_cast<Integer>(dynamic_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };
-        });
-        nativeRegister().registerProperty(TypeId::Array, _impl->rt.atomTable.intern("length"_str), [](const Value &thisObj) {
-            return Value{ Integer{ static_cast<Integer>(dynamic_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };
-        });
+        };
+        registerProperty<Array>("count"_str, arrayCount);
+        registerProperty<Array>("length"_str, arrayCount);
 
         // Dictionary 方法
-        nativeRegister().registerMethod(TypeId::Dictionary, _impl->rt.atomTable.intern("assign"_str), &stdlib::dictAssign);
-        nativeRegister().registerMethod(TypeId::Dictionary, _impl->rt.atomTable.intern("clear"_str), &stdlib::dictClear);
-        nativeRegister().registerMethod(TypeId::Dictionary, _impl->rt.atomTable.intern("erase"_str), &stdlib::dictErase);
+        registerMethod<Dictionary>("assign"_str, &stdlib::dictAssign);
+        registerMethod<Dictionary>("clear"_str, &stdlib::dictClear);
+        registerMethod<Dictionary>("erase"_str, &stdlib::dictErase);
         // count 属性
-        nativeRegister().registerProperty(
-            TypeId::Dictionary, _impl->rt.atomTable.intern("count"_str), [](const Value &thisObj) {
-                return Value{ Integer{ static_cast<Integer>(
-                    dynamic_cast<Dictionary &>(*thisObj.asObject().unwrap()).members.size()) } };
-            });
+        registerProperty<Dictionary>("count"_str, [](const Value &thisObj) {
+            return Value{ Integer{ static_cast<Integer>(
+                dynamic_cast<Dictionary &>(*thisObj.asObject().unwrap()).members.size()) } };
+        });
 
         // RegExp 方法（TJS2 tjsRegExp.cpp 对齐）；matches/start/index 等状态属性走 RegExp::getProp
-        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("test"_str),
-                                        &stdlib::regexpTest);
-        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("match"_str),
-                                        &stdlib::regexpMatch);
-        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("exec"_str),
-                                        &stdlib::regexpExec);
-        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("compile"_str),
-                                        &stdlib::regexpCompile);
-        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("replace"_str),
-                                        &stdlib::regexpReplace);
-        nativeRegister().registerMethod(TypeId::RegExp, _impl->rt.atomTable.intern("split"_str),
-                                        &stdlib::regexpSplit);
+        registerMethod<RegExp>("test"_str, &stdlib::regexpTest);
+        registerMethod<RegExp>("match"_str, &stdlib::regexpMatch);
+        registerMethod<RegExp>("exec"_str, &stdlib::regexpExec);
+        registerMethod<RegExp>("compile"_str, &stdlib::regexpCompile);
+        registerMethod<RegExp>("replace"_str, &stdlib::regexpReplace);
+        registerMethod<RegExp>("split"_str, &stdlib::regexpSplit);
 
         // Array/Dictionary "类对象"注册到全局：承载静态方法命名空间（语料惯用法
         // Dictionary.assign incontextof obj——取未绑定方法后 ChgThis 换 this）
