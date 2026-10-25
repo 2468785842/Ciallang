@@ -30,7 +30,7 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] 标准库剩余：Math.RandomGenerator（MT19937 类）；Date.parse 完整文法
+- [ ] 标准库剩余：Date.parse 完整文法
       （tjsdate.y：英文月名/相对表达等，当前仅 "YYYY/MM/DD HH:MM[:SS]" 子集）；
       RegExp 剩余（静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
 - [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
@@ -45,6 +45,13 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 RandomGenerator 批次：Math.RandomGenerator（MT19937 类，对齐 tjsMT19937ar-cok
+  与 tjsRandomGenerator.cpp）——randomize 三形态（0 参=time 单值播种/整数=(低32,高32)
+  init_by_array/Dictionary=状态恢复）、random（rand_double 52 位尾数法）、random32/63/64、
+  serialize（Dictionary{state hex 624×8, left, next} 跨引擎格式）。自写 MT（std::mt19937
+  内部布局不可移植），固定种子序列与原版逐位一致（对拍 6 值全等；曾因 tempering 未分步
+  全链错位）；state 2.5KB 超 GC 节点 512B，堆分离持有。93 用例双配置全绿
 
 - 2026-10-25 默认构造批次：new 无构造器类——原版为未定义行为，按参考实现实测行为
   对齐（较报错更宽容）：仅成员字段初始化（递归含

@@ -100,7 +100,7 @@
 * [ ] Array // ◐ 字面量/new Array()/下标读写/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/sort(含比较器回调)/count；save/load/pack 未实现
 * [ ] Dictionary // ◐ 字面量/new Dictionary()/下标读写/assign/clear/erase/count；save/load 未实现
 * [ ] Date // ◐ new Date(now/分量/字符串) + get/set 系 + getTimezoneOffset；parse 仅常用格式子集
-* [ ] Math // ◐ abs/acos/asin/atan/atan2/ceil/exp/floor/log/pow/max/min/random/round/sin/cos/sqrt/tan + E/PI/LN2/... 常量；RandomGenerator 未实现
+* [ ] Math // ◐ 静态方法 16 个+常量 8 个+random(Xorshift) ✅；Math.RandomGenerator ✅（MT19937 与原版序列逐位一致、serialize 互认）
 * [ ] RegExp // ◐ /pattern/flags 字面量 + test/match/exec/compile/replace(含函数回调)/split + 匹配状态属性 + new RegExp(pattern, flags) 构造器；RegExp.last 未实现
 * [x] String // charAt/indexOf/toUpperCase/toLowerCase/substring/sprintf/replace(g 全局)/split/escape/trim/reverse/repeat/length
 

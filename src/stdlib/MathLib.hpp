@@ -14,7 +14,10 @@ namespace cial {
 
     class VM;
 
-    // Math 命名空间承载对象（无实例状态；Math 不能 new——call 报错）
+    class RandomGen;
+
+    // Math 命名空间承载对象（call 报错——Math 不能 new）；持有 RandomGenerator
+    // 类对象（Math.RandomGenerator 构造入口）
     class MathNS final : public Object {
     public:
         MathNS() = default;
@@ -22,6 +25,21 @@ namespace cial {
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Math; }
 
         void call(vm::VMState &, u32, size_t) override { throw std::runtime_error("Math is not callable"); }
+
+        void setRandomGenerator(Atom name, RandomGen *rg) {
+            rgAtom = name;
+            rgClass = rg;
+        }
+
+        Value getProp(Atom a) override;
+
+        [[nodiscard]] bool hasProp(Atom a) const override { return a == rgAtom && rgClass; }
+
+        void marked() noexcept override;
+
+    private:
+        Atom rgAtom = ATOM_INVALID;
+        RandomGen *rgClass{};
     };
 
 } // namespace cial

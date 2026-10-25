@@ -6,6 +6,7 @@
 #include "runtime/Runtime.hpp"
 #include "stdlib/DateLib.hpp"
 #include "stdlib/MathLib.hpp"
+#include "stdlib/RandomLib.hpp"
 #include "types/Array.hpp"
 #include "types/Dictionary.hpp"
 #include "types/Function.hpp"
@@ -37,6 +38,8 @@ namespace cial {
                 return TypeId::Math;
             } else if constexpr(std::is_same_v<T, DateNS>) {
                 return TypeId::Date;
+            } else if constexpr(std::is_same_v<T, RandomGen>) {
+                return TypeId::RandomGen;
             } else {
                 static_assert(!std::is_same_v<T, T> && "type is not support");
                 return TypeId::None;

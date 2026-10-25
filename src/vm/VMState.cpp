@@ -883,7 +883,7 @@ namespace cial::vm {
             // 未命中落到对象自身 getProp（RegExp 的 matches/index 等状态属性走此路径）
             const TypeId tid = obj->typeId();
             if(tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp ||
-               tid == TypeId::Math || tid == TypeId::Date) {
+               tid == TypeId::Math || tid == TypeId::Date || tid == TypeId::RandomGen) {
                 if(auto *getter = context.findProperty(tid, atom)) {
                     regs[r3] = getter(val);
                     return DispatchRet::Continue;

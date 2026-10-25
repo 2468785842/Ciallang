@@ -13,6 +13,7 @@
 #include "stdlib/DateLib.hpp"
 #include "stdlib/DictLib.hpp"
 #include "stdlib/MathLib.hpp"
+#include "stdlib/RandomLib.hpp"
 #include "stdlib/RegExpLib.hpp"
 #include "stdlib/StringLib.hpp"
 #include "types/Array.hpp"
@@ -131,8 +132,19 @@ namespace cial {
         registerProperty<MathNS>("PI"_str, [](const Value &) { return Value{ Real{ M_PI } }; });
         registerProperty<MathNS>("SQRT1_2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 / 2 } }; });
         registerProperty<MathNS>("SQRT2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 } }; });
-        _impl->globalObject.setProp(_impl->rt.atomTable.intern("Math"_str),
-                                    Value{ _impl->rt.create<MathNS>().get() });
+        auto *mathNS = _impl->rt.create<MathNS>().get();
+        // Math.RandomGenerator 类对象（new Math.RandomGenerator(seed) 构造入口）
+        mathNS->setRandomGenerator(_impl->rt.atomTable.intern("RandomGenerator"_str),
+                                   _impl->rt.create<RandomGen>().get());
+        _impl->globalObject.setProp(_impl->rt.atomTable.intern("Math"_str), Value{ mathNS });
+
+        // RandomGenerator 实例方法（TypeId::RandomGen 分派）
+        registerMethod<RandomGen>("randomize"_str, &stdlib::rgRandomize);
+        registerMethod<RandomGen>("random"_str, &stdlib::rgRandom);
+        registerMethod<RandomGen>("random32"_str, &stdlib::rgRandom32);
+        registerMethod<RandomGen>("random63"_str, &stdlib::rgRandom63);
+        registerMethod<RandomGen>("random64"_str, &stdlib::rgRandom64);
+        registerMethod<RandomGen>("serialize"_str, &stdlib::rgSerialize);
 
         // Array/Dictionary "类对象"注册到全局：承载静态方法命名空间（语料惯用法
         // Dictionary.assign incontextof obj——取未绑定方法后 ChgThis 换 this）；

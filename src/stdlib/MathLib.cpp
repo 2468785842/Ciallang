@@ -5,6 +5,8 @@
 
 #include "MathLib.hpp"
 
+#include "RandomLib.hpp"
+
 #include <cmath>
 #include <cstdint>
 #include <ctime>
@@ -179,3 +181,19 @@ namespace cial::stdlib {
     }
 
 } // namespace cial::stdlib
+
+namespace cial {
+    Value MathNS::getProp(const Atom a) {
+        if(a == rgAtom && rgClass)
+            return Value{ rgClass };
+        throw std::runtime_error("Math member not found");
+    }
+
+    void MathNS::marked() noexcept {
+        if(_marked)
+            return;
+        Object::marked();
+        if(rgClass)
+            rgClass->marked();
+    }
+} // namespace cial

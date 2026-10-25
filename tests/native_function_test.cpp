@@ -430,6 +430,37 @@ TEST_CASE("数字字面量——进制/浮点/科学计数法") {
     }
 }
 
+TEST_CASE("Math.RandomGenerator（MT19937，序列与原版逐位一致）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // 固定种子序列对拍 TJS2（tjsMT19937ar-cok）：以下期望值取自参考实现输出
+    vm.eval(R"tjs(
+        var r = new Math.RandomGenerator(123);
+        var v1 = r.random64();
+        var v2 = r.random32();
+        var v3 = r.random63();
+        var f = r.random();
+        r.randomize(777);
+        var v4 = r.random32();
+        var v5 = r.random64();
+        var dic = r.serialize();
+        var seq1 = r.random64();
+        var r2 = new Math.RandomGenerator(dic);
+        var restored = r2.random64() == seq1;
+    )tjs"_str);
+    REQUIRE(*vm.evalExpr<Integer>("v1"_str) == 7311485051347868734LL);
+    REQUIRE(*vm.evalExpr<Integer>("v2"_str) == 4088668458LL);
+    REQUIRE(*vm.evalExpr<Integer>("v3"_str) == 7907280711022731305LL);
+    REQUIRE(*vm.evalExpr<Integer>("v4"_str) == 78096651LL);
+    REQUIRE(*vm.evalExpr<Integer>("v5"_str) == -1466894912068952260LL);
+    REQUIRE((*vm.evalExpr<Real>("f"_str)).value() == Catch::Approx(0.457861570107705).epsilon(1e-12));
+    REQUIRE(*vm.evalExpr<Integer>("restored"_str) == 1); // serialize→恢复序列一致
+}
+
 TEST_CASE("Date 标准库") {
     Runtime rt{};
     Context context{ rt };
