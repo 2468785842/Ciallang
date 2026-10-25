@@ -772,14 +772,15 @@ TEST_CASE("TJS2 - super.<Ctor>() 显式基类构造调用") {
     }
 }
 
-TEST_CASE("无构造器类 new 走默认构造（TJS2 语义）") {
+TEST_CASE("无构造器类 new 走默认构造（原版 UB，按参考实现实测对齐）") {
     Runtime rt{};
     Context context{ rt };
     context.initNativeMethod();
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
-    // 对拍 TJSCompiler：字段初始化照常（递归含基类），基类构造器不调用
+    // 无构造器 new 在原版 TJS2 为未定义行为；此处锁定参考实现实测行为：
+    // 字段初始化照常（递归含基类），基类构造器不调用
     // （C 无构造器 extends B：B.b 保持字段默认值 1 而非构造器里的 2）
     vm.eval(R"tjs(
         class B { var b = 1; function B() { b = 2; } }
