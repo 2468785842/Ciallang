@@ -98,7 +98,7 @@
 ### 📚 标准库
 * [x] Exception // message 成员；原生错误自动包装为 Exception 实例
 * [ ] Array // ◐ 字面量/new Array()/下标读写/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/sort(含比较器回调)/count；save/load/pack 未实现
-* [ ] Dictionary // ◐ 字面量/下标读写/assign/clear/erase/count；save/load 未实现
+* [ ] Dictionary // ◐ 字面量/new Dictionary()/下标读写/assign/clear/erase/count；save/load 未实现
 * [ ] Date
 * [ ] Math // ◐ abs/acos/asin/atan/atan2/ceil/exp/floor/log/pow/max/min/random/round/sin/cos/sqrt/tan + E/PI/LN2/... 常量；RandomGenerator 未实现
 * [ ] RegExp // ◐ /pattern/flags 字面量 + test/match/exec/compile/replace(含函数回调)/split + 匹配状态属性 + new RegExp(pattern, flags) 构造器；RegExp.last 未实现
@@ -144,7 +144,7 @@ cmake --build build/Windows/Bench --target conformance-report
 ```
 
 报告落盘 `bench/results/`。当前与原版 TJS2（Release）wall-time 比值：
-类实例化 ≈112%、整数循环 ≈121%、fib(25) ≈125%、字符串拼接 ≈194%（2026-10-25）。
+类实例化 ≈112%、整数循环 ≈127%、fib(25) ≈114%、字符串拼接 ≈155%（2026-10-25，payload 单块分配后）。
 
 ---
 

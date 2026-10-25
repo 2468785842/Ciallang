@@ -1,7 +1,7 @@
 # 后续任务清单
 
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
-> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-25，payload 单块批次后）——
+> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-25，原生类构造批次后）——
 > 类实例化 112% / 整数循环 127% / fib(25) 114% / 字符串拼接 155%
 >（本机波动 ±10%；string_concat 自 194% 显著回落，payload 单块分配见效）。
 > TJS2 语料对拍（2026-10-25）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
