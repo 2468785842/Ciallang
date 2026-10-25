@@ -3,6 +3,8 @@
 
 #include "RegExp.hpp"
 
+#include "vm/VMState.hpp"
+
 #include "runtime/Runtime.hpp"
 
 namespace cial {
@@ -46,6 +48,23 @@ namespace cial {
             return RegExpProp::None;
         }
     } // namespace
+
+    // 类对象构造入口：RegExp(pattern, flags?) / new RegExp(...)（TJS2 无 new 亦可）
+    void RegExp::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {
+        Value *args = vmState.curFrame()->getArgs(argCount);
+        String pattern{}, flags{};
+        if(argCount >= 1 && !args[0].isVoid()) {
+            Value v = args[0];
+            if(const auto r = v.toString(); !r.isFailed() && v.isString())
+                pattern = *v.asString().unwrap();
+        }
+        if(argCount >= 2 && !args[1].isVoid()) {
+            Value v = args[1];
+            if(const auto r = v.toString(); !r.isFailed() && v.isString())
+                flags = *v.asString().unwrap();
+        }
+        vmState.regRef(ret) = Value{ vmState.rt.create<RegExp>(&vmState.rt, pattern, flags).get() };
+    }
 
     void RegExp::setProp(const Atom a, const Value &v) {
         if(regexpPropName(_rt->wkAtoms, a) == RegExpProp::Start) {

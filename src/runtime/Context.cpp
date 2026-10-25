@@ -134,11 +134,16 @@ namespace cial {
                                     Value{ _impl->rt.create<MathNS>().get() });
 
         // Array/Dictionary "类对象"注册到全局：承载静态方法命名空间（语料惯用法
-        // Dictionary.assign incontextof obj——取未绑定方法后 ChgThis 换 this）
+        // Dictionary.assign incontextof obj——取未绑定方法后 ChgThis 换 this）；
+        // call() 即构造入口（new Array() / new Dictionary() / new RegExp(...)，
+        // new 编译为透明调用——IRGenerator 对 New 直接求值 rhs）
         _impl->globalObject.setProp(_impl->rt.atomTable.intern("Array"_str),
                                     Value{ _impl->rt.create<Array>(&_impl->rt).get() });
         _impl->globalObject.setProp(_impl->rt.atomTable.intern("Dictionary"_str),
                                     Value{ _impl->rt.create<Dictionary>().get() });
+        // RegExp 类对象：空模式占位实例，RegExp(pattern, flags?) 构造入口
+        _impl->globalObject.setProp(_impl->rt.atomTable.intern("RegExp"_str),
+                                    Value{ _impl->rt.create<RegExp>(&_impl->rt, ""_str).get() });
     }
 
     void Context::collectMark() const {

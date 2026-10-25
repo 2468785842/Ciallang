@@ -130,9 +130,9 @@ namespace cial {
 
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::RegExp; }
 
-        void call(vm::VMState &, u32, size_t) override {
-            throw std::runtime_error("Not implemented RegExp call");
-        }
+        // 类对象构造入口：RegExp(pattern, flags?) / new RegExp(...)（TJS2 无 new 亦可）。
+        // 全局 "RegExp" 挂一个空模式占位实例，call 时按实参构造新对象
+        void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
             if(_marked)

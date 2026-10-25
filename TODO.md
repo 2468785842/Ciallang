@@ -32,8 +32,8 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] 标准库：Date 完整 API；Math 剩余（Math.RandomGenerator MT19937 类）；RegExp 剩余
-      （`new RegExp(...)` 构造器、静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
+- [ ] 标准库：Date 完整 API；Math.RandomGenerator（MT19937 类）；RegExp 剩余
+      （静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
 - [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
 - [ ] `(const)[...]` / `(const)%[...]` 的只读共享实例语义（当前按运行时新建处理，行为兼容）
@@ -46,6 +46,11 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 原生类构造批次：new 编译为透明调用（IRGenerator 对 New 直接求值 rhs）——
+  原生类构造只需把全局类对象的 call() 从抛错升级为构造。RegExp(pattern, flags?) /
+  new RegExp(...)（全局 "RegExp" 挂空模式占位实例）+ new Array() / new Dictionary()
+  （TJS2 构造器为空、参数忽略）。此机制为后续 new Date()/new RandomGenerator() 的模板
 
 - 2026-10-25 性能小组合批：TypeId 扩 Global/Class 专用值（不进方法表，仅分派标识），
   GlobalObject/ClassObject 覆写 typeId()——GProp/DProp 对象分支的 Global/Class 两次

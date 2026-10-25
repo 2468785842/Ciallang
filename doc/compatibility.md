@@ -58,7 +58,7 @@
 | Exception | 异常类（message 成员），脚本异常载体 | ✅（TJS 源自举，main.cpp 注入；原生错误自动包装为 Exception 实例） |
 | Math / Math.RandomGenerator | abs/floor/…；Xorshift / MT19937 | ◐ Math 静态方法 16 个+常量 8 个+random(Xorshift 同源) ✅；RandomGenerator ❌ |
 | Date | get/set 系列 + 字符串 parse（tjsdate.y 文法） | ❌ |
-| RegExp | compile/test/match/exec/replace/split（oniguruma）；属性 matches/start/index/lastIndex/input/lastMatch/lastParen/leftContext/rightContext | ◐ /pattern/flags 字面量（g/i）+ 全部方法 + 全部实例属性 ✅（std::regex ECMAScript）；缺：`new RegExp(...)` 构造器、静态属性 `RegExp.last`；replace 回调 this 绑定为函数自身（TJS2 以 regexp 作 objthis）；匹配位置为字节偏移（TJS2 为 UTF-16 码元） |
+| RegExp | compile/test/match/exec/replace/split（oniguruma）；属性 matches/start/index/lastIndex/input/lastMatch/lastParen/leftContext/rightContext | ◐ /pattern/flags 字面量（g/i）+ 全部方法 + 全部实例属性 ✅（std::regex ECMAScript）；缺：静态属性 `RegExp.last`；`new RegExp(pattern, flags?)` ✅；replace 回调 this 绑定为函数自身（TJS2 以 regexp 作 objthis）；匹配位置为字节偏移（TJS2 为 UTF-16 码元） |
 | Octet | 字节流 + pack 系 | ❌（类型有，库无） |
 
 ## 4. 运行时行为差异（已知，须保持记录）

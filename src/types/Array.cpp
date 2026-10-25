@@ -3,6 +3,8 @@
 
 #include "Array.hpp"
 
+#include "vm/VMState.hpp"
+
 #include "runtime/Runtime.hpp"
 
 namespace cial {
@@ -12,8 +14,10 @@ namespace cial {
         return a == rt->wkAtoms.count || a == rt->wkAtoms.length;
     }
 
-    void Array::call(vm::VMState &, u32, size_t) {
-        throw std::runtime_error("Not implemented Array call");
+    // 类对象构造入口：Array() / new Array()（TJS2 构造器为空——参数被忽略，
+    // 无 JS 的 Array(n) 尺寸语义；语料惯用 [] 字面量）
+    void Array::call(vm::VMState &vmState, const u32 ret, size_t) {
+        vmState.regRef(ret) = Value{ vmState.rt.create<Array>(&vmState.rt).get() };
     }
 
     // count/length 属性可写（TJS2 语义）：调大补 void、调小截断；其余命名成员当前不支持
