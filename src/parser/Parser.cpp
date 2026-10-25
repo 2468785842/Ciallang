@@ -532,6 +532,13 @@ namespace cial::syntax {
         parser->consume(r, identifier);
         const auto line = identifier.location;
 
+        // const 必须初始化（对齐原版编译期行为：const E; 报错；赋值/自增等
+        // 只读性原版不强制——实测全局/局部/for 递增全部放行）
+        if(token->type() == TokenType::Const && !parser->peek(r, TokenType::Assignment)) {
+            parser->error(r, "const declaration must be initialized", identifier.location);
+            return nullptr;
+        }
+
         if(parser->peek(r, TokenType::SemiColon)) {
             parser->consume(r);
             varDeclNode = parser->astBuilder()->makeNode<VarDeclNode>(identifier, nullptr, nullptr);

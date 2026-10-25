@@ -430,6 +430,37 @@ TEST_CASE("数字字面量——进制/浮点/科学计数法") {
     }
 }
 
+TEST_CASE("const 语义（对齐原版实测：必须初始化，赋值不强制）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("const 无初始化为编译期错误") {
+        const auto r1 = vm.eval<Value>("const E; return 1;"_str);
+        REQUIRE(r1.get().isVoid()); // 编译失败不产出值
+        const auto r2 = vm.eval<Value>("const a = 1, b; return 2;"_str);
+        REQUIRE(r2.get().isVoid()); // 逗号链同样检查
+    }
+
+    SECTION("const 赋值/自增/for 递增放行（原版行为）") {
+        vm.eval(R"tjs(
+            const A = 10;
+            A = 20;
+            var g = A;
+            const C = 0;
+            C++;
+            var ci = C;
+            var iters = 0;
+            for(const i = 0; i < 2; i++) iters++;
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("g"_str) == 20);
+        REQUIRE(*vm.evalExpr<Integer>("ci"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("iters"_str) == 2);
+    }
+}
+
 TEST_CASE("Math.RandomGenerator（MT19937，序列与原版逐位一致）") {
     Runtime rt{};
     Context context{ rt };

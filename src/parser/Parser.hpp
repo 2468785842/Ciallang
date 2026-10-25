@@ -188,7 +188,7 @@ namespace cial::syntax {
         frozen::make_unordered_map<TokenType, const DeclParser *>({ { TokenType::Property, &S_PropertyDeclParser },
                                                                     { TokenType::Var, &S_VarDeclParser },
                                                                     // const 与 var 声明语法相同（const x = expr;），
-                                                                    // 复用 VarDeclParser；只读性暂不强制
+                                                                    // 复用 VarDeclParser；const 仅要求初始化（对齐原版）
                                                                     { TokenType::Const, &S_VarDeclParser },
                                                                     { TokenType::Function, &S_FunctionDeclParser },
                                                                     { TokenType::Class, &S_ClassDeclParser } });

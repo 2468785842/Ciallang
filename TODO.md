@@ -36,7 +36,6 @@
 - [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
 - [ ] `(const)[...]` / `(const)%[...]` 的只读共享实例语义（当前按运行时新建处理，行为兼容）
-- [ ] const 只读性检查（当前 const 与 var 等价，仅语法接入）
 - [ ] with 块内 try/catch 穿越 WithPush 的栈截断（当前仅帧级恢复；语料未覆盖）
 
 ## 四、工程化
@@ -45,6 +44,11 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 const 语义批次：对拍实测原版行为后落地——原版 const 仅在编译期要求
+  初始化（const E; 报错），赋值/自增/复合赋值/for 递增全部放行（无只读强制）；
+  据此实现 VarDeclParser 的 const 必须初始化检查（逗号链逐个查），只读强制不实现
+  （与原版一致）。94 用例双配置全绿。TODO 原「只读性检查」条目基于错误预期，已更正关闭
 
 - 2026-10-25 RandomGenerator 批次：Math.RandomGenerator（MT19937 类，对齐 tjsMT19937ar-cok
   与 tjsRandomGenerator.cpp）——randomize 三形态（0 参=time 单值播种/整数=(低32,高32)
