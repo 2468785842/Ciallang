@@ -1,9 +1,9 @@
 # 后续任务清单
 
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
-> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-24，RegExp 批次后）——
-> 类实例化 110% / 整数循环 121% / fib(25) 127% / 字符串拼接 185%。
-> TJS2 语料对拍（2026-10-24）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
+> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-25，热路径优化批次后）——
+> 类实例化 115% / 整数循环 122% / fib(25) 132% / 字符串拼接 179%。
+> TJS2 语料对拍（2026-10-25）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
 > DIFF 3（test_misc、test_variant 为异常消息格式差异，Ciallang 行为正确；
 > test_string 双方干净通过，Ciallang 侧无输出、参考实现多 25 行引擎转储）/
 > CIAL_ONLY 1（参考实现自身崩溃）。
@@ -19,11 +19,17 @@
 
 ## 二、性能（剩余方向）
 
-- [ ] fib 剩余差距（136%）：实参 Push 拷贝与指令条数（TJS 为密集指令编码）；
+- [ ] fib 剩余差距（132%）：实参 Push 拷贝与指令条数（TJS 为密集指令编码）；
       可选：参数直传被调帧窗口、调用点内联缓存
-- [ ] string_concat 剩余差距（185%）：payload+String 单块分配、Value 内联 SSO
-- [ ] loop_int（123%）与类实例化（114%）的小幅差距：词法器 token 判别等
-      本轮新增热路径开销的复核
+- [ ] string_concat 剩余差距（179%）：payload+String 单块分配、Value 内联 SSO
+- [ ] 类实例化/loop_int 小幅差距（115%/122%）：GProp 通用对象分支仍有
+      GlobalObject/ClassObject 两次 dynamic_cast（可扩 typeId()）；
+      词法器 token 判别等新增热路径复核
+- [ ] 方法访问 NativeFunction 每次分配（GProp 绑定拷贝）：正确修法是调用约定
+      携带 objthis（TJS2 同款），属调用点内联缓存的前置；现有基准不敏感
+      （stdlib 密集脚本受益）
+- [ ] 成员名 Atom 往返：常量池 Atom → String Value → GProp 再 intern 回 Atom；
+      方案 LoadAtom 指令或 GProp 操作数直引常量池（指令集变更）
 
 ## 三、语言特性缺口（对照 README）
 
@@ -43,6 +49,15 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 热路径优化批次：GProp 消同指令双重 intern + 对象分支直取 typeId()（一次虚调用
+  替代 ValueToTypeId 的 3 连 dynamic_cast；TypeId 枚举提取 types/TypeId.hpp 破循环依赖，
+  Object::typeId() 虚函数，Array/Dictionary/RegExp 覆写）+ Runtime::wkAtoms 构造期驻留
+  高频属性名（Array::isCountAtom 每次 intern×2、RegExp 属性协议每次 intern×9 → 零哈希比较）+
+  Value::add 补 String+String 快路径（跳过通用分支的两次 Value 拷贝与 toString no-op）。
+  基准：string_concat 185%→179%；其余持平（现有基准不覆盖容器属性访问路径）。
+  已评估未做：Chunk 编码后释放 TAC（Class.cpp 两处 Debug assert 与 Debugger dump 依赖，
+  收益为内存非速度）；NativeFunction 绑定拷贝与成员 Atom 直达记入性能节剩余项
 
 - 2026-10-24 RegExp 完整 API 批次：`/pattern/flags` 字面量 flags 接入（g=全局/i=忽略大小写/l=忽略，
   lexer 捕获、token 编码 "pattern\nflags"、NewRegExp 处解码）+ RegExp 方法

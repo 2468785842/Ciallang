@@ -43,6 +43,16 @@ namespace cial {
         virtual void collectMark() const = 0;
     };
 
+    // 高频属性名：构造期驻留一次，热路径（Array::isCountAtom / RegExp 属性协议）
+    // 直接比较 Atom，省去每次访问的 intern 哈希 + map 查找
+    struct WellKnownAtoms {
+        Atom count{};
+        Atom length{};
+        // RegExp 匹配状态属性（tjsRegExp.cpp 同名属性）
+        Atom reMatches{}, reStart{}, reIndex{}, reLastIndex{}, reInput{};
+        Atom reLastMatch{}, reLastParen{}, reLeftContext{}, reRightContext{};
+    };
+
     class Runtime {
     public:
         static constexpr Atom ATOM_OBJECT{ 1 };
@@ -55,6 +65,22 @@ namespace cial {
             at.intern("Function"_str); // ATOM_FUNCTION
             at.intern("Class"_str); // ATOM_CLASS
             return std::move(at);
+        }();
+
+        WellKnownAtoms wkAtoms = [this] {
+            WellKnownAtoms w{};
+            w.count = atomTable.intern("count"_str);
+            w.length = atomTable.intern("length"_str);
+            w.reMatches = atomTable.intern("matches"_str);
+            w.reStart = atomTable.intern("start"_str);
+            w.reIndex = atomTable.intern("index"_str);
+            w.reLastIndex = atomTable.intern("lastIndex"_str);
+            w.reInput = atomTable.intern("input"_str);
+            w.reLastMatch = atomTable.intern("lastMatch"_str);
+            w.reLastParen = atomTable.intern("lastParen"_str);
+            w.reLeftContext = atomTable.intern("leftContext"_str);
+            w.reRightContext = atomTable.intern("rightContext"_str);
+            return w;
         }();
 
         MarkSweep markSweep{ 512 };

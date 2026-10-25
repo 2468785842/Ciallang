@@ -8,20 +8,9 @@
 #include "types/Dictionary.hpp"
 #include "types/Function.hpp"
 #include "types/RegExp.hpp"
+#include "types/TypeId.hpp"
 
 namespace cial {
-
-    enum class TypeId {
-        None,
-        Integer,
-        Real,
-        Object,
-        Octet,
-        String,
-        Array,
-        Dictionary,
-        RegExp,
-    };
 
     template <typename T>
     struct TypeTraits {
@@ -59,17 +48,10 @@ namespace cial {
                 return TypeTraits<Octet>::id;
             if(v.isString())
                 return TypeTraits<String>::id;
-            if(v.isObject()) {
-                // 容器对象（Array/Dictionary/RegExp 的原生方法表分派）
-                const auto *obj = v.asObject().unwrap();
-                if(dynamic_cast<const Array *>(obj) != nullptr)
-                    return TypeId::Array;
-                if(dynamic_cast<const Dictionary *>(obj) != nullptr)
-                    return TypeId::Dictionary;
-                if(dynamic_cast<const RegExp *>(obj) != nullptr)
-                    return TypeId::RegExp;
-                return TypeId::Object;
-            }
+            if(v.isObject())
+                // 容器对象（Array/Dictionary/RegExp 的原生方法表分派）：
+                // 一次虚调用，替代逐个 dynamic_cast 的 RTTI 链
+                return v.asObject().unwrap()->typeId();
             return TypeId::None;
         }
     };

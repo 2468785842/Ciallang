@@ -823,16 +823,17 @@ namespace cial::vm {
         const Atom atom = rt.atomTable.intern(name);
 
         if(val.isObject()) {
+            auto *obj = val.asObject().value();
+
             // Array/Dictionary/RegExp 的原生成员（方法 / count 属性）：与字符串原生表同机制；
             // 未命中落到对象自身 getProp（RegExp 的 matches/index 等状态属性走此路径）
-            if(const TypeId tid = ValueToTypeId::getId(val);
-               tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp) {
-                const Atom memberAtom = rt.atomTable.intern(name);
-                if(auto *getter = context.findProperty(tid, memberAtom)) {
+            const TypeId tid = obj->typeId();
+            if(tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp) {
+                if(auto *getter = context.findProperty(tid, atom)) {
                     regs[r3] = getter(val);
                     return DispatchRet::Continue;
                 }
-                if(auto *nativeFn = context.findMethod(tid, memberAtom)) {
+                if(auto *nativeFn = context.findMethod(tid, atom)) {
                     nativeFn = rt.create<NativeFunction>(*nativeFn).get();
                     nativeFn->setThisObj(val);
                     regs[r3] = Value{ nativeFn };
@@ -840,8 +841,6 @@ namespace cial::vm {
                 }
                 // 未命中落到对象自身 getProp（count 读在 Array::getProp 有兜底）
             }
-
-            auto *obj = val.asObject().value();
 
             if(auto *global = dynamic_cast<GlobalObject *>(obj)) {
                 // for global, proxy object, maybe get extends object in dataObject?

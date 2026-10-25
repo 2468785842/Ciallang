@@ -18,6 +18,8 @@ namespace cial {
 
         explicit Dictionary() = default;
 
+        [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Dictionary; }
+
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {

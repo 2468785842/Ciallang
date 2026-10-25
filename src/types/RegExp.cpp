@@ -9,7 +9,8 @@ namespace cial {
 
     namespace {
         // TJS2 RegExp 属性名（tjsRegExp.cpp）：matches/start/index/lastIndex/input/
-        // lastMatch/lastParen/leftContext/rightContext；其中仅 start 可写
+        // lastMatch/lastParen/leftContext/rightContext；其中仅 start 可写。
+        // 比较走 Runtime::wkAtoms 构造期驻留（旧实现每次 getProp intern ×9）
         enum class RegExpProp {
             None,
             Matches,
@@ -23,31 +24,31 @@ namespace cial {
             RightContext,
         };
 
-        RegExpProp regexpPropName(AtomTable &atomTable, const Atom a) {
-            if(a == atomTable.intern("matches"_str))
+        RegExpProp regexpPropName(const WellKnownAtoms &wk, const Atom a) {
+            if(a == wk.reMatches)
                 return RegExpProp::Matches;
-            if(a == atomTable.intern("start"_str))
+            if(a == wk.reStart)
                 return RegExpProp::Start;
-            if(a == atomTable.intern("index"_str))
+            if(a == wk.reIndex)
                 return RegExpProp::Index;
-            if(a == atomTable.intern("lastIndex"_str))
+            if(a == wk.reLastIndex)
                 return RegExpProp::LastIndex;
-            if(a == atomTable.intern("input"_str))
+            if(a == wk.reInput)
                 return RegExpProp::Input;
-            if(a == atomTable.intern("lastMatch"_str))
+            if(a == wk.reLastMatch)
                 return RegExpProp::LastMatch;
-            if(a == atomTable.intern("lastParen"_str))
+            if(a == wk.reLastParen)
                 return RegExpProp::LastParen;
-            if(a == atomTable.intern("leftContext"_str))
+            if(a == wk.reLeftContext)
                 return RegExpProp::LeftContext;
-            if(a == atomTable.intern("rightContext"_str))
+            if(a == wk.reRightContext)
                 return RegExpProp::RightContext;
             return RegExpProp::None;
         }
     } // namespace
 
     void RegExp::setProp(const Atom a, const Value &v) {
-        if(regexpPropName(_rt->atomTable, a) == RegExpProp::Start) {
+        if(regexpPropName(_rt->wkAtoms, a) == RegExpProp::Start) {
             start = v.isVoid() ? Integer{ 0 } : v.asInteger().unwrap();
             return;
         }
@@ -55,7 +56,7 @@ namespace cial {
     }
 
     Value RegExp::getProp(const Atom a) {
-        switch(regexpPropName(_rt->atomTable, a)) {
+        switch(regexpPropName(_rt->wkAtoms, a)) {
             case RegExpProp::Matches:
                 return matches ? Value{ matches } : Value{};
             case RegExpProp::Start:
@@ -81,7 +82,7 @@ namespace cial {
     }
 
     bool RegExp::hasProp(const Atom a) const {
-        return regexpPropName(_rt->atomTable, a) != RegExpProp::None;
+        return regexpPropName(_rt->wkAtoms, a) != RegExpProp::None;
     }
 
 } // namespace cial

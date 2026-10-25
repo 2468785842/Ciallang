@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "TypeId.hpp"
 #include "Value.hpp"
 #include "gc/gc.hpp"
 #include "runtime/AtomTable.hpp"
@@ -34,6 +35,10 @@ namespace cial {
         [[nodiscard]] Atom getName() const noexcept { return _name; }
 
         void setName(const Atom atom) noexcept { _name = atom; }
+
+        // 动态类型标识：一次虚调用替代 NativeRegister 分派处的 dynamic_cast 链
+        // （Array/Dictionary/RegExp 等有原生方法表的子类覆写）
+        [[nodiscard]] virtual TypeId typeId() const noexcept { return TypeId::Object; }
 
         virtual void call(vm::VMState &vmState, u32 ret, size_t argCount) = 0;
 

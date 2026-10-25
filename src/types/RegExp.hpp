@@ -128,6 +128,8 @@ namespace cial {
             return true;
         }
 
+        [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::RegExp; }
+
         void call(vm::VMState &, u32, size_t) override {
             throw std::runtime_error("Not implemented RegExp call");
         }

@@ -8,9 +8,8 @@
 namespace cial {
 
     bool Array::isCountAtom(const Atom a) const {
-        const Atom count = rt->atomTable.intern("count"_str);
-        const Atom length = rt->atomTable.intern("length"_str);
-        return a == count || a == length;
+        // WellKnownAtoms 构造期驻留：比较零哈希（旧实现每次 intern ×2）
+        return a == rt->wkAtoms.count || a == rt->wkAtoms.length;
     }
 
     void Array::call(vm::VMState &, u32, size_t) {

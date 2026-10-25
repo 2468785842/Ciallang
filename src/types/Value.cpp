@@ -308,6 +308,11 @@ namespace cial {
         if(_type == ValueType::Integer && value._type == ValueType::Integer)
             return Ret<Value>::ok(Value{ _integer + value._integer });
 
+        // String+String 快路径：直接取负载拼接，跳过下面通用分支的
+        // 两次 Value 拷贝（payload 引用计数往返）与 toString no-op 调用
+        if(_type == ValueType::String && value._type == ValueType::String)
+            return Ret<Value>::ok(Value{ String::concat(*_string->data, *value._string->data) });
+
         if(this->isString() || value.isString()) {
             Value lhs = *this;
             if(auto lhsR = lhs.toString(); lhsR.isFailed())

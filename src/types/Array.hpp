@@ -22,6 +22,8 @@ namespace cial {
 
         explicit Array(Runtime *runtime, const size_t count) : rt(runtime) { elements.resize(count); }
 
+        [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Array; }
+
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {
