@@ -35,7 +35,6 @@
       RegExp 剩余（静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
 - [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
-- [ ] with 块内 try/catch 穿越 WithPush 的栈截断（当前仅帧级恢复；语料未覆盖）
 
 ## 四、工程化
 
@@ -43,6 +42,14 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-25 with-try 查证批次：对拍+源码定论——"with 内 catch 丢 with 上下文"是原版
+  设计现状而非缺陷：裸标识符未命中局部时原版降级为 this.member（T_THIS_PROXY，
+  tjsInterCodeGen.cpp:2039 注释 "assume the variable is in this"），只有显式 .member
+  裸词链查 with 栈（T_WITHDOT_PROXY）；异常穿越后裸词/裸词链行为两引擎一致
+  （多场景对拍全同）。with 的正途是 .member 形态（语料 test_with.tjs 全部此形态，
+  本项目已 MATCH）。TODO「WithPush 栈截断」条目关闭；行为锁定测试补齐
+  （穿越后新 with 块/裸词链恢复均正常）。96 用例双配置全绿
 
 - 2026-10-25 (const) 内联形态批次：查证定论——原版 `(const)[...]`/`(const)%[...]` 无只读
   也无共享实例语义（tjs.y:795 产生式 = TJSCreateArrayObject 新建 + T_CONSTVAL 节点，

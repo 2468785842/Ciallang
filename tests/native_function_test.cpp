@@ -430,6 +430,48 @@ TEST_CASE("数字字面量——进制/浮点/科学计数法") {
     }
 }
 
+TEST_CASE("with 内 try/catch（对齐原版：catch 内 with 上下文丢失）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // 对拍定论（原版 tjsInterCodeGen.cpp）：裸标识符未命中局部时降级为
+    // this.member（T_THIS_PROXY），只有显式 .member 裸词链查 with 栈
+    // （T_WITHDOT_PROXY）——因此 with 内异常穿越后（原版 catch 帧重建同样
+    // 丢 with 栈）catch 块里裸标识符不解析到 with 对象，两个引擎行为一致。
+    // with 的正途是 .member 裸词链（语料 test_with.tjs 全部此形态）
+    vm.eval(R"tjs(
+        var o = %[m: 7];
+        var r = "";
+        function f() {
+            with(o) {
+                try {
+                    r = r + "A";
+                    throw "e";
+                } catch(e) {
+                    r = r + "B";
+                }
+            }
+            with(o) {
+                r = r + "|" + .m;
+            }
+            return "done";
+        }
+        var st = f();
+        var g = %[n: 1];
+        var out = "";
+        with(g) {
+            try { out = "n=" + .n; throw "y"; } catch(e) { out = out + "|c"; }
+            out = out + "|" + .n;
+        }
+    )tjs"_str);
+    REQUIRE((**vm.evalExpr<String *>("r"_str)) == "AB|7"_str); // 异常穿越后 with 仍可用于下一 with 块
+    REQUIRE((**vm.evalExpr<String *>("st"_str)) == "done"_str);
+    REQUIRE((**vm.evalExpr<String *>("out"_str)) == "n=1|c|1"_str); // try 前裸词链 + 穿越后恢复
+}
+
 TEST_CASE("(const)[...] / (const)%[...] 常量内联形态（对齐原版：无只读/无共享）") {
     Runtime rt{};
     Context context{ rt };
