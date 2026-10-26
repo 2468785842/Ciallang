@@ -83,6 +83,7 @@ AST ──IRGenerator──▶ TAC 指令序列（72 种，Instruction 对象）
 | 9 | Inv | `%src` | invalidate 对象（DataObject::invalidate） |
 | 10 | Throw | `%src` | 抛异常值（触发 unwind） |
 | 20 | ChkInv | `%src, %dst` | `dst = isvalid(src)` |
+| 24 | EvalStr | `%src, %dst` | 后缀 `!` 即时求值：src 字符串化为 TJS 表达式编译执行（嵌套双帧 run0），结果写 dst；空串/非串原值不变（tjs.y T_EVAL → VM_EVAL 对应物） |
 
 ### 3.5 常量装入
 

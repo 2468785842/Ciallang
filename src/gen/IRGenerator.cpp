@@ -504,6 +504,19 @@ namespace cial::inter {
     void IRGenerator::generate(const syntax::SuffixUnaryExprNode *node, OptReg &optReg) {
         using enum syntax::TokenType;
         switch(node->token.type()) {
+            case Exclamation: {
+                // 后缀 `!` 即时求值（tjs.y priority_expr "!" → T_EVAL；原版 Eval）：
+                // A 字符串化为 TJS 表达式编译执行；空串/非串原值不变
+                Register src{};
+                if(!expectValue(node->lhs, src)) {
+                    return;
+                }
+                const Register dst = allocateRegister();
+                _chunk->emit<EvalStr>(src, dst);
+                optReg = dst;
+                freeRegister(src);
+                break;
+            }
             case Isvalid: {
                 auto src = allocateRegister();
                 if(!expectValue(node->lhs, src)) {

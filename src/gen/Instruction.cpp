@@ -156,6 +156,7 @@ namespace cial::inter {
     // 逻辑与比较
     DEF_AUTO_DUMP(Inv, "inv");
     DEF_AUTO_DUMP(ChkInv, "chk_inv");
+    DEF_AUTO_DUMP(EvalStr, "eval_str");
     DEF_AUTO_DUMP(ChkIns, "chk_ins");
     DEF_AUTO_DUMP(TestVoid, "test_void");
     DEF_AUTO_DUMP(Test, "test");

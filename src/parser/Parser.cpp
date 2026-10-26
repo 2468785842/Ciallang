@@ -1300,6 +1300,12 @@ namespace cial::syntax {
         return suffixUnaryExprNode;
     }
 
+    ExprNode *PostfixEvalInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
+        // TJS 后缀 `!`（即时求值）：A 为任意表达式，语义在 IRGen/VM 侧（EvalStr）
+        auto *suffixUnaryExprNode = parser->astBuilder()->makeNode<SuffixUnaryExprNode>(*token, lhs);
+        return suffixUnaryExprNode;
+    }
+
     ExprNode *SuffixIfInfixParser::parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const {
         // TJS 后缀条件: `lhs if cond`。语义(参考旧版 tjsInterCodeGen T_IF):
         // cond 为真才求值 lhs,整个表达式值为 void;降糖为 cond ? lhs : void

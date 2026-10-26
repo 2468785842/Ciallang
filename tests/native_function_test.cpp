@@ -1002,6 +1002,59 @@ TEST_CASE("Array/Dictionary 结构化存取 + Octet pack 系（tjsBinarySerializ
     }
 }
 
+TEST_CASE("后缀 ! 即时求值（tjs.y T_EVAL 对齐）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // 语义对齐原版 tTJSInterCodeContext::Eval：A 字符串化为 TJS 表达式编译
+    // 执行，空串原值不变、编译失败抛脚本异常可捕获。参考实现 standalone 对
+    // 空串用例段错误（流工厂外的又一参考端缺陷），语义按原版源码锁定
+    SECTION("基础求值/动态表达式/嵌套") {
+        vm.eval(R"tjs(
+            var x = "1 + 2";
+            var a = (x!);
+            var n = 7;
+            var d = (("n * n")! + 1);
+            var nest = "\"1+1\"!";
+            var g = (nest!);
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("a"_str) == 3);
+        REQUIRE(*vm.evalExpr<Integer>("d"_str) == 50); // 求值结果直接参与运算
+        REQUIRE(*vm.evalExpr<Integer>("g"_str) == 2); // 嵌套 eval
+    }
+
+    SECTION("空串原值不变 + 非字符串字符串化") {
+        vm.eval(R"tjs(
+            var e = "";
+            var c = (e!);
+            var f = (5)!;
+        )tjs"_str);
+        REQUIRE((**vm.evalExpr<String *>("c"_str)) == ""_str); // 空串不求值、原值返回
+        REQUIRE(*vm.evalExpr<Integer>("f"_str) == 5); // ttstr 化 "5" 再求值
+    }
+
+    SECTION("表达式语句形态（结果不被需要）") {
+        vm.eval(R"tjs(
+            var hit = 0;
+            var q = "hit = 1";
+            q!;
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("hit"_str) == 1); // 语句形态仍执行求值
+    }
+
+    SECTION("编译失败抛脚本异常可捕获") {
+        vm.eval(R"tjs(
+            var bad = "1 +";
+            var caught = 0;
+            try { bad!; } catch(ex) { caught = 1; }
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("caught"_str) == 1);
+    }
+}
+
 TEST_CASE("Math 标准库") {
     Runtime rt{};
     Context context{ rt };

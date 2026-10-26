@@ -87,7 +87,7 @@
 * [x] `operator A` 类型转换运算符 `int real string`
 * [x] `A operator` 后缀单目运算符 `() . -- ++`
 * [x] `A operator` 后缀单目运算符 `[]`（数组/字典/字符串通用下标读写）
-* [ ] `A operator` 后缀单目运算符 `!`
+* [x] `A operator` 后缀单目运算符 `!`（即时求值：A 的字符串值作为 TJS 表达式编译执行；空串原值不变）
 * [x] `A instanceof B` 实例判断运算符
 * [x] `A incontextof B` 上下文替换运算符
 
@@ -96,11 +96,11 @@
 ### 📚 标准库
 
 * [x] Exception // message 成员；原生错误自动包装为 Exception 实例
-* [ ] Array // ◐ 字面量/new Array()/下标读写/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/sort(含比较器回调)/count；save/load/pack 未实现
-* [ ] Dictionary // ◐ 字面量/new Dictionary()/下标读写/assign/clear/erase/count；save/load 未实现
-* [ ] Date // ◐ new Date(now/分量/字符串) + get/set 系 + getTimezoneOffset；parse 仅常用格式子集
+* [x] Array // 字面量/new Array()/下标读写/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/sort(含比较器回调)/count/save(文本行)/load(文本行)/saveStruct(文本+二进制)/loadStruct(二进制)/pack/assignStruct
+* [x] Dictionary // 字面量/new Dictionary()/下标读写/assign/assignStruct/clear/erase/count/saveStruct(文本+二进制)/loadStruct(二进制入自身,文本回落解析)；load/save 原版即 TODO 空实现，按特性同步
+* [x] Date // new Date(now/分量/字符串) + get/set 系 + getTimezoneOffset + parse 完整文法（tjsdate.y 全 11 形态，对拍逐位一致）
 * [x] Math // 静态方法 16 个+常量 8 个+random(Xorshift)+Math.RandomGenerator（MT19937 与原版序列逐位一致、serialize 互认）
-* [ ] RegExp // ◐ /pattern/flags 字面量 + test/match/exec/compile/replace(含函数回调)/split + 匹配状态属性 + new RegExp(pattern, flags) 构造器；RegExp.last 未实现
+* [x] RegExp // /pattern/flags 字面量 + test/match/exec/compile/replace(含函数回调)/split + 全部匹配状态属性(码点语义) + RegExp.last 静态属性 + new RegExp(pattern, flags) 构造器
 * [x] String // charAt/indexOf/toUpperCase/toLowerCase/substring/sprintf/replace(g 全局)/split/escape/trim/reverse/repeat/length
 
 ## 编译与运行
@@ -150,7 +150,7 @@ cmake --build build/Windows/Bench --target conformance-report
 
 ### 未来计划
 
-* 完整实现 **TJS2 标准库**（剩余：Array/Dictionary 的 save/load/pack、Date.parse 完整文法、RegExp.last）
+* ~~完整实现 TJS2 标准库~~（已完成：Date.parse 完整文法 / RegExp.last+码点位置 / Array·Dictionary save·load·pack 系）
 * 性能追平原版（当前 112~155%，方向见 [TODO.md](TODO.md)：实参直写被调帧窗口、Value 内联 SSO、调用点内联缓存）
 * 编译优化 Pass 接线（CFG/Optimizer 已建成未启用：LoadSub、常量传播、DCE）
 * 集成 **LSP (Language Server Protocol)**，支持 VSCode / IDEA 智能提示

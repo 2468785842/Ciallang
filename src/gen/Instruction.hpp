@@ -43,6 +43,7 @@
     O(ChgSign)                                                                                                         \
     O(ChgThis)                                                                                                         \
     O(ChkInv)                                                                                                          \
+    O(EvalStr)                                                                                                         \
     O(ChkIns)                                                                                                          \
     O(TestVoid)                                                                                                        \
     O(Load)                                                                                                            \
@@ -272,6 +273,11 @@ namespace cial::inter {
     DEF_INST(ChgThis, 2, OP_GET1(dst, Register) OP_GET2(src, Register));
 
     DEF_INST(ChkInv, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
+
+    // 后缀 `!` 即时求值（tjs.y priority_expr "!" → T_EVAL）：src 字符串化为
+    // TJS 表达式编译执行，结果写 dst；空串/非串原值不变（原版 Eval 语义）
+    DEF_INST(EvalStr, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
+
     DEF_INST(ChkIns, 2, OP_GET1(dst, Register) OP_GET2(src, Register));
 
     // src 是否为 void → dst(bool)；默认参数守卫用（实参未传时才求值默认表达式）

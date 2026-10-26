@@ -175,6 +175,12 @@ namespace cial::vm {
         write<u16>(info.code, tac->dst().index());
     }
 
+    void Bytecode::encode(Info &info, const inter::EvalStr *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::EvalStr));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
     void Bytecode::encode(Info &info, const inter::ChkIns *tac) {
         // op1=dst（同时是输入对象与输出 bool），op2=src（类名字符串）
         info.code.push_back(static_cast<u8>(VmOpCode::ChkIns));

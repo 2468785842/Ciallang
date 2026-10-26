@@ -31,7 +31,7 @@ Ciallang/
 │   ├─ compatibility.md         兼容性矩阵与路线图
 │   ├─ bytecode/
 │   │   ├─ tjs2-bytecode.md     旧版 TJS2 字节码规范（128 操作码/序列化格式）
-│   │   ├─ ciallang-bytecode.md 本项目指令集规范（TAC 55 + 扁平字节码 17）
+│   │   ├─ ciallang-bytecode.md 本项目指令集规范（TAC 75 + 扁平字节码 75）
 │   │   └─ mapping.md           TJS2→Ciallang 转译设计（后续实现字节码兼容的蓝本）
 │   ├─ grammar/                 原版 bison 语法副本（tjs.y / tjsdate.y / tjspp.y）
 │   └─ language/                类语义/表达式运算符笔记
@@ -50,8 +50,8 @@ Ciallang/
 |---|---|---|
 | `src/common/` | 基础设施 | `Result.hpp`(错误收集)、`Ret.hpp`(ErrCode/Ret<T>)、`SourceFile`、`SourceLocation`、`UTF8`、`Hash.hpp`、`Defer.hpp` |
 | `src/parser/` | 词法+语法+预处理 | `Lexer`(手写 DFA)、`Parser`(Pratt 优先级)、`PreProcessor`(@set/@if)、`Token.hpp`、`OperatorTrie`、`ast/*`(AstNode 基类 + X-macro 节点枚举) |
-| `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**55 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`ControlFlowGraph`+`Optimizer`(**已建未接线**) |
-| `src/vm/` | 执行引擎 | `VMState`(**run0() 扁平字节码解释，唯一执行路径；多态 run() 已删除**)、`Chunk`(指令+常量池+双空间 try 表)、`Bytecode`(扁平 u8 编码, **55/55 全实现**)、`CallFrame`(含 thisData 缓存)、`FastRegisterPool`、`Constant.hpp`(FuncMeta/ClassMeta/PropMeta)、`Rlc`(行号表)、`VM.hpp`(宿主门面) |
+| `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**75 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`ControlFlowGraph`+`Optimizer`(**已建未接线**) |
+| `src/vm/` | 执行引擎 | `VMState`(**run0() 扁平字节码解释，唯一执行路径；多态 run() 已删除**)、`Chunk`(指令+常量池+双空间 try 表)、`Bytecode`(扁平 u8 编码, **75/75 全实现**)、`CallFrame`(含 thisData 缓存)、`FastRegisterPool`、`Constant.hpp`(FuncMeta/ClassMeta/PropMeta)、`Rlc`(行号表)、`VM.hpp`(宿主门面) |
 | `src/runtime/` | 全局运行时 | `Runtime`(GC/RootGuard/atomTable)、`Context`(调用栈/全局对象, 深度上限 1024)、`AtomTable`(字符串驻留 Atom) |
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
 | `src/gc/` | 内存管理 | `MarkSweepHeader`、固定 512B 节点自由链表 + 标记清除 |

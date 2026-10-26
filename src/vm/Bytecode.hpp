@@ -38,6 +38,7 @@
     O(ChgSign)                                                                                                         \
     O(ChgThis)                                                                                                         \
     O(ChkInv)                                                                                                          \
+    O(EvalStr)                                                                                                         \
     O(ChkIns)                                                                                                          \
     O(TestVoid)                                                                                                        \
     O(Load)                                                                                                            \

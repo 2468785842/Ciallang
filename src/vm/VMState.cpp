@@ -14,7 +14,10 @@
 #include "VMState.hpp"
 
 #include "../gen/Instruction.hpp"
+#include "../gen/IRGenerator.hpp"
 #include "VMDebug.hpp"
+#include "parser/Parser.hpp"
+#include "parser/ast/ExprNode.hpp"
 #include "stdlib/NativeRegister.hpp"
 #include "types/Array.hpp"
 #include "types/Class.hpp"
@@ -630,6 +633,69 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
         regs[r2] = Value{ dynamic_cast<DataObject *>(regs[r1].asObject().unwrap())->isValid() };
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(EvalStr) {
+        // 后缀 `!` 即时求值（tjs.y priority_expr "!" → T_EVAL → VM_EVAL 对应物）：
+        // src 字符串化为 TJS 表达式编译执行；空串/非串原值不变（原版 Eval 语义）。
+        // 嵌套执行用 eval() 同款双帧模式（tmp 宿主帧承接返回值 + 栈平衡）——外层
+        // 脚本帧存活时不能用单帧模式，否则嵌套 run0 会继续执行外层帧
+        const u16 src = read<u16>(ip, pc); // 与 encode 同序：先 src 后 dst
+        const u16 dst = read<u16>(ip, pc);
+        const Value &val = regs[src];
+        if(!val.isString() || val.asString().unwrap()->isEmpty()) {
+            regs[dst] = val;
+            return DispatchRet::Continue;
+        }
+        const String expr = *val.asString().unwrap();
+
+        // 表达式编译（失败抛脚本异常，与原版 EvalExpression 一致）
+        Common::SourceFile sourceFile{};
+        Common::Result r{};
+        sourceFile.load(r, expr.toStdStr());
+        if(r.isFailed())
+            throw std::runtime_error("cannot evaluate expression");
+        syntax::Parser parser{ sourceFile, context.pp() };
+        syntax::ExprNode *node = parser.parseExpression(r, true);
+        if(r.isFailed() || !node)
+            throw std::runtime_error("cannot evaluate expression");
+        inter::IRGenerator codeGen{ r, rt, sourceFile };
+        OptReg retReg{};
+        Opt<vm::Chunk> compiled = codeGen.parseAst(node, retReg);
+        if(r.isFailed() || !compiled || !retReg || compiled->getRegCount() == 0
+           || compiled->getInstVec().empty())
+            throw std::runtime_error("cannot evaluate expression");
+        // 表达式块以 Ret 收尾：返回值经 Ret 写回 tmp 帧槽位，嵌套 run0 在本帧
+        // 弹出后即停（callValue 的帧契约——无 Ret 的块会由 run0 的"代码到末尾"
+        // 路径自行弹帧，返回值无人回写）
+        compiled->emit<inter::Ret>(*retReg);
+        auto *evalChunk = rt.create<vm::Chunk>(std::move(*compiled)).get();
+
+        constexpr u16 retSlot = 0;
+        vm::Chunk tmpChunk{};
+        tmpChunk.setRegCount(1); // reg0 = 返回值槽 / 哨兵异常值槽
+        tmpChunk.emit<inter::NOP>();
+        tmpChunk.addThrowHandler({ 0, 1, retSlot }); // 全区哨兵：截住 unwind
+        tmpChunk.toBytecode(); // 哨兵表必须显式落 bc 层（callValue 同款陷阱）
+
+        const size_t tmpSp = getRegPoolTop(); // tmp 帧 reg0 的池内位置（异常值落点）
+        allocCallFrame(&tmpChunk);
+        makeClosure();
+        allocCallFrame(evalChunk, retSlot);
+        makeClosure();
+        const size_t stackTop = context.stackTop();
+        run0();
+
+        // 哨兵路径：eval/tmp 帧均被弹出（栈深 -2）→ 载体解开 native 调用链
+        if(context.stackTop() == stackTop - 2)
+            throw ScriptExceptionCarrier{ poolAt(tmpSp) };
+
+        const Value ret = reg(retSlot);
+        if(stackTop - 1 != context.stackTop())
+            freeCallFrame();
+        freeCallFrame();
+        _curFrame->regs()[dst] = ret; // 嵌套 run 可能迁移寄存器池，重取当前窗口
         return DispatchRet::Continue;
     }
 

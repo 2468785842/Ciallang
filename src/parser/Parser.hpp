@@ -456,6 +456,16 @@ namespace cial::syntax {
         [[nodiscard]] Precedence precedence() const override { return Precedence::postfix; }
     };
 
+    // TJS 后缀 `!`（即时求值，tjs.y priority_expr "!" → T_EVAL）：A 的字符串值
+    // 作为 TJS 表达式编译执行；A 为任意表达式（IRGen 走 SuffixUnary 的 Exclamation 分支）
+    struct PostfixEvalInfixParser final : InfixParser {
+        explicit PostfixEvalInfixParser() = default;
+
+        ExprNode *parse(Result &r, Parser *parser, ExprNode *lhs, Token *token) const override;
+
+        [[nodiscard]] Precedence precedence() const override { return Precedence::postfix; }
+    };
+
     // TJS 后缀条件表达式: `expr if cond`(cond 为真才求值 lhs,否则 void)。
     // 降糖为 TernaryExprNode(cond, lhs, void)
     // 语法层级(tjs.y): expr -> comma_expr "if" expr —— 后缀 if 绑定比赋值/逗号更松,
@@ -496,6 +506,7 @@ namespace cial::syntax {
     static constinit ProcCallInfixParser S_ProcCallInfixParser{};
     static constinit TernaryInfixParser S_ConditionalTernaryBinOpParser{};
     static constinit UnaryInfixParser S_UnaryInfixParser{};
+    static constinit PostfixEvalInfixParser S_PostfixEvalInfixParser{};
     static constinit SuffixIfInfixParser S_SuffixIfInfixParser{};
     static constinit IndexInfixParser S_IndexInfixParser{};
 
@@ -515,7 +526,7 @@ namespace cial::syntax {
         { TokenType::PercentEqual, &S_AssignBinOpParser }, // "%="
         { TokenType::Asterisk, &S_ProductBinOpParser }, // "*"
         { TokenType::AsteriskEqual, &S_AssignBinOpParser }, // "*="
-        { TokenType::Exclamation, &S_ProductBinOpParser }, // !
+        { TokenType::Exclamation, &S_PostfixEvalInfixParser }, // ! 后缀即时求值
         { TokenType::LogicalAndEqual, &S_AssignBinOpParser }, // "&&="
         { TokenType::LogicalOrEqual, &S_AssignBinOpParser }, // "||="
         { TokenType::LArithShift, &S_BitwiseShiftOrRollBinOpParser }, // "<<"

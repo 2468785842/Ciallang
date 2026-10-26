@@ -42,6 +42,15 @@
 
 ## 已完成（摘要）
 
+- 2026-10-26 后缀 `!` 即时求值批次（语言特性最后一项，README 语法表清零）——
+  tjs.y priority_expr "!" → T_EVAL 对齐：新指令 EvalStr（TAC/扁平字节码 75+75 全量
+  X-macro 四点接线），Parser 后缀位置登记 PostfixEvalInfixParser（前缀 ! LNot 不受
+  影响），VM dispatch 内嵌套求值走 eval() 同款双帧模式（tmp 宿主帧 + 表达式块补发
+  Ret 收尾 + 哨兵截获 + 栈平衡）——编译失败抛脚本异常可捕获，空串/非串原值不变
+  （原版 Eval 语义），嵌套 eval 可用。对拍：a/b 两行一致后参考端对空串用例段错误
+  （第 3 个参考端缺陷），语义按原版源码锁定。连带勘误：AGENTS/bytecode 文档指令
+  计数 55→75（X-macro 实际值，历史漂移）。100 用例双配置全绿
+
 - 2026-10-26 Array/Dictionary 结构化存取 + Octet pack 系批次（新 SerializeLib.cpp，
   三、语言特性缺口节清零）——二进制序列化（tTJSBinarySerializer 全对齐：MessagePack
   近似类型码阶梯 + UTF-16LE 字符串 + "KBAD100\0" 头）+ 结构化文本写读（(const) %[...]
