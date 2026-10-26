@@ -45,7 +45,7 @@
 | 类（ctClass 加载期解释）/ NEW / try-catch | 📐 M2 |
 | 新增 TAC（Typeof/Asc/Chr/BNot/DelProp/GetP/SetP/比较写 zf…）+ run0 编码补全 | 📐 M3 |
 | octet 常量、collapse/展开/省略调用、EVAL/EEXP、superClassGetter | 📐 M4 |
-| 对拍工具链：TJSCompiler `--dump` 导出选项 + `cial --tjsbc` + 语料入库 | 📐（已批准修改 TJSCompiler，仅 main.cpp） |
+| 对拍工具链：TJSCompiler `--dump` 导出选项 + `cial --tjsbc` + 语料入库 | ◐ `--dump` ✅（2026-10-26）+ 语料入库（tests/test_files/tjsbc/）✅ + TjsBytecodeReader 格式解析 ✅（阶段 1）；转译器与 `cial --tjsbc` 为阶段 2 |
 
 ## 3. 标准库兼容
 

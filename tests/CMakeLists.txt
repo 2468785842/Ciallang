@@ -27,6 +27,7 @@ set(SOURCES
         judgment_test.cpp
         oop_test.cpp
         property_test.cpp
+        tjsbc_reader_test.cpp
         scope_test.cpp
         try_catch_test.cpp
 #        statement_test.cpp
