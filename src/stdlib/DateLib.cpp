@@ -6,7 +6,9 @@
 #include "DateLib.hpp"
 
 #include <ctime>
+#include <stdexcept>
 
+#include "DateParser.hpp"
 #include "vm/VMState.hpp"
 
 namespace cial::stdlib {
@@ -48,26 +50,6 @@ namespace cial::stdlib {
             d->dateTime = mktime(&t);
             if(d->dateTime == static_cast<time_t>(-1))
                 throw std::runtime_error("invalid value for timestamp");
-        }
-
-        // 常用子集："YYYY/MM/DD HH:MM[:SS]"（也接受 YYYY-M-D）；完整 tjsdate.y
-        // 文法（英文月名/相对表达等）未实现
-        time_t parseDateString(const std::string &s) {
-            tm t{};
-            int y = 1970, mon = 0, day = 1, h = 0, mi = 0, sec = 0;
-            if(const int n = std::sscanf(s.c_str(), "%d/%d/%d %d:%d:%d", &y, &mon, &day, &h, &mi, &sec);
-               n < 3) {
-                if(const int n2 = std::sscanf(s.c_str(), "%d-%d-%d %d:%d:%d", &y, &mon, &day, &h, &mi, &sec);
-                   n2 < 3)
-                    return static_cast<time_t>(-1);
-            }
-            t.tm_year = y - 1900;
-            t.tm_mon = mon;
-            t.tm_mday = day;
-            t.tm_hour = h;
-            t.tm_min = mi;
-            t.tm_sec = sec;
-            return mktime(&t);
         }
     } // namespace
 
@@ -163,21 +145,13 @@ namespace cial::stdlib {
         if(n < 1 || !args[0].isString())
             throw std::runtime_error("Date.parse expects a date string");
         const String *s = args[0].asString().unwrap();
-        const time_t t = parseDateString(std::string(s->getData(), s->length()));
-        if(t == static_cast<time_t>(-1))
-            throw std::runtime_error("invalid value for timestamp");
-        asDate(thisObj)->dateTime = t;
+        asDate(thisObj)->dateTime = parseDateString(std::string(s->getData(), s->length()));
         return Value{};
     }
 
     Value dateGetTimezoneOffset(VM *, const Value &, size_t, Value *) {
-#ifdef _WIN32
-        long tzSeconds = 0;
-        _get_timezone(&tzSeconds);
-        return Value{ Integer{ tzSeconds / 60 } }; // TJS2 = TJS_timezone/60（西正东负）
-#else
-        return Value{ Integer{ timezone / 60 } };
-#endif
+        // TJS2 = TJS_timezone/60（西正东负，分钟）
+        return Value{ Integer{ static_cast<Integer>(tjsTimezoneSeconds() / 60) } };
     }
 
 } // namespace cial::stdlib
@@ -193,8 +167,6 @@ namespace cial {
         } else if(args[0].isString()) {
             const String *s = args[0].asString().unwrap();
             t = stdlib::parseDateString(std::string(s->getData(), s->length()));
-            if(t == static_cast<time_t>(-1))
-                throw std::runtime_error("invalid value for timestamp");
         } else {
             tm d{};
             d.tm_year = static_cast<int>(stdlib::intArg(args[0], Integer{ 1970 })) - 1900;

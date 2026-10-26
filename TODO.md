@@ -31,9 +31,7 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] 标准库剩余：Date.parse 完整文法
-      （tjsdate.y：英文月名/相对表达等，当前仅 "YYYY/MM/DD HH:MM[:SS]" 子集）；
-      RegExp 剩余（静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
+- [ ] RegExp 剩余（静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
 - [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
 
@@ -45,6 +43,16 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-26 Date.parse 完整文法批次：tjsdate.y 全部 11 种日期形态（新 DateParser.cpp，
+  手写递归下降 + 单 token 回退对齐 LALR 判定；词表 tjsDateWordMap 全量转写——月名/
+  星期/AMPM/时区缩写 hhmm，最长前缀命中+词边界等价原 trie 语义；两位年 ≤50→2000+、
+  PM+12 原版朴素语义、时区省略取系统时区、mktime 后 -= TJS_timezone - tz）。
+  连带修复：旧子集解析器 "Y/M/D" 少 SetMonth(-1)（/6/ 曾得 7 月，对拍定案）。
+  对拍 TJSCompiler：46 值行 + ERR 行逐字节一致（含进程首个字符串构造 +2×|tz| 的
+  CRT _timezone 惰性初始化怪癖——原版 bug 可复现，按特性同步保留，注释在
+  DateParser.cpp build()；参考实现连抛异常自身段错误未跑完尾部用例，已知）。
+  97 用例双配置全绿
 
 - 2026-10-25 with-try 查证批次：对拍+源码定论——"with 内 catch 丢 with 上下文"是原版
   设计现状而非缺陷：裸标识符未命中局部时原版降级为 this.member（T_THIS_PROXY，

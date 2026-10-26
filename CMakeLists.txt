@@ -68,6 +68,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/RegExpLib.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/MathLib.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/DateLib.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/DateParser.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/RandomLib.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc.cpp

@@ -599,10 +599,185 @@ TEST_CASE("Date 标准库") {
     SECTION("now/字符串解析/setTime") {
         REQUIRE(*vm.evalExpr<Integer>("nowOk"_str) == 1);
         REQUIRE(*vm.evalExpr<Integer>("py"_str) == 2024);
-        REQUIRE(*vm.evalExpr<Integer>("pmo"_str) == 6);
+        // 6 月（原版 SetMonth($4-1)；旧子集解析器少 -1 曾得 7 月，对拍已修正）
+        REQUIRE(*vm.evalExpr<Integer>("pmo"_str) == 5);
         REQUIRE(*vm.evalExpr<Integer>("pd"_str) == 1);
         REQUIRE(*vm.evalExpr<Integer>("ph"_str) == 12);
         REQUIRE(*vm.evalExpr<Integer>("qy"_str) == 2023); // 1700000000000ms = 2023-11-14
+    }
+}
+
+TEST_CASE("Date.parse 完整文法（tjsdate.y 全形态，对拍 TJSCompiler 一致）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // 时区字符串的 getTime() 为真实 UTC epoch（双端对拍锁定）；无时区字符串
+    // 存本地钟面秒（原版同），断言走 localtime 字段保证跨时区可移植。
+    // 先做一次热身构造：Windows CRT _timezone 惰性初始化，进程首个字符串构造
+    // 会偏移 +2×|tz|（原版同款怪癖，见 DateParser.cpp build() 注释），
+    // 任意一次构造后时区状态即固定
+    vm.eval(R"tjs(var warm = new Date("2000/01/01 00:00:00 gmt");)tjs"_str);
+
+    SECTION("F11 数值形态：斜杠/连字符/混合分隔符 + 秒可省 + 小数秒忽略") {
+        vm.eval(R"tjs(
+            var a = new Date("2004/03/03 11:22:33");
+            var ay = a.getYear(); var amo = a.getMonth(); var ad = a.getDate();
+            var ah = a.getHours(); var ami = a.getMinutes(); var as = a.getSeconds();
+            var b = new Date("2004-3-3 11:22:33");
+            var bamo = b.getMonth();
+            var c = new Date("2004-03/03 11:22:33");
+            var cami = c.getMinutes();
+            var d = new Date("2004/03/03 11:22");
+            var ds = d.getSeconds();
+            var e2 = new Date("2004/03/03 11:22:33.5");
+            var es = e2.getSeconds();
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("ay"_str) == 2004);
+        REQUIRE(*vm.evalExpr<Integer>("amo"_str) == 2); // SetMonth($4-1)
+        REQUIRE(*vm.evalExpr<Integer>("ad"_str) == 3);
+        REQUIRE(*vm.evalExpr<Integer>("ah"_str) == 11);
+        REQUIRE(*vm.evalExpr<Integer>("ami"_str) == 22);
+        REQUIRE(*vm.evalExpr<Integer>("as"_str) == 33);
+        REQUIRE(*vm.evalExpr<Integer>("bamo"_str) == 2);
+        REQUIRE(*vm.evalExpr<Integer>("cami"_str) == 22); // 分隔符逐个独立
+        REQUIRE(*vm.evalExpr<Integer>("ds"_str) == 0); // 秒可省
+        REQUIRE(*vm.evalExpr<Integer>("es"_str) == 33); // 小数秒消费但忽略
+    }
+
+    SECTION("月名形态 F1~F10（day/year 位置互换 + 连字符变体 + 星期前缀）") {
+        vm.eval(R"tjs(
+            var f1 = new Date("3 May 2004 11:22:33");
+            var f2 = new Date("3-May 2004 11:22:33");
+            var f3 = new Date("3-May-2004 11:22:33");
+            var f4 = new Date("May 3 2004 11:22:33");
+            var f5 = new Date("May-3 2004 11:22:33");
+            var f6 = new Date("May-3-2004 11:22:33");
+            var f7 = new Date("3 May 11:22:33 2004");
+            var f8 = new Date("3-May 11:22:33 2004");
+            var f9 = new Date("May 3 11:22:33 2004");
+            var f10 = new Date("May-3 11:22:33 2004");
+            var same = f1.getTime() == f2.getTime() && f2.getTime() == f3.getTime()
+                && f3.getTime() == f4.getTime() && f4.getTime() == f5.getTime()
+                && f5.getTime() == f6.getTime() && f6.getTime() == f7.getTime()
+                && f7.getTime() == f8.getTime() && f8.getTime() == f9.getTime()
+                && f9.getTime() == f10.getTime();
+            var mo = f1.getMonth();
+            var wd1 = new Date("Sun, 3 May 2004 11:22:33").getTime() == f1.getTime();
+            var wd2 = new Date("Thurs, 3 May 2004 11:22:33").getTime() == f1.getTime();
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("same"_str) == 1); // 10 形态同一时刻
+        REQUIRE(*vm.evalExpr<Integer>("mo"_str) == 4);
+        REQUIRE(*vm.evalExpr<Integer>("wd1"_str) == 1); // 星期值不参与语义
+        REQUIRE(*vm.evalExpr<Integer>("wd2"_str) == 1);
+    }
+
+    SECTION("am/pm 位置与原版怪癖（12 点不加减，pm 12 点进位次日）") {
+        vm.eval(R"tjs(
+            var pmSuf = new Date("3 May 2004 11:22:33 pm");
+            var pmPre = new Date("3 May pm 11:22:33 2004");
+            var pmF7 = new Date("May-3 11:22:33 pm 2004");
+            var amF9 = new Date("May 3 am 11:22:33 2004");
+            var noonAm = new Date("2004/03/03 12:00:00 am");
+            var noonAmH = noonAm.getHours(); var noonAmD = noonAm.getDate();
+            var noonPm = new Date("2004/03/03 12:00:00 pm");
+            var noonPmH = noonPm.getHours(); var noonPmD = noonPm.getDate();
+            var diff = pmSuf.getTime() - new Date("3 May 2004 11:22:33").getTime();
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("pmSuf.getHours()"_str) == 23); // 11+12
+        REQUIRE(*vm.evalExpr<Integer>("pmPre.getHours()"_str) == 23);
+        REQUIRE(*vm.evalExpr<Integer>("pmF7.getHours()"_str) == 23);
+        REQUIRE(*vm.evalExpr<Integer>("amF9.getHours()"_str) == 11);
+        REQUIRE(*vm.evalExpr<Integer>("noonAmH"_str) == 12); // 怪癖：am 12 点不动
+        REQUIRE(*vm.evalExpr<Integer>("noonAmD"_str) == 3);
+        REQUIRE(*vm.evalExpr<Integer>("noonPmH"_str) == 0); // 24:00 → 次日 0 点
+        REQUIRE(*vm.evalExpr<Integer>("noonPmD"_str) == 4);
+        REQUIRE(*vm.evalExpr<Integer>("diff"_str) == 12 * 3600 * 1000);
+    }
+
+    SECTION("时区：名字/偏移/组合（绝对 epoch 与参考实现对拍锁定）") {
+        vm.eval(R"tjs(
+            var gmt = new Date("2004/03/03 00:00:00 gmt").getTime();
+            var gmtPlus9 = new Date("2004/03/03 00:00:00 GMT +900").getTime();
+            var jst = new Date("2004/03/03 00:00:00 JST").getTime();
+            var utc = new Date("2004/03/03 00:00:00 UTC").getTime();
+            var zulu = new Date("2004/03/03 00:00:00 Z").getTime();
+            var nst = new Date("2004/03/03 00:00:00 NST").getTime();
+            var halfHour = new Date("2004/03/03 00:00:00 +30").getTime();
+            var jdoc = new Date("Sun, 3 May 2004 11:22:33 GMT +900 (JST)").getTime();
+            var paren = new Date("3 May 2004 11:22:33 gmt (JST)").getTime();
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("gmt"_str) == 1078272000000);
+        REQUIRE(*vm.evalExpr<Integer>("gmtPlus9"_str) == 1078239600000); // -9h
+        REQUIRE(*vm.evalExpr<Integer>("jst"_str) == 1078239600000); // JST == GMT+900
+        REQUIRE(*vm.evalExpr<Integer>("utc"_str) == 1078272000000);
+        REQUIRE(*vm.evalExpr<Integer>("zulu"_str) == 1078272000000);
+        REQUIRE(*vm.evalExpr<Integer>("nst"_str) == 1078284600000); // -3.5h
+        REQUIRE(*vm.evalExpr<Integer>("halfHour"_str) == 1078270200000); // +30 分
+        REQUIRE(*vm.evalExpr<Integer>("jdoc"_str) == 1083550953000);
+        REQUIRE(*vm.evalExpr<Integer>("paren"_str) == 1083583353000); // 括号段忽略
+    }
+
+    SECTION("两位年与词表缩写/怪癖") {
+        vm.eval(R"tjs(
+            var y04 = new Date("May 3 04 11:22:33").getYear();
+            var y50 = new Date("May 3 50 11:22:33").getYear();
+            var y99 = new Date("May 3 99 11:22:33").getYear();
+            var ju = new Date("3 ju 2004 11:22:33").getMonth();
+            var sept = new Date("3 sept 2004 11:22:33").getMonth();
+            var sepDot = new Date("3 Sep. 2004 11:22:33").getMonth();
+            var dec = new Date("3 DEC 2004 11:22:33").getMonth();
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("y04"_str) == 2004); // <=50 → 2000+
+        REQUIRE(*vm.evalExpr<Integer>("y50"_str) == 2050);
+        REQUIRE(*vm.evalExpr<Integer>("y99"_str) == 1999); // >50 → 1900+
+        REQUIRE(*vm.evalExpr<Integer>("ju"_str) == 5); // "ju" 单独成词（原版怪癖）
+        REQUIRE(*vm.evalExpr<Integer>("sept"_str) == 8);
+        REQUIRE(*vm.evalExpr<Integer>("sepDot"_str) == 8);
+        REQUIRE(*vm.evalExpr<Integer>("dec"_str) == 11);
+    }
+
+    SECTION("越界分量 mktime 归一化（原版放行）") {
+        vm.eval(R"tjs(
+            var m13 = new Date("2004/13/03 11:22:33");
+            var m13y = m13.getYear(); var m13m = m13.getMonth();
+            var d32 = new Date("2004/03/32 11:22:33");
+            var d32m = d32.getMonth(); var d32d = d32.getDate();
+            var h25 = new Date("2004/03/03 25:00:00");
+            var h25d = h25.getDate(); var h25h = h25.getHours();
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("m13y"_str) == 2005);
+        REQUIRE(*vm.evalExpr<Integer>("m13m"_str) == 0);
+        REQUIRE(*vm.evalExpr<Integer>("d32m"_str) == 3);
+        REQUIRE(*vm.evalExpr<Integer>("d32d"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("h25d"_str) == 4);
+        REQUIRE(*vm.evalExpr<Integer>("h25h"_str) == 1);
+    }
+
+    SECTION("Date.parse 实例方法 + 省略时区（本地钟面）") {
+        vm.eval(R"tjs(
+            var d = new Date();
+            d.parse("2004/03/03 11:22:33");
+            var py = d.getYear(); var ph = d.getHours();
+            var p2 = new Date("2024/6/1 12:30:00");
+            var p2m = p2.getMonth(); var p2h = p2.getHours();
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("py"_str) == 2004);
+        REQUIRE(*vm.evalExpr<Integer>("ph"_str) == 11);
+        REQUIRE(*vm.evalExpr<Integer>("p2m"_str) == 5); // /6/ = 6 月（0-based）
+        REQUIRE(*vm.evalExpr<Integer>("p2h"_str) == 12);
+    }
+
+    SECTION("解析失败（cannot parse date）") {
+        REQUIRE_THROWS(vm.eval<Value>(R"(var d = new Date("2004/03/03");)"_str)); // 缺时刻
+        REQUIRE_THROWS(vm.eval<Value>(R"(var d = new Date("3 May 2004");)"_str));
+        REQUIRE_THROWS(vm.eval<Value>(R"(var d = new Date("xyz");)"_str));
+        REQUIRE_THROWS(vm.eval<Value>(R"(var d = new Date("");)"_str));
+        REQUIRE_THROWS(vm.eval<Value>(R"(var d = new Date("2004/03/03 11");)"_str)); // 缺分
+        REQUIRE_THROWS(vm.eval<Value>(R"(var d = new Date("2004/03/03 11:22:33 x");)"_str)); // 尾部垃圾
+        REQUIRE_THROWS(vm.eval<Value>(R"(var d = new Date("May 2004 11:22:33");)"_str)); // 缺日
     }
 }
 

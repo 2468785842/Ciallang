@@ -3,8 +3,7 @@
 // Date 内建库（TJS2 tjsDate.cpp 对齐）：构造（now / 分量 mktime / 字符串解析）+
 // get 系（localtime 字段）/ set 系（读改 mktime）/ getTime(ms)/setTime(ms) /
 // getTimezoneOffset(分钟)。内部表示 time_t 秒，与原版一致。
-// 字符串 parse 的完整 bison 文法（tjsdate.y，相对表达/英文月名等）未实现，
-// 当前支持 "YYYY/MM/DD HH:MM[:SS]" 常用子集（记 TODO）。
+// 字符串 parse 走 DateParser（tjsdate.y 完整文法）。
 #pragma once
 
 #include "types/Object.hpp"
