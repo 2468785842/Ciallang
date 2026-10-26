@@ -781,6 +781,79 @@ TEST_CASE("Date.parse 完整文法（tjsdate.y 全形态，对拍 TJSCompiler �
     }
 }
 
+TEST_CASE("RegExp.last 静态属性 + 匹配位置码点语义") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // tjsRegExp.cpp：LastRegExp 仅由 test/exec 更新（失败也更新），match/replace
+    // 不更新；未执行过为 void。位置语义：本项目为 UTF-8 码点（TJS2 为 UTF-16
+    // 码元，BMP 内两者一致；原版 index 属性混加字节偏移是自身 bug，见
+    // compatibility.md——此处按 TODO 定案的码点语义锁定）
+    SECTION("last：test/exec 更新（失败也更新），match/replace 不更新") {
+        vm.eval(R"tjs(
+            var r1 = /(\d+)/;
+            r1.test("a123b");
+            var l1 = RegExp.last.lastMatch;
+            /zzz/.test("aaa");
+            var l2 = RegExp.last.lastMatch;
+            var r3 = /b/;
+            r3.match("abc");
+            var l3 = RegExp.last.lastMatch;
+            "xxx".replace(/x/, "y");
+            var l4 = RegExp.last.lastMatch;
+            var r5 = /(\d+)-(\d+)/;
+            r5.exec("77-42");
+            var l5 = RegExp.last.lastParen;
+            var r6 = /zzz/;
+            r6.exec("aaa");
+            var l6 = RegExp.last.lastMatch;
+        )tjs"_str);
+        REQUIRE((**vm.evalExpr<String *>("l1"_str)) == "123"_str);
+        REQUIRE((**vm.evalExpr<String *>("l2"_str)) == ""_str); // 失败也更新
+        REQUIRE((**vm.evalExpr<String *>("l3"_str)) == ""_str); // match 不更新
+        REQUIRE((**vm.evalExpr<String *>("l4"_str)) == ""_str); // replace 不更新
+        REQUIRE((**vm.evalExpr<String *>("l5"_str)) == "42"_str);
+        REQUIRE((**vm.evalExpr<String *>("l6"_str)) == ""_str); // exec 失败也更新
+    }
+
+    SECTION("未执行过任何 test/exec 时为 void") {
+        REQUIRE(vm.eval<Value>("RegExp.last"_str).get().isVoid());
+    }
+
+    SECTION("CJK 码点位置（index/lastIndex/start/上下文）") {
+        vm.eval(R"tjs(
+            var g = /x(\d+)x/g;
+            var m1 = g.exec("中文x22x b x333x");
+            var i1 = g.index; var li1 = g.lastIndex;
+            var m2 = g.exec("中文x22x b x333x");
+            var i2 = g.index; var li2 = g.lastIndex;
+            var e3 = /b/;
+            e3.exec("中文b文文");
+            var lc = e3.leftContext; var rc = e3.rightContext; var ei = e3.index;
+            var s1 = /a/;
+            s1.start = 2;
+            var sm = s1.exec("中文abc")[0]; var si = s1.index;
+            var r7 = /x(\d+)x/;
+            r7.exec("中文x88x尾");
+            var l7m = RegExp.last.lastMatch; var l7i = RegExp.last.index;
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("i1"_str) == 2); // "中文" = 2 码点（非 6 字节）
+        REQUIRE(*vm.evalExpr<Integer>("li1"_str) == 6);
+        REQUIRE(*vm.evalExpr<Integer>("i2"_str) == 9);
+        REQUIRE(*vm.evalExpr<Integer>("li2"_str) == 14);
+        REQUIRE((**vm.evalExpr<String *>("lc"_str)) == "中文"_str);
+        REQUIRE((**vm.evalExpr<String *>("rc"_str)) == "文文"_str);
+        REQUIRE(*vm.evalExpr<Integer>("ei"_str) == 2);
+        REQUIRE((**vm.evalExpr<String *>("sm"_str)) == "a"_str); // start=2 跳过中文
+        REQUIRE(*vm.evalExpr<Integer>("si"_str) == 2);
+        REQUIRE((**vm.evalExpr<String *>("l7m"_str)) == "x88x"_str);
+        REQUIRE(*vm.evalExpr<Integer>("l7i"_str) == 2); // RegExp.last 指向实例可读状态
+    }
+}
+
 TEST_CASE("Math 标准库") {
     Runtime rt{};
     Context context{ rt };

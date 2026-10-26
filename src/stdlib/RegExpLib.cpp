@@ -98,6 +98,7 @@ namespace cial::stdlib {
         auto *arr = vm->create<Array>(&vm->rt());
         const bool matched = re->execState(valueToString(args[0]), arr);
         re->matches = arr;
+        re->runtime()->lastRegExp = re; // tTJSNC_RegExp::LastRegExp：失败也更新
         return Value{ Integer{ matched ? 1 : 0 } };
     }
 
@@ -123,6 +124,7 @@ namespace cial::stdlib {
         auto *arr = vm->create<Array>(&vm->rt());
         re->execState(valueToString(args[0]), arr);
         re->matches = arr;
+        re->runtime()->lastRegExp = re; // tTJSNC_RegExp::LastRegExp：失败也更新
         return Value{ arr };
     }
 

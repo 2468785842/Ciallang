@@ -12,6 +12,8 @@ namespace cial {
     namespace {
         // TJS2 RegExp 属性名（tjsRegExp.cpp）：matches/start/index/lastIndex/input/
         // lastMatch/lastParen/leftContext/rightContext；其中仅 start 可写。
+        // last 为类对象静态只读属性（tTJSNC_RegExp::LastRegExp），此处挂在全局
+        // "RegExp" 占位实例上应答（实例上也可读，超出原版但无害）。
         // 比较走 Runtime::wkAtoms 构造期驻留（旧实现每次 getProp intern ×9）
         enum class RegExpProp {
             None,
@@ -24,6 +26,7 @@ namespace cial {
             LastParen,
             LeftContext,
             RightContext,
+            Last,
         };
 
         RegExpProp regexpPropName(const WellKnownAtoms &wk, const Atom a) {
@@ -45,6 +48,8 @@ namespace cial {
                 return RegExpProp::LeftContext;
             if(a == wk.reRightContext)
                 return RegExpProp::RightContext;
+            if(a == wk.reLast)
+                return RegExpProp::Last;
             return RegExpProp::None;
         }
     } // namespace
@@ -94,6 +99,11 @@ namespace cial {
                 return Value{ leftContext };
             case RegExpProp::RightContext:
                 return Value{ rightContext };
+            case RegExpProp::Last:
+                // tTJSNC_RegExp::LastRegExp：未执行过任何 test/exec 时为 void
+                if(_rt->lastRegExp)
+                    return Value{ static_cast<Object *>(_rt->lastRegExp) };
+                return Value{};
             case RegExpProp::None:
                 break;
         }

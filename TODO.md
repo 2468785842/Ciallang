@@ -31,7 +31,6 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] RegExp 剩余（静态属性 `RegExp.last`、匹配位置改 UTF-8 码点语义——当前为字节偏移）
 - [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
 - [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
 
@@ -43,6 +42,15 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-26 RegExp 剩余批次：`RegExp.last` 静态属性（tTJSNC_RegExp::LastRegExp 对齐——
+  仅 test/exec 更新且失败也更新，match/replace 不更新，未执行过为 void；持有点挂
+  Runtime::lastRegExp 接入 collectMark GC 根）+ 匹配位置改 UTF-8 码点语义
+  （index/lastIndex/start 全套；TJS2 为 UTF-16 码元，BMP 内一致）。对拍 15 行：
+  last 全语义/lastIndex/失败路径/start 推进/上下文逐位一致；`index` 属性成功匹配
+  的非 ASCII 值为文档化偏差——原版 tjsRegExp.cpp:669 少除 sizeof(tjs_char)
+  （UTF-16 单位+字节混加，start>0 时可与 lastIndex 相等），忠实复现需模拟 UTF-16
+  字节算术且与自身 lastIndex 语义矛盾，按 TODO 定案取纯码点。98 用例双配置全绿
 
 - 2026-10-26 Date.parse 完整文法批次：tjsdate.y 全部 11 种日期形态（新 DateParser.cpp，
   手写递归下降 + 单 token 回退对齐 LALR 判定；词表 tjsDateWordMap 全量转写——月名/

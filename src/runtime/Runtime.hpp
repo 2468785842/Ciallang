@@ -51,6 +51,8 @@ namespace cial {
         // RegExp 匹配状态属性（tjsRegExp.cpp 同名属性）
         Atom reMatches{}, reStart{}, reIndex{}, reLastIndex{}, reInput{};
         Atom reLastMatch{}, reLastParen{}, reLeftContext{}, reRightContext{};
+        // RegExp.last 静态属性（tTJSNC_RegExp::LastRegExp）
+        Atom reLast{};
     };
 
     class Runtime {
@@ -80,12 +82,18 @@ namespace cial {
             w.reLastParen = atomTable.intern("lastParen"_str);
             w.reLeftContext = atomTable.intern("leftContext"_str);
             w.reRightContext = atomTable.intern("rightContext"_str);
+            w.reLast = atomTable.intern("last"_str);
             return w;
         }();
 
         MarkSweep markSweep{ 512 };
 
         std::vector<MarkSweepHeader *> handles{};
+
+        // RegExp.last 静态属性（tTJSNC_RegExp::LastRegExp）：最近一次执行过
+        // test/exec 的 RegExp 实例（失败也更新；match/replace 不更新）。
+        // 持有 GC 对象的全局数据，接入下方 collectMark 标记
+        MarkSweepHeader *lastRegExp{};
 
         explicit Runtime() = default;
 
@@ -100,6 +108,8 @@ namespace cial {
                 if(handle)
                     handle->marked();
             }
+            if(lastRegExp)
+                lastRegExp->marked();
         }
 
         void addMarkRoot(const MarkRootProvider *provider) { _markRoots.push_back(provider); }

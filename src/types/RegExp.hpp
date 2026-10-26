@@ -3,7 +3,8 @@
 // RegExp 内建对象（TJS2 RegExp）：/pattern/flags 字面量的运行时载体。
 // 引擎用 std::regex（ECMAScript 方言；TJS2 原版为 oniguruma，复杂模式差异记 TODO）。
 // 匹配状态（start/index/lastIndex/input/lastMatch/lastParen/leftContext/rightContext/
-// matches）对齐 tjsRegExp.cpp 的 tTJSNI_RegExp；位置为字节偏移（UTF-8 码点语义记 TODO）。
+// matches）对齐 tjsRegExp.cpp 的 tTJSNI_RegExp；位置为 UTF-8 码点偏移
+// （TJS2 为 UTF-16 码元，本项目字符串统一码点语义，与 str.length 一致）。
 #pragma once
 
 #include <algorithm>
@@ -16,6 +17,29 @@
 namespace cial {
 
     class Runtime;
+
+    // UTF-8 字节偏移 ↔ 码点偏移换算（匹配位置码点语义的底座）
+    namespace regexp_cp {
+        // 统计 [0, bytePos) 字节区间内的码点数（前导字节计数）
+        inline size_t cpCountTo(const std::string &s, const size_t bytePos) {
+            size_t n = 0;
+            for(size_t i = 0; i < bytePos; ++i)
+                if((static_cast<unsigned char>(s[i]) & 0xC0) != 0x80)
+                    ++n;
+            return n;
+        }
+
+        // 第 cp 个码点的字节偏移；cp 超出码点数时钳位到串长
+        inline size_t cpToByte(const std::string &s, size_t cp) {
+            size_t i = 0;
+            while(i < s.size() && cp > 0) {
+                if((static_cast<unsigned char>(s[i]) & 0xC0) != 0x80)
+                    --cp;
+                ++i;
+            }
+            return i;
+        }
+    } // namespace regexp_cp
 
     class RegExp final : public Object {
     public:
@@ -67,16 +91,18 @@ namespace cial {
             }
         }
 
-        // TJS2 tTJSNC_RegExp::Match：start 达到或超过目标长度 → 不匹配
+        // TJS2 tTJSNC_RegExp::Match：start（码点）达到或超过目标码点长度 → 不匹配。
+        // start 为码点偏移，先换算为字节偏移再交给 std::regex
         [[nodiscard]] bool searchFrom(const std::string &target, std::smatch &m) const {
-            const auto s = static_cast<size_t>(start);
-            if(s >= target.size())
+            const size_t byteStart = regexp_cp::cpToByte(target, static_cast<size_t>(start));
+            if(byteStart >= target.size())
                 return false;
-            return std::regex_search(target.begin() + static_cast<i64>(s), target.end(), m, re);
+            return std::regex_search(target.begin() + static_cast<i64>(byteStart), target.end(), m, re);
         }
 
         // TJS2 tTJSNC_RegExp::Exec：搜索 + 更新全部状态；result 非空时按
-        // GetResultArray 语义填充（[0]=整体匹配、[i]=第 i 组；未匹配=空数组）
+        // GetResultArray 语义填充（[0]=整体匹配、[i]=第 i 组；未匹配=空数组）。
+        // index/lastIndex 存码点偏移；TJS2 失败时 LeftContext = 前 start 个字符
         bool execState(const String &targetStr, Array *result) {
             const std::string target(targetStr.getData(), targetStr.length());
             std::smatch m;
@@ -87,19 +113,20 @@ namespace cial {
                 lastIndex = start;
                 lastMatch = ""_str;
                 lastParen = ""_str;
-                leftContext = String(target.c_str(), static_cast<u32>(static_cast<size_t>(start)));
+                leftContext = String(target.c_str(),
+                                     static_cast<u32>(regexp_cp::cpToByte(target, static_cast<size_t>(start))));
                 // TJS2 失败时 RightContext 不更新（保留上次值）
                 return false;
             }
 
-            const size_t s = static_cast<size_t>(start);
-            index = Integer{ static_cast<i64>(s + static_cast<size_t>(m.position(0))) };
+            const size_t s = regexp_cp::cpToByte(target, static_cast<size_t>(start));
+            index = Integer{ static_cast<i64>(regexp_cp::cpCountTo(target, s + static_cast<size_t>(m.position(0)))) };
             size_t lastEnd = 0;
             for(size_t i = 0; i < m.size(); ++i) {
                 if(m[i].matched)
                     lastEnd = std::max(lastEnd, static_cast<size_t>(m.position(i) + m.length(i)));
             }
-            lastIndex = Integer{ static_cast<i64>(s + lastEnd) };
+            lastIndex = Integer{ static_cast<i64>(regexp_cp::cpCountTo(target, s + lastEnd)) };
 
             if(result) {
                 const std::string whole = m[0].str();
@@ -121,10 +148,10 @@ namespace cial {
                 lastParen = ""_str;
             }
             leftContext = String(target.c_str(), static_cast<u32>(s + static_cast<size_t>(m.position(0))));
-            rightContext = String(target.c_str() + static_cast<size_t>(lastIndex),
+            rightContext = String(target.c_str() + s + lastEnd,
                                    static_cast<u32>(target.size() - (s + lastEnd)));
             if(flagGlobal)
-                start = lastIndex; // g：下次搜索从本次匹配尾起
+                start = lastIndex; // g：下次搜索从本次匹配尾起（码点）
             return true;
         }
 
