@@ -437,11 +437,14 @@ namespace cial::syntax {
     }
 
     bool Lexer::matchOperator(Token *&token) {
-        static const OperatorTrie OpTrie{
+        static OperatorTrie OpTrie{
 #define LIST_TO_TOKEN_TYPE_PAIR(SYMBOL, NAME) { NAME##_str, TokenType::SYMBOL },
             SYMBOL_LIST(LIST_TO_TOKEN_TYPE_PAIR)
 #undef LIST_TO_TOKEN_TYPE_PAIR
         };
+        // TJS2 词法怪癖："=>" 词形化为 ">="（tjsInterCodeGen 字典键 "k" >= v 的
+        // 唯一入口；saveStruct 文本写 " => "，载入端依赖此别名回环）
+        OpTrie.insert("=>"_str, TokenType::GtOrEqual);
 
         const size_t start = _sourceFile.pos();
         size_t i = start;

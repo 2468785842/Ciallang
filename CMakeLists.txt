@@ -70,6 +70,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/DateLib.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/DateParser.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/RandomLib.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/SerializeLib.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc.cpp
 

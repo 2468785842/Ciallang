@@ -31,8 +31,7 @@
 
 ## 三、语言特性缺口（对照 README）
 
-- [ ] Array 标准库剩余：save/load/pack 系/Assignment 联动
-- [ ] Dictionary 标准库剩余：save/load（BinarySerializer）
+（本节已清空——Array/Dictionary 标准库全量完成，见已完成摘要）
 
 ## 四、工程化
 
@@ -42,6 +41,21 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-26 Array/Dictionary 结构化存取 + Octet pack 系批次（新 SerializeLib.cpp，
+  三、语言特性缺口节清零）——二进制序列化（tTJSBinarySerializer 全对齐：MessagePack
+  近似类型码阶梯 + UTF-16LE 字符串 + "KBAD100\0" 头）+ 结构化文本写读（(const) %[...]
+  表达式形态，EscapeC 转义含 \x 传播规则、实数十六进制浮点串、环 → null 注释；
+  载入用专用递归下降解析器——evalExpr 与外层脚本执行共用 VMState 不可重入）+
+  Array save/load（文本逐行）/loadStruct（仅二进制，原版同）/saveStruct（'b' 分叉）+
+  Dictionary loadStruct/saveStruct + load/save（原版 TODO 空实现按特性同步）+
+  assignStruct 深拷贝（环 → null）+ Array.pack/Octet.unpack（tjsOctPack 全类型：
+  c/C/s/S/i/I/l/L/n/N/v/V/d/f/a/A/b/B/h/H/x/X/@/m，p/P 原版 TODO 同步、u/w 报错同）。
+  连带：词法器 "=>" 词形化为 ">="（TJS2 怪癖，saveStruct 文本回环依赖）。
+  对拍：pack/unpack 数值/位串/base64/字节序 11 行逐位一致；偏差两处已文档化——
+  原版 BinToHex 负 len 钳位 bug（unpack h*/H* 恒空串，本项目返回正确 hex）、
+  文件 IO 参考端未注册流工厂直接段错误（无法对拍，按规范实现+自回环验证）。
+  99 用例双配置全绿
 
 - 2026-10-26 RegExp 剩余批次：`RegExp.last` 静态属性（tTJSNC_RegExp::LastRegExp 对齐——
   仅 test/exec 更新且失败也更新，match/replace 不更新，未执行过为 void；持有点挂

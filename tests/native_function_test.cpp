@@ -854,6 +854,154 @@ TEST_CASE("RegExp.last 静态属性 + 匹配位置码点语义") {
     }
 }
 
+TEST_CASE("Array/Dictionary 结构化存取 + Octet pack 系（tjsBinarySerializer/tjsOctPack 对齐）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("pack/unpack：整数宽度/符号/字节序/浮点/base64") {
+        vm.eval(R"tjs(
+            var h1 = [1, -1].pack("c2").unpack("H*")[0];
+            var u1 = [1, -1].pack("c2").unpack("c2").join(",");
+            var h2 = [1000, -1000].pack("s2").unpack("H*")[0];
+            var v1 = [0x1234].pack("v").unpack("S1")[0];
+            var n1 = [0x1234].pack("n").unpack("S1")[0];
+            var d1 = [1.5].pack("d").unpack("d1")[0];
+            var f1 = [1.5].pack("f").unpack("f1")[0];
+            var b64 = [72, 101, 108, 108, 111].pack("C5").unpack("m1")[0];
+            var m1 = ["aGVsbG8="].pack("m1").unpack("H*")[0];
+            var star = [1, 2, 3, 4].pack("C*").unpack("C*").join(",");
+        )tjs"_str);
+        REQUIRE((**vm.evalExpr<String *>("h1"_str)) == "01FF"_str);
+        REQUIRE((**vm.evalExpr<String *>("u1"_str)) == "1,-1"_str);
+        REQUIRE((**vm.evalExpr<String *>("h2"_str)) == "E80318FC"_str);
+        REQUIRE(*vm.evalExpr<Integer>("v1"_str) == 4660); // LE
+        REQUIRE(*vm.evalExpr<Integer>("n1"_str) == 13330); // BE
+        REQUIRE((*vm.evalExpr<Real>("d1"_str)).value() == 1.5);
+        REQUIRE((*vm.evalExpr<Real>("f1"_str)).value() == 1.5);
+        REQUIRE((**vm.evalExpr<String *>("b64"_str)) == "SGVsbG8="_str);
+        REQUIRE((**vm.evalExpr<String *>("m1"_str)) == "68656C6C6F"_str); // "hello"
+        REQUIRE((**vm.evalExpr<String *>("star"_str)) == "1,2,3,4"_str); // '*' 吃尽剩余
+    }
+
+    SECTION("pack：字符串填充/位串/nibble/结构控制") {
+        vm.eval(R"tjs(
+            var a1 = ["hi"].pack("a4").unpack("H*")[0];
+            var a2 = ["hi"].pack("A4").unpack("H*")[0];
+            var b1 = ["11000001"].pack("b8").unpack("H*")[0];
+            var b2 = ["1100000101000010"].pack("B*").unpack("H*")[0];
+            var x1 = ["12ab"].pack("h4").unpack("H*")[0];
+            var x2 = ["12ab"].pack("H4").unpack("H*")[0];
+            var s1 = [1, 2].pack("c1x2c1").unpack("H*")[0];
+            var s2 = [1, 2, 3].pack("c1X1c2").unpack("H*")[0];
+            var s3 = [1, 2].pack("c1@8C1").unpack("C*").join(",");
+        )tjs"_str);
+        REQUIRE((**vm.evalExpr<String *>("a1"_str)) == "68690000"_str); // \0 填充
+        REQUIRE((**vm.evalExpr<String *>("a2"_str)) == "68692020"_str); // 空格填充
+        REQUIRE((**vm.evalExpr<String *>("b1"_str)) == "83"_str); // 低位在前
+        REQUIRE((**vm.evalExpr<String *>("b2"_str)) == "C142"_str); // 高位在前
+        REQUIRE((**vm.evalExpr<String *>("x1"_str)) == "21BA"_str); // 低位 nibble 在前
+        REQUIRE((**vm.evalExpr<String *>("x2"_str)) == "12AB"_str); // 高位 nibble 在前
+        REQUIRE((**vm.evalExpr<String *>("s1"_str)) == "01000002"_str); // x 跳过
+        REQUIRE((**vm.evalExpr<String *>("s2"_str)) == "0203"_str); // X 回退
+        REQUIRE((**vm.evalExpr<String *>("s3"_str)) == "1,0,0,0,0,0,0,0,2"_str); // @ 补齐到绝对位置 8 后再追加
+    }
+
+    SECTION("Array.save/load 文本行（元素一律字符串）") {
+        vm.eval(R"tjs(
+            var a = ["one", 2, 3.5];
+            a.save("t_lines.txt");
+            var b = [];
+            b.load("t_lines.txt");
+            var j = b.join("|");
+            var c = b.count;
+        )tjs"_str);
+        REQUIRE((**vm.evalExpr<String *>("j"_str)) == "one|2|3.5"_str);
+        REQUIRE(*vm.evalExpr<Integer>("c"_str) == 3);
+    }
+
+    SECTION("saveStruct 文本/二进制回环 + assignStruct 深拷贝") {
+        vm.eval(R"tjs(
+            var d = %[k1: 1, k2: "s", k3: [1, 2], k4: %[n: 7]];
+            d.saveStruct("t_d.txt");
+            var d2 = %[];
+            var r2 = d2.loadStruct("t_d.txt");
+            var d2c = d2.count;      // 文本路径不写入自身（原版同款怪癖）
+            var r2c = r2.count;
+            var k4n = r2["k4"]["n"];
+            d.saveStruct("t_d.bin", "b");
+            var d3 = %[x: 0];
+            d3.loadStruct("t_d.bin", "b");
+            var d3c = d3.count;
+            var k2 = d3["k2"];
+            var k3 = d3["k3"].join("+");
+            var src = %[a: 1, sub: %[deep: [5, 6]]];
+            var dst = %[];
+            dst.assignStruct(src);
+            var deep = src["sub"]["deep"];
+            deep[0] = 99;
+            var dp = dst["sub"]["deep"][0];
+            var da = dst["a"];
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("d2c"_str) == 0);
+        REQUIRE(*vm.evalExpr<Integer>("r2c"_str) == 4);
+        REQUIRE(*vm.evalExpr<Integer>("k4n"_str) == 7);
+        REQUIRE(*vm.evalExpr<Integer>("d3c"_str) == 4);
+        REQUIRE((**vm.evalExpr<String *>("k2"_str)) == "s"_str);
+        REQUIRE((**vm.evalExpr<String *>("k3"_str)) == "1+2"_str);
+        REQUIRE(*vm.evalExpr<Integer>("dp"_str) == 5); // 深拷贝独立
+        REQUIRE(*vm.evalExpr<Integer>("da"_str) == 1);
+    }
+
+    SECTION("Array.loadStruct 仅收二进制（文本报错，原版同）+ 环 → null + octet 进出") {
+        vm.eval(R"tjs(
+            var arr = [1, "x", [7], %[y: 8]];
+            arr.saveStruct("t_a.txt");
+            var a2 = [];
+            var txtErr = 0;
+            try { a2.loadStruct("t_a.txt"); } catch(e) { txtErr = 1; }
+            arr.saveStruct("t_a.bin", "b");
+            var a3 = [];
+            a3.loadStruct("t_a.bin", "b");
+            var a3c = a3.count;
+            var e3 = a3[2][0];
+            var y = a3[3]["y"];
+            var inner = %[v: 1];
+            var arrC = [1, inner];
+            inner["back"] = arrC;
+            arrC.saveStruct("t_c.bin", "b");
+            var c2 = [];
+            c2.loadStruct("t_c.bin", "b");
+            var innerV = c2[1]["v"];
+            var backIsNull = c2[1]["back"] === void ? 1 : 0;
+            var od = %[o: [0xde, 0xad].pack("C2")];
+            od.saveStruct("t_o.bin", "b");
+            var od2 = %[];
+            od2.loadStruct("t_o.bin", "b");
+            var oh = od2["o"].unpack("H*")[0];
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("txtErr"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("a3c"_str) == 4);
+        REQUIRE(*vm.evalExpr<Integer>("e3"_str) == 7);
+        REQUIRE(*vm.evalExpr<Integer>("y"_str) == 8);
+        REQUIRE(*vm.evalExpr<Integer>("innerV"_str) == 1);
+        REQUIRE(*vm.evalExpr<Integer>("backIsNull"_str) == 1); // 环检测 → null
+        REQUIRE((**vm.evalExpr<String *>("oh"_str)) == "DEAD"_str);
+    }
+
+    SECTION("Dictionary.load/save 为原版 TODO 空实现（按特性同步）") {
+        vm.eval(R"tjs(
+            var d = %[k: 1];
+            d.load("whatever.txt");
+            d.save("whatever.txt");
+            var c = d.count;
+        )tjs"_str);
+        REQUIRE(*vm.evalExpr<Integer>("c"_str) == 1); // 无操作，字典原样
+    }
+}
+
 TEST_CASE("Math 标准库") {
     Runtime rt{};
     Context context{ rt };

@@ -15,6 +15,7 @@
 #include "stdlib/MathLib.hpp"
 #include "stdlib/RandomLib.hpp"
 #include "stdlib/RegExpLib.hpp"
+#include "stdlib/SerializeLib.hpp"
 #include "stdlib/StringLib.hpp"
 #include "types/Array.hpp"
 #include "types/Dictionary.hpp"
@@ -79,6 +80,13 @@ namespace cial {
         registerMethod<Array>("join"_str, &stdlib::arrayJoin);
         registerMethod<Array>("split"_str, &stdlib::arraySplitWith);
         registerMethod<Array>("sort"_str, &stdlib::arraySort);
+        // save/load 结构化族（TJS2 tjsArray.cpp + tjsBinarySerializer 对齐）
+        registerMethod<Array>("load"_str, &stdlib::arrayLoad);
+        registerMethod<Array>("save"_str, &stdlib::arraySave);
+        registerMethod<Array>("loadStruct"_str, &stdlib::arrayLoadStruct);
+        registerMethod<Array>("saveStruct"_str, &stdlib::arraySaveStruct);
+        registerMethod<Array>("pack"_str, &stdlib::arrayPack);
+        registerMethod<Array>("assignStruct"_str, &stdlib::arrayAssignStruct);
         // count/length 属性（get；写走 Array::setProp）
         const auto arrayCount = [](const Value &thisObj) {
             return Value{ Integer{ static_cast<Integer>(dynamic_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };
@@ -90,6 +98,12 @@ namespace cial {
         registerMethod<Dictionary>("assign"_str, &stdlib::dictAssign);
         registerMethod<Dictionary>("clear"_str, &stdlib::dictClear);
         registerMethod<Dictionary>("erase"_str, &stdlib::dictErase);
+        // save/load 结构化族（load/save 原版即 TODO 空实现，按特性同步）
+        registerMethod<Dictionary>("load"_str, &stdlib::dictLoad);
+        registerMethod<Dictionary>("save"_str, &stdlib::dictSave);
+        registerMethod<Dictionary>("loadStruct"_str, &stdlib::dictLoadStruct);
+        registerMethod<Dictionary>("saveStruct"_str, &stdlib::dictSaveStruct);
+        registerMethod<Dictionary>("assignStruct"_str, &stdlib::dictAssignStruct);
         // count 属性
         registerProperty<Dictionary>("count"_str, [](const Value &thisObj) {
             return Value{ Integer{ static_cast<Integer>(
@@ -145,6 +159,9 @@ namespace cial {
         registerMethod<RandomGen>("random63"_str, &stdlib::rgRandom63);
         registerMethod<RandomGen>("random64"_str, &stdlib::rgRandom64);
         registerMethod<RandomGen>("serialize"_str, &stdlib::rgSerialize);
+
+        // Octet 方法（TJS2 ProcessOctetFunction：unpack 是 Octet 仅有的方法）
+        registerMethod<Octet>("unpack"_str, &stdlib::octetUnpack);
 
         // Array/Dictionary "类对象"注册到全局：承载静态方法命名空间（语料惯用法
         // Dictionary.assign incontextof obj——取未绑定方法后 ChgThis 换 this）；

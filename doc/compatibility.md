@@ -53,13 +53,13 @@
 |---|---|---|
 | （宿主）print | 控制台输出 | ✅ print/println |
 | String 内建成员 | length/charAt/indexOf/toUpperCase/…/sprintf/replace/split/escape/trim | ◐ replace（g 全局）/split ✅；length 为码点计数（其余方法字节语义） |
-| Array | 数字下标数组；load/save(BinarySerializer)/sort/join/split/pack… | ◐ 字面量/下标/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/sort(字母+比较器回调)/count ✅；save/load/pack ❌ |
-| Dictionary | 哈希字典；load/save/assign/clear | ◐ 字面量/下标/assign/clear/erase/count ✅；save/load ❌ |
+| Array | 数字下标数组；load/save(BinarySerializer)/sort/join/split/pack… | ✅ 字面量/下标/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/sort/count/assign ✅；save（文本行）/load（文本行）/saveStruct（文本+二进制）/loadStruct（仅二进制，原版同）/pack/assignStruct ✅（2026-10-26）；文件文本 UTF-8 写出、读取自动识别 UTF-8/UTF-16LE/BE BOM |
+| Dictionary | 哈希字典；load/save/assign/clear | ✅ 字面量/下标/assign/clear/erase/count/assignStruct/saveStruct（文本+二进制）/loadStruct（二进制入自身；非二进制回落文本解析且解析值作返回值不写入自身——原版同款怪癖）✅（2026-10-26）；load/save 原版即 TODO 空实现，按特性同步 |
 | Exception | 异常类（message 成员），脚本异常载体 | ✅（TJS 源自举，main.cpp 注入；原生错误自动包装为 Exception 实例） |
 | Math / Math.RandomGenerator | abs/floor/…；Xorshift / MT19937 | ◐ Math 方法+常量+random ✅；Math.RandomGenerator ✅（MT19937 序列与原版逐位一致、serialize 格式互认） |
 | Date | get/set 系列 + 字符串 parse（tjsdate.y 文法） | ✅ 全部方法+构造+parse 完整文法（tjsdate.y 全 11 形态/月名/星期/AMPM/时区名与 ±hhmm/括号忽略段/两位年/小数秒，2026-10-26 对拍逐位一致）；注意：进程首个字符串构造因 CRT `_timezone` 惰性初始化偏移 +2×\|tz\|（原版同款怪癖，已同步保留，见 DateParser.cpp build() 注释） |
 | RegExp | compile/test/match/exec/replace/split（oniguruma）；属性 matches/start/index/lastIndex/input/lastMatch/lastParen/leftContext/rightContext | ✅ /pattern/flags 字面量（g/i）+ 全部方法 + 全部实例属性 + 静态属性 `RegExp.last`（仅 test/exec 更新且失败也更新）；`new RegExp(pattern, flags?)` ✅；replace 回调 this 绑定为函数自身（TJS2 以 regexp 作 objthis）。位置语义：UTF-8 码点（TJS2 为 UTF-16 码元，BMP 内一致；2026-10-26 从字节偏移改定）。已知偏差：`index` 属性成功匹配的非 ASCII 值——原版 tjsRegExp.cpp:669 少除 sizeof(tjs_char)（UTF-16 单位+字节混加，start>0 时可与 lastIndex 相等），本项目为纯码点 |
-| Octet | 字节流 + pack 系 | ❌（类型有，库无） |
+| Octet | 字节流 + pack 系 | ◐ 类型+字面量+unpack ✅（2026-10-26，tjsOctPack 全类型；Octet 仅有的方法即 unpack）；偏差：原版 BinToHex 负 len 钳位 bug 使 unpack h\*/H\* 恒返回空串，本项目返回正确 hex（同 tjsOctPack.cpp HexToBin 大写仅收 A-E 的漏写按特性同步） |
 
 ## 4. 运行时行为差异（已知，须保持记录）
 
