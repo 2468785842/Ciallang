@@ -17,6 +17,8 @@
 #include <crtdbg.h>
 
 #include "stdlib/ExceptionLib.hpp"
+#include "tjsbc/TjsBytecodeReader.hpp"
+#include "tjsbc/TjsTranslator.hpp"
 #include "stdlib/Print.hpp"
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
@@ -62,6 +64,40 @@ var Debug = new __DebugShim();
 )"_str);
     // Exception 内建类(语料中 throw new Exception(...) 高频依赖)
     stdlib::initExceptionClass(vm);
+
+    // --tjsbc <file.tjsbc>:加载 TJS2 字节码,转译进现有 VM 执行顶层 context
+    // (doc/bytecode/mapping.md 转译路线;M1)
+    if(std::string(argv[1]) == "--tjsbc") {
+        if(argc < 3) {
+            fmt::println("Usage: cial --tjsbc <bytecode-file>");
+            return 1;
+        }
+        try {
+            const auto file = tjsbc::readTjsBytecodeFile(argv[2]);
+            tjsbc::TjsTranslator translator{ rt, file };
+            const auto program = translator.translate();
+            if(program.topLevel < 0)
+                throw std::runtime_error("bytecode has no top-level context");
+            auto *chunk = program.contexts[static_cast<size_t>(program.topLevel)].chunk;
+            vmState.allocCallFrame(chunk);
+            vmState.makeClosure();
+            try {
+                vmState.run0();
+            } catch(...) {
+                vmState.clearException();
+                throw;
+            }
+            vmState.freeCallFrame();
+        } catch(const std::exception &e) {
+            fmt::println(stderr, "cial: runtime error: {}", e.what());
+            return 1;
+        }
+        const auto end = std::chrono::high_resolution_clock::now();
+        const auto duration = duration_cast<std::chrono::nanoseconds>(end - start);
+        fmt::println("Time taken by function: {}ns", duration.count());
+        return 0;
+    }
+
     try {
         vm.eval(String(argv[1]), true);
     } catch(const std::exception &e) {

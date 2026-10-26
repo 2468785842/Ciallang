@@ -42,6 +42,20 @@
 
 ## 已完成（摘要）
 
+- 2026-10-26 TJS2 字节码转译批次（阶段 2/阶段 3 一部分，分支 feat/tjs-bytecode 已并回
+  master）——TjsTranslator：码字长度表（TranslateCodeAddress 逐 case 对齐，含 CALL
+  变长/四连变体 INC-PD=4/二目-P=4 差异）+ 寄存器恒等平移（K=VC+RC，多参函数
+  K≥argc+2 修正）+ 标志物化 %F/%T/%N（CLT=GT 换序直译、TT=双 LNot、SETNF 过 %T）+
+  属性族两套操作数序（GPD 族 dst,obj,m；SPD 族 obj,m,src——GPDS/SPDS/GPIS/SPIS
+  经 GPropRaw/DPropRaw）+ CALL/CALLD/CALLI + SRV/RET 契约（SRV 记寄存器、无 SRV
+  返回 ra[0]=void）+ ENTRY/EXTRY 静态 handler 收集 + INTER_OBJECT 两阶段回填
+  FuncMeta（chunk 全部入 GC 后经 getConstants() 可变引用回填，规避栈 chunk 悬垂）+
+  实参搬运经 scratch 寄存器两段拷贝（目标与源为同组槽位置换，顺序搬必丢一）。
+  函数 context 直调单测全绿（callValue 21→42、多参 3+4*10=43、不支持特性报错）。
+  已知 M2 缺口：顶层 global proxy 注册模式（函数定义经 ra[-1] 代理解析成员名，
+  顶层 SPDS obj=ra[-1] 惯用法）、类/property context、NEW。--tjsbc 入口已接。
+  103 用例双配置全绿
+
 - 2026-10-26 后缀 `!` 即时求值批次（语言特性最后一项，README 语法表清零）——
   tjs.y priority_expr "!" → T_EVAL 对齐：新指令 EvalStr（TAC/扁平字节码 75+75 全量
   X-macro 四点接线），Parser 后缀位置登记 PostfixEvalInfixParser（前缀 ! LNot 不受

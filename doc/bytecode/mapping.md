@@ -6,7 +6,7 @@
 > 不采用"独立 TJS 解释器"方案（被否决原因：保留两条执行路径不如统一到现有 VM，
 > 且本项目 TAC 本就对标 TJS 指令集）。
 >
-> 本文是**实现前的设计文档**。实施进度（2026-10-26）：阶段 0（TJSCompiler `--dump` 样本生成）与阶段 1（`src/tjsbc/TjsBytecodeReader` 格式解析 + 语料入库）已完成；阶段 2（转译器）与阶段 3（双路径对拍）未开始。前置阅读：
+> 本文是**实现前的设计文档**。实施进度（2026-10-26）：阶段 0（--dump）与阶段 1（Reader）完成；阶段 2（TjsTranslator M1：函数 context 直调已验证）部分完成——已知缺口：顶层 global proxy 注册模式、类/property context、NEW、PD/PI/P 运算变体；阶段 3（双路径对拍）待顶层支持后进行。前置阅读：
 > [tjs2-bytecode.md](tjs2-bytecode.md)（旧格式）、[ciallang-bytecode.md](ciallang-bytecode.md)（本项目指令集）。
 
 ---

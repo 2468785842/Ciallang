@@ -67,7 +67,7 @@ namespace cial::tjsbc {
         i32 maxFrameCount = 0;                    // ┘
         i32 funcDeclArgCount = 0;                 // ┐
         i32 funcDeclUnnamedArgArrayBase = 0;      // │函数签名
-        i32 funcDeclCollapseBase = 0;             // ┘
+        i32 funcDeclCollapseBase = -1;            // -1 = 无 collapse             // ┘
         i32 propSetter = -1;                      // context 索引（property setter）
         i32 propGetter = -1;
         i32 superClassGetter = -1;

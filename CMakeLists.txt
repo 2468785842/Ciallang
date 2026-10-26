@@ -72,6 +72,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/RandomLib.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/SerializeLib.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/tjsbc/TjsBytecodeReader.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/tjsbc/TjsTranslator.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc.cpp
 
