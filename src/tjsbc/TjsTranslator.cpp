@@ -100,8 +100,9 @@ namespace cial::tjsbc {
             i32 word{};        // 指令首码字偏移
             i32 r1 = 0, r2 = 0, r3 = 0, r4 = 0;
             i32 dataIdx = -1;  // CONST/PD/CALLD 的常量槽下标
-            i32 imm = 0;       // CCL 计数 / 跳转相对字偏移 / CALL 实参数
+            i32 imm = 0;       // CCL 计数 / 跳转相对字偏移 / CALL 实参数（-1 省略 / -2 展开）
             Vec<i32> args{};   // CALL 族实参寄存器（TJS r）
+            Vec<std::pair<i32, i32>> fatEntries{}; // 展开调用 (fatType, TJS r) 表
             i32 size = 1;      // 本指令码字步长（CALL 族在 decode 内计算）
         };
 
@@ -211,7 +212,7 @@ namespace cial::tjsbc {
                 case OP_INT: case OP_REAL: case OP_STR: case OP_INC:
                 case OP_DEC: case OP_SRV: case OP_THROW: case OP_GLOBAL:
                 case OP_BNOT: case OP_NUM: case OP_ASC: case OP_CHR:
-                case OP_TYPEOF: case OP_CL:
+                case OP_TYPEOF: case OP_CL: case OP_EVAL: case OP_EEXP:
                     d.r1 = reg(1);
                     return d;
                 case OP_RET:
@@ -239,8 +240,18 @@ namespace cial::tjsbc {
                     d.r1 = reg(1);
                     d.r2 = reg(2);
                     d.imm = reg(3);
-                    if(d.imm < 0)
-                        trError("collapsed/expanded calls are not supported in M1 translator");
+                    if(d.imm == -1) { // 省略透传（tjs2-bytecode.md §4）
+                        d.size = 4;
+                        return d;
+                    }
+                    if(d.imm == -2) { // 展开调用：条目表 (fatType, reg) × count
+                        const i32 count = reg(4);
+                        d.size = 5 + count * 2;
+                        d.fatEntries.reserve(static_cast<size_t>(count));
+                        for(i32 k = 0; k < count; ++k)
+                            d.fatEntries.emplace_back(reg(5 + k * 2), reg(6 + k * 2));
+                        return d;
+                    }
                     d.args.reserve(static_cast<size_t>(d.imm));
                     for(i32 k = 0; k < d.imm; ++k)
                         d.args.push_back(reg(4 + k));
@@ -255,8 +266,18 @@ namespace cial::tjsbc {
                     else
                         d.r3 = reg(3);
                     d.imm = reg(4);
-                    if(d.imm < 0)
-                        trError("collapsed/expanded calls are not supported in M1 translator");
+                    if(d.imm == -1) {
+                        d.size = 5;
+                        return d;
+                    }
+                    if(d.imm == -2) {
+                        const i32 count = reg(5);
+                        d.size = 6 + count * 2;
+                        d.fatEntries.reserve(static_cast<size_t>(count));
+                        for(i32 k = 0; k < count; ++k)
+                            d.fatEntries.emplace_back(reg(6 + k * 2), reg(7 + k * 2));
+                        return d;
+                    }
                     d.args.reserve(static_cast<size_t>(d.imm));
                     for(i32 k = 0; k < d.imm; ++k)
                         d.args.push_back(reg(5 + k));
@@ -398,8 +419,6 @@ namespace cial::tjsbc {
             const TjsContext &ctx = file.contexts[ci];
             if(ctx.type == TjsContextType::SuperClassGetter)
                 continue; // 由 ctClass 经 superClassGetter 加载期解释消费，无产物
-            if(ctx.funcDeclCollapseBase >= 0)
-                trError("collapse parameters (*args) are not supported");
 
             // ── ctClass：加载期解释（mapping.md §7）——body 不生成 TAC ──
             if(ctx.type == TjsContextType::Class) {
@@ -547,6 +566,14 @@ namespace cial::tjsbc {
                         inter::Register{static_cast<u16>(k - 3 - a)});
             }
 
+            // collapse 参数（TJS `function f(a, b*)`）：FuncDeclCollapseBase>=0 时
+            // 把本帧实际实参 %base.. 收拢成 Array 落 TJS 槽 ra[-3-base]
+            //（须在实参仍完整的 prologue 末尾执行）
+            if(ctx.funcDeclCollapseBase >= 0)
+                chunk.emitRaw<inter::CollapseArgs>(
+                    mapReg(-3 - ctx.funcDeclCollapseBase),
+                    Integer{ctx.funcDeclCollapseBase});
+
             const i32 tacBase = static_cast<i32>(chunk.getInstVec().size());
             Vec<std::pair<i32, i32>> offsetMap{}; // 字偏移 → TAC 下标
             Vec<JumpFixup> jumpFixups{};
@@ -649,11 +676,14 @@ namespace cial::tjsbc {
                     case OP_CDEQ:
                         chunk.emit<inter::AbsEQ>(r1, r2, regF);
                         break;
-                    case OP_CLT: // TJS CLT = r1 > r2（编译器换序，直译不纠正）
-                        chunk.emit<inter::GT>(r1, r2, regF);
+                    // CLT/CGT 是自然序：CLT → tTJSVariant::GreaterThan 实现为
+                    // `this < val2`（TJS2 历史命名陷阱），CGT → LittlerThan 实现为
+                    // `this > val2`（tjsVariant.cpp:827/853 实测）
+                    case OP_CLT:
+                        chunk.emit<inter::LT>(r1, r2, regF);
                         break;
                     case OP_CGT:
-                        chunk.emit<inter::LT>(r1, r2, regF);
+                        chunk.emit<inter::GT>(r1, r2, regF);
                         break;
                     case OP_TT:
                         chunk.emit<inter::LNot>(r1, regF);
@@ -824,6 +854,11 @@ namespace cial::tjsbc {
                         }
                         break;
                     }
+                    case OP_EVAL: case OP_EEXP:
+                        // 字符串即时求值（源码路径 EvalStr 同款；EEXP 内嵌表达式
+                        // 形态差异仅编译期，运行期语义一致）
+                        chunk.emit<inter::EvalStr>(r1, r1);
+                        break;
                     case OP_BNOT: case OP_NUM:
                         trError("opcode not supported in M1 translator");
                     case OP_TYPEOF:
@@ -872,6 +907,20 @@ namespace cial::tjsbc {
                             chunk.emit<inter::GProp>(r2, r3, regT);
                             func = regT;
                         }
+                        if(d.imm == -1) { // 省略透传：转发本帧实际实参
+                            chunk.emitRaw<inter::CallOmit>(r1, func);
+                            break;
+                        }
+                        if(d.imm == -2) { // 展开调用
+                            Vec<std::pair<u8, inter::Register>> entries{};
+                            entries.reserve(d.fatEntries.size());
+                            for(const auto &[type, tjsReg] : d.fatEntries)
+                                entries.emplace_back(static_cast<u8>(type), mapReg(tjsReg));
+                            chunk.emitRaw<inter::CallExpand>(
+                                r1, func, Integer{ctx.funcDeclUnnamedArgArrayBase},
+                                std::move(entries));
+                            break;
+                        }
                         for(const i32 arg : d.args)
                             chunk.emit<inter::Push>(mapReg(arg));
                         chunk.emit<inter::Call>(r1, func,
@@ -881,6 +930,20 @@ namespace cial::tjsbc {
                     case OP_NEW: {
                         // 构造：类值上 Call（ClassObject::call 创建 DataObject +
                         // initDefaultVal + 构造器），与 TJS CreateNew 对齐
+                        if(d.imm == -1) {
+                            chunk.emitRaw<inter::CallOmit>(r1, r2);
+                            break;
+                        }
+                        if(d.imm == -2) {
+                            Vec<std::pair<u8, inter::Register>> entries{};
+                            entries.reserve(d.fatEntries.size());
+                            for(const auto &[type, tjsReg] : d.fatEntries)
+                                entries.emplace_back(static_cast<u8>(type), mapReg(tjsReg));
+                            chunk.emitRaw<inter::CallExpand>(
+                                r1, r2, Integer{ctx.funcDeclUnnamedArgArrayBase},
+                                std::move(entries));
+                            break;
+                        }
                         for(const i32 arg : d.args)
                             chunk.emit<inter::Push>(mapReg(arg));
                         chunk.emit<inter::Call>(r1, r2,

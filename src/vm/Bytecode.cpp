@@ -387,6 +387,30 @@ namespace cial::vm {
             write<u16>(info.code, r.index());
     }
 
+    void Bytecode::encode(Info &info, const inter::CallOmit *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CallOmit));
+        write<u16>(info.code, tac->dst.index());
+        write<u16>(info.code, tac->func.index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::CallExpand *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CallExpand));
+        write<u16>(info.code, tac->dst.index());
+        write<u16>(info.code, tac->func.index());
+        encodeUleb128(static_cast<u64>(tac->unnamedBase), info.code);
+        encodeUleb128(static_cast<u64>(tac->entries.size()), info.code);
+        for(const auto &[type, reg] : tac->entries) {
+            info.code.push_back(type);
+            write<u16>(info.code, reg.index());
+        }
+    }
+
+    void Bytecode::encode(Info &info, const inter::CollapseArgs *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CollapseArgs));
+        write<u16>(info.code, tac->dst.index());
+        encodeUleb128(static_cast<u64>(tac->base), info.code);
+    }
+
     void Bytecode::encode(Info &info, const inter::NewRegExp *tac) {
         info.code.push_back(static_cast<u8>(VmOpCode::NewRegExp));
         write<u16>(info.code, tac->dst().index());

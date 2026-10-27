@@ -80,10 +80,19 @@ var Debug = new __DebugShim();
             if(program.topLevel < 0)
                 throw std::runtime_error("bytecode has no top-level context");
             auto *chunk = program.contexts[static_cast<size_t>(program.topLevel)].chunk;
-            // CIAL_TJSBC_DUMP=1:打印顶层 context 转译产物 TAC（调试用）
-            if(const char *dp = std::getenv("CIAL_TJSBC_DUMP"); dp && *dp)
-                fmt::println("--- tjsbc top-level TAC ---\n{}",
-                             chunk->dumpInstructions());
+            // CIAL_TJSBC_DUMP=1:打印顶层 context 转译产物 TAC；=all 打印全部 context（调试用）
+            if(const char *dp = std::getenv("CIAL_TJSBC_DUMP"); dp && *dp) {
+                if(std::string(dp) == "all") {
+                    for(size_t i = 0; i < program.contexts.size(); ++i) {
+                        if(program.contexts[i].chunk)
+                            fmt::println("--- tjsbc ctx[{}] ---\n{}", i,
+                                         program.contexts[i].chunk->dumpInstructions());
+                    }
+                } else {
+                    fmt::println("--- tjsbc top-level TAC ---\n{}",
+                                 chunk->dumpInstructions());
+                }
+            }
             vmState.allocCallFrame(chunk);
             vmState.makeClosure();
             // 顶层 this = 全局对象（TJS 顶层 SPDS/GPD 经 this/proxy 寄存器读写全局）

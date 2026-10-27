@@ -12,8 +12,10 @@
 // （this→global 回落链，TJS2 objthis-proxy 语义）。
 // 已知近似（见 mapping.md §8.1）：TYPEOFD/I 成员缺失时抛错（TJS2 返回
 // "undefined"）；GPI/SPIS/CALLI 经 proxy 无回落；SPDS 经 proxy 落 this 槽。
-// 仍缺口（M4）：collapse 参数、省略/展开调用（argc=-1/-2，加载期报错）、
-// EVAL/EEXP、octet 转换指令。
+// M4 支持集：省略透传（argc=-1→CallOmit）、展开调用（argc=-2→CallExpand，
+// fatNormal/fatExpand/fatUnnamedExpand）、collapse 参数（CollapseArgs）、
+// EVAL/EEXP→EvalStr、CLT/CGT 自然序（GreaterThan/LittlerThan 名实相反）。
+// 仍缺口：OP_OCTET 转换指令、octet 转换。
 #pragma once
 
 #include "runtime/AtomTable.hpp"

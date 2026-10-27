@@ -937,11 +937,122 @@ namespace cial::vm {
         return DispatchRet::Call;
     }
 
+    namespace {
+        // 下标 → Array 的 0 基位置；负数从尾数（-1 = 末元素）；越界返回 npos
+        constexpr size_t npos = static_cast<size_t>(-1);
+        size_t arrayIndex(const i64 idx, const size_t n) {
+            if(idx >= 0)
+                return static_cast<u64>(idx) < n ? static_cast<size_t>(idx) : npos;
+            const auto u = static_cast<u64>(-idx);
+            return u <= n && u > 0 ? n - static_cast<size_t>(u) : npos;
+        }
+    } // namespace
+
+    // 本帧实际实参读取：超额调用（argCount > arity）时全部实参由
+    // Function::call 按调用顺序复制在窗口顶部保留区 regCount..；
+    // 未超额时 %0..%actualArgc-1 即实参（与池顶重合）
+    static Value frameArg(CallFrame *cur, const Value *regs, const u32 i) {
+        const u32 arity = cur->funcMeta ? cur->funcMeta->arity : 0;
+        if(cur->actualArgc > arity)
+            return regs[cur->chunk->getRegCount() + i];
+        return regs[i];
+    }
+
+    // 省略透传调用（旧版 argc=-1，TJS `f(...)`）：把本帧实际实参
+    // %0..%actualArgc-1 原样转发。压池可能迁移寄存器窗口，先拷贝再压
+    DISPATCH_OP_METHOD(CallOmit) {
+        const u16 r1 = read<u16>(ip, pc); // dst
+        const u16 r2 = read<u16>(ip, pc); // func
+        const u32 argc = cur->actualArgc;
+        Vec<Value> args{};
+        args.reserve(argc);
+        for(u32 i = 0; i < argc; ++i)
+            args.push_back(frameArg(cur, regs, i));
+        // 被调者与实参都在压池前取值：push 扩池会迁移寄存器窗口使 regs 悬空
+        const Value callee = regs[r2];
+        for(const auto &v : args)
+            push(v);
+        cur->pc = pc;
+        callee.asObject().unwrap()->call(*this, r1, static_cast<size_t>(argc));
+        return DispatchRet::Call;
+    }
+
+    // 展开调用（旧版 argc=-2，TJS `f(1, arr*, *)`）：entries 逐条
+    // Normal/Expand(Array 元素)/UnnamedExpand(本帧 unnamed 实参) 收集后统一压池
+    DISPATCH_OP_METHOD(CallExpand) {
+        const u16 r1 = read<u16>(ip, pc);  // dst
+        const u16 r2 = read<u16>(ip, pc);  // func
+        const u64 unnamedBase = decodeUleb128(ip, pc, 10);
+        const u64 count = decodeUleb128(ip, pc, 10);
+        Vec<Value> args{};
+        for(u64 k = 0; k < count; ++k) {
+            const u8 type = ip[pc++]; // 1 字节 fatType（read<> 需 ≥2 字节）
+            const u16 reg = read<u16>(ip, pc);
+            switch(type) {
+                case 0: // fatNormal
+                    args.push_back(regs[reg]);
+                    break;
+                case 1: { // fatExpand：展开 Array 元素
+                    const auto &obj = regs[reg];
+                    auto *arr = obj.isObject()
+                        ? dynamic_cast<Array *>(obj.asObject().unwrap())
+                        : nullptr;
+                    if(!arr)
+                        throw std::runtime_error("expand call '*' expects an array");
+                    for(auto &el : arr->elements)
+                        args.push_back(el);
+                    break;
+                }
+                default: { // fatUnnamedExpand：本帧 unnamed 实参（%base..）
+                    const u32 base = static_cast<u32>(unnamedBase);
+                    for(u32 i = base; i < cur->actualArgc; ++i)
+                        args.push_back(frameArg(cur, regs, i));
+                    break;
+                }
+            }
+        }
+        // 被调者在压池前取值（同 CallOmit）
+        const Value callee = regs[r2];
+        for(const auto &v : args)
+            push(v);
+        cur->pc = pc;
+        callee.asObject().unwrap()->call(*this, r1, args.size());
+        return DispatchRet::Call;
+    }
+
+    // collapse 参数收拢（旧版 FuncDeclCollapseBase，TJS `function f(a, b*)`）：
+    // 本帧实际实参 %base..%actualArgc-1 收拢成新 Array 写 dst；无超额实参时
+    // 写空 Array（TJS2 无条件建 Array）
+    DISPATCH_OP_METHOD(CollapseArgs) {
+        const u16 r1 = read<u16>(ip, pc); // dst（TJS 位置 ra[-3-base]）
+        const u64 base = decodeUleb128(ip, pc, 10);
+        const u32 argc = cur->actualArgc;
+        const size_t n = argc > base ? argc - base : 0;
+        auto arr = rt.create<Array>(&rt, n);
+        for(size_t i = 0; i < n; ++i)
+            arr->elements[i] = frameArg(cur, regs, static_cast<u32>(base + i));
+        regs[r1] = Value{ arr.get() };
+        return DispatchRet::Continue;
+    }
+
     DISPATCH_OP_METHOD(GProp) {
         const u16 r1 = read<u16>(ip, pc); // obj
         const u16 r2 = read<u16>(ip, pc); // member
         const u16 r3 = read<u16>(ip, pc); // dst
         const auto &val = regs[r1];
+        // 整数成员名（旧版 PropGetByNum，TJS `a[0]` 编译为 GPI+整数名）：数组下标
+        if(regs[r2].isInteger()) {
+            auto *arr = val.isObject() ? dynamic_cast<Array *>(val.asObject().unwrap())
+                                       : nullptr;
+            if(!arr)
+                throw std::runtime_error("integer member access expects an array");
+            const auto i = regs[r2].asInteger().unwrap();
+            const size_t pos = arrayIndex(i, arr->elements.size());
+            if(pos == npos)
+                throw std::runtime_error("array index out of range");
+            regs[r3] = arr->elements[pos];
+            return DispatchRet::Continue;
+        }
         const String &name = *regs[r2].asString().unwrap();
         const Atom atom = rt.atomTable.intern(name);
 
@@ -1026,6 +1137,25 @@ namespace cial::vm {
         const u16 r3 = read<u16>(ip, pc); // src
         const auto &objVal = regs[r1];
         CLL_ASSERT(objVal.isObject(), "dprop obj is not object");
+        // 整数成员名（旧版 PropSetByNum）：数组下标写，越界自动扩展补 void
+        if(regs[r2].isInteger()) {
+            auto *arr = dynamic_cast<Array *>(objVal.asObject().unwrap());
+            if(!arr)
+                throw std::runtime_error("integer member access expects an array");
+            const auto i = regs[r2].asInteger().unwrap();
+            if(i >= 0) {
+                const auto u = static_cast<u64>(i);
+                if(u >= arr->elements.size())
+                    arr->elements.resize(static_cast<size_t>(u) + 1);
+                arr->elements[static_cast<size_t>(u)] = regs[r3];
+            } else {
+                const auto u = static_cast<u64>(-i);
+                if(u == 0 || u > arr->elements.size())
+                    throw std::runtime_error("array index out of range");
+                arr->elements[arr->elements.size() - static_cast<size_t>(u)] = regs[r3];
+            }
+            return DispatchRet::Continue;
+        }
         const String &name = *regs[r2].asString().unwrap();
         const Atom atom = rt.atomTable.intern(name);
         // 成员写（旧版 SPD）：槽位当前值是 Property 对象则调 setter（invokeSet 只压
@@ -1057,6 +1187,24 @@ namespace cial::vm {
         if(!objVal.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
         }
+        if(regs[r2].isInteger()) { // 整数成员名：数组下标写（越界扩展补 void）
+            auto *arr = dynamic_cast<Array *>(objVal.asObject().unwrap());
+            if(!arr)
+                throw std::runtime_error("integer member access expects an array");
+            const auto i = regs[r2].asInteger().unwrap();
+            if(i >= 0) {
+                const auto u = static_cast<u64>(i);
+                if(u >= arr->elements.size())
+                    arr->elements.resize(static_cast<size_t>(u) + 1);
+                arr->elements[static_cast<size_t>(u)] = regs[r3];
+            } else {
+                const auto u = static_cast<u64>(-i);
+                if(u == 0 || u > arr->elements.size())
+                    throw std::runtime_error("array index out of range");
+                arr->elements[arr->elements.size() - static_cast<size_t>(u)] = regs[r3];
+            }
+            return DispatchRet::Continue;
+        }
         const String &name = *regs[r2].asString().unwrap();
         const Atom atom = rt.atomTable.intern(name);
         objVal.asObject().unwrap()->setProp(atom, regs[r3]);
@@ -1086,6 +1234,17 @@ namespace cial::vm {
         const u16 r2 = read<u16>(ip, pc); // member
         const u16 r3 = read<u16>(ip, pc); // dst
         const auto &val = regs[r1];
+        if(regs[r2].isInteger()) { // 整数成员名：数组下标读
+            auto *arr = val.isObject() ? dynamic_cast<Array *>(val.asObject().unwrap())
+                                       : nullptr;
+            if(!arr)
+                throw std::runtime_error("integer member access expects an array");
+            const size_t pos = arrayIndex(regs[r2].asInteger().unwrap(), arr->elements.size());
+            if(pos == npos)
+                throw std::runtime_error("array index out of range");
+            regs[r3] = arr->elements[pos];
+            return DispatchRet::Continue;
+        }
         const String &name = *regs[r2].asString().unwrap();
         const Atom atom = rt.atomTable.intern(name);
         if(!val.isObject()) {
@@ -1156,17 +1315,6 @@ namespace cial::vm {
         regs[r1] = Value{ rt.create<Dictionary>().get() };
         return DispatchRet::Continue;
     }
-
-    namespace {
-        // 下标 → Array 的 0 基位置；负数从尾数（-1 = 末元素）；越界返回 npos
-        constexpr size_t npos = static_cast<size_t>(-1);
-        size_t arrayIndex(const i64 idx, const size_t n) {
-            if(idx >= 0)
-                return static_cast<u64>(idx) < n ? static_cast<size_t>(idx) : npos;
-            const auto u = static_cast<u64>(-idx);
-            return u <= n && u > 0 ? n - static_cast<size_t>(u) : npos;
-        }
-    } // namespace
 
     // a[i] 读：数组整数下标（负=从尾，越界报脚本异常）、字典键（字符串化）、
     // 字符串字符（保持旧 charAt 字节语义：越界得空串）、其余对象按成员名访问

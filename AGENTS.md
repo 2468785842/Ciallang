@@ -56,7 +56,7 @@ Ciallang/
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
 | `src/gc/` | 内存管理 | `MarkSweepHeader`、固定 512B 节点自由链表 + 标记清除 |
 | `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`NativeRegister`(按 TypeId 分派原生方法)、`Debug` |
-| `src/tjsbc/` | TJS2 字节码转译（阶段 2） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(M1+M2：恒等平移/标志物化/属性全族/类 context 加载期解释（var/构造器/成员 property/superClassGetter→extends）/NEW→Call/P 变体与 GETP·SETP/DELD·TYPEOFD/proxy(ra[-2])→GThis·DThis 回落链——`test_class.tjs` 字节码路径与源码路径对拍一致；collapse/展开调用为 M4，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
+| `src/tjsbc/` | TJS2 字节码转译（阶段 2） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(M1+M2+M4：恒等平移/标志物化/属性全族（含整数成员名）/类 context 加载期解释/NEW→Call/P 变体与 GETP·SETP/DELD·TYPEOFD/proxy 回落链/省略透传·展开调用·collapse 参数（CallOmit·CallExpand·CollapseArgs）/CLT·CGT 自然序——`test_class`/`test_function`/`test_misc` 字节码路径全量通过，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
 | `src/logging/` | 日志 | `Logger`（fmt 实际输出） |
 | `src/main.cpp` | 可执行 `cial`：`cial <script.tjs>`，走 run0() | |
 | `src/main0.cpp` | 可执行 `cial_bc`：fib 基准，走 run0() 扁平字节码路径 | |

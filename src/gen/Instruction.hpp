@@ -92,7 +92,10 @@
     O(WithPush)                                                                                                        \
     O(WithPop)                                                                                                         \
     O(GetWith)                                                                                                         \
-    O(NewRegExp)                                                                                                            O(CallV)
+    O(NewRegExp)                                                                                                            O(CallV)                                                                                                           \
+    O(CallOmit)                                                                                                        \
+    O(CallExpand)                                                                                                      \
+    O(CollapseArgs)
 
 namespace cial::vm {
     class VMState;
@@ -367,6 +370,58 @@ namespace cial::inter {
         ~CallV() override = default;
 
         [[nodiscard]] TacOpCode opcode() const override { return TacOpCode::CallV; }
+
+        [[nodiscard]] std::string dump(const vm::VMState *vmState) override;
+    };
+
+    // 省略透传调用（旧版 argc=-1，TJS `f(...)`）：把当前帧的实际实参
+    //（%0..%actualArgc-1）原样转发给 func。actualArgc 由 CallFrame 记录
+    struct CallOmit : Instruction {
+        Register dst{};
+        Register func{};
+
+        CallOmit(const Register d, const Register f) : dst(d), func(f) {}
+
+        ~CallOmit() override = default;
+
+        [[nodiscard]] TacOpCode opcode() const override { return TacOpCode::CallOmit; }
+
+        [[nodiscard]] std::string dump(const vm::VMState *vmState) override;
+    };
+
+    // 展开调用（旧版 argc=-2，TJS `f(1, arr*, *)`）：entries 为
+    // (fatType, 寄存器) 表——0=Normal 直传、1=Expand 展开 Array 元素、
+    // 2=UnnamedExpand 转发本帧 unnamed 实参（%unnamedBase..%actualArgc-1）。
+    // 与 CallV 同款手写子类
+    struct CallExpand : Instruction {
+        Register dst{};
+        Register func{};
+        Integer unnamedBase{};
+        Vec<std::pair<u8, Register>> entries{};
+
+        CallExpand(const Register d, const Register f, const Integer base,
+                   Vec<std::pair<u8, Register>> e) :
+            dst(d), func(f), unnamedBase(base), entries(std::move(e)) {}
+
+        ~CallExpand() override = default;
+
+        [[nodiscard]] TacOpCode opcode() const override { return TacOpCode::CallExpand; }
+
+        [[nodiscard]] std::string dump(const vm::VMState *vmState) override;
+    };
+
+    // collapse 参数收拢（旧版 FuncDeclCollapseBase，TJS `function f(a, b*)`）：
+    // 把本帧实际实参 %base..%actualArgc-1 收拢成新 Array 写 dst（TJS 位置
+    // ra[-3-base]）；无超额实参时写空 Array（TJS2 无条件建 Array）
+    struct CollapseArgs : Instruction {
+        Register dst{};
+        Integer base{};
+
+        CollapseArgs(const Register d, const Integer b) : dst(d), base(b) {}
+
+        ~CollapseArgs() override = default;
+
+        [[nodiscard]] TacOpCode opcode() const override { return TacOpCode::CollapseArgs; }
 
         [[nodiscard]] std::string dump(const vm::VMState *vmState) override;
     };

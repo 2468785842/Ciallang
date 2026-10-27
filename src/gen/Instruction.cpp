@@ -193,6 +193,23 @@ namespace cial::inter {
             out += fmt::format("%{} ", r.index());
         return out;
     }
+
+    std::string CallOmit::dump(const VMState *vm) {
+        return fmt::format("call_omit  {:<4} {:<4}", func.index(), dst.index());
+    }
+
+    std::string CallExpand::dump(const VMState *vm) {
+        std::string out = fmt::format("call_expd  {:<4} {:<4} base={} ", func.index(),
+                                      dst.index(), static_cast<i64>(unnamedBase));
+        static constexpr std::string_view names[]{"n", "e", "u"};
+        for(const auto &[t, r] : entries)
+            out += fmt::format("{}:%{} ", names[t < 3 ? t : 0], r.index());
+        return out;
+    }
+
+    std::string CollapseArgs::dump(const VMState *vm) {
+        return fmt::format("collapse   {:<4} base={}", dst.index(), static_cast<i64>(base));
+    }
     DEF_AUTO_DUMP(Ret, "ret");
 
     // 属性操作

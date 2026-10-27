@@ -130,16 +130,7 @@ TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
         REQUIRE(ret.asInteger().unwrap() == 43); // 3 + 4*10
     }
 
-    SECTION("M1 不支持特性明确报错") {
-        // collapse 参数（funcDeclCollapseBase >= 0）
-        TjsBytecodeFile file{};
-        file.topLevel = -1;
-        auto ctx = makeFuncContext({119}, {}, 0);
-        ctx.funcDeclCollapseBase = 0;
-        file.contexts.push_back(ctx);
-        REQUIRE_THROWS(TjsTranslator{ rt, file }.translate());
-
-        // 未知操作码
+    SECTION("未知操作码明确报错") {
         TjsBytecodeFile file2{};
         file2.topLevel = -1;
         file2.contexts.push_back(makeFuncContext({200}, {}, 0));
@@ -183,8 +174,16 @@ TEST_CASE("TJS2 字节码转译——M2 语料端到端（类/NEW/property/继�
         REQUIRE(pv.asInteger().unwrap() == 20);
     }
 
-    SECTION("test_function：展开/收拢调用为 M4，加载期明确报错") {
-        REQUIRE_THROWS(CorpusRun{ TEST_FILES_PATH R"(/tjsbc/test_function.tjsbc)" });
+    SECTION("test_function：省略透传/展开调用/collapse 参数（M4）") {
+        // kirikiri 原版函数测试全量：成功时零输出（失败即 throw），走到尾即通过。
+        // 源码路径不支持 `...`/`*` 语法，对拍基准为原版引擎行为（成功 = 无异常）
+        CorpusRun run{ TEST_FILES_PATH R"(/tjsbc/test_function.tjsbc)" };
+        // 抽查：argMul(*argsArray) 展开调用经 collapse 参数往返后全局写入的标记
+        //（脚本尾部 isFaild 应为 false）
+        const Value isFaild =
+            run.vmState.context.global()->getProp(run.rt.atomTable.intern("isFaild"_str));
+        REQUIRE(isFaild.isInteger());
+        REQUIRE(isFaild.asInteger().unwrap() == 0);
     }
 }
 

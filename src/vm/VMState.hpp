@@ -95,10 +95,10 @@ namespace cial::vm {
         void makeClosure() { _curFrame->closure = _stackTop > 1 ? prevFrame() : nullptr; }
 
         template <typename T>
-        void allocCallFrame(T *arg, const Opt<u16> ret = {}) {
+        void allocCallFrame(T *arg, const Opt<u16> ret = {}, const size_t extraSlots = 0) {
             if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
-            _curFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, _pool };
+            _curFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, _pool, extraSlots };
             _curFrame->withDepth = withStack.size();
         }
 

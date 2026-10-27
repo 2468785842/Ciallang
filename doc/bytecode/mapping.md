@@ -19,7 +19,16 @@
 > 寄存器未参与运算）、INTER_OBJECT 占位常量被 addConstant 去重合并（回填互相覆盖）。
 > 配套 VM 语义修正：DProp/GProp 对全局 property 槽触发 getter/setter（TJS2 PropSet 语义），
 > ChgThis 接受 Property 闭包，Function::call 未绑定时继承调用者 this（TJS2 调用点绑定，
-> super.<方法>() 经类对象成员访问的关键路径）。已知近似与 M4 缺口见 §8.1。
+> super.<方法>() 经类对象成员访问的关键路径），GPD/GPI/SPD/SPI/DPropRaw/GPropRaw 支持
+> 整数成员名（数组数值下标，旧版 PropGet/SetByNum——TJS `a[0]` 编译为 GPI+整数名）。
+> **M4 完成（2026-10-27）**：省略透传（argc=-1 → CallOmit）、展开调用（argc=-2 →
+> CallExpand，fatNormal/fatExpand/fatUnnamedExpand 条目表）、collapse 参数
+> （FuncDeclCollapseBase → CollapseArgs，超额实参由 Function::call 复制到窗口顶部
+> 保留区按调用序保全）、EVAL/EEXP→EvalStr；CLT/CGT 序修正。`test_function.tjs`
+> 与 `test_misc.tjs` 字节码路径全量通过（test_misc 与源码路径逐行一致；这两类语法
+> 源码路径不支持，对拍基准为原版引擎行为）。仍缺口：OP_OCTET 转换指令、
+> test_variant（Reader 对 TJSCompiler 导出文件尾 8 字节不一致拒读）、
+> test_string（TJSCompiler --dump 自身崩溃）。已知近似见 §8.1。
 > 前置阅读：
 > [tjs2-bytecode.md](tjs2-bytecode.md)（旧格式）、[ciallang-bytecode.md](ciallang-bytecode.md)（本项目指令集）。
 
@@ -102,7 +111,7 @@ TJS 的 VM 级单 bool `flag`（CEQ/TT 写、JF/JNF 读、NF 取反、SETF/SETNF
 
 | TJS | 转译序列 |
 |---|---|
-| CEQ/CDEQ/CLT/CGT r1,r2 | `EQ/AbsEQ/GT/LT r1, r2, %F`（⚠️ CLT=GreaterThan、CGT=LittlerThan 已被 TJS 编译器换序，直接对应即可） |
+| CEQ/CDEQ/CLT/CGT r1,r2 | `EQ/AbsEQ/LT/GT r1, r2, %F`（⚠️ CLT/CGT 是自然序：tTJSVariant::GreaterThan 实现为 `this < val2`、LittlerThan 为 `this > val2`（tjsVariant.cpp:827/853），即 CLT= `<`、CGT= `>`。§8 旧表"编译器已换序"的说法有误——只对了名字没对实现） |
 | TT r / TF r | `GLocal r → %F` / `GLocal r → %F` + `LNot %F,%F` |
 | SETF r / SETNF r | `GLocal %F → r` / `GLocal %F → tmp` + `LNot tmp → r` |
 | NF | `LNot %F, %F` |
@@ -255,7 +264,7 @@ propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 
 |---|---|---|
 | `===` 语义 | TJS DiscernCompare vs Ciallang `discernEquals` | 用例对拍（int/real/string/void/null/object 全组合） |
 | 加法重载 | TJS ADD 对 string/int/real 混合的隐式转换规则 | Value::add 已按 TJS 实现（有 ieee 测试），对拍确认 |
-| CLT/CGT 换序 | TJS 编译器已把 `<` 编为 CLT(=GreaterThan 换序) | 转译按表直译即可，**不要"纠正"** |
+| CLT/CGT 序 | `CLT=自然 <`、`CGT=自然 >`（GreaterThan/LittlerThan 名实相反，见 §3） | CLT→LT、CGT→GT（2026-10-27 修正：曾按"换序"说法译反，s 语料无 `<` 比较未暴露，test_misc 暴露） |
 | 整数/实数除法 | DIV/IDIV vs div/idiv | 对拍 |
 | 布尔判定 | TJS `value != 0` 式宽松真 vs `Value::asBool` | 对拍（空串/void/null/NaN） |
 | flag 物化 | flag 跨指令存活的场景（CEQ …非 flag 指令… JF） | %F 物化天然正确；仅性能损耗 |
@@ -275,6 +284,11 @@ propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 
 | 读-算-写属性模板 | `Operation()` 原子派发 | GProp→算→DProp 三条指令 | getter/setter 间状态可变，已知近似 |
 | 类体 super 初始化三连（GPD+CHGTHIS+CALL） | 运行期重跑父类类体 | 加载期跳过，继承语义由 superClassGetter 解释的 `extends` 承担 | 与源码路径 extends 模型一致 |
 | int/real 等 binop PD 变体 dst==0 | 丢弃结果 | 不发射写回（%K void 槽不被污染） | 修复：曾无条件写回 %K，污染裸 RET 的 void 返回值 |
+| 省略透传（argc=-1） | 转发调用者实际实参（含超额） | `CallOmit`：实参由 Function::call 复制到窗口顶部保留区（regCount..，调用顺序），帧 %0..%arity-1 重写为前 arity 个 | 超额时物理池布局只会让末 arity 个落在 %0..，且 prologue 静态写位会覆盖之 |
+| 展开调用（argc=-2） | fatNormal/fatExpand(Array)/fatUnnamedExpand 条目表 | `CallExpand dst, func, unnamedBase, entries` 同构实现；fatExpand 仅支持 Array | UnnamedExpand 以调用方 FuncDeclUnnamedArgArrayBase 为界 |
+| collapse 参数（`function f(a, b*)`） | 入口把 args[base..] 收拢成 Array 落 ra[-3-base] | `CollapseArgs dst, base` 在 prologue 末尾发射（实参尚完整时） | 无超额实参也建空 Array（TJS2 无条件建） |
+| EVAL/EEXP | 字符串即时编译执行，this=ra[-1] | `EvalStr`（源码路径已有指令）；EEXP 编译期形态差异运行期无别 | — |
+| 整数成员名（`a[0]` → GPI+整数名） | PropGet/SetByNum | GPD/GPI/SPD/SPI/DPropRaw/GPropRaw 整数名分支 = 数组数值下标（负从尾、写越界扩展） | — |
 
 ## 9. 对拍与工具链（已立项，未实现）
 
@@ -292,7 +306,7 @@ propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 
 | **M1** ✅ | Reader（容器+常量池+context 骨架）；顶层/函数 context 转译（§4.1/4.2 基型/4.5 CALL/4.6）；flag 物化；prologue；`cial --tjsbc` | fib/循环/算术/字符串拼接/print 的 .bc 对拍全绿（s1–s5） |
 | **M2** ✅ | 属性全族（GPI/SPI/GPDS…模板）、ctClass 加载期解释、NEW、try/catch、property、P 变体、DELD/DELI、TYPEOFD/I、octet 常量、proxy 回落链 | kirikiri `test_class.tjs` 编译产物对拍全绿（2026-10-27，与源码路径逐字节一致）；`test_function.tjs` 前半通过，展开/收拢调用部分留 M4 |
 | **M3** | 新增 TAC（比较写 zf / Inc/Dec / Typeof / Asc/Chr / BNot / DelProp / GetP/SetP）+ run0 编码补全 | M1 语料走 `run0()` 性能对齐源码路径；指令覆盖 128/128 |
-| **M4** | octet 转换指令、collapse 参数、展开/省略调用、EVAL/EEXP、`test_function.tjs` 全量 | tjs2 目录全部脚本 + 边缘语义清单通过 |
+| **M4** ✅ | collapse 参数（CollapseArgs）、展开调用（CallExpand）、省略透传（CallOmit）、EVAL/EEXP→EvalStr、CLT/CGT 序修正 | `test_function.tjs` 全量通过（2026-10-27）；`test_misc`/`test_with` 与源码路径一致；`test.tjs` 双方同位置失败（需宿主 Scripts 对象）。遗留：OP_OCTET 转换、test_variant Reader 拒读、test_string 原版导出崩溃 |
 
 **新增 TAC 指令提案汇总**（M3 落地，命名沿用现有风格）：
 `CmpEQ/CmpDEQ/CmpLT/CmpGT`（写 zf）、`Inc/Dec`、`Typeof`、`Asc/Chr`、`BNot`、`Num`、

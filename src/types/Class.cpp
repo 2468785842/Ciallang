@@ -126,6 +126,7 @@ namespace cial {
 
             vmState.allocCallFrame(constructor.meta, ret);
             auto *currentCallFrame = vmState.curFrame();
+            currentCallFrame->actualArgc = static_cast<u32>(argCount);
             currentCallFrame->setThisObj(Value{ constructor.thisObj });
 
             // 构造函数块保证以 Ret 结尾，run0 执行完自行释放帧
@@ -173,6 +174,7 @@ namespace cial {
 
                         vmState.allocCallFrame(constructor.meta, ret);
                         auto *currentCallFrame = vmState.curFrame();
+                        currentCallFrame->actualArgc = static_cast<u32>(argCount);
                         currentCallFrame->setThisObj(Value{ constructor.thisObj });
 
                         vmState.run0();

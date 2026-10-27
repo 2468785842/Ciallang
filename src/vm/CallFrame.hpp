@@ -29,6 +29,11 @@ namespace cial {
         DataObject *thisData{}; // thisObj 为 DataObject 时的缓存，否则 nullptr（消除热路径 dynamic_cast）
         Opt<u16> ret{};
         u64 pc{};
+        // 本帧实际收到的实参个数（arity 为补齐后的形参数）：省略透传（CallOmit）、
+        // unnamed 展开（CallExpand）与 collapse 收拢（CollapseArgs）依赖。
+        // 由各调用入口（Function::call / ClassObject::call 构造路径）在压帧后填写；
+        // 非函数帧（eval/顶层/字段初始化）保持 0
+        u32 actualArgc{};
         // 进入帧时的 with 上下文栈深（VMState::allocCallFrame 填写）：
         // 帧释放时 withStack 截断到此深度（unwind/正常返回共用 freeCallFrame）
         size_t withDepth{};
@@ -45,12 +50,18 @@ namespace cial {
 
         explicit CallFrame() = default;
 
-        explicit CallFrame(vm::Chunk *chunk, const Opt<u16> ret, vm::FastRegisterPool &pool) :
-            chunk(chunk), ret(ret), _pool(&pool), _sp(pool.allocFrame(chunk->getRegCount())) {}
+        explicit CallFrame(vm::Chunk *chunk, const Opt<u16> ret, vm::FastRegisterPool &pool,
+                           const size_t extraSlots = 0) :
+            chunk(chunk), ret(ret), _pool(&pool),
+            _sp(pool.allocFrame(chunk->getRegCount() + extraSlots)) {}
 
-        explicit CallFrame(FuncMeta *funcMeta, const Opt<u16> ret, vm::FastRegisterPool &pool) :
+        // extraSlots：实际实参超过 arity 的超额数。窗口按超额扩容后，%0.. 仍与
+        // 实参重合而静态槽（prologue 的 this/void 写入位）整体上移——否则
+        // prologue 会覆盖掉超额实参（省略透传/unnamed 展开/collapse 依赖它们）
+        explicit CallFrame(FuncMeta *funcMeta, const Opt<u16> ret, vm::FastRegisterPool &pool,
+                           const size_t extraSlots = 0) :
             chunk(funcMeta->chunk), funcMeta(funcMeta), ret(ret), _pool(&pool),
-            _sp(pool.allocFrame(funcMeta->chunk->getRegCount()) - funcMeta->arity) {}
+            _sp(pool.allocFrame(funcMeta->chunk->getRegCount() + extraSlots) - funcMeta->arity) {}
 
         CallFrame(CallFrame &&callFrame) noexcept :
             closure(callFrame.closure), chunk(callFrame.chunk), funcMeta(callFrame.funcMeta),
