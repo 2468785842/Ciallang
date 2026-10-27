@@ -13,7 +13,7 @@
 | 层 | 目标 | 状态 |
 |---|---|---|
 | 源码兼容 | 直接运行 .tjs 源码 | 部分实现（核心语句/函数/类/property 已通，缺 Array/Dictionary 字面量、with、RegExp 等，见 [doc/compatibility.md](doc/compatibility.md)） |
-| 字节码兼容 | 加载 TJSCompiler 编译出的字节码文件（`"TJS2" "100\0"` 格式），**转译**为本项目内部指令后执行 | 设计定稿（路线：转译，非独立解释器），见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md) |
+| 字节码兼容 | 加载 TJSCompiler 编译出的字节码文件（`"TJS2" "100\0"` 格式），**转译**为本项目内部指令后执行 | M2 完成（转译路线，`cial --tjsbc`；`test_class.tjs` 对拍一致；M4 缺 collapse/展开调用），见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md) |
 | 标准库兼容 | Array/Dictionary/String/Math/Date/RegExp/Exception/Octet | 仅 String 部分 |
 
 官方语言参考（语法权威）：[TJS2 リファレンス](https://hydrozoa.felisworks.com/doc/tjs2doc/contents/index.html)。
@@ -56,7 +56,7 @@ Ciallang/
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
 | `src/gc/` | 内存管理 | `MarkSweepHeader`、固定 512B 节点自由链表 + 标记清除 |
 | `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`NativeRegister`(按 TypeId 分派原生方法)、`Debug` |
-| `src/tjsbc/` | TJS2 字节码转译（阶段 1：格式解析） | `TjsBytecodeReader`(格式解析)+`TjsBytecodeReader`(格式解析)+`TjsTranslator`(M1 转译：恒等平移/标志物化/属性两族操作数序/CALL 族/顶层+函数 context 全链路——s1/s4/s5 字节码输出与源码路径一致；类/NEW/P 变体(闭包运算)为 M2，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
+| `src/tjsbc/` | TJS2 字节码转译（阶段 2） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(M1+M2：恒等平移/标志物化/属性全族/类 context 加载期解释（var/构造器/成员 property/superClassGetter→extends）/NEW→Call/P 变体与 GETP·SETP/DELD·TYPEOFD/proxy(ra[-2])→GThis·DThis 回落链——`test_class.tjs` 字节码路径与源码路径对拍一致；collapse/展开调用为 M4，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
 | `src/logging/` | 日志 | `Logger`（fmt 实际输出） |
 | `src/main.cpp` | 可执行 `cial`：`cial <script.tjs>`，走 run0() | |
 | `src/main0.cpp` | 可执行 `cial_bc`：fib 基准，走 run0() 扁平字节码路径 | |
@@ -79,7 +79,7 @@ ctest --test-dir build/Windows/Debug --output-on-failure
 ```
 
 - 依赖经 vcpkg 管理（`vcpkg.json`）：Catch2、fmt、spdlog、utf8proc。
-- 测试共 100 个 TEST_CASE（17 文件，其中 5 个文件因历史原因注释在 `tests/CMakeLists.txt`）。
+- 测试共 105 个 TEST_CASE（17 文件，其中 5 个文件因历史原因注释在 `tests/CMakeLists.txt`）。
 - `tests/test_files/tjs2/` 下是原版 kirikiri 测试脚本，是兼容性的行为基准。
 
 ## 代码风格与惯例

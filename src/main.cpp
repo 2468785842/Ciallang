@@ -80,13 +80,21 @@ var Debug = new __DebugShim();
             if(program.topLevel < 0)
                 throw std::runtime_error("bytecode has no top-level context");
             auto *chunk = program.contexts[static_cast<size_t>(program.topLevel)].chunk;
+            // CIAL_TJSBC_DUMP=1:打印顶层 context 转译产物 TAC（调试用）
+            if(const char *dp = std::getenv("CIAL_TJSBC_DUMP"); dp && *dp)
+                fmt::println("--- tjsbc top-level TAC ---\n{}",
+                             chunk->dumpInstructions());
             vmState.allocCallFrame(chunk);
             vmState.makeClosure();
             // 顶层 this = 全局对象（TJS 顶层 SPDS/GPD 经 this/proxy 寄存器读写全局）
             vmState.curFrame()->setThisObj(
                 Value{ static_cast<Object *>(vmState.context.global()) });
             try {
+                if(const char *dp = std::getenv("CIAL_TJSBC_DUMP"); dp && *dp)
+                    fmt::println(stderr, "[TJSBC] before run0");
                 vmState.run0();
+                if(const char *dp = std::getenv("CIAL_TJSBC_DUMP"); dp && *dp)
+                    fmt::println(stderr, "[TJSBC] after run0");
             } catch(...) {
                 vmState.clearException();
                 throw;

@@ -4,6 +4,7 @@
 #include "TjsTranslator.hpp"
 
 #include <cstring>
+#include <map>
 
 #include "gen/Label.hpp"
 #include "runtime/AtomTable.hpp"
@@ -88,7 +89,7 @@ namespace cial::tjsbc {
                 const i32 k4 = (op - OP_INC) % 4;
                 if(op < OP_LOR) // INC/DEC 组
                     return k4 == 0 ? 2 : (k4 == 3 ? 3 : 4);
-                return k4 == 0 ? 3 : 5;
+                return k4 == 0 ? 3 : (k4 == 3 ? 4 : 5);
             }
             return 1;
         }
@@ -226,6 +227,14 @@ namespace cial::tjsbc {
                     d.r1 = reg(1); // 类名 reg
                     d.r2 = reg(2); // 对象 reg
                     return d;
+                case OP_SETP: // [target, src]：*target = src
+                    d.r1 = reg(1);
+                    d.r2 = reg(2);
+                    return d;
+                case OP_GETP: // [dst, target]：dst = *target
+                    d.r1 = reg(1);
+                    d.r2 = reg(2);
+                    return d;
                 case OP_CALL: case OP_NEW: {
                     d.r1 = reg(1);
                     d.r2 = reg(2);
@@ -259,7 +268,7 @@ namespace cial::tjsbc {
             }
             // 4 连组：base / PD / PI / P
             if(d.op == OP_ADDCI || d.op == OP_REGMEMBER)
-                trError("class construction opcodes are not supported in M1 (M2)");
+                trError("class construction opcodes are not supported outside class bodies");
             if(d.op >= OP_INC && d.op <= OP_MUL) {
                 const i32 k4 = (d.op - OP_INC) % 4;
                 if(k4 == 0) { // base：破坏性双目 r1 = r1 OP r2 / INC·DEC r1
@@ -277,8 +286,12 @@ namespace cial::tjsbc {
                     d.r4 = reg(4); // rhs
                     return d;
                 }
-                trError("property closure arithmetic (P) is not supported in M1: opcode "
-                        + std::to_string(d.op));
+                // P（属性闭包）：二目组 [dst, target, param]、INC/DEC 组 [dst, target]
+                d.r1 = reg(1); // dst（0 = 丢弃）
+                d.r2 = reg(2); // target：属性节点对象
+                if(d.op >= OP_LOR)
+                    d.r3 = reg(3); // param
+                return d;
             }
             // 属性 4 字族，两套操作数序（tjsDisassemble 对齐）：
             //   GPD/GPDS: dst, obj, memberData    GPI/GPIS: dst, obj, memberReg
@@ -313,9 +326,34 @@ namespace cial::tjsbc {
                 d.r4 = reg(4);
                 return d;
             }
-            if(d.op == OP_DELD || d.op == OP_DELI || d.op == OP_TYPEOFD
-               || d.op == OP_TYPEOFI)
-                trError("delete/typeof member are not supported in M1 translator");
+            if(d.op == OP_DELD) { // [dst, obj, daIdx]
+                d.r1 = reg(1);      // dst（bool 结果）
+                d.r2 = reg(2);      // obj
+                d.dataIdx = reg(3); // member 名（DataArea 槽）
+                d.r4 = reg(4);
+                return d;
+            }
+            if(d.op == OP_DELI) { // [dst, obj, memberReg]
+                d.r1 = reg(1);
+                d.r2 = reg(2);
+                d.r3 = reg(3);
+                d.r4 = reg(4);
+                return d;
+            }
+            if(d.op == OP_TYPEOFD) { // [dst, obj, daIdx]
+                d.r1 = reg(1);
+                d.r2 = reg(2);
+                d.dataIdx = reg(3);
+                d.r4 = reg(4);
+                return d;
+            }
+            if(d.op == OP_TYPEOFI) { // [dst, obj, memberReg]
+                d.r1 = reg(1);
+                d.r2 = reg(2);
+                d.r3 = reg(3);
+                d.r4 = reg(4);
+                return d;
+            }
             trError("unsupported instruction in M1 translator: opcode " + std::to_string(d.op));
         }
 
@@ -351,20 +389,125 @@ namespace cial::tjsbc {
         // INTER_OBJECT 占位回填记录（Phase B' 经 GC chunk 指针回填 FuncMeta*）：
         // 每 context 一组 (常量下标, 目标 context 索引)
         Vec<Vec<std::pair<u16, i32>>> deferredPerCtx{};
+        // ctClass 的 var 成员：(名字 Atom, 初值常量槽)
+        Vec<Vec<std::pair<Atom, TjsDataSlot>>> classVarsPerCtx{};
 
         for(size_t ci = 0; ci < file.contexts.size(); ++ci) {
             deferredPerCtx.emplace_back();
+            classVarsPerCtx.emplace_back();
             const TjsContext &ctx = file.contexts[ci];
-            if(ctx.type == TjsContextType::Class)
-                trError("class contexts are not supported in M1 translator (M2)");
-            if(ctx.type == TjsContextType::Property
-               || ctx.type == TjsContextType::PropertySetter
-               || ctx.type == TjsContextType::PropertyGetter)
-                trError("property contexts are not supported in M1 translator (M2)");
             if(ctx.type == TjsContextType::SuperClassGetter)
-                trError("superClassGetter contexts are not supported in M1 translator (M2/M4)");
+                continue; // 由 ctClass 经 superClassGetter 加载期解释消费，无产物
             if(ctx.funcDeclCollapseBase >= 0)
                 trError("collapse parameters (*args) are not supported");
+
+            // ── ctClass：加载期解释（mapping.md §7）——body 不生成 TAC ──
+            if(ctx.type == TjsContextType::Class) {
+                auto &out = program.contexts[ci];
+                out.isClass = true;
+                out.parent = ctx.parent;
+                out.type = ctx.type;
+                auto classMetaGuard = rt.create<ClassMeta>(
+                    rt.atomTable.intern(poolString(file, ctx.name)), 0);
+                auto *meta = classMetaGuard.get();
+                rt.addHandleVal(meta);
+                _impl->roots.push_back(meta);
+                out.classMeta = meta;
+
+                // 解释 body：CONST/CL 跟踪寄存器常量；SPDS this.*name ← reg 记 var；
+                // GPD+CHGTHIS+CALL 为编译器生成的 super 类体初始化三连（继承语义由
+                // superClassGetter 解释出的 extends 承担），整段跳过
+                std::map<i32, i32> regSlot; // 寄存器 → 常量槽
+                i32 i2 = 0;
+                while(i2 < static_cast<i32>(ctx.code.size())) {
+                    const i32 op = ctx.code[static_cast<size_t>(i2)];
+                    if(op == OP_CONST) {
+                        regSlot[ctx.code[static_cast<size_t>(i2 + 1)]] =
+                            ctx.code[static_cast<size_t>(i2 + 2)];
+                        i2 += 3;
+                    } else if(op == OP_CL || op == OP_ADDCI) {
+                        if(op == OP_CL)
+                            regSlot.erase(ctx.code[static_cast<size_t>(i2 + 1)]);
+                        i2 += op == OP_ADDCI ? 3 : 2;
+                    } else if(op == OP_GPD) {
+                        // super 初始化三连：GPD r,-2,<父类槽>; CHGTHIS r,-1; CALL 0,r,n
+                        const i32 callAt = i2 + 7;
+                        if(i2 + 11 <= static_cast<i32>(ctx.code.size())
+                           && ctx.code[static_cast<size_t>(i2 + 4)] == OP_CHGTHIS
+                           && ctx.code[static_cast<size_t>(callAt)] == OP_CALL) {
+                            i2 += 11 + ctx.code[static_cast<size_t>(callAt + 3)];
+                        } else {
+                            trError("class body contains unrecognized GPD pattern (M2)");
+                        }
+                    } else if(op == OP_SPDS || op == OP_SPDE || op == OP_SPDEH) {
+                        // obj=%-1(this)，member=DataArea 槽（STRING 名），src=reg
+                        //（src=r0 = void：无初值的 var 声明）
+                        const i32 memberData = ctx.code[static_cast<size_t>(i2 + 2)];
+                        const i32 srcReg = ctx.code[static_cast<size_t>(i2 + 3)];
+                        const auto slotIt = regSlot.find(srcReg);
+                        if(ctx.code[static_cast<size_t>(i2 + 1)] != -1
+                           || (slotIt == regSlot.end() && srcReg != 0))
+                            trError("class body contains non-static member pattern (M2)");
+                        const auto &nameSlot = ctx.data[static_cast<size_t>(memberData)];
+                        if(nameSlot.type != TJS_TYPE_STRING)
+                            trError("class var member name is not a string");
+                        const auto nameAtom =
+                            rt.atomTable.intern(poolString(file, nameSlot.index));
+                        meta->setMember(
+                            MemberShapeMeta{ .name = nameAtom, .isVar = true },
+                            ClassFieldMeta{});
+                        // 初值槽 = src 寄存器 CONST 跟踪的槽；r0 → void
+                        classVarsPerCtx[ci].emplace_back(
+                            nameAtom,
+                            slotIt != regSlot.end()
+                                ? ctx.data[static_cast<size_t>(slotIt->second)]
+                                : TjsDataSlot{TJS_TYPE_VOID, 0});
+                        i2 += 4;
+                    } else if(op == OP_SRV) {
+                        i2 += 2;
+                    } else if(op == OP_REGMEMBER || op == OP_RET || op == OP_NOP) {
+                        // 方法注册经 parent 链在 Phase B 处理；RET 结束
+                        if(op == OP_RET)
+                            break;
+                        i2 += 1;
+                    } else if(op == OP_DEBUGGER) {
+                        i2 += 1;
+                    } else {
+                        trError("class body contains unrecognized pattern (M2): opcode "
+                                + std::to_string(op));
+                    }
+                }
+
+                // superClassGetter 加载期解释（mapping.md §7）：getter ctx 代码内
+                // 按 superClassGetterPointers 逐个取子程序，识别
+                // `GPD r,-2,<名字槽>; SRV r; RET` 得父类名，填 extends
+                if(ctx.superClassGetter >= 0) {
+                    const auto &getter = file.contexts[static_cast<size_t>(ctx.superClassGetter)];
+                    for(const i32 ptr : getter.superClassGetterPointers) {
+                        if(ptr < 0 || ptr + 7 > static_cast<i32>(getter.code.size())
+                           || getter.code[static_cast<size_t>(ptr)] != OP_GPD
+                           || getter.code[static_cast<size_t>(ptr + 4)] != OP_SRV
+                           || getter.code[static_cast<size_t>(ptr + 6)] != OP_RET)
+                            trError("superClassGetter contains unsupported pattern (M2)");
+                        const i32 memberData = getter.code[static_cast<size_t>(ptr + 3)];
+                        meta->extends.push_back(rt.atomTable.intern(
+                            dataSlotString(getter, file, memberData)));
+                    }
+                }
+                continue;
+            }
+
+            // ── ctProperty 聚合：getter/setter 子 context 在 Phase B 装配 ──
+            if(ctx.type == TjsContextType::Property) {
+                auto &out = program.contexts[ci];
+                out.isProperty = true;
+                out.parent = ctx.parent;
+                out.type = ctx.type;
+                out.nameAtom = ctx.name >= 0 ? rt.atomTable.intern(poolString(file, ctx.name))
+                                             : Atom{}; // 匿名 context（name=-1）
+                continue;
+            }
+            // getter/setter：按函数路径转译（type 保留，Phase B 装配 PropMeta）
 
             // ra 基偏移恒等平移：K = VC+RC，但实参区 ra[-3-i] 要求 K ≥ 2+argc，
             // 多参函数取 max 修正（如 g(a,b) 的 %-4 越出 VC+RC=3）
@@ -384,8 +527,11 @@ namespace cial::tjsbc {
                 return chunk.addConstant(Constant{rt.atomTable.intern(s)});
             };
 
-            // prologue：ra[-2]≈global、ra[-1]=this、ra[0]=void；函数搬实参
-            chunk.emit<inter::Global>(inter::Register{static_cast<u16>(k - 2 >= 0 ? k - 2 : 0)});
+            // prologue：ra[-2]、ra[-1] 都取 this、ra[0]=void；函数搬实参。
+            // TJS2 的 ra[-2] 是 objthis-proxy（this 优先、global 回落）：方法/getter
+            // 内经 -2 的成员访问必须解析到实例——映射为 This（Ciallang getThis 自带
+            // this→global 回落；顶层/全局函数 this 本就是全局对象，行为不变）
+            chunk.emit<inter::This>(inter::Register{static_cast<u16>(k - 2 >= 0 ? k - 2 : 0)});
             chunk.emit<inter::This>(inter::Register{static_cast<u16>(k - 1)});
             chunk.emit<inter::Load>(inter::Register{static_cast<u16>(k)}, ConstIdx{0});
             if(ctx.type != TjsContextType::TopLevel && ctx.funcDeclArgCount > 0) {
@@ -462,9 +608,15 @@ namespace cial::tjsbc {
                                    || slot.index >= static_cast<i32>(file.contexts.size()))
                                     trError("INTER_OBJECT index out of range");
                                 // 占位常量：Phase B'（全部 context 完成后）经 GC chunk
-                                // 指针回填 FuncMeta*——此处 chunk 仍在栈上不可持指针
-                                const u16 cidx =
-                                    static_cast<u16>(chunk.addConstant(Constant{}).index());
+                                // 指针回填 FuncMeta*——此处 chunk 仍在栈上不可持指针。
+                                // 直接 append 绕过 addConstant 去重：空 Constant 彼此
+                                // 相等，去重会让多个 INTER_OBJECT 站点共享同一槽位，
+                                // 回填时互相覆盖（global.A 写成 B 的类对象这类错位）
+                                auto &consts = chunk.getConstants();
+                                if(consts.size() >= std::numeric_limits<u16>::max())
+                                    trError("too many constants");
+                                const u16 cidx = static_cast<u16>(consts.size());
+                                consts.emplace_back(Constant{});
                                 deferredPerCtx[ci].emplace_back(cidx, slot.index);
                                 chunk.emit<inter::Load>(r1, ConstIdx{cidx});
                                 break;
@@ -532,11 +684,13 @@ namespace cial::tjsbc {
                             chunk.emit<inter::Jmp>(Label{0});
                         } else {
                             chunk.emit<inter::Test>(regF);
+                            // TJS JF = flag 真则跳 → Test 置 _zf=flag 后 JmpE（真跳）；
+                            // JNF = 假则跳 → JmpNE。mapping.md §3 表格同款
                             const JumpKind kind =
-                                d.op == OP_JF ? JumpKind::JmpNE : JumpKind::JmpE;
+                                d.op == OP_JF ? JumpKind::JmpE : JumpKind::JmpNE;
                             jumpFixups.push_back(
                                 {chunk.getInstVec().size(), static_cast<size_t>(target), kind});
-                            chunk.emit<inter::JmpNE>(Label{0}); // 占位，repl 时按 kind 修正
+                            chunk.emit<inter::JmpE>(Label{0}); // 占位，repl 时按 kind 修正
                         }
                         break;
                     }
@@ -544,37 +698,74 @@ namespace cial::tjsbc {
                         chunk.emit<inter::DLocal>(r2, regT);
                         chunk.emit<inter::ChkIns>(regT, r1);
                         break;
-                    case OP_INC: case OP_DEC: {
+                    case OP_INC: case OP_INC + 1: case OP_INC + 2: case OP_INC + 3:
+                    case OP_DEC: case OP_DEC + 1: case OP_DEC + 2: case OP_DEC + 3: {
                         const i32 k4 = (d.op - OP_INC) % 4;
-                        const bool isInc = d.op == OP_INC;
+                        const bool isInc = d.op < OP_DEC; // 组判定：INC 族 18..21
+                        // v = v ± 1（1 预载在 regT2；v==regT2 时由调用方保证不发生）
                         auto emitOne = [&](const inter::Register v) {
                             if(isInc)
-                                chunk.emit<inter::Add>(v, regT, v);
+                                chunk.emit<inter::Add>(v, regT2, v);
                             else
-                                chunk.emit<inter::Sub>(v, regT, v);
+                                chunk.emit<inter::Sub>(v, regT2, v);
                         };
                         if(k4 == 0) { // base：r1 ± 1
-                            chunk.emit<inter::LoadImm>(regT, Integer{1});
+                            chunk.emit<inter::LoadImm>(regT2, Integer{1});
                             emitOne(r1);
                             break;
                         }
-                        // PD/PI：o[m] ± 1（读-算-写）
+                        if(k4 == 3) { // P：*target ± 1（属性节点读-算-写）
+                            chunk.emit<inter::DerefGet>(r2, regT);
+                            chunk.emit<inter::LoadImm>(regT2, Integer{1});
+                            emitOne(regT);
+                            chunk.emit<inter::DerefSet>(r2, regT);
+                            if(d.r1 != 0)
+                                chunk.emit<inter::DLocal>(regT, r1);
+                            break;
+                        }
+                        // PD/PI：o[m] ± 1（读-算-写）；PD 且 obj=proxy 时走
+                        // GThis/DThis（this→global 回落链）
                         const inter::Register name =
                             k4 == 1 ? regN : r3;
-                        if(k4 == 1)
+                        const bool viaProxy = k4 == 1 && d.r2 == -2;
+                        if(k4 == 1) {
+                            if(viaProxy) {
+                                const Atom nameAtom2 = rt.atomTable.intern(
+                                    dataSlotString(ctx, file, d.dataIdx));
+                                chunk.emit<inter::GThis>(nameAtom2, regT);
+                                chunk.emit<inter::LoadImm>(regT2, Integer{1});
+                                emitOne(regT);
+                                chunk.emit<inter::DThis>(nameAtom2, regT);
+                                if(d.r1 != 0) // dst=0 丢弃
+                                    chunk.emit<inter::DLocal>(regT, r1);
+                                break;
+                            }
                             chunk.emit<inter::Load>(
                                 regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                        }
                         chunk.emit<inter::GProp>(r2, name, regT);
                         chunk.emit<inter::LoadImm>(regT2, Integer{1});
                         emitOne(regT);
                         chunk.emit<inter::DProp>(r2, name, regT);
-                        chunk.emit<inter::DLocal>(regT, r1);
+                        if(d.r1 != 0) // dst=0 丢弃
+                            chunk.emit<inter::DLocal>(regT, r1);
                         break;
                     }
-                    case OP_LOR: case OP_LAND: case OP_BOR: case OP_BXOR:
-                    case OP_BAND: case OP_SAR: case OP_SAL: case OP_SR:
-                    case OP_ADD: case OP_SUB: case OP_MOD: case OP_DIV:
-                    case OP_IDIV: case OP_MUL: {
+                    // 14 组二目运算 × 4 变体（base/PD/PI/P），组内按 k4 分派
+                    case OP_LOR: case OP_LOR + 1: case OP_LOR + 2: case OP_LOR + 3:
+                    case OP_LAND: case OP_LAND + 1: case OP_LAND + 2: case OP_LAND + 3:
+                    case OP_BOR: case OP_BOR + 1: case OP_BOR + 2: case OP_BOR + 3:
+                    case OP_BXOR: case OP_BXOR + 1: case OP_BXOR + 2: case OP_BXOR + 3:
+                    case OP_BAND: case OP_BAND + 1: case OP_BAND + 2: case OP_BAND + 3:
+                    case OP_SAR: case OP_SAR + 1: case OP_SAR + 2: case OP_SAR + 3:
+                    case OP_SAL: case OP_SAL + 1: case OP_SAL + 2: case OP_SAL + 3:
+                    case OP_SR: case OP_SR + 1: case OP_SR + 2: case OP_SR + 3:
+                    case OP_ADD: case OP_ADD + 1: case OP_ADD + 2: case OP_ADD + 3:
+                    case OP_SUB: case OP_SUB + 1: case OP_SUB + 2: case OP_SUB + 3:
+                    case OP_MOD: case OP_MOD + 1: case OP_MOD + 2: case OP_MOD + 3:
+                    case OP_DIV: case OP_DIV + 1: case OP_DIV + 2: case OP_DIV + 3:
+                    case OP_IDIV: case OP_IDIV + 1: case OP_IDIV + 2: case OP_IDIV + 3:
+                    case OP_MUL: case OP_MUL + 1: case OP_MUL + 2: case OP_MUL + 3: {
                         const i32 k4 = (d.op - OP_LOR) % 4;
                         const i32 base = d.op - k4;
                         auto emitBinary = [&](const inter::Register a, const inter::Register b,
@@ -598,16 +789,36 @@ namespace cial::tjsbc {
                             }
                         };
                         if(k4 == 1 || k4 == 2) {
-                            // PD/PI：o[m] = o[m] OP p（读-算-写，mapping.md §6.1）
+                            // PD/PI：o[m] = o[m] OP p（读-算-写，mapping.md §6.1）；
+                            // PD 且 obj=proxy 时走 GThis/DThis（this→global 回落链）
                             const inter::Register name =
                                 k4 == 1 ? regN : r3;
-                            if(k4 == 1)
+                            if(k4 == 1) {
+                                if(d.r2 == -2) {
+                                    const Atom nameAtom2 = rt.atomTable.intern(
+                                        dataSlotString(ctx, file, d.dataIdx));
+                                    chunk.emit<inter::GThis>(nameAtom2, regT);
+                                    emitBinary(regT, r4, regT);
+                                    chunk.emit<inter::DThis>(nameAtom2, regT);
+                                    if(d.r1 != 0)
+                                        chunk.emit<inter::DLocal>(regT, r1);
+                                    break;
+                                }
                                 chunk.emit<inter::Load>(
                                     regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                            }
                             chunk.emit<inter::GProp>(r2, name, regT);
                             emitBinary(regT, r4, regT);
                             chunk.emit<inter::DProp>(r2, name, regT);
-                            chunk.emit<inter::DLocal>(regT, r1);
+                            if(d.r1 != 0) // dst=0 丢弃（%K 是 void 槽，不得污染）
+                                chunk.emit<inter::DLocal>(regT, r1);
+                        } else if(k4 == 3) {
+                            // P：*target = *target OP param（属性节点读-算-写）
+                            chunk.emit<inter::DerefGet>(r2, regT);
+                            emitBinary(regT, r3, regT);
+                            chunk.emit<inter::DerefSet>(r2, regT);
+                            if(d.r1 != 0)
+                                chunk.emit<inter::DLocal>(regT, r1);
                         } else {
                             emitBinary(r1, r2, r1);
                         }
@@ -647,9 +858,15 @@ namespace cial::tjsbc {
                     case OP_CALL: case OP_CALLD: case OP_CALLI: {
                         inter::Register func = r2;
                         if(d.op == OP_CALLD) {
-                            chunk.emit<inter::Load>(regN,
-                                                    atomConst(dataSlotString(ctx, file, d.dataIdx)));
-                            chunk.emit<inter::GProp>(r2, regN, regN);
+                            if(d.r2 == -2) { // obj = proxy：基类构造直调（this→global 回落）
+                                const Atom nameAtom2 =
+                                    rt.atomTable.intern(dataSlotString(ctx, file, d.dataIdx));
+                                chunk.emit<inter::GThis>(nameAtom2, regN);
+                            } else {
+                                chunk.emit<inter::Load>(
+                                    regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                                chunk.emit<inter::GProp>(r2, regN, regN);
+                            }
                             func = regN;
                         } else if(d.op == OP_CALLI) {
                             chunk.emit<inter::GProp>(r2, r3, regT);
@@ -661,10 +878,26 @@ namespace cial::tjsbc {
                                                 Integer{static_cast<i64>(d.imm)});
                         break;
                     }
-                    case OP_NEW:
-                        trError("NEW is not supported in M1 translator (class contexts are M2)");
+                    case OP_NEW: {
+                        // 构造：类值上 Call（ClassObject::call 创建 DataObject +
+                        // initDefaultVal + 构造器），与 TJS CreateNew 对齐
+                        for(const i32 arg : d.args)
+                            chunk.emit<inter::Push>(mapReg(arg));
+                        chunk.emit<inter::Call>(r1, r2,
+                                                Integer{static_cast<i64>(d.imm)});
+                        break;
+                    }
                     case OP_GPD: case OP_GPDS: {
                         // GPDS(IGNOREPROP) = 不触发 getter 的读 = GPropRaw
+                        if(d.r2 == -2) { // obj = ra[-2] proxy：this→global 回落链
+                            const Atom nameAtom2 =
+                                rt.atomTable.intern(dataSlotString(ctx, file, d.dataIdx));
+                            if(d.op == OP_GPD)
+                                chunk.emit<inter::GThis>(nameAtom2, r1);
+                            else
+                                chunk.emit<inter::GRefRaw>(nameAtom2, r1);
+                            break;
+                        }
                         chunk.emit<inter::Load>(regN,
                                                 atomConst(dataSlotString(ctx, file, d.dataIdx)));
                         if(d.op == OP_GPD)
@@ -674,8 +907,23 @@ namespace cial::tjsbc {
                         break;
                     }
                     case OP_SPD: case OP_SPDE: case OP_SPDEH: case OP_SPDS: {
-                        // SPDE/SPDEH(MEMBERENSURE)：Ciallang setProp 天然 ENSURE；
+                        // SPDE/SPDEH(MEMBERENSURE)：Ciallang setThis/setProp 天然 ENSURE；
                         // SPDS(IGNOREPROP) = 绕过 setter 写槽位 = DPropRaw
+                        if(d.r1 == -2) { // obj = proxy：经 DThis 走 this→global 回落
+                            const Atom nameAtom2 =
+                                rt.atomTable.intern(dataSlotString(ctx, file, d.dataIdx));
+                            if(d.op == OP_SPDS) {
+                                // 无 atom 形态的原始写：落 this 槽位（TJS2 proxy 原始写
+                                // 在 this 空时落 global 的差异记录为已知近似）
+                                chunk.emit<inter::Load>(
+                                    regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                                chunk.emit<inter::DPropRaw>(
+                                    inter::Register{static_cast<u16>(k - 1)}, regN, r3);
+                            } else {
+                                chunk.emit<inter::DThis>(nameAtom2, r3);
+                            }
+                            break;
+                        }
                         chunk.emit<inter::Load>(regN,
                                                 atomConst(dataSlotString(ctx, file, d.dataIdx)));
                         if(d.op == OP_SPDS)
@@ -697,10 +945,34 @@ namespace cial::tjsbc {
                     case OP_SPIS:
                         chunk.emit<inter::DPropRaw>(r1, r2, r3);
                         break;
-                    case OP_SETP: case OP_GETP:
-                        trError("property closures (SETP/GETP) are not supported in M1 translator");
-                    case OP_DELD: case OP_DELI: case OP_TYPEOFD: case OP_TYPEOFI:
-                        trError("delete/typeof direct-indirect are not supported in M1 translator");
+                    case OP_GETP: // dst = *target：强制属性访问读（调 getter）
+                        chunk.emit<inter::DerefGet>(r2, r1);
+                        break;
+                    case OP_SETP: // *target = src：强制属性访问写（调 setter）
+                        chunk.emit<inter::DerefSet>(r1, r2);
+                        break;
+                    case OP_DELD: case OP_DELI: {
+                        // dst = delete obj.member（bool）
+                        const inter::Register name =
+                            d.op == OP_DELD ? regN : r3;
+                        if(d.op == OP_DELD)
+                            chunk.emit<inter::Load>(
+                                regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                        chunk.emit<inter::DelProp>(r2, name, r1);
+                        break;
+                    }
+                    case OP_TYPEOFD: case OP_TYPEOFI: {
+                        // dst = typeof obj.member。已知近似：TJS 成员不存在时返回
+                        // "undefined" 字符串，此处 GProp 直接抛错（其余路径一致）
+                        const inter::Register name =
+                            d.op == OP_TYPEOFD ? regN : r3;
+                        if(d.op == OP_TYPEOFD)
+                            chunk.emit<inter::Load>(
+                                regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                        chunk.emit<inter::GProp>(r2, name, r1);
+                        chunk.emit<inter::TypeOf>(r1, r1);
+                        break;
+                    }
                     case OP_SRV:
                         srvTjsReg = d.r1;
                         break;
@@ -769,8 +1041,12 @@ namespace cial::tjsbc {
             out.parent = ctx.parent;
             out.type = ctx.type;
             out.arity = ctx.funcDeclArgCount;
+            out.nameAtom = ctx.name >= 0 ? rt.atomTable.intern(poolString(file, ctx.name))
+                                         : Atom{}; // 匿名 context（name=-1）
             out.isFunctionLike = ctx.type == TjsContextType::Function
-                              || ctx.type == TjsContextType::ExprFunction;
+                              || ctx.type == TjsContextType::ExprFunction
+                              || ctx.type == TjsContextType::PropertySetter
+                              || ctx.type == TjsContextType::PropertyGetter;
             out.chunk = chunkPtr;
         }
 
@@ -783,19 +1059,141 @@ namespace cial::tjsbc {
             auto metaGuard = rt.create<FuncMeta>(static_cast<u32>(ctx.funcDeclArgCount),
                                                  out.chunk, Vec<inter::LocalVariable>{});
             auto *meta = metaGuard.get();
+            meta->name = out.nameAtom; // super.<Ctor>() 的基类构造器按名匹配依赖此字段
             rt.addHandleVal(meta);
             _impl->roots.push_back(meta);
             out.funcMeta = meta;
+
+            // 类成员：parent 为 ctClass → 注册进其 ClassMeta（REGMEMBER 加载期等价）。
+            // 构造器（名 == 类名）只走 setConstructor——与源码路径一致不入成员表，
+            // ClassObject::getProp(类名) 才能返回类对象本身，super.<Ctor>() /
+            // global.<Ctor>() 直调才能进 ClassObject::call 的 super 构造分支
+            if(ctx.parent >= 0
+               && program.contexts[static_cast<size_t>(ctx.parent)].isClass) {
+                auto &owner = program.contexts[static_cast<size_t>(ctx.parent)];
+                if(out.nameAtom == owner.classMeta->className)
+                    owner.classMeta->setConstructor(meta);
+                else
+                    owner.classMeta->setMember(
+                        MemberShapeMeta{ .name = out.nameAtom, .isMethod = true },
+                        ClassFieldMeta{ meta });
+            }
         }
 
-        // Phase B'：INTER_OBJECT 占位回填 FuncMeta*（chunk 已全部入 GC）
+        // Phase B-class-var：类 var 成员 + initDefaultVal chunk（实例 this 上落初值）。
+        // 无 var 成员的类也必须产出（initClassFields 对每个类无条件执行
+        // initDefaultVal，空缺为 null 会在 new 时解引用空指针）
+        for(size_t ci = 0; ci < file.contexts.size(); ++ci) {
+            auto &out = program.contexts[ci];
+            if(!out.isClass)
+                continue;
+            vm::Chunk initChunk{}; // 常量 0 = Void
+            for(const auto &[nameAtom, slot] : classVarsPerCtx[ci]) {
+                switch(slot.type) {
+                    case TJS_TYPE_VOID:
+                        initChunk.emit<inter::Load>(inter::Register{0}, ConstIdx{0});
+                        break;
+                    case TJS_TYPE_BYTE:
+                        initChunk.emit<inter::LoadImm>(
+                            inter::Register{0},
+                            Integer{static_cast<i64>(poolByte(file, slot.index))});
+                        break;
+                    case TJS_TYPE_SHORT:
+                        initChunk.emit<inter::LoadImm>(
+                            inter::Register{0},
+                            Integer{static_cast<i64>(poolShort(file, slot.index))});
+                        break;
+                    case TJS_TYPE_INTEGER:
+                        initChunk.emit<inter::LoadImm>(
+                            inter::Register{0},
+                            Integer{static_cast<i64>(poolInt(file, slot.index))});
+                        break;
+                    case TJS_TYPE_LONG:
+                        initChunk.emit<inter::LoadImm>(inter::Register{0},
+                                                       Integer{poolLong(file, slot.index)});
+                        break;
+                    case TJS_TYPE_REAL:
+                        initChunk.emit<inter::Load>(
+                            inter::Register{0},
+                            initChunk.addConstant(Constant{Real{poolReal(file, slot.index)}}));
+                        break;
+                    case TJS_TYPE_STRING:
+                        initChunk.emit<inter::Load>(
+                            inter::Register{0},
+                            initChunk.addConstant(
+                                Constant{rt.atomTable.intern(poolString(file, slot.index))}));
+                        break;
+                    default:
+                        trError("class var initializer slot type not supported");
+                }
+                initChunk.emit<inter::DThis>(nameAtom, inter::Register{0});
+                out.classMeta->setMember(
+                    MemberShapeMeta{ .name = nameAtom, .isVar = true },
+                    ClassFieldMeta{});
+            }
+            // initClassFields 契约：块以 Ret 结尾（空 var 表也要有，run0 不读越界码）
+            initChunk.emit<inter::Ret>(inter::Register{0});
+            auto initChunkGuard = rt.create<vm::Chunk>(std::move(initChunk));
+            auto *initChunkPtr = initChunkGuard.get();
+            auto initMetaGuard = rt.create<FuncMeta>(0, initChunkPtr, Vec<inter::LocalVariable>{});
+            auto *initMeta = initMetaGuard.get();
+            initChunkPtr->setRegCount(1); // 仅用 %0
+            rt.addHandleVal(initChunkPtr);
+            rt.addHandleVal(initMeta);
+            _impl->roots.push_back(initChunkPtr);
+            _impl->roots.push_back(initMeta);
+            out.classMeta->initDefaultVal = initMeta;
+        }
+
+        // Phase B-prop：property ctx 装配 PropMeta（getter/setter 子 context）
+        for(size_t ci = 0; ci < file.contexts.size(); ++ci) {
+            auto &out = program.contexts[ci];
+            if(!out.isProperty)
+                continue;
+            FuncMeta *setter = nullptr;
+            FuncMeta *getter = nullptr;
+            for(size_t k = 0; k < file.contexts.size(); ++k) {
+                const auto &child = file.contexts[k];
+                if(child.parent != static_cast<i32>(ci))
+                    continue;
+                auto &childOut = program.contexts[k];
+                if(child.type == TjsContextType::PropertySetter)
+                    setter = childOut.funcMeta;
+                else if(child.type == TjsContextType::PropertyGetter)
+                    getter = childOut.funcMeta;
+            }
+            auto propMetaGuard = rt.create<PropMeta>(setter, getter);
+            auto *propMeta = propMetaGuard.get();
+            rt.addHandleVal(propMeta);
+            _impl->roots.push_back(propMeta);
+            out.propMeta = propMeta;
+
+            // 类成员 property：注册进父 ClassMeta（initClassFields 按实例建
+            // 绑定 this 的 Property 对象）；顶层 property 由顶层码字 SPDS 注册
+            if(out.parent >= 0) {
+                auto &owner = program.contexts[static_cast<size_t>(out.parent)];
+                if(owner.isClass)
+                    owner.classMeta->setMember(
+                        MemberShapeMeta{ .name = out.nameAtom, .isProp = true },
+                        ClassFieldMeta{ propMeta });
+            }
+        }
+
+        // Phase B'：INTER_OBJECT 占位回填（FuncMeta/ClassMeta/PropMeta）
         for(size_t ci = 0; ci < deferredPerCtx.size(); ++ci) {
             for(const auto &[constIdx, targetCtx] : deferredPerCtx[ci]) {
                 auto &target = program.contexts[static_cast<size_t>(targetCtx)];
-                if(target.funcMeta == nullptr)
-                    trError("INTER_OBJECT references a non-function context (M2: classes)");
-                program.contexts[ci].chunk->getConstants()[constIdx] =
-                    Constant{target.funcMeta};
+                if(target.funcMeta)
+                    program.contexts[ci].chunk->getConstants()[constIdx] =
+                        Constant{target.funcMeta};
+                else if(target.classMeta)
+                    program.contexts[ci].chunk->getConstants()[constIdx] =
+                        Constant{target.classMeta};
+                else if(target.propMeta)
+                    program.contexts[ci].chunk->getConstants()[constIdx] =
+                        Constant{target.propMeta};
+                else
+                    trError("INTER_OBJECT references an unsupported context");
             }
         }
 

@@ -1,0 +1,12 @@
+// M2 语料：extends 继承 + super.<Ctor>() + super.<方法>() 调用
+class Animal {
+	var legs;
+	function Animal(n) { legs = n; }
+	function describe() { return "legs=" + legs; }
+}
+class Dog extends Animal {
+	function Dog() { super.Animal(4); }
+	function describe() { return "dog:" + super.describe(); }
+}
+var d = new Dog();
+println(d.describe());

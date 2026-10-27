@@ -29,10 +29,18 @@ namespace cial {
         if(cnt > 0)
             vmState.pushVoid(cnt);
 
+        // 调用者 this 需在压帧前取（allocCallFrame 后栈顶即新帧）
+        const Value callerThis = vmState.curFrame()->thisObj;
+
         vmState.allocCallFrame(meta, ret);
         auto *currentCallFrame = vmState.curFrame();
         if(thisObj) {
             currentCallFrame->setThisObj(Value{ thisObj });
+        } else if(callerThis.isObject()) {
+            // TJS2 调用点绑定语义：clo.ObjThis 为空时 this 取调用者的 this
+            //（super.<方法>() 经类对象成员访问得到未绑定函数，需沿调用链继承；
+            // 顶层/全局函数的 this 本就是全局对象，行为不变）
+            currentCallFrame->setThisObj(callerThis);
         } else {
             // 全局函数调用(绝大多数):免 Value 装配与 dynamic_cast
             currentCallFrame->setThisObjNull();

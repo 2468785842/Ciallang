@@ -39,13 +39,13 @@
 
 | 项 | 状态 |
 |---|---|
-| 容器/常量池/context 解析（Reader） | 📐 M1 |
-| 顶层/函数 context 转译（算术/比较/跳转/调用/flag 物化） | 📐 M1 |
-| 属性访问全族（GPD/GPI/SPD/…/S 变体） | 📐 M2 |
-| 类（ctClass 加载期解释）/ NEW / try-catch | 📐 M2 |
-| 新增 TAC（Typeof/Asc/Chr/BNot/DelProp/GetP/SetP/比较写 zf…）+ run0 编码补全 | 📐 M3 |
-| octet 常量、collapse/展开/省略调用、EVAL/EEXP、superClassGetter | 📐 M4 |
-| 对拍工具链：TJSCompiler `--dump` 导出选项 + `cial --tjsbc` + 语料入库 | ◐ `--dump` ✅（2026-10-26）+ 语料入库（tests/test_files/tjsbc/）✅ + TjsBytecodeReader 格式解析 ✅（阶段 1）；转译器与 `cial --tjsbc` 为阶段 2 |
+| 容器/常量池/context 解析（Reader） | ✅ M1 |
+| 顶层/函数 context 转译（算术/比较/跳转/调用/flag 物化） | ✅ M1（s1–s5 对拍） |
+| 属性访问全族（GPD/GPI/SPD/…/S 变体 + P 变体/GETP/SETP/DELD/TYPEOFD） | ✅ M2 |
+| 类（ctClass 加载期解释）/ NEW / try-catch / property / extends | ✅ M2（`test_class.tjs` 对拍一致，2026-10-27） |
+| 新增 TAC（Typeof/Asc/Chr/BNot/DelProp/GetP/SetP/比较写 zf…）+ run0 编码补全 | 📐 M3（TypeOf/Asc/Chr/DelProp 已随 M1/M2 提前落地） |
+| octet 转换指令、collapse/展开/省略调用、EVAL/EEXP、`test_function.tjs` 全量 | 📐 M4（octet 常量已随 M2 落地） |
+| 对拍工具链：TJSCompiler `--dump` 导出选项 + `cial --tjsbc` + 语料入库 | ✅ `--dump` + 语料（tests/test_files/tjsbc/ s1–s7 + test_class/test_function）+ 转译器 + `cial --tjsbc`（`CIAL_TJSBC_DUMP=1` 可打印顶层转译 TAC） |
 
 ## 3. 标准库兼容
 

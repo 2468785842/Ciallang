@@ -1,14 +1,21 @@
 /*
  * Copyright (c) 2026/10/26
  *
- * TJS2 字节码转译器（阶段 2 / M1）测试：手工构造函数 context 字节码，
- * 转译后经 callValue 直调，验证寄存器恒等映射与算术/返回语义。
+ * TJS2 字节码转译器（阶段 2）测试：
+ * - M1：手工构造函数 context 字节码，转译后经 callValue 直调，验证寄存器恒等映射；
+ * - M2：类/NEW/property 闭包/P 变体（参考实现语料端到端，对拍源码路径语义）。
  */
 
 #include <catch.hpp>
 
 #include <fmt/ostream.h>
 
+#include "stdlib/ExceptionLib.hpp"
+#include "stdlib/Print.hpp"
+#include "test_config.h"
+#include "types/Class.hpp"
+#include "types/Dictionary.hpp"
+#include "tjsbc/TjsBytecodeReader.hpp"
 #include "tjsbc/TjsTranslator.hpp"
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
@@ -31,6 +38,48 @@ namespace {
         ctx.data = slots;
         return ctx;
     }
+
+    // 语料端到端：加载 .tjsbc → 转译 → 执行顶层 context（main.cpp --tjsbc 同款流程，
+    // 含 Debug 垫片与 Exception 内建类），返回 VM 供调用方断言全局状态
+    struct CorpusRun {
+        Runtime rt;
+        Context context;
+        vm::VMState vmState;
+        TjsBytecodeFile file;
+        std::unique_ptr<tjsbc::TjsTranslator> translator;
+        TjsTranslatedProgram program;
+
+        explicit CorpusRun(const std::string &path) : context(rt), vmState(context) {
+            context.initNativeMethod();
+            context.registryGlobalFunc("print"_str, &stdlib::S_PrintFunction);
+            context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
+            VM vm{ &vmState };
+            vm.eval(R"(class __DebugShim {
+    function __DebugShim() {}
+    function message(s) { println(s); }
+}
+var Debug = new __DebugShim();
+)"_str);
+            stdlib::initExceptionClass(vm);
+
+            file = readTjsBytecodeFile(path);
+            translator = std::make_unique<tjsbc::TjsTranslator>(rt, file);
+            program = translator->translate();
+            auto *chunk = program.contexts[static_cast<size_t>(program.topLevel)].chunk;
+            vmState.allocCallFrame(chunk);
+            vmState.makeClosure();
+            // 顶层 this = 全局对象（TJS 顶层经 this/proxy 寄存器读写全局）
+            vmState.curFrame()->setThisObj(
+                Value{ static_cast<Object *>(vmState.context.global()) });
+            try {
+                vmState.run0();
+            } catch(...) {
+                vmState.clearException();
+                throw;
+            }
+            vmState.freeCallFrame();
+        }
+    };
 } // namespace
 
 TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
@@ -96,4 +145,76 @@ TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
         file2.contexts.push_back(makeFuncContext({200}, {}, 0));
         REQUIRE_THROWS(TjsTranslator{ rt, file2 }.translate());
     }
+}
+
+// ──────────────────────────── M2：类/property 闭包/P 变体 ────────────────────────────
+
+TEST_CASE("TJS2 字节码转译——M2 语料端到端（类/NEW/property/继承）") {
+    SECTION("s6_class：类 + NEW + 成员 property + &/* 闭包 + P 变体") {
+        CorpusRun run{ TEST_FILES_PATH R"(/tjsbc/s6_class.tjsbc)" };
+        // 序列：4 → 6 → 8(*f) → 9(++) → 11(*f += 2)，实例槽最终 legs==11
+        const Value a = run.vmState.context.global()->getProp(run.rt.atomTable.intern("a"_str));
+        REQUIRE(a.isObject());
+        const Value legs = a.asObject().unwrap()->getProp(run.rt.atomTable.intern("legs"_str));
+        REQUIRE(legs.isInteger());
+        REQUIRE(legs.asInteger().unwrap() == 11);
+    }
+
+    SECTION("s7_ext：extends + super.<Ctor>() + super.<方法>()") {
+        CorpusRun run{ TEST_FILES_PATH R"(/tjsbc/s7_ext.tjsbc)" };
+        const Value d = run.vmState.context.global()->getProp(run.rt.atomTable.intern("d"_str));
+        REQUIRE(d.isObject());
+        // Dog 实例经继承初始化了基类 var 成员（Animal(4) 构造写入）
+        const Value legs = d.asObject().unwrap()->getProp(run.rt.atomTable.intern("legs"_str));
+        REQUIRE(legs.isInteger());
+        REQUIRE(legs.asInteger().unwrap() == 4);
+        // 基类已挂到实例 super 链（ClassObject::call 的 setSuperClass）
+        auto *dataObj = dynamic_cast<DataObject *>(d.asObject().unwrap());
+        REQUIRE(dataObj != nullptr);
+        REQUIRE(dataObj->getSuperClass(run.rt.atomTable.intern("Animal"_str)) != nullptr);
+    }
+
+    SECTION("test_class：kirikiri 原版类测试全量（property/闭包/继承/invalidate）") {
+        CorpusRun run{ TEST_FILES_PATH R"(/tjsbc/test_class.tjsbc)" };
+        // 脚本全链路断言内建（不等式失败即 throw），走到尾即通过；
+        // 这里抽查 classproptest 经 property 闭包链写入的全局 propvalue==20
+        const Value pv = run.vmState.context.global()->getProp(run.rt.atomTable.intern("propvalue"_str));
+        REQUIRE(pv.isInteger());
+        REQUIRE(pv.asInteger().unwrap() == 20);
+    }
+
+    SECTION("test_function：展开/收拢调用为 M4，加载期明确报错") {
+        REQUIRE_THROWS(CorpusRun{ TEST_FILES_PATH R"(/tjsbc/test_function.tjsbc)" });
+    }
+}
+
+TEST_CASE("TJS2 字节码转译——TYPEOFD/DELD 直译") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // f(o) = { typeof o.x; delete o.x } → 返回删除是否成功(bool)
+    TjsBytecodeFile file{};
+    file.topLevel = -1;
+    file.pool.strings.push_back("x"_str);
+    file.contexts.push_back(makeFuncContext(
+        // TYPEOFD r1,-3,0 (丢结果) ; DELD r1,-3,0 ; SRV r1 ; RET
+        {84, 1, -3, 0, 116, 1, -3, 0, 118, 1, 119},
+        {TjsDataSlot{TJS_TYPE_STRING, 0}}, 1));
+
+    TjsTranslator translator{ rt, file };
+    const auto program = translator.translate();
+    const Value func = Constant{program.contexts[0].funcMeta}.createValue(&rt);
+
+    Value dict = Value{ rt.create<Dictionary>().get() };
+    dict.asObject().unwrap()->setProp(rt.atomTable.intern("x"_str), Value{ Integer{ 1 } });
+    REQUIRE(dict.isObject());
+    Value args[1]{ dict };
+    const Value ret = vm.callValue(func, 1, args);
+    REQUIRE(ret.isInteger());
+    REQUIRE(ret.asInteger().unwrap() != 0); // 删除成功 → true
+    // 成员已被删除
+    REQUIRE(dict.asObject().unwrap()->hasProp(rt.atomTable.intern("x"_str)) == false);
 }

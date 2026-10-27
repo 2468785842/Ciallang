@@ -618,11 +618,14 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(ChgThis) {
         const u16 r1 = read<u16>(ip, pc); // 函数
         const u16 r2 = read<u16>(ip, pc); // 新 this
-        // incontextof 的对象可为脚本函数或原生函数（如 Dictionary.assign）
+        // incontextof 的对象可为脚本函数、原生函数或 property 闭包
+        //（TJS2 顶层 property 定义经 CHGTHIS 绑定 this=global）
         if(auto *fn = dynamic_cast<Function *>(regs[r1].asObject().unwrap())) {
             fn->thisObj = regs[r2].asObject().unwrap();
         } else if(auto *nativeFn = dynamic_cast<NativeFunction *>(regs[r1].asObject().unwrap())) {
             nativeFn->setThisObj(regs[r2]);
+        } else if(auto *prop = dynamic_cast<Property *>(regs[r1].asObject().unwrap())) {
+            prop->thisObj = regs[r2].asObject().unwrap();
         } else {
             throw std::runtime_error("incontextof expects a function");
         }
@@ -969,7 +972,9 @@ namespace cial::vm {
                 if(global->proxy) {
                     throw std::runtime_error("Not implemented");
                 }
-                regs[r3] = global->getProp(atom);
+                auto tmp = global->getProp(atom);
+                propObjectGet(*this, tmp, tmp); // 顶层 property 读（字节码 SPD/GPD 经 this=全局）
+                regs[r3] = tmp;
                 return DispatchRet::Continue;
             }
 
@@ -1024,16 +1029,15 @@ namespace cial::vm {
         const String &name = *regs[r2].asString().unwrap();
         const Atom atom = rt.atomTable.intern(name);
         // 成员写（旧版 SPD）：槽位当前值是 Property 对象则调 setter（invokeSet 只压
-        // 帧不执行，与 DGlobal 同款检测栈变化交还主循环）；普通成员纯写
+        // 帧不执行，与 DGlobal 同款检测栈变化交还主循环）；普通成员纯写。
+        // Global 不豁免：字节码路径顶层 property 写入即 SPD this.x（this=全局），
+        // TJS2 PropSet 对 property 槽同样触发 setter
         auto *obj = objVal.asObject().unwrap();
         Value curVal{};
         bool hasCur = false;
-        if(obj->typeId() != TypeId::Global) {
-            // GlobalObject::hasProp 对缺失成员外的行为与 DataObject 一致；
-            // 但 property 触发不应作用于全局槽（全局写走 DGlobal），此处仅实例/类对象
-            hasCur = obj->hasProp(atom);
-            if(hasCur)
-                curVal = obj->getProp(atom);
+        if(obj->hasProp(atom)) {
+            hasCur = true;
+            curVal = obj->getProp(atom);
         }
         if(hasCur && propObjectSet(*this, regs[r3], curVal)) {
             cur->pc = pc;

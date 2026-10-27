@@ -2,11 +2,25 @@
 
 > **已选定的技术路线**（2026-10 决策）：Ciallang 加载 TJSCompiler 编译出的字节码文件
 > （`"TJS2" "100\0"` 格式，见 [tjs2-bytecode.md](tjs2-bytecode.md) §5），**转译（转义）为
-> Ciallang 的 TAC 指令**，进入现有 `Chunk`，由现有 VM（`run()`/`run0()`）执行。
+> Ciallang 的 TAC 指令**，进入现有 `Chunk`，由现有 VM（`run0()`）执行。
 > 不采用"独立 TJS 解释器"方案（被否决原因：保留两条执行路径不如统一到现有 VM，
 > 且本项目 TAC 本就对标 TJS 指令集）。
 >
-> 本文是**实现前的设计文档**。实施进度（2026-10-26）：阶段 0（--dump）与阶段 1（Reader）完成；阶段 2（TjsTranslator M1）基本完成：顶层+函数 context 全链路跑通（s1/s4/s5 字节码路径输出与源码路径一致；顶层 SPDS/GPD 经 this=全局对象、GPD 经 proxy=全局对象近似）；已知缺口：类/property context、NEW、P 变体（property 闭包运算）、collapse/展开调用（均有明确报错）；PD/PI 与 octet 常量已于 2026-10-27 支持。阶段 3 双路径对拍可基于 s1/s4/s5 语料进行。前置阅读：
+> 本文是**实现前的设计文档**。实施进度（2026-10-27）：阶段 0（--dump）与阶段 1（Reader）完成；
+> 阶段 2（TjsTranslator）**M1+M2 完成**：kirikiri `test_class.tjs` 编译产物对拍通过
+> （字节码路径与源码路径输出逐字节一致；s1–s7 语料全绿）。M2 落地：类 context 加载期解释
+> （var 成员 + initDefaultVal（无成员类也产出，initClassFields 契约）+ 构造器 setConstructor
+> （不入成员表，保 super.<Ctor>() 经类对象调用进 super 分支）+ 成员 property 注册 +
+> superClassGetter 加载期解释为 extends）、NEW→Call（ClassObject::call 构造）、
+> GETP/SETP→DerefGet/Set、P 变体（INCP/二目 P 读-算-写）、DELD/DELI→DelProp、
+> TYPEOFD/I→GProp+TypeOf、octet 常量、proxy(ra[-2]) 访存→GThis/DThis/GRefRaw
+> （TJS2 objthis-proxy 的 this→global 回落语义）。修复的 M1 遗留缺陷：JF/JNF 物化跳转
+> 方向颠倒、INCPD/ADDPD 等 +1/+2/+3 变体落 default 静默不发射、INCPD 自加（加载 1 的
+> 寄存器未参与运算）、INTER_OBJECT 占位常量被 addConstant 去重合并（回填互相覆盖）。
+> 配套 VM 语义修正：DProp/GProp 对全局 property 槽触发 getter/setter（TJS2 PropSet 语义），
+> ChgThis 接受 Property 闭包，Function::call 未绑定时继承调用者 this（TJS2 调用点绑定，
+> super.<方法>() 经类对象成员访问的关键路径）。已知近似与 M4 缺口见 §8.1。
+> 前置阅读：
 > [tjs2-bytecode.md](tjs2-bytecode.md)（旧格式）、[ciallang-bytecode.md](ciallang-bytecode.md)（本项目指令集）。
 
 ---
@@ -249,6 +263,19 @@ propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 
 | 全局对象 | TJS global 可任意读写；Ciallang GlobalObject | 行为一致，对拍 |
 | 栈深限制 | Ciallang 1024 帧 vs TJS 无显式同值 | 记录差异 |
 
+### 8.1 M2 落地后的已知近似（逐条记录在案）
+
+| 差异点 | TJS2 行为 | 本项目行为 | 说明 |
+|---|---|---|---|
+| proxy(ra[-2]) 直访 | objthis-proxy：this 优先、global 回落 | prologue 以 `This` 填 %K-2；GPD/GPDS/SPD/SPDE/SPDEH/INCPD/二目 PD/CALLD 在 obj==-2 时译为 GThis/GRefRaw/DThis（atom 形态，自带回落）| GPI/GPIS/SPIS/CALLI（成员名在寄存器）经 proxy 无回落，直接对 this 值访问 |
+| SPDS obj==-2 | 原始写 proxy（this 空则 global） | `DPropRaw(%K-1)`（落 this 槽） | this 为空的帧不回落 global；语料未覆盖此形态 |
+| TYPEOFD/TYPEOFI | 成员不存在 → "undefined" 字符串 | GProp 直接抛错 | 成员存在路径一致 |
+| 顶层 property 写 | PropSet 触发 setter | DProp 已放开 Global 豁免，同触发 | 源码路径走 DGlobal，行为一致 |
+| 未绑定函数调用 | 调用点绑定 `clo.ObjThis ?: ra[-1]` | `Function::call` 未绑定时继承调用者 thisObj | super.<方法>() 经类对象取成员（未绑定）的关键路径；全局函数调用行为不变（调用者 this 即 global 或空） |
+| 读-算-写属性模板 | `Operation()` 原子派发 | GProp→算→DProp 三条指令 | getter/setter 间状态可变，已知近似 |
+| 类体 super 初始化三连（GPD+CHGTHIS+CALL） | 运行期重跑父类类体 | 加载期跳过，继承语义由 superClassGetter 解释的 `extends` 承担 | 与源码路径 extends 模型一致 |
+| int/real 等 binop PD 变体 dst==0 | 丢弃结果 | 不发射写回（%K void 槽不被污染） | 修复：曾无条件写回 %K，污染裸 RET 的 void 返回值 |
+
 ## 9. 对拍与工具链（已立项，未实现）
 
 1. **TJSCompiler 加 `--dump <out>` 导出选项**（仅改 `src/main.cpp`，默认行为不变）：
@@ -262,10 +289,10 @@ propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 
 
 | 里程碑 | 范围 | 出口判据 |
 |---|---|---|
-| **M1** | Reader（容器+常量池+context 骨架）；顶层/函数 context 转译（§4.1/4.2 基型/4.5 CALL/4.6）；flag 物化；prologue；`cial --tjsbc` | fib/循环/算术/字符串拼接/print 的 .bc 对拍全绿（走 `run()`） |
-| **M2** | 属性全族（GPI/SPI/GPDS…模板）、ctClass 加载期解释、NEW、try/catch、property | 原 kirikiri `test_class.tjs`/`test_function.tjs` 编译产物对拍 |
+| **M1** ✅ | Reader（容器+常量池+context 骨架）；顶层/函数 context 转译（§4.1/4.2 基型/4.5 CALL/4.6）；flag 物化；prologue；`cial --tjsbc` | fib/循环/算术/字符串拼接/print 的 .bc 对拍全绿（s1–s5） |
+| **M2** ✅ | 属性全族（GPI/SPI/GPDS…模板）、ctClass 加载期解释、NEW、try/catch、property、P 变体、DELD/DELI、TYPEOFD/I、octet 常量、proxy 回落链 | kirikiri `test_class.tjs` 编译产物对拍全绿（2026-10-27，与源码路径逐字节一致）；`test_function.tjs` 前半通过，展开/收拢调用部分留 M4 |
 | **M3** | 新增 TAC（比较写 zf / Inc/Dec / Typeof / Asc/Chr / BNot / DelProp / GetP/SetP）+ run0 编码补全 | M1 语料走 `run0()` 性能对齐源码路径；指令覆盖 128/128 |
-| **M4** | octet 常量、collapse 参数、展开/省略调用、EVAL/EEXP、superClassGetter 惰性 | tjs2 目录全部脚本 + 边缘语义清单通过 |
+| **M4** | octet 转换指令、collapse 参数、展开/省略调用、EVAL/EEXP、`test_function.tjs` 全量 | tjs2 目录全部脚本 + 边缘语义清单通过 |
 
 **新增 TAC 指令提案汇总**（M3 落地，命名沿用现有风格）：
 `CmpEQ/CmpDEQ/CmpLT/CmpGT`（写 zf）、`Inc/Dec`、`Typeof`、`Asc/Chr`、`BNot`、`Num`、

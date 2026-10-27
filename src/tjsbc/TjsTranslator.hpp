@@ -1,19 +1,26 @@
 // Copyright (c) 2026/10/26
 //
-// TJS2 字节码 → Ciallang TAC 转译器（doc/bytecode/mapping.md 阶段 2，M1 范围）。
-// 寄存器恒等平移：cialReg(r) = r + K（K = maxVariableCount + variableReserveCount）。
-// 标志物化：%F = K+MFC+1（bool 值寄存器），%T = K+MFC+2（临时），%N = K+MFC+3（名字）。
-// M1 支持集：§4.1 传送 / §4.2 基型双目+INC·DEC / 标志族+跳转 / §4.3 GPD·GPI·SPD·
-// SPI·SPDE·SPDEH / §4.4 INT·REAL·STR·CHS·LNOT·INV·CHKINV·CHKINS·TYPEOF·ASC·CHR /
-// §4.5 CALL·CALLD·CALLI / §4.6 SRV·RET·THROW·ENTRY·EXTRY·CHGTHIS·GLOBAL·DEBUGGER。
-// 已知 M2 缺口：类/property context、NEW、PD/PI/P 运算变体、GPDS/SPDS 穿透族、
-// SETP/GETP、DELD/DELI、TYPEOFD/I、collapse/展开调用、octet 常量、顶层 global
-// proxy 注册模式（顶层函数定义经 ra[-1] 代理解析成员名，见 s1 顶层码字）。
+// TJS2 字节码 → Ciallang TAC 转译器（doc/bytecode/mapping.md 阶段 2，M1+M2 范围）。
+// 寄存器恒等平移：cialReg(r) = r + K（K = max(VC+RC, argc+2)）。
+// 标志物化：%F = K+MFC+1（bool 值寄存器），%T/%T2 = +2/+3（临时），%N = +4（名字）。
+// M1 支持集：§4.1 传送 / §4.2 基型+INC·DEC·PD·PI / 标志族+跳转 / §4.3 GPD·GPI·
+// SPD·SPI 全族（含 S 穿透变体）/ §4.4 转换一元 / §4.5 CALL 族 / §4.6 返回异常全族。
+// M2 支持集：ctClass 加载期解释（var 成员/initDefaultVal/构造器/成员 property/
+// superClassGetter→extends）、NEW→Call（ClassObject::call 构造）、P 变体
+// （GETP/SETP/DerefGet·Set 与 INCP/二目 P 的读-算-写）、DELD/DELI→DelProp、
+// TYPEOFD/I→GProp+TypeOf、octet 常量、proxy(ra[-2]) 访存→GThis/DThis/GRefRaw
+// （this→global 回落链，TJS2 objthis-proxy 语义）。
+// 已知近似（见 mapping.md §8.1）：TYPEOFD/I 成员缺失时抛错（TJS2 返回
+// "undefined"）；GPI/SPIS/CALLI 经 proxy 无回落；SPDS 经 proxy 落 this 槽。
+// 仍缺口（M4）：collapse 参数、省略/展开调用（argc=-1/-2，加载期报错）、
+// EVAL/EEXP、octet 转换指令。
 #pragma once
 
+#include "runtime/AtomTable.hpp"
 #include "tjsbc/TjsBytecodeReader.hpp"
 #include "vm/Chunk.hpp"
 #include "vm/Constant.hpp"
+#include <memory>
 
 namespace cial {
 
@@ -31,6 +38,13 @@ namespace cial {
             bool isFunctionLike = false; // Function/ExprFunction
             vm::Chunk *chunk = nullptr;  // GC 持有（翻译器根保护）
             FuncMeta *funcMeta = nullptr; // 仅 isFunctionLike
+            // ctClass：加载期解释产物（body 不生成 TAC）
+            bool isClass = false;
+            ClassMeta *classMeta = nullptr;
+            // ctProperty：getter/setter 聚合
+            bool isProperty = false;
+            PropMeta *propMeta = nullptr;
+            Atom nameAtom{}; // ctx 名（STRING 池下标 intern）
         };
 
         struct TjsTranslatedProgram {
