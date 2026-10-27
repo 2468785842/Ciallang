@@ -6,7 +6,6 @@
 #include <cstring>
 
 #include "gen/Label.hpp"
-#include <cstdio>
 #include "runtime/AtomTable.hpp"
 #include "runtime/Runtime.hpp"
 
@@ -150,6 +149,12 @@ namespace cial::tjsbc {
             return f.pool.reals[static_cast<size_t>(idx)];
         }
 
+        const Vec<u8> &poolOctet(const TjsBytecodeFile &f, const i32 idx) {
+            if(idx < 0 || idx >= static_cast<i32>(f.pool.octets.size()))
+                trError("OCTET constant index out of range");
+            return f.pool.octets[static_cast<size_t>(idx)];
+        }
+
         const String &poolString(const TjsBytecodeFile &f, const i32 idx) {
             if(idx < 0 || idx >= static_cast<i32>(f.pool.strings.size()))
                 trError("STRING constant index out of range");
@@ -257,12 +262,22 @@ namespace cial::tjsbc {
                 trError("class construction opcodes are not supported in M1 (M2)");
             if(d.op >= OP_INC && d.op <= OP_MUL) {
                 const i32 k4 = (d.op - OP_INC) % 4;
-                if(k4 == 0) {
+                if(k4 == 0) { // base：破坏性双目 r1 = r1 OP r2 / INC·DEC r1
                     d.r1 = reg(1);
                     d.r2 = reg(2);
                     return d;
                 }
-                trError("property arithmetic variants are not supported in M1 translator: opcode "
+                if(k4 == 1 || k4 == 2) { // PD（成员名 DataArea 槽）/ PI（成员名 reg）
+                    d.r1 = reg(1); // dst
+                    d.r2 = reg(2); // obj
+                    if(k4 == 1)
+                        d.dataIdx = reg(3);
+                    else
+                        d.r3 = reg(3);
+                    d.r4 = reg(4); // rhs
+                    return d;
+                }
+                trError("property closure arithmetic (P) is not supported in M1: opcode "
                         + std::to_string(d.op));
             }
             // 属性 4 字族，两套操作数序（tjsDisassemble 对齐）：
@@ -359,7 +374,8 @@ namespace cial::tjsbc {
             const auto regF = inter::Register{static_cast<u16>(k + ctx.maxFrameCount + 1)}; // 标志物化
             const auto regT = inter::Register{static_cast<u16>(regF.index() + 1)};          // 临时
             const auto regN = inter::Register{static_cast<u16>(regF.index() + 2)};          // 名字常量临时
-            const u16 regCount = static_cast<u16>(regN.index() + 1 + ctx.funcDeclArgCount + 1);
+            const auto regT2 = inter::Register{static_cast<u16>(regF.index() + 3)};         // 第二临时
+            const u16 regCount = static_cast<u16>(regT2.index() + 1 + ctx.funcDeclArgCount + 1);
 
             vm::Chunk chunk{}; // 常量 0 = Void
 
@@ -395,7 +411,6 @@ namespace cial::tjsbc {
             i32 i = 0;
             while(i < static_cast<i32>(ctx.code.size())) {
                 Decoded d = decode(ctx.code, i);
-                fprintf(stderr, "[TR] i=%d op=%d\n", i, d.op);
                 offsetMap.emplace_back(d.word, static_cast<i32>(chunk.getInstVec().size()));
                 const auto r1 = mapReg(d.r1);
                 const auto r2 = mapReg(d.r2);
@@ -454,8 +469,13 @@ namespace cial::tjsbc {
                                 chunk.emit<inter::Load>(r1, ConstIdx{cidx});
                                 break;
                             }
-                            case TJS_TYPE_OCTET:
-                                trError("octet constants are not supported in M1 translator");
+                            case TJS_TYPE_OCTET: {
+                                const auto &bytes = poolOctet(file, slot.index);
+                                auto *payload = SharedPayload<Octet>::makeSingle(
+                                    Octet{bytes.data(), static_cast<u32>(bytes.size())});
+                                chunk.emit<inter::Load>(r1, chunk.addConstant(Constant{payload}));
+                                break;
+                            }
                             default:
                                 trError("unknown constant slot type");
                         }
@@ -525,34 +545,71 @@ namespace cial::tjsbc {
                         chunk.emit<inter::ChkIns>(regT, r1);
                         break;
                     case OP_INC: case OP_DEC: {
-                        chunk.emit<inter::LoadImm>(regT, Integer{1});
-                        if(d.op == OP_INC)
-                            chunk.emit<inter::Add>(r1, regT, r1);
-                        else
-                            chunk.emit<inter::Sub>(r1, regT, r1);
+                        const i32 k4 = (d.op - OP_INC) % 4;
+                        const bool isInc = d.op == OP_INC;
+                        auto emitOne = [&](const inter::Register v) {
+                            if(isInc)
+                                chunk.emit<inter::Add>(v, regT, v);
+                            else
+                                chunk.emit<inter::Sub>(v, regT, v);
+                        };
+                        if(k4 == 0) { // base：r1 ± 1
+                            chunk.emit<inter::LoadImm>(regT, Integer{1});
+                            emitOne(r1);
+                            break;
+                        }
+                        // PD/PI：o[m] ± 1（读-算-写）
+                        const inter::Register name =
+                            k4 == 1 ? regN : r3;
+                        if(k4 == 1)
+                            chunk.emit<inter::Load>(
+                                regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                        chunk.emit<inter::GProp>(r2, name, regT);
+                        chunk.emit<inter::LoadImm>(regT2, Integer{1});
+                        emitOne(regT);
+                        chunk.emit<inter::DProp>(r2, name, regT);
+                        chunk.emit<inter::DLocal>(regT, r1);
                         break;
                     }
                     case OP_LOR: case OP_LAND: case OP_BOR: case OP_BXOR:
                     case OP_BAND: case OP_SAR: case OP_SAL: case OP_SR:
                     case OP_ADD: case OP_SUB: case OP_MOD: case OP_DIV:
                     case OP_IDIV: case OP_MUL: {
-                        const i32 base = d.op - (d.op - OP_LOR) % 4;
-                        switch(base) {
-                            case OP_LOR: chunk.emit<inter::LOr>(r1, r2, r1); break;
-                            case OP_LAND: chunk.emit<inter::LAnd>(r1, r2, r1); break;
-                            case OP_BOR: chunk.emit<inter::BOr>(r1, r2, r1); break;
-                            case OP_BXOR: chunk.emit<inter::BXor>(r1, r2, r1); break;
-                            case OP_BAND: chunk.emit<inter::BAnd>(r1, r2, r1); break;
-                            case OP_SAR: chunk.emit<inter::BrShift>(r1, r2, r1); break;
-                            case OP_SAL: chunk.emit<inter::BlShift>(r1, r2, r1); break;
-                            case OP_SR: chunk.emit<inter::BurShift>(r1, r2, r1); break;
-                            case OP_ADD: chunk.emit<inter::Add>(r1, r2, r1); break;
-                            case OP_SUB: chunk.emit<inter::Sub>(r1, r2, r1); break;
-                            case OP_MOD: chunk.emit<inter::Mod>(r1, r2, r1); break;
-                            case OP_DIV: chunk.emit<inter::Div>(r1, r2, r1); break;
-                            case OP_IDIV: chunk.emit<inter::Idiv>(r1, r2, r1); break;
-                            case OP_MUL: chunk.emit<inter::Mul>(r1, r2, r1); break;
-                            default: break;
+                        const i32 k4 = (d.op - OP_LOR) % 4;
+                        const i32 base = d.op - k4;
+                        auto emitBinary = [&](const inter::Register a, const inter::Register b,
+                                              const inter::Register dst) {
+                            switch(base) {
+                                case OP_LOR: chunk.emit<inter::LOr>(a, b, dst); break;
+                                case OP_LAND: chunk.emit<inter::LAnd>(a, b, dst); break;
+                                case OP_BOR: chunk.emit<inter::BOr>(a, b, dst); break;
+                                case OP_BXOR: chunk.emit<inter::BXor>(a, b, dst); break;
+                                case OP_BAND: chunk.emit<inter::BAnd>(a, b, dst); break;
+                                case OP_SAR: chunk.emit<inter::BrShift>(a, b, dst); break;
+                                case OP_SAL: chunk.emit<inter::BlShift>(a, b, dst); break;
+                                case OP_SR: chunk.emit<inter::BurShift>(a, b, dst); break;
+                                case OP_ADD: chunk.emit<inter::Add>(a, b, dst); break;
+                                case OP_SUB: chunk.emit<inter::Sub>(a, b, dst); break;
+                                case OP_MOD: chunk.emit<inter::Mod>(a, b, dst); break;
+                                case OP_DIV: chunk.emit<inter::Div>(a, b, dst); break;
+                                case OP_IDIV: chunk.emit<inter::Idiv>(a, b, dst); break;
+                                case OP_MUL: chunk.emit<inter::Mul>(a, b, dst); break;
+                                default: break;
+                            }
+                        };
+                        if(k4 == 1 || k4 == 2) {
+                            // PD/PI：o[m] = o[m] OP p（读-算-写，mapping.md §6.1）
+                            const inter::Register name =
+                                k4 == 1 ? regN : r3;
+                            if(k4 == 1)
+                                chunk.emit<inter::Load>(
+                                    regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                            chunk.emit<inter::GProp>(r2, name, regT);
+                            emitBinary(regT, r4, regT);
+                            chunk.emit<inter::DProp>(r2, name, regT);
+                            chunk.emit<inter::DLocal>(regT, r1);
+                        } else {
+                            emitBinary(r1, r2, r1);
                         }
                         break;
                     }

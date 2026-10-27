@@ -42,6 +42,14 @@
 
 ## 已完成（摘要）
 
+- 2026-10-27 字节码 M1.5 批次——octet 常量（CONST OCTET 经
+  SharedPayload<Octet>::makeSingle 入常量池）+ 二目组 PD/PI 读-算-写模板
+  （GProp → OP → DProp → DLocal，mapping.md §6.1；14 种二目共用 emitBinary
+  lambda）+ INC/DEC 组 PD/PI（GProp → LoadImm 1 → Add/Sub → DProp）+
+  scratch 扩容（%T2）。s2 字节码路径全通（实数/octet/中文/超界长整数）。
+  剩余 M2：ctClass 加载期解释 + NEW、property context、P 变体（property
+  闭包运算）、 collapse/展开调用。103 用例双配置全绿
+
 - 2026-10-26 TJS2 字节码转译批次（阶段 2/阶段 3 一部分，分支 feat/tjs-bytecode 已并回
   master）——TjsTranslator：码字长度表（TranslateCodeAddress 逐 case 对齐，含 CALL
   变长/四连变体 INC-PD=4/二目-P=4 差异）+ 寄存器恒等平移（K=VC+RC，多参函数

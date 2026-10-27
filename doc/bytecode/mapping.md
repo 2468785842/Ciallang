@@ -6,7 +6,7 @@
 > 不采用"独立 TJS 解释器"方案（被否决原因：保留两条执行路径不如统一到现有 VM，
 > 且本项目 TAC 本就对标 TJS 指令集）。
 >
-> 本文是**实现前的设计文档**。实施进度（2026-10-26）：阶段 0（--dump）与阶段 1（Reader）完成；阶段 2（TjsTranslator M1）基本完成：顶层+函数 context 全链路跑通（s1/s4/s5 字节码路径输出与源码路径一致；顶层 SPDS/GPD 经 this=全局对象、GPD 经 proxy=全局对象近似）；已知缺口：类/property context、NEW、PD/PI/P 运算变体、octet 常量（均有明确报错）。阶段 3 双路径对拍可基于 s1/s4/s5 语料进行。前置阅读：
+> 本文是**实现前的设计文档**。实施进度（2026-10-26）：阶段 0（--dump）与阶段 1（Reader）完成；阶段 2（TjsTranslator M1）基本完成：顶层+函数 context 全链路跑通（s1/s4/s5 字节码路径输出与源码路径一致；顶层 SPDS/GPD 经 this=全局对象、GPD 经 proxy=全局对象近似）；已知缺口：类/property context、NEW、P 变体（property 闭包运算）、collapse/展开调用（均有明确报错）；PD/PI 与 octet 常量已于 2026-10-27 支持。阶段 3 双路径对拍可基于 s1/s4/s5 语料进行。前置阅读：
 > [tjs2-bytecode.md](tjs2-bytecode.md)（旧格式）、[ciallang-bytecode.md](ciallang-bytecode.md)（本项目指令集）。
 
 ---
