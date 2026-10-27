@@ -56,7 +56,7 @@ Ciallang/
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
 | `src/gc/` | 内存管理 | `MarkSweepHeader`、固定 512B 节点自由链表 + 标记清除 |
 | `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`NativeRegister`(按 TypeId 分派原生方法)、`Debug` |
-| `src/tjsbc/` | TJS2 字节码转译（阶段 1：格式解析） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(M1 转译：恒等平移/标志物化/CALL 族/函数 context 直调已验证；顶层 proxy 模式为 M2，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
+| `src/tjsbc/` | TJS2 字节码转译（阶段 1：格式解析） | `TjsBytecodeReader`(格式解析)+`TjsBytecodeReader`(格式解析)+`TjsTranslator`(M1 转译：恒等平移/标志物化/属性两族操作数序/CALL 族/顶层+函数 context 全链路——s1/s4/s5 字节码输出与源码路径一致；类/NEW/PD 变体为 M2，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
 | `src/logging/` | 日志 | `Logger`（fmt 实际输出） |
 | `src/main.cpp` | 可执行 `cial`：`cial <script.tjs>`，走 run0() | |
 | `src/main0.cpp` | 可执行 `cial_bc`：fib 基准，走 run0() 扁平字节码路径 | |

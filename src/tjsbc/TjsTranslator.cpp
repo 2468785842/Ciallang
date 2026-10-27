@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "gen/Label.hpp"
+#include <cstdio>
 #include "runtime/AtomTable.hpp"
 #include "runtime/Runtime.hpp"
 
@@ -45,6 +46,11 @@ namespace cial::tjsbc {
         // 逐 case 对齐：寄存器操作数占 1 码字、CODE_ADDR 偏移占 1 码字）
         i32 opcodeSize(const i32 op) {
             switch(op) {
+                case OP_GPD: case OP_GPDS: case OP_SPDS: case OP_SPD: case OP_SPDE:
+                case OP_SPDEH: case OP_GPI: case OP_SPI: case OP_SPIE:
+                case OP_GPIS: case OP_SPIS: case OP_DELD: case OP_DELI:
+                case OP_TYPEOFD: case OP_TYPEOFI:
+                    return 4; // op, 3 操作数
                 case OP_NOP: case OP_NF:
                     return 1;
                 case OP_CONST:
@@ -96,6 +102,7 @@ namespace cial::tjsbc {
             i32 dataIdx = -1;  // CONST/PD/CALLD 的常量槽下标
             i32 imm = 0;       // CCL 计数 / 跳转相对字偏移 / CALL 实参数
             Vec<i32> args{};   // CALL 族实参寄存器（TJS r）
+            i32 size = 1;      // 本指令码字步长（CALL 族在 decode 内计算）
         };
 
         enum class JumpKind { Jmp, JmpE, JmpNE };
@@ -165,6 +172,7 @@ namespace cial::tjsbc {
             Decoded d{};
             d.op = code[i];
             d.word = i;
+            d.size = opcodeSize(d.op); // 非 CALL 族默认；CALL 族在分支内覆盖
             auto reg = [&](const i32 wordIdx) { return static_cast<i32>(code[i + wordIdx]); };
 
             switch(d.op) {
@@ -222,6 +230,7 @@ namespace cial::tjsbc {
                     d.args.reserve(static_cast<size_t>(d.imm));
                     for(i32 k = 0; k < d.imm; ++k)
                         d.args.push_back(reg(4 + k));
+                    d.size = 4 + d.imm;
                     return d;
                 }
                 case OP_CALLD: case OP_CALLI: {
@@ -237,6 +246,7 @@ namespace cial::tjsbc {
                     d.args.reserve(static_cast<size_t>(d.imm));
                     for(i32 k = 0; k < d.imm; ++k)
                         d.args.push_back(reg(5 + k));
+                    d.size = 5 + d.imm;
                     return d;
                 }
                 default:
@@ -385,6 +395,7 @@ namespace cial::tjsbc {
             i32 i = 0;
             while(i < static_cast<i32>(ctx.code.size())) {
                 Decoded d = decode(ctx.code, i);
+                fprintf(stderr, "[TR] i=%d op=%d\n", i, d.op);
                 offsetMap.emplace_back(d.word, static_cast<i32>(chunk.getInstVec().size()));
                 const auto r1 = mapReg(d.r1);
                 const auto r2 = mapReg(d.r2);
@@ -655,7 +666,7 @@ namespace cial::tjsbc {
                     default:
                         break;
                 }
-                i += opcodeSize(d.op);
+                i += d.size;
             }
 
             // 尾部兜底 Ret（无 RET 收尾的路径；ra[0]=void）

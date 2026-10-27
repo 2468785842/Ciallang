@@ -56,6 +56,14 @@
   顶层 SPDS obj=ra[-1] 惯用法）、类/property context、NEW。--tjsbc 入口已接。
   103 用例双配置全绿
 
+- 2026-10-26 字节码 M1 收尾批次（同日第二批次）——修复 opcodeSize 属性 4 字族
+  case 整体缺失（多次编辑踩踏，SPDS 走 1 字步进导致 "opcode -1/-2" 错位）+
+  属性族操作数序两套布局（GPD 族 dst,obj,m；SPD 族 obj,m,src）+ SPD 族 DataArea
+  槽解析 + 顶层 this=全局对象（--tjsbc 帧设 thisObj）。实测：s1（函数注册/
+  代理读参/CALLD/字符串拼接/Debug.message）、s4（GPD+SPDS+CALLD）、s5（GPD+
+  CALLD）字节码路径输出与源码路径一致；s2（octet）/s3（class）按 M1 范围明确
+  报错。102→103 用例双配置全绿
+
 - 2026-10-26 后缀 `!` 即时求值批次（语言特性最后一项，README 语法表清零）——
   tjs.y priority_expr "!" → T_EVAL 对齐：新指令 EvalStr（TAC/扁平字节码 75+75 全量
   X-macro 四点接线），Parser 后缀位置登记 PostfixEvalInfixParser（前缀 ! LNot 不受

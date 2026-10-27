@@ -21,6 +21,7 @@
 #include "tjsbc/TjsTranslator.hpp"
 #include "stdlib/Print.hpp"
 #include "vm/VM.hpp"
+#include "types/Class.hpp"
 #include "vm/VMState.hpp"
 
 using namespace cial;
@@ -81,6 +82,9 @@ var Debug = new __DebugShim();
             auto *chunk = program.contexts[static_cast<size_t>(program.topLevel)].chunk;
             vmState.allocCallFrame(chunk);
             vmState.makeClosure();
+            // 顶层 this = 全局对象（TJS 顶层 SPDS/GPD 经 this/proxy 寄存器读写全局）
+            vmState.curFrame()->setThisObj(
+                Value{ static_cast<Object *>(vmState.context.global()) });
             try {
                 vmState.run0();
             } catch(...) {
@@ -88,6 +92,7 @@ var Debug = new __DebugShim();
                 throw;
             }
             vmState.freeCallFrame();
+            fmt::println(stderr, "[TJSBC] done");
         } catch(const std::exception &e) {
             fmt::println(stderr, "cial: runtime error: {}", e.what());
             return 1;
