@@ -56,7 +56,7 @@ Ciallang/
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
 | `src/gc/` | 内存管理 | `MarkSweepHeader`、固定 512B 节点自由链表 + 标记清除 |
 | `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`NativeRegister`(按 TypeId 分派原生方法)、`Debug` |
-| `src/tjsbc/` | TJS2 字节码转译（阶段 2） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(M1+M2+M4：恒等平移/标志物化/属性全族（含整数成员名）/类 context 加载期解释/NEW→Call/P 变体与 GETP·SETP/DELD·TYPEOFD/proxy 回落链/省略透传·展开调用·collapse 参数（CallOmit·CallExpand·CollapseArgs）/CLT·CGT 自然序——`test_class`/`test_function`/`test_misc` 字节码路径全量通过，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
+| `src/tjsbc/` | TJS2 字节码转译（阶段 2，M1–M4 完成） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(恒等平移/标志物化与 M3 前瞻融合（Cmp 族直写 zf）/属性全族（含整数成员名）/类 context 加载期解释/NEW→Call/P 变体与 GETP·SETP/DELD·TYPEOFD/proxy 回落链/省略透传·展开调用·collapse 参数/BNOT·NUM·OCTET/dst=0 丢弃语义——tjs2 语料 12 文件字节码路径全量通过，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
 | `src/logging/` | 日志 | `Logger`（fmt 实际输出） |
 | `src/main.cpp` | 可执行 `cial`：`cial <script.tjs>`，走 run0() | |
 | `src/main0.cpp` | 可执行 `cial_bc`：fib 基准，走 run0() 扁平字节码路径 | |
@@ -79,7 +79,7 @@ ctest --test-dir build/Windows/Debug --output-on-failure
 ```
 
 - 依赖经 vcpkg 管理（`vcpkg.json`）：Catch2、fmt、spdlog、utf8proc。
-- 测试共 105 个 TEST_CASE（17 文件，其中 5 个文件因历史原因注释在 `tests/CMakeLists.txt`）。
+- 测试共 106 个 TEST_CASE（17 文件，其中 5 个文件因历史原因注释在 `tests/CMakeLists.txt`）。
 - `tests/test_files/tjs2/` 下是原版 kirikiri 测试脚本，是兼容性的行为基准。
 
 ## 代码风格与惯例

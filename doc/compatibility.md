@@ -45,7 +45,8 @@
 | 类（ctClass 加载期解释）/ NEW / try-catch / property / extends | ✅ M2（`test_class.tjs` 对拍一致，2026-10-27） |
 | 新增 TAC（Typeof/Asc/Chr/BNot/DelProp/GetP/SetP/比较写 zf…）+ run0 编码补全 | 📐 M3（TypeOf/Asc/Chr/DelProp 已随 M1/M2 提前落地） |
 | collapse/展开/省略调用、EVAL/EEXP、CLT/CGT 序修正、`test_function.tjs` 全量 | ✅ M4（2026-10-27：CallOmit/CallExpand/CollapseArgs 三条新 TAC + 超额实参保留区；test_misc/test_with 同步一致） |
-| octet 转换指令（OP_OCTET）、test_variant（Reader 对导出尾 8 字节不一致拒读）、test_string（原版 --dump 崩溃） | 📐 后续 |
+| test_variant（octet 语料） | ✅ 2026-10-27（Reader OCTET 段 pos 推进修复 + dst=0 丢弃语义修复后全量通过） |
+| test_string（原版 --dump 崩溃，无法产出字节码） | 📐 受上游阻塞 |
 | 对拍工具链：TJSCompiler `--dump` 导出选项 + `cial --tjsbc` + 语料入库 | ✅ `--dump` + 语料（tests/test_files/tjsbc/ s1–s7 + test_class/test_function）+ 转译器 + `cial --tjsbc`（`CIAL_TJSBC_DUMP=1` 可打印顶层转译 TAC） |
 
 ## 3. 标准库兼容

@@ -908,6 +908,102 @@ namespace cial::vm {
     DISPATCH_CMP(LAnd, regs[r1].logicalAnd(regs[r2]))
     DISPATCH_CMP(LOr, regs[r1].logicalOr(regs[r2]))
 
+    // ── M3：比较直写 _zf（省 %F 物化与 Test，配 JmpE/JmpNE 直连分支） ──
+    DISPATCH_OP_METHOD(CmpEQ) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        _zf = regs[r1].equals(regs[r2]);
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(CmpDEQ) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        _zf = regs[r1].discernEquals(regs[r2]);
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(CmpLT) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        _zf = regs[r1].littlerThan(regs[r2]).unwrap();
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(CmpGT) {
+        const u16 r1 = read<u16>(ip, pc);
+        const u16 r2 = read<u16>(ip, pc);
+        _zf = regs[r1].greaterThan(regs[r2]).unwrap();
+        return DispatchRet::Continue;
+    }
+
+    // 自增/自减单指令（旧版 INC/DEC 基型）：int ±1 / real ±1.0、其余报错
+    //（TJS increment 语义；字符串不拼接）
+    DISPATCH_OP_METHOD(Inc) {
+        const u16 r1 = read<u16>(ip, pc);
+        Value &v = regs[r1];
+        if(v.isIntegerFast())
+            v = Value{ Integer{ v.asIntegerUnsafe() + 1 } };
+        else if(v.isReal())
+            v = Value{ Real{ v.asReal().unwrap().value() + 1.0 } };
+        else
+            throw std::runtime_error("increment expects a number");
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(Dec) {
+        const u16 r1 = read<u16>(ip, pc);
+        Value &v = regs[r1];
+        if(v.isIntegerFast())
+            v = Value{ Integer{ v.asIntegerUnsafe() - 1 } };
+        else if(v.isReal())
+            v = Value{ Real{ v.asReal().unwrap().value() - 1.0 } };
+        else
+            throw std::runtime_error("decrement expects a number");
+        return DispatchRet::Continue;
+    }
+
+    // 按位非（旧版 BNOT/bitnot）
+    DISPATCH_OP_METHOD(BNot) {
+        const u16 r1 = read<u16>(ip, pc); // src
+        const u16 r2 = read<u16>(ip, pc); // dst
+        Value v = regs[r1];
+        if(const auto r = v.bitNot(); r.isFailed())
+            throw r.getErr();
+        regs[r2] = v;
+        return DispatchRet::Continue;
+    }
+
+    // 数值规范化（旧版 NUM/tonumber）
+    DISPATCH_OP_METHOD(ToNumber) {
+        const u16 r1 = read<u16>(ip, pc); // src
+        const u16 r2 = read<u16>(ip, pc); // dst
+        Value v = regs[r1];
+        if(const auto r = v.toNumber(); r.isFailed())
+            throw r.getErr();
+        regs[r2] = v;
+        return DispatchRet::Continue;
+    }
+
+    // 转 octet（旧版 OCTET/ToOctet）：void → 空 octet、octet 不变、其余报错
+    DISPATCH_OP_METHOD(ToOctet) {
+        const u16 r1 = read<u16>(ip, pc); // src
+        const u16 r2 = read<u16>(ip, pc); // dst
+        const Value &v = regs[r1];
+        if(v.isOctet()) {
+            regs[r2] = v;
+            return DispatchRet::Continue;
+        }
+        if(v.isVoid()) {
+            auto *payload = SharedPayload<Octet>::makeSingle(Octet(nullptr, 0));
+            regs[r2] = Value{};
+            regs[r2].type(ValueType::Octet);
+            regs[r2].octetStore(payload);
+            return DispatchRet::Continue;
+        }
+        throw std::runtime_error("cannot convert to octet");
+    }
+
     // ── 调用/属性 ────────────────────────────────────────────
     DISPATCH_OP_METHOD(Call) {
         const u16 r1 = read<u16>(ip, pc);

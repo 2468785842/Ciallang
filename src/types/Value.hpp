@@ -145,6 +145,14 @@ namespace cial {
 
         void toLogicalNot() noexcept;
 
+        // 按位非（旧版 VM_BNOT/bitnot）：~asInteger（real 截断、字符串解析，
+        // 与 TJS AsInteger 链一致）；原地
+        Ret<void> bitNot() noexcept;
+
+        // 数值规范化（旧版 VM_NUM/tonumber）：int/real 不变、字符串解析为数值
+        //（整样貌→int 否则 real）、void → 0、其余报错；原地
+        Ret<void> toNumber() noexcept;
+
         [[nodiscard]] Ret<void> toSignChange() noexcept;
 
         [[nodiscard]] Ret<Value> add(const Value &value) const noexcept;

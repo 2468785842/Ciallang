@@ -217,3 +217,57 @@ TEST_CASE("TJS2 字节码转译——TYPEOFD/DELD 直译") {
     // 成员已被删除
     REQUIRE(dict.asObject().unwrap()->hasProp(rt.atomTable.intern("x"_str)) == false);
 }
+
+TEST_CASE("TJS2 字节码转译——BNOT/NUM/OCTET 转换指令（M3）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("BNOT：~5 → -6") {
+        // CONST r1 ← BYTE(5) ; BNOT r1,r1 ; SRV r1 ; RET
+        TjsBytecodeFile file{};
+        file.topLevel = -1;
+        file.pool.bytes.push_back(5);
+        file.contexts.push_back(makeFuncContext({1, 1, 0, 82, 1, 118, 1, 119},
+                                                {TjsDataSlot{TJS_TYPE_BYTE, 0}}, 1));
+        TjsTranslator translator{ rt, file }; // 具名持有：GC 根须存活至断言结束
+        const auto program = translator.translate();
+        const Value func = Constant{program.contexts[0].funcMeta}.createValue(&rt);
+        Value arg{ Integer{ 5 } };
+        const Value ret = vm.callValue(func, 1, &arg);
+        REQUIRE(ret.isInteger());
+        REQUIRE(ret.asInteger().unwrap() == ~5);
+    }
+
+    SECTION("NUM：字符串转 42") {
+        // CONST r1 ← STR ; NUM r1,r1 ; SRV r1 ; RET
+        TjsBytecodeFile file{};
+        file.topLevel = -1;
+        file.pool.strings.push_back("42"_str);
+        file.contexts.push_back(makeFuncContext({1, 1, 0, 91, 1, 118, 1, 119},
+                                                {TjsDataSlot{TJS_TYPE_STRING, 0}}, 1));
+        TjsTranslator translator{ rt, file };
+        const auto program = translator.translate();
+        const Value func = Constant{program.contexts[0].funcMeta}.createValue(&rt);
+        Value arg = Value{ "42"_str };
+        const Value ret = vm.callValue(func, 1, &arg);
+        REQUIRE(ret.isInteger());
+        REQUIRE(ret.asInteger().unwrap() == 42);
+    }
+
+    SECTION("OCTET：void → 空 octet") {
+        // CL r1 ; OCTET r1,r1 ; SRV r1 ; RET
+        TjsBytecodeFile file{};
+        file.topLevel = -1;
+        file.contexts.push_back(makeFuncContext({3, 1, 98, 1, 118, 1, 119}, {}, 1));
+        TjsTranslator translator{ rt, file };
+        const auto program = translator.translate();
+        const Value func = Constant{program.contexts[0].funcMeta}.createValue(&rt);
+        Value arg{};
+        const Value ret = vm.callValue(func, 1, &arg);
+        REQUIRE(ret.isOctet());
+        REQUIRE(ret.asOctet().unwrap()->getSize() == 0);
+    }
+}

@@ -26,9 +26,17 @@
 > （FuncDeclCollapseBase → CollapseArgs，超额实参由 Function::call 复制到窗口顶部
 > 保留区按调用序保全）、EVAL/EEXP→EvalStr；CLT/CGT 序修正。`test_function.tjs`
 > 与 `test_misc.tjs` 字节码路径全量通过（test_misc 与源码路径逐行一致；这两类语法
-> 源码路径不支持，对拍基准为原版引擎行为）。仍缺口：OP_OCTET 转换指令、
-> test_variant（Reader 对 TJSCompiler 导出文件尾 8 字节不一致拒读）、
-> test_string（TJSCompiler --dump 自身崩溃）。已知近似见 §8.1。
+> 源码路径不支持，对拍基准为原版引擎行为）。
+> **M3 完成（2026-10-27）**：CmpEQ/CmpDEQ/CmpLT/CmpGT 比较直写 _zf + 转译器前瞻融合
+> （比较/TT/TF 紧随 JF/JNF 时省 %F 物化与 Test，每分支省 1 条）、Inc/Dec 单指令
+> （int/real，TJS increment 语义——旧译法 LoadImm+Add 对字符串会误拼接）、
+> BNOT/NUM/OCTET 转换指令补全（Value 增 bitNot/toNumber；128 操作码转译覆盖闭环）。
+> **Reader 修复**：OCTET 段条目读取后未推进 pos（内容字节缺失导致多 octet 文件
+> 错位，仅靠段尾收口掩盖）——test_variant 因此解锁并全量通过（与源码路径一致）。
+> **dst=0 调用丢弃语义修复**：TJS `CALLD dst=0` 表示不写回（原版传 NULL 结果指针），
+> 旧译法写入 %K（void 槽）沿隐式 return 链污染上层 `SRV r0` 返回值——统一落到窗口
+> 顶部专用丢弃寄存器。仍缺口：test_string（TJSCompiler --dump 自身崩溃）。
+> 已知近似见 §8.1。
 > 前置阅读：
 > [tjs2-bytecode.md](tjs2-bytecode.md)（旧格式）、[ciallang-bytecode.md](ciallang-bytecode.md)（本项目指令集）。
 
@@ -289,6 +297,9 @@ propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 
 | collapse 参数（`function f(a, b*)`） | 入口把 args[base..] 收拢成 Array 落 ra[-3-base] | `CollapseArgs dst, base` 在 prologue 末尾发射（实参尚完整时） | 无超额实参也建空 Array（TJS2 无条件建） |
 | EVAL/EEXP | 字符串即时编译执行，this=ra[-1] | `EvalStr`（源码路径已有指令）；EEXP 编译期形态差异运行期无别 | — |
 | 整数成员名（`a[0]` → GPI+整数名） | PropGet/SetByNum | GPD/GPI/SPD/SPI/DPropRaw/GPropRaw 整数名分支 = 数组数值下标（负从尾、写越界扩展） | — |
+| 调用 dst=0 | 丢弃（结果指针 NULL，不写回） | 落窗口顶部专用丢弃寄存器（regCount-1） | 修复：曾写 %K（void 槽）污染 `SRV r0` 返回链 |
+| INC/DEC 基型 | increment（int/real，字符串报错） | `Inc`/`Dec` 单指令，同语义 | 旧译法 LoadImm+Add 对字符串会误拼接 |
+| BNOT/NUM/OCTET | bitnot / tonumber / ToOctet | `BNot`/`ToNumber`/`ToOctet`（Value 增 bitNot/toNumber） | OCTET：void→空 octet、octet 不变、其余报错 |
 
 ## 9. 对拍与工具链（已立项，未实现）
 
@@ -305,8 +316,8 @@ propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 
 |---|---|---|
 | **M1** ✅ | Reader（容器+常量池+context 骨架）；顶层/函数 context 转译（§4.1/4.2 基型/4.5 CALL/4.6）；flag 物化；prologue；`cial --tjsbc` | fib/循环/算术/字符串拼接/print 的 .bc 对拍全绿（s1–s5） |
 | **M2** ✅ | 属性全族（GPI/SPI/GPDS…模板）、ctClass 加载期解释、NEW、try/catch、property、P 变体、DELD/DELI、TYPEOFD/I、octet 常量、proxy 回落链 | kirikiri `test_class.tjs` 编译产物对拍全绿（2026-10-27，与源码路径逐字节一致）；`test_function.tjs` 前半通过，展开/收拢调用部分留 M4 |
-| **M3** | 新增 TAC（比较写 zf / Inc/Dec / Typeof / Asc/Chr / BNot / DelProp / GetP/SetP）+ run0 编码补全 | M1 语料走 `run0()` 性能对齐源码路径；指令覆盖 128/128 |
-| **M4** ✅ | collapse 参数（CollapseArgs）、展开调用（CallExpand）、省略透传（CallOmit）、EVAL/EEXP→EvalStr、CLT/CGT 序修正 | `test_function.tjs` 全量通过（2026-10-27）；`test_misc`/`test_with` 与源码路径一致；`test.tjs` 双方同位置失败（需宿主 Scripts 对象）。遗留：OP_OCTET 转换、test_variant Reader 拒读、test_string 原版导出崩溃 |
+| **M3** ✅ | 比较写 zf 指令族（CmpEQ/DEQ/LT/GT + 前瞻融合）、Inc/Dec 单指令、BNot/ToNumber/ToOctet（Typeof/Asc/Chr/DelProp/GetP·SetP 已随 M1/M2 提前落地） | 指令转译覆盖 128/128（2026-10-27）；全部语料 run0 路径全绿 |
+| **M4** ✅ | collapse 参数（CollapseArgs）、展开调用（CallExpand）、省略透传（CallOmit）、EVAL/EEXP→EvalStr、CLT/CGT 序修正、dst=0 丢弃语义 | `test_function.tjs` 全量通过（2026-10-27）；test_misc/test_with/test_variant 与源码路径一致；`test.tjs` 双方同位置失败（需宿主 Scripts 对象）。遗留：test_string 原版导出崩溃 |
 
 **新增 TAC 指令提案汇总**（M3 落地，命名沿用现有风格）：
 `CmpEQ/CmpDEQ/CmpLT/CmpGT`（写 zf）、`Inc/Dec`、`Typeof`、`Asc/Chr`、`BNot`、`Num`、

@@ -6,6 +6,7 @@
 #include <cstring>
 #include <map>
 
+
 #include "gen/Label.hpp"
 #include "runtime/AtomTable.hpp"
 #include "runtime/Runtime.hpp"
@@ -213,6 +214,7 @@ namespace cial::tjsbc {
                 case OP_DEC: case OP_SRV: case OP_THROW: case OP_GLOBAL:
                 case OP_BNOT: case OP_NUM: case OP_ASC: case OP_CHR:
                 case OP_TYPEOF: case OP_CL: case OP_EVAL: case OP_EEXP:
+                case OP_OCTET:
                     d.r1 = reg(1);
                     return d;
                 case OP_RET:
@@ -538,6 +540,10 @@ namespace cial::tjsbc {
             const auto regN = inter::Register{static_cast<u16>(regF.index() + 2)};          // 名字常量临时
             const auto regT2 = inter::Register{static_cast<u16>(regF.index() + 3)};         // 第二临时
             const u16 regCount = static_cast<u16>(regT2.index() + 1 + ctx.funcDeclArgCount + 1);
+            // TJS dst=0 的调用是丢弃语义（原版传 NULL 结果指针，不写回）——落到
+            // 窗口顶部保留位。不能写 %K：TJS ra[0] 是 void 寄存器，SRV r0 读它，
+            // 写入调用的返回值会沿隐式 return 链污染上层（test_variant 暴露）
+            const auto regDiscard = inter::Register{static_cast<u16>(regCount - 1)};
 
             vm::Chunk chunk{}; // 常量 0 = Void
 
@@ -587,6 +593,41 @@ namespace cial::tjsbc {
                 offsetMap.emplace_back(d.word, static_cast<i32>(chunk.getInstVec().size()));
                 const auto r1 = mapReg(d.r1);
                 const auto r2 = mapReg(d.r2);
+
+                // ── 前瞻融合（M3）：比较/TT/TF 紧随 JF/JNF 时，Cmp 直写 _zf +
+                // JmpE/JmpNE 直连，省 %F 物化与 Test。TJS 编译器保证 flag 消费者
+                // （JF/JNF/SETF/SETNF/NF）紧邻生产者，非跳转消费者走旧路径 ──
+                {
+                    const i32 next =
+                        i + d.size < static_cast<i32>(ctx.code.size()) ? ctx.code[static_cast<size_t>(i + d.size)] : -1;
+                    const bool nextIsJump = next == OP_JF || next == OP_JNF;
+                    const bool isCmp = d.op == OP_CEQ || d.op == OP_CDEQ
+                                    || d.op == OP_CLT || d.op == OP_CGT;
+                    const bool isTTTF = d.op == OP_TT || d.op == OP_TF;
+                    if((isCmp || isTTTF) && nextIsJump) {
+                        if(isCmp) {
+                            switch(d.op) {
+                                case OP_CEQ: chunk.emit<inter::CmpEQ>(r1, r2); break;
+                                case OP_CDEQ: chunk.emit<inter::CmpDEQ>(r1, r2); break;
+                                case OP_CLT: chunk.emit<inter::CmpLT>(r1, r2); break;
+                                default: chunk.emit<inter::CmpGT>(r1, r2); break;
+                            }
+                        } else {
+                            chunk.emit<inter::Test>(r1); // TT/TF = _zf ← bool(r)
+                        }
+                        Decoded j = decode(ctx.code, i + d.size);
+                        offsetMap.emplace_back(j.word, static_cast<i32>(chunk.getInstVec().size()));
+                        const i32 target = j.word + j.imm;
+                        // JF=真跳 → JmpE；JNF=假跳 → JmpNE；TF 取反翻转方向
+                        JumpKind kind = (next == OP_JF) != (d.op == OP_TF) ? JumpKind::JmpE
+                                                                          : JumpKind::JmpNE;
+                        jumpFixups.push_back({chunk.getInstVec().size(),
+                                              static_cast<size_t>(target), kind});
+                        chunk.emit<inter::JmpE>(Label{0}); // 占位，repl 按 kind 修正
+                        i = j.word + j.size;
+                        continue;
+                    }
+                }
                 const auto r3 = mapReg(d.r3);
                 const auto r4 = mapReg(d.r4);
 
@@ -739,9 +780,11 @@ namespace cial::tjsbc {
                             else
                                 chunk.emit<inter::Sub>(v, regT2, v);
                         };
-                        if(k4 == 0) { // base：r1 ± 1
-                            chunk.emit<inter::LoadImm>(regT2, Integer{1});
-                            emitOne(r1);
+                        if(k4 == 0) { // base：单指令 ±1（int/real，其余 TJS increment 报错）
+                            if(isInc)
+                                chunk.emit<inter::Inc>(r1);
+                            else
+                                chunk.emit<inter::Dec>(r1);
                             break;
                         }
                         if(k4 == 3) { // P：*target ± 1（属性节点读-算-写）
@@ -859,8 +902,12 @@ namespace cial::tjsbc {
                         // 形态差异仅编译期，运行期语义一致）
                         chunk.emit<inter::EvalStr>(r1, r1);
                         break;
-                    case OP_BNOT: case OP_NUM:
-                        trError("opcode not supported in M1 translator");
+                    case OP_BNOT:
+                        chunk.emit<inter::BNot>(r1, r1);
+                        break;
+                    case OP_NUM:
+                        chunk.emit<inter::ToNumber>(r1, r1);
+                        break;
                     case OP_TYPEOF:
                         chunk.emit<inter::TypeOf>(r1, r1);
                         break;
@@ -889,7 +936,8 @@ namespace cial::tjsbc {
                         chunk.emit<inter::ToString>(r1, r1);
                         break;
                     case OP_OCTET:
-                        trError("OCTET conversion is not supported in M1 translator");
+                        chunk.emit<inter::ToOctet>(r1, r1);
+                        break;
                     case OP_CALL: case OP_CALLD: case OP_CALLI: {
                         inter::Register func = r2;
                         if(d.op == OP_CALLD) {
@@ -908,7 +956,7 @@ namespace cial::tjsbc {
                             func = regT;
                         }
                         if(d.imm == -1) { // 省略透传：转发本帧实际实参
-                            chunk.emitRaw<inter::CallOmit>(r1, func);
+                            chunk.emitRaw<inter::CallOmit>(d.r1 == 0 ? regDiscard : r1, func);
                             break;
                         }
                         if(d.imm == -2) { // 展开调用
@@ -917,13 +965,14 @@ namespace cial::tjsbc {
                             for(const auto &[type, tjsReg] : d.fatEntries)
                                 entries.emplace_back(static_cast<u8>(type), mapReg(tjsReg));
                             chunk.emitRaw<inter::CallExpand>(
-                                r1, func, Integer{ctx.funcDeclUnnamedArgArrayBase},
+                                d.r1 == 0 ? regDiscard : r1, func,
+                                Integer{ctx.funcDeclUnnamedArgArrayBase},
                                 std::move(entries));
                             break;
                         }
                         for(const i32 arg : d.args)
                             chunk.emit<inter::Push>(mapReg(arg));
-                        chunk.emit<inter::Call>(r1, func,
+                        chunk.emit<inter::Call>(d.r1 == 0 ? regDiscard : r1, func,
                                                 Integer{static_cast<i64>(d.imm)});
                         break;
                     }
@@ -931,7 +980,7 @@ namespace cial::tjsbc {
                         // 构造：类值上 Call（ClassObject::call 创建 DataObject +
                         // initDefaultVal + 构造器），与 TJS CreateNew 对齐
                         if(d.imm == -1) {
-                            chunk.emitRaw<inter::CallOmit>(r1, r2);
+                            chunk.emitRaw<inter::CallOmit>(d.r1 == 0 ? regDiscard : r1, r2);
                             break;
                         }
                         if(d.imm == -2) {
@@ -940,13 +989,14 @@ namespace cial::tjsbc {
                             for(const auto &[type, tjsReg] : d.fatEntries)
                                 entries.emplace_back(static_cast<u8>(type), mapReg(tjsReg));
                             chunk.emitRaw<inter::CallExpand>(
-                                r1, r2, Integer{ctx.funcDeclUnnamedArgArrayBase},
+                                d.r1 == 0 ? regDiscard : r1, r2,
+                                Integer{ctx.funcDeclUnnamedArgArrayBase},
                                 std::move(entries));
                             break;
                         }
                         for(const i32 arg : d.args)
                             chunk.emit<inter::Push>(mapReg(arg));
-                        chunk.emit<inter::Call>(r1, r2,
+                        chunk.emit<inter::Call>(d.r1 == 0 ? regDiscard : r1, r2,
                                                 Integer{static_cast<i64>(d.imm)});
                         break;
                     }

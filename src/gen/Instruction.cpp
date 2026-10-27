@@ -210,6 +210,16 @@ namespace cial::inter {
     std::string CollapseArgs::dump(const VMState *vm) {
         return fmt::format("collapse   {:<4} base={}", dst.index(), static_cast<i64>(base));
     }
+
+    DEF_AUTO_DUMP(CmpEQ, "cmp_eq");
+    DEF_AUTO_DUMP(CmpDEQ, "cmp_deq");
+    DEF_AUTO_DUMP(CmpLT, "cmp_lt");
+    DEF_AUTO_DUMP(CmpGT, "cmp_gt");
+    DEF_AUTO_DUMP(Inc, "inc");
+    DEF_AUTO_DUMP(Dec, "dec");
+    DEF_AUTO_DUMP(BNot, "b_not");
+    DEF_AUTO_DUMP(ToNumber, "to_number");
+    DEF_AUTO_DUMP(ToOctet, "to_octet");
     DEF_AUTO_DUMP(Ret, "ret");
 
     // 属性操作

@@ -278,6 +278,49 @@ namespace cial {
         return Ret<void>::err(ErrCode::InvalidCast, "Invalid type cast to Object"_str);
     }
 
+    Ret<void> Value::bitNot() noexcept {
+        const auto r = asInteger();
+        if(r.isFailed())
+            return Ret<void>::err(r.getErr());
+        this->~Value();
+        _type = ValueType::Integer;
+        _integer = ~r.value();
+        return Ret<void>::ok();
+    }
+
+    Ret<void> Value::toNumber() noexcept {
+        switch(_type) {
+            case ValueType::Integer:
+            case ValueType::Real:
+                return Ret<void>::ok();
+            case ValueType::Void:
+                this->~Value();
+                _type = ValueType::Integer;
+                _integer = 0;
+                return Ret<void>::ok();
+            case ValueType::String: {
+                const auto &str = *_string->data;
+                // TJS String::ToNumber：整样貌解析为 int，否则 real
+                if(const auto i = TypeConverter::stringToInteger(str); !i.isFailed()) {
+                    this->~Value();
+                    _type = ValueType::Integer;
+                    _integer = i.value();
+                    return Ret<void>::ok();
+                }
+                if(const auto d = TypeConverter::stringToReal(str); !d.isFailed()) {
+                    this->~Value();
+                    _type = ValueType::Real;
+                    _real = d.value();
+                    return Ret<void>::ok();
+                }
+                return Ret<void>::err(ErrCode::InvalidCast, "cannot convert string to number"_str);
+            }
+            default:
+                break;
+        }
+        return Ret<void>::err(ErrCode::InvalidCast, "cannot convert to number"_str);
+    }
+
     void Value::toLogicalNot() noexcept {
         const auto r = asBool();
         this->~Value();

@@ -8,6 +8,7 @@
 
 #include "common/UTF8.hpp"
 
+
 namespace cial::tjsbc {
 
     namespace {
@@ -179,8 +180,11 @@ namespace cial::tjsbc {
                     c.need(static_cast<size_t>(len));
                     pool.octets[static_cast<size_t>(k)].assign(c.data + c.pos,
                                                                c.data + c.pos + len);
-                    c.skip(((static_cast<size_t>(len) + 3) & ~static_cast<size_t>(3))
-                           - static_cast<size_t>(len));
+                    // 内容 + 4 对齐填充一并跳过（缺内容推进会使后续条目错位，
+                    // 仅靠段尾 c.pos=end 收口掩盖，test_variant 的多 octet 语料暴露）
+                    c.skip(static_cast<size_t>(len)
+                           + (((static_cast<size_t>(len) + 3) & ~static_cast<size_t>(3))
+                              - static_cast<size_t>(len)));
                 }
             }
 

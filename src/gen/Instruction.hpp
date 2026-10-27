@@ -95,7 +95,16 @@
     O(NewRegExp)                                                                                                            O(CallV)                                                                                                           \
     O(CallOmit)                                                                                                        \
     O(CallExpand)                                                                                                      \
-    O(CollapseArgs)
+    O(CollapseArgs)                                                                                                    \
+    O(CmpEQ)                                                                                                           \
+    O(CmpDEQ)                                                                                                          \
+    O(CmpLT)                                                                                                           \
+    O(CmpGT)                                                                                                           \
+    O(Inc)                                                                                                             \
+    O(Dec)                                                                                                             \
+    O(BNot)                                                                                                            \
+    O(ToNumber)                                                                                                        \
+    O(ToOctet)
 
 namespace cial::vm {
     class VMState;
@@ -425,6 +434,28 @@ namespace cial::inter {
 
         [[nodiscard]] std::string dump(const vm::VMState *vmState) override;
     };
+
+    // ── M3：比较直写 _zf（省 %F 物化与 Test；2 操作数，无 dst） ──
+    // CmpEQ/CmpDEQ/CmpLT/CmpGT ↔ 旧版 CEQ/CDEQ/CLT/CGT（自然序，见转译器注）
+    DEF_INST(CmpEQ, 2, OP_GET1(src1, Register) OP_GET2(src2, Register));
+    DEF_INST(CmpDEQ, 2, OP_GET1(src1, Register) OP_GET2(src2, Register));
+    DEF_INST(CmpLT, 2, OP_GET1(src1, Register) OP_GET2(src2, Register));
+    DEF_INST(CmpGT, 2, OP_GET1(src1, Register) OP_GET2(src2, Register));
+
+    // 自增/自减单指令（旧版 INC/DEC 基型）：int ±1 / real ±1.0，其余报错
+    //（旧译法 LoadImm+Add 对字符串会拼接，TJS increment 语义应报错）
+    DEF_INST(Inc, 1, OP_GET1(src, Register));
+    DEF_INST(Dec, 1, OP_GET1(src, Register));
+
+    // 按位非（旧版 BNOT）：~asInteger（real 截断、字符串解析，与 TJS AsInteger 链一致）
+    DEF_INST(BNot, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
+
+    // 数值规范化（旧版 NUM/tonumber）：int/real 不变、字符串解析为数值、
+    // void → 0、其余报错
+    DEF_INST(ToNumber, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
+
+    // 转 octet（旧版 OCTET/ToOctet）：void → 空 octet、octet 不变、其余报错
+    DEF_INST(ToOctet, 2, OP_GET1(src, Register) OP_GET2(dst, Register));
 
     struct DumpInst {
         [[nodiscard]] static String dumpOperand(const Operand &operand);

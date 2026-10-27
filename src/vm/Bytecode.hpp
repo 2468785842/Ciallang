@@ -90,7 +90,16 @@
     O(NewRegExp)                                                                                                            O(CallV)                                                                                                           \
     O(CallOmit)                                                                                                        \
     O(CallExpand)                                                                                                      \
-    O(CollapseArgs)
+    O(CollapseArgs)                                                                                                    \
+    O(CmpEQ)                                                                                                           \
+    O(CmpDEQ)                                                                                                          \
+    O(CmpLT)                                                                                                           \
+    O(CmpGT)                                                                                                           \
+    O(Inc)                                                                                                             \
+    O(Dec)                                                                                                             \
+    O(BNot)                                                                                                            \
+    O(ToNumber)                                                                                                        \
+    O(ToOctet)
 
 namespace cial::vm {
     class VMState;

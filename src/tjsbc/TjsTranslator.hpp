@@ -14,8 +14,11 @@
 // "undefined"）；GPI/SPIS/CALLI 经 proxy 无回落；SPDS 经 proxy 落 this 槽。
 // M4 支持集：省略透传（argc=-1→CallOmit）、展开调用（argc=-2→CallExpand，
 // fatNormal/fatExpand/fatUnnamedExpand）、collapse 参数（CollapseArgs）、
-// EVAL/EEXP→EvalStr、CLT/CGT 自然序（GreaterThan/LittlerThan 名实相反）。
-// 仍缺口：OP_OCTET 转换指令、octet 转换。
+// EVAL/EEXP→EvalStr、CLT/CGT 自然序（GreaterThan/LittlerThan 名实相反）、
+// dst=0 调用丢弃语义（落 regCount-1 专用寄存器）。
+// M3 支持集：比较直写 _zf（CmpEQ/DEQ/LT/GT）+ JF/JNF/TT/TF 前瞻融合（省 %F
+// 物化与 Test）、Inc/Dec 单指令、BNOT/NUM/OCTET（BNot/ToNumber/ToOctet）。
+// 128 操作码转译覆盖闭环。仍缺口：无（test_string 受上游 --dump 崩溃阻塞）。
 #pragma once
 
 #include "runtime/AtomTable.hpp"

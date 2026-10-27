@@ -411,6 +411,58 @@ namespace cial::vm {
         encodeUleb128(static_cast<u64>(tac->base), info.code);
     }
 
+    void Bytecode::encode(Info &info, const inter::CmpEQ *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CmpEQ));
+        write<u16>(info.code, tac->src1().index());
+        write<u16>(info.code, tac->src2().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::CmpDEQ *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CmpDEQ));
+        write<u16>(info.code, tac->src1().index());
+        write<u16>(info.code, tac->src2().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::CmpLT *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CmpLT));
+        write<u16>(info.code, tac->src1().index());
+        write<u16>(info.code, tac->src2().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::CmpGT *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CmpGT));
+        write<u16>(info.code, tac->src1().index());
+        write<u16>(info.code, tac->src2().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::Inc *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::Inc));
+        write<u16>(info.code, tac->src().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::Dec *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::Dec));
+        write<u16>(info.code, tac->src().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::BNot *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::BNot));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::ToNumber *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::ToNumber));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::ToOctet *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::ToOctet));
+        write<u16>(info.code, tac->src().index());
+        write<u16>(info.code, tac->dst().index());
+    }
+
     void Bytecode::encode(Info &info, const inter::NewRegExp *tac) {
         info.code.push_back(static_cast<u8>(VmOpCode::NewRegExp));
         write<u16>(info.code, tac->dst().index());
