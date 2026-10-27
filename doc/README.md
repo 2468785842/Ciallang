@@ -15,7 +15,7 @@
 | 文档 | 内容 |
 |---|---|
 | [bytecode/tjs2-bytecode.md](bytecode/tjs2-bytecode.md) | 旧版 TJS2（TJSCompiler）字节码规范：128 操作码全表、寄存器模型与助记符约定、`"TJS2" "100\0"` 序列化文件格式、内存态/文件态地址换算 |
-| [bytecode/ciallang-bytecode.md](bytecode/ciallang-bytecode.md) | 本项目（Ciallang）指令集规范：55 条 TAC、扁平字节码 17 操作码与 LEB128 编码、Chunk 结构、未编码指令清单 |
+| [bytecode/ciallang-bytecode.md](bytecode/ciallang-bytecode.md) | 本项目（Ciallang）指令集规范：86 条 TAC = 86 扁平字节码操作码（全编码，X-macro 单一定义）与 LEB128 编码、Chunk 结构、TJS 字节码转译入口 |
 
 ## 语言
 

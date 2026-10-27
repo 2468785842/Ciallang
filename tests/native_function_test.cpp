@@ -6,6 +6,10 @@
 
 #include <catch.hpp>
 
+#include <filesystem>
+
+#include <fmt/core.h>
+
 #include "stdlib/StringLib.hpp"
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
@@ -861,6 +865,15 @@ TEST_CASE("Array/Dictionary 结构化存取 + Octet pack 系（tjsBinarySerializ
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
+    // save/load 系落盘路径：系统临时目录（正斜杠，TJS 字符串无需转义），
+    // 不污染工作目录/仓库根
+    std::string tmpDir = (std::filesystem::temp_directory_path() / "cial_test").string();
+    std::filesystem::create_directories(tmpDir);
+    for(auto &c : tmpDir)
+        if(c == '\\')
+            c = '/';
+    vm.eval(String{ fmt::format(R"tjs(var __tmpDir = "{}";)tjs", tmpDir).c_str() });
+
     SECTION("pack/unpack：整数宽度/符号/字节序/浮点/base64") {
         vm.eval(R"tjs(
             var h1 = [1, -1].pack("c2").unpack("H*")[0];
@@ -912,9 +925,9 @@ TEST_CASE("Array/Dictionary 结构化存取 + Octet pack 系（tjsBinarySerializ
     SECTION("Array.save/load 文本行（元素一律字符串）") {
         vm.eval(R"tjs(
             var a = ["one", 2, 3.5];
-            a.save("t_lines.txt");
+            a.save(__tmpDir + "/t_lines.txt");
             var b = [];
-            b.load("t_lines.txt");
+            b.load(__tmpDir + "/t_lines.txt");
             var j = b.join("|");
             var c = b.count;
         )tjs"_str);
@@ -925,15 +938,15 @@ TEST_CASE("Array/Dictionary 结构化存取 + Octet pack 系（tjsBinarySerializ
     SECTION("saveStruct 文本/二进制回环 + assignStruct 深拷贝") {
         vm.eval(R"tjs(
             var d = %[k1: 1, k2: "s", k3: [1, 2], k4: %[n: 7]];
-            d.saveStruct("t_d.txt");
+            d.saveStruct(__tmpDir + "/t_d.txt");
             var d2 = %[];
-            var r2 = d2.loadStruct("t_d.txt");
+            var r2 = d2.loadStruct(__tmpDir + "/t_d.txt");
             var d2c = d2.count;      // 文本路径不写入自身（原版同款怪癖）
             var r2c = r2.count;
             var k4n = r2["k4"]["n"];
-            d.saveStruct("t_d.bin", "b");
+            d.saveStruct(__tmpDir + "/t_d.bin", "b");
             var d3 = %[x: 0];
-            d3.loadStruct("t_d.bin", "b");
+            d3.loadStruct(__tmpDir + "/t_d.bin", "b");
             var d3c = d3.count;
             var k2 = d3["k2"];
             var k3 = d3["k3"].join("+");
@@ -958,22 +971,22 @@ TEST_CASE("Array/Dictionary 结构化存取 + Octet pack 系（tjsBinarySerializ
     SECTION("Array.loadStruct 仅收二进制（文本报错，原版同）+ 环 → null + octet 进出") {
         vm.eval(R"tjs(
             var arr = [1, "x", [7], %[y: 8]];
-            arr.saveStruct("t_a.txt");
+            arr.saveStruct(__tmpDir + "/t_a.txt");
             var a2 = [];
             var txtErr = 0;
-            try { a2.loadStruct("t_a.txt"); } catch(e) { txtErr = 1; }
-            arr.saveStruct("t_a.bin", "b");
+            try { a2.loadStruct(__tmpDir + "/t_a.txt"); } catch(e) { txtErr = 1; }
+            arr.saveStruct(__tmpDir + "/t_a.bin", "b");
             var a3 = [];
-            a3.loadStruct("t_a.bin", "b");
+            a3.loadStruct(__tmpDir + "/t_a.bin", "b");
             var a3c = a3.count;
             var e3 = a3[2][0];
             var y = a3[3]["y"];
             var inner = %[v: 1];
             var arrC = [1, inner];
             inner["back"] = arrC;
-            arrC.saveStruct("t_c.bin", "b");
+            arrC.saveStruct(__tmpDir + "/t_c.bin", "b");
             var c2 = [];
-            c2.loadStruct("t_c.bin", "b");
+            c2.loadStruct(__tmpDir + "/t_c.bin", "b");
             var innerV = c2[1]["v"];
             var backIsNull = c2[1]["back"] === void ? 1 : 0;
             var od = %[o: [0xde, 0xad].pack("C2")];

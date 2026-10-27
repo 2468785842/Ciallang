@@ -15,17 +15,17 @@
 ## 1. 两级结构总览
 
 ```
-AST ──IRGenerator──▶ TAC 指令序列（72 种，Instruction 对象）
+AST ──IRGenerator──▶ TAC 指令序列（86 种，Instruction 对象）
                         │  存于 Chunk::_instructions
                         ▼  Chunk::toBytecode()（幂等、惰性）
-                     扁平字节码 Vec<u8>（72 种 VmOpCode，与 TAC 一一对应）
+                     扁平字节码 Vec<u8>（86 种 VmOpCode，与 TAC 一一对应）
                         │  存于 Chunk::_code
                         ▼
                      VMState::run0() switch 解释（唯一执行路径）
 ```
 
 - 早期的 `run()` 多态执行路径（逐条虚调用 `Instruction::execute`）已删除；
-  语义全部收敛到 `run0()` 的 72 个 `dispatchXXX`。
+  语义全部收敛到 `run0()` 的 86 个 `dispatchXXX`。
 - `Instruction` 子类只作为 IR 载体与 dump 来源保留。
 
 ## 2. 执行模型
@@ -43,7 +43,7 @@ AST ──IRGenerator──▶ TAC 指令序列（72 种，Instruction 对象）
 - **this**：`CallFrame::thisObj`；`Function::call` 设为函数对象的 `thisObj` 字段（可被
   `ChgThis`/`GProp` 的方法绑定改写）。`GThis`/`DThis` 做名字查找（thisObj → closure 局部 → global）。
 
-## 3. TAC 指令全表（73 条）
+## 3. TAC 指令全表（86 条）
 
 枚举值 = 表中顺序（X-macro `CIAL_TAC_OPCODE_ENUMS`）。操作数记号：
 `%r`=寄存器、`@l`=标签（TAC 指令下标）、`*c`=常量池下标、`imm`=立即整数、`atom`=驻留名。
@@ -164,6 +164,31 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 调 getter/setter；GLocal/DLocal（局部变量=寄存器拷贝，TJS2 VM_CP 语义）与
 *Raw 系列永不触发——这是 `&` 引用能作为一等值传递的前提。
 
+### 3.10 追加指令（TJS 字节码转译与性能批次，2026-10-27；编号续 3.9 表）
+
+> 本节指令为转译路线（mapping.md）与调用优化新增，3.9 之前表格的编号系历史快照；
+> 枚举顺序以 X-macro `CIAL_TAC_OPCODE_ENUMS` 为权威（86 条全量编码进扁平字节码）。
+
+| 指令 | 操作数 | 语义 |
+|---|---|---|
+| Call | `%dst, %func, argc` | 调用对象（Function/Class/Property 之外的通用入口，实参已 Push） |
+| CallV | `%dst, %func, argc, %r1..%rn` | 变长实参调用：语义 = N×Push + Call（手写子类 + emitRaw） |
+| CallOmit | `%dst, %func` | 省略透传（TJS `f(...)`）：转发本帧 actualArgc 个实参（CallFrame 记录） |
+| CallExpand | `%dst, %func, unnamedBase, (type,%r)*` | 展开调用（TJS `f(1, arr*, *)`）：Normal/Expand(Array)/UnnamedExpand 条目表 |
+| CollapseArgs | `%dst, base` | collapse 参数（TJS `function f(a, b*)`）：实参 %base.. 收拢成 Array |
+| DerefGet | `%prop, %dst` | `*p` 强制属性访问读（调 getter，旧版 GETP） |
+| DerefSet | `%prop, %src` | `*p = v` 强制属性访问写（调 setter，旧版 SETP） |
+| NewArray / NewDict | `%dst[, count]` | `[...]` / `%[...]` 字面量 |
+| GetIndex / SetIndex | `%obj, %idx, %dst/%src` | 通用下标读写（数组负下标/越界扩展/字典键/字符串字符） |
+| WithPush / WithPop / GetWith | `%src` / — / `%dst` | with 上下文栈与 `.member` 裸词链 |
+| NewRegExp | `%dst, *pattern` | `/pattern/flags` 字面量 |
+| CmpEQ / CmpDEQ / CmpLT / CmpGT | `%src1, %src2` | **比较直写 _zf**（M3：无 dst，配 JmpE/JmpNE 直连分支，省标志物化） |
+| Inc / Dec | `%r` | 自增/自减单指令（int/real，TJS increment 语义） |
+| BNot | `%src, %dst` | 按位非 `~`（旧版 BNOT） |
+| ToNumber | `%src, %dst` | 数值规范化（旧版 NUM：字符串解析、void→0） |
+| ToOctet | `%src, %dst` | 转 octet（旧版 OCTET：void→空 octet、其余报错） |
+| EvalStr | `%src, %dst` | 后缀 `!` 即时求值（见 3.4 表 #24） |
+
 ## 4. Chunk 结构（`src/vm/Chunk.hpp`）
 
 | 成员 | 说明 |
@@ -188,10 +213,10 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 
 ## 5. 扁平字节码（`run0()` 路径）
 
-### 5.1 操作码（72 个，`VmOpCode : u8`）
+### 5.1 操作码（86 个，`VmOpCode : u8`）
 
 与 TAC 指令一一对应、编号一致（同一个 X-macro 序表 `CIAL_BYTECODE_OPCODE_ENUMS`，
-顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 73 条，无占位断言。
+顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 86 条，无占位断言。
 
 ### 5.2 立即数编码
 
@@ -201,7 +226,7 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 - 操作数宽度约定：寄存器 `u16`、Atom `u32`（Atom.v 是顺序索引，远小于 2^32）、
   跳转目标 `u32`（编译期回填的绝对偏移）。
 
-### 5.3 指令编码表（73 条全覆盖）
+### 5.3 指令编码表（86 条全覆盖）
 
 | 类别 | 指令 | 编码 |
 |---|---|---|

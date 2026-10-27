@@ -126,6 +126,13 @@
    ```sh
    ./cial <script-file>
    ```
+5. 运行 TJS2 编译产物（字节码兼容，M1–M4 完成）：
+   ```sh
+   ./cial --tjsbc <compiled.tjsbc>
+   ```
+   加载 TJSCompiler 编译的 `"TJS2" "100\0"` 字节码文件，转译为内部指令后由同一
+   VM 执行。kirikiri 官方语料 test_class / test_function / test_misc / test_variant /
+   test_with 等全部通过（详见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)）。
 
 ### ⚡ 基准与 TJS2 对拍
 
@@ -151,10 +158,10 @@ cmake --build build/Windows/Bench --target conformance-report
 ### 未来计划
 
 * ~~完整实现 TJS2 标准库~~（已完成：Date.parse 完整文法 / RegExp.last+码点位置 / Array·Dictionary save·load·pack 系）
+* ~~字节码兼容~~（**已完成 M1–M4**：加载 TJS2 编译产物转译执行，`cial --tjsbc`；128 操作码转译覆盖，tjs2 语料全量通过，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)）
 * 性能追平原版（当前 112~155%，方向见 [TODO.md](TODO.md)：实参直写被调帧窗口、Value 内联 SSO、调用点内联缓存）
 * 编译优化 Pass 接线（CFG/Optimizer 已建成未启用：LoadSub、常量传播、DCE）
 * 集成 **LSP (Language Server Protocol)**，支持 VSCode / IDEA 智能提示
-* 字节码兼容（加载 TJS2 编译产物，转译路线设计已定稿，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)）
 
 ---
 

@@ -8,6 +8,10 @@
 > DIFF 3（test_misc、test_variant 为异常消息格式差异，Ciallang 行为正确；
 > test_string 双方干净通过，Ciallang 侧无输出、参考实现多 25 行引擎转储）/
 > CIAL_ONLY 1（参考实现自身崩溃）。
+> **字节码兼容 M1–M4 完成（2026-10-27）**：`cial --tjsbc` 全链路——tjs2 语料 12 文件
+> 字节码路径全量通过（test_class/test_function/test_misc/test_variant/test_with +
+> s1–s7；test.tjs 需宿主 Scripts 对象双方同位置失败、test_string 上游 --dump 崩溃）；
+> 128 操作码转译覆盖；106 用例 755 断言全绿。见 doc/bytecode/mapping.md。
 
 ## 一、正确性（已知未修）
 
@@ -41,6 +45,44 @@
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
 
 ## 已完成（摘要）
+
+- 2026-10-27 字节码 M3 批次（9eb914e）——CmpEQ/CmpDEQ/CmpLT/CmpGT 比较直写 _zf
+  （2 操作数无 dst）+ 转译器前瞻融合（比较/TT/TF 紧随 JF/JNF 时 Cmp+Jmp 直连，
+  省 %F 物化与 Test；非跳转消费者走旧路径，SETF/SETNF/NF 不受影响）+ Inc/Dec
+  单指令（int/real，TJS increment 语义——旧译法 LoadImm+Add 对字符串误拼接）+
+  BNOT/NUM/OCTET 补全（Value 增 bitNot/toNumber；OCTET=void→空 octet 对齐
+  tjsVariant::ToOctet）——128 操作码转译覆盖闭环。连带两修复：Reader OCTET 段
+  assign 后未推进 pos（内容缺失使后续条目错位，段尾收口掩盖——s 语料无 octet、
+  test_misc 幸免，test_variant 暴露）→ test_variant 解锁全量通过与源码路径一致；
+  dst=0 调用丢弃语义（原版传 NULL 结果指针不写回，旧译法写 %K void 槽沿
+  SRV r0 隐式 return 链污染上层）→ 统一落窗口顶部专用丢弃寄存器。
+  106 用例 755 断言全绿，12 语料全过
+
+- 2026-10-27 字节码 M4 批次（5f190e4）——三条新 TAC：CallOmit（省略透传
+  TJS `f(...)`）/CallExpand（展开调用 `f(1, arr*, *)`，fatNormal/fatExpand/
+  fatUnnamedExpand 条目表）/CollapseArgs（collapse 参数 `function f(a, b*)`，
+  prologue 末尾收拢）；帧布局修正——超额实参（argCount>arity）按调用序复制到
+  窗口顶部保留区（CallFrame 按实参数扩容 + actualArgc 字段），原布局末 arity 个
+  才落 %0.. 且 prologue 静态写位会覆盖之；整数成员名分支（TJS `a[0]` 编译为
+  GPI+整数名、数组字面量=NEW Array+SPIS 整数名写——GPD/GPI/SPD/SPI/Raw 系
+  全补数组数值下标）；CLT/CGT 序修正（tTJSVariant::GreaterThan 实现为 `<`、
+  LittlerThan 为 `>`，tjsVariant.cpp:827/853 名实相反——mapping.md 旧注
+  "编译器已换序"有误，曾译反，test_misc 暴露）；EVAL/EEXP→EvalStr。
+  test_function.tjs 全量通过（原版成功即零输出）；test_misc/test_with 入库一致
+
+- 2026-10-27 字节码 M2 批次（caa6d88）——ctClass 加载期解释收尾（r0 void 的
+  var 成员、SRV、super 初始化三连跳过；每类无条件产出 initDefaultVal；
+  构造器 setConstructor 不入成员表保 super.<Ctor>() 走 super 分支；成员
+  property 注册进 ClassMeta）+ superClassGetter 加载期解释为 extends +
+  NEW→Call（ClassObject::call 构造）+ GETP/SETP→DerefGet/Set + P 变体
+  读-算-写 + DELD/DELI→DelProp + TYPEOFD/I→GProp+TypeOf + proxy(ra[-2])
+  访存→GThis/DThis/GRefRaw 回落链（TJS2 objthis-proxy 语义）。修复 M1 遗留：
+  JF/JNF 物化跳转方向颠倒；INC·DEC/二目组 +1/+2/+3 变体落 default 静默不发射
+  （PD/PI 模板实际未生效）；INCPD 自加；INTER_OBJECT 占位常量被 addConstant
+  去重合并回填互相覆盖。VM 配套：DProp/GProp 全局 property 槽触发 setter/getter、
+  ChgThis 接受 Property 闭包、Function::call 未绑定 this 继承调用者（TJS2
+  调用点绑定）、getter/setter 计入 isFunctionLike。test_class.tjs 字节码路径
+  与源码路径逐字节一致
 
 - 2026-10-27 字节码 M1.5 批次——octet 常量（CONST OCTET 经
   SharedPayload<Octet>::makeSingle 入常量池）+ 二目组 PD/PI 读-算-写模板
