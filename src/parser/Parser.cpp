@@ -48,7 +48,6 @@ namespace cial::syntax {
     // 该实参是展开实参 `expr*`—— Pratt 表达式会把顶层 `*` 吃成乘法，
     // 需先探测再以 product 优先级上限解析（乘法不进前缀循环，`*` 留给调用方消费）
     static bool argEndsWithTopLevelAsterisk(Result &r, Parser *parser) {
-        fmt::println(stderr, "[scan] enter");
         // 实参扫描：arg 的 depth-0 末尾 token 是否 `*`（紧随 `,`/`)`）——
         // `expr*` 展开实参标记。Pratt 会把顶层 `*` 吃成乘法，须先探测再以
         // product 优先级上限解析（乘法不进中缀循环，`*` 留给调用方消费）
@@ -60,8 +59,6 @@ namespace cial::syntax {
             Token *token{};
             if(!parser->peekTokenAt(r, token, k))
                 return false;
-            fmt::println(stderr, "[scan k={}] type={} loc={}", k, token->name(),
-                         token->location.start().line);
             switch(token->type()) {
                 case TokenType::LParenthesis:
                 case TokenType::LBracket:
@@ -122,7 +119,6 @@ namespace cial::syntax {
                     expectArgument = false;
                 } else {
                     const bool expand = argEndsWithTopLevelAsterisk(r, parser);
-                    fmt::println(stderr, "[scan] expand={}", expand);
                     const auto pre = expand ? Precedence::product : Precedence::lowest;
 
                     // 解析表达式参数

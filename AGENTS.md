@@ -69,7 +69,7 @@ cmake --preset "Windows Debug"     # 产物在 build/Windows/Debug
 cmake --build build/Windows/Debug
 
 # 运行测试（Catch2，通过 CTest 注册）
-ctest --test-dir build/Windows/Debug --output-on-failure
+ctest --test-dir build/Windows/Debug/tests --output-on-failure
 
 # 运行脚本
 ./build/Windows/Debug/cial.exe tests/test_files/fib_test.tjs
@@ -79,7 +79,7 @@ ctest --test-dir build/Windows/Debug --output-on-failure
 ```
 
 - 依赖经 vcpkg 管理（`vcpkg.json`）：Catch2、fmt、spdlog、utf8proc。
-- 测试共 106 个 TEST_CASE（17 文件，其中 5 个文件因历史原因注释在 `tests/CMakeLists.txt`）。
+- 测试共 107 个 TEST_CASE（17 文件；未启用的历史测试文件见 `tests/CMakeLists.txt`）。
 - `tests/test_files/tjs2/` 下是原版 kirikiri 测试脚本，是兼容性的行为基准。
 
 ## 代码风格与惯例
@@ -112,7 +112,7 @@ ctest --test-dir build/Windows/Debug --output-on-failure
    `Property::invokeGet` / `Class.cpp` 初始化与构造则用**嵌套 run0**（entryStackTop 语义）。
 5. **GC sweep 不得重入解释器**：`~DataObject` 不再触发 finalize（曾在 sweep 批量析构时压入
    数百个无人执行的帧）。finalize 仅在脚本显式 `invalidate` 时执行。
-6. **Optimizer 未接线**：`IRGenerator.cpp` 中对 CFG/Optimizer 的调用被注释；`gen/ControlFlowGraph.cpp`、`gen/Optimizer.cpp` 处于"建成未使用"状态，不要误以为优化生效。
+6. **优化器尚未实现**：`IRGenerator.cpp` 中对 CFG/Optimizer 的调用被注释；`ControlFlowGraph::buildCFG()` 当前返回空块，`Optimizer::removeNopInst()` 为空实现，尚无可运行的常量传播、DCE 或 LoadSub pass（见 `src/gen/ControlFlowGraph.cpp`、`src/gen/Optimizer.cpp`）。不要仅解除接线注释；先实现并验证 CFG、具体 pass，以及指令/异常表/行号表的重映射。
 7. **Value 字符串是共享负载块**（`SharedPayload<String>`：Value→payload(引用计数+String*)），
    拷贝零堆分配；旧三层 RefCountPointer 布局已删除。
 8. **tests/CMakeLists.txt 有 5 个被注释的测试文件**（statement/type_system/ieee/integration），

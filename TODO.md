@@ -18,8 +18,6 @@
 
 ## 一、正确性（已知未修）
 
-- [ ] `&` 引用存入全局变量后读取会触发 getter（GGlobal 对 Property 的触发与
-      property 声明槽位无法区分；语料中引用均为局部变量，暂记已知限制）
 - [ ] GC 期 finalize 语义：当前 ~DataObject 禁止 sweep 中重入解释器；
       若需 TJS2 完整语义需"回收队列 + 安全区 drain"
 
@@ -27,7 +25,7 @@
 
 - [ ] string_concat 剩余差距（148%）：payload 单块分配已做，剩余为 Value 内联 SSO
       （小串零堆分配）
-- [ ] loop_int 小幅差距（116%）：词法器 token 判别等热路径复核；指令条数
+- [ ] loop_int 小幅差距（116%）：词法器 token 判别等热路径复核；指令条数优化需先实现 CFG 和具体 Pass（当前仅有占位接口，见 `src/gen/ControlFlowGraph.cpp`、`src/gen/Optimizer.cpp`）
 - [ ] 方法访问 NativeFunction 每次分配（GProp 绑定拷贝）：正确修法是调用约定
       携带 objthis（TJS2 同款），属调用点内联缓存的前置；现有基准不敏感
       （stdlib 密集脚本受益）
