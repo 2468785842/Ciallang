@@ -1048,8 +1048,11 @@ namespace cial::vm {
     // Function::call 按调用顺序复制在窗口顶部保留区 regCount..；
     // 未超额时 %0..%actualArgc-1 即实参（与池顶重合）
     static Value frameArg(CallFrame *cur, const Value *regs, const u32 i) {
-        const u32 arity = cur->funcMeta ? cur->funcMeta->arity : 0;
-        if(cur->actualArgc > arity)
+        // collapse 声明的帧：Function::call 已把全部实参按调用序备份到尾区
+        //（CollapseArgs 会覆盖参数槽，原始值只在尾区）
+        if(cur->funcMeta && cur->funcMeta->hasCollapse)
+            return regs[cur->chunk->getRegCount() + i];
+        if(cur->actualArgc > cur->funcMeta->arity)
             return regs[cur->chunk->getRegCount() + i];
         return regs[i];
     }

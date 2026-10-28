@@ -666,9 +666,68 @@ namespace cial::inter {
 
     void IRGenerator::generate(const syntax::ProcCallExprNode *node, OptReg &optReg) {
         auto dst = allocateRegister();
+
+        // `...`：省略透传（旧版 argc=-1）——转发本帧实际实参
+        const bool omitCall =
+            std::any_of(node->arguments.begin(), node->arguments.end(), [](const auto *expr) {
+                return dynamic_cast<const syntax::OmitArgExprNode *>(expr) != nullptr;
+            });
+
+        // `expr*` / 裸 `*`：展开调用（旧版 argc=-2 条目表）
+        bool expandCall = false;
+        if(!omitCall) {
+            for(const auto *exprNode : node->arguments) {
+                if(exprNode && dynamic_cast<const syntax::ExpandArgExprNode *>(exprNode)) {
+                    expandCall = true;
+                    break;
+                }
+            }
+        }
+
         std::vector<Register> arguments{};
         Register memberReg{ 0 };
         if(!expectValue(node->memberAccess, memberReg)) {
+            return;
+        }
+
+        if(omitCall) {
+            freeRegister(memberReg);
+            _chunk->emitRaw<CallOmit>(dst, memberReg);
+            optReg = dst;
+            return;
+        }
+
+        if(expandCall) {
+            using FatEntry = std::pair<u8, Register>;
+            Vec<FatEntry> entries{};
+            for(const auto *exprNode : node->arguments) {
+                if(!exprNode) {
+                    // 缺位实参：void 常量寄存器（Normal）
+                    entries.emplace_back(0, loadVoidReg());
+                    continue;
+                }
+                if(const auto *expand = dynamic_cast<const syntax::ExpandArgExprNode *>(exprNode)) {
+                    if(expand->inner) {
+                        Register reg{ 0 };
+                        if(!expectValue(expand->inner, reg)) {
+                            return;
+                        }
+                        entries.emplace_back(1, reg); // fatExpand：展开 Array 元素
+                    } else {
+                        entries.emplace_back(2, Register{ 0 }); // fatUnnamedExpand
+                    }
+                    continue;
+                }
+                Register reg{ 0 };
+                if(!expectValue(exprNode, reg)) {
+                    return;
+                }
+                entries.emplace_back(0, reg); // fatNormal
+            }
+            freeRegister(memberReg);
+            _chunk->emitRaw<CallExpand>(dst, memberReg, Integer{unnamedArgBase},
+                                        std::move(entries));
+            optReg = dst;
             return;
         }
 
@@ -688,10 +747,17 @@ namespace cial::inter {
         // 变长实参单指令调用（消逐参 Push 派发；语义等价）
         _chunk->emitRaw<CallV>(dst, memberReg, static_cast<Integer>(node->arguments.size()),
                                std::move(argRegs));
-        // if(!node->arguments.empty()) {
-        //     _chunk->emit<PopN>(node->arguments.size());
-        // }
         optReg = dst;
+    }
+
+    // `...` / `*` 只在调用实参表内合法（ProcCall 生成时已特判降为
+    // CallOmit/CallExpand）；单独到达此处即语法位置错误
+    void IRGenerator::generate(const syntax::OmitArgExprNode *node, OptReg &optReg) {
+        error("`...` is only allowed in a call argument list", node->location);
+    }
+
+    void IRGenerator::generate(const syntax::ExpandArgExprNode *node, OptReg &optReg) {
+        error("`*` expand is only allowed in a call argument list", node->location);
     }
 
     void IRGenerator::generate(const syntax::AssignExprNode *node, OptReg &optReg) {
@@ -1005,13 +1071,34 @@ namespace cial::inter {
                 // 与 generateFuncMeta 相同：实参按位置落入帧寄存器，
                 // 默认参数守卫在全部参数分配后发射
                 Vec<std::pair<Register, const syntax::ExprNode *>> defaultParams{};
-                for(auto &[token, exprNode] : node->constructor->parameters) {
-                    const auto varName = getAtomFromToken(token);
-                    const Register paramReg = gen.allocateRegister();
-                    gen.addLocalVar(LocalVariable{ varName, paramReg, gen.makeLabel() });
-                    if(exprNode)
-                        defaultParams.emplace_back(paramReg, exprNode);
+                bool hasCollapse = false;
+                u32 collapseBase = 0;
+                Register collapseReg{ 0 };
+                {
+                    u32 paramIndex = 0;
+                    for(const auto &param : node->constructor->parameters) {
+                        const auto varName = param.name.type() == syntax::TokenType::None
+                            ? _rt.atomTable.intern(String{})
+                            : getAtomFromToken(param.name);
+                        const Register paramReg = gen.allocateRegister();
+                        if(param.collapse) {
+                            hasCollapse = true;
+                            collapseBase = paramIndex;
+                            collapseReg = paramReg;
+                        }
+                        gen.addLocalVar(LocalVariable{ varName, paramReg, gen.makeLabel() });
+                        if(param.defaultValue)
+                            defaultParams.emplace_back(paramReg, param.defaultValue);
+                        ++paramIndex;
+                    }
                 }
+                gen.unnamedArgBase = hasCollapse ? collapseBase
+                                                 : static_cast<u32>(node->constructor->parameters.size());
+
+                // collapse 参数收拢（旧版 FuncDeclCollapseBase）：本帧实际实参 %base..
+                // 收拢成 Array 落收拢参数寄存器；须在默认参数守卫前发射
+                if(hasCollapse)
+                    gen._chunk->emitRaw<CollapseArgs>(collapseReg, Integer{collapseBase});
 
                 for(const auto &[paramReg, exprNode] : defaultParams) {
                     // 仅当实参为 void(未传)时才以默认值覆盖
@@ -1533,13 +1620,38 @@ namespace cial::inter {
         // 调用约定：实参按位置落入帧寄存器 0..arity-1，参数寄存器必须连续分配，
         // 默认参数的守卫代码只能在全部参数分配完之后发射
         Vec<std::pair<Register, const syntax::ExprNode *>> defaultParams{};
-        for(auto &[token, exprNode] : parameters) {
-            const auto varName = getAtomFromToken(token);
-            const Register paramReg = gen.allocateRegister();
-            gen.addLocalVar(LocalVariable{ varName, paramReg, gen.makeLabel() });
-            if(exprNode)
-                defaultParams.emplace_back(paramReg, exprNode);
+        bool hasCollapse = false;
+        u32 collapseBase = 0;
+        Register collapseReg{ 0 };
+        {
+            u32 paramIndex = 0;
+            for(const auto &param : parameters) {
+                // 未命名 collapse（裸 `*`）名为空 Token：getString 解引用未初始化
+                // 载荷会段错误，落一个不会被引用的占位名
+                const auto varName = param.name.type() == syntax::TokenType::None
+                    ? _rt.atomTable.intern(String{})
+                    : getAtomFromToken(param.name);
+                const Register paramReg = gen.allocateRegister();
+                if(param.collapse) {
+                    // 收拢参数（`name*` / `*`，语法上必为最后一个）：
+                    // 未命名基 = 其位次（= 前面具名参数个数）
+                    hasCollapse = true;
+                    collapseBase = paramIndex;
+                    collapseReg = paramReg;
+                }
+                gen.addLocalVar(LocalVariable{ varName, paramReg, gen.makeLabel() });
+                if(param.defaultValue)
+                    defaultParams.emplace_back(paramReg, param.defaultValue);
+                ++paramIndex;
+            }
         }
+        // `*` 展开实参转发本帧实际实参的起点（旧版 FuncDeclUnnamedArgArrayBase）
+        gen.unnamedArgBase = hasCollapse ? collapseBase : static_cast<u32>(parameters.size());
+
+        // collapse 参数收拢（旧版 FuncDeclCollapseBase）：本帧实际实参 %base..
+        // 收拢成 Array 落收拢参数寄存器；须在默认参数守卫前发射
+        if(hasCollapse)
+            gen._chunk->emitRaw<CollapseArgs>(collapseReg, Integer{collapseBase});
 
         for(const auto &[paramReg, exprNode] : defaultParams) {
             // 默认参数语义（TJS2）：仅当对应实参为 void(未传)时才以默认值覆盖，
@@ -1574,7 +1686,10 @@ namespace cial::inter {
         }
 
         auto *chunk = _rt.createNoGC<vm::Chunk>(std::move(*funChunk));
-        return _rt.createNoGC<FuncMeta>(static_cast<u32>(parameters.size()), chunk, std::move(gen._localVars));
+        auto *funcMeta = _rt.createNoGC<FuncMeta>(static_cast<u32>(parameters.size()), chunk,
+                                                  std::move(gen._localVars));
+        funcMeta->hasCollapse = hasCollapse;
+        return funcMeta;
     }
 
     Register IRGenerator::loadVoidReg() {

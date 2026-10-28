@@ -118,6 +118,14 @@ namespace cial::syntax {
         // 第 count 个 token 是否为 type（1 基；peek=1）
         bool peekAt(Result &r, size_t count, TokenType tokenType);
 
+        // 第 count 个未消费 token（1 基，需先 lookAhead 缓冲）
+        bool peekTokenAt(Result &r, Token *&token, const size_t count) {
+            if(!lookAhead(r, count))
+                return false;
+            _lexer.peekTokenAt(token, count);
+            return true;
+        }
+
         void synchronize(Result &r);
 
         AstNode *parse(Result &r);

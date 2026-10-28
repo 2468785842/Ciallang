@@ -39,6 +39,7 @@
 * [x] `switch`
 * [x] `try-catch`（含 `catch()` 空参数列表）
 * [x] `function` 函数定义与调用（块内提升，先调用后声明）
+* [x] `function f(a, b*)` collapse 参数 / `function f(*)` 未命名收拢（超额实参收拢成 Array）
 * [x] `property`
 * [x] `class`
 * [x] `with`（含块内 `.member` 裸词链访问）
@@ -86,6 +87,7 @@
 * [x] `operator A` 前缀单目运算符 `! new invalidate isvalid - ~ typeof + & -- ++ delete # $ *`
 * [x] `operator A` 类型转换运算符 `int real string`
 * [x] `A operator` 后缀单目运算符 `() . -- ++`
+* [x] `f(expr*)` 展开实参 / `f(*)` 未命名透传 / `f(...)` 省略透传（透传本帧实际实参）
 * [x] `A operator` 后缀单目运算符 `[]`（数组/字典/字符串通用下标读写）
 * [x] `A operator` 后缀单目运算符 `!`（即时求值：A 的字符串值作为 TJS 表达式编译执行；空串原值不变）
 * [x] `A instanceof B` 实例判断运算符

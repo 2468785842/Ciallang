@@ -46,6 +46,10 @@ namespace cial {
     struct FuncMeta : MarkSweepHeader {
         Atom name = ATOM_INVALID;
         u32 arity;
+        // collapse 参数声明（TJS `function f(a, b*)`）：Function::call 据此把
+        // 全部实际实参按调用序备份到窗口尾区（CollapseArgs/CallExpand 的
+        // frameArg 读取源），避免 CollapseArgs 写参数槽覆盖原始实参
+        bool hasCollapse{};
         vm::Chunk *chunk; // manager for gc
         Vec<inter::LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
 

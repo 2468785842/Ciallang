@@ -35,7 +35,7 @@ namespace cial {
         // 供 prologue 声明参数搬运
         const size_t excess = argCount > meta->arity ? argCount - meta->arity : 0;
         Vec<Value> rawArgs{};
-        if(excess > 0) {
+        if(excess > 0 || meta->hasCollapse) {
             const Value *raw = vmState.curFrame()->getArgs(argCount);
             rawArgs.assign(raw, raw + argCount);
         }
@@ -50,6 +50,11 @@ namespace cial {
             const u16 tail = meta->chunk->getRegCount();
             for(size_t i = 0; i < meta->arity; ++i)
                 vmState.regRef(static_cast<u16>(i)) = rawArgs[i];
+        }
+        if(!rawArgs.empty()) {
+            // collapse 声明的帧：全部实参按调用序备份（excess=0 时 %0.. 会
+            // 被 CollapseArgs 的收拢 Array 覆盖，原始值只此一份）
+            const u16 tail = meta->chunk->getRegCount();
             for(size_t j = 0; j < argCount; ++j)
                 vmState.regRef(static_cast<u16>(tail + j)) = rawArgs[j];
         }

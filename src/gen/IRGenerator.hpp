@@ -31,6 +31,10 @@ namespace cial::inter {
 
         void addLocalVar(LocalVariable variable) { _localVars.emplace_back(variable); }
 
+        // 当前函数的未命名实参基（旧版 FuncDeclUnnamedArgArrayBase）：
+        // `*` 展开实参转发本帧 %base.. 的实际实参；无 collapse 声明时 = 具名参数个数
+        u32 unnamedArgBase{};
+
         /**
          * allocate a temp register in this chunk
          * @return register

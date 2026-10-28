@@ -233,3 +233,49 @@ TEST_CASE("函数声明 - 递归函数") {
         REQUIRE(*ret == 6);
     }
 }
+
+TEST_CASE("省略透传 / collapse 参数 / 展开调用（源码路径，对齐 tjs.y func_decl_arg_collapse）") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    SECTION("`...` 省略透传（旧版 argc=-1）") {
+        vm.eval(R"(
+            function argMul(a, b) { return a * b; }
+            function argThrough() { return argMul(...); }
+            var r = argThrough(5, 3);
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r"_str) == 15);
+    }
+
+    SECTION("`name*` collapse 参数：超额实参收拢成 Array") {
+        vm.eval(R"(
+            function arrayArg(a*) { return a[0] + a[1] * 10; }
+            var r = arrayArg(2, 7);
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r"_str) == 72);
+    }
+
+    SECTION("`expr*` 展开调用与混合形态") {
+        vm.eval(R"(
+            function sum3(a, b, c) { return a + b * 100 + c * 10000; }
+            var arr = [2];
+            var r1 = sum3(1, arr*, 4);
+            var args = [1, 2, 3];
+            var r2 = sum3(args*);
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r1"_str) == 1 + 2 * 100 + 4 * 10000);
+        REQUIRE(*vm.evalExpr<Integer>("r2"_str) == 1 + 2 * 100 + 3 * 10000);
+    }
+
+    SECTION("裸 `*` 未命名收拢/展开对") {
+        vm.eval(R"(
+            function wrap(*) { return passthrough(*); }
+            function passthrough(a, b) { return a + b; }
+            var r = wrap(30, 12);
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r"_str) == 42);
+    }
+}

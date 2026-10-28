@@ -1122,6 +1122,3 @@ TEST_CASE("Math 标准库") {
         REQUIRE(*vm.evalExpr<Integer>(R"((Math.random() >= 0 && Math.random() < 1) ? 1 : 0)"_str) == 1);
     }
 }
-
-
-

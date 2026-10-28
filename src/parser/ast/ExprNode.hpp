@@ -106,6 +106,35 @@ namespace cial::syntax {
         }
     };
 
+    // `...`：省略透传实参（tjs.y T_OMIT）——仅调用实参表内合法，
+    // ProcCall 生成时整表降为 CallOmit
+    class OmitArgExprNode final : public ExprNode {
+    public:
+        explicit OmitArgExprNode(Token token) : ExprNode(std::move(token), "omit-arg") {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
+
+    // `expr*` 展开实参（旧版 fatExpand）/ 裸 `*` 未命名展开（旧版
+    // fatUnnamedExpand，inner 为空）——仅调用实参表内合法
+    class ExpandArgExprNode final : public ExprNode {
+    public:
+        const ExprNode *inner; // nullptr = 裸 `*`
+
+        explicit ExpandArgExprNode(Token token, const ExprNode *innerNode) :
+            ExprNode(std::move(token), "expand-arg"), inner(innerNode) {}
+
+        void accept(Visitor *visitor) const override { visitor->visit(this); }
+
+        void generateBytecode(inter::IRGenerator *gen, OptReg &retReg) const override {
+            return gen->generate(this, retReg);
+        }
+    };
+
     class PrefixUnaryExprNode final : public ExprNode {
     public:
         const ExprNode *rhs;
@@ -166,7 +195,7 @@ namespace cial::syntax {
     public:
         BlockStmtNode *body{ nullptr };
         // name, default value
-        Vec<std::pair<Token, ExprNode *>> parameters{};
+        Parameters parameters{};
 
         explicit FunctionExprNode() : ExprNode("function_declaration") {}
 

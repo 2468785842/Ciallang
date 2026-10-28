@@ -14,6 +14,8 @@
 
 #include "Parser.hpp"
 
+#include <fmt/core.h>
+
 #include "parser/ast/DeclNode.hpp"
 #include "parser/ast/ExprNode.hpp"
 #include "parser/ast/StmtNode.hpp"
@@ -42,6 +44,53 @@ namespace cial::syntax {
      * a(2,) -> a(2, void)
      * a(,2) -> a(void, 2)
      */
+    // 实参扫描：arg 表达式的 depth-0 末尾若是 `*`（其后紧随 `,`/`)`），
+    // 该实参是展开实参 `expr*`—— Pratt 表达式会把顶层 `*` 吃成乘法，
+    // 需先探测再以 product 优先级上限解析（乘法不进前缀循环，`*` 留给调用方消费）
+    static bool argEndsWithTopLevelAsterisk(Result &r, Parser *parser) {
+        fmt::println(stderr, "[scan] enter");
+        // 实参扫描：arg 的 depth-0 末尾 token 是否 `*`（紧随 `,`/`)`）——
+        // `expr*` 展开实参标记。Pratt 会把顶层 `*` 吃成乘法，须先探测再以
+        // product 优先级上限解析（乘法不进中缀循环，`*` 留给调用方消费）
+        int depth = 0;
+        TokenType prev = TokenType::Invalid;
+        for(size_t k = 1;; ++k) {
+            if(!parser->lookAhead(r, k))
+                return false;
+            Token *token{};
+            if(!parser->peekTokenAt(r, token, k))
+                return false;
+            fmt::println(stderr, "[scan k={}] type={} loc={}", k, token->name(),
+                         token->location.start().line);
+            switch(token->type()) {
+                case TokenType::LParenthesis:
+                case TokenType::LBracket:
+                case TokenType::LeftCurlyBrace:
+                    ++depth;
+                    prev = token->type();
+                    break;
+                case TokenType::RParenthesis:
+                case TokenType::RBracket:
+                case TokenType::RightCurlyBrace:
+                    if(depth == 0)
+                        return prev == TokenType::Asterisk && k >= 2;
+                    --depth;
+                    prev = token->type();
+                    break;
+                case TokenType::Comma:
+                    if(depth == 0)
+                        return prev == TokenType::Asterisk && k >= 2;
+                    prev = token->type();
+                    break;
+                default:
+                    prev = token->type();
+                    break;
+            }
+            if(depth < 0)
+                return false;
+        }
+    }
+
     static bool parseArguments(Result &r, Parser *parser, ProcCallExprNode *node) {
         bool expectArgument = true;
 
@@ -57,12 +106,39 @@ namespace cial::syntax {
                         return false;
                     // 继续期望参数
                     expectArgument = true;
+                } else if(parser->peek(r, TokenType::Omit)) {
+                    // `...`：省略透传（tjs.y T_OMIT → AddOmitArg）
+                    Token omitToken{};
+                    parser->consume(r, omitToken);
+                    node->arguments.push_back(
+                        parser->astBuilder()->makeNode<OmitArgExprNode>(omitToken));
+                    expectArgument = false;
+                } else if(parser->peek(r, TokenType::Asterisk)) {
+                    // 裸 `*`：未命名展开（旧版 fatUnnamedExpand）
+                    Token starToken{};
+                    parser->consume(r, starToken);
+                    node->arguments.push_back(
+                        parser->astBuilder()->makeNode<ExpandArgExprNode>(starToken, nullptr));
+                    expectArgument = false;
                 } else {
+                    const bool expand = argEndsWithTopLevelAsterisk(r, parser);
+                    fmt::println(stderr, "[scan] expand={}", expand);
+                    const auto pre = expand ? Precedence::product : Precedence::lowest;
+
                     // 解析表达式参数
-                    auto *expr = parser->parseExpression(r, false);
+                    auto *expr = parser->parseExpression(r, false, pre);
                     if(!expr)
                         return false;
-                    node->arguments.push_back(expr);
+                    if(expand) {
+                        // 消费展开标记 `*`（product 上限解析下未被中缀循环吞掉）
+                        Token starToken{};
+                        if(!parser->expect(r, TokenType::Asterisk))
+                            return false;
+                        node->arguments.push_back(
+                            parser->astBuilder()->makeNode<ExpandArgExprNode>(starToken, expr));
+                    } else {
+                        node->arguments.push_back(expr);
+                    }
                     expectArgument = false;
                 }
             } else {
@@ -92,6 +168,16 @@ namespace cial::syntax {
         }
 
         for(;;) {
+            // 裸 `*`：未命名收拢参数（tjs.y func_decl_arg_collapse，必须是最后一个）
+            if(parser->peek(r, TokenType::Asterisk)) {
+                Token starToken{};
+                parser->consume(r, starToken);
+                parameters.push_back(FuncParam{ Token{}, nullptr, true });
+                if(!parser->expect(r, TokenType::RParenthesis))
+                    return false;
+                break;
+            }
+
             if(!parser->peek(r, TokenType::Identifier)) {
                 parser->error(r, "function parameter expect a identifier", location);
                 return false;
@@ -110,7 +196,16 @@ namespace cial::syntax {
                     return false;
             }
 
-            parameters.emplace_back(std::move(identifier), expr);
+            // `name*`：命名收拢参数（必须是最后一个，tjs.y 同款不支持默认值）
+            if(parser->peek(r, TokenType::Asterisk)) {
+                parser->consume(r);
+                parameters.push_back(FuncParam{ std::move(identifier), nullptr, true });
+                if(!parser->expect(r, TokenType::RParenthesis))
+                    return false;
+                break;
+            }
+
+            parameters.push_back(FuncParam{ std::move(identifier), expr, false });
 
             if(parser->peek(r, TokenType::RParenthesis)) {
                 parser->consume(r);
@@ -135,7 +230,9 @@ namespace cial::syntax {
                 _lexer.takeOverToken(ignoreToken);
             }
         }
-        return _lexer.tokenSize() != 0;
+        // 须能供给 count 个才算成功：EOF 时 buffer 不足 count（旧判据 != 0
+        // 会虚报成功，深前视的调用方 peekTokenAt(count) 越界读出垃圾 token）
+        return _lexer.tokenSize() >= count;
     }
 
     bool Parser::peek(Result &r, const TokenType tokenType) {
@@ -245,7 +342,9 @@ namespace cial::syntax {
 
     bool Parser::parseScope(Result &r, BlockStmtNode *blockStmtNode, const TokenType terminatorToken) {
         bool success = true;
-        while(_lexer.hasNext()) {
+        // 门控用缓冲计数而非 _lexer.hasNext()：深前视（如调用实参的 `*` 展开扫描）
+        // 会提前把源读到 EOF 翻转 hasNext，若以此退出循环，块体将整体不解析
+        while(_lexer.tokenSize() > 0 || _lexer.hasNext()) {
             if(peek(r, terminatorToken))
                 break;
             auto *statement = parseDeclaration(r);

@@ -109,6 +109,12 @@ namespace cial {
             node->statement->accept(this);
         }
 
+        void visit(const syntax::OmitArgExprNode *node) override { printNode("OmitArgument(...)"); }
+
+        void visit(const syntax::ExpandArgExprNode *node) override {
+            printNode(node->inner ? "ExpandArgument(expr*)" : "ExpandArgument(*)");
+        }
+
         void visit(const syntax::VarDeclNode *node) override {
             // printNode("DeclareVar");
             // child(

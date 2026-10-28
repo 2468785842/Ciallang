@@ -46,6 +46,19 @@
 
 ## 已完成（摘要）
 
+- 2026-10-27 源码前端补齐批次——`...`/`*` 语法（源码路径与字节码路径能力对齐）：
+  Parser 参数表支持 `name*`/`*`（func_decl_arg_collapse 对齐，FuncParam 结构替代
+  pair）；实参表支持 `expr*`（展开）/裸 `*`（未命名透传）/`...`（省略透传，
+  tjs.y T_OMIT 对齐）——Pratt 乘法歧义用实参级 token 深度扫描 + product 优先级
+  上限解析解决（LALR `mul_div_expr "*"` 悬空星号的等价实现）。IRGenerator 发射
+  既有 CallOmit/CallExpand/CollapseArgs（VM 侧零新增）；FuncMeta 增 hasCollapse
+  ——Function::call 对 collapse 帧无条件全实参备份到窗口尾区（CollapseArgs 写
+  参数槽会覆盖 `*` 要转发的原始实参，argThrough4(a,*) 场景暴露）。连带修复
+  parseScope 深前视门控 bug：循环条件用 _lexer.hasNext()（EOF 标志），深前视
+  提前读尾使其翻转、函数体块整体不解析（0xDD 悬垂 token 位置垃圾）——改用
+  缓冲计数门控。test_function.tjs 源码路径全量通过（此前仅字节码路径可跑），
+  双路径输出一致；107 用例 760 断言多 seed 全绿
+
 - 2026-10-27 字节码 M3 批次（9eb914e）——CmpEQ/CmpDEQ/CmpLT/CmpGT 比较直写 _zf
   （2 操作数无 dst）+ 转译器前瞻融合（比较/TT/TF 紧随 JF/JNF 时 Cmp+Jmp 直连，
   省 %F 物化与 Test；非跳转消费者走旧路径，SETF/SETNF/NF 不受影响）+ Inc/Dec
