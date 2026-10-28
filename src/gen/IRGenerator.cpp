@@ -14,6 +14,8 @@
 
 #include <ranges>
 
+#include <fmt/format.h>
+
 #include "Optimizer.hpp"
 #include "common/Defer.hpp"
 #include "runtime/Runtime.hpp"
@@ -35,11 +37,23 @@ namespace cial::inter {
         const auto chunk = std::move(_chunk);
         // 字节码按需编译：编码器尚未覆盖全部指令（未覆盖的在 Debug 下会断言），
         // 由 run0 调用方显式 toBytecode()
-        // ===
-        // OptimizerManager optimizerManager(*chunk);
-        // optimizerManager.addOptimizer(std::make_unique<LoadSubOptimizer>());
-        // optimizerManager.applyOptimizations();
-        // ===
+        OptimizerManager optimizerManager(*chunk);
+        optimizerManager.addOptimizer(std::make_unique<IntegerConstantPropagationOptimizer>());
+        optimizerManager.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>(optReg));
+        const OptimizerStats optimizerStats = optimizerManager.applyOptimizations();
+        if(OptimizerManager::profilingEnabled()) {
+            fmt::print(stderr,
+                       "[optimizer] TAC {} -> {}, removed={} by compaction, CFG {:.3f} us, compaction {:.3f} us",
+                       optimizerStats.instructionsBefore, optimizerStats.instructionsAfter,
+                       optimizerStats.instructionsRemovedByCompaction,
+                       static_cast<double>(optimizerStats.cfgNanoseconds) / 1000.0,
+                       static_cast<double>(optimizerStats.compactionNanoseconds) / 1000.0);
+            for(const auto &pass : optimizerStats.passes)
+                fmt::print(stderr, ", {} {:.3f} us (TAC {} -> {}, transforms={})", pass.name,
+                           static_cast<double>(pass.nanoseconds) / 1000.0, pass.instructionsBefore,
+                           pass.instructionsAfter, pass.transformations);
+            fmt::print(stderr, "\n");
+        }
 
         _chunk = std::make_unique<vm::Chunk>();
         return vm::Chunk{ std::move(*chunk) };

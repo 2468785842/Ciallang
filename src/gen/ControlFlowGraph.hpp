@@ -3,18 +3,21 @@
 //
 #pragma once
 
+#include <cstddef>
+
 #include "Instruction.hpp"
 
 namespace cial::inter {
     class BasicBlock {
     public:
         vm::Chunk *parentChunk{};
-        int start{}; // 该基本块的开始指令索引
-        int end{}; // 该基本块的结束指令索引
+        size_t start{}; // 包含的起始 TAC 下标
+        size_t end{}; // 不包含的结束 TAC 下标
         bool hasSideEffect{}; // 是否有副作用（如函数调用）
+        Vec<size_t> successors; // 后继基本块索引
 
         explicit BasicBlock();
-        explicit BasicBlock(vm::Chunk *chunk, const int start, const int end) :
+        explicit BasicBlock(vm::Chunk *chunk, const size_t start, const size_t end) :
             parentChunk(chunk), start(start), end(end) {}
 
         BasicBlock(BasicBlock &&rhs) noexcept = default;

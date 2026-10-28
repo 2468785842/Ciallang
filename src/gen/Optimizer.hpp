@@ -3,38 +3,61 @@
 //
 #pragma once
 
+#include <chrono>
+#include <string_view>
+
 #include "ControlFlowGraph.hpp"
 #include "Instruction.hpp"
 #include "vm/Chunk.hpp"
 
 namespace cial::inter {
 
-    // int main() {
-    //     Vec<Instruction> code = {
-    //         Instruction(Instruction::Op::LoadConst, 1, -1, -1, 1),  // load const 1
-    //         Instruction(Instruction::Op::Sub, 2, 1, 1),              // sub r2, r1
-    //         Instruction(Instruction::Op::Ret, 2)                      // ret r2
-    //     };
-    //
-    //     OptimizerManager optimizerManager(code);
-    //     optimizerManager.addOptimizer(std::make_unique<LoadSubOptimizer>());
-    //     optimizerManager.applyOptimizations();
-    //
-    //     for (const auto& instr : code) {
-    //         std::cout << static_cast<int>(instr.op) << " ";
-    //     }
-    //
-    //     return 0;
-    // }
+    struct OptimizerPassStats {
+        std::string_view name;
+        u64 nanoseconds{};
+        size_t instructionsBefore{};
+        size_t instructionsAfter{};
+        size_t transformations{};
+    };
+
+    struct OptimizerStats {
+        size_t instructionsBefore{};
+        size_t instructionsAfter{};
+        size_t instructionsRemovedByCompaction{};
+        u64 cfgNanoseconds{};
+        u64 compactionNanoseconds{};
+        Vec<OptimizerPassStats> passes;
+    };
 
     class Optimizer {
     public:
-        virtual void optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) = 0;
+        virtual size_t optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) = 0;
+        [[nodiscard]] virtual std::string_view name() const noexcept = 0;
 
         virtual ~Optimizer() = default;
 
     protected:
-        static void removeNopInst(Vec<Instruction> &instVec);
+        static size_t removeNopInst(vm::Chunk &chunk);
+        friend class OptimizerManager;
+    };
+
+    // 仅折叠可证明安全的有符号整数常量运算；不改变可能抛错的动态运算。
+    class IntegerConstantPropagationOptimizer final : public Optimizer {
+    public:
+        [[nodiscard]] std::string_view name() const noexcept override { return "integer-constant-folding"; }
+        size_t optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) override;
+    };
+
+    // 仅移除结果未被读取的立即数加载；Load 可能实例化运行时对象，保守保留。
+    class DeadLoadEliminationOptimizer final : public Optimizer {
+    public:
+        explicit DeadLoadEliminationOptimizer(OptReg externallyObserved = {}) :
+            externallyObserved(externallyObserved) {}
+        [[nodiscard]] std::string_view name() const noexcept override { return "dead-load-elimination"; }
+        size_t optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) override;
+
+    private:
+        OptReg externallyObserved;
     };
 
     class OptimizerManager {
@@ -45,14 +68,46 @@ namespace cial::inter {
         void addOptimizer(Box<Optimizer> optimizer) { optimizers.push_back(std::move(optimizer)); }
 
         // 执行所有优化
-        void applyOptimizations() const {
+        [[nodiscard]] OptimizerStats applyOptimizations() const {
+            using Clock = std::chrono::steady_clock;
+            const bool profile = profilingEnabled();
+            OptimizerStats stats;
+            stats.instructionsBefore = chunk.getInstVec().size();
+            stats.instructionsAfter = stats.instructionsBefore;
+            if(stats.instructionsBefore == 0 || optimizers.empty())
+                return stats;
+
+            auto phaseStart = profile ? Clock::now() : Clock::time_point{};
             ControlFlowGraph cfg;
             const Vec<BasicBlock> blocks = cfg.buildCFG(chunk);
+            if(profile)
+                stats.cfgNanoseconds = static_cast<u64>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - phaseStart).count());
 
             for(const auto &optimizer : optimizers) {
-                optimizer->optimize(chunk, blocks);
+                const size_t instructionsBefore = profile ? chunk.getInstVec().size() : 0;
+                if(profile)
+                    phaseStart = Clock::now();
+                const size_t transformations = optimizer->optimize(chunk, blocks);
+                if(profile) {
+                    const auto duration =
+                        std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - phaseStart).count();
+                    stats.passes.push_back({ optimizer->name(), static_cast<u64>(duration), instructionsBefore,
+                                             chunk.getInstVec().size(), transformations });
+                }
             }
+
+            if(profile)
+                phaseStart = Clock::now();
+            stats.instructionsRemovedByCompaction = Optimizer::removeNopInst(chunk);
+            if(profile)
+                stats.compactionNanoseconds = static_cast<u64>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - phaseStart).count());
+            stats.instructionsAfter = chunk.getInstVec().size();
+            return stats;
         }
+
+        [[nodiscard]] static bool profilingEnabled() noexcept;
 
     private:
         vm::Chunk &chunk;

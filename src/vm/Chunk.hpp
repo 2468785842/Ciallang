@@ -33,6 +33,8 @@ namespace cial::vm {
         }
 
         void addThrowHandler(const ThrowHandler &tHandler) { _throwHandlers.push_back(tHandler); }
+        [[nodiscard]] Vec<ThrowHandler> &getThrowHandlers() noexcept { return _throwHandlers; }
+        [[nodiscard]] const Vec<ThrowHandler> &getThrowHandlers() const noexcept { return _throwHandlers; }
 
         // TAC pc 空间的 try 区间表（供指令 dump 等使用）
         [[nodiscard]] Opt<ThrowHandler> findThrowHandler(const u64 pc) const {

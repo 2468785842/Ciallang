@@ -2,8 +2,11 @@
 
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
 > 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-28）——
-> 类实例化 112% / 整数循环 116% / fib(25) 132% / 字符串拼接 148%
->（本机多轮波动 ±10%；⚠️ 本机 Release 构建缓存曾丢失优化标志（`CMAKE_CXX_FLAGS_RELEASE`
+> 类实例化 107% / 整数循环 120% / fib(25) 147% / 字符串拼接 141%
+>（同机无 pass 对照为 114% / 119% / 150% / 151%；两次绝对耗时波动明显，暂不据此归因。
+> profile 覆盖四个基准的 46 个 chunk，常量折叠和 DCE 均未改写指令，所有 pass 合计约 0.2 ms；
+> 后续应先找到可稳定触发优化的热路径，再判断 pass 是否值得常开。）
+> ⚠️ 本机 Release 构建缓存曾丢失优化标志（`CMAKE_CXX_FLAGS_RELEASE`
 > 为空 → 实际 -O0），2026-10-28 重新以 `-O3 -DNDEBUG` 配置后基准才可比——此前一轮测量
 > 若与本表量级不符先查构建缓存。fib 内部 VM 计时 A/B：Atom 直引 + 实参直写后
 > 中位 63ms → 43ms（约 -25%））。
@@ -14,7 +17,7 @@
 > **字节码兼容 M1–M4 完成（2026-10-27）**：`cial --tjsbc` 全链路——tjs2 语料 12 文件
 > 字节码路径全量通过（test_class/test_function/test_misc/test_variant/test_with +
 > s1–s7；test.tjs 需宿主 Scripts 对象双方同位置失败、test_string 上游 --dump 崩溃）；
-> 128 操作码转译覆盖；107 用例 760 断言全绿。见 doc/bytecode/mapping.md。
+> 128 操作码转译覆盖；现有 110 个用例双配置全绿。见 doc/bytecode/mapping.md。
 
 ## 一、正确性（已知未修）
 
@@ -25,7 +28,7 @@
 
 - [ ] string_concat 剩余差距（148%）：payload 单块分配已做，剩余为 Value 内联 SSO
       （小串零堆分配）
-- [ ] loop_int 小幅差距（116%）：词法器 token 判别等热路径复核；指令条数优化需先实现 CFG 和具体 Pass（当前仅有占位接口，见 `src/gen/ControlFlowGraph.cpp`、`src/gen/Optimizer.cpp`）
+- [ ] 优化器收益：CFG、整数常量折叠和死 `LoadImm` 清理已接入 `IRGenerator::parseAst()`；常量池 `Load` 可能实例化运行时对象，必须保留。profile 四个基准的 46 个 chunk 后零条指令被改写，pass 总耗时约 0.2 ms；无 pass/接线两次 wall-time 对照受测量波动影响，不能证明优化收益。先用 profile 找到 loop_int（当前约 120%）等热路径的实际 TAC 形态，再决定增加何种优化。
 - [ ] 方法访问 NativeFunction 每次分配（GProp 绑定拷贝）：正确修法是调用约定
       携带 objthis（TJS2 同款），属调用点内联缓存的前置；现有基准不敏感
       （stdlib 密集脚本受益）

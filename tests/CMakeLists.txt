@@ -24,6 +24,7 @@ set(SOURCES
         interpreter_test.cpp
         #        integration_test.cpp
         loop_test.cpp
+        optimizer_test.cpp
         judgment_test.cpp
         oop_test.cpp
         property_test.cpp

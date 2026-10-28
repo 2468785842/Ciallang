@@ -50,7 +50,7 @@ Ciallang/
 |---|---|---|
 | `src/common/` | 基础设施 | `Result.hpp`(错误收集)、`Ret.hpp`(ErrCode/Ret<T>)、`SourceFile`、`SourceLocation`、`UTF8`、`Hash.hpp`、`Defer.hpp` |
 | `src/parser/` | 词法+语法+预处理 | `Lexer`(手写 DFA)、`Parser`(Pratt 优先级)、`PreProcessor`(@set/@if)、`Token.hpp`、`OperatorTrie`、`ast/*`(AstNode 基类 + X-macro 节点枚举) |
-| `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**92 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`ControlFlowGraph`+`Optimizer`(**已建未接线**) |
+| `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**92 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`ControlFlowGraph`+`Optimizer`(基本块 CFG、整数常量折叠、死 `LoadImm` 清理；在 `parseAst()` 接线) |
 | `src/vm/` | 执行引擎 | `VMState`(**run0() 扁平字节码解释，唯一执行路径；多态 run() 已删除**)、`Chunk`(指令+常量池+双空间 try 表)、`Bytecode`(扁平 u8 编码, **92/92 全实现**)、`CallFrame`(含 thisData 缓存 + argWindowDirect 直写布局)、`FastRegisterPool`、`Constant.hpp`(FuncMeta/ClassMeta/PropMeta)、`Rlc`(行号表)、`VM.hpp`(宿主门面) |
 | `src/runtime/` | 全局运行时 | `Runtime`(GC/RootGuard/atomTable)、`Context`(调用栈/全局对象, 深度上限 1024)、`AtomTable`(字符串驻留 Atom) |
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
@@ -79,7 +79,7 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
 ```
 
 - 依赖经 vcpkg 管理（`vcpkg.json`）：Catch2、fmt、spdlog、utf8proc。
-- 测试共 107 个 TEST_CASE（17 文件；未启用的历史测试文件见 `tests/CMakeLists.txt`）。
+- 测试共 110 个 TEST_CASE（18 文件；未启用的历史测试文件见 `tests/CMakeLists.txt`）。
 - `tests/test_files/tjs2/` 下是原版 kirikiri 测试脚本，是兼容性的行为基准。
 
 ## 代码风格与惯例
@@ -112,7 +112,7 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
    `Property::invokeGet` / `Class.cpp` 初始化与构造则用**嵌套 run0**（entryStackTop 语义）。
 5. **GC sweep 不得重入解释器**：`~DataObject` 不再触发 finalize（曾在 sweep 批量析构时压入
    数百个无人执行的帧）。finalize 仅在脚本显式 `invalidate` 时执行。
-6. **优化器尚未实现**：`IRGenerator.cpp` 中对 CFG/Optimizer 的调用被注释；`ControlFlowGraph::buildCFG()` 当前返回空块，`Optimizer::removeNopInst()` 为空实现，尚无可运行的常量传播、DCE 或 LoadSub pass（见 `src/gen/ControlFlowGraph.cpp`、`src/gen/Optimizer.cpp`）。不要仅解除接线注释；先实现并验证 CFG、具体 pass，以及指令/异常表/行号表的重映射。
+6. **优化器范围有限**：`IRGenerator::parseAst()` 已接入 CFG、溢出安全的整数 `Add/Sub/Mul` 常量折叠、死 `LoadImm` 清理和 NOP 压缩；常量池 `Load` 会实例化运行时对象，DCE 不得删除。压缩会重映射跳转、try 区间与 RLC 行号。DCE 对 try 保护块保守保留加载，其他指令按活跃性屏障处理。尚无跨块常量传播或 `LoadSub`，且当前基准显示 pass 编译开销会抵消部分运行收益；扩展优化前先做同机 Release 对拍基准并覆盖外部可观察寄存器、异常边与元数据重映射。
 7. **Value 字符串是共享负载块**（`SharedPayload<String>`：Value→payload(引用计数+String*)），
    拷贝零堆分配；旧三层 RefCountPointer 布局已删除。
 8. **tests/CMakeLists.txt 有 5 个被注释的测试文件**（statement/type_system/ieee/integration），
