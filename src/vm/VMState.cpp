@@ -230,6 +230,111 @@ namespace cial::vm {
         return false;
     }
 
+    // ── 成员访问共享体（GProp/GPropC、DProp/DPropC 等成对指令共用）──
+    // 寄存器成员名形态先做整数成员名分支（数组下标）并 intern，随后进入此处
+
+    // obj.member 读：原生成员（方法/count 属性）→ Global/Class/普通对象分支 →
+    // 非对象值的原生 property 表。getter 经 invokeGet 嵌套 run0 同步完成，恒 Continue
+    static void propGetMember(VMState &vmState, CallFrame *cur, const Value &val, const Atom atom,
+                              Value &dst) {
+        if(val.isObject()) {
+            auto *obj = val.asObject().value();
+
+            // Array/Dictionary/RegExp 的原生成员（方法 / count 属性）：与字符串原生表同机制；
+            // 未命中落到对象自身 getProp（RegExp 的 matches/index 等状态属性走此路径）
+            const TypeId tid = obj->typeId();
+            if(tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp ||
+               tid == TypeId::Math || tid == TypeId::Date || tid == TypeId::RandomGen) {
+                if(auto *getter = vmState.context.findProperty(tid, atom)) {
+                    dst = getter(val);
+                    return;
+                }
+                if(auto *nativeFn = vmState.context.findMethod(tid, atom)) {
+                    nativeFn = vmState.rt.create<NativeFunction>(*nativeFn).get();
+                    nativeFn->setThisObj(val);
+                    dst = Value{ nativeFn };
+                    return;
+                }
+                // 未命中落到对象自身 getProp（count 读在 Array::getProp 有兜底）
+            }
+
+            if(tid == TypeId::Global) {
+                // for global, proxy object, maybe get extends object in dataObject?
+                auto *global = static_cast<GlobalObject *>(obj);
+                if(global->proxy) {
+                    throw std::runtime_error("Not implemented");
+                }
+                auto tmp = global->getProp(atom);
+                propObjectGet(vmState, tmp, tmp); // 顶层 property 读（字节码 SPD/GPD 经 this=全局）
+                dst = tmp;
+                return;
+            }
+
+            if(tid == TypeId::Class) {
+                auto tmp = obj->getProp(atom);
+                propObjectGet(vmState, tmp, tmp);
+                // 构造器名访问返回 ClassObject 本身（super.<Ctor>() 路径），非 Function
+                if(tmp.isObject()) {
+                    if(auto *fun = dynamic_cast<Function *>(tmp.asObject().value())) {
+                        fun->thisObj = cur->thisObj.asObject().value();
+                    }
+                }
+                dst = tmp;
+                return;
+            }
+
+            auto tmp = obj->getProp(atom);
+            propObjectGet(vmState, tmp, tmp);
+            dst = tmp;
+            return;
+        }
+
+        // Native property（如 str.length / octet.length）
+        // void 等无方法表的值：直接报脚本异常（旧实现 Debug 下 assert 崩溃，
+        // Release 走 findProperty/None 落空后 throw——两配置行为不一致）
+        if(val.isVoid())
+            throw std::runtime_error("cannot access member of void");
+        const TypeId tId = ValueToTypeId::getId(val);
+        if(auto *getter = vmState.context.findProperty(tId, atom)) {
+            dst = getter(val);
+            return;
+        }
+
+        // Native method
+        NativeFunction *nativeFn = vmState.context.findMethod(tId, atom);
+        if(!nativeFn) {
+            // 成员不存在:脚本可捕获的运行期异常(与对象成员缺失同语义)
+            const auto *entry = vmState.rt.atomTable.get(atom);
+            const std::string nameStr = entry && entry->str ? entry->str->toStdStr() : "?atom?";
+            throw std::runtime_error("in native object Not found property: " + nameStr);
+        }
+        nativeFn = vmState.rt.create<NativeFunction>(*nativeFn).get();
+        nativeFn->setThisObj(val);
+        dst = Value{ nativeFn };
+    }
+
+    // obj.member = v 写：槽位当前值是 Property 对象则调 setter（invokeSet 只压
+    // 帧不执行，与 DGlobal 同款检测栈变化交还主循环）；普通成员纯写。
+    // Global 不豁免：字节码路径顶层 property 写入即 SPD this.x（this=全局），
+    // TJS2 PropSet 对 property 槽同样触发 setter。返回 true 表示 setter 已压帧
+    static bool propSetMember(VMState &vmState, const Value &objVal, const Atom atom, const Value &src) {
+        if(!objVal.isObject()) {
+            throw std::runtime_error("dprop obj is not object");
+        }
+        auto *obj = objVal.asObject().unwrap();
+        Value curVal{};
+        bool hasCur = false;
+        if(obj->hasProp(atom)) {
+            hasCur = true;
+            curVal = obj->getProp(atom);
+        }
+        if(hasCur && propObjectSet(vmState, src, curVal)) {
+            return true;
+        }
+        obj->setProp(atom, src);
+        return false;
+    }
+
     /**
      * 扁平字节码解释器主循环。
      *
@@ -1015,21 +1120,73 @@ namespace cial::vm {
         return DispatchRet::Call;
     }
 
-    // 变长实参调用：等价 N×Push + Call。寄存器号先读全再压栈——push 扩池可能
-    // 迁移寄存器窗口，边读边用 regs 会读到悬空指针
+    // 变长实参调用。Function 被调者走实参直写：一次分配被调帧窗口，实参寄存器
+    // 直接拷入 %0..%arity-1（缺位补 void，超额/hasCollapse 按调用序备份窗口尾区，
+    // 语义与 Function::call 一致），省去 N×push 的池顶中转与逐次 allocFrame。
+    // 其余可调用对象（NativeFunction/类对象/property 闭包/容器）回落压栈 + 虚
+    // call 旧路径（压帧约定：池顶实参区与被调 %0.. 重合）。
+    // 两路径都先读全寄存器号——压栈/扩池后再读 ip 无碍，但不依赖边读边写
     DISPATCH_OP_METHOD(CallV) {
+        constexpr u64 maxCallArgs = 64;
         const u16 dst = read<u16>(ip, pc);
         const u16 func = read<u16>(ip, pc);
         const u64 argc = decodeUleb128(ip, pc, 10);
-        u16 argRegs[16]{};
-        const u64 n = argc < 16 ? argc : 16;
-        for(u64 i = 0; i < n; ++i)
+        if(argc > maxCallArgs)
+            throw std::runtime_error("too many arguments");
+        u16 argRegs[maxCallArgs]{};
+        for(u64 i = 0; i < argc; ++i)
             argRegs[i] = read<u16>(ip, pc);
-        for(u64 i = 0; i < n; ++i)
+
+        const Value &funcVal = regs[func];
+        if(funcVal.isObject()) {
+            auto *callee = funcVal.asObject().unwrap();
+            // typeId 一次虚调用判型（替代 dynamic_cast）；NativeFunction 保持
+            // Object 标识走通用回落
+            if(callee->typeId() == TypeId::Function) {
+                auto *fn = static_cast<Function *>(callee);
+                const FuncMeta *meta = fn->meta;
+                const u32 arity = meta->arity;
+                const u32 argc32 = static_cast<u32>(argc);
+                const bool needTail = argc32 > arity || meta->hasCollapse;
+                // 压帧前取：调用者 this（调用点绑定）与函数的绑定 this（incontextof）
+                const Value callerThis = cur->thisObj;
+                Object *boundThis = fn->thisObj;
+
+                // 直写布局：%0 = 新分配基址，窗口整体在调用者上方（无槽位别名）
+                allocCallFrame(fn->meta, dst, needTail ? argc : 0, /*argWindowDirect=*/true);
+                CallFrame *nf = curFrame();
+                nf->actualArgc = argc32;
+                Value *w = nf->regs();
+                const u32 head = argc32 < arity ? argc32 : arity;
+                for(u32 i = 0; i < head; ++i)
+                    w[i] = regs[argRegs[i]];
+                for(u32 i = head; i < arity; ++i)
+                    w[i] = Value{}; // 缺位实参补 void（prologue TestVoid 守卫依赖）
+                if(needTail) {
+                    // 超额实参/collapse 声明：全部实参按调用序备份到窗口尾区
+                    //（frameArg 读取源；CollapseArgs 写参数槽不丢原始值）
+                    const u16 tail = meta->chunk->getRegCount();
+                    for(u32 j = 0; j < argc32; ++j)
+                        w[tail + j] = regs[argRegs[j]];
+                }
+                if(boundThis) {
+                    nf->setThisObj(Value{ boundThis });
+                } else if(callerThis.isObject()) {
+                    // TJS2 调用点绑定语义：clo.ObjThis 为空时 this 取调用者的 this
+                    nf->setThisObj(callerThis);
+                } else {
+                    nf->setThisObjNull();
+                }
+                // 交还主循环前同步调用者 pc（被调帧 Return 后从这继续）
+                cur->pc = pc;
+                return DispatchRet::Call;
+            }
+        }
+
+        for(u64 i = 0; i < argc; ++i)
             push(regs[argRegs[i]]);
-        const auto &object = regs[func].asObject().unwrap();
         cur->pc = pc;
-        object->call(*this, dst, argc);
+        regs[func].asObject().unwrap()->call(*this, dst, argc);
         return DispatchRet::Call;
     }
 
@@ -1153,80 +1310,16 @@ namespace cial::vm {
             return DispatchRet::Continue;
         }
         const String &name = *regs[r2].asString().unwrap();
-        const Atom atom = rt.atomTable.intern(name);
+        propGetMember(*this, cur, val, rt.atomTable.intern(name), regs[r3]);
+        return DispatchRet::Continue;
+    }
 
-        if(val.isObject()) {
-            auto *obj = val.asObject().value();
-
-            // Array/Dictionary/RegExp 的原生成员（方法 / count 属性）：与字符串原生表同机制；
-            // 未命中落到对象自身 getProp（RegExp 的 matches/index 等状态属性走此路径）
-            const TypeId tid = obj->typeId();
-            if(tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp ||
-               tid == TypeId::Math || tid == TypeId::Date || tid == TypeId::RandomGen) {
-                if(auto *getter = context.findProperty(tid, atom)) {
-                    regs[r3] = getter(val);
-                    return DispatchRet::Continue;
-                }
-                if(auto *nativeFn = context.findMethod(tid, atom)) {
-                    nativeFn = rt.create<NativeFunction>(*nativeFn).get();
-                    nativeFn->setThisObj(val);
-                    regs[r3] = Value{ nativeFn };
-                    return DispatchRet::Continue;
-                }
-                // 未命中落到对象自身 getProp（count 读在 Array::getProp 有兜底）
-            }
-
-            if(tid == TypeId::Global) {
-                // for global, proxy object, maybe get extends object in dataObject?
-                auto *global = static_cast<GlobalObject *>(obj);
-                if(global->proxy) {
-                    throw std::runtime_error("Not implemented");
-                }
-                auto tmp = global->getProp(atom);
-                propObjectGet(*this, tmp, tmp); // 顶层 property 读（字节码 SPD/GPD 经 this=全局）
-                regs[r3] = tmp;
-                return DispatchRet::Continue;
-            }
-
-            if(tid == TypeId::Class) {
-                auto tmp = obj->getProp(atom);
-                propObjectGet(*this, tmp, tmp);
-                // 构造器名访问返回 ClassObject 本身（super.<Ctor>() 路径），非 Function
-                if(tmp.isObject()) {
-                    if(auto *fun = dynamic_cast<Function *>(tmp.asObject().value())) {
-                        fun->thisObj = cur->thisObj.asObject().value();
-                    }
-                }
-                regs[r3] = tmp;
-                return DispatchRet::Continue;
-            }
-
-            auto tmp = obj->getProp(atom);
-            propObjectGet(*this, tmp, tmp);
-            regs[r3] = tmp;
-            return DispatchRet::Continue;
-        }
-
-        // Native property（如 str.length / octet.length）
-        // void 等无方法表的值：直接报脚本异常（旧实现 Debug 下 assert 崩溃，
-        // Release 走 findProperty/None 落空后 throw——两配置行为不一致）
-        if(val.isVoid())
-            throw std::runtime_error("cannot access member of void");
-        const TypeId tId = ValueToTypeId::getId(val);
-        if(auto *getter = context.findProperty(tId, atom)) {
-            regs[r3] = getter(val);
-            return DispatchRet::Continue;
-        }
-
-        // Native method
-        NativeFunction *nativeFn = context.findMethod(tId, atom);
-        if(!nativeFn) {
-            // 成员不存在:脚本可捕获的运行期异常(与对象成员缺失同语义)
-            throw std::runtime_error("in native object Not found property: " + name.toStdStr());
-        }
-        nativeFn = rt.create<NativeFunction>(*nativeFn).get();
-        nativeFn->setThisObj(val);
-        regs[r3] = Value{ nativeFn };
+    // 成员名编译期 Atom 直引（同 GProp，跳过名字寄存器与 dispatch 再 intern）
+    DISPATCH_OP_METHOD(GPropC) {
+        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
+        const u16 r3 = read<u16>(ip, pc);    // dst
+        propGetMember(*this, cur, regs[r1], Atom{ atomV }, regs[r3]);
         return DispatchRet::Continue;
     }
 
@@ -1235,9 +1328,10 @@ namespace cial::vm {
         const u16 r2 = read<u16>(ip, pc); // member
         const u16 r3 = read<u16>(ip, pc); // src
         const auto &objVal = regs[r1];
-        CLL_ASSERT(objVal.isObject(), "dprop obj is not object");
         // 整数成员名（旧版 PropSetByNum）：数组下标写，越界自动扩展补 void
         if(regs[r2].isInteger()) {
+            if(!objVal.isObject())
+                throw std::runtime_error("dprop obj is not object");
             auto *arr = dynamic_cast<Array *>(objVal.asObject().unwrap());
             if(!arr)
                 throw std::runtime_error("integer member access expects an array");
@@ -1256,23 +1350,22 @@ namespace cial::vm {
             return DispatchRet::Continue;
         }
         const String &name = *regs[r2].asString().unwrap();
-        const Atom atom = rt.atomTable.intern(name);
-        // 成员写（旧版 SPD）：槽位当前值是 Property 对象则调 setter（invokeSet 只压
-        // 帧不执行，与 DGlobal 同款检测栈变化交还主循环）；普通成员纯写。
-        // Global 不豁免：字节码路径顶层 property 写入即 SPD this.x（this=全局），
-        // TJS2 PropSet 对 property 槽同样触发 setter
-        auto *obj = objVal.asObject().unwrap();
-        Value curVal{};
-        bool hasCur = false;
-        if(obj->hasProp(atom)) {
-            hasCur = true;
-            curVal = obj->getProp(atom);
-        }
-        if(hasCur && propObjectSet(*this, regs[r3], curVal)) {
+        if(propSetMember(*this, objVal, rt.atomTable.intern(name), regs[r3])) {
             cur->pc = pc;
             return DispatchRet::Call;
         }
-        obj->setProp(atom, regs[r3]);
+        return DispatchRet::Continue;
+    }
+
+    // 成员名编译期 Atom 直引（同 DProp，跳过名字寄存器与 dispatch 再 intern）
+    DISPATCH_OP_METHOD(DPropC) {
+        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
+        const u16 r3 = read<u16>(ip, pc);    // src
+        if(propSetMember(*this, regs[r1], Atom{ atomV }, regs[r3])) {
+            cur->pc = pc;
+            return DispatchRet::Call;
+        }
         return DispatchRet::Continue;
     }
 
@@ -1305,8 +1398,19 @@ namespace cial::vm {
             return DispatchRet::Continue;
         }
         const String &name = *regs[r2].asString().unwrap();
-        const Atom atom = rt.atomTable.intern(name);
-        objVal.asObject().unwrap()->setProp(atom, regs[r3]);
+        objVal.asObject().unwrap()->setProp(rt.atomTable.intern(name), regs[r3]);
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(DPropRawC) {
+        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
+        const u16 r3 = read<u16>(ip, pc);    // src
+        const auto &objVal = regs[r1];
+        if(!objVal.isObject()) {
+            throw std::runtime_error("'&' operand is not an object");
+        }
+        objVal.asObject().unwrap()->setProp(Atom{ atomV }, regs[r3]);
         return DispatchRet::Continue;
     }
 
@@ -1321,8 +1425,20 @@ namespace cial::vm {
             return DispatchRet::Continue;
         }
         const String &name = *regs[r2].asString().unwrap();
-        const Atom atom = rt.atomTable.intern(name);
-        regs[r3] = Value{ Integer{ objVal.asObject().unwrap()->delProp(atom) } };
+        regs[r3] = Value{ Integer{ objVal.asObject().unwrap()->delProp(rt.atomTable.intern(name)) } };
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(DelPropC) {
+        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
+        const u16 r3 = read<u16>(ip, pc);    // dst
+        const auto &objVal = regs[r1];
+        if(!objVal.isObject()) {
+            regs[r3] = Value{ Integer{ false } };
+            return DispatchRet::Continue;
+        }
+        regs[r3] = Value{ Integer{ objVal.asObject().unwrap()->delProp(Atom{ atomV }) } };
         return DispatchRet::Continue;
     }
 
@@ -1345,11 +1461,22 @@ namespace cial::vm {
             return DispatchRet::Continue;
         }
         const String &name = *regs[r2].asString().unwrap();
-        const Atom atom = rt.atomTable.intern(name);
         if(!val.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
         }
-        regs[r3] = val.asObject().unwrap()->getProp(atom);
+        regs[r3] = val.asObject().unwrap()->getProp(rt.atomTable.intern(name));
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(GPropRawC) {
+        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
+        const u16 r3 = read<u16>(ip, pc);    // dst
+        const auto &val = regs[r1];
+        if(!val.isObject()) {
+            throw std::runtime_error("'&' operand is not an object");
+        }
+        regs[r3] = val.asObject().unwrap()->getProp(Atom{ atomV });
         return DispatchRet::Continue;
     }
 

@@ -99,7 +99,12 @@
     O(Dec)                                                                                                             \
     O(BNot)                                                                                                            \
     O(ToNumber)                                                                                                        \
-    O(ToOctet)
+    O(ToOctet)                                                                                                         \
+    O(GPropC)                                                                                                          \
+    O(DPropC)                                                                                                          \
+    O(GPropRawC)                                                                                                       \
+    O(DPropRawC)                                                                                                       \
+    O(DelPropC)
 
 namespace cial::vm {
     class VMState;

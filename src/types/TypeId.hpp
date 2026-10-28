@@ -25,6 +25,9 @@ namespace cial {
         //（替代热路径上的 dynamic_cast）
         Global,
         Class,
+        // 脚本函数专有标识（CallV 直写路径用一次虚调用替代 dynamic_cast）；
+        // NativeFunction 不用此值——CallV 对它走通用回落
+        Function,
     };
 
 } // namespace cial

@@ -15,17 +15,17 @@
 ## 1. 两级结构总览
 
 ```
-AST ──IRGenerator──▶ TAC 指令序列（86 种，Instruction 对象）
+AST ──IRGenerator──▶ TAC 指令序列（92 种，Instruction 对象）
                         │  存于 Chunk::_instructions
                         ▼  Chunk::toBytecode()（幂等、惰性）
-                     扁平字节码 Vec<u8>（86 种 VmOpCode，与 TAC 一一对应）
+                     扁平字节码 Vec<u8>（92 种 VmOpCode，与 TAC 一一对应）
                         │  存于 Chunk::_code
                         ▼
                      VMState::run0() switch 解释（唯一执行路径）
 ```
 
 - 早期的 `run()` 多态执行路径（逐条虚调用 `Instruction::execute`）已删除；
-  语义全部收敛到 `run0()` 的 86 个 `dispatchXXX`。
+  语义全部收敛到 `run0()` 的 92 个 `dispatchXXX`。
 - `Instruction` 子类只作为 IR 载体与 dump 来源保留。
 
 ## 2. 执行模型
@@ -39,11 +39,15 @@ AST ──IRGenerator──▶ TAC 指令序列（86 种，Instruction 对象）
   不足 arity 补 void → `allocCallFrame`，帧 `_sp` 回退 `arity`，使**被调帧的 %0..%arity-1
   与压入的实参区重合（%0 = 第 1 个实参）**。IRGenerator 为参数依次分配 `%0..` 起的寄存器
   （`IRGenerator.cpp:1117-1149`）。
+  **CallV 直写布局**（性能专项 2026-10-28）：Function 被调者跳过池顶中转——一次分配
+  被调帧窗口（`argWindowDirect` 布局，`_sp` = 分配基址不回退 arity），实参寄存器直接
+  拷入 %0..%arity-1（缺位补 void、超额/hasCollapse 备份窗口尾区，语义与 `Function::call`
+  一致）；其余可调用对象回落压栈 + 虚 `call` 旧约定。
 - **返回**：`Ret` 把寄存器值写入调用方 `CallFrame::ret`（即 Call 的 dst 寄存器）并弹帧。
 - **this**：`CallFrame::thisObj`；`Function::call` 设为函数对象的 `thisObj` 字段（可被
   `ChgThis`/`GProp` 的方法绑定改写）。`GThis`/`DThis` 做名字查找（thisObj → closure 局部 → global）。
 
-## 3. TAC 指令全表（86 条）
+## 3. TAC 指令全表（92 条）
 
 枚举值 = 表中顺序（X-macro `CIAL_TAC_OPCODE_ENUMS`）。操作数记号：
 `%r`=寄存器、`@l`=标签（TAC 指令下标）、`*c`=常量池下标、`imm`=立即整数、`atom`=驻留名。
@@ -156,9 +160,11 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 | 58 | GRefRaw | `%atom, %dst` | `&name`：取 this/global 槽位本体，不触发 getter（旧版 GPDS 符号形态） |
 | 59 | DPropRaw | `%obj, %name, %src` | `&obj[name] = src`：绕过 setter 直接写槽位（旧版 SPDS），& 作赋值左值 |
 
-⚠️ 与 TJS 不同：Ciallang 的 GProp/DProp **只有 indirect 形态**（名字来自寄存器），
-没有 direct（常量池名字）与 P（无成员闭包）变体；IGNOREPROP/MEMBERENSURE 标志位
-由独立的 *Raw 指令承担（见 mapping.md §6 缺口清单）。
+⚠️ 与 TJS 不同：Ciallang 的 GProp/DProp 原本**只有 indirect 形态**（名字来自寄存器）。
+性能专项（2026-10-28）补齐 **direct 形态**：`GPropC/DPropC/GPropRawC/DPropRawC/DelPropC`
+（§3.10）成员名以 u32 Atom 内联进指令流，编译期直引、dispatch 免再 intern；
+寄存器形态保留给动态成员名与整数成员名（旧版 GPI/PropGetByNum，数组下标）。
+IGNOREPROP/MEMBERENSURE 标志位由独立的 *Raw 指令承担（见 mapping.md §6 缺口清单）。
 
 **property 触发协议**：GProp/DProp/GThis/GGlobal/DThis/DGlobal 在槽位为 Property 时
 调 getter/setter；GLocal/DLocal（局部变量=寄存器拷贝，TJS2 VM_CP 语义）与
@@ -167,17 +173,22 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 ### 3.10 追加指令（TJS 字节码转译与性能批次，2026-10-27；编号续 3.9 表）
 
 > 本节指令为转译路线（mapping.md）与调用优化新增，3.9 之前表格的编号系历史快照；
-> 枚举顺序以 X-macro `CIAL_TAC_OPCODE_ENUMS` 为权威（86 条全量编码进扁平字节码）。
+> 枚举顺序以 X-macro `CIAL_TAC_OPCODE_ENUMS` 为权威（92 条全量编码进扁平字节码）。
 
 | 指令 | 操作数 | 语义 |
 |---|---|---|
 | Call | `%dst, %func, argc` | 调用对象（Function/Class/Property 之外的通用入口，实参已 Push） |
-| CallV | `%dst, %func, argc, %r1..%rn` | 变长实参调用：语义 = N×Push + Call（手写子类 + emitRaw） |
+| CallV | `%dst, %func, argc, %r1..%rn` | 变长实参调用。Function 被调者走实参直写（§2 执行模型）：一次分配被调帧窗口、实参寄存器直接落 %0..；其余对象压栈 + 虚 call 回落 |
 | CallOmit | `%dst, %func` | 省略透传（TJS `f(...)`）：转发本帧 actualArgc 个实参（CallFrame 记录） |
 | CallExpand | `%dst, %func, unnamedBase, (type,%r)*` | 展开调用（TJS `f(1, arr*, *)`）：Normal/Expand(Array)/UnnamedExpand 条目表 |
 | CollapseArgs | `%dst, base` | collapse 参数（TJS `function f(a, b*)`）：实参 %base.. 收拢成 Array |
 | DerefGet | `%prop, %dst` | `*p` 强制属性访问读（调 getter，旧版 GETP） |
 | DerefSet | `%prop, %src` | `*p = v` 强制属性访问写（调 setter，旧版 SETP） |
+| GPropC | `%obj, atom, %dst` | `dst = obj.member`，成员名编译期 Atom 直引（性能专项 2026-10-28，语义同 GProp） |
+| DPropC | `%obj, atom, %src` | `obj.member = src`（同 DProp：Property 槽触发 setter 压帧 → Call） |
+| GPropRawC | `%obj, atom, %dst` | `&obj.member`（同 GPropRaw，不触发 getter） |
+| DPropRawC | `%obj, atom, %src` | `&obj.member = src`（同 DPropRaw，绕过 setter） |
+| DelPropC | `%obj, atom, %dst` | `delete obj.member`（同 DelProp） |
 | NewArray / NewDict | `%dst[, count]` | `[...]` / `%[...]` 字面量 |
 | GetIndex / SetIndex | `%obj, %idx, %dst/%src` | 通用下标读写（数组负下标/越界扩展/字典键/字符串字符） |
 | WithPush / WithPop / GetWith | `%src` / — / `%dst` | with 上下文栈与 `.member` 裸词链 |
@@ -239,6 +250,7 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 | 调用 | CallV（`dst, func, argc, r1..rn`；Operand 三槽装不下寄存器列表，手写子类 + emitRaw） | `op + u16 + u16 + uleb(argc) + u16×n` | 
 | 装载 | Load（`dst, constIdx`）、LoadImm（`dst, imm`） | `op + u16 + u16` / `op + u16 + sLEB128` |
 | 名字访问 | DGlobal/GGlobal/GThis/DThis/GRefRaw | `op + u32 atom + u16 reg` |
+| 成员名直引 | GPropC/DPropC/GPropRawC/DPropRawC/DelPropC（`obj, atom, dst/src`） | `op + u16 obj + u32 atom + u16 dst/src` |
 | 算术/位/比较 | Add..LOr 全部 22 条（§3.8） | `op + u16 src1 + u16 src2 + u16 dst`（**三寄存器非破坏性**） |
 | 调用/属性 | Call（`dst, func, sLEB argc`）、GProp/DProp/DelProp/GPropRaw/DPropRaw（`obj, name, dst/src`）、GetIndex/SetIndex（`obj, idx, dst/src`） | 见括号内顺序 |
 

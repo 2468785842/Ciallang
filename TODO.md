@@ -1,9 +1,12 @@
 # 后续任务清单
 
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
-> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-25）——
-> 类实例化 112% / 整数循环 121~127% / fib(25) 114~130% / 字符串拼接 151~155%
->（本机多轮波动 ±10%，区间为多轮实测；string_concat 自 194% 回落，payload 单块分配+CallV 见效）。
+> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-28）——
+> 类实例化 112% / 整数循环 116% / fib(25) 132% / 字符串拼接 148%
+>（本机多轮波动 ±10%；⚠️ 本机 Release 构建缓存曾丢失优化标志（`CMAKE_CXX_FLAGS_RELEASE`
+> 为空 → 实际 -O0），2026-10-28 重新以 `-O3 -DNDEBUG` 配置后基准才可比——此前一轮测量
+> 若与本表量级不符先查构建缓存。fib 内部 VM 计时 A/B：Atom 直引 + 实参直写后
+> 中位 63ms → 43ms（约 -25%））。
 > TJS2 语料对拍（2026-10-25）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
 > DIFF 3（test_misc、test_variant 为异常消息格式差异，Ciallang 行为正确；
 > test_string 双方干净通过，Ciallang 侧无输出、参考实现多 25 行引擎转储）/
@@ -11,7 +14,7 @@
 > **字节码兼容 M1–M4 完成（2026-10-27）**：`cial --tjsbc` 全链路——tjs2 语料 12 文件
 > 字节码路径全量通过（test_class/test_function/test_misc/test_variant/test_with +
 > s1–s7；test.tjs 需宿主 Scripts 对象双方同位置失败、test_string 上游 --dump 崩溃）；
-> 128 操作码转译覆盖；106 用例 755 断言全绿。见 doc/bytecode/mapping.md。
+> 128 操作码转译覆盖；107 用例 760 断言全绿。见 doc/bytecode/mapping.md。
 
 ## 一、正确性（已知未修）
 
@@ -22,16 +25,14 @@
 
 ## 二、性能（剩余方向）
 
-- [ ] fib 剩余差距（130%，本机噪声主导）：值拷贝仍在（CallV 压栈同 N×Push 的
-      pool 写）——进一步需实参直写被调帧窗口（跳过中转）；调用点内联缓存
-- [ ] string_concat 剩余差距（151~155%）：payload 单块分配已做，剩余为 Value 内联 SSO
+- [ ] string_concat 剩余差距（148%）：payload 单块分配已做，剩余为 Value 内联 SSO
       （小串零堆分配）
-- [ ] loop_int 小幅差距（121~127%）：词法器 token 判别等热路径复核；指令条数
+- [ ] loop_int 小幅差距（116%）：词法器 token 判别等热路径复核；指令条数
 - [ ] 方法访问 NativeFunction 每次分配（GProp 绑定拷贝）：正确修法是调用约定
       携带 objthis（TJS2 同款），属调用点内联缓存的前置；现有基准不敏感
       （stdlib 密集脚本受益）
-- [ ] 成员名 Atom 往返：常量池 Atom → String Value → GProp 再 intern 回 Atom；
-      方案 LoadAtom 指令或 GProp 操作数直引常量池（指令集变更）
+- [ ] fib 剩余差距（132%≈噪声，内部计时已 -25%）：调用点内联缓存
+      （typeId 判型已做，下一步缓存 GProp 方法查找结果）
 
 ## 三、语言特性缺口（对照 README）
 
@@ -43,8 +44,27 @@
       `cp build/Windows/Release/*.dll build/Windows/Release/tests/`（当前实践）；
       长期改静态 triplet
 - [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
+- [ ] 清理 Parser.cpp `argEndsWithTopLevelAsterisk` 里 e47ba4c 遗留的无条件
+      `[scan]` 调试打印（`fmt::println(stderr, ...)`，Release 也在输出）
+- [ ] 本机 Release 构建缓存曾丢失 `CMAKE_CXX_FLAGS_RELEASE`（为空 → -O0，
+      2026-10-28 发现并已用 `-O3 -DNDEBUG` 重新配置）；干净目录重配即恢复默认，
+      疑似历史缓存污染，留意复发
 
 ## 已完成（摘要）
+
+- 2026-10-28 性能专项批次——成员名 Atom 往返消除 + 调用点实参直写：
+  新增 5 条 TAC/扁平字节码指令 `GPropC/DPropC/GPropRawC/DPropRawC/DelPropC`
+  （成员名 u32 Atom 内联，同 GGlobal 编码；86→92 条），源码路径 IRGenerator
+  全部字面成员访问与转译器 GPD/SPD/DELD/TYPEOFD/CALLD/INC·DEC·二目-PD 改发直引
+  （省名字寄存器 Load 与 dispatch 再 intern；整数名形态保留寄存器指令），
+  GProp/DProp 共享体提取为 propGetMember/propSetMember；CallV 对 Function 被调者
+  走实参直写——`argWindowDirect` 帧布局（`_sp`=分配基址不回退 arity）一次分配
+  被调窗口，实参寄存器直接落 %0..（缺位补 void、超额/hasCollapse 备份尾区，
+  语义与 Function::call 一致），跳过 N×push 池顶中转；其余可调用对象回落压栈 +
+  虚 call。配套：TypeId 增 Function 专有标识（CallV 判型一次虚调用替代
+  dynamic_cast；NativeFunction 保持 Object 走回落）。fib 内部计时 A/B 中位
+  63ms→43ms（约 -25%），class/loop/concat 持平；107 用例双配置全绿，
+  tjs2 语料双路径对拍一致（test_misc 行号后缀差异为既有已知项）
 
 - 2026-10-27 源码前端补齐批次——`...`/`*` 语法（源码路径与字节码路径能力对齐）：
   Parser 参数表支持 `name*`/`*`（func_decl_arg_collapse 对齐，FuncParam 结构替代

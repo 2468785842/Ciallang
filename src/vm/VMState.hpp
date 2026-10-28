@@ -14,6 +14,7 @@
 #pragma once
 
 #include <cstdlib>
+#include <type_traits>
 #include <fmt/format.h>
 
 #include "CallFrame.hpp"
@@ -95,10 +96,16 @@ namespace cial::vm {
         void makeClosure() { _curFrame->closure = _stackTop > 1 ? prevFrame() : nullptr; }
 
         template <typename T>
-        void allocCallFrame(T *arg, const Opt<u16> ret = {}, const size_t extraSlots = 0) {
+        void allocCallFrame(T *arg, const Opt<u16> ret = {}, const size_t extraSlots = 0,
+                            const bool argWindowDirect = false) {
             if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
-            _curFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, _pool, extraSlots };
+            if constexpr(std::is_same_v<T, Chunk>) {
+                _curFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, _pool, extraSlots };
+            } else {
+                _curFrame = new(&_callStack[_stackTop++])
+                    CallFrame{ arg, ret, _pool, extraSlots, argWindowDirect };
+            }
             _curFrame->withDepth = withStack.size();
         }
 

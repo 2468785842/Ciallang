@@ -104,7 +104,12 @@
     O(Dec)                                                                                                             \
     O(BNot)                                                                                                            \
     O(ToNumber)                                                                                                        \
-    O(ToOctet)
+    O(ToOctet)                                                                                                         \
+    O(GPropC)                                                                                                          \
+    O(DPropC)                                                                                                          \
+    O(GPropRawC)                                                                                                       \
+    O(DPropRawC)                                                                                                       \
+    O(DelPropC)
 
 namespace cial::vm {
     class VMState;
@@ -346,6 +351,22 @@ namespace cial::inter {
     DEF_INST(DerefGet, 2, OP_GET1(prop, Register) OP_GET2(dst, Register));
     // *p = v 写:强制属性访问(调 setter,旧版 SETP);setter 压帧,需 Call 接管
     DEF_INST(DerefSet, 2, OP_GET1(prop, Register) OP_GET2(src, Register));
+
+    // ── 成员名 Atom 直引族（C 后缀 = 编译期常量成员名）──
+    // 成员名以 u32 Atom 内联进指令流（同 GGlobal），dispatch 免去
+    // 「常量池 Atom → String Value → intern 回 Atom」的往返哈希。
+    // 寄存器成员名形态（GProp/DProp/...）保留：动态成员名与整数成员名
+    //（旧版 GPI/PropGetByNum，数组下标）仍走寄存器
+    // obj.member 读（getter 语义与 GProp 一致）
+    DEF_INST(GPropC, 3, OP_GET1(obj, Register) OP_GET2(atom, Atom) OP_GET3(dst, Register));
+    // obj.member = v 写（DProp 语义：Property 槽位触发 setter，压帧 → Call）
+    DEF_INST(DPropC, 3, OP_GET1(obj, Register) OP_GET2(atom, Atom) OP_GET3(src, Register));
+    // &obj.member 读（GPropRaw 语义：不触发 getter）
+    DEF_INST(GPropRawC, 3, OP_GET1(obj, Register) OP_GET2(atom, Atom) OP_GET3(dst, Register));
+    // &obj.member = v 写（DPropRaw 语义：绕过 setter）
+    DEF_INST(DPropRawC, 3, OP_GET1(obj, Register) OP_GET2(atom, Atom) OP_GET3(src, Register));
+    // delete obj.member（DelProp 语义：dst 写是否删除成功）
+    DEF_INST(DelPropC, 3, OP_GET1(obj, Register) OP_GET2(atom, Atom) OP_GET3(dst, Register));
 
     // [a, b, ...] 字面量:分配 count 长度的新 Array,元素随后逐个 SetIndex
     DEF_INST(NewArray, 2, OP_GET1(dst, Register) OP_GET2(count, Integer));

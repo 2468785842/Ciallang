@@ -231,6 +231,11 @@ namespace cial::inter {
     DEF_AUTO_DUMP(DPropRaw, "d_prop_raw");
     DEF_AUTO_DUMP(DerefGet, "deref_get");
     DEF_AUTO_DUMP(DerefSet, "deref_set");
+    DEF_AUTO_DUMP(GPropC, "g_prop_c");
+    DEF_AUTO_DUMP(DPropC, "d_prop_c");
+    DEF_AUTO_DUMP(GPropRawC, "g_prop_raw_c");
+    DEF_AUTO_DUMP(DPropRawC, "d_prop_raw_c");
+    DEF_AUTO_DUMP(DelPropC, "del_prop_c");
     DEF_AUTO_DUMP(NewArray, "new_array");
     DEF_AUTO_DUMP(NewDict, "new_dict");
     DEF_AUTO_DUMP(GetIndex, "get_index");

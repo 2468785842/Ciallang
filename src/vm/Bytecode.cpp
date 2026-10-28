@@ -339,6 +339,42 @@ namespace cial::vm {
         write<u16>(info.code, tac->src().index());
     }
 
+    // ── 成员名 Atom 直引族：obj u16 + atom u32（同 GGlobal 的截断约定）+ dst/src u16 ──
+    void Bytecode::encode(Info &info, const inter::GPropC *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::GPropC));
+        write<u16>(info.code, tac->obj().index());
+        write<u32>(info.code, static_cast<u32>(tac->atom().v));
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::DPropC *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::DPropC));
+        write<u16>(info.code, tac->obj().index());
+        write<u32>(info.code, static_cast<u32>(tac->atom().v));
+        write<u16>(info.code, tac->src().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::GPropRawC *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::GPropRawC));
+        write<u16>(info.code, tac->obj().index());
+        write<u32>(info.code, static_cast<u32>(tac->atom().v));
+        write<u16>(info.code, tac->dst().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::DPropRawC *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::DPropRawC));
+        write<u16>(info.code, tac->obj().index());
+        write<u32>(info.code, static_cast<u32>(tac->atom().v));
+        write<u16>(info.code, tac->src().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::DelPropC *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::DelPropC));
+        write<u16>(info.code, tac->obj().index());
+        write<u32>(info.code, static_cast<u32>(tac->atom().v));
+        write<u16>(info.code, tac->dst().index());
+    }
+
     void Bytecode::encode(Info &info, const inter::NewArray *tac) {
         info.code.push_back(static_cast<u8>(VmOpCode::NewArray));
         write<u16>(info.code, tac->dst().index());

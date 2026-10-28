@@ -116,8 +116,8 @@ namespace cial::inter {
             Register dst = allocateRegister();
 
             if(auto *identifier = dynamic_cast<const syntax::IdentifierExprNode *>(node->rhs); identifier) {
-                genTokenValueLoadInst(dst, identifier->token);
-                _chunk->emit<GProp>(reg1, dst, dst);
+                // 成员名编译期 Atom 直引（跳过名字字符串寄存器与 dispatch 再 intern）
+                _chunk->emit<GPropC>(reg1, getAtomFromToken(identifier->token), dst);
             } else {
                 Register reg2{ 0 };
                 if(!expectValue(node->rhs, reg2))
@@ -431,10 +431,8 @@ namespace cial::inter {
                     error("delete member must be identifier", node->location);
                     return;
                 }
-                auto memberReg = allocateRegister();
-                genTokenValueLoadInst(memberReg, identifierExpr->token);
-                _chunk->emit<DelProp>(objReg, memberReg, dst);
-                freeRegister(memberReg);
+                // 成员名编译期 Atom 直引
+                _chunk->emit<DelPropC>(objReg, getAtomFromToken(identifierExpr->token), dst);
                 optReg = dst;
                 break;
             }
@@ -476,10 +474,7 @@ namespace cial::inter {
                     return;
                 }
 
-                auto memberReg = allocateRegister();
-                genTokenValueLoadInst(memberReg, *memberToken);
-                _chunk->emit<GPropRaw>(objReg, memberReg, dst);
-                freeRegister(memberReg);
+                _chunk->emit<GPropRawC>(objReg, getAtomFromToken(*memberToken), dst);
                 freeRegister(objReg);
                 optReg = dst;
                 break;
@@ -545,11 +540,10 @@ namespace cial::inter {
                     Register objReg{ 0 };
                     if(!expectValue(member->lhs, objReg))
                         return;
-                    auto memberReg = allocateRegister();
-                    genTokenValueLoadInst(memberReg, identifierExpr->token);
+                    const Atom memberAtom = getAtomFromToken(identifierExpr->token);
 
                     Register curReg = allocateRegister();
-                    _chunk->emit<GProp>(objReg, memberReg, curReg); // 触发 getter
+                    _chunk->emit<GPropC>(objReg, memberAtom, curReg); // 触发 getter
                     Register oldReg{};
                     if(optReg) {
                         oldReg = allocateRegister();
@@ -564,12 +558,11 @@ namespace cial::inter {
                         // 注意操作数顺序：变量 - 1
                         _chunk->emit<Sub>(curReg, one, nv);
                     }
-                    _chunk->emit<DProp>(objReg, memberReg, nv); // 触发 setter（压帧 → Call）
+                    _chunk->emit<DPropC>(objReg, memberAtom, nv); // 触发 setter（压帧 → Call）
 
                     freeRegister(one);
                     freeRegister(nv);
                     freeRegister(curReg);
-                    freeRegister(memberReg);
                     freeRegister(objReg);
                     if(optReg)
                         optReg = oldReg;
@@ -801,10 +794,8 @@ namespace cial::inter {
                     return;
 
                 if(const auto *identifierExpr = dynamic_cast<const syntax::IdentifierExprNode *>(expr->rhs)) {
-                    auto tmpR = allocateRegister();
-                    genTokenValueLoadInst(tmpR, identifierExpr->token);
-                    _chunk->emit<DProp>(lhsR, tmpR, src);
-                    freeRegister(tmpR);
+                    // 成员名编译期 Atom 直引
+                    _chunk->emit<DPropC>(lhsR, getAtomFromToken(identifierExpr->token), src);
 
                     optReg = src;
                     return;
@@ -845,11 +836,8 @@ namespace cial::inter {
             Register src{ 0 };
             if(!expectValue(node->rhs, src))
                 return;
-            auto memberReg = allocateRegister();
-            genTokenValueLoadInst(memberReg,
-                                  dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs)->token);
-            _chunk->emit<DPropRaw>(objReg, memberReg, src);
-            freeRegister(memberReg);
+            _chunk->emit<DPropRawC>(objReg, getAtomFromToken(
+                dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs)->token), src);
             freeRegister(objReg);
             freeRegister(src);
             optReg = src;

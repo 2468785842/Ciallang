@@ -798,11 +798,8 @@ namespace cial::tjsbc {
                         }
                         // PD/PI：o[m] ± 1（读-算-写）；PD 且 obj=proxy 时走
                         // GThis/DThis（this→global 回落链）
-                        const inter::Register name =
-                            k4 == 1 ? regN : r3;
-                        const bool viaProxy = k4 == 1 && d.r2 == -2;
                         if(k4 == 1) {
-                            if(viaProxy) {
+                            if(d.r2 == -2) { // obj = proxy
                                 const Atom nameAtom2 = rt.atomTable.intern(
                                     dataSlotString(ctx, file, d.dataIdx));
                                 chunk.emit<inter::GThis>(nameAtom2, regT);
@@ -813,13 +810,22 @@ namespace cial::tjsbc {
                                     chunk.emit<inter::DLocal>(regT, r1);
                                 break;
                             }
-                            chunk.emit<inter::Load>(
-                                regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                            // 成员名 Atom 直引（省名字寄存器 Load 与 dispatch 再 intern）
+                            const Atom nameAtom = rt.atomTable.intern(
+                                dataSlotString(ctx, file, d.dataIdx));
+                            chunk.emit<inter::GPropC>(r2, nameAtom, regT);
+                            chunk.emit<inter::LoadImm>(regT2, Integer{1});
+                            emitOne(regT);
+                            chunk.emit<inter::DPropC>(r2, nameAtom, regT);
+                            if(d.r1 != 0) // dst=0 丢弃
+                                chunk.emit<inter::DLocal>(regT, r1);
+                            break;
                         }
-                        chunk.emit<inter::GProp>(r2, name, regT);
+                        // k4 == 2（PI）：整数成员名寄存器形态（数组数值下标）
+                        chunk.emit<inter::GProp>(r2, r3, regT);
                         chunk.emit<inter::LoadImm>(regT2, Integer{1});
                         emitOne(regT);
-                        chunk.emit<inter::DProp>(r2, name, regT);
+                        chunk.emit<inter::DProp>(r2, r3, regT);
                         if(d.r1 != 0) // dst=0 丢弃
                             chunk.emit<inter::DLocal>(regT, r1);
                         break;
@@ -864,8 +870,6 @@ namespace cial::tjsbc {
                         if(k4 == 1 || k4 == 2) {
                             // PD/PI：o[m] = o[m] OP p（读-算-写，mapping.md §6.1）；
                             // PD 且 obj=proxy 时走 GThis/DThis（this→global 回落链）
-                            const inter::Register name =
-                                k4 == 1 ? regN : r3;
                             if(k4 == 1) {
                                 if(d.r2 == -2) {
                                     const Atom nameAtom2 = rt.atomTable.intern(
@@ -877,14 +881,22 @@ namespace cial::tjsbc {
                                         chunk.emit<inter::DLocal>(regT, r1);
                                     break;
                                 }
-                                chunk.emit<inter::Load>(
-                                    regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                                // 成员名 Atom 直引
+                                const Atom nameAtom = rt.atomTable.intern(
+                                    dataSlotString(ctx, file, d.dataIdx));
+                                chunk.emit<inter::GPropC>(r2, nameAtom, regT);
+                                emitBinary(regT, r4, regT);
+                                chunk.emit<inter::DPropC>(r2, nameAtom, regT);
+                                if(d.r1 != 0) // dst=0 丢弃（%K 是 void 槽，不得污染）
+                                    chunk.emit<inter::DLocal>(regT, r1);
+                            } else {
+                                // k4 == 2（PI）：整数成员名寄存器形态（数组数值下标）
+                                chunk.emit<inter::GProp>(r2, r3, regT);
+                                emitBinary(regT, r4, regT);
+                                chunk.emit<inter::DProp>(r2, r3, regT);
+                                if(d.r1 != 0)
+                                    chunk.emit<inter::DLocal>(regT, r1);
                             }
-                            chunk.emit<inter::GProp>(r2, name, regT);
-                            emitBinary(regT, r4, regT);
-                            chunk.emit<inter::DProp>(r2, name, regT);
-                            if(d.r1 != 0) // dst=0 丢弃（%K 是 void 槽，不得污染）
-                                chunk.emit<inter::DLocal>(regT, r1);
                         } else if(k4 == 3) {
                             // P：*target = *target OP param（属性节点读-算-写）
                             chunk.emit<inter::DerefGet>(r2, regT);
@@ -946,9 +958,9 @@ namespace cial::tjsbc {
                                     rt.atomTable.intern(dataSlotString(ctx, file, d.dataIdx));
                                 chunk.emit<inter::GThis>(nameAtom2, regN);
                             } else {
-                                chunk.emit<inter::Load>(
-                                    regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
-                                chunk.emit<inter::GProp>(r2, regN, regN);
+                                chunk.emit<inter::GPropC>(
+                                    r2, rt.atomTable.intern(dataSlotString(ctx, file, d.dataIdx)),
+                                    regN);
                             }
                             func = regN;
                         } else if(d.op == OP_CALLI) {
@@ -1011,12 +1023,13 @@ namespace cial::tjsbc {
                                 chunk.emit<inter::GRefRaw>(nameAtom2, r1);
                             break;
                         }
-                        chunk.emit<inter::Load>(regN,
-                                                atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                        // 成员名 Atom 直引
+                        const Atom nameAtom =
+                            rt.atomTable.intern(dataSlotString(ctx, file, d.dataIdx));
                         if(d.op == OP_GPD)
-                            chunk.emit<inter::GProp>(r2, regN, r1);
+                            chunk.emit<inter::GPropC>(r2, nameAtom, r1);
                         else
-                            chunk.emit<inter::GPropRaw>(r2, regN, r1);
+                            chunk.emit<inter::GPropRawC>(r2, nameAtom, r1);
                         break;
                     }
                     case OP_SPD: case OP_SPDE: case OP_SPDEH: case OP_SPDS: {
@@ -1028,21 +1041,19 @@ namespace cial::tjsbc {
                             if(d.op == OP_SPDS) {
                                 // 无 atom 形态的原始写：落 this 槽位（TJS2 proxy 原始写
                                 // 在 this 空时落 global 的差异记录为已知近似）
-                                chunk.emit<inter::Load>(
-                                    regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
-                                chunk.emit<inter::DPropRaw>(
-                                    inter::Register{static_cast<u16>(k - 1)}, regN, r3);
+                                chunk.emit<inter::DPropRawC>(
+                                    inter::Register{static_cast<u16>(k - 1)}, nameAtom2, r3);
                             } else {
                                 chunk.emit<inter::DThis>(nameAtom2, r3);
                             }
                             break;
                         }
-                        chunk.emit<inter::Load>(regN,
-                                                atomConst(dataSlotString(ctx, file, d.dataIdx)));
+                        const Atom nameAtom =
+                            rt.atomTable.intern(dataSlotString(ctx, file, d.dataIdx));
                         if(d.op == OP_SPDS)
-                            chunk.emit<inter::DPropRaw>(r1, regN, r3);
+                            chunk.emit<inter::DPropRawC>(r1, nameAtom, r3);
                         else
-                            chunk.emit<inter::DProp>(r1, regN, r3);
+                            chunk.emit<inter::DPropC>(r1, nameAtom, r3);
                         break;
                     }
                     case OP_GPI: case OP_GPIS: {
@@ -1065,24 +1076,22 @@ namespace cial::tjsbc {
                         chunk.emit<inter::DerefSet>(r1, r2);
                         break;
                     case OP_DELD: case OP_DELI: {
-                        // dst = delete obj.member（bool）
-                        const inter::Register name =
-                            d.op == OP_DELD ? regN : r3;
+                        // dst = delete obj.member（bool）；DELD 成员名 Atom 直引
                         if(d.op == OP_DELD)
-                            chunk.emit<inter::Load>(
-                                regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
-                        chunk.emit<inter::DelProp>(r2, name, r1);
+                            chunk.emit<inter::DelPropC>(
+                                r2, rt.atomTable.intern(dataSlotString(ctx, file, d.dataIdx)), r1);
+                        else
+                            chunk.emit<inter::DelProp>(r2, r3, r1);
                         break;
                     }
                     case OP_TYPEOFD: case OP_TYPEOFI: {
                         // dst = typeof obj.member。已知近似：TJS 成员不存在时返回
                         // "undefined" 字符串，此处 GProp 直接抛错（其余路径一致）
-                        const inter::Register name =
-                            d.op == OP_TYPEOFD ? regN : r3;
                         if(d.op == OP_TYPEOFD)
-                            chunk.emit<inter::Load>(
-                                regN, atomConst(dataSlotString(ctx, file, d.dataIdx)));
-                        chunk.emit<inter::GProp>(r2, name, r1);
+                            chunk.emit<inter::GPropC>(
+                                r2, rt.atomTable.intern(dataSlotString(ctx, file, d.dataIdx)), r1);
+                        else
+                            chunk.emit<inter::GProp>(r2, r3, r1);
                         chunk.emit<inter::TypeOf>(r1, r1);
                         break;
                     }

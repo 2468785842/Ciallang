@@ -58,10 +58,17 @@ namespace cial {
         // extraSlots：实际实参超过 arity 的超额数。窗口按超额扩容后，%0.. 仍与
         // 实参重合而静态槽（prologue 的 this/void 写入位）整体上移——否则
         // prologue 会覆盖掉超额实参（省略透传/unnamed 展开/collapse 依赖它们）
+        //
+        // argWindowDirect：实参直写布局（CallV 直写路径专用）——窗口不回退 arity，
+        // _sp 即分配基址，实参由调用点显式拷入 %0..%arity-1（不经过池顶 push 中转）。
+        // 缺省布局的 _sp 回退 arity，使 %0.. 与调用前压入池顶的实参区重合
+        //（Function::call / ClassObject::call 的压栈约定）
         explicit CallFrame(FuncMeta *funcMeta, const Opt<u16> ret, vm::FastRegisterPool &pool,
-                           const size_t extraSlots = 0) :
+                           const size_t extraSlots = 0, const bool argWindowDirect = false) :
             chunk(funcMeta->chunk), funcMeta(funcMeta), ret(ret), _pool(&pool),
-            _sp(pool.allocFrame(funcMeta->chunk->getRegCount() + extraSlots) - funcMeta->arity) {}
+            _sp(argWindowDirect
+                ? pool.allocFrame(funcMeta->chunk->getRegCount() + extraSlots)
+                : pool.allocFrame(funcMeta->chunk->getRegCount() + extraSlots) - funcMeta->arity) {}
 
         CallFrame(CallFrame &&callFrame) noexcept :
             closure(callFrame.closure), chunk(callFrame.chunk), funcMeta(callFrame.funcMeta),

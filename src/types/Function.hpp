@@ -30,6 +30,10 @@ namespace cial {
 
         explicit Function(FuncMeta *funcMeta) : Object(Runtime::ATOM_FUNCTION), meta(funcMeta) {}
 
+        // 脚本函数专有标识（NativeFunction 不覆写、保持 Object）：CallV 直写路径
+        // 据此一次虚调用判型后 static_cast，替代热路径 dynamic_cast
+        [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Function; }
+
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {

@@ -27,6 +27,11 @@
 > 保留区按调用序保全）、EVAL/EEXP→EvalStr；CLT/CGT 序修正。`test_function.tjs`
 > 与 `test_misc.tjs` 字节码路径全量通过（test_misc 与源码路径逐行一致；这两类语法
 > 源码路径不支持，对拍基准为原版引擎行为）。
+> **成员名 Atom 直引（2026-10-28）**：GPD/GPDS/SPD/SPDS/DELD/TYPEOFD/CALLD 及
+> INC·DEC·二目组的 PD 变体不再「Load 名字常量进寄存器 + 寄存器名属性指令」，
+> 改发 `GPropC/DPropC/GPropRawC/DPropRawC/DelPropC`（成员名 u32 Atom 内联，
+> dispatch 免再 intern）；PI/GPI 等整数名形态保留寄存器指令（见
+> ciallang-bytecode.md §3.10）。
 > **M3 完成（2026-10-27）**：CmpEQ/CmpDEQ/CmpLT/CmpGT 比较直写 _zf + 转译器前瞻融合
 > （比较/TT/TF 紧随 JF/JNF 时省 %F 物化与 Test，每分支省 1 条）、Inc/Dec 单指令
 > （int/real，TJS increment 语义——旧译法 LoadImm+Add 对字符串会误拼接）、
@@ -158,15 +163,18 @@ M3 优化提案：新增 2 操作数"比较写 zf"指令族（`CmpEQ %r1,%r2` �
 
 ### 4.3 属性访问
 
+> 下表为设计期快照，实施状态以本文件头部进度注记与 `TjsTranslator.cpp` 为准；
+> direct 名（GPD/SPD/DELD/TYPEOFD/CALLD）现均发 *C 直引指令（不再 Load 名字常量）。
+
 | TJS | 转译 | 备注 |
 |---|---|---|
-| GPD d,o,m | `Load %n, *m'`（名字常量）+ `GProp %o,%n,%d` | direct 型先把常量池字符串装入寄存器 |
-| GPI d,o,m | `GProp %o,%m,%d` | 成员名已在寄存器 |
-| SPD o,m,s | `Load %n,*m'` + `DProp %o,%n,%s` | ⚠️ SPD 操作数顺序 `[obj,member,src]`，DProp 是 `[obj,name,src]` 一致 |
+| GPD d,o,m | `GPropC %o,atom,%d` | 成员名 Atom 内联（设计期方案 Load+%n+GProp 已替换） |
+| GPI d,o,m | `GProp %o,%m,%d` | 成员名已在寄存器（整数名=数组下标） |
+| SPD o,m,s | `DPropC %o,atom,%s` | ⚠️ SPD 操作数顺序 `[obj,member,src]`，DProp 是 `[obj,name,src]` 一致 |
 | SPI o,m,s | `DProp %o,%m,%s` | |
-| GETP/SETP | **缺口** | 提案 `GetP/SetP` 或 Property invoke 近似 |
-| DELD/DELI | **缺口** | 提案 `DelProp`（返回 bool 到 %d） |
-| GPDS/SPDS/GPIS/SPIS（IGNOREPROP） | **缺口** | Ciallang Property 无穿透标志；提案 GProp/DProp 加 flag 操作数 |
+| GETP/SETP | `DerefGet/DerefSet` | M2 落地 |
+| DELD/DELI | `DelPropC`/`DelProp`（返回 bool 到 %d） | M2/M4 落地 |
+| GPDS/SPDS | `GPropRawC`/`DPropRawC`；GPIS/SPIS 走寄存器 Raw 指令 | M2/M4 落地 |
 | SPDE/SPIE/SPDEH（MEMBERENSURE） | Ciallang `setProp` 语义即"不存在则创建" | DataObject::setProp 直接 `_props[a]=v`，天然 ENSURE，行为兼容 |
 
 字符串/字节串下标（`str[i]`）：TJS 在 GPD/GPI 内特判；Ciallang 走 stdlib 原生方法表
@@ -193,7 +201,7 @@ M3 优化提案：新增 2 操作数"比较写 zf"指令族（`CmpEQ %r1,%r2` �
 | TJS | 转译 | 备注 |
 |---|---|---|
 | CALL d,f,n,[args] | `Push %a1 … Push %an` + `Call %d,%f,n` | this 绑定：Ciallang `Function::call` 用函数对象 thisObj；成员调用经 GProp 时 `DataObject::getProp` 已克隆并绑定 this（`Class.cpp:210-235`），语义对齐 |
-| CALLD d,f,m,[args] | `Load %n,*m'` + `GProp %f,%n,%f2` + Push… + `Call %d,%f2,n` | 方法名 direct |
+| CALLD d,f,m,[args] | `GPropC %f2,%o,atom` + Push… + `Call %d,%f2,n` | 方法名 Atom 直引（设计期方案 Load+%n+GProp 已替换）；obj=proxy 走 GThis |
 | CALLI d,f,m,[args] | `GProp %f,%m,%f2` + … | |
 | NEW d,c,[args] | **设计点** | TJS：调用类 context（其代码体做类构造，见 §7）。转译：对类值 Call；需要 Ciallang `ClassObject` 可调用 = 创建 DataObject + 跑构造；当前 ClassObject::call 语义需核对/补齐 |
 | argcount = -1/-2 | **缺口** | 省略透传/展开调用；提案 `ExpandCall`；首期加载报不支持 |
