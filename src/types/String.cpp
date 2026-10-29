@@ -192,7 +192,8 @@ namespace cial {
                     double val = params[in++].asReal().unwrap().value();
                     char fmtBuf[16];
                     if(prec >= 0)
-                        std::snprintf(fmtBuf, sizeof(fmtBuf), "%%.%lld%c", prec, type);
+                        // Integer 在 LP64 下是 long，与 %lld 类型须显式对齐
+                        std::snprintf(fmtBuf, sizeof(fmtBuf), "%%.%lld%c", static_cast<long long>(prec), type);
                     else
                         std::snprintf(fmtBuf, sizeof(fmtBuf), "%%%c", type);
                     std::snprintf(buffer, sizeof(buffer), fmtBuf, val);
