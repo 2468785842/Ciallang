@@ -27,6 +27,12 @@ namespace cial::inter {
         BasicBlock &operator=(const BasicBlock &rhs) noexcept = default;
     };
 
+    // 自然循环：回边 t→h（h 支配 t）确定的单表头循环，body 含 header、升序排列。
+    struct LoopInfo {
+        size_t header{};
+        Vec<size_t> body;
+    };
+
 
     class ControlFlowGraph {
     public:
@@ -36,8 +42,14 @@ namespace cial::inter {
         // 获取所有的基本块
         const Vec<BasicBlock> &getBasicBlocks() const { return _basicBlocks; }
 
+        // 自然循环集合（buildCFG 时计算；不可达块不参与，同表头回边合并）
+        const Vec<LoopInfo> &getLoops() const { return _loops; }
+
     private:
+        void detectLoops();
+
         Vec<BasicBlock> _basicBlocks; // 所有基本块
+        Vec<LoopInfo> _loops; // 自然循环（按 header 升序）
     };
 
 } // namespace cial::inter

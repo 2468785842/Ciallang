@@ -51,7 +51,7 @@ Ciallang/
 |---|---|---|
 | `src/common/` | 基础设施 | `Result.hpp`(错误收集)、`Ret.hpp`(ErrCode/Ret<T>)、`SourceFile`、`SourceLocation`、`UTF8`、`Hash.hpp`、`Defer.hpp` |
 | `src/parser/` | 词法+语法+预处理 | `Lexer`(手写 DFA)、`Parser`(Pratt 优先级)、`PreProcessor`(@set/@if)、`Token.hpp`、`OperatorTrie`、`ast/*`(AstNode 基类 + X-macro 节点枚举) |
-| `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**95 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`ControlFlowGraph`+`Optimizer`(基本块 CFG、整数常量折叠、死 `LoadImm` 清理、CompareTest 融合；在 `parseAst()` 接线) |
+| `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**95 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`ControlFlowGraph`+`Optimizer`(基本块 CFG+自然循环识别（支配树回边检测，getLoops()）、整数常量传播（块内折叠+唯一前驱跨块继承）、死 `LoadImm` 清理、CompareTest 融合；在 `parseAst()` 接线) |
 | `src/vm/` | 执行引擎 | `VMState`(**run0() 扁平字节码解释，唯一执行路径；多态 run() 已删除**)、`Chunk`(指令+常量池+双空间 try 表)、`Bytecode`(扁平 u8 编码, **95/95 全实现**)、`CallFrame`(含 thisData 缓存 + argWindowDirect 直写布局)、`FastRegisterPool`、`Constant.hpp`(FuncMeta/ClassMeta/PropMeta)、`Rlc`(行号表)、`VM.hpp`(宿主门面) |
 | `src/runtime/` | 全局运行时 | `Runtime`(GC/RootGuard/atomTable)、`Context`(调用栈/全局对象, 深度上限 1024)、`AtomTable`(字符串驻留 Atom) |
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |

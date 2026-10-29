@@ -123,6 +123,69 @@ TEST_CASE("optimizer - does not propagate into a loop header across the back edg
     REQUIRE(chunk.inst(1)->opcode() == TacOpCode::Add);
 }
 
+TEST_CASE("optimizer - detects natural loop from a back edge") {
+    vm::Chunk chunk;
+    chunk.emit<LoadImm>(Register{ 1 }, 5); // 0 init
+    chunk.emit<Jmp>(Label{ 3 }); // 1 → 循环头
+    chunk.emit<Add>(Register{ 1 }, Register{ 1 }, Register{ 1 }); // 2 latch
+    chunk.emit<LoadImm>(Register{ 2 }, 7); // 3 循环头（条件）
+    chunk.emit<JmpE>(Label{ 2 }); // 4 → body；fallthrough 出循环
+    chunk.emit<inter::Ret>(Register{ 1 }); // 5
+    chunk.setRegCount(3);
+
+    ControlFlowGraph cfg;
+    (void)cfg.buildCFG(chunk);
+    const auto &loops = cfg.getLoops();
+
+    // 块划分：[0,2)=init+Jmp、[2,3)=latch、[3,5)=header 条件、[5,6)=出口。
+    // 回边 latch→header（header 支配 latch 的唯一入路）
+    REQUIRE(loops.size() == 1);
+    REQUIRE(loops[0].header == 2);
+    REQUIRE(loops[0].body == Vec<size_t>({ 1, 2 }));
+}
+
+TEST_CASE("optimizer - detects nested loops with distinct headers") {
+    vm::Chunk chunk;
+    chunk.emit<LoadImm>(Register{ 1 }, 0); // 0 外层 init
+    chunk.emit<Jmp>(Label{ 5 }); // 1 → 外层头
+    chunk.emit<LoadImm>(Register{ 2 }, 0); // 2 内层 init（外层 body 起点）
+    chunk.emit<Jmp>(Label{ 8 }); // 3 → 内层头
+    chunk.emit<Add>(Register{ 1 }, Register{ 1 }, Register{ 1 }); // 4 外层 latch
+    chunk.emit<LoadImm>(Register{ 3 }, 7); // 5 外层头（条件）
+    chunk.emit<JmpE>(Label{ 2 }); // 6 → 外层 body；fallthrough 退出
+    chunk.emit<inter::Ret>(Register{ 1 }); // 7
+    chunk.emit<LoadImm>(Register{ 4 }, 1); // 8 内层头（条件）
+    chunk.emit<JmpNE>(Label{ 11 }); // 9 → 内层 body；fallthrough 内层退出
+    chunk.emit<Jmp>(Label{ 4 }); // 10 内层退出 → 外层 latch
+    chunk.emit<Add>(Register{ 2 }, Register{ 2 }, Register{ 2 }); // 11 内层 latch
+    chunk.emit<Jmp>(Label{ 8 }); // 12 → 内层头（回边）
+    chunk.setRegCount(5);
+
+    ControlFlowGraph cfg;
+    (void)cfg.buildCFG(chunk);
+    const auto &loops = cfg.getLoops();
+
+    REQUIRE(loops.size() == 2);
+    // 块划分：[0,2)/[2,4)/[4,5)/[5,7)/[7,8)/[8,10)/[10,11)/[11,13)。
+    // 外层 {外层条件, 内层 init, 外层 latch, 内层头, 内层出口, 内层体}，
+    // 内层 {内层头, 内层体}，内层 body 是外层 body 的子集。
+    REQUIRE(loops[0].header == 3);
+    REQUIRE(loops[0].body == Vec<size_t>({ 1, 2, 3, 5, 6, 7 }));
+    REQUIRE(loops[1].header == 5);
+    REQUIRE(loops[1].body == Vec<size_t>({ 5, 7 }));
+}
+
+TEST_CASE("optimizer - ignores loops inside unreachable blocks") {
+    vm::Chunk chunk;
+    chunk.emit<inter::Ret>(Register{ 0 });
+    chunk.emit<Jmp>(Label{ 1 }); // 不可达代码里的自环
+    chunk.setRegCount(1);
+
+    ControlFlowGraph cfg;
+    (void)cfg.buildCFG(chunk);
+    REQUIRE(cfg.getLoops().empty());
+}
+
 TEST_CASE("optimizer - remaps try ranges and source lines while compacting NOPs") {
     vm::Chunk chunk;
     chunk.emit<NOP>();
