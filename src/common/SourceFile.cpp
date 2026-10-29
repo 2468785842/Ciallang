@@ -13,6 +13,7 @@
  */
 
 #include <fstream>
+#include <iterator>
 #include <sstream>
 
 #include "SourceFile.hpp"

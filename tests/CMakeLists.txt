@@ -50,4 +50,11 @@ target_include_directories(CiallangTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 include(CTest)
 include(Catch)
 
-catch_discover_tests(CiallangTests)
+# Windows 下 CTest/CMake 按 ANSI 代码页转码测试名与过滤器（CI runner 为 1252），
+# 中文用例名经 discovery/传参链路后变成 "？?" 导致 No test cases matched；
+# 本机开启系统级 UTF-8 所以无感。Windows 改为单条测试跑整个套件绕开按名过滤。
+if(WIN32)
+    add_test(NAME CiallangSuite COMMAND CiallangTests)
+else()
+    catch_discover_tests(CiallangTests)
+endif()
