@@ -32,8 +32,8 @@
 
 ## 四、工程化
 
-- [x] Windows DLL 部署：Windows 预设改用 `x64-windows-static` 与静态 CRT，移除手动复制 DLL 的需求，见 `CMakePresets.json`。本机未执行 Windows 构建，待 CI 验证。
-- [x] Debug/Release CI：新增 Linux/macOS/Windows 六配置，构建 CLI 和测试并运行 CTest，见 `.github/workflows/ci.yml`。工作流尚未推送运行。
+- [x] Windows DLL 部署：Windows 预设改用 `x64-windows-static` 与静态 CRT，移除手动复制 DLL 的需求，见 `CMakePresets.json`。CI Windows 构建已验证。
+- [x] Debug/Release CI：新增 Linux/macOS/Windows 六配置，构建 CLI 和测试并运行 CTest，见 `.github/workflows/ci.yml`。2026-10-29 首次推送运行后修复三处移植性问题（缺 `<iterator>/<algorithm>/<cstring>/<limits>` 直接包含、LP64 下 `%lld` 格式匹配、Windows CTest 非 ASCII 用例名按 ANSI 代码页转码致过滤器失配→改单条测试跑整个套件），六配置全绿。
 - [x] Release 缓存防护：配置阶段拒绝缺少优化标志的 Release 缓存；空标志配置失败已验证，见 `CMakeLists.txt`。
 - [x] Parser 无条件 `[scan]` 打印：核实当前 `src/parser/Parser.cpp` 已不存在，关闭过时条目。
 - [x] 历史测试文件回归主线（2026-10-29）：statement/type_system/ieee/integration 四个被注释禁用的文件修复为现代 API 并启用——AST 结构直查（Parser 改经 `Context::pp()` 构造）、Value `as*`/Ret 运算面、`types/Real.hpp` IEEE 位工具（原 `lexer/IEEETypes.hpp` 已并入该头，此前零覆盖）、VM 门面多特性组合端到端；测试 120→143 用例（Windows Debug 全绿）。同步 doc/compatibility.md 与实现状态对齐。
