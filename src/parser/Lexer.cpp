@@ -12,6 +12,7 @@
  *
  */
 
+#include <algorithm>
 #include <fmt/format.h>
 #include "Lexer.hpp"
 

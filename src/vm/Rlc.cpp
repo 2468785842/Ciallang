@@ -11,6 +11,8 @@
  *                                                            \_/__/
  *
  */
+#include <algorithm>
+
 #include "Rlc.hpp"
 #include "logging/Logger.hpp"
 
