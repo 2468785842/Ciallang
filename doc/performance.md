@@ -22,11 +22,31 @@ TJSCompiler，新 CLI 使用命令行脚本路径，不再依赖写死的本机�
 当前引擎与 TJS2 可用 `cmake --build build/MacOS/Release --target bench` 复测；该目标使用
 `cmake/Bench.cmake` 的 min/mean 口径，与本表中位数口径不同。
 
+## 2026-10-29 Windows 首次实测
+
+环境：Windows x64、MSVC 14.44 `-O3 -DNDEBUG`，对照同机 TJSCompiler `windows-release`
+构建（2026-10-26）。`cmake/Bench.cmake` 编排：预热 1 轮 + 交替 7 轮取 **min**（含进程启动
+wall-time），与本文件上表中位数口径不同，两引擎口径一致。提交 7fe3f84。
+
+| 脚本 | TJS2 min | Ciallang min | Ciallang/TJS2 |
+|---|---:|---:|---:|
+| class_instantiate | 13.771 | 13.629 | 98% |
+| fib | 70.129 | 80.441 | 114% |
+| loop_int | 853.943 | 401.106 | 46% |
+| native_methods | 21.108 | 30.169 | 142% |
+| string_concat | 17.665 | 15.250 | 85% |
+
+同机对照下 5 项中 3 项反超 TJS2（整数循环 2.2×、字符串拼接、类实例化），fib 与原生方法
+仍落后（1.14× / 1.42×）。不同机器、编译器与口径的历史比例不可直接比较；上表 macOS 数据
+为 wall-time 中位数。另：TJS2 CLI 的内部计时标签 "Time taken by function: Nms" 实为
+微秒（fib(25) 标 31586"ms"，外部实测 52ms 含转储输出），对照时勿按标签字面取值。
+
 实现与回归来源：`src/gen/Optimizer.cpp`（比较融合）、`src/vm/VMState.cpp`（缓存和整型槽读写）、
 `src/types/Value.cpp` / `String.hpp`（紧凑短串）、`src/types/Function.cpp`（objthis 分离）、
 `tests/optimizer_test.cpp` / `native_function_test.cpp` / `value_storage_test.cpp`。
 
-验证：Debug、Release、UBSan 的 CTest 各 120/120 通过；12 个字节码样本全部成功；从其他工作目录配置的 TJSCompiler 相对路径检查通过；Release 空优化标志配置被拒绝。
+验证：macOS Debug、Release、UBSan 的 CTest 各 120/120 通过（2026-10-28 批次时点）；
+Windows Debug CTest 143/143 通过（2026-10-29，4 个历史测试文件回归主线后）；12 个字节码样本全部成功；从其他工作目录配置的 TJSCompiler 相对路径检查通过；Release 空优化标志配置被拒绝。
 ASan 在测试进程进入 main 前卡于系统运行库初始化，采样链为 AsanInitInternal →
 InitializeShadowMemory → malloc → AsanInitFromRtl 自旋，因此未获得 ASan 测试结果。
 Windows 静态 triplet 与 Linux/Windows CI 尚未在本机执行，工作流配置见 `.github/workflows/ci.yml`。

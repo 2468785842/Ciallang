@@ -1,234 +1,208 @@
 // Copyright (c) 2025/11/16
 //
-// IEEE 754 Double Precision Floating Point Tests
-// Tests modernized C++20 implementation
+// IEEE 754 双精度位工具测试（对准 src/types/Real.hpp，原 lexer/IEEETypes.hpp 已并入该头）
 
 #include <catch.hpp>
-#include <limits>
 
-#include "lexer/IEEETypes.hpp"
+#include "types/Real.hpp"
 
-using namespace cial::syntax::IEEE;
+using namespace cial;
 
-TEST_CASE("IEEE 754 - Basic Constants") {
-    SECTION("Constants are correctly defined") {
+TEST_CASE("IEEE 754 - 常量与掩码") {
+    SECTION("常量定义正确") {
         REQUIRE(EXP_MAX == 1023);
         REQUIRE(EXP_MIN == -1022);
         REQUIRE(SIGNIFICAND_BITS == 52);
         REQUIRE(EXP_BIAS == 1023);
 
-        REQUIRE(SIGN_MASK == 0x8000000000000000ull);
-        REQUIRE(EXP_MASK == 0x7ff0000000000000ull);
-        REQUIRE(SIGNIFICAND_MASK == 0x000fffffffffffffull);
-        REQUIRE(SIGNIFICAND_MSB_MASK == 0x0008000000000000ull);
+        REQUIRE(SIGN_MASK == 0x8000'0000'0000'0000ull);
+        REQUIRE(EXP_MASK == 0x7ff0'0000'0000'0000ull);
+        REQUIRE(SIGNIFICAND_MASK == 0x000f'ffff'ffff'ffffull);
+        REQUIRE(SIGNIFICAND_MSB_MASK == 0x0008'0000'0000'0000ull);
+    }
+
+    SECTION("特殊值位模式") {
+        REQUIRE(P_INF == EXP_MASK);
+        REQUIRE(N_INF == (SIGN_MASK | EXP_MASK));
+        REQUIRE(checkInf(P_INF));
+        REQUIRE(checkInf(N_INF));
+        REQUIRE(checkNan(P_NaN));
+        REQUIRE(checkNan(N_NaN));
     }
 }
 
-TEST_CASE("IEEE 754 - Component Extraction") {
-    SECTION("Sign bit extraction") {
-        REQUIRE(get_sign(P_INF) == false);
-        REQUIRE(get_sign(N_INF) == true);
-        REQUIRE(get_sign(P_NaN) == false);
-        REQUIRE(get_sign(N_NaN) == true);
+TEST_CASE("IEEE 754 - 特殊值判定") {
+    SECTION("NaN 检测") {
+        REQUIRE(checkNan(P_NaN));
+        REQUIRE(checkNan(N_NaN));
+        REQUIRE_FALSE(checkNan(P_INF));
+        REQUIRE_FALSE(checkNan(N_INF));
+        REQUIRE_FALSE(checkNan(0));
     }
 
-    SECTION("Exponent extraction") {
-        REQUIRE(get_exponent(P_INF) == 1024); // 2047 - 1023 = 1024
-        REQUIRE(get_exponent(N_INF) == 1024);
-        REQUIRE(get_exponent(P_NaN) == 1024);
-        REQUIRE(get_exponent(N_NaN) == 1024);
+    SECTION("无穷检测") {
+        REQUIRE(checkInf(P_INF));
+        REQUIRE(checkInf(N_INF));
+        REQUIRE_FALSE(checkInf(P_NaN));
+        REQUIRE_FALSE(checkInf(N_NaN));
+        REQUIRE_FALSE(checkInf(0));
     }
 
-    SECTION("Significand extraction") {
-        REQUIRE(get_significand(P_INF) == 0);
-        REQUIRE(get_significand(N_INF) == 0);
-        REQUIRE(get_significand(P_NaN) == SIGNIFICAND_MSB_MASK);
-        REQUIRE(get_significand(N_NaN) == SIGNIFICAND_MSB_MASK);
-    }
-}
-
-TEST_CASE("IEEE 754 - Component Composition") {
-    SECTION("Sign composition") {
-        REQUIRE(make_sign(false) == 0ull);
-        REQUIRE(make_sign(true) == SIGN_MASK);
-    }
-
-    SECTION("Exponent composition") {
-        REQUIRE(make_exponent(0) == (static_cast<u64>(EXP_BIAS) << SIGNIFICAND_BITS));
-        REQUIRE(make_exponent(EXP_MAX) == (static_cast<u64>(EXP_MAX + EXP_BIAS) << SIGNIFICAND_BITS));
-        REQUIRE(make_exponent(EXP_MIN) == (static_cast<u64>(1) << SIGNIFICAND_BITS));
-    }
-
-    SECTION("Significand composition") {
-        REQUIRE(make_significand(0) == 0);
-        REQUIRE(make_significand(SIGNIFICAND_MASK) == SIGNIFICAND_MASK);
+    SECTION("位往返保持判定结果") {
+        const double nan = std::numeric_limits<double>::quiet_NaN();
+        const double inf = std::numeric_limits<double>::infinity();
+        REQUIRE(checkNan(doubleToBits(nan)));
+        REQUIRE(checkInf(doubleToBits(inf)));
+        REQUIRE(checkInf(doubleToBits(-inf)));
+        REQUIRE_FALSE(checkNan(doubleToBits(1.0)));
+        REQUIRE(bitsToDouble(doubleToBits(nan)) != bitsToDouble(doubleToBits(nan)));
     }
 }
 
-TEST_CASE("IEEE 754 - Special Value Checks") {
-    SECTION("NaN detection") {
-        REQUIRE(check_nan(P_NaN));
-        REQUIRE(check_nan(N_NaN));
-        REQUIRE_FALSE(check_nan(P_INF));
-        REQUIRE_FALSE(check_nan(N_INF));
-        REQUIRE_FALSE(check_nan(0));
+TEST_CASE("IEEE 754 - 分量提取") {
+    SECTION("符号位提取") {
+        REQUIRE_FALSE(hasSign(doubleToBits(1.0)));
+        REQUIRE(hasSign(doubleToBits(-1.0)));
+        REQUIRE(hasSign(N_INF));
+        REQUIRE_FALSE(hasSign(P_NaN));
     }
 
-    SECTION("Infinity detection") {
-        REQUIRE(check_inf(P_INF));
-        REQUIRE(check_inf(N_INF));
-        REQUIRE_FALSE(check_inf(P_NaN));
-        REQUIRE_FALSE(check_inf(N_NaN));
-        REQUIRE_FALSE(check_inf(0));
+    SECTION("指数提取") {
+        // 规格化数：raw - EXP_BIAS
+        REQUIRE(getExponent(doubleToBits(1.0)) == 0);
+        REQUIRE(getExponent(doubleToBits(2.0)) == 1);
+        REQUIRE(getExponent(doubleToBits(0.5)) == -1);
+
+        // 零/次规格化 raw==0 记为 EXP_MIN
+        REQUIRE(getExponent(0) == EXP_MIN);
+
+        // 全指数位：NaN 记 0、无穷记 9999（该头文件的哨兵约定）
+        REQUIRE(getExponent(P_NaN) == 0);
+        REQUIRE(getExponent(P_INF) == 9999);
+        REQUIRE(getExponent(N_INF) == 9999);
+    }
+
+    SECTION("尾数提取") {
+        REQUIRE(getSignificand(P_INF) == 0);
+        REQUIRE(getSignificand(P_NaN) == SIGNIFICAND_MSB_MASK);
+        REQUIRE(getSignificand(doubleToBits(1.0)) == 0);
     }
 }
 
-TEST_CASE("IEEE 754 - Double Class") {
-    SECTION("Construction from bits") {
-        Double pos_inf(P_INF);
-        REQUIRE(pos_inf.is_infinity());
-        REQUIRE_FALSE(pos_inf.sign());
-        REQUIRE(pos_inf.exponent() == 1024); // 2047 - 1023 = 1024
-        REQUIRE(pos_inf.significand() == 0);
-
-        Double neg_inf(N_INF);
-        REQUIRE(neg_inf.is_infinity());
-        REQUIRE(neg_inf.sign());
-        REQUIRE(neg_inf.exponent() == 1024); // 2047 - 1023 = 1024
-        REQUIRE(neg_inf.significand() == 0);
-
-        Double nan_val(P_NaN);
-        REQUIRE(nan_val.is_nan());
-        REQUIRE_FALSE(nan_val.is_finite());
+TEST_CASE("IEEE 754 - 分量合成") {
+    SECTION("符号合成") {
+        REQUIRE(makeSign(false) == 0ull);
+        REQUIRE(makeSign(true) == SIGN_MASK);
     }
 
-    SECTION("Construction from double") {
-        Double zero(0.0);
-        REQUIRE(zero.is_finite());
+    SECTION("指数合成") {
+        REQUIRE(makeExponent(0) == (static_cast<u64>(EXP_BIAS) << SIGNIFICAND_BITS));
+        REQUIRE(makeExponent(EXP_MAX) == (static_cast<u64>(EXP_MAX + EXP_BIAS) << SIGNIFICAND_BITS));
+        REQUIRE(makeExponent(EXP_MIN) == (static_cast<u64>(1) << SIGNIFICAND_BITS));
+    }
+
+    SECTION("尾数合成") {
+        REQUIRE(makeSignificand(0) == 0);
+        REQUIRE(makeSignificand(SIGNIFICAND_MASK) == SIGNIFICAND_MASK);
+        REQUIRE(makeSignificand(~0ull) == SIGNIFICAND_MASK);
+    }
+}
+
+TEST_CASE("IEEE 754 - Real 类") {
+    SECTION("从位模式构造") {
+        const Real posInf{ P_INF };
+        REQUIRE(posInf.isInfinity());
+        REQUIRE_FALSE(posInf.sign());
+        REQUIRE(posInf.significand() == 0);
+
+        const Real negInf{ N_INF };
+        REQUIRE(negInf.isInfinity());
+        REQUIRE(negInf.sign());
+
+        const Real nanVal{ P_NaN };
+        REQUIRE(nanVal.isNan());
+        REQUIRE_FALSE(nanVal.isFinite());
+    }
+
+    SECTION("从 double 构造") {
+        const Real zero{ 0.0 };
+        REQUIRE(zero.isFinite());
         REQUIRE_FALSE(zero.sign());
-        REQUIRE(zero.exponent() == -EXP_BIAS);
+        REQUIRE(zero.exponent() == EXP_MIN);
 
-        Double neg_zero(-0.0);
-        REQUIRE(neg_zero.is_finite());
-        REQUIRE(neg_zero.sign());
+        const Real negZero{ -0.0 };
+        REQUIRE(negZero.isFinite());
+        REQUIRE(negZero.sign());
 
-        Double one(1.0);
-        REQUIRE(one.is_finite());
+        const Real one{ 1.0 };
+        REQUIRE(one.isFinite());
         REQUIRE_FALSE(one.sign());
         REQUIRE(one.exponent() == 0);
     }
 
-    SECTION("Static factory methods") {
-        auto pos_inf = Double::positive_infinity();
-        REQUIRE(pos_inf.is_infinity());
-        REQUIRE_FALSE(pos_inf.sign());
-
-        auto neg_inf = Double::negative_infinity();
-        REQUIRE(neg_inf.is_infinity());
-        REQUIRE(neg_inf.sign());
-
-        auto qnan = Double::quiet_nan();
-        REQUIRE(qnan.is_nan());
-
-        auto snan = Double::signaling_nan();
-        REQUIRE(snan.is_nan());
-    }
-}
-
-TEST_CASE("IEEE 754 - Bit Manipulation Utilities") {
-    SECTION("Bit extraction") {
-        u64 test_val = 0b1010'1100'1110'0000ull;
-        REQUIRE(bit_extract(test_val, 4, 4) == 0b1110);
-        REQUIRE(bit_extract(test_val, 8, 4) == 0b1100);
-        REQUIRE(bit_extract(test_val, 0, 16) == test_val);
+    SECTION("静态工厂") {
+        REQUIRE(Real::positiveInf().isInfinity());
+        REQUIRE_FALSE(Real::positiveInf().sign());
+        REQUIRE(Real::negativeInf().isInfinity());
+        REQUIRE(Real::negativeInf().sign());
+        REQUIRE(Real::quietNan().isNan());
+        REQUIRE(Real::signalingNan().isNan());
     }
 
-    SECTION("Bit insertion") {
-        u64 base = 0b0000'0000'0000'0000ull;
-        u64 modified = bit_insert(base, 4, 4, 0b1010ull);
-        REQUIRE(bit_extract(modified, 4, 4) == 0b1010);
-
-        u64 complex = bit_insert(base, 8, 8, 0b1111'0000ull);
-        REQUIRE(bit_extract(complex, 8, 8) == 0b1111'0000);
-    }
-}
-
-TEST_CASE("IEEE 754 - C++20 Concepts") {
-    SECTION("IEEE754Double concept") {
-        static_assert(IEEE754Double<double>);
-        static_assert(!IEEE754Double<float>);
-        static_assert(!IEEE754Double<int>);
-        static_assert(!IEEE754Double<long double>);
-    }
-}
-
-TEST_CASE("IEEE 754 - Constexpr Support") {
-    SECTION("Compile-time evaluation") {
-        // Test that functions can be evaluated at compile time
-        constexpr bool test1 = check_nan(P_NaN);
-        constexpr bool test2 = check_inf(P_INF);
-        constexpr i32 exp = get_exponent(P_INF);
-        constexpr bool sign = get_sign(N_INF);
-        constexpr u64 bits = double_to_bits(1.0);
-
-        static_assert(test1 == true);
-        static_assert(test2 == true);
-        static_assert(exp == 1024); // 2047 - 1023 = 1024
-        static_assert(sign == true);
-
-        REQUIRE(test1);
-        REQUIRE(test2);
-        REQUIRE(exp == 1024); // 2047 - 1023 = 1024
-        REQUIRE(sign);
-    }
-
-    SECTION("Double class constexpr") {
-        constexpr Double pos_inf(P_INF);
-        static_assert(pos_inf.is_infinity());
-        static_assert(!pos_inf.sign());
-
-        constexpr Double zero(0.0);
-        static_assert(zero.is_finite());
-        static_assert(!zero.sign());
-
-        REQUIRE(pos_inf.is_infinity());
-        REQUIRE(zero.is_finite());
-    }
-}
-
-TEST_CASE("IEEE 754 - Real-world Values") {
-    SECTION("Common double values") {
-        // Test with actual double values
-        double values[] = { 1.0, -1.0, 0.5, -0.5, 2.0, -2.0, 42.0, -42.0 };
-
-        for(double val : values) {
-            Double d(val);
-            REQUIRE(d.is_finite());
-            REQUIRE(d.value() == val);
-
-            u64 bits = double_to_bits(val);
-            REQUIRE(d.bits() == bits);
-
-            double reconstructed = bits_to_double(bits);
-            REQUIRE(reconstructed == val);
+    SECTION("值与位往返") {
+        const double values[] = { 1.0, -1.0, 0.5, -0.5, 2.0, -2.0, 42.0, -42.0 };
+        for(const double val : values) {
+            const Real r{ val };
+            REQUIRE(r.isFinite());
+            REQUIRE(r.value() == val);
+            REQUIRE(r.bits() == doubleToBits(val));
+            REQUIRE(bitsToDouble(r.bits()) == val);
         }
     }
 
-    SECTION("Special double values") {
-        double inf = std::numeric_limits<double>::infinity();
-        double neg_inf = -std::numeric_limits<double>::infinity();
-        double nan = std::numeric_limits<double>::quiet_NaN();
+    SECTION("算术与比较") {
+        const Real a{ 10.5 }, b{ 2.5 };
+        REQUIRE((a + b).value() == Catch::Approx(13.0));
+        REQUIRE((a - b).value() == Catch::Approx(8.0));
+        REQUIRE((a * b).value() == Catch::Approx(26.25));
+        REQUIRE((a / b).value() == Catch::Approx(4.2));
 
-        Double d_inf(inf);
-        REQUIRE(d_inf.is_infinity());
-        REQUIRE_FALSE(d_inf.sign());
+        REQUIRE(a == Real{ 10.5 });
+        REQUIRE((b < a));
+        REQUIRE((a > b));
+        REQUIRE_FALSE(Real::quietNan() == Real::quietNan());
+    }
+}
 
-        Double d_neg_inf(neg_inf);
-        REQUIRE(d_neg_inf.is_infinity());
-        REQUIRE(d_neg_inf.sign());
+TEST_CASE("IEEE 754 - constexpr 支持") {
+    SECTION("编译期求值") {
+        constexpr bool nanIsNan = checkNan(P_NaN);
+        constexpr bool infIsInf = checkInf(P_INF);
+        constexpr u64 oneBits = doubleToBits(1.0);
 
-        Double d_nan(nan);
-        REQUIRE(d_nan.is_nan());
-        REQUIRE_FALSE(d_nan.is_finite());
+        static_assert(nanIsNan);
+        static_assert(infIsInf);
+        static_assert(oneBits == 0x3ff0'0000'0000'0000ull);
+        static_assert(getExponent(doubleToBits(1.0)) == 0);
+        static_assert(hasSign(N_INF));
+
+        REQUIRE(nanIsNan);
+        REQUIRE(infIsInf);
+    }
+
+    SECTION("Real 类 constexpr") {
+        constexpr Real posInf{ P_INF };
+        static_assert(posInf.isInfinity());
+        static_assert(!posInf.sign());
+
+        constexpr Real zero{ 0.0 };
+        static_assert(zero.isFinite());
+        static_assert(!zero.sign());
+
+        constexpr Real one{ 1.0 };
+        static_assert(one.exponent() == 0);
+
+        REQUIRE(posInf.isInfinity());
+        REQUIRE(zero.isFinite());
     }
 }

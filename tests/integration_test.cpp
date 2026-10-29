@@ -1,117 +1,149 @@
 /*
  * Copyright (c) 2024/12/18
  *
- * 集成测试 - 测试完整脚本执行流程
- * 注意：由于当前API限制，这个测试文件被简化了
+ * 集成测试 - 完整脚本执行流程
+ * 源码 → Parser → IRGenerator → run0 扁平字节码 → VM，多特性组合场景
+ * 经 VM 门面端到端执行后断言全局状态（与 interpreter_test 的单特性/错误路径互补）。
  */
 
 #include <catch.hpp>
 
-#include "common/SourceFile.hpp"
-#include "gen/IRGenerator.hpp"
-#include "parser/Parser.hpp"
-#include "parser/ast/AstBuilder.hpp"
-#include "stdlib/Print.hpp"
+#include "stdlib/ExceptionLib.hpp"
+#include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
 using namespace cial;
 
-TEST_CASE("集成测试 - 基本脚本解析") {
-    SECTION("简单表达式解析") {
-        Common::SourceFile sourceFile{};
-        Common::Result r{};
-        sourceFile.load(r, "1 + 2;");
+TEST_CASE("集成 - 函数与控制流组合") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
 
-        if(r.isFailed()) {
-            WARN("Failed to load source");
-            return;
+    vm.eval(R"(
+        function fib(n) {
+            if (n < 2) return n;
+            return fib(n - 1) + fib(n - 2);
         }
-
-        syntax::AstBuilder astBuilder{};
-        syntax::Parser parser{ sourceFile, astBuilder };
-        auto *globalNode = parser.parse(r);
-
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-    }
-
-    SECTION("变量声明解析") {
-        Common::SourceFile sourceFile{};
-        Common::Result r{};
-        sourceFile.load(r, "var x = 10;");
-
-        syntax::AstBuilder astBuilder{};
-        syntax::Parser parser{ sourceFile, astBuilder };
-        auto *globalNode = parser.parse(r);
-
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-    }
-
-    SECTION("函数声明解析") {
-        Common::SourceFile sourceFile{};
-        Common::Result r{};
-        sourceFile.load(r, "function add(a, b) { return a + b; }");
-
-        syntax::AstBuilder astBuilder{};
-        syntax::Parser parser{ sourceFile, astBuilder };
-        auto *globalNode = parser.parse(r);
-
-        REQUIRE(globalNode != nullptr);
-        REQUIRE_FALSE(r.isFailed());
-    }
-
-    SECTION("类声明解析") {
-        Common::SourceFile sourceFile{};
-        Common::Result r{};
-        sourceFile.load(r, "class MyClass { function A() {} }");
-
-        syntax::AstBuilder astBuilder{};
-        syntax::Parser parser{ sourceFile, astBuilder };
-        auto *globalNode = parser.parse(r);
-
-        REQUIRE(globalNode != nullptr);
-        for(const auto &msg : r.messages()) {
-            if(msg.isError()) {
-                INFO(msg.details());
-                INFO(msg.message());
-            }
+        function sum(a, b = 10) { return a + b; }
+        var r1 = fib(10);
+        var r2 = sum(5);
+        var total = 0;
+        for (var i = 1; i <= 10; i++) {
+            if (i % 2 == 0) continue;
+            total += i;
         }
-        REQUIRE_FALSE(r.isFailed());
-    }
+        var w = 0;
+        var k = 0;
+        while (k < 3) { k++; w += k; }
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("r1"_str) == 55);
+    REQUIRE(*vm.evalExpr<Integer>("r2"_str) == 15);
+    REQUIRE(*vm.evalExpr<Integer>("total"_str) == 25);
+    REQUIRE(*vm.evalExpr<Integer>("w"_str) == 6);
 }
 
-TEST_CASE("集成测试 - 代码生成和执行") {
-    SECTION("简单表达式执行") {
-        Common::SourceFile sourceFile{};
-        Common::Result r{};
-        sourceFile.load(r, "println(\"Hello World!\");");
+TEST_CASE("集成 - 容器与字符串组合") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
 
-        syntax::AstBuilder astBuilder{};
-        syntax::Parser parser{ sourceFile, astBuilder };
-        auto *globalNode = parser.parse(r);
-
-        if(r.isFailed() || globalNode == nullptr) {
-            WARN("Failed to parse");
-            return;
+    vm.eval(R"(
+        var arr = [3, 1, 2];
+        arr.push(4);
+        arr.sort();
+        var s = "";
+        for (var i = 0; i < arr.count; i++) {
+            s += arr[i] + ",";
         }
+        var d = %["a" >= 1, "b" >= 2];
+        d["c"] = 3;
+        var dc = d.count;
+        var up = "abc".toUpperCase();
+    )"_str);
 
-        inter::SymbolTable globalTable{};
-        inter::IRGenerator codeGen{ sourceFile, globalTable };
-        auto chunk = codeGen.parseAst(r, globalNode);
+    REQUIRE(*vm.evalExpr<Integer>("arr[0]"_str) == 1);
+    REQUIRE(*vm.evalExpr<Integer>("arr[3]"_str) == 4);
+    REQUIRE(*(*vm.evalExpr<String *>("s"_str)) == "1,2,3,4,"_str);
+    REQUIRE(*vm.evalExpr<Integer>("dc"_str) == 3);
+    REQUIRE(*vm.evalExpr<Integer>("d[\"c\"]"_str) == 3);
+    REQUIRE(*(*vm.evalExpr<String *>("up"_str)) == "ABC"_str);
+}
 
-        if(r.isFailed() || !chunk) {
-            WARN("Failed to generate code");
-            return;
+TEST_CASE("集成 - 类、继承、property 与异常组合") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+    stdlib::initExceptionClass(vm);
+
+    vm.eval(R"(
+        class Animal {
+            function speak() { return "..."; }
         }
+        class Dog extends Animal {
+            property tag { getter() { return "dog"; } }
+            function speak() { return "woof"; }
+            function describe() { return tag + " says " + this.speak(); }
+        }
+        var d = new Dog();
+        var sp = d.speak();
+        var de = d.describe();
+        var caught = 0;
+        var msg = "";
+        try {
+            throw new Exception("boom");
+        } catch(e) {
+            caught = 1;
+            msg = e.message;
+        }
+        var after = 1;
+    )"_str);
 
-        Runtime rt;
-        vm::VMState vm{ globalTable, rt };
+    REQUIRE(*(*vm.evalExpr<String *>("sp"_str)) == "woof"_str);
+    REQUIRE(*(*vm.evalExpr<String *>("de"_str)) == "dog says woof"_str);
+    REQUIRE(*vm.evalExpr<Integer>("caught"_str) == 1);
+    REQUIRE(*(*vm.evalExpr<String *>("msg"_str)) == "boom"_str);
+    REQUIRE(*vm.evalExpr<Integer>("after"_str) == 1);
+}
 
-        vm.global("println", stdlib::S_PrintlnFunction);
-        vm.allocCallFrame(chunk.get());
-        vm.run();
+TEST_CASE("集成 - with 语句写实例成员") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
 
-        REQUIRE(true); // 如果执行到这里说明没有崩溃
-    }
+    vm.eval(R"(
+        var obj = %["x" >= 0, "y" >= 0];
+        with (obj) {
+            .x = 42;
+            .y = .x + 1;
+        }
+        var x = obj.x;
+        var y = obj.y;
+    )"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("x"_str) == 42);
+    REQUIRE(*vm.evalExpr<Integer>("y"_str) == 43);
+}
+
+TEST_CASE("集成 - 同一 VM 跨脚本共享全局与函数") {
+    Runtime rt{};
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    vm.eval("var acc = 0; function add(n) { acc += n; return acc; }"_str);
+    vm.eval("add(2);"_str);
+    vm.eval("add(3);"_str);
+
+    REQUIRE(*vm.evalExpr<Integer>("acc"_str) == 5);
+    REQUIRE(*vm.evalExpr<Integer>("add(4)"_str) == 9);
 }

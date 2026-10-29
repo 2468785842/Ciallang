@@ -8,21 +8,22 @@
 
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"
-#include "parser/ast/AstBuilder.hpp"
 #include "parser/ast/DeclNode.hpp"
 #include "parser/ast/ExprNode.hpp"
 #include "parser/ast/StmtNode.hpp"
+#include "runtime/Context.hpp"
 
 using namespace cial;
 
 TEST_CASE("语句 - 变量声明语句") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
 
     SECTION("带初始化的变量声明") {
         sourceFile.load(r, "var x = 42;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -39,7 +40,7 @@ TEST_CASE("语句 - 变量声明语句") {
 
     SECTION("不带初始化的变量声明") {
         sourceFile.load(r, "var x;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -55,7 +56,7 @@ TEST_CASE("语句 - 变量声明语句") {
 
     SECTION("多个变量声明") {
         sourceFile.load(r, "var a = 1; var b = 2; var c = a + b;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -74,11 +75,12 @@ TEST_CASE("语句 - 变量声明语句") {
 TEST_CASE("语句 - 表达式语句") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
 
     SECTION("函数调用语句") {
         sourceFile.load(r, "print(\"hello\");");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -96,7 +98,7 @@ TEST_CASE("语句 - 表达式语句") {
 
     SECTION("赋值语句") {
         sourceFile.load(r, "x = 10;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -116,11 +118,12 @@ TEST_CASE("语句 - 表达式语句") {
 TEST_CASE("语句 - 代码块语句") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
 
     SECTION("空代码块") {
         sourceFile.load(r, "{}");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -138,7 +141,7 @@ TEST_CASE("语句 - 代码块语句") {
 
     SECTION("带语句的代码块") {
         sourceFile.load(r, "{ var x = 1; x = x + 1; }");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -156,7 +159,7 @@ TEST_CASE("语句 - 代码块语句") {
 
     SECTION("嵌套代码块") {
         sourceFile.load(r, "{ { var x = 1; } { var y = 2; } }");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -184,11 +187,12 @@ TEST_CASE("语句 - 代码块语句") {
 TEST_CASE("语句 - 条件语句") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
 
     SECTION("简单if语句") {
         sourceFile.load(r, "if (x > 0) x = 1;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -208,7 +212,7 @@ TEST_CASE("语句 - 条件语句") {
 
     SECTION("if-else语句") {
         sourceFile.load(r, "if (x > 0) x = 1; else x = -1;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -228,7 +232,7 @@ TEST_CASE("语句 - 条件语句") {
 
     SECTION("if-else if-else语句") {
         sourceFile.load(r, "if (x > 0) x = 1; else if (x < 0) x = -1; else x = 0;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -259,11 +263,12 @@ TEST_CASE("语句 - 条件语句") {
 TEST_CASE("语句 - 循环语句") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
 
     SECTION("while循环") {
         sourceFile.load(r, "while (i < 10) i = i + 1;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -282,7 +287,7 @@ TEST_CASE("语句 - 循环语句") {
 
     SECTION("带代码块的while循环") {
         sourceFile.load(r, "while (true) { break; continue; }");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -302,11 +307,12 @@ TEST_CASE("语句 - 循环语句") {
 TEST_CASE("语句 - 控制转移语句") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
 
     SECTION("break语句") {
         sourceFile.load(r, "break;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -323,7 +329,7 @@ TEST_CASE("语句 - 控制转移语句") {
 
     SECTION("continue语句") {
         sourceFile.load(r, "continue;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -340,7 +346,7 @@ TEST_CASE("语句 - 控制转移语句") {
 
     SECTION("return语句") {
         sourceFile.load(r, "return 42;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -358,7 +364,7 @@ TEST_CASE("语句 - 控制转移语句") {
 
     SECTION("无返回值return语句") {
         sourceFile.load(r, "return;");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);
@@ -378,11 +384,12 @@ TEST_CASE("语句 - 控制转移语句") {
 TEST_CASE("语句 - 复杂语句组合") {
     Common::SourceFile sourceFile{};
     Common::Result r{};
-    syntax::AstBuilder astBuilder{};
+    Runtime rt{};
+    Context context{ rt };
 
     SECTION("嵌套控制流") {
         sourceFile.load(r, "if (x > 0) { while (y < 10) { if (z == 5) break; y = y + 1; } }");
-        syntax::Parser parser{ sourceFile, astBuilder };
+        syntax::Parser parser{ sourceFile, context.pp() };
 
         auto *globalNode = parser.parse(r);
         REQUIRE(globalNode != nullptr);

@@ -1,322 +1,176 @@
 /*
  * Copyright (c) 2024/12/18
  *
- * 类型系统单元测试
+ * 类型系统单元测试（对准 Value 六类型动态值现代 API：
+ * 显式构造 / is* 谓词 / as* 转换（TJS2 语义）/ 算术与位运算）
  */
 
 #include <catch.hpp>
-#include <climits>
-#include <limits>
-#include <memory>
 
-#include "types/Object.hpp"
 #include "types/Octet.hpp"
-#include "types/String.hpp"
-#include "types/Types.hpp"
 #include "types/Value.hpp"
 
 using namespace cial;
 
-TEST_CASE("Value - 基本类型创建") {
-    SECTION("创建整数类型") {
-        cial::Value value{ static_cast<cial::Integer>(42) };
-        REQUIRE(value.type() == cial::ValueType::Integer);
-        REQUIRE(value.toInteger() == 42);
+TEST_CASE("类型系统 - 六类型构造与谓词") {
+    SECTION("整数") {
+        const Value value{ Integer{ 42 } };
+        REQUIRE(value.type() == ValueType::Integer);
         REQUIRE(value.isInteger());
         REQUIRE_FALSE(value.isReal());
         REQUIRE_FALSE(value.isString());
+        REQUIRE_FALSE(value.isOctet());
         REQUIRE_FALSE(value.isObject());
+        REQUIRE_FALSE(value.isVoid());
     }
 
-    SECTION("创建浮点数类型") {
-        cial::Value value{ static_cast<cial::Real>(3.14) };
-        REQUIRE(value.type() == cial::ValueType::Real);
-        REQUIRE(value.toReal() == Catch::Approx(3.14));
+    SECTION("实数") {
+        const Value value{ Real{ 3.14 } };
+        REQUIRE(value.type() == ValueType::Real);
         REQUIRE(value.isReal());
         REQUIRE_FALSE(value.isInteger());
         REQUIRE_FALSE(value.isString());
-        REQUIRE_FALSE(value.isObject());
     }
 
-    SECTION("创建字符串类型") {
-        cial::Value value = String::create("Hello World");
-        REQUIRE(value.type() == cial::ValueType::String);
-        REQUIRE(value.toString() != nullptr);
+    SECTION("字符串") {
+        const Value value{ "Hello World"_str };
+        REQUIRE(value.type() == ValueType::String);
         REQUIRE(value.isString());
         REQUIRE_FALSE(value.isInteger());
         REQUIRE_FALSE(value.isReal());
-        REQUIRE_FALSE(value.isObject());
     }
 
-    SECTION("创建Void类型") {
-        cial::Value value;
-        REQUIRE(value.type() == cial::ValueType::Void);
+    SECTION("Void 默认构造") {
+        const Value value{};
+        REQUIRE(value.type() == ValueType::Void);
         REQUIRE(value.isVoid());
         REQUIRE_FALSE(value.isInteger());
-        REQUIRE_FALSE(value.isReal());
-        REQUIRE_FALSE(value.isString());
         REQUIRE_FALSE(value.isObject());
     }
-}
 
-TEST_CASE("Value - 类型转换") {
-    SECTION("整数到浮点数转换") {
-        cial::Value intValue{ static_cast<cial::Integer>(42) };
-        REQUIRE(intValue.toInteger() == 42);
-
-        // 转换为浮点数
-        cial::Value realValue{ static_cast<cial::Real>(intValue.toInteger() * 1.0) };
-        REQUIRE(realValue.toReal() == 42.0);
-    }
-
-    SECTION("浮点数到整数转换") {
-        cial::Value realValue{ static_cast<cial::Real>(3.99) };
-        REQUIRE(realValue.toReal() == Catch::Approx(3.99));
-
-        // 转换为整数（截断）
-        cial::Value intValue{ static_cast<cial::Integer>(realValue.toReal()) };
-        REQUIRE(intValue.toInteger() == 3);
-    }
-
-    SECTION("字符串到整数转换") {
-        cial::Value strValue = String::create("123");
-        REQUIRE(strValue.toString() != nullptr);
-
-        // 字符串解析为整数
-        long long parsedInt = std::stoll(strValue.toString()->toStdStr());
-        cial::Value intValue{ static_cast<cial::Integer>(parsedInt) };
-        REQUIRE(intValue.toInteger() == 123);
-    }
-
-    SECTION("整数到字符串转换") {
-        cial::Value intValue{ static_cast<cial::Integer>(456) };
-        REQUIRE(intValue.toInteger() == 456);
-
-        // 整数转换为字符串
-        std::string str = std::to_string(intValue.toInteger());
-        cial::Value strValue = String::create(str.c_str(), str.size());
-        REQUIRE(strValue.toString() != nullptr);
+    SECTION("Octet") {
+        const u8 bytes[]{ 0x01, 0x02, 0x03, 0x04 };
+        const Value value{ Octet{ bytes, 4 } };
+        REQUIRE(value.type() == ValueType::Octet);
+        REQUIRE(value.isOctet());
+        REQUIRE_FALSE(value.isString());
+        REQUIRE_FALSE(value.isInteger());
     }
 }
 
-TEST_CASE("Value - 比较操作") {
-    SECTION("整数比较") {
-        cial::Value value1{ static_cast<cial::Integer>(10) };
-        cial::Value value2{ static_cast<cial::Integer>(20) };
-        cial::Value value3{ static_cast<cial::Integer>(10) };
-
-        REQUIRE(value1.toInteger() < value2.toInteger());
-        REQUIRE(value2.toInteger() > value1.toInteger());
-        REQUIRE(value1.toInteger() == value3.toInteger());
+TEST_CASE("类型系统 - as* 转换的 TJS2 语义") {
+    SECTION("整数原样取出") {
+        const Value value{ Integer{ 42 } };
+        REQUIRE(value.asInteger().unwrap() == 42);
     }
 
-    SECTION("浮点数比较") {
-        cial::Value value1{ static_cast<cial::Real>(1.5) };
-        cial::Value value2{ static_cast<cial::Real>(2.5) };
-        cial::Value value3{ static_cast<cial::Real>(1.5) };
-
-        REQUIRE(value1.toReal() < value2.toReal());
-        REQUIRE(value2.toReal() > value1.toReal());
-        REQUIRE(value1.toReal() == Catch::Approx(value3.toReal()));
+    SECTION("大整数不经 double 往返") {
+        const Value value{ Integer{ std::numeric_limits<i64>::max() } };
+        REQUIRE(value.asInteger().unwrap() == std::numeric_limits<i64>::max());
     }
 
-    SECTION("字符串比较") {
-        cial::Value value1 = String::create("apple");
-        cial::Value value2 = String::create("banana");
-        cial::Value value3 = String::create("apple");
-
-        REQUIRE(value1.toString() != nullptr);
-        REQUIRE(value2.toString() != nullptr);
-        REQUIRE(value3.toString() != nullptr);
-    }
-}
-
-TEST_CASE("Value - 算术运算") {
-    SECTION("整数算术运算") {
-        cial::Value a{ static_cast<cial::Integer>(10) };
-        cial::Value b{ static_cast<cial::Integer>(5) };
-
-        // 使用TjsValue的运算符
-        cial::Value addResult = a + b;
-        REQUIRE(addResult.toInteger() == 15);
-
-        cial::Value subResult = a - b;
-        REQUIRE(subResult.toInteger() == 5);
-
-        cial::Value mulResult = a * b;
-        REQUIRE(mulResult.toInteger() == 50);
-
-        cial::Value divResult = a / b;
-        REQUIRE(divResult.toInteger() == 2);
+    SECTION("Void 转 0") {
+        const Value value{};
+        REQUIRE(value.asInteger().unwrap() == 0);
     }
 
-    SECTION("浮点数算术运算") {
-        cial::Value a{ static_cast<cial::Real>(10.5) };
-        cial::Value b{ static_cast<cial::Real>(2.5) };
+    SECTION("实数转整数截断") {
+        const Value value{ Real{ 3.99 } };
+        REQUIRE(value.asInteger().unwrap() == 3);
+        REQUIRE(value.asReal().unwrap().value() == Catch::Approx(3.99));
+    }
 
-        cial::Value addResult = a + b;
-        REQUIRE(addResult.toReal() == Catch::Approx(13.0));
+    SECTION("字符串解析为整数") {
+        REQUIRE((Value{ "123"_str }).asInteger().unwrap() == 123);
+        REQUIRE((Value{ "-12"_str }).asInteger().unwrap() == -12);
+        REQUIRE((Value{ "abc"_str }).asInteger().isFailed());
+    }
 
-        cial::Value subResult = a - b;
-        REQUIRE(subResult.toReal() == Catch::Approx(8.0));
+    SECTION("字符串原样取出") {
+        const Value value{ "abc"_str };
+        REQUIRE(value.asString().unwrap()->toStdStr() == "abc");
+    }
 
-        cial::Value mulResult = a * b;
-        REQUIRE(mulResult.toReal() == Catch::Approx(26.25));
-
-        cial::Value divResult = a / b;
-        REQUIRE(divResult.toReal() == Catch::Approx(4.2));
+    SECTION("octet 不参与算术转换") {
+        const u8 bytes[]{ 0x01 };
+        const Value value{ Octet{ bytes, 1 } };
+        REQUIRE(value.asInteger().isFailed());
     }
 }
 
-// TEST_CASE("String - 字符串操作") {
-//     SECTION("字符串创建和访问") {
-//         auto v = String::create("Hello World");
-//         Ciallang::String str = *v.toString();
-//         REQUIRE(str == "Hello World");
-//         REQUIRE(str.length() == 11);
-//         REQUIRE_FALSE(str.empty());
-//     }
+TEST_CASE("类型系统 - 算术运算") {
+    SECTION("整数四则") {
+        const Value a{ Integer{ 10 } }, b{ Integer{ 5 } };
+        REQUIRE(a.add(b).unwrap().asInteger().unwrap() == 15);
+        REQUIRE(a.sub(b).unwrap().asInteger().unwrap() == 5);
+        REQUIRE(a.mul(b).unwrap().asInteger().unwrap() == 50);
+    }
 
-//     SECTION("空字符串") {
-//         auto v = String::create("");
-//         Ciallang::String emptyStr = *v.toString();
-//         REQUIRE(emptyStr == "");
-//         REQUIRE(emptyStr.length() == 0);
-//         REQUIRE(emptyStr.empty());
-//     }
+    SECTION("除法为实数除、整除为独立运算（TJS2 语义）") {
+        const Value a{ Integer{ 5 } }, b{ Integer{ 2 } };
+        REQUIRE(a.div(b).unwrap().asReal().unwrap().value() == Catch::Approx(2.5));
+        REQUIRE(a.idiv(b).unwrap().asInteger().unwrap() == 2);
+        REQUIRE(a.mod(b).unwrap().asInteger().unwrap() == 1);
+    }
 
-//     SECTION("字符串连接") {
-//         auto v1 = String::create("Hello");
-//         Ciallang::String str1 = *v1.toString();
-//         auto v2 = String::create(" World");
-//         Ciallang::String str2 = *v2.toString();
+    SECTION("实数与混合运算") {
+        const Value a{ Real{ 10.5 } }, b{ Real{ 2.5 } };
+        REQUIRE(a.add(b).unwrap().asReal().unwrap().value() == Catch::Approx(13.0));
+        REQUIRE(a.mul(b).unwrap().asReal().unwrap().value() == Catch::Approx(26.25));
 
-//         // 字符串连接
-//         std::string result = str1 + str2;
-//         Ciallang::String combined{ result };
-//         REQUIRE(combined == "Hello World");
-//     }
+        const Value mixed{ Integer{ 10 } };
+        REQUIRE(mixed.add(b).unwrap().asReal().unwrap().value() == Catch::Approx(12.5));
+    }
 
-//     SECTION("字符串比较") {
-//         Ciallang::String str1{ "apple" };
-//         Ciallang::String str2{ "banana" };
-//         Ciallang::String str3{ "apple" };
+    SECTION("字符串拼接") {
+        REQUIRE((Value{ "a"_str }).add(Value{ "b"_str }).unwrap().asString().unwrap()->toStdStr() == "ab");
+        REQUIRE((Value{ "n"_str }).add(Value{ Integer{ 1 } }).unwrap().asString().unwrap()->toStdStr() == "n1");
+    }
 
-//         REQUIRE(str1 == str3);
-//         REQUIRE(str1 != str2);
-//         REQUIRE(str1 < str2);
-//     }
-// }
+    SECTION("除零报 DivideByZero") {
+        const Value a{ Integer{ 1 } };
+        REQUIRE(a.div(Value{ Integer{ 0 } }).isFailed());
+        REQUIRE(a.idiv(Value{ Integer{ 0 } }).isFailed());
+        REQUIRE(a.mod(Value{ Integer{ 0 } }).isFailed());
+    }
 
-// TEST_CASE("Octet - 字节操作") {
-//     // 注意：TjsOctet没有公共访问方法，这里只测试创建
-//     SECTION("字节数组创建") {
-//         std::vector<u8> data{ 0x01, 0x02, 0x03, 0x04 };
-//         Ciallang::Octet octet{ data };
-//         REQUIRE(true); // 如果能创建成功就通过
-//     }
+    SECTION("octet 参与算术报 TypeError") {
+        const u8 bytes[]{ 0x01 };
+        const Value o{ Octet{ bytes, 1 } };
+        REQUIRE(o.add(Value{ Integer{ 1 } }).isFailed());
+    }
+}
 
-//     SECTION("空字节数组") {
-//         std::vector<u8> emptyData;
-//         Ciallang::Octet emptyOctet{ emptyData };
-//         REQUIRE(true); // 如果能创建成功就通过
-//     }
+TEST_CASE("类型系统 - 位运算") {
+    const Value a{ Integer{ 0b1100 } }, b{ Integer{ 0b1010 } };
 
-//     SECTION("字节数组访问") {
-//         std::vector<u8> data{ 0x10, 0x20, 0x30 };
-//         Ciallang::Octet octet{ data };
-//         REQUIRE(true); // 如果能创建成功就通过
-//     }
-// }
+    SECTION("与或非异或") {
+        REQUIRE(a.bitwiseAnd(b).unwrap().asInteger().unwrap() == 0b1000);
+        REQUIRE(a.bitwiseOr(b).unwrap().asInteger().unwrap() == 0b1110);
+        REQUIRE(a.bitwiseXor(b).unwrap().asInteger().unwrap() == 0b0110);
+    }
 
-// TEST_CASE("Object - 对象操作") {
-//     // 注意：Object是一个抽象基类，需要具体实现
-//     // 这里只测试基本功能
-//     SECTION("对象类型检查") {
-//         // Object是抽象类，无法直接实例化
-//         // 这个测试主要用于验证类型系统
-//         REQUIRE(true);
-//     }
-// }
+    SECTION("移位") {
+        const Value one{ Integer{ 1 } };
+        REQUIRE(one.bitwiseLeftShift(Value{ Integer{ 4 } }).unwrap().asInteger().unwrap() == 16);
+        REQUIRE(Value{ Integer{ -16 } }.bitwiseRightShift(Value{ Integer{ 2 } }).unwrap().asInteger().unwrap() == -4);
+    }
 
-// TEST_CASE("类型系统 - 混合类型操作") {
-//     SECTION("不同类型值存储") {
-//         // 创建不同类型的值
-//         Ciallang::Value intValue{ static_cast<Ciallang::Integer>(100) };
-//         Ciallang::Value realValue{ static_cast<Ciallang::Real>(3.14) };
-//         Ciallang::String str{ "test" };
-//         Ciallang::Value strValue{ str };
+    SECTION("非整数操作数按 TJS2 语义截断") {
+        REQUIRE(a.bitwiseAnd(Value{ Real{ 1.5 } }).unwrap().asInteger().unwrap() == 0);
+    }
+}
 
-//         // 验证类型
-//         REQUIRE(intValue.type() == Ciallang::ValueType::Integer);
-//         REQUIRE(realValue.type() == Ciallang::ValueType::Real);
-//         REQUIRE(strValue.type() == Ciallang::ValueType::String);
+TEST_CASE("类型系统 - 拷贝与赋值独立性") {
+    const Value original{ "payload"_str };
+    const Value copy = original;
+    REQUIRE(copy.asString().unwrap()->toStdStr() == "payload");
+    // 拷贝不得共享可变负载：改副本不影响原值
+    copy.asString().unwrap()->append("x"_str);
+    REQUIRE(original.asString().unwrap()->length() == 7);
 
-//         // 验证值
-//         REQUIRE(intValue.toInteger() == 100);
-//         REQUIRE(realValue.toReal() == Catch::Approx(3.14));
-//         REQUIRE(strValue.toString() != nullptr);
-//     }
-
-//     SECTION("类型检查和转换") {
-//         Ciallang::Value intValue{ static_cast<Ciallang::Integer>(42) };
-//         Ciallang::Value realValue{ static_cast<Ciallang::Real>(2.71) };
-//         Ciallang::String str{ "hello" };
-//         Ciallang::Value strValue{ str };
-
-//         // 类型检查
-//         REQUIRE(intValue.isInteger());
-//         REQUIRE(realValue.isReal());
-//         REQUIRE(strValue.isString());
-
-//         // 类型转换检查
-//         REQUIRE_FALSE(intValue.isReal());
-//         REQUIRE_FALSE(realValue.isInteger());
-//         REQUIRE_FALSE(strValue.isInteger());
-//     }
-// }
-
-// TEST_CASE("类型系统 - 边界值测试") {
-//     SECTION("整数边界值") {
-//         // 最小整数
-//         Ciallang::Value minInt{ static_cast<Ciallang::Integer>(LLONG_MIN) };
-//         REQUIRE(minInt.toInteger() == LLONG_MIN);
-
-//         // 最大整数
-//         Ciallang::Value maxInt{ static_cast<Ciallang::Integer>(LLONG_MAX) };
-//         REQUIRE(maxInt.toInteger() == LLONG_MAX);
-
-//         // 零
-//         Ciallang::Value zero{ static_cast<Ciallang::Integer>(0) };
-//         REQUIRE(zero.toInteger() == 0);
-//     }
-
-//     SECTION("浮点数边界值") {
-//         // 正无穷大
-//         Ciallang::Value posInf{ static_cast<Ciallang::Real>(std::numeric_limits<double>::infinity()) };
-//         REQUIRE(posInf.toReal() == std::numeric_limits<double>::infinity());
-
-//         // 负无穷大
-//         Ciallang::Value negInf{ static_cast<Ciallang::Real>(-std::numeric_limits<double>::infinity()) };
-//         REQUIRE(negInf.toReal() == -std::numeric_limits<double>::infinity());
-
-//         // NaN
-//         Ciallang::Value nan{ static_cast<Ciallang::Real>(std::numeric_limits<double>::quiet_NaN()) };
-//         REQUIRE(std::isnan(nan.toReal()));
-
-//         // 零
-//         Ciallang::Value zero{ static_cast<Ciallang::Real>(0.0) };
-//         REQUIRE(zero.toReal() == 0.0);
-//     }
-
-//     SECTION("字符串边界值") {
-//         // 空字符串
-//         Ciallang::String empty{ "" };
-//         REQUIRE(empty.empty());
-
-//         // 长字符串
-//         std::string longStr(1000, 'a');
-//         Ciallang::String longTjsStr{ longStr };
-//         REQUIRE(longTjsStr.length() == 1000);
-//     }
-// }
+    Value moved{ Integer{ 7 } };
+    const Value target = std::move(moved);
+    REQUIRE(moved.isVoid());
+    REQUIRE(target.asInteger().unwrap() == 7);
+}

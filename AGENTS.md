@@ -80,7 +80,7 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
 ```
 
 - 依赖经 vcpkg 管理（`vcpkg.json`）：Catch2、fmt、spdlog、utf8proc。
-- 测试共 120 个 TEST_CASE（19 文件；未启用的历史测试文件见 `tests/CMakeLists.txt`）。
+- 测试共 143 个 TEST_CASE（23 文件，全部登记在 `tests/CMakeLists.txt`）。
 - `tests/test_files/tjs2/` 下是原版 kirikiri 测试脚本，是兼容性的行为基准。
 
 ## 代码风格与惯例
@@ -121,8 +121,8 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
    `SharedPayload<String>`；见 `src/types/Value.hpp`、`String.hpp`。`asString()` 借用指针
    的寿命不能超过所属 Value，尤其禁止借用 `createValue()` 临时值（NewRegExp 曾因此丢 flags）。
    原生方法直接调用用 GMethodC/CallMethodV 分离接收者；提取为一等值时仍创建独立绑定。
-8. **tests/CMakeLists.txt 有 4 个被注释的测试文件**（statement/type_system/ieee/integration），
-   全绿 ≠ 全部测试通过，新增测试记得登记。
+8. **测试注册**：新增测试文件必须登记进 `tests/CMakeLists.txt` 的 SOURCES（历史上有 4 个
+   文件被注释禁用导致"全绿 ≠ 全部通过"，2026-10-29 已全部修复启用）。
 
 ## "我想改 X，先读什么"
 
