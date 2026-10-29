@@ -11,7 +11,9 @@ namespace cial::stdlib {
 
     namespace {
         RegExp *asRegExp(const Value &thisObj) {
-            return dynamic_cast<RegExp *>(thisObj.asObject().unwrap());
+            // typeId 直判替代 dynamic_cast（RegExp 为 final，二者等价），见 asArray 同注
+            auto *obj = thisObj.asObject().unwrap();
+            return obj->typeId() == TypeId::RegExp ? static_cast<RegExp *>(obj) : nullptr;
         }
 
         // 值 → 字符串（TJS2 ttstr(*param) 语义：void 得空串）
@@ -48,8 +50,7 @@ namespace cial::stdlib {
         }
 
         // TJS2 Array.split 的字符串模式：pattern 的每个字符都是分隔符（UTF-8 逐字符比较）
-        void splitCharsetInto(const String &pattern, const std::string &target, const bool purgeempty,
-                              Array *out) {
+        void splitCharsetInto(const String &pattern, const std::string &target, const bool purgeempty, Array *out) {
             Vec<std::string_view> delims;
             const char *p = pattern.getData();
             const u32 plen = pattern.length();
@@ -176,8 +177,7 @@ namespace cial::stdlib {
         std::string out;
         out.reserve(target.size());
         size_t last = 0;
-        for(auto it = std::sregex_iterator(target.begin(), target.end(), re->re);
-            it != std::sregex_iterator(); ++it) {
+        for(auto it = std::sregex_iterator(target.begin(), target.end(), re->re); it != std::sregex_iterator(); ++it) {
             const std::smatch &m = *it;
             const size_t pos = static_cast<size_t>(m.position(0));
             const size_t end = pos + static_cast<size_t>(m.length(0));

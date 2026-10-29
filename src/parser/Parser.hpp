@@ -192,14 +192,14 @@ namespace cial::syntax {
     static constinit FunctionDeclParser S_FunctionDeclParser{};
     static constinit ClassDeclParser S_ClassDeclParser{};
 
-    static constinit auto S_DeclParsers =
-        frozen::make_unordered_map<TokenType, const DeclParser *>({ { TokenType::Property, &S_PropertyDeclParser },
-                                                                    { TokenType::Var, &S_VarDeclParser },
-                                                                    // const 与 var 声明语法相同（const x = expr;），
-                                                                    // 复用 VarDeclParser；const 仅要求初始化（对齐原版）
-                                                                    { TokenType::Const, &S_VarDeclParser },
-                                                                    { TokenType::Function, &S_FunctionDeclParser },
-                                                                    { TokenType::Class, &S_ClassDeclParser } });
+    static constinit auto S_DeclParsers = frozen::make_unordered_map<TokenType, const DeclParser *>(
+        { { TokenType::Property, &S_PropertyDeclParser },
+          { TokenType::Var, &S_VarDeclParser },
+          // const 与 var 声明语法相同（const x = expr;），
+          // 复用 VarDeclParser；const 仅要求初始化（对齐原版）
+          { TokenType::Const, &S_VarDeclParser },
+          { TokenType::Function, &S_FunctionDeclParser },
+          { TokenType::Class, &S_ClassDeclParser } });
 
     /**
      * +----------------------------------------------------------------------------+
@@ -505,8 +505,8 @@ namespace cial::syntax {
         // 而 AssignToken::support 不认裸符号,导致被无条件包装成 AssignExprNode
         S_BitwiseOrBinOpParser{ Precedence::bitwise_or, false },
         S_BitwiseAndBinOpParser{ Precedence::bitwise_and, false },
-        S_BitwiseXorBinOpParser{ Precedence::bitwise_xor, false },
-        S_EqualityBinOpParser{ Precedence::equality, false }, S_RelationalBinOpParser{ Precedence::relational, false },
+        S_BitwiseXorBinOpParser{ Precedence::bitwise_xor, false }, S_EqualityBinOpParser{ Precedence::equality, false },
+        S_RelationalBinOpParser{ Precedence::relational, false },
         S_LogicalOrBinOpParser{ Precedence::logical_or, false }, S_SwapBinOpParser{ Precedence::swap, false },
         S_LogicalAndBinOpParser{ Precedence::logical_and, false }, S_OrderBinOpParser{ Precedence::comma, false },
         S_PostfixBinOpParser{ Precedence::postfix, false }, S_KeywordInfixBinOpParser{ Precedence::keyword, false };
@@ -562,6 +562,9 @@ namespace cial::syntax {
         { TokenType::Dot, &S_PostfixBinOpParser }, // .
         { TokenType::InContextOf, &S_KeywordInfixBinOpParser }, // "incontextof"
         { TokenType::Instanceof, &S_KeywordInfixBinOpParser }, // "instanceof"
+        // "in"（tjs.y:661 与 instanceof 同级）：原版保留字，codegen 无 T_IN 分支
+        // ——节点与操作数均不求值，整体为 void（语义由 IRGenerator 落实）
+        { TokenType::In, &S_KeywordInfixBinOpParser },
         { TokenType::Isvalid, &S_UnaryInfixParser }, // "isvalid"
         { TokenType::Decrement, &S_UnaryInfixParser }, // "--"
         { TokenType::Increment, &S_UnaryInfixParser }, // "++"

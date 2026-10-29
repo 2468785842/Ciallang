@@ -17,7 +17,7 @@
 | 整数字面量 | 十进制、`0x` 十六进制 | ✅ |
 | 实数字面量 | `1.5`、`1e3`、`1.5e-3`；十六进制浮点 `0x1.07CCp14`、二进制浮点 `0b1.1`（p 指数，C99 同构） | ✅ |
 | 字符串 `"..."` / `'...'` | 单双等价；`\` 转义（`\n \t \\ \"` 等） | ✅ |
-| 模板/逐字字符串 `@"..."` | 逐字转义；**内嵌表达式** `&expr;`（求值嵌入）与 `$expr;`（表达式结果再作为内嵌表达式求值） | ◐（模板串已实现；内嵌表达式语义对齐中） |
+| 模板/逐字字符串 `@"..."` | **内嵌表达式** `&expr;` 与 `${expr}` 求值嵌入；`\&`/`\$` 转义不展开；裸 `$`（未紧跟 `{`）为普通文本 | ✅（2026-10-29 对拍 tjsLex.cpp:309-325 定论：仅 `&` 与 `${` 两种形态，行为锁定测试见 `tests/compat_reserved_test.cpp`） |
 | 正则字面量 `/re/flags` | 与除法 `/` 的歧义由语法状态消解（`SetStartOfRegExp`，tjs.y/词法配合） | ✅（lexer 按前 token 判别；flags g/i 生效，`l` 忽略——对齐 TJS2） |
 | 保留字 | `var const if else while do for continue break switch case default function return class extends property setter getter try catch throw debugger new invalidate isvalid delete typeof void null true false global this super int real string incontextof instanceof in` 等 | 词法层 ✅ |
 
@@ -45,7 +45,7 @@
 | Real | double | ✅ |
 | String | `"..."`（16 位字符语义） | ✅（内部 UTF-8） |
 | Object | `null`（空闭包）、对象/函数/类/数组/字典 | ✅（Array/Dictionary 类缺失，见标准库） |
-| Octet | `<% 00 01 ff %>` 十六进制字节流 | ❌ 字面量（类型已实现） |
+| Octet | `<% 00 01 ff %>` 十六进制字节流 | ✅ |
 | `true` / `false` | 布尔（编译为 Integer 1/0 语义） | ✅ |
 | `Infinity` / `-Infinity` | | ✅ |
 
@@ -70,7 +70,7 @@
 | 12 | 加减 `+ -`（`+` 对字符串为连接） | ✅ |
 | 13 | 乘除类 `% / \ *`（`\` 整除；`*` 与前缀属性访问歧义经专门产生式 `mul_div_expr_and_asterisk` 消解） | ✅ |
 | 14 | **一元前缀** `! ~ ++ -- new invalidate isvalid delete typeof # $ + - & *` | ✅（`&` 取属性本体不触发 getter、`*` 解引用调 getter/setter，引用须存局部变量） |
-| 14′ | **一元中缀式** `A instanceof B`（B 为类名）、`A in B`（成员存在判断） | ◐：instanceof ✅（基础类型按类型名匹配，Number 覆盖 Integer/Real）；`in` ❌ |
+| 14′ | **一元中缀式** `A instanceof B`（B 为类名）、`A in B` | instanceof ✅（基础类型按类型名匹配，Number 覆盖 Integer/Real）；`in` ✅（保留字行为对齐：原版 codegen 无 T_IN 分支，节点与操作数均不求值、结果为 void，2026-10-29 实测定论；勿实现成成员存在判断） |
 | 15 | `A isvalid`（**后缀**形态，与前缀并存）、`A incontextof B`（**右结合**，替换函数闭包的 this） | ◐：incontextof ✅；后缀 isvalid ✅ |
 | 16 | **类型转换** `(int)A (real)A (string)A` 或裸 `int A real A string A` | ✅ |
 | 17 | **后缀**：调用 `f(args)`、成员 `.sym`（含 `.` 起始的裸词链）、下标 `a[i]`（通用路径：数组/字典/字符串；可写，越界扩展）、后缀 `++ --`（表达式值为旧值；成员形态走 getter/setter 链）、**即时求值 `A !`**（把 A 的字符串值作为 TJS 表达式编译执行） | 全部 ✅：`() . -- ++ []`；后缀 `!` 即时求值（A 字符串化为表达式编译执行，空串原值不变，2026-10-26） |
@@ -94,7 +94,7 @@
 |---|---|---|
 | 空语句 `;` | | ✅ |
 | 表达式语句 | | ✅ |
-| `var` 声明 | `var a, b = expr;`；可带类型注解 `var a:int`（注解仅文档性） | ◐：核心与 `const` 声明 ✅（const 与 var 等价，只读性不强制）；注解 ❌ |
+| `var` 声明 | `var a, b = expr;`；可带类型注解 `var a:int`（注解仅文档性） | ✅（const 与 var 等价，只读性不强制）；类型注解 ✅（2026-10-29：var/函数参数/函数返回值/getter/setter 全位解析并丢弃，对齐 tjs.y:339 "Ignore types"） |
 | `if (e) s [else s]` | | ✅ |
 | `while (e) s` | | ✅ |
 | `do s while (e);` | | ✅ |
@@ -113,9 +113,9 @@
 ## 6. 函数
 
 ```
-function 名(参数表) { … }          // 声明（顶层/成员）
-function (参数表) { … }            // 函数表达式（值）
-参数:  名字 [= 默认值表达式]        // 默认值：实参为 void 时求值
+function 名(参数表) [: 类型] { … }   // 声明（顶层/成员；返回值类型注解，文档性）
+function (参数表) [: 类型] { … }     // 函数表达式（值）
+参数:  名字 [: 类型] [= 默认值表达式]  // 默认值：实参为 void 时求值；类型注解文档性
        *                        // 匿名收拢：多余实参打包 Array
        名字*                     // 命名收拢
 调用:  f(a, b, ...)               // ... 省略：透传当前函数全部实参
@@ -156,7 +156,7 @@ class 类名 extends 父类1, 父类2 … {   // 多继承，后面的覆盖前�
 (const)[ … ] / (const)%[ … ]  // 常量形：元素须为编译期常量，编译时构建真实 Array/Dictionary 常量
 ```
 
-状态：全部 ❌（依赖 Array/Dictionary 类型，见 [compatibility.md](compatibility.md)）。
+状态：全部 ✅（Array/Dictionary 字面量 2026-10-24 批次接入，`(const)` 常量形同批）。
 
 ## 9. 标准库概览（详细对照见 compatibility.md）
 
@@ -166,4 +166,5 @@ Xorshift 与 `Math.RandomGenerator` MT19937）`Date`（bison 日期文法 `tjsda
 
 Ciallang 现状：`print/println` ✅、String 大部 ✅（replace/split/escape/trim/…，见 compatibility.md）、
 Array/Dictionary 字面量+主要方法 ✅、RegExp `/pattern/flags` 字面量+全部方法/实例属性 ✅、
-Exception ✅；Math/Date/Octet pack 系 ❌。
+Exception ✅；Math（含 RandomGenerator MT19937）/Date（parse 完整文法）/Octet pack 系 ✅
+（逐库状态与已知偏差见 [compatibility.md](compatibility.md) §3）。

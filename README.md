@@ -13,7 +13,7 @@
 ### 🔧 核心特性
   * [x] `JIT` 即时编译基础（可选 x64 整数原生代码后端，默认关闭；`--jit`，范围与构建见 [doc/jit.md](doc/jit.md)）
   * [x] `CFG` 控制流图生成（基本块级，含跳转/终止/try 隐式异常边，`src/gen/ControlFlowGraph.cpp`）
-  * [ ] `SSA` 静态单赋值构造
+  * [x] `SSA` 静态单赋值构造（按需分析：支配树/pruned phi/重命名/def-use 链，`--dump-ssa`，见 [doc/ssa.md](doc/ssa.md)；执行 IR 尚未切换为 SSA，基于 SSA 的优化待后续）
   * [x] `常量传播` 与块间状态分析（块内溢出安全整数折叠 + 唯一前驱块间继承，`src/gen/Optimizer.cpp`）
   * [x] `死代码消除`（活跃性分析驱动的死 `LoadImm` 清理；常量池 `Load` 因实例化对象保守保留）
   * [x] `循环优化`（回边检测——支配树 + 自然循环识别，`ControlFlowGraph::getLoops()`；循环体变换待后续）
@@ -31,7 +31,7 @@
 * [x] `@if` `@endif`
 
 #### 语法结构
-* [x] `var` / `const` 变量声明与使用（const 须初始化；赋值放行——对齐原版 tjs.y 设计现状）
+* [x] `var` / `const` 变量声明与使用（const 须初始化；赋值放行——对齐原版 tjs.y 设计现状；类型注解 `var a:int` 文档性解析并丢弃——对齐 tjs.y:339 "Ignore types"）
 * [x] `if`
 * [x] `while`
 * [x] `do while`
@@ -91,6 +91,7 @@
 * [x] `A operator` 后缀单目运算符 `[]`（数组/字典/字符串通用下标读写）
 * [x] `A operator` 后缀单目运算符 `!`（即时求值：A 的字符串值作为 TJS 表达式编译执行；空串原值不变）
 * [x] `A instanceof B` 实例判断运算符
+* [x] `A in B`（保留字：对齐原版——操作数不求值、结果 void，勿当成成员存在判断）
 * [x] `A incontextof B` 上下文替换运算符
 
 ---

@@ -15,6 +15,7 @@ configure_file(test_config.h.in test_config.h)
 
 set(SOURCES
         fuzz_regress_test.cpp
+        compat_reserved_test.cpp
         expression_test.cpp
         function_test.cpp
         native_function_test.cpp

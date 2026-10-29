@@ -107,15 +107,13 @@ namespace cial::syntax {
                     // `...`：省略透传（tjs.y T_OMIT → AddOmitArg）
                     Token omitToken{};
                     parser->consume(r, omitToken);
-                    node->arguments.push_back(
-                        parser->astBuilder()->makeNode<OmitArgExprNode>(omitToken));
+                    node->arguments.push_back(parser->astBuilder()->makeNode<OmitArgExprNode>(omitToken));
                     expectArgument = false;
                 } else if(parser->peek(r, TokenType::Asterisk)) {
                     // 裸 `*`：未命名展开（旧版 fatUnnamedExpand）
                     Token starToken{};
                     parser->consume(r, starToken);
-                    node->arguments.push_back(
-                        parser->astBuilder()->makeNode<ExpandArgExprNode>(starToken, nullptr));
+                    node->arguments.push_back(parser->astBuilder()->makeNode<ExpandArgExprNode>(starToken, nullptr));
                     expectArgument = false;
                 } else {
                     const bool expand = argEndsWithTopLevelAsterisk(r, parser);
@@ -130,8 +128,7 @@ namespace cial::syntax {
                         Token starToken{};
                         if(!parser->expect(r, TokenType::Asterisk))
                             return false;
-                        node->arguments.push_back(
-                            parser->astBuilder()->makeNode<ExpandArgExprNode>(starToken, expr));
+                        node->arguments.push_back(parser->astBuilder()->makeNode<ExpandArgExprNode>(starToken, expr));
                     } else {
                         node->arguments.push_back(expr);
                     }
@@ -152,6 +149,21 @@ namespace cial::syntax {
         }
 
         return true;
+    }
+
+    // tjs.y:339 variable_type：`":" symbol|void|int|real|string|/octet`，原作者注释
+    // "It is not currently effect. Ignore types."——仅接受并丢弃，不进 AST
+    static void parseTypeAnnotation(Result &r, Parser *parser, const SourceLocation &location) {
+        if(!parser->peek(r, TokenType::Colon))
+            return;
+        parser->consume(r);
+
+        Token type{};
+        if(!parser->consume(r, type) ||
+           (type.type() != TokenType::Identifier && type.type() != TokenType::Void && type.type() != TokenType::Int &&
+            type.type() != TokenType::Real && type.type() != TokenType::String && type.type() != TokenType::Octet)) {
+            parser->error(r, "type annotation expect symbol or void/int/real/string/octet", location);
+        }
     }
 
     static bool parseParameters(Result &r, Parser *parser, Parameters &parameters, const SourceLocation &location) {
@@ -180,6 +192,9 @@ namespace cial::syntax {
             }
             Token identifier{};
             parser->consume(r, identifier);
+
+            // `a : type`（tjs.y func_decl_arg：variable_type 在默认值/收拢 `*` 之前）
+            parseTypeAnnotation(r, parser, identifier.location);
 
             // default value
             ExprNode *expr = nullptr;
@@ -575,6 +590,9 @@ namespace cial::syntax {
                         return nullptr;
                 }
 
+                // `getter() : type` / `getter : type`（tjs.y:450 variable_type）
+                parseTypeAnnotation(r, parser, getterToken.location);
+
                 if(!parser->peek(r, TokenType::LeftCurlyBrace)) {
                     parser->error(r, "getter expect token '{'", getterToken.location);
                     return nullptr;
@@ -626,6 +644,9 @@ namespace cial::syntax {
         Token identifier;
         parser->consume(r, identifier);
         const auto line = identifier.location;
+
+        // `var a : type`（tjs.y variable_id：variable_type，文档性忽略）
+        parseTypeAnnotation(r, parser, identifier.location);
 
         // const 必须初始化（对齐原版编译期行为：const E; 报错；赋值/自增等
         // 只读性原版不强制——实测全局/局部/for 递增全部放行）
@@ -685,6 +706,9 @@ namespace cial::syntax {
                 return nullptr;
             }
         }
+
+        // 返回值类型注解（tjs.y func_def：func_decl_arg_opt variable_type block）
+        parseTypeAnnotation(r, parser, token->location);
 
         if(!parser->peek(r, TokenType::LeftCurlyBrace)) {
             parser->error(r, "function expect {", token->location);
@@ -1056,8 +1080,8 @@ namespace cial::syntax {
                 auto *expr = parser->parseExpression(r, true);
                 if(!expr)
                     return nullptr;
-                initDecl = parser->astBuilder()->makeNode<StmtDeclNode>(
-                    parser->astBuilder()->makeNode<ExprStmtNode>(expr));
+                initDecl =
+                    parser->astBuilder()->makeNode<StmtDeclNode>(parser->astBuilder()->makeNode<ExprStmtNode>(expr));
             }
         }
         if(!initAteSemiColon && !parser->expect(r, TokenType::SemiColon))
@@ -1271,10 +1295,35 @@ namespace cial::syntax {
         return parser->astBuilder()->makeNode<ValueExprNode>(*token);
     }
 
+    // tjs.y:659 `"new" func_call_expr`：new 的操作数必须是调用。裸 `new A`（无括号）
+    // 原版为语法错误（实测 "syntax error, unexpected ;"），此处对齐；后缀
+    // Dot/Index 已剥壳豁免——`new A().m` / `new A()[0]` 等价 (new A()).m
+    static bool isNewOperandCallable(const ExprNode *node) {
+        for(;;) {
+            if(dynamic_cast<const ProcCallExprNode *>(node))
+                return true;
+            if(const auto *bin = dynamic_cast<const BinaryExprNode *>(node);
+               bin && bin->token.type() == TokenType::Dot) {
+                node = bin->lhs;
+                continue;
+            }
+            if(const auto *index = dynamic_cast<const IndexExprNode *>(node)) {
+                node = index->lhs;
+                continue;
+            }
+            return false;
+        }
+    }
+
     ExprNode *UnaryOperatorPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
         const auto *rhs = parser->parseExpression(r, true, _precedence);
         if(!rhs) {
             parser->error(r, "unary operator expects right-hand-side expression", token->location);
+            return nullptr;
+        }
+
+        if(token->type() == TokenType::New && !isNewOperandCallable(rhs)) {
+            parser->error(r, "operator new expects a call: new ClassName(...)", token->location);
             return nullptr;
         }
 
@@ -1303,14 +1352,12 @@ namespace cial::syntax {
         }
         // (int)x / (real)x / (string)x —— TJS 的括号内类型转换写法;
         // 语料中亦有 (int x) 无括号变体(test_variant.tjs),两种都接受
-        if(parser->peek(r, TokenType::Int) || parser->peek(r, TokenType::Real) ||
-           parser->peek(r, TokenType::String)) {
+        if(parser->peek(r, TokenType::Int) || parser->peek(r, TokenType::Real) || parser->peek(r, TokenType::String)) {
             Token castToken;
             parser->consume(r, castToken);
             // TJS 语法为 (int)expr —— 右括号在目标表达式之前;
             // 若括号内直接跟表达式((int tmp)),则右括号在表达式之后
-            if(!parser->peek(r, TokenType::RParenthesis) &&
-               !parser->peek(r, TokenType::LParenthesis)) {
+            if(!parser->peek(r, TokenType::RParenthesis) && !parser->peek(r, TokenType::LParenthesis)) {
                 // (int expr) 形态:表达式在括号内
                 const auto *inner = parser->parseExpression(r, true, Precedence::type);
                 if(!inner) {
@@ -1364,6 +1411,9 @@ namespace cial::syntax {
                 return nullptr;
             }
         }
+
+        // 返回值类型注解（tjs.y func_expr_def：func_decl_arg_opt variable_type block）
+        parseTypeAnnotation(r, parser, token->location);
 
         if(!parser->peek(r, TokenType::LeftCurlyBrace)) {
             parser->error(r, "function expect {", token->location);
@@ -1494,8 +1544,7 @@ namespace cial::syntax {
                 parser->consume(r, sym);
                 parser->consume(r); // ':'
                 consumedSeparator = true;
-                key = parser->astBuilder()->makeNode<ValueExprNode>(
-                    Token{ TokenType::ConstVal, sym.getString() });
+                key = parser->astBuilder()->makeNode<ValueExprNode>(Token{ TokenType::ConstVal, sym.getString() });
             }
             if(!key) {
                 // "k >= v" 形式（=> 的词形即 >=）：key 解析 floor 用 relational，

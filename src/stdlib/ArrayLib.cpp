@@ -14,7 +14,10 @@ namespace cial::stdlib {
 
     namespace {
         Array *asArray(const Value &thisObj) {
-            return dynamic_cast<Array *>(thisObj.asObject().unwrap());
+            // typeId 直判替代 dynamic_cast（Array 为 final，二者等价）：
+            // 原生方法热路径每次调用省一次 libc++abi RTTI 遍历
+            auto *obj = thisObj.asObject().unwrap();
+            return obj->typeId() == TypeId::Array ? static_cast<Array *>(obj) : nullptr;
         }
 
         // 数组元素 → 字符串（join 用）；TJS2 的字符串化语义
@@ -93,9 +96,7 @@ namespace cial::stdlib {
         return removed;
     }
 
-    void arrayErase(VM *, const Value &thisObj, size_t) {
-        asArray(thisObj)->elements.clear();
-    }
+    void arrayErase(VM *, const Value &thisObj, size_t) { asArray(thisObj)->elements.clear(); }
 
     void arrayReverse(VM *, const Value &thisObj, size_t) {
         auto *arr = asArray(thisObj);

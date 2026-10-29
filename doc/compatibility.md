@@ -13,14 +13,14 @@
 | 预处理 | @set / @if / @endif | ✅ |
 | 语句 | var/if/while/do-while/for/switch/try-catch/return/break/continue/function/property/class/debugger | ✅ |
 | 语句 | with | ✅（withStack 上下文栈，异常随帧截断）|
-| 语句 | for(const …)、var 类型注解 | ◐ for(const) ✅；const 声明 ✅（只读性不强制）；类型注解 ❌ |
+| 语句 | for(const …)、var 类型注解 | ✅ for(const)；const 声明（只读性不强制）；类型注解 `: symbol/void/int/real/string/octet`（var/函数参数/返回值/getter/setter 全位解析并丢弃——tjs.y:339 "Ignore types"，2026-10-29 对齐） |
 | 表达式 | 赋值全家（含 `<->`、`\|\|=`、`&&=`、`>>>=`）、?:、逻辑/位/比较/严格相等/移位/乘除整除 | ✅ |
 | 一元前缀 | `!` `new` `invalidate` `-` `~` `++` `--` `delete` `typeof` `#` `$` `+` `&` `*`（及前后缀 `isvalid`） | ✅ |
 | 一元后缀 | `()` `.` `++` `--` | ✅ |
 | 一元后缀 | `[]`（下标读写：数组/字典/字符串） | ✅ |
 | 一元后缀 | `!`（eval 即时求值，EvalStr 指令；嵌套 eval 可用） | ✅ |
 | 容器成员 | Array/Dictionary 方法面（sort/split/save/load/pack 系含） | ✅（逐方法状态见 §3 标准库兼容） |
-| 中缀 | instanceof / incontextof | ✅（instanceof 基础类型按类型名匹配）/ ✅；`in` ❌ |
+| 中缀 | instanceof / incontextof / `in` | instanceof ✅（基础类型按类型名匹配）/ incontextof ✅；`in` ✅ 保留字行为对齐（原版 codegen 无 T_IN 分支——节点与操作数均不求值、结果 void；官方リファレンス亦无此运算符，2026-10-29 实测定论，见 `tests/compat_reserved_test.cpp`） |
 | 字面量 | 全部标量（含 i64 大整数字面量精确解析）+ 函数表达式 + @"…" 模板串 | ✅ |
 | 字面量 | `[...]` Array、`%[...]` Dictionary、`<%%>` Octet、`(const)` 常量形 | ✅（`(const)` 运行时新建，与原版一致——tjs.y:795 查证原版无只读共享语义，2026-10-25 对齐） |
 | 后缀条件 | `expr if cond`（假条件整体不赋值，tjs.y expr 层级绑定） | ✅ |
@@ -86,3 +86,4 @@ P0–P4 全部完成（2026-10-27 字节码兼容 M4 收官）：run0 唯一执�
 性能对照见 doc/performance.md。
 
 - 2026-10-28：String.reverse 返回独立反转结果，接收者不变（UTF-8 按码点反转；TJS2 按 UTF-16 码元）。依据 `../TJSCompiler/src/syntax/tjsInterCodeExec.cpp` 的 reverse 分支及参考 CLI 对拍；实现见 `src/stdlib/StringLib.cpp`，回归见 `tests/native_function_test.cpp`。
+- 2026-10-29 查证定论批次：①`in` 为保留字——原版 tjsInterCodeGen 无 T_IN 分支，`A in B` 节点与操作数均不求值、结果 void（参考 CLI 实测 + 官方リファレンス无此运算符章节），本项目按同语义实现（`src/parser/Parser.hpp` infix 表 + `src/gen/IRGenerator.cpp` BinaryExprNode In 分支）；②类型注解（tjs.y:339 "Ignore types"）var/参数/返回值/getter/setter 全位解析并丢弃（`src/parser/Parser.cpp` parseTypeAnnotation）；③裸 `new A`（无括号）原版为语法错误（实测 "syntax error, unexpected ;"，tjs.y:659 `"new" func_call_expr`），本项目对齐为编译错误，`new A().m` 后缀豁免（`src/parser/Parser.cpp` isNewOperandCallable）；④模板串内嵌表达式仅 `&expr;` 与 `${expr}` 两形态，裸 `$` 为普通文本、`\&`/`\$` 转义不展开（tjsLex.cpp:309-325），与本项目实现逐项一致。行为锁定测试见 `tests/compat_reserved_test.cpp`。

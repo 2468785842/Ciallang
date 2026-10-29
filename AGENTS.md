@@ -82,7 +82,7 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
 ```
 
 - 依赖经 vcpkg 管理（`vcpkg.json`）：Catch2、fmt、spdlog、utf8proc。
-- 测试共 154 个 TEST_CASE（23 文件，全部登记在 `tests/CMakeLists.txt`）。
+- 测试共 198 个 TEST_CASE（24 文件，全部登记在 `tests/CMakeLists.txt`）。
 - `tests/test_files/tjs2/` 下是原版 kirikiri 测试脚本，是兼容性的行为基准。
 
 ## 代码风格与惯例

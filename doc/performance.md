@@ -61,6 +61,19 @@ string 84~85%），无回退。至此 fib 与 TJS2 同机比值首次进入 1.1�
 剩余差距在调用帧建立与参数窗口路径（CallV 实参直写已做，下一步可评估
 调用点参数寄存器直映）。
 
+## 2026-10-29 保留字语法批次后的 macOS 复核
+
+语言批次（`in`/类型注解/`new` 检查均为解析期改动，执行路径不变）后同机复测：
+fib 126~132% / native_methods 174~183% / loop_int 68% / string_concat ~100% /
+class_instantiate ~98%（预热 1 轮 + 交替 5~11 轮取 min，含进程启动），与
+2026-10-28 批次一致，无回退。native_methods 仍为最大缺口；采样（`sample`，5M
+迭代变体，861 样本）显示：解释器 dispatch 约 66%、`NativeFunction::callWithThis`
+调用链约 21%、Value 拷贝/析构约 12%；`asArray` 的 `dynamic_cast`（libc++abi
+RTTI 遍历）约 2%。据此把 Array/Dictionary/RegExp 三处接收者辅助改为 `typeId()`
+直判 + `static_cast`（final 类，二者等价，`src/stdlib/ArrayLib.cpp` 等）——
+严格更优但端到端在噪声带内（177% vs 182%），证实剩余差距在调用帧建立与
+实参窗口路径而非类型判断，与下文"下一步可评估调用点参数寄存器直映"结论一致。
+
 实现与回归来源：`src/gen/Optimizer.cpp`（比较融合）、`src/vm/VMState.cpp`（缓存和整型槽读写）、
 `src/types/Value.cpp` / `String.hpp`（紧凑短串）、`src/types/Function.cpp`（objthis 分离）、
 `tests/optimizer_test.cpp` / `native_function_test.cpp` / `value_storage_test.cpp`。

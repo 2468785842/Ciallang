@@ -10,7 +10,9 @@ namespace cial::stdlib {
 
     namespace {
         Dictionary *asDict(const Value &thisObj) {
-            return dynamic_cast<Dictionary *>(thisObj.asObject().unwrap());
+            // typeId 直判替代 dynamic_cast（Dictionary 为 final，二者等价），见 asArray 同注
+            auto *obj = thisObj.asObject().unwrap();
+            return obj->typeId() == TypeId::Dictionary ? static_cast<Dictionary *>(obj) : nullptr;
         }
 
         // 键统一字符串化（Atom 化）
@@ -34,9 +36,7 @@ namespace cial::stdlib {
         dst->members = src->members;
     }
 
-    void dictClear(VM *, const Value &thisObj, size_t) {
-        asDict(thisObj)->members.clear();
-    }
+    void dictClear(VM *, const Value &thisObj, size_t) { asDict(thisObj)->members.clear(); }
 
     Value dictErase(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
         if(argCount < 1)

@@ -124,6 +124,13 @@ namespace cial::inter {
     void IRGenerator::generate(const syntax::BinaryExprNode *node, OptReg &optReg) {
         using enum syntax::TokenType;
 
+        // tjs.y:661 `A in B`：原版保留字，tjsInterCodeGen 无 T_IN 分支，整个节点
+        // （含两侧操作数）不求值，结果寄存器为 void。行为对齐锁定，勿改成成员存在判断
+        if(node->token.type() == In) {
+            optReg = loadVoidReg();
+            return;
+        }
+
         if(node->token.type() == Dot) {
             Register reg1{ 0 };
             if(!expectValue(node->lhs, reg1))
@@ -405,8 +412,8 @@ namespace cial::inter {
                     error("prefix ++/-- expects identifier operand", node->location);
                     return;
                 }
-                generateIncDec(getAtomFromToken(identifier->token),
-                               node->token.type() == syntax::TokenType::Increment, optReg);
+                generateIncDec(getAtomFromToken(identifier->token), node->token.type() == syntax::TokenType::Increment,
+                               optReg);
                 break;
             }
             case syntax::TokenType::Sharp: {
@@ -677,10 +684,9 @@ namespace cial::inter {
         auto dst = allocateRegister();
 
         // `...`：省略透传（旧版 argc=-1）——转发本帧实际实参
-        const bool omitCall =
-            std::any_of(node->arguments.begin(), node->arguments.end(), [](const auto *expr) {
-                return dynamic_cast<const syntax::OmitArgExprNode *>(expr) != nullptr;
-            });
+        const bool omitCall = std::any_of(node->arguments.begin(), node->arguments.end(), [](const auto *expr) {
+            return dynamic_cast<const syntax::OmitArgExprNode *>(expr) != nullptr;
+        });
 
         // `expr*` / 裸 `*`：展开调用（旧版 argc=-2 条目表）
         bool expandCall = false;
@@ -746,8 +752,7 @@ namespace cial::inter {
                 entries.emplace_back(0, reg); // fatNormal
             }
             freeRegister(memberReg);
-            _chunk->emitRaw<CallExpand>(dst, memberReg, Integer{unnamedArgBase},
-                                        std::move(entries));
+            _chunk->emitRaw<CallExpand>(dst, memberReg, Integer{ unnamedArgBase }, std::move(entries));
             optReg = dst;
             return;
         }
@@ -869,8 +874,8 @@ namespace cial::inter {
             Register src{ 0 };
             if(!expectValue(node->rhs, src))
                 return;
-            _chunk->emit<DPropRawC>(objReg, getAtomFromToken(
-                dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs)->token), src);
+            _chunk->emit<DPropRawC>(
+                objReg, getAtomFromToken(dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs)->token), src);
             freeRegister(objReg);
             freeRegister(src);
             optReg = src;
@@ -1113,13 +1118,13 @@ namespace cial::inter {
                         ++paramIndex;
                     }
                 }
-                gen.unnamedArgBase = hasCollapse ? collapseBase
-                                                 : static_cast<u32>(node->constructor->parameters.size());
+                gen.unnamedArgBase =
+                    hasCollapse ? collapseBase : static_cast<u32>(node->constructor->parameters.size());
 
                 // collapse 参数收拢（旧版 FuncDeclCollapseBase）：本帧实际实参 %base..
                 // 收拢成 Array 落收拢参数寄存器；须在默认参数守卫前发射
                 if(hasCollapse)
-                    gen._chunk->emitRaw<CollapseArgs>(collapseReg, Integer{collapseBase});
+                    gen._chunk->emitRaw<CollapseArgs>(collapseReg, Integer{ collapseBase });
 
                 for(const auto &[paramReg, exprNode] : defaultParams) {
                     // 仅当实参为 void(未传)时才以默认值覆盖
@@ -1170,8 +1175,7 @@ namespace cial::inter {
             auto funChunk = _rt.createNoGC<vm::Chunk>(*genFinalize.parseAst(nullptr, ignoreReg));
             auto *finalize = _rt.createNoGC<FuncMeta>(0, funChunk, Vec<LocalVariable>{});
             finalize->syntheticFinalizer = true;
-            classMeta->setMember(MemberShapeMeta{ .name = finalizeAtom, .isMethod = true },
-                                 ClassFieldMeta{ finalize });
+            classMeta->setMember(MemberShapeMeta{ .name = finalizeAtom, .isMethod = true }, ClassFieldMeta{ finalize });
         }
         endScope();
         freeRegister(classReg);
@@ -1649,9 +1653,8 @@ namespace cial::inter {
             for(const auto &param : parameters) {
                 // 未命名 collapse（裸 `*`）名为空 Token：getString 解引用未初始化
                 // 载荷会段错误，落一个不会被引用的占位名
-                const auto varName = param.name.type() == syntax::TokenType::None
-                    ? _rt.atomTable.intern(String{})
-                    : getAtomFromToken(param.name);
+                const auto varName = param.name.type() == syntax::TokenType::None ? _rt.atomTable.intern(String{})
+                                                                                  : getAtomFromToken(param.name);
                 const Register paramReg = gen.allocateRegister();
                 if(param.collapse) {
                     // 收拢参数（`name*` / `*`，语法上必为最后一个）：
@@ -1672,7 +1675,7 @@ namespace cial::inter {
         // collapse 参数收拢（旧版 FuncDeclCollapseBase）：本帧实际实参 %base..
         // 收拢成 Array 落收拢参数寄存器；须在默认参数守卫前发射
         if(hasCollapse)
-            gen._chunk->emitRaw<CollapseArgs>(collapseReg, Integer{collapseBase});
+            gen._chunk->emitRaw<CollapseArgs>(collapseReg, Integer{ collapseBase });
 
         for(const auto &[paramReg, exprNode] : defaultParams) {
             // 默认参数语义（TJS2）：仅当对应实参为 void(未传)时才以默认值覆盖，
@@ -1707,8 +1710,8 @@ namespace cial::inter {
         }
 
         auto *chunk = _rt.createNoGC<vm::Chunk>(std::move(*funChunk));
-        auto *funcMeta = _rt.createNoGC<FuncMeta>(static_cast<u32>(parameters.size()), chunk,
-                                                  std::move(gen._localVars));
+        auto *funcMeta =
+            _rt.createNoGC<FuncMeta>(static_cast<u32>(parameters.size()), chunk, std::move(gen._localVars));
         funcMeta->hasCollapse = hasCollapse;
         return funcMeta;
     }
