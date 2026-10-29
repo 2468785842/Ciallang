@@ -14,8 +14,8 @@
 #pragma once
 
 #include <cstdlib>
-#include <type_traits>
 #include <fmt/format.h>
+#include <type_traits>
 
 #include "CallFrame.hpp"
 #include "Chunk.hpp"
@@ -102,6 +102,10 @@ namespace cial::vm {
 
         void push(const Value &v) const { *_pool.ptrAt(_pool.allocFrame(1)) = v; }
 
+        // 批量压入 n 个空槽并返回首槽指针：一次扩容检查替代 N 次 push 的逐次
+        // allocFrame；调用方必须立刻逐槽写满（池顶约定与 push 系一致）
+        Value *pushSlots(const size_t n) const { return _pool.ptrAt(_pool.allocFrame(n)); }
+
         void pop(const size_t count) const { _pool.freeFrame(count); }
 
         void makeClosure() { _curFrame->closure = _stackTop > 1 ? prevFrame() : nullptr; }
@@ -114,8 +118,7 @@ namespace cial::vm {
             if constexpr(std::is_same_v<T, Chunk>) {
                 _curFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, _pool, extraSlots };
             } else {
-                _curFrame = new(&_callStack[_stackTop++])
-                    CallFrame{ arg, ret, _pool, extraSlots, argWindowDirect };
+                _curFrame = new(&_callStack[_stackTop++]) CallFrame{ arg, ret, _pool, extraSlots, argWindowDirect };
             }
             _curFrame->withDepth = withStack.size();
         }
@@ -208,8 +211,8 @@ namespace cial::vm {
         CallFrame *_curFrame{ context.callStack() };
         CallFrame *_callStack{ context.callStack() };
         size_t &_stackTop{ context.stackTop() }; // callFrame count
-        CIAL_INLINE DispatchRet invokeCallV(CallFrame *cur, Value *regs, u16 dst, u16 func, const u16 *argRegs, u64 argc, u64 pc,
-                                const Value *receiver = nullptr);
+        CIAL_INLINE DispatchRet invokeCallV(CallFrame *cur, Value *regs, u16 dst, u16 func, const u16 *argRegs,
+                                            u64 argc, u64 pc, const Value *receiver = nullptr);
         struct NativeMemberCache {
             TypeId type{ TypeId::None };
             Atom atom{};

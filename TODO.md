@@ -28,7 +28,7 @@
 
 - [x] 可选整数 JIT / Trace JIT 基础：x64 原生代码、热点路径录制、整数/溢出/分支守卫和未提交状态回退；默认关闭，尚不覆盖对象与调用优化。见 `src/vm/IntegerJit.*`、`tests/jit_test.cpp`、`doc/jit.md`。
 - [x] 数值自尾递归：显式启用后复用安全的自身调用帧，支持两万层递归；try、对象、闭包和外部副作用保守回落。见 `src/vm/VMState.cpp`、`tests/tail_recursion_test.cpp`。
-- [ ] 原版性能追平：可选后端的正确性验证不代表已达到全程序性能目标，继续按同机对拍记录收益与回退。2026-10-29 macOS 复核：loop_int 68%/string ~100%/class ~98% 已持平或反超；fib 126~132%；native_methods 174~183% 为最大缺口（采样定位：解释器 dispatch ~66%、原生调用链 ~21%、Value 拷贝 ~12%；RTTI 遍历仅 ~2%，已改 typeId 直判但端到端在噪声内）——下一步集中在调用帧建立与实参窗口路径（调用点参数寄存器直映），见 doc/performance.md。
+- [ ] 原版性能追平：可选后端的正确性验证不代表已达到全程序性能目标，继续按同机对拍记录收益与回退。2026-10-29 调用路径批次后 macOS 对照：**fib 94~97%（首次追平）**、loop_int 68%、string ~100%、class ~96% 均持平或反超；native_methods 135~140% 为剩余缺口——大头在 NativeFn 回调协议（std::function 间接调用 + Value 拷贝语义），后续可评估函数指针化与 GMethodC+CallMethodV 合并单指令；采样与削减记录见 doc/performance.md。
 
 ## 三、语言特性缺口
 
@@ -52,6 +52,8 @@
 ## 已完成（摘要）
 
 > 细节见各提交信息；字节码批次见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)，性能见 doc/performance.md。
+
+- 2026-10-29 调用路径批次：原生同步调用免池快路径（NativeFunction dispatch 内同步完成返回 Continue，免主循环 FETCH_NEW_FRAME 重取）+ TypeId 增加 NativeFunction/Property 专有值并替换 loadGlobal/propObjectGet·Set 等六处热路径 dynamic_cast + 实参 placement new 栈直传（NativeFunction::callDirect，免池压弹与 getArgs 中转）；fib 与 TJS2 同机比值首次进入 ≤100%（94~97%），native_methods 183%→135~140%；留意栈数组禁默认初始化全槽的教训（Value 非平凡构造/析构）
 
 - 2026-10-29 保留字与文档性语法批次：`in` 保留字语义（void/不求值）+ 类型注解全位解析忽略 + 裸 `new` 编译错误对齐 + 模板串 `${}` 定论；文档状态修正（README SSA 勾选、syntax.md Octet 字面量/内联字面量/标准库滞后项）
 - 2026-10-29 常量传播与测试主线回归批次：整数常量 pass 升级为块间状态分析（唯一前驱块继承前驱出口常量状态，回边/多前驱/try handler 汇聚保守放弃）；CFG 增加支配树回边检测与自然循环识别（getLoops，循环体变换待后续）+ `cial --dump-cfg` 导出各 chunk 控制流图 DOT（回边标红/循环头高亮，可视化调试-控制流部分）；新增拷贝传播 pass（GLocal/DLocal 纯拷贝改写，变量读免家园寄存器拷贝，fib 函数块 14→10 条指令）+ DEL 扩展死拷贝清除；README 核心特性清单勾选 CFG/常量传播/死代码消除/循环优化（回边检测）；statement/type_system/ieee/integration 四个历史测试文件修复为现代 API 回归主线（120→154 用例）；Windows 首次双引擎基准与文档同步见 doc/performance.md；CI 首次推送运行，修复三处移植性问题后六配置全绿

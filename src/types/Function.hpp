@@ -54,6 +54,9 @@ namespace cial {
 
         NativeFunction(NativeFunction &&) = delete;
 
+        // 专有 TypeId：CallV/CallMethodV 用一次虚调用判型走原生同步快路径
+        [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::NativeFunction; }
+
         NativeFunction(const NativeFunction &rhs) noexcept :
             Object(Runtime::ATOM_FUNCTION), _callback(rhs._callback), _arity(rhs._arity) {}
 
@@ -75,6 +78,16 @@ namespace cial {
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void callWithThis(vm::VMState &vmState, u32 ret, size_t argCount, const Value &receiver);
+
+        // 免池直调：args 由调用方准备（栈数组，缺省参数已补位到 _arity），
+        // 结果返回给调用方写回，不经池顶窗口也不写寄存器
+        Value callDirect(vm::VMState &vmState, const Value &receiver, size_t argCount, Value *args) const;
+
+        [[nodiscard]] size_t arity() const noexcept { return _arity; }
+
+        // 共享原型上的绑定接收者（GMethodC 缓存命中的裸方法无绑定，为 void；
+        // propGetMember 现场生成的绑定方法持有接收者）
+        [[nodiscard]] const Value &boundThis() const noexcept { return _thisObj; }
 
         void marked() noexcept override {
             if(_marked)

@@ -203,8 +203,7 @@ namespace cial::vm {
                         if(auto *obj = _exValue.asObject().unwrap(); dynamic_cast<DataObject *>(obj)) {
                             const Atom msgAtom = rt.atomTable.intern("message"_str);
                             if(obj->hasProp(msgAtom)) {
-                                throw std::runtime_error(
-                                    fmt::format("{}{}", obj->getProp(msgAtom), suffix));
+                                throw std::runtime_error(fmt::format("{}{}", obj->getProp(msgAtom), suffix));
                             }
                         }
                     }
@@ -224,8 +223,9 @@ namespace cial::vm {
 
     static bool propObjectSet(VMState &vmState, const Value &src, const Value &dst) {
         if(dst.isObject()) {
-            if(const auto *prop = dynamic_cast<Property *>(dst.asObject().value())) {
-                prop->invokeSet(vmState, src);
+            // typeId 直判替代 dynamic_cast（Property 为 final，二者等价）
+            if(const auto *obj = dst.asObject().value(); obj->typeId() == TypeId::Property) {
+                static_cast<const Property *>(obj)->invokeSet(vmState, src);
                 return true;
             }
         }
@@ -235,8 +235,8 @@ namespace cial::vm {
     static bool propObjectGet(VMState &vmState, const Value &src, Value &dst) {
         if(src.isObject()) {
             if(const auto object = src.asObject().unwrap()) {
-                if(const auto *prop = dynamic_cast<Property *>(object)) {
-                    dst = prop->invokeGet(vmState);
+                if(object->typeId() == TypeId::Property) {
+                    dst = static_cast<const Property *>(object)->invokeGet(vmState);
                     return true;
                 }
             }
@@ -249,16 +249,15 @@ namespace cial::vm {
 
     // obj.member 读：原生成员（方法/count 属性）→ Global/Class/普通对象分支 →
     // 非对象值的原生 property 表。getter 经 invokeGet 嵌套 run0 同步完成，恒 Continue
-    static void propGetMember(VMState &vmState, CallFrame *cur, const Value &val, const Atom atom,
-                              Value &dst) {
+    static void propGetMember(VMState &vmState, CallFrame *cur, const Value &val, const Atom atom, Value &dst) {
         if(val.isObject()) {
             auto *obj = val.asObject().value();
 
             // Array/Dictionary/RegExp 的原生成员（方法 / count 属性）：与字符串原生表同机制；
             // 未命中落到对象自身 getProp（RegExp 的 matches/index 等状态属性走此路径）
             const TypeId tid = obj->typeId();
-            if(tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp ||
-               tid == TypeId::Math || tid == TypeId::Date || tid == TypeId::RandomGen) {
+            if(tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp || tid == TypeId::Math ||
+               tid == TypeId::Date || tid == TypeId::RandomGen) {
                 if(auto *getter = vmState.context.findProperty(tid, atom)) {
                     dst = getter(val);
                     return;
@@ -471,7 +470,8 @@ namespace cial::vm {
                     _pending = PendingCF::Throw;
                     const Atom excAtom = rt.atomTable.intern("Exception"_str);
                     bool wrapped = false;
-                    if(const Value *klassVal = context.global()->findPropRef(excAtom); klassVal && klassVal->isObject()) {
+                    if(const Value *klassVal = context.global()->findPropRef(excAtom);
+                       klassVal && klassVal->isObject()) {
                         if(auto *klass = dynamic_cast<ClassObject *>(klassVal->asObject().unwrap())) {
                             auto *obj = rt.create<DataObject>(this, klass).get();
                             obj->setProp(rt.atomTable.intern("message"_str), Value{ String{ e.what() } });
@@ -490,14 +490,13 @@ namespace cial::vm {
                         if(_exValue.isObject()) {
                             auto *obj = _exValue.asObject().unwrap();
                             if(obj->hasProp(msgAtom)) {
-                                obj->setProp(msgAtom, Value{ String{
-                                    fmt::format("{} (line {})", obj->getProp(msgAtom),
-                                                loc->start().line + 1) // AST 行号 0-based
-                                        .c_str() } });
+                                obj->setProp(msgAtom,
+                                             Value{ String{ fmt::format("{} (line {})", obj->getProp(msgAtom),
+                                                                        loc->start().line + 1) // AST 行号 0-based
+                                                                .c_str() } });
                             }
                         } else {
-                            _exValue = Value{
-                                String{ fmt::format("{} (line {})", _exValue, loc->start().line + 1) } };
+                            _exValue = Value{ String{ fmt::format("{} (line {})", _exValue, loc->start().line + 1) } };
                         }
                     }
                     cur->pc = pc;
@@ -725,8 +724,8 @@ namespace cial::vm {
             }
         }
         const String *str = strVal.asString().unwrap();
-        regs[r2] =
-            Value{ Integer{ str->isEmpty() ? 0 : static_cast<Integer>(static_cast<unsigned char>(str->getData()[0])) } };
+        regs[r2] = Value{ Integer{
+            str->isEmpty() ? 0 : static_cast<Integer>(static_cast<unsigned char>(str->getData()[0])) } };
         return DispatchRet::Continue;
     }
 
@@ -767,8 +766,7 @@ namespace cial::vm {
                 const auto objR = src.asObject();
                 if(objR.isOk() && objR.value()) {
                     const Atom name = objR.value()->getName();
-                    if(const auto *entry = rt.atomTable.get(name);
-                       entry && entry->str && entry->str->length() > 0) {
+                    if(const auto *entry = rt.atomTable.get(name); entry && entry->str && entry->str->length() > 0) {
                         regs[r2] = Value{ String{ entry->str->getData(), entry->str->length() } };
                     } else {
                         regs[r2] = Value{ String{ "Object" } };
@@ -809,7 +807,7 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc); // 函数
         const u16 r2 = read<u16>(ip, pc); // 新 this
         // incontextof 的对象可为脚本函数、原生函数或 property 闭包
-        //（TJS2 顶层 property 定义经 CHGTHIS 绑定 this=global）
+        // （TJS2 顶层 property 定义经 CHGTHIS 绑定 this=global）
         if(auto *fn = dynamic_cast<Function *>(regs[r1].asObject().unwrap())) {
             fn->thisObj = regs[r2].asObject().unwrap();
         } else if(auto *nativeFn = dynamic_cast<NativeFunction *>(regs[r1].asObject().unwrap())) {
@@ -856,8 +854,7 @@ namespace cial::vm {
         inter::IRGenerator codeGen{ r, rt, sourceFile };
         OptReg retReg{};
         Opt<vm::Chunk> compiled = codeGen.parseAst(node, retReg);
-        if(r.isFailed() || !compiled || !retReg || compiled->getRegCount() == 0
-           || compiled->getInstVec().empty())
+        if(r.isFailed() || !compiled || !retReg || compiled->getRegCount() == 0 || compiled->getInstVec().empty())
             throw std::runtime_error("cannot evaluate expression");
         // 表达式块以 Ret 收尾：返回值经 Ret 写回 tmp 帧槽位，嵌套 run0 在本帧
         // 弹出后即停（callValue 的帧契约——无 Ret 的块会由 run0 的"代码到末尾"
@@ -971,8 +968,10 @@ namespace cial::vm {
         if(const Value *g = cachedGlobal(atom)) {
             // Property 触发 getter 的慢路径之外,直接从槽位零拷贝取值。
             // 注意寄存器写入可能触发 setter 语义无关,只读安全;
-            // Property 调用可能修改 _props(重入),先拷出再降级慢路径
-            if(g->isObject() && dynamic_cast<const Property *>(g->asObject().unwrap()) != nullptr) {
+            // Property 调用可能修改 _props(重入),先拷出再降级慢路径。
+            // typeId 直判替代 dynamic_cast（Property 为 final，二者等价）：
+            // 循环体内的对象型全局读（如 arr.push 的 arr）每次省一次 RTTI 遍历
+            if(g->isObject() && g->asObject().unwrap()->typeId() == TypeId::Property) {
                 Value srcVal = *g;
                 propObjectGet(*this, srcVal, srcVal);
                 dst = srcVal;
@@ -1051,30 +1050,32 @@ namespace cial::vm {
     // ── 算术/位运算（三寄存器） ───────────────────────────────
     // 整数特化：双 int 时绕开 Ret<Value> 装配（optional 构造/析构），
     // 直接写寄存器槽——循环体算术的主路径
-#define DISPATCH_RRR_INT(op, optr, method) \
-    DISPATCH_OP_METHOD(op) { \
-        const u16 r1 = read<u16>(ip, pc); \
-        const u16 r2 = read<u16>(ip, pc); \
-        const u16 r3 = read<u16>(ip, pc); \
-        Value &a = regs[r1]; \
-        Value &b = regs[r2]; \
-        if(a.isIntegerFast() && b.isIntegerFast()) { \
-            const Integer result = a.asIntegerUnsafe() optr b.asIntegerUnsafe(); \
-            if(regs[r3].isIntegerFast()) regs[r3].asIntegerStore(result); \
-            else regs[r3] = Value{ result }; \
-            return DispatchRet::Continue; \
-        } \
-        regs[r3] = (a.method(b)).unwrap(); \
-        return DispatchRet::Continue; \
+#define DISPATCH_RRR_INT(op, optr, method)                                                                             \
+    DISPATCH_OP_METHOD(op) {                                                                                           \
+        const u16 r1 = read<u16>(ip, pc);                                                                              \
+        const u16 r2 = read<u16>(ip, pc);                                                                              \
+        const u16 r3 = read<u16>(ip, pc);                                                                              \
+        Value &a = regs[r1];                                                                                           \
+        Value &b = regs[r2];                                                                                           \
+        if(a.isIntegerFast() && b.isIntegerFast()) {                                                                   \
+            const Integer result = a.asIntegerUnsafe() optr b.asIntegerUnsafe();                                       \
+            if(regs[r3].isIntegerFast())                                                                               \
+                regs[r3].asIntegerStore(result);                                                                       \
+            else                                                                                                       \
+                regs[r3] = Value{ result };                                                                            \
+            return DispatchRet::Continue;                                                                              \
+        }                                                                                                              \
+        regs[r3] = (a.method(b)).unwrap();                                                                             \
+        return DispatchRet::Continue;                                                                                  \
     }
 
-#define DISPATCH_RRR(op, expr)                                                                                          \
-    DISPATCH_OP_METHOD(op) {                                                                                            \
-        const u16 r1 = read<u16>(ip, pc);                                                                               \
-        const u16 r2 = read<u16>(ip, pc);                                                                               \
-        const u16 r3 = read<u16>(ip, pc);                                                                               \
-        regs[r3] = (expr);                                                                                              \
-        return DispatchRet::Continue;                                                                                    \
+#define DISPATCH_RRR(op, expr)                                                                                         \
+    DISPATCH_OP_METHOD(op) {                                                                                           \
+        const u16 r1 = read<u16>(ip, pc);                                                                              \
+        const u16 r2 = read<u16>(ip, pc);                                                                              \
+        const u16 r3 = read<u16>(ip, pc);                                                                              \
+        regs[r3] = (expr);                                                                                             \
+        return DispatchRet::Continue;                                                                                  \
     }
 
     DISPATCH_RRR_INT(Add, +, add)
@@ -1092,13 +1093,13 @@ namespace cial::vm {
     DISPATCH_RRR(BurShift, (regs[r1].bitwiseUnsignedRightShift(regs[r2]).unwrap()))
 
     // ── 比较/逻辑（结果为 bool） ──────────────────────────────
-#define DISPATCH_CMP(op, expr)                                                                                          \
-    DISPATCH_OP_METHOD(op) {                                                                                            \
-        const u16 r1 = read<u16>(ip, pc);                                                                               \
-        const u16 r2 = read<u16>(ip, pc);                                                                               \
-        const u16 r3 = read<u16>(ip, pc);                                                                               \
-        regs[r3] = Value{ (expr) };                                                                                     \
-        return DispatchRet::Continue;                                                                                    \
+#define DISPATCH_CMP(op, expr)                                                                                         \
+    DISPATCH_OP_METHOD(op) {                                                                                           \
+        const u16 r1 = read<u16>(ip, pc);                                                                              \
+        const u16 r2 = read<u16>(ip, pc);                                                                              \
+        const u16 r3 = read<u16>(ip, pc);                                                                              \
+        regs[r3] = Value{ (expr) };                                                                                    \
+        return DispatchRet::Continue;                                                                                  \
     }
 
     DISPATCH_CMP(EQ, regs[r1].equals(regs[r2]))
@@ -1225,7 +1226,7 @@ namespace cial::vm {
     }
 
     // 自增/自减单指令（旧版 INC/DEC 基型）：int ±1 / real ±1.0、其余报错
-    //（TJS increment 语义；字符串不拼接）
+    // （TJS increment 语义；字符串不拼接）
     DISPATCH_OP_METHOD(Inc) {
         const u16 r1 = read<u16>(ip, pc);
         Value &v = regs[r1];
@@ -1487,8 +1488,8 @@ namespace cial::vm {
         const Value &funcVal = regs[func];
         if(funcVal.isObject()) {
             auto *callee = funcVal.asObject().unwrap();
-            // typeId 一次虚调用判型（替代 dynamic_cast）；NativeFunction 保持
-            // Object 标识走通用回落
+            // typeId 一次虚调用判型（替代 dynamic_cast）：Function 走直写压帧，
+            // NativeFunction 走免池同步快路径，其余回落通用 call
             if(callee->typeId() == TypeId::Function) {
                 auto *fn = static_cast<Function *>(callee);
                 const FuncMeta *meta = fn->meta;
@@ -1511,7 +1512,7 @@ namespace cial::vm {
                     w[i] = Value{}; // 缺位实参补 void（prologue TestVoid 守卫依赖）
                 if(needTail) {
                     // 超额实参/collapse 声明：全部实参按调用序备份到窗口尾区
-                    //（frameArg 读取源；CollapseArgs 写参数槽不丢原始值）
+                    // （frameArg 读取源；CollapseArgs 写参数槽不丢原始值）
                     const u16 tail = meta->chunk->getRegCount();
                     for(u32 j = 0; j < argc32; ++j)
                         w[tail + j] = regs[argRegs[j]];
@@ -1528,15 +1529,45 @@ namespace cial::vm {
                 cur->pc = pc;
                 return DispatchRet::Call;
             }
+
+            // 原生同步调用：回调在本次 dispatch 内同步完成，帧/chunk/寄存器窗口
+            // 均未变——返回 Continue 让主循环直接续内层取指（pc 已推进），免
+            // FETCH_NEW_FRAME 全段重取（toBytecode 幂等检查、chunk/regs/ip 重取）。
+            // 实参 placement new 到栈缓冲直传回调（免池压弹与 getArgs 中转）：
+            // 实参对象的 GC 根仍在调用者寄存器槽（回调期间不被覆盖），栈副本
+            // 无需注册；Value 具有非平凡构造/析构，禁止直接声明数组默认初始化
+            // 全部 64 槽（每次调用 1KB 冗余流量），只构造实际数量并在回调后析构
+            if(callee->typeId() == TypeId::NativeFunction) {
+                auto *nativeFn = static_cast<NativeFunction *>(callee);
+                constexpr u64 maxDirectArgs = 64;
+                alignas(Value) unsigned char argBuf[maxDirectArgs * sizeof(Value)];
+                Value *const localArgs = reinterpret_cast<Value *>(argBuf);
+                const u64 n = argc < maxDirectArgs ? argc : maxDirectArgs;
+                u64 built = 0;
+                for(; built < n; ++built)
+                    new(argBuf + built * sizeof(Value)) Value(regs[argRegs[built]]);
+                // 缺省参数：槽补 void 到 _arity（argCount 仍传实际 argc，
+                // 回调对尾部 void 做 TestVoid 判缺省，与 callWithThis 池顶
+                // [args..., void...] 布局等价）
+                const u64 full =
+                    static_cast<u64>(nativeFn->arity()) > argc ? static_cast<u64>(nativeFn->arity()) : argc;
+                for(; built < full && built < maxDirectArgs; ++built)
+                    new(argBuf + built * sizeof(Value)) Value();
+                cur->pc = pc;
+                const Value recv = receiver && !receiver->isVoid() ? *receiver : nativeFn->boundThis();
+                regs[dst] = nativeFn->callDirect(*this, recv, n, localArgs);
+                while(built > 0)
+                    localArgs[--built].~Value();
+                return DispatchRet::Continue;
+            }
         }
 
+        // 其余可调用对象（类对象 new/property 闭包/容器等，call 内压帧）：压栈 +
+        // 虚 call 旧路径（压帧约定：池顶实参区与被调 %0.. 重合），主循环重取新帧
         for(u64 i = 0; i < argc; ++i)
             push(regs[argRegs[i]]);
         cur->pc = pc;
-        if(receiver && !receiver->isVoid())
-            static_cast<NativeFunction *>(regs[func].asObject().unwrap())->callWithThis(*this, dst, argc, *receiver);
-        else
-            regs[func].asObject().unwrap()->call(*this, dst, argc);
+        regs[func].asObject().unwrap()->call(*this, dst, argc);
         return DispatchRet::Call;
     }
 
@@ -1556,7 +1587,7 @@ namespace cial::vm {
     // 未超额时 %0..%actualArgc-1 即实参（与池顶重合）
     static Value frameArg(CallFrame *cur, const Value *regs, const u32 i) {
         // collapse 声明的帧：Function::call 已把全部实参按调用序备份到尾区
-        //（CollapseArgs 会覆盖参数槽，原始值只在尾区）
+        // （CollapseArgs 会覆盖参数槽，原始值只在尾区）
         if(cur->funcMeta && cur->funcMeta->hasCollapse)
             return regs[cur->chunk->getRegCount() + i];
         if(cur->actualArgc > cur->funcMeta->arity)
@@ -1586,8 +1617,8 @@ namespace cial::vm {
     // 展开调用（旧版 argc=-2，TJS `f(1, arr*, *)`）：entries 逐条
     // Normal/Expand(Array 元素)/UnnamedExpand(本帧 unnamed 实参) 收集后统一压池
     DISPATCH_OP_METHOD(CallExpand) {
-        const u16 r1 = read<u16>(ip, pc);  // dst
-        const u16 r2 = read<u16>(ip, pc);  // func
+        const u16 r1 = read<u16>(ip, pc); // dst
+        const u16 r2 = read<u16>(ip, pc); // func
         const u64 unnamedBase = decodeUleb128(ip, pc, 10);
         const u64 count = decodeUleb128(ip, pc, 10);
         Vec<Value> args{};
@@ -1600,9 +1631,7 @@ namespace cial::vm {
                     break;
                 case 1: { // fatExpand：展开 Array 元素
                     const auto &obj = regs[reg];
-                    auto *arr = obj.isObject()
-                        ? dynamic_cast<Array *>(obj.asObject().unwrap())
-                        : nullptr;
+                    auto *arr = obj.isObject() ? dynamic_cast<Array *>(obj.asObject().unwrap()) : nullptr;
                     if(!arr)
                         throw std::runtime_error("expand call '*' expects an array");
                     for(auto &el : arr->elements)
@@ -1648,8 +1677,7 @@ namespace cial::vm {
         const auto &val = regs[r1];
         // 整数成员名（旧版 PropGetByNum，TJS `a[0]` 编译为 GPI+整数名）：数组下标
         if(regs[r2].isInteger()) {
-            auto *arr = val.isObject() ? dynamic_cast<Array *>(val.asObject().unwrap())
-                                       : nullptr;
+            auto *arr = val.isObject() ? dynamic_cast<Array *>(val.asObject().unwrap()) : nullptr;
             if(!arr)
                 throw std::runtime_error("integer member access expects an array");
             const auto i = regs[r2].asInteger().unwrap();
@@ -1679,7 +1707,8 @@ namespace cial::vm {
         const Atom atom{ read<u32>(ip, pc) };
         const u16 dst = read<u16>(ip, pc);
         const u16 receiver = read<u16>(ip, pc);
-        const Value value = regs[obj];
+        // 只读引用替代栈拷贝：native 判定/propGetMember 均不修改源槽
+        const Value &value = regs[obj];
         const TypeId type = ValueToTypeId::getId(value);
         const bool native = !value.isObject() || type == TypeId::Array || type == TypeId::Dictionary ||
             type == TypeId::RegExp || type == TypeId::Math || type == TypeId::Date || type == TypeId::RandomGen;
@@ -1697,9 +1726,9 @@ namespace cial::vm {
     }
 
     DISPATCH_OP_METHOD(GPropC) {
-        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
-        const u16 r3 = read<u16>(ip, pc);    // dst
+        const u16 r3 = read<u16>(ip, pc); // dst
         propGetMember(*this, cur, regs[r1], Atom{ atomV }, regs[r3]);
         return DispatchRet::Continue;
     }
@@ -1740,9 +1769,9 @@ namespace cial::vm {
 
     // 成员名编译期 Atom 直引（同 DProp，跳过名字寄存器与 dispatch 再 intern）
     DISPATCH_OP_METHOD(DPropC) {
-        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
-        const u16 r3 = read<u16>(ip, pc);    // src
+        const u16 r3 = read<u16>(ip, pc); // src
         if(propSetMember(*this, regs[r1], Atom{ atomV }, regs[r3])) {
             cur->pc = pc;
             return DispatchRet::Call;
@@ -1784,9 +1813,9 @@ namespace cial::vm {
     }
 
     DISPATCH_OP_METHOD(DPropRawC) {
-        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
-        const u16 r3 = read<u16>(ip, pc);    // src
+        const u16 r3 = read<u16>(ip, pc); // src
         const auto &objVal = regs[r1];
         if(!objVal.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
@@ -1811,9 +1840,9 @@ namespace cial::vm {
     }
 
     DISPATCH_OP_METHOD(DelPropC) {
-        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
-        const u16 r3 = read<u16>(ip, pc);    // dst
+        const u16 r3 = read<u16>(ip, pc); // dst
         const auto &objVal = regs[r1];
         if(!objVal.isObject()) {
             regs[r3] = Value{ Integer{ false } };
@@ -1831,8 +1860,7 @@ namespace cial::vm {
         const u16 r3 = read<u16>(ip, pc); // dst
         const auto &val = regs[r1];
         if(regs[r2].isInteger()) { // 整数成员名：数组下标读
-            auto *arr = val.isObject() ? dynamic_cast<Array *>(val.asObject().unwrap())
-                                       : nullptr;
+            auto *arr = val.isObject() ? dynamic_cast<Array *>(val.asObject().unwrap()) : nullptr;
             if(!arr)
                 throw std::runtime_error("integer member access expects an array");
             const size_t pos = arrayIndex(regs[r2].asInteger().unwrap(), arr->elements.size());
@@ -1850,9 +1878,9 @@ namespace cial::vm {
     }
 
     DISPATCH_OP_METHOD(GPropRawC) {
-        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
-        const u16 r3 = read<u16>(ip, pc);    // dst
+        const u16 r3 = read<u16>(ip, pc); // dst
         const auto &val = regs[r1];
         if(!val.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
@@ -1879,7 +1907,9 @@ namespace cial::vm {
         if(!propVal.isObject()) {
             throw std::runtime_error("'*' operand is not a property");
         }
-        auto *prop = dynamic_cast<Property *>(propVal.asObject().unwrap());
+        auto *prop = propVal.asObject().unwrap()->typeId() == TypeId::Property
+            ? static_cast<Property *>(propVal.asObject().unwrap())
+            : nullptr;
         if(!prop) {
             throw std::runtime_error("'*' operand is not a property");
         }
@@ -1896,7 +1926,9 @@ namespace cial::vm {
         if(!propVal.isObject()) {
             throw std::runtime_error("'*' operand is not a property");
         }
-        auto *prop = dynamic_cast<Property *>(propVal.asObject().unwrap());
+        auto *prop = propVal.asObject().unwrap()->typeId() == TypeId::Property
+            ? static_cast<Property *>(propVal.asObject().unwrap())
+            : nullptr;
         if(!prop) {
             throw std::runtime_error("'*' operand is not a property");
         }

@@ -125,6 +125,14 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
    原生方法直接调用用 GMethodC/CallMethodV 分离接收者；提取为一等值时仍创建独立绑定。
 8. **测试注册**：新增测试文件必须登记进 `tests/CMakeLists.txt` 的 SOURCES（历史上有 4 个
    文件被注释禁用导致"全绿 ≠ 全部通过"，2026-10-29 已全部修复启用）。
+9. **Value 具有非平凡构造/析构**：C++ 栈上声明 `Value arr[N]` 会对全部 N 槽默认
+   初始化并逐槽析构——热路径的变长实参缓冲必须 placement new 只构造实际数量
+   （见 `invokeCallV` 原生快路径；初版全槽默认初始化曾致 native 基准回退 256%）。
+   槽内 Value 的对象引用在调用期间由调用者寄存器槽保根，无需额外注册 GC 根。
+10. **新增 Object 子类判型走 TypeId**：热路径禁止 `dynamic_cast`（RTTI 遍历），
+   在 `TypeId`（`src/types/TypeId.hpp`）加专有值并 override `typeId()`，用一次
+   虚调用判型（Function/NativeFunction/Property 先例）；Property/NativeFunction
+   均为 final，static_cast 与 dynamic_cast 等价。
 
 ## "我想改 X，先读什么"
 

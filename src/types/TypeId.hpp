@@ -22,12 +22,14 @@ namespace cial {
         Date,
         RandomGen,
         // 以下不进 NativeRegister 方法表，仅作 GProp/DProp 的分派标识
-        //（替代热路径上的 dynamic_cast）
+        // （替代热路径上的 dynamic_cast）
         Global,
         Class,
-        // 脚本函数专有标识（CallV 直写路径用一次虚调用替代 dynamic_cast）；
-        // NativeFunction 不用此值——CallV 对它走通用回落
+        // 脚本函数/原生函数/属性闭包专有标识（CallV 直写路径与
+        // loadGlobal/propObjectGet·Set 等热路径用一次虚调用替代 dynamic_cast）
         Function,
+        NativeFunction,
+        Property,
     };
 
 } // namespace cial

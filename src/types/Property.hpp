@@ -35,6 +35,10 @@ namespace cial {
         Object *thisObj{};
         PropMeta *propMeta{};
 
+        // 专有 TypeId：loadGlobal/propObjectGet·Set 等热路径用一次虚调用
+        // 替代 dynamic_cast 的 RTTI 遍历
+        [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Property; }
+
         explicit Property(Object *thisObj, PropMeta *propMeta) : thisObj{ thisObj }, propMeta{ propMeta } {}
 
         void invokeSet(vm::VMState &vmState, const Value &v) const {

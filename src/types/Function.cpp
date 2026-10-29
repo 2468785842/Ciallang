@@ -63,7 +63,7 @@ namespace cial {
             currentCallFrame->setThisObj(Value{ thisObj });
         } else if(callerThis.isObject()) {
             // TJS2 调用点绑定语义：clo.ObjThis 为空时 this 取调用者的 this
-            //（super.<方法>() 经类对象成员访问得到未绑定函数，需沿调用链继承；
+            // （super.<方法>() 经类对象成员访问得到未绑定函数，需沿调用链继承；
             // 顶层/全局函数的 this 本就是全局对象，行为不变）
             currentCallFrame->setThisObj(callerThis);
         } else {
@@ -98,5 +98,11 @@ namespace cial {
         const auto &value = _callback(&vm, receiver, argCount, curFrame->getArgs(cnt != 0 ? _arity : argCount));
 
         vmState.regRef(ret) = value;
+    }
+
+    Value NativeFunction::callDirect(vm::VMState &vmState, const Value &receiver, const size_t argCount,
+                                     Value *args) const {
+        VM vm{ &vmState };
+        return _callback(&vm, receiver, argCount, args);
     }
 } // namespace cial

@@ -74,6 +74,38 @@ RTTI 遍历）约 2%。据此把 Array/Dictionary/RegExp 三处接收者辅助�
 严格更优但端到端在噪声带内（177% vs 182%），证实剩余差距在调用帧建立与
 实参窗口路径而非类型判断，与下文"下一步可评估调用点参数寄存器直映"结论一致。
 
+### 2026-10-29 调用路径批次：fib 首次追平
+
+采样定位（`sample`，native_methods 5M 迭代变体）出三大开销并逐项削减：
+
+1. **原生同步调用的主循环重取**：`DispatchRet::Call` 一律 `goto FETCH_NEW_FRAME`
+   重算 chunk/regs/ip/toBytecode 检查，但 NativeFunction 回调在 dispatch 内同步
+   完成、帧未变——新增免池同步快路径返回 `Continue` 直接续内层取指
+   （`src/vm/VMState.cpp` invokeCallV）。
+2. **热路径 RTTI 遍历**：`loadGlobal` 对每个对象型全局读、`propObjectGet/Set` 对
+   每次成员访问都做 `dynamic_cast<Property*>`（libc++abi 遍历）。TypeId 增加
+   `NativeFunction`/`Property` 专有值（`src/types/TypeId.hpp`），六处 dynamic_cast
+   换一次虚调用 typeId 直判（final 类等价）。
+3. **实参池中转**：原生调用实参 N×push 压池 → getArgs 读回；改为 placement new
+   到调用点栈缓冲直传回调（`NativeFunction::callDirect`，`src/types/Function.*`），
+   缺省参数补 void 布局与池顶约定等价。注意 Value 具有非平凡构造/析构，栈数组
+   必须只构造实际数量（初版 `Value localArgs[64]` 默认初始化全槽曾致回退 256%）。
+   实参对象的 GC 根仍在调用者寄存器槽（回调期间不被覆盖），栈副本无需注册根。
+
+同机对照（预热 1 轮 + 交替 5 轮取 min，含进程启动）：
+
+| 脚本 | 改前 | 改后 | TJS2 | 后/TJS2 |
+|---|---:|---:|---:|---:|
+| fib | 126~132% | — | — | **94~97%（首次 ≤100%）** |
+| native_methods | 174~183% | — | — | **135~140%** |
+| loop_int | 68% | 68% | — | 无回退 |
+| string_concat | ~100% | ~100% | — | 无回退 |
+| class_instantiate | ~98% | ~96% | — | 噪声带内 |
+
+fib 收益主要来自 loadGlobal 的 RTTI 消除（每次递归读全局 fib 名字）；native_methods
+剩余缺口的大头在 NativeFn 回调协议（std::function 间接调用 + Value 拷贝语义），
+结构性改造（函数指针化/寄存器直读协议）记入 TODO.md 待后续。
+
 实现与回归来源：`src/gen/Optimizer.cpp`（比较融合）、`src/vm/VMState.cpp`（缓存和整型槽读写）、
 `src/types/Value.cpp` / `String.hpp`（紧凑短串）、`src/types/Function.cpp`（objthis 分离）、
 `tests/optimizer_test.cpp` / `native_function_test.cpp` / `value_storage_test.cpp`。
