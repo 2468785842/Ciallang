@@ -41,10 +41,12 @@ namespace cial::inter {
         friend class OptimizerManager;
     };
 
-    // 仅折叠可证明安全的有符号整数常量运算；不改变可能抛错的动态运算。
+    // 有符号整数常量传播：块内折叠溢出安全的 Add/Sub/Mul；
+    // 块间状态分析——唯一前驱的块继承前驱出口常量状态（回边与多前驱保守放弃）。
+    // 不改变可能抛错的动态运算。
     class IntegerConstantPropagationOptimizer final : public Optimizer {
     public:
-        [[nodiscard]] std::string_view name() const noexcept override { return "integer-constant-folding"; }
+        [[nodiscard]] std::string_view name() const noexcept override { return "integer-constant-propagation"; }
         size_t optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) override;
     };
 

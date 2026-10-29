@@ -282,11 +282,36 @@ namespace cial::inter {
         if(!hasImmediate || !hasArithmetic)
             return 0;
 
+        const size_t registerCount = chunk.getRegCount();
+
+        // 前驱统计：块间状态分析只沿唯一前驱的前向边继承（回边前驱晚于自身
+        // 出现，自然落在 pred >= self 分支被跳过；try handler 汇聚多前驱同样放弃）。
+        Vec<u32> predecessorCount(blocks.size(), 0);
+        Vec<size_t> predecessorIndex(blocks.size(), 0);
+        for(size_t i = 0; i < blocks.size(); ++i) {
+            for(const size_t successor : blocks[i].successors) {
+                if(predecessorCount[successor] == 0)
+                    predecessorIndex[successor] = i;
+                ++predecessorCount[successor];
+            }
+        }
+
+        // 出口状态按需记录：仅唯一前驱的后继块会读取前驱状态。
         size_t foldedCount = 0;
-        Vec<Integer> constants(chunk.getRegCount());
-        Vec<u8> known(chunk.getRegCount(), 0);
-        for(const auto &block : blocks) {
+        Vec<Vec<Integer>> blockOutConstants(blocks.size());
+        Vec<Vec<u8>> blockOutKnown(blocks.size());
+        Vec<Integer> constants(registerCount);
+        Vec<u8> known(registerCount, 0);
+        for(size_t blockIndex = 0; blockIndex < blocks.size(); ++blockIndex) {
+            const auto &block = blocks[blockIndex];
             std::fill(known.begin(), known.end(), 0);
+            if(predecessorCount[blockIndex] == 1) {
+                const size_t predecessor = predecessorIndex[blockIndex];
+                if(predecessor < blockIndex && !blockOutKnown[predecessor].empty()) {
+                    known = blockOutKnown[predecessor];
+                    constants = blockOutConstants[predecessor];
+                }
+            }
             for(size_t pc = block.start; pc < block.end; ++pc) {
                 const Instruction &instruction = *chunk.inst(pc);
                 const TacOpCode opcode = instruction.opcode();
@@ -321,11 +346,15 @@ namespace cial::inter {
 
                 // Any non-literal instruction may mutate or reinterpret its register
                 // operands. Forget those facts; no value is propagated across it.
+                // 出口状态取"正常完成"路径：块内中途抛异常时控制转 handler，
+                // 唯一前驱的继承语义不受影响。
                 forEachRegisterOf(instruction, [&](const Register reg) {
                     if(reg.index() < known.size())
                         known[reg.index()] = 0;
                 });
             }
+            blockOutKnown[blockIndex] = known;
+            blockOutConstants[blockIndex] = constants;
         }
         return foldedCount;
     }

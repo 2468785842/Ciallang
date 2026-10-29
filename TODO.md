@@ -38,12 +38,13 @@
 - [x] Parser 无条件 `[scan]` 打印：核实当前 `src/parser/Parser.cpp` 已不存在，关闭过时条目。
 - [x] 历史测试文件回归主线（2026-10-29）：statement/type_system/ieee/integration 四个被注释禁用的文件修复为现代 API 并启用——AST 结构直查（Parser 改经 `Context::pp()` 构造）、Value `as*`/Ret 运算面、`types/Real.hpp` IEEE 位工具（原 `lexer/IEEETypes.hpp` 已并入该头，此前零覆盖）、VM 门面多特性组合端到端；测试 120→143 用例（Windows Debug 全绿）。同步 doc/compatibility.md 与实现状态对齐。
 
-本机最终验证：macOS Debug、Release、UBSan 均 **120/120 通过**（上一批次时点）；本批 4 个测试文件回归主线后 Windows Debug **143/143 通过**。12 个字节码样本全部成功；从 `/tmp` 配置时 TJSCompiler 相对路径解析通过。ASan 运行库在 macOS 初始化阶段自旋，尚未进入测试，不能计为通过。
+本机最终验证：macOS Debug、Release、UBSan 均 **120/120 通过**（上一批次时点）；Windows Debug **146/146 通过**（2026-10-29，4 个历史测试文件回归主线 + 常量传播 pass 后）。12 个字节码样本全部成功；从 `/tmp` 配置时 TJSCompiler 相对路径解析通过。ASan 运行库在 macOS 初始化阶段自旋，尚未进入测试，不能计为通过。
 
 ## 已完成（摘要）
 
 > 细节见各提交信息；字节码批次见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)，性能见 doc/performance.md。
 
+- 2026-10-29 常量传播与测试主线回归批次：整数常量 pass 升级为块间状态分析（唯一前驱块继承前驱出口常量状态，回边/多前驱/try handler 汇聚保守放弃），CFG/常量传播/死代码消除在 README 核心特性清单勾选；statement/type_system/ieee/integration 四个历史测试文件修复为现代 API 回归主线（120→146 用例）；Windows 首次双引擎基准与文档同步见 doc/performance.md
 - 2026-10-28 macOS 构建验证：修正 DateParser `::tzset()` 命名空间与系统头引用，fuzz 测试 CRT 断言重定向限定 MSVC，双配置 110/110 通过
 - 2026-10-28 性能批次：成员名 Atom 直引指令 GPropC/DPropC/GPropRawC/DPropRawC/DelPropC（86→92 条）+ CallV 实参直写 argWindowDirect 帧布局；fib 内部计时 -25%
 - 2026-10-27 源码前端补齐：`...`/`*` 语法（收拢参数/展开调用/省略透传），test_function 源码路径全量通过；连带修复 parseScope 深前视门控

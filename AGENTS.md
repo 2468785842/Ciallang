@@ -116,7 +116,7 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
    回调期间再 GC、环和复活均受保护，终结一次，异常经脚本异常协议传播。
    队列由 `Runtime::collectMark()` 标记，见 `src/gc/gc.hpp`、`src/vm/VMState.cpp`。
    Runtime 销毁阶段不执行脚本；宿主主动收集后应让所属 VM 再运行或在有效帧中 drain。
-6. **优化器范围有限**：`IRGenerator::parseAst()` 已接入 CFG、溢出安全的整数 `Add/Sub/Mul` 常量折叠、死 `LoadImm` 清理、保留结果寄存器的 CompareTest 融合和 NOP 压缩；常量池 `Load` 会实例化运行时对象，DCE 不得删除。压缩会重映射跳转、try 区间与 RLC 行号。DCE 对 try 保护块保守保留加载，其他指令按活跃性屏障处理。尚无跨块常量传播或 `LoadSub`，性能结果以 `doc/performance.md` 的同机对照为准；扩展优化前先做同机 Release 对拍基准并覆盖外部可观察寄存器、异常边与元数据重映射。
+6. **优化器范围有限**：`IRGenerator::parseAst()` 已接入 CFG、溢出安全的整数 `Add/Sub/Mul` 常量传播（块内折叠 + 唯一前驱块间继承出口状态；回边与多前驱保守放弃）、死 `LoadImm` 清理、保留结果寄存器的 CompareTest 融合和 NOP 压缩；常量池 `Load` 会实例化运行时对象，DCE 不得删除。压缩会重映射跳转、try 区间与 RLC 行号。DCE 对 try 保护块保守保留加载，其他指令按活跃性屏障处理。尚无 SSA、跨块汇合点传播或 `LoadSub`，性能结果以 `doc/performance.md` 的同机对照为准；扩展优化前先做同机 Release 对拍基准并覆盖外部可观察寄存器、异常边与元数据重映射。
 7. **Value 字符串分短串内联和长串共享两种**：14 字节内直接存 String，长串用
    `SharedPayload<String>`；见 `src/types/Value.hpp`、`String.hpp`。`asString()` 借用指针
    的寿命不能超过所属 Value，尤其禁止借用 `createValue()` 临时值（NewRegExp 曾因此丢 flags）。

@@ -1,5 +1,7 @@
 #include <catch.hpp>
 
+#include <algorithm>
+
 #include "gen/ControlFlowGraph.hpp"
 #include "gen/Optimizer.hpp"
 #include "vm/Chunk.hpp"
@@ -52,6 +54,73 @@ TEST_CASE("optimizer - folds safe integers and remaps jumps after dead load remo
     REQUIRE(instructions[1]->getOp1().value<Label>().address() == 2);
     REQUIRE(instructions[2]->opcode() == TacOpCode::Ret);
     REQUIRE(instructions[2]->getOp1().value<Register>() == Register{ 3 });
+}
+
+TEST_CASE("optimizer - propagates constants into the unique-predecessor successor block") {
+    vm::Chunk chunk;
+    chunk.emit<LoadImm>(Register{ 1 }, 20);
+    chunk.emit<LoadImm>(Register{ 2 }, 0);
+    chunk.emit<JmpE>(Label{ 4 });
+    chunk.emit<Add>(Register{ 1 }, Register{ 1 }, Register{ 3 });
+    chunk.emit<inter::Ret>(Register{ 3 });
+    chunk.setRegCount(4);
+
+    OptimizerManager optimizer{ chunk };
+    optimizer.addOptimizer(std::make_unique<IntegerConstantPropagationOptimizer>());
+    optimizer.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>());
+    (void)optimizer.applyOptimizations();
+
+    // 块 [3,4) 的唯一前驱是入口块，继承 %1=20 后 Add 折叠为 40；
+    // 折叠后 %1/%2 均死，随之删除。
+    const auto &instructions = chunk.getInstVec();
+    REQUIRE(instructions.size() == 3);
+    REQUIRE(instructions[0]->opcode() == TacOpCode::JmpE);
+    REQUIRE(instructions[1]->opcode() == TacOpCode::LoadImm);
+    REQUIRE(instructions[1]->getOp1().value<Register>() == Register{ 3 });
+    REQUIRE(instructions[1]->getOp2().value<Integer>() == 40);
+    REQUIRE(instructions[2]->opcode() == TacOpCode::Ret);
+}
+
+TEST_CASE("optimizer - does not propagate into a block with multiple predecessors") {
+    vm::Chunk chunk;
+    chunk.emit<LoadImm>(Register{ 1 }, 20);
+    chunk.emit<LoadImm>(Register{ 2 }, 1);
+    chunk.emit<JmpE>(Label{ 4 });
+    chunk.emit<Jmp>(Label{ 5 });
+    chunk.emit<LoadImm>(Register{ 1 }, 7);
+    chunk.emit<Add>(Register{ 1 }, Register{ 1 }, Register{ 3 });
+    chunk.emit<inter::Ret>(Register{ 3 });
+    chunk.setRegCount(4);
+
+    OptimizerManager optimizer{ chunk };
+    optimizer.addOptimizer(std::make_unique<IntegerConstantPropagationOptimizer>());
+    optimizer.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>());
+    (void)optimizer.applyOptimizations();
+
+    // Add 所在块的前驱是条件分支两侧（Jmp 与 fallthrough），必须保持动态加法。
+    const auto &instructions = chunk.getInstVec();
+    const auto addPosition = std::ranges::find_if(instructions, [](const auto &instruction) {
+        return instruction->opcode() == TacOpCode::Add;
+    });
+    REQUIRE(addPosition != instructions.end());
+    REQUIRE((*addPosition)->getOp1().value<Register>() == Register{ 1 });
+}
+
+TEST_CASE("optimizer - does not propagate into a loop header across the back edge") {
+    vm::Chunk chunk;
+    chunk.emit<LoadImm>(Register{ 1 }, 5);
+    chunk.emit<Add>(Register{ 1 }, Register{ 1 }, Register{ 3 });
+    chunk.emit<JmpE>(Label{ 1 });
+    chunk.emit<inter::Ret>(Register{ 3 });
+    chunk.setRegCount(4);
+
+    OptimizerManager optimizer{ chunk };
+    optimizer.addOptimizer(std::make_unique<IntegerConstantPropagationOptimizer>());
+    optimizer.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>());
+    (void)optimizer.applyOptimizations();
+
+    // 循环头块有回边前驱，入口处的 %1=5 不得跨越回边传播。
+    REQUIRE(chunk.inst(1)->opcode() == TacOpCode::Add);
 }
 
 TEST_CASE("optimizer - remaps try ranges and source lines while compacting NOPs") {

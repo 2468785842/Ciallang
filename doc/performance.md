@@ -41,6 +41,16 @@ wall-time），与本文件上表中位数口径不同，两引擎口径一致�
 为 wall-time 中位数。另：TJS2 CLI 的内部计时标签 "Time taken by function: Nms" 实为
 微秒（fib(25) 标 31586"ms"，外部实测 52ms 含转储输出），对照时勿按标签字面取值。
 
+### 2026-10-29 常量传播扩展后的复核
+
+整数常量 pass 升级为块间状态分析（唯一前驱块继承出口状态）后同机复测三轮，比值
+class 99~108% / fib 122~132% / loop 50~53% / native 148~164% / string 80~88%，均在
+本机噪声带内：未改动的 TJS2 二进制 fib min 跨批次在 35.8~70.1ms 间摆动（2 倍），
+绝对值与单轮比值不可比。`CIAL_OPTIMIZER_STATS=1` 证实 pass 对 fib 块 transforms=0
+（代码路径未变），基准差异均为机器负载噪声。注意：当前 IR 形态下局部变量每次使用
+经 GLocal 重载（VM_CP 语义），常量极少以寄存器形态跨块存活——跨块继承对现有脚本
+收益有限，为后续槽位提升类优化打底（单元测试已锁定传播/多前驱/回边语义）。
+
 实现与回归来源：`src/gen/Optimizer.cpp`（比较融合）、`src/vm/VMState.cpp`（缓存和整型槽读写）、
 `src/types/Value.cpp` / `String.hpp`（紧凑短串）、`src/types/Function.cpp`（objthis 分离）、
 `tests/optimizer_test.cpp` / `native_function_test.cpp` / `value_storage_test.cpp`。

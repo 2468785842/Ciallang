@@ -12,10 +12,10 @@
 
 ### 🔧 核心特性
   * [ ] `JIT` 即时编译优化
-  * [ ] `CFG` 控制流图生成
+  * [x] `CFG` 控制流图生成（基本块级，含跳转/终止/try 隐式异常边，`src/gen/ControlFlowGraph.cpp`）
   * [ ] `SSA` 静态单赋值构造
-  * [ ] `常量传播` 与块间状态分析
-  * [ ] `死代码消除`
+  * [x] `常量传播` 与块间状态分析（块内溢出安全整数折叠 + 唯一前驱块间继承，`src/gen/Optimizer.cpp`）
+  * [x] `死代码消除`（活跃性分析驱动的死 `LoadImm` 清理；常量池 `Load` 因实例化对象保守保留）
   * [ ] `循环优化`（回边检测）
   * [ ] `尾递归消除`
   * [ ] `Trace JIT` 热路径跟踪
@@ -164,7 +164,7 @@ cmake --build build/Windows/Bench --target conformance-report
 * ~~完整实现 TJS2 标准库~~（已完成：Date.parse 完整文法 / RegExp.last+码点位置 / Array·Dictionary save·load·pack 系）
 * ~~字节码兼容~~（**已完成 M1–M4**：加载 TJS2 编译产物转译执行，`cial --tjsbc`；128 操作码转译覆盖，tjs2 语料全量通过，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)）
 * 性能追平原版（当前 112~155%，方向见 [TODO.md](TODO.md)：实参直写被调帧窗口、Value 内联 SSO、调用点内联缓存）
-* 扩展编译优化（CFG、整数常量折叠、死加载清理和比较/Test 融合已接入；见 `src/gen/Optimizer.cpp`）
+* 扩展编译优化（CFG、跨块整数常量传播、死加载清理和比较/Test 融合已接入；见 `src/gen/Optimizer.cpp`）
 * 集成 **LSP (Language Server Protocol)**，支持 VSCode / IDEA 智能提示
 
 ---
