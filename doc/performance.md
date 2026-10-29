@@ -51,6 +51,16 @@ class 99~108% / fib 122~132% / loop 50~53% / native 148~164% / string 80~88%，�
 经 GLocal 重载（VM_CP 语义），常量极少以寄存器形态跨块存活——跨块继承对现有脚本
 收益有限，为后续槽位提升类优化打底（单元测试已锁定传播/多前驱/回边语义）。
 
+### 2026-10-29 拷贝传播批次
+
+新增 CopyPropagationOptimizer（GLocal/DLocal 纯拷贝在使用点改写为源寄存器 +
+DEL 扩展死拷贝清除，管线首位）后同机三轮：**fib 从 122~132% 降至 108~120%**
+（fib 函数块 14→10 条指令，每次调用省 3 条变量读拷贝，`--dump-cfg` 可复核）；
+其余四项均在既有噪声带内（class 96~102% / loop 47~49% / native 148~149% /
+string 84~85%），无回退。至此 fib 与 TJS2 同机比值首次进入 1.1× 以内，
+剩余差距在调用帧建立与参数窗口路径（CallV 实参直写已做，下一步可评估
+调用点参数寄存器直映）。
+
 实现与回归来源：`src/gen/Optimizer.cpp`（比较融合）、`src/vm/VMState.cpp`（缓存和整型槽读写）、
 `src/types/Value.cpp` / `String.hpp`（紧凑短串）、`src/types/Function.cpp`（objthis 分离）、
 `tests/optimizer_test.cpp` / `native_function_test.cpp` / `value_storage_test.cpp`。

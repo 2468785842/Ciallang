@@ -212,6 +212,93 @@ TEST_CASE("optimizer - dumpDot renders blocks, loop headers and back edges") {
     REQUIRE((dot.find("load_imm") != std::string::npos || dot.find("LoadImm") != std::string::npos));
 }
 
+TEST_CASE("optimizer - propagates local copies and removes dead copies") {
+    vm::Chunk chunk;
+    chunk.emit<GLocal>(Register{0}, Register{1}); // 读变量：%1 := home %0
+    chunk.emit<LoadImm>(Register{2}, 2);
+    chunk.emit<LT>(Register{1}, Register{2}, Register{3});
+    chunk.emit<inter::Ret>(Register{3});
+    chunk.setRegCount(4);
+
+    OptimizerManager optimizer{chunk};
+    optimizer.addOptimizer(std::make_unique<CopyPropagationOptimizer>());
+    optimizer.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>());
+    (void)optimizer.applyOptimizations();
+
+    // LT 的 %1 改写为家园寄存器 %0，死拷贝被 DEL 清除
+    const auto &instructions = chunk.getInstVec();
+    REQUIRE(instructions.size() == 3);
+    REQUIRE(instructions[0]->opcode() == TacOpCode::LoadImm);
+    REQUIRE(instructions[1]->opcode() == TacOpCode::LT);
+    REQUIRE(instructions[1]->getOp1().value<Register>() == Register{0});
+    REQUIRE(instructions[2]->opcode() == TacOpCode::Ret);
+}
+
+TEST_CASE("optimizer - chases copy chains across DLocal and GLocal") {
+    vm::Chunk chunk;
+    chunk.emit<LoadImm>(Register{5}, 7);
+    chunk.emit<DLocal>(Register{5}, Register{0}); // n = %5
+    chunk.emit<GLocal>(Register{0}, Register{6}); // 读 n：%6 := %0
+    chunk.emit<inter::Ret>(Register{6});
+    chunk.setRegCount(7);
+
+    OptimizerManager optimizer{chunk};
+    optimizer.addOptimizer(std::make_unique<CopyPropagationOptimizer>());
+    optimizer.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>());
+    (void)optimizer.applyOptimizations();
+
+    // 链式解析 %6 := %0 := %5，两条拷贝全部变死清除
+    const auto &instructions = chunk.getInstVec();
+    REQUIRE(instructions.size() == 2);
+    REQUIRE(instructions[0]->opcode() == TacOpCode::LoadImm);
+    REQUIRE(instructions[0]->getOp1().value<Register>() == Register{5});
+    REQUIRE(instructions[1]->opcode() == TacOpCode::Ret);
+    REQUIRE(instructions[1]->getOp1().value<Register>() == Register{5});
+}
+
+TEST_CASE("optimizer - keeps copy after the home register is redefined") {
+    vm::Chunk chunk;
+    chunk.emit<GLocal>(Register{0}, Register{1}); // 旧值快照 %1 := %0
+    chunk.emit<DLocal>(Register{2}, Register{0}); // n = %2：家园寄存器重定义
+    chunk.emit<inter::Ret>(Register{1}); // 必须仍是旧值，不得改写为 %0
+    chunk.setRegCount(3);
+
+    OptimizerManager optimizer{chunk};
+    optimizer.addOptimizer(std::make_unique<CopyPropagationOptimizer>());
+    optimizer.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>());
+    (void)optimizer.applyOptimizations();
+
+    const auto &instructions = chunk.getInstVec();
+    REQUIRE(instructions.size() == 3);
+    REQUIRE(instructions[0]->opcode() == TacOpCode::GLocal);
+    REQUIRE(instructions[0]->getOp2().value<Register>() == Register{1});
+    REQUIRE(instructions[2]->opcode() == TacOpCode::Ret);
+    REQUIRE(instructions[2]->getOp1().value<Register>() == Register{1});
+}
+
+TEST_CASE("optimizer - propagates copies into call arguments") {
+    vm::Chunk chunk;
+    chunk.emit<GLocal>(Register{0}, Register{6}); // 读 n
+    chunk.emit<LoadImm>(Register{7}, 2);
+    chunk.emit<Sub>(Register{6}, Register{7}, Register{8}); // n - 2
+    chunk.emitRaw<CallV>(Register{9}, Register{10}, 1, Vec<Register>{Register{8}});
+    chunk.emit<inter::Ret>(Register{9});
+    chunk.setRegCount(11);
+
+    OptimizerManager optimizer{chunk};
+    optimizer.addOptimizer(std::make_unique<CopyPropagationOptimizer>());
+    optimizer.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>());
+    (void)optimizer.applyOptimizations();
+
+    // Sub 直读家园寄存器 %0，读拷贝死亡清除
+    const auto &instructions = chunk.getInstVec();
+    REQUIRE(instructions.size() == 4);
+    REQUIRE(instructions[1]->opcode() == TacOpCode::Sub);
+    REQUIRE(instructions[1]->getOp1().value<Register>() == Register{0});
+    REQUIRE(instructions[2]->opcode() == TacOpCode::CallV);
+    REQUIRE(instructions[3]->opcode() == TacOpCode::Ret);
+}
+
 TEST_CASE("optimizer - remaps try ranges and source lines while compacting NOPs") {
     vm::Chunk chunk;
     chunk.emit<NOP>();

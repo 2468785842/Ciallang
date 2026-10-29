@@ -33,6 +33,25 @@ namespace cial::inter {
     namespace {
         using RegisterSet = Vec<u64>;
 
+        // 纯拷贝指令判定：GLocal/DLocal 是 dst(op2) := src(op1) 的寄存器拷贝
+        // （运行时 regs[r2]=regs[r1]，VM_CP 语义，无任何副作用）。
+        bool pureCopyDestination(const Instruction &instruction, Register &destination, Register &source) {
+            switch(instruction.opcode()) {
+                case TacOpCode::GLocal:
+                case TacOpCode::DLocal: {
+                    if(instruction.getOp1().type() != Operand::Type::Register ||
+                       instruction.getOp2().type() != Operand::Type::Register)
+                        return false;
+                    source = instruction.getOp1().value<Register>();
+                    destination = instruction.getOp2().value<Register>();
+                    return true;
+                }
+                default:
+                    return false;
+            }
+        }
+
+
         template <typename Callback>
         void forEachRegisterOf(const Instruction &instruction, Callback &&callback) {
             const auto addRegister = [&](const Operand &operand) {
@@ -269,6 +288,199 @@ namespace cial::inter {
         return count;
     }
 
+    size_t CopyPropagationOptimizer::optimize(Chunk &chunk, const Vec<BasicBlock> &blocks) {
+        const bool hasCopyInstruction = std::ranges::any_of(chunk.getInstVec(), [](const auto &instruction) {
+            const TacOpCode opcode = instruction->opcode();
+            return opcode == TacOpCode::GLocal || opcode == TacOpCode::DLocal;
+        });
+        if(!hasCopyInstruction)
+            return 0;
+
+        const size_t registerCount = chunk.getRegCount();
+
+        // 前驱统计：跨块仅沿唯一前驱前向边继承出口状态（同整数常量传播；
+        // 回边前驱晚于自身出现自然跳过，多前驱/try handler 汇聚保守放弃）
+        Vec<u32> predecessorCount(blocks.size(), 0);
+        Vec<size_t> predecessorIndex(blocks.size(), 0);
+        for(size_t i = 0; i < blocks.size(); ++i) {
+            for(const size_t successor : blocks[i].successors) {
+                if(predecessorCount[successor] == 0)
+                    predecessorIndex[successor] = i;
+                ++predecessorCount[successor];
+            }
+        }
+
+        size_t replacedCount = 0;
+        Vec<Vec<Register>> blockOutSource(blocks.size());
+        Vec<Vec<u8>> blockOutHas(blocks.size());
+        Vec<Register> copySource(registerCount);
+        Vec<u8> hasCopy(registerCount, 0);
+
+        // 链式解析：%dst := %src 且 %src 自身也是拷贝的 dst → 指向最终源。
+        // 记录时源已完全解析，且 def 处理会清以 dst 为源的条目，循环必终止。
+        auto resolve = [&](Register reg) {
+            while(reg.index() < registerCount && hasCopy[reg.index()])
+                reg = copySource[reg.index()];
+            return reg;
+        };
+        auto processDef = [&](const Register def) {
+            if(def.index() >= registerCount)
+                return;
+            hasCopy[def.index()] = 0;
+            for(size_t r = 0; r < registerCount; ++r)
+                if(hasCopy[r] && copySource[r].index() == def.index())
+                    hasCopy[r] = 0;
+        };
+        auto replaceUse = [&](const Register use) {
+            if(use.index() < registerCount && hasCopy[use.index()])
+                return copySource[use.index()];
+            return use;
+        };
+        auto replaceOperand = [&](auto operandSet, const Register current) {
+            const Register replaced = replaceUse(current);
+            if(replaced.index() != current.index()) {
+                operandSet(replaced);
+                ++replacedCount;
+            }
+        };
+
+        for(size_t blockIndex = 0; blockIndex < blocks.size(); ++blockIndex) {
+            const auto &block = blocks[blockIndex];
+            std::fill(hasCopy.begin(), hasCopy.end(), 0);
+            if(predecessorCount[blockIndex] == 1) {
+                const size_t predecessor = predecessorIndex[blockIndex];
+                if(predecessor < blockIndex && !blockOutHas[predecessor].empty()) {
+                    hasCopy = blockOutHas[predecessor];
+                    copySource = blockOutSource[predecessor];
+                }
+            }
+
+            for(size_t pc = block.start; pc < block.end; ++pc) {
+                Instruction &instruction = *chunk.inst(pc);
+                const TacOpCode opcode = instruction.opcode();
+
+                Register copyDst{}, copySrc{};
+                const bool isCopy = pureCopyDestination(instruction, copyDst, copySrc);
+
+                // 1) 使用点改写：仅限寄存器操作数均为纯读取的指令；
+                //    拷贝指令只改写其 src（dst 是定义位，改写会污染写入目标）
+                switch(opcode) {
+                    case TacOpCode::GLocal:
+                    case TacOpCode::DLocal:
+                        if(copySrc.index() < registerCount)
+                            replaceOperand([&](const Register v) { instruction.setOp1Val(v); }, copySrc);
+                        break;
+                    case TacOpCode::Test:
+                    case TacOpCode::Ret:
+                        if(instruction.getOp1().type() == Operand::Type::Register)
+                            replaceOperand([&](const Register v) { instruction.setOp1Val(v); },
+                                           instruction.getOp1().value<Register>());
+                        break;
+                    case TacOpCode::Add:
+                    case TacOpCode::Sub:
+                    case TacOpCode::Mul:
+                    case TacOpCode::Div:
+                    case TacOpCode::Idiv:
+                    case TacOpCode::Mod:
+                    case TacOpCode::BXor:
+                    case TacOpCode::BOr:
+                    case TacOpCode::BAnd:
+                    case TacOpCode::BlShift:
+                    case TacOpCode::BrShift:
+                    case TacOpCode::BurShift:
+                    case TacOpCode::EQ:
+                    case TacOpCode::NEQ:
+                    case TacOpCode::AbsEQ:
+                    case TacOpCode::AbsNEQ:
+                    case TacOpCode::LT:
+                    case TacOpCode::LE:
+                    case TacOpCode::GT:
+                    case TacOpCode::GE:
+                        if(instruction.getOp1().type() == Operand::Type::Register)
+                            replaceOperand([&](const Register v) { instruction.setOp1Val(v); },
+                                           instruction.getOp1().value<Register>());
+                        if(instruction.getOp2().type() == Operand::Type::Register)
+                            replaceOperand([&](const Register v) { instruction.setOp2Val(v); },
+                                           instruction.getOp2().value<Register>());
+                        break;
+                    case TacOpCode::CompareTest:
+                        if(instruction.getOp1().type() == Operand::Type::Register)
+                            replaceOperand([&](const Register v) { instruction.setOp1Val(v); },
+                                           instruction.getOp1().value<Register>());
+                        if(instruction.getOp2().type() == Operand::Type::Register)
+                            replaceOperand([&](const Register v) { instruction.setOp2Val(v); },
+                                           instruction.getOp2().value<Register>());
+                        break;
+                    case TacOpCode::CallV: {
+                        auto &call = static_cast<CallV &>(instruction);
+                        const Register func = replaceUse(call.func);
+                        if(func.index() != call.func.index()) {
+                            call.func = func;
+                            ++replacedCount;
+                        }
+                        for(auto &arg : call.args) {
+                            const Register replaced = replaceUse(arg);
+                            if(replaced.index() != arg.index()) {
+                                arg = replaced;
+                                ++replacedCount;
+                            }
+                        }
+                        break;
+                    }
+                    case TacOpCode::CallMethodV: {
+                        auto &call = static_cast<CallMethodV &>(instruction);
+                        const Register func = replaceUse(call.func);
+                        if(func.index() != call.func.index()) {
+                            call.func = func;
+                            ++replacedCount;
+                        }
+                        const Register receiver = replaceUse(call.receiver);
+                        if(receiver.index() != call.receiver.index()) {
+                            call.receiver = receiver;
+                            ++replacedCount;
+                        }
+                        for(auto &arg : call.args) {
+                            const Register replaced = replaceUse(arg);
+                            if(replaced.index() != arg.index()) {
+                                arg = replaced;
+                                ++replacedCount;
+                            }
+                        }
+                        break;
+                    }
+                    case TacOpCode::GMethodC: {
+                        auto &method = static_cast<GMethodC &>(instruction);
+                        method.receiver = replaceUse(method.receiver);
+                        if(method.getOp1().type() == Operand::Type::Register)
+                            replaceOperand([&](const Register v) { method.setOp1Val(v); },
+                                           method.getOp1().value<Register>());
+                        break;
+                    }
+                    default:
+                        break;
+                }
+
+                // 2) 定义处理：拷贝指令 def 精确为 dst（src 是读取，不得失效链）；
+                //    其余指令保守——提及即重定义
+                if(isCopy) {
+                    processDef(copyDst);
+                    if(copyDst.index() < registerCount) {
+                        const Register source = resolve(copySrc);
+                        if(source.index() != copyDst.index()) {
+                            copySource[copyDst.index()] = source;
+                            hasCopy[copyDst.index()] = 1;
+                        }
+                    }
+                } else {
+                    forEachRegisterOf(instruction, [&](const Register reg) { processDef(reg); });
+                }
+            }
+            blockOutHas[blockIndex] = hasCopy;
+            blockOutSource[blockIndex] = copySource;
+        }
+        return replacedCount;
+    }
+
     size_t IntegerConstantPropagationOptimizer::optimize(Chunk &chunk, const Vec<BasicBlock> &blocks) {
         bool hasImmediate = false;
         bool hasArithmetic = false;
@@ -393,6 +605,12 @@ namespace cial::inter {
                     setRegister(blockDefs[i], destination.index());
                     continue;
                 }
+                Register copyDst{}, copySrc{};
+                if(pureCopyDestination(instruction, copyDst, copySrc)) {
+                    // 拷贝的 src 仍计入 use：活跃性不得欠记，否则跨块前驱的
+                    // 定义会被误删（死拷贝自身的清除在反向遍历中处理）
+                    setRegister(blockDefs[i], copyDst.index());
+                }
                 forEachRegisterOf(instruction, [&](const Register reg) {
                     if(!isSet(blockDefs[i], reg.index()))
                         setRegister(blockUse[i], reg.index());
@@ -449,6 +667,19 @@ namespace cial::inter {
                         ++removedCount;
                     } else {
                         clearRegister(live, destination.index());
+                    }
+                    continue;
+                }
+                Register copyDst{}, copySrc{};
+                if(pureCopyDestination(instruction, copyDst, copySrc)) {
+                    // 纯拷贝无副作用：dst 死即可删；dst 活则删除 dst 的活跃并
+                    // 让 src（家园寄存器）接续活跃
+                    if(!isSet(live, copyDst.index())) {
+                        chunk.repl<NOP>(pc);
+                        ++removedCount;
+                    } else {
+                        clearRegister(live, copyDst.index());
+                        setRegister(live, copySrc.index());
                     }
                     continue;
                 }

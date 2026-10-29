@@ -38,6 +38,7 @@ namespace cial::inter {
         // 字节码按需编译：编码器尚未覆盖全部指令（未覆盖的在 Debug 下会断言），
         // 由 run0 调用方显式 toBytecode()
         OptimizerManager optimizerManager(*chunk);
+        optimizerManager.addOptimizer(std::make_unique<CopyPropagationOptimizer>());
         optimizerManager.addOptimizer(std::make_unique<IntegerConstantPropagationOptimizer>());
         optimizerManager.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>(optReg));
         optimizerManager.addOptimizer(std::make_unique<CompareTestFusionOptimizer>());

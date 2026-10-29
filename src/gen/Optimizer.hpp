@@ -41,6 +41,17 @@ namespace cial::inter {
         friend class OptimizerManager;
     };
 
+    // 拷贝传播：GLocal/DLocal 是纯寄存器拷贝（VM_CP 语义，不触发 getter/setter），
+    // 记录 dst:=src 可用拷贝并在白名单指令（算术/比较/CallV 实参等）的使用点
+    // 改写为源寄存器——变量读的家园寄存器拷贝随之变成死代码，由
+    // DeadLoadElimination 一并清除。def 精确集合只覆盖拷贝指令自身，
+    // 其余指令按"提及即重定义"保守失效；跨块仅沿唯一前驱继承（同整数常量传播）。
+    class CopyPropagationOptimizer final : public Optimizer {
+    public:
+        [[nodiscard]] std::string_view name() const noexcept override { return "copy-propagation"; }
+        size_t optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) override;
+    };
+
     // 有符号整数常量传播：块内折叠溢出安全的 Add/Sub/Mul；
     // 块间状态分析——唯一前驱的块继承前驱出口常量状态（回边与多前驱保守放弃）。
     // 不改变可能抛错的动态运算。
