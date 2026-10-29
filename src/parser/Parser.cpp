@@ -444,7 +444,7 @@ namespace cial::syntax {
         if(const auto stmtParser = stmtParserFor(token->type())) {
             Token t{};
             consume(r, t);
-            return stmtParser->parse(r, this, token);
+            return stmtParser->parse(r, this, &t);
         }
 
         // maybe ExpressionStatement

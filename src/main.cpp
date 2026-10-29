@@ -15,18 +15,20 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <algorithm>
+#include <fstream>
 
 #ifdef _MSC_VER
 #include <crtdbg.h>
 #endif
 
 #include "gen/ControlFlowGraph.hpp"
+#include "gen/SSA.hpp"
 #include "stdlib/ExceptionLib.hpp"
+#include "stdlib/Print.hpp"
 #include "tjsbc/TjsBytecodeReader.hpp"
 #include "tjsbc/TjsTranslator.hpp"
-#include "stdlib/Print.hpp"
-#include "vm/VM.hpp"
 #include "types/Class.hpp"
+#include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
 using namespace cial;
@@ -43,9 +45,41 @@ static const bool g_redirectCrtReport = [] {
 }();
 #endif
 
+static std::string jsonString(const std::string &text) {
+    std::string out = "\"";
+    for(const unsigned char c : text) {
+        switch(c) {
+            case '"':
+                out += "\\\"";
+                break;
+            case '\\':
+                out += "\\\\";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                if(c < 32)
+                    out += fmt::format("\\u{:04x}", c);
+                else
+                    out += static_cast<char>(c);
+        }
+    }
+    return out + '"';
+}
+
 int main(const int argc, char **argv) {
     if(argc < 2) {
-        fmt::println("Usage: cial <script-file>\n       cial --dump-cfg <script-file>");
+        fmt::println("Usage: cial <script-file>\n       cial --dump-cfg <script-file>\n       cial --trace-execution "
+                     "<script-file> <output.dot>\n       cial --jit|--trace-jit <script-file>\n       cial "
+                     "--check-json <script-file>\n       cial --tail-recursion <script-file>\n       cial --dump-ssa "
+                     "<script-file>");
         return 0;
     }
 
@@ -70,6 +104,45 @@ var Debug = new __DebugShim();
 )"_str);
     // Exception 内建类(语料中 throw new Exception(...) 高频依赖)
     stdlib::initExceptionClass(vm);
+
+    // LSP 等宿主使用：仅解析/编译，绝不执行被检查的脚本；stdout 是单个 JSON 值。
+    if(std::string(argv[1]) == "--check-json") {
+        Common::Result result;
+        if(argc != 3) {
+            result.error("Usage: cial --check-json <script-file>");
+        } else {
+            try {
+                Common::SourceFile source{ argv[2] };
+                source.load(result);
+                if(!result.isFailed()) {
+                    syntax::Parser parser{ source, context.pp() };
+                    auto *node = parser.parse(result);
+                    if(node && !result.isFailed()) {
+                        inter::IRGenerator generator{ result, rt, source };
+                        OptReg ignored;
+                        (void)generator.parseAst(node, ignored);
+                    } else if(!result.isFailed()) {
+                        result.error("cannot parse script");
+                    }
+                }
+            } catch(const std::exception &e) {
+                result.error(e.what());
+            }
+        }
+        fmt::print("{{\"ok\":{},\"columnEncoding\":\"utf-8\",\"diagnostics\":[", !result.isFailed());
+        bool first = true;
+        for(const auto &message : result.messages()) {
+            if(!first)
+                fmt::print(",");
+            first = false;
+            const auto &location = message.location();
+            fmt::print("{{\"message\":{},\"severity\":{},\"line\":{},\"column\":{},\"endLine\":{},\"endColumn\":{}}}",
+                       jsonString(message.message()), message.isError() ? 1 : 2, location.start().line,
+                       location.start().column, location.end().line, location.end().column);
+        }
+        fmt::println("]}}");
+        return result.isFailed() ? 1 : 0;
+    }
 
     // --tjsbc <file.tjsbc>:加载 TJS2 字节码,转译进现有 VM 执行顶层 context
     // (doc/bytecode/mapping.md 转译路线;M1)
@@ -128,9 +201,10 @@ var Debug = new __DebugShim();
     // --dump-cfg <script.tjs>:编译(含优化)后输出各 chunk 控制流图 DOT,不执行脚本。
     // 节点=基本块(带 TAC 区间与指令文本),回边标红,循环头高亮,可用于核对
     // 优化器块划分与循环识别(ControlFlowGraph::getLoops)
-    if(std::string(argv[1]) == "--dump-cfg") {
+    if(std::string(argv[1]) == "--dump-cfg" || std::string(argv[1]) == "--dump-ssa") {
+        const bool dumpSsa = std::string(argv[1]) == "--dump-ssa";
         if(argc < 3) {
-            fmt::println("Usage: cial --dump-cfg <script-file>");
+            fmt::println("Usage: cial --dump-cfg|--dump-ssa <script-file>");
             return 1;
         }
         try {
@@ -146,7 +220,7 @@ var Debug = new __DebugShim();
             inter::IRGenerator codeGen{ r, rt, sf };
             OptReg ir{};
             auto topLevel = codeGen.parseAst(node, ir);
-            if(!topLevel)
+            if(!topLevel || r.isFailed())
                 throw std::runtime_error("cannot compile script");
             vm::Chunk *topChunk = &topLevel.value();
 
@@ -174,13 +248,81 @@ var Debug = new __DebugShim();
                 inter::ControlFlowGraph cfg;
                 cfg.buildCFG(*chunk);
                 fmt::println("// ===== {} =====", name);
-                fmt::println("{}", cfg.dumpDot(*chunk));
+                if(dumpSsa) {
+                    const auto form = inter::SsaBuilder::buildChunkSsa(*chunk, cfg.getBasicBlocks());
+                    fmt::println("{}", inter::SsaBuilder::dumpSsaText(*chunk, form));
+                } else {
+                    fmt::println("{}", cfg.dumpDot(*chunk));
+                }
             }
         } catch(const std::exception &e) {
             fmt::println(stderr, "cial: {}", e.what());
             return 1;
         }
         return 0;
+    }
+
+    if(std::string(argv[1]) == "--tail-recursion") {
+        if(argc != 3) {
+            fmt::println(stderr, "Usage: cial --tail-recursion <script-file>");
+            return 1;
+        }
+        try {
+            vmState.setTailRecursionEnabled(true);
+            vm.eval(String(argv[2]), true);
+            fmt::println(stderr, "[tail] eliminated={}", vmState.tailCallsEliminated());
+        } catch(const std::exception &e) {
+            fmt::println(stderr, "cial: {}", e.what());
+            return 1;
+        }
+        return 0;
+    }
+
+    if(std::string(argv[1]) == "--jit" || std::string(argv[1]) == "--trace-jit") {
+        if(argc != 3) {
+            fmt::println(stderr, "Usage: cial --jit|--trace-jit <script-file>");
+            return 1;
+        }
+        try {
+            vmState.setJitMode(std::string(argv[1]) == "--jit" ? vm::JitMode::Eager : vm::JitMode::Trace);
+            vm.eval(String(argv[2]), true);
+            const auto stats = vmState.jitStats();
+            fmt::println(stderr, "[jit] compiled={} executions={} type-exits={} side-exits={} traces={}",
+                         stats.compiled, stats.executions, stats.typeExits, stats.sideExits, stats.recordedTraces);
+        } catch(const std::exception &e) {
+            fmt::println(stderr, "cial: {}", e.what());
+            return 1;
+        }
+        return 0;
+    }
+
+    if(std::string(argv[1]) == "--trace-execution") {
+        if(argc != 4) {
+            fmt::println(stderr, "Usage: cial --trace-execution <script-file> <output.dot>");
+            return 1;
+        }
+        std::ofstream output{ argv[3] };
+        if(!output) {
+            fmt::println(stderr, "cial: cannot open trace output: {}", argv[3]);
+            return 1;
+        }
+        vm::ExecutionTrace trace;
+        vmState.setExecutionTrace(&trace);
+        int status = 0;
+        try {
+            vm.eval(String(argv[2]), true);
+        } catch(const std::exception &e) {
+            fmt::println(stderr, "cial: runtime error: {}", e.what());
+            status = 1;
+        }
+        vmState.setExecutionTrace(nullptr);
+        output << trace.dumpDot();
+        output.close();
+        if(!output) {
+            fmt::println(stderr, "cial: cannot write trace output: {}", argv[3]);
+            return 1;
+        }
+        return status;
     }
 
     try {

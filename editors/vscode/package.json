@@ -1,0 +1,23 @@
+{
+  "name": "ciallang-language",
+  "displayName": "Ciallang / TJS2",
+  "description": "Ciallang syntax diagnostics and basic language hints",
+  "version": "0.1.0",
+  "publisher": "ciallang",
+  "license": "MIT",
+  "engines": {"vscode": "^1.82.0"},
+  "main": "./extension.js",
+  "activationEvents": ["onLanguage:ciallang"],
+  "contributes": {
+    "languages": [{"id": "ciallang", "aliases": ["Ciallang", "TJS2"], "extensions": [".tjs"]}],
+    "configuration": {
+      "title": "Ciallang",
+      "properties": {
+        "ciallang.python": {"type": "string", "default": "", "description": "Python interpreter (defaults to python on Windows, python3 elsewhere)"},
+        "ciallang.executable": {"type": "string", "default": "", "description": "Absolute path to cial; defaults to the workspace Debug build"}
+      }
+    }
+  },
+  "scripts": {"prepare": "node prepare.js", "vscode:prepublish": "node prepare.js", "check": "node --check extension.js"},
+  "dependencies": {"vscode-languageclient": "9.0.1"}
+}

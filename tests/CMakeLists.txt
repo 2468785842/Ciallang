@@ -26,6 +26,11 @@ set(SOURCES
         interpreter_test.cpp
         loop_test.cpp
         optimizer_test.cpp
+        ssa_integration_test.cpp
+        ssa_test.cpp
+        execution_trace_test.cpp
+        tail_recursion_test.cpp
+        jit_test.cpp
         judgment_test.cpp
         oop_test.cpp
         property_test.cpp
@@ -57,4 +62,12 @@ if(WIN32)
     add_test(NAME CiallangSuite COMMAND CiallangTests)
 else()
     catch_discover_tests(CiallangTests)
+endif()
+
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND AND TARGET cial)
+    add_test(NAME CiallangLspProtocol
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/lsp/test_protocol.py"
+                --cial "$<TARGET_FILE:cial>")
+    set_tests_properties(CiallangLspProtocol PROPERTIES TIMEOUT 30)
 endif()

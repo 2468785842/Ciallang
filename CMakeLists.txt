@@ -1,6 +1,19 @@
 cmake_minimum_required(VERSION 3.25)
 
+option(CIAL_ENABLE_JIT "Enable the optional x64 integer JIT backend" OFF)
+if(CIAL_ENABLE_JIT)
+    list(APPEND VCPKG_MANIFEST_FEATURES jit)
+    list(REMOVE_DUPLICATES VCPKG_MANIFEST_FEATURES)
+endif()
+
 project(Ciallang CXX)
+
+if(CIAL_ENABLE_JIT)
+    if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|amd64|x86_64|x64)$")
+        message(FATAL_ERROR "CIAL_ENABLE_JIT currently requires x64")
+    endif()
+    find_package(asmjit CONFIG REQUIRED)
+endif()
 
 option(ENABLE_FUZZ "enable fuzz execute build" OFF)
 option(CIAL_BUILD_BENCH "build benchmark & TJS2 conformance tooling" OFF)
@@ -42,6 +55,7 @@ set(SOURCE_FILES
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gen/IRGenerator.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gen/ControlFlowGraph.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/gen/SSA.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gen/Optimizer.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gen/Instruction.cpp
 
@@ -52,6 +66,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Chunk.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Bytecode.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/VMState.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/IntegerJit.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Rlc.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Constant.cpp
 
@@ -125,6 +140,15 @@ if(${BUILD_EXECUTABLE})
             PRIVATE
             fmt::fmt utf8proc frozen::frozen argparse::argparse spdlog::spdlog
     )
+endif()
+
+if(CIAL_ENABLE_JIT)
+    foreach(target Ciallang cial cial_bc)
+        if(TARGET ${target})
+            target_compile_definitions(${target} PUBLIC CIAL_ENABLE_JIT=1)
+            target_link_libraries(${target} PUBLIC asmjit::asmjit)
+        endif()
+    endforeach()
 endif()
 
 if (${ENABLE_TESTS})

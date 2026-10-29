@@ -26,9 +26,15 @@
 - [x] 原生方法调用分离 objthis：GMethodC/CallMethodV 直接携带接收者，避免每次调用分配 NativeFunction；提取方法为一等值时继续创建独立绑定。覆盖嵌套调用、宿主替换方法和分配数量测试。见 `src/gen/IRGenerator.cpp`、`src/types/Function.*`、`tests/native_function_test.cpp`。
 - [x] 访问缓存：64 项原生成员调用点缓存按注册版本失效；64 项全局槽缓存按插入/删除版本失效，函数替换读取最新值。本批 fib 耗时约为原来的 93.7%，仍有性能差距。见 `src/vm/VMState.*`、`src/types/Class.cpp`、`src/stdlib/NativeRegister.hpp`。
 
+- [x] 可选整数 JIT / Trace JIT 基础：x64 原生代码、热点路径录制、整数/溢出/分支守卫和未提交状态回退；默认关闭，尚不覆盖对象与调用优化。见 `src/vm/IntegerJit.*`、`tests/jit_test.cpp`、`doc/jit.md`。
+- [x] 数值自尾递归：显式启用后复用安全的自身调用帧，支持两万层递归；try、对象、闭包和外部副作用保守回落。见 `src/vm/VMState.cpp`、`tests/tail_recursion_test.cpp`。
+- [ ] 原版性能追平：可选后端的正确性验证不代表已达到全程序性能目标，继续按同机对拍记录收益与回退。
+
 ## 三、语言特性缺口
 
 本轮未新增语法；已知语义差异继续在 `doc/compatibility.md` 跟踪，不以本清单已完成代表完全兼容。
+
+- [x] 语句源码位置：消除 `parseStatement` 使用已释放 token 的借用；RLC 查找改为前驱位置并保留首个指令边界。见 `src/parser/Parser.cpp`、`src/vm/Rlc.*`、`tests/execution_trace_test.cpp`。
 
 ## 四、工程化
 
@@ -37,6 +43,9 @@
 - [x] Release 缓存防护：配置阶段拒绝缺少优化标志的 Release 缓存；空标志配置失败已验证，见 `CMakeLists.txt`。
 - [x] Parser 无条件 `[scan]` 打印：核实当前 `src/parser/Parser.cpp` 已不存在，关闭过时条目。
 - [x] 历史测试文件回归主线（2026-10-29）：statement/type_system/ieee/integration 四个被注释禁用的文件修复为现代 API 并启用——AST 结构直查（Parser 改经 `Context::pp()` 构造）、Value `as*`/Ret 运算面、`types/Real.hpp` IEEE 位工具（原 `lexer/IEEETypes.hpp` 已并入该头，此前零覆盖）、VM 门面多特性组合端到端；测试 120→143 用例（Windows Debug 全绿）。同步 doc/compatibility.md 与实现状态对齐。
+
+- [x] 执行路径 DOT：按代码位置与边聚合次数，覆盖嵌套原生回调、异常和 GC 后快照，见 `src/vm/ExecutionTrace.hpp`、`doc/execution-trace.md`。
+- [x] LSP 基础：只编译的 `--check-json` + Python stdio 服务 + VSCode 客户端；诊断使用 UTF-16 位置，提供词法补全、内置提示与符号。真实 stdio 协议测试已接 CTest，跨文件语义和 IDE UI 验证待后续。见 `tools/lsp/`、`editors/vscode/`、`doc/lsp.md`。
 
 本机最终验证：macOS Debug、Release、UBSan 均 **120/120 通过**（上一批次时点）；Windows Debug **154/154 通过**（2026-10-29，测试主线回归 + 常量传播/回边检测/拷贝传播后）。12 个字节码样本全部成功；从 `/tmp` 配置时 TJSCompiler 相对路径解析通过。ASan 运行库在 macOS 初始化阶段自旋，尚未进入测试，不能计为通过。
 

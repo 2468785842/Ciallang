@@ -12,6 +12,7 @@ jobs:
           - {os: macos-latest, platform: MacOS, configuration: Release}
           - {os: windows-latest, platform: Windows, configuration: Debug}
           - {os: windows-latest, platform: Windows, configuration: Release}
+          - {os: windows-latest, platform: Windows, configuration: Release, jit: 'ON'}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +20,7 @@ jobs:
         shell: bash
         run: |
           export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
-          cmake --preset "${{ matrix.platform }} ${{ matrix.configuration }}"
+          cmake --preset "${{ matrix.platform }} ${{ matrix.configuration }}" -DCIAL_ENABLE_JIT=${{ matrix.jit || 'OFF' }}
       - name: Build tests
         run: cmake --build build/${{ matrix.platform }}/${{ matrix.configuration }} --target cial CiallangTests --parallel 4
       - name: Test

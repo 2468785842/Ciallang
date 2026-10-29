@@ -13,6 +13,7 @@
  */
 #pragma once
 
+#include <atomic>
 #include <limits>
 #include <ranges>
 
@@ -172,12 +173,20 @@ namespace cial::vm {
 
         // bc 偏移 -> 源码位置（toBytecode 后有效；无记录返回空 Opt）
         [[nodiscard]] Opt<Common::SourceLocation> lineAtBc(const u64 bcPc) const {
-            if(_rlc.empty())
+            if(_rlc.empty() || bcPc < _rlc.rawEntries().front().first)
                 return {};
             return _rlc.find(static_cast<size_t>(bcPc));
         }
 
         [[nodiscard]] Rlc &rlc() noexcept { return _rlc; }
+
+        // 仅在启用执行记录时分配身份；记录器保存值快照，不持有 GC 对象指针。
+        [[nodiscard]] u64 executionTraceId() {
+            static std::atomic<u64> next{ 1 };
+            if(!_executionTraceId)
+                _executionTraceId = next.fetch_add(1, std::memory_order_relaxed);
+            return _executionTraceId;
+        }
 
         [[nodiscard]] const Vec<u8> &code() const {
             if(!_isBytecode) {
@@ -195,5 +204,6 @@ namespace cial::vm {
         Vec<u8> _code{};
         u32 _registerCount{};
         bool _isBytecode{ false };
+        u64 _executionTraceId{};
     };
 } // namespace cial::vm

@@ -28,17 +28,11 @@ namespace cial::vm {
             CLL_LOG_FATAL("rlc is empty");
         }
 
-        Common::SourceLocation preSIndex{};
-
-        for(auto [bcIndex, sIndex] : _bytecodeMapLine) {
-            preSIndex = sIndex;
-            if(bytecodeIndex == bcIndex)
-                return sIndex;
-            if(bytecodeIndex < bcIndex)
-                return preSIndex;
-        }
-
-        return preSIndex; // target 超出末条记录：归属最后一行（正常，非告警）
+        const auto next = std::upper_bound(_bytecodeMapLine.begin(), _bytecodeMapLine.end(), bytecodeIndex,
+                                           [](const size_t index, const auto &entry) { return index < entry.first; });
+        if(next == _bytecodeMapLine.begin())
+            return {};
+        return std::prev(next)->second;
     }
 
     [[nodiscard]] bool Rlc::contains(const Common::SourceLocation sourceLine) const {

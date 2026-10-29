@@ -70,3 +70,28 @@ Windows Debug CTest 143/143 通过（2026-10-29，4 个历史测试文件回归�
 ASan 在测试进程进入 main 前卡于系统运行库初始化，采样链为 AsanInitInternal →
 InitializeShadowMemory → malloc → AsanInitFromRtl 自旋，因此未获得 ASan 测试结果。
 Windows 静态 triplet 与 Linux/Windows CI 尚未在本机执行，工作流配置见 `.github/workflows/ci.yml`。
+
+
+## 2026-10-29 README 开发批次的默认路径复核
+
+Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT；可选 JIT、尾递归与执行记录均关闭。
+对照是本次开发中加入尾递归/JIT 之前保存的 Release 二进制（已经包含执行记录功能），
+不是本轮全部改动前的 Git 提交。每项预热一次，随后交替运行前/后两个二进制五轮，
+每轮反转先后顺序，统计含进程启动的 wall-time 中位数。脚本 `bench/*.tjs` 均通过自校验。
+测量前确认本机没有正在构建的编译器进程，clangd 连续三秒无 CPU 活动；后台繁忙期间的样本不用于下表。
+
+| 脚本 | 对照 ms | 当前 ms | 当前/对照 |
+|---|---:|---:|---:|
+| class_instantiate | 12.003 | 12.297 | 102.4% |
+| fib | 48.079 | 45.414 | 94.5% |
+| loop_int | 387.752 | 381.368 | 98.4% |
+| native_methods | 31.434 | 33.552 | 106.7% |
+| string_concat | 17.791 | 18.594 | 104.5% |
+
+结果仍不能支持“默认执行全面无回退”或“已追平 TJS2”的结论；原生调用项慢约 6.7%，
+字符串项慢约 4.5%，需后续定位和复测；fib 与整数循环本轮较快。完整样本保留于本机
+`bench/results/20261029-readme-default.json`，二进制 SHA-256 记录于同名 `.metadata.json`
+（该目录按既有约定不入库）。本表只比较默认执行，不代表可选 JIT 或尾递归的加速比。
+为了避免每条指令和每次普通调用承担开关判断，`VMState::run0()` 在进入时选择模板化
+解释循环；尾递归仅显式启用，可选模式状态放在类末尾以保留已有热字段布局。
+实现见 `src/vm/VMState.cpp`、`VMState.hpp`；可选后端范围见 `doc/jit.md`、`doc/tail-recursion.md`。

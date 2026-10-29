@@ -19,7 +19,9 @@
 
 #include "CallFrame.hpp"
 #include "Chunk.hpp"
+#include "ExecutionTrace.hpp"
 #include "FastRegisterPool.hpp"
+#include "IntegerJit.hpp"
 #include "runtime/Context.hpp"
 #include "runtime/Runtime.hpp"
 
@@ -53,6 +55,14 @@ namespace cial::vm {
         explicit VMState(Context &context) : rt(context.rt()), context(context) {}
 
         void run0();
+        // 借用记录器；调用方保证它覆盖所有 run0（含原生回调）的执行期。
+        void setExecutionTrace(ExecutionTrace *trace) noexcept { _executionTrace = trace; }
+        [[nodiscard]] u64 tailCallsEliminated() const noexcept { return _tailCallsEliminated; }
+        void setTailRecursionEnabled(bool enabled) noexcept { _tailRecursionEnabled = enabled; }
+        void setJitMode(JitMode mode, u32 threshold = 32) {
+            _integerJit = mode == JitMode::Off ? nullptr : std::make_unique<IntegerJit>(mode, threshold);
+        }
+        [[nodiscard]] JitStats jitStats() const noexcept { return _integerJit ? _integerJit->stats() : JitStats{}; }
         void drainFinalizers();
 
         [[nodiscard]] const Value &reg(u16 reg) const;
@@ -189,6 +199,11 @@ namespace cial::vm {
         }
 
     private:
+        template <bool Record, bool Native, bool Tail>
+        void runLoop();
+        DispatchRet dispatchTailCallV(CallFrame *cur, Value *regs, const u8 *ip, u64 &pc);
+        bool trySelfTailCall(CallFrame *cur, Value *regs, Object *callee, u16 dst, const u16 *argRegs, u32 argc,
+                             u64 pc);
         FastRegisterPool &_pool{ context.regPool() };
         CallFrame *_curFrame{ context.callStack() };
         CallFrame *_callStack{ context.callStack() };
@@ -218,6 +233,12 @@ namespace cial::vm {
         // with 语句上下文栈（裸词链 .member 的查找基座）；对象挂 Runtime handle 保 GC，
         // 帧释放时截断到 CallFrame::withDepth（unwind/正常返回共用 freeCallFrame）
         Vec<Object *> withStack{};
+
+        // 可选模式状态置于末尾，保持已有解释器热字段的布局。
+        ExecutionTrace *_executionTrace{};
+        u64 _tailCallsEliminated{};
+        bool _tailRecursionEnabled{};
+        std::unique_ptr<IntegerJit> _integerJit;
 
 #define DISPATCH_OP_METHOD(op)                                                                                         \
     CIAL_INLINE DispatchRet dispatch##op(CallFrame *cur, const Constant *constants, Value *regs, const u8 *ip, u64 &pc);

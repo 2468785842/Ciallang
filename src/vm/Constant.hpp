@@ -51,6 +51,7 @@ namespace cial {
         // frameArg 读取源），避免 CollapseArgs 写参数槽覆盖原始实参
         bool hasCollapse{};
         bool syntheticFinalizer{}; // 编译器生成的空 finalize，无需进入 GC 终结队列
+        i8 tailRecursionSafe{ -1 }; // -1 未分析，0 保守回落，1 数值自尾递归子集
         vm::Chunk *chunk; // manager for gc
         Vec<inter::LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
 

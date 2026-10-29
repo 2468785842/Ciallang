@@ -11,15 +11,15 @@
 ## 🚧 开发进度
 
 ### 🔧 核心特性
-  * [ ] `JIT` 即时编译优化
+  * [x] `JIT` 即时编译基础（可选 x64 整数原生代码后端，默认关闭；`--jit`，范围与构建见 [doc/jit.md](doc/jit.md)）
   * [x] `CFG` 控制流图生成（基本块级，含跳转/终止/try 隐式异常边，`src/gen/ControlFlowGraph.cpp`）
   * [ ] `SSA` 静态单赋值构造
   * [x] `常量传播` 与块间状态分析（块内溢出安全整数折叠 + 唯一前驱块间继承，`src/gen/Optimizer.cpp`）
   * [x] `死代码消除`（活跃性分析驱动的死 `LoadImm` 清理；常量池 `Load` 因实例化对象保守保留）
   * [x] `循环优化`（回边检测——支配树 + 自然循环识别，`ControlFlowGraph::getLoops()`；循环体变换待后续）
-  * [ ] `尾递归消除`
-  * [ ] `Trace JIT` 热路径跟踪
-  * [ ] `可视化调试`（控制流部分已接入：`cial --dump-cfg <script>` 导出各 chunk 的 DOT 图——基本块/TAC、边分类、回边标红、循环头高亮；执行路径分析待后续）
+  * [x] `尾递归消除`（显式 `--tail-recursion`，保守数值自递归子集；见 [doc/tail-recursion.md](doc/tail-recursion.md)）
+  * [x] `Trace JIT` 热路径跟踪基础（热点计数、路径录制、分支守卫与失败回退；`--trace-jit`，见 [doc/jit.md](doc/jit.md)）
+  * [x] `可视化调试`（`--dump-cfg` 导出静态控制流；`--trace-execution <script> <output.dot>` 记录真实字节码节点、执行次数与跨帧路径；见 [doc/execution-trace.md](doc/execution-trace.md)）
 
 ---
 
@@ -153,9 +153,7 @@ cmake --preset "Windows Local Bench" && cmake --build --preset "Windows Local Be
 cmake --build build/Windows/Bench --target conformance-report
 ```
 
-报告落盘 `bench/results/`。当前与原版 TJS2（Release）wall-time 比值（2026-10-25，
-本机多轮波动 ±10%）：
-类实例化 ≈112%、整数循环 ≈121~127%、fib(25) ≈114~130%、字符串拼接 ≈151~155%。
+报告落盘 `bench/results/`。同机实测、统计口径与性能缺口见 [doc/performance.md](doc/performance.md)；不同机器和不同批次的历史比例不可直接比较。可选 JIT 与尾递归当前以受限子集的正确性为主，尚不能视为全程序性能追平。
 
 ---
 
@@ -163,9 +161,9 @@ cmake --build build/Windows/Bench --target conformance-report
 
 * ~~完整实现 TJS2 标准库~~（已完成：Date.parse 完整文法 / RegExp.last+码点位置 / Array·Dictionary save·load·pack 系）
 * ~~字节码兼容~~（**已完成 M1–M4**：加载 TJS2 编译产物转译执行，`cial --tjsbc`；128 操作码转译覆盖，tjs2 语料全量通过，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)）
-* 性能追平原版（当前 112~155%，方向见 [TODO.md](TODO.md)：实参直写被调帧窗口、Value 内联 SSO、调用点内联缓存）
+* 性能追平原版（仍有差距；已完成的优化和后续方向见 [TODO.md](TODO.md)、[性能记录](doc/performance.md)）
 * 扩展编译优化（CFG、跨块整数常量传播、死加载清理、比较/Test 融合和回边检测已接入；见 `src/gen/Optimizer.cpp`）
-* 集成 **LSP (Language Server Protocol)**，支持 VSCode / IDEA 智能提示
+* **LSP 基础已接入**：语法诊断、词法补全、内置提示与文档符号，含 VSCode 客户端；IDEA/CLion 可接通用 stdio LSP 客户端，尚未提供 JetBrains 专用插件。跨文件语义补全与 IDE 交互验证待后续（[doc/lsp.md](doc/lsp.md)，`tools/lsp/`、`editors/vscode/`）
 
 ---
 
@@ -207,4 +205,5 @@ MIT License
 Windows 预设使用 `x64-windows-static` 与静态 CRT，测试无需复制依赖 DLL（`CMakePresets.json`）。
 Release 配置若缺少优化标志会直接报错，避免污染性能数据（`CMakeLists.txt`）。
 GitHub Actions 覆盖 Linux/macOS/Windows 的 Debug 与 Release，构建 CLI/测试并执行 CTest
-（`.github/workflows/ci.yml`）；本机验证结果与基准见 [TODO.md](TODO.md)。
+，另有 Windows x64 Release 启用 JIT 的验证配置
+（`.github/workflows/ci.yml`；新增配置尚未在远端运行）；本机验证结果与基准见 [TODO.md](TODO.md)。

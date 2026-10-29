@@ -381,12 +381,36 @@ namespace cial::vm {
     }
 
     void VMState::run0() {
+        if(_executionTrace) {
+            if(_tailRecursionEnabled)
+                runLoop<true, false, true>();
+            else
+                runLoop<true, false, false>();
+        } else if(_integerJit) {
+            if(_tailRecursionEnabled)
+                runLoop<false, true, true>();
+            else
+                runLoop<false, true, false>();
+        } else {
+            if(_tailRecursionEnabled)
+                runLoop<false, false, true>();
+            else
+                runLoop<false, false, false>();
+        }
+    }
+
+    template <bool Record, bool Native, bool Tail>
+    void VMState::runLoop() {
         const size_t entryStackTop = _stackTop;
         if(entryStackTop == 0)
             return;
 
+        ExecutionTrace::RunGuard traceRun{ Record ? _executionTrace : nullptr };
+
         for(;;) {
         FETCH_NEW_FRAME:
+            if constexpr(Native)
+                _integerJit->breakTrace();
             CallFrame *cur = _curFrame;
             u64 pc = cur->pc;
             Chunk *chunk = cur->chunk;
@@ -401,19 +425,31 @@ namespace cial::vm {
 
             while(pc < bcSize) {
                 DispatchRet r{};
+                [[maybe_unused]] const u64 instructionPc = pc;
+                [[maybe_unused]] bool dispatched = false;
                 try {
                     if(!rt.markSweep.pendingFinalizers.empty() && !rt.markSweep.drainingFinalizers) {
                         cur->pc = pc;
                         drainFinalizers();
                     }
+                    if constexpr(Record)
+                        _executionTrace->record(*chunk, pc, rt, cur->funcMeta);
+                    if constexpr(Native) {
+                        if(_integerJit->tryRun(*chunk, regs, pc, _zf))
+                            continue;
+                    }
                     switch(static_cast<VmOpCode>(ip[pc++])) {
 #define DISPATCH_CASE(op)                                                                                              \
     case VmOpCode::op:                                                                                                 \
-        r = dispatch##op(cur, constants, regs, ip, pc);                                                                \
+        if constexpr(Tail && VmOpCode::op == VmOpCode::CallV)                                                          \
+            r = dispatchTailCallV(cur, regs, ip, pc);                                                                  \
+        else                                                                                                           \
+            r = dispatch##op(cur, constants, regs, ip, pc);                                                            \
         break;
                         CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_CASE)
 #undef DISPATCH_CASE
                     }
+                    dispatched = true;
                 } catch(ScriptExceptionCarrier &carried) {
                     // 回调异常（VM::callValue 哨兵截获）：转入脚本异常协议，
                     // 由下方 unwind 恢复外层脚本 try/catch（栈空时 unwind 抛终态）
@@ -465,6 +501,13 @@ namespace cial::vm {
                         }
                     }
                     cur->pc = pc;
+                }
+
+                if constexpr(Native) {
+                    if(dispatched && r == DispatchRet::Continue && _pending == PendingCF::None)
+                        _integerJit->observe(*chunk, instructionPc, pc);
+                    else
+                        _integerJit->breakTrace();
                 }
 
                 if(r == DispatchRet::Call) {
@@ -1279,6 +1322,27 @@ namespace cial::vm {
         return invokeCallV(cur, regs, dst, func, argRegs, argc, pc);
     }
 
+    DispatchRet VMState::dispatchTailCallV(CallFrame *cur, Value *regs, const u8 *ip, u64 &pc) {
+        const u16 dst = read<u16>(ip, pc);
+        const u16 func = read<u16>(ip, pc);
+        const u64 argc = decodeUleb128(ip, pc, 10);
+        if(argc > 64)
+            throw std::runtime_error("too many arguments");
+        u16 args[64]{};
+        for(u64 i = 0; i < argc; ++i)
+            args[i] = read<u16>(ip, pc);
+        if(regs[func].isObject()) {
+            auto *callee = regs[func].asObject().unwrap();
+            if(callee->typeId() == TypeId::Function) {
+                auto *meta = static_cast<Function *>(callee)->meta;
+                if(meta == cur->funcMeta && meta->tailRecursionSafe != 0 &&
+                   trySelfTailCall(cur, regs, callee, dst, args, static_cast<u32>(argc), pc))
+                    return DispatchRet::Call;
+            }
+        }
+        return invokeCallV(cur, regs, dst, func, args, argc, pc);
+    }
+
     DISPATCH_OP_METHOD(CallMethodV) {
         const u16 receiverReg = read<u16>(ip, pc);
         const u16 dst = read<u16>(ip, pc);
@@ -1290,6 +1354,132 @@ namespace cial::vm {
         for(u64 i = 0; i < argc; ++i)
             args[i] = read<u16>(ip, pc);
         return invokeCallV(cur, regs, dst, func, args, argc, pc, &regs[receiverReg]);
+    }
+
+    namespace {
+        // 无外部调用、动态状态访问或堆对象操作的函数，帧局部数值才可安全丢弃。
+        bool numericSelfRecursion(const FuncMeta &meta) {
+            using inter::TacOpCode;
+            const auto &chunk = *meta.chunk;
+            if(meta.hasCollapse || !chunk.getThrowHandlers().empty())
+                return false;
+            bool hasTailReturn = false;
+            const auto &instructions = meta.chunk->getInstVec();
+            for(size_t i = 0; i + 1 < instructions.size(); ++i) {
+                if(instructions[i]->opcode() == TacOpCode::CallV && instructions[i + 1]->opcode() == TacOpCode::Ret &&
+                   static_cast<const inter::CallV &>(*instructions[i]).dst ==
+                       instructions[i + 1]->getOp1().value<inter::Register>())
+                    hasTailReturn = true;
+            }
+            if(!hasTailReturn)
+                return false;
+            Vec<bool> selfRegisters(chunk.getRegCount(), false);
+            for(const auto &instruction : meta.chunk->getInstVec()) {
+                if(instruction->opcode() == TacOpCode::GThis) {
+                    if(instruction->getOp1().value<Atom>() != meta.name)
+                        return false;
+                    selfRegisters[instruction->getOp2().value<inter::Register>().index()] = true;
+                }
+            }
+            for(const auto &instruction : meta.chunk->getInstVec()) {
+                Opt<inter::Register> destination;
+                switch(instruction->opcode()) {
+                    case TacOpCode::NOP:
+                    case TacOpCode::Ret:
+                    case TacOpCode::Test:
+                    case TacOpCode::Jmp:
+                    case TacOpCode::JmpE:
+                    case TacOpCode::JmpNE:
+                    case TacOpCode::GThis:
+                        continue;
+                    case TacOpCode::Load: {
+                        const auto kind = chunk.getConstant(instruction->getOp2().value<ConstIdx>()).type();
+                        if(kind != ConstantType::None && kind != ConstantType::Real)
+                            return false;
+                        destination = instruction->getOp1().value<inter::Register>();
+                        break;
+                    }
+                    case TacOpCode::LoadImm:
+                        destination = instruction->getOp1().value<inter::Register>();
+                        break;
+                    case TacOpCode::GLocal:
+                    case TacOpCode::DLocal:
+                    case TacOpCode::TestVoid:
+                    case TacOpCode::ChgSign:
+                    case TacOpCode::LNot:
+                        destination = instruction->getOp2().value<inter::Register>();
+                        break;
+                    case TacOpCode::Add:
+                    case TacOpCode::Sub:
+                    case TacOpCode::Mul:
+                    case TacOpCode::Div:
+                    case TacOpCode::Idiv:
+                    case TacOpCode::Mod:
+                    case TacOpCode::EQ:
+                    case TacOpCode::NEQ:
+                    case TacOpCode::AbsEQ:
+                    case TacOpCode::AbsNEQ:
+                    case TacOpCode::LT:
+                    case TacOpCode::LE:
+                    case TacOpCode::GT:
+                    case TacOpCode::GE:
+                    case TacOpCode::CompareTest:
+                        destination = instruction->getOp3().value<inter::Register>();
+                        break;
+                    case TacOpCode::CallV: {
+                        const auto &call = static_cast<const inter::CallV &>(*instruction);
+                        if(!selfRegisters[call.func.index()])
+                            return false;
+                        destination = call.dst;
+                        break;
+                    }
+                    default:
+                        return false;
+                }
+                if(destination && selfRegisters[destination->index()])
+                    return false; // 函数寄存器不得有其他定义（包含跨块重用）。
+            }
+            return true;
+        }
+        bool tailNumber(const Value &value) { return value.isIntegerFast() || value.isReal() || value.isVoid(); }
+    } // namespace
+
+    bool VMState::trySelfTailCall(CallFrame *cur, Value *regs, Object *callee, const u16 dst, const u16 *argRegs,
+                                  const u32 argc, const u64 pc) {
+        auto *fn = static_cast<Function *>(callee);
+        auto *meta = fn->meta;
+        if(meta->tailRecursionSafe < 0)
+            meta->tailRecursionSafe = numericSelfRecursion(*meta) ? 1 : 0;
+        if(!meta->tailRecursionSafe || argc != meta->arity || cur->actualArgc != meta->arity || cur->closure ||
+           !(cur->thisObj.isVoid() ||
+             (cur->thisObj.isObject() && cur->thisObj.asObject().unwrap() == context.global())))
+            return false;
+        const auto &code = cur->chunk->code();
+        if(pc + 3 > code.size() || code[pc] != static_cast<u8>(VmOpCode::Ret))
+            return false;
+        u64 next = pc + 1;
+        if(read<u16>(code.data(), next) != dst)
+            return false;
+        const Value *globalSelf = context.global()->findPropRef(meta->name);
+        if(!globalSelf || !globalSelf->isObject() || globalSelf->asObject().unwrap() != callee ||
+           (fn->thisObj && fn->thisObj != context.global()))
+            return false;
+        for(u32 i = 0; i < cur->chunk->getRegCount(); ++i)
+            if(!tailNumber(regs[i]) && !(regs[i].isObject() && regs[i].asObject().unwrap() == callee))
+                return false;
+        for(u32 i = 0; i < argc; ++i)
+            if(!tailNumber(regs[argRegs[i]]))
+                return false;
+        Value arguments[64];
+        for(u32 i = 0; i < argc; ++i)
+            arguments[i] = regs[argRegs[i]];
+        for(u32 i = 0; i < cur->chunk->getRegCount(); ++i)
+            regs[i] = Value{};
+        for(u32 i = 0; i < argc; ++i)
+            regs[i] = arguments[i];
+        cur->pc = 0;
+        ++_tailCallsEliminated;
+        return true;
     }
 
     DispatchRet VMState::invokeCallV(CallFrame *cur, Value *regs, const u16 dst, const u16 func, const u16 *argRegs,

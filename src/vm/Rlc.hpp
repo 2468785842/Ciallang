@@ -25,8 +25,13 @@ namespace cial::vm {
         explicit Rlc(std::filesystem::path path) : _path(std::move(path)) {}
 
         void addBytecodeLine(size_t bytecodeIndex, Common::SourceLocation sourceLine) {
-            if(contains(sourceLine)) {
-                _bytecodeMapLine.pop_back();
+            if(!_bytecodeMapLine.empty()) {
+                if(_bytecodeMapLine.back().first == bytecodeIndex) {
+                    _bytecodeMapLine.back().second = sourceLine;
+                    return;
+                }
+                if(_bytecodeMapLine.back().second == sourceLine)
+                    return;
             }
             _bytecodeMapLine.emplace_back(bytecodeIndex, sourceLine);
         }
@@ -47,6 +52,7 @@ namespace cial::vm {
         [[nodiscard]] std::vector<std::pair<size_t, Common::SourceLocation>> &rawEntries() {
             return _bytecodeMapLine;
         }
+        [[nodiscard]] const auto &rawEntries() const noexcept { return _bytecodeMapLine; }
 
     private:
         // 行默认是按序插入, from 0 start

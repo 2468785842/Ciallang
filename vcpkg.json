@@ -2,6 +2,12 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "ciallang",
   "version-string": "1.0.0",
+  "features": {
+    "jit": {
+      "description": "Optional x64 integer JIT backend",
+      "dependencies": ["asmjit"]
+    }
+  },
   "dependencies": [
     {
       "name": "argparse",

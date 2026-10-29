@@ -12,6 +12,16 @@
 
 - [本轮性能与验证](performance.md)：同机 Release 对照及验证范围（来源：`bench/*.tjs`、`src/vm/VMState.cpp`）。
 
+## 优化与开发工具
+
+| 文档 | 内容 |
+|---|---|
+| [ssa.md](ssa.md) | 按需 SSA、支配关系与定义链分析 |
+| [jit.md](jit.md) | 可选 x64 整数 JIT、热点路径录制、守卫和解释器回退 |
+| [tail-recursion.md](tail-recursion.md) | 显式启用的数值自尾递归消除与保守边界 |
+| [execution-trace.md](execution-trace.md) | 真实执行路径与计数 DOT 导出 |
+| [lsp.md](lsp.md) | stdio LSP、编译诊断与 VSCode 客户端接入 |
+
 ## 字节码（新旧项目）
 
 | 文档 | 内容 |
