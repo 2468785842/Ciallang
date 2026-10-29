@@ -10,6 +10,8 @@
 //                                                            \_/__/
 //
 
+#include <cstring>
+
 #include "Octet.hpp"
 
 namespace cial {

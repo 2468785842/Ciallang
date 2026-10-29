@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <ctime>
+#include <limits>
 
 namespace cial::stdlib {
 

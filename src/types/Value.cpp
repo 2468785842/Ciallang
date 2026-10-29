@@ -10,6 +10,8 @@
 //                                                            \_/__/
 //
 
+#include <cstring>
+
 #include "Value.hpp"
 
 #include "Octet.hpp"

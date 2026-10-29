@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include <limits>
+
 #include "Label.hpp"
 #include "Register.hpp"
 #include "common/Result.hpp"

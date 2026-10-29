@@ -13,6 +13,7 @@
  */
 #pragma once
 
+#include <limits>
 #include <ranges>
 
 #include <fmt/format.h>

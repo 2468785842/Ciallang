@@ -3,6 +3,8 @@
 //
 #pragma once
 
+#include <cstring>
+
 #include "config.h"
 #include "gen/Instruction.hpp"
 #include "types/Types.hpp"

@@ -4,6 +4,7 @@
 #include "TjsTranslator.hpp"
 
 #include <cstring>
+#include <limits>
 #include <map>
 
 

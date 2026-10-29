@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstring>
 #include <fmt/ostream.h>
 
 #include "common/Hash.hpp"
