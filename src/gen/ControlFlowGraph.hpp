@@ -45,6 +45,10 @@ namespace cial::inter {
         // 自然循环集合（buildCFG 时计算；不可达块不参与，同表头回边合并）
         const Vec<LoopInfo> &getLoops() const { return _loops; }
 
+        // DOT 格式控制流图：节点=基本块（TAC 区间+指令文本），边按终结指令标注
+        // jmp/cond/fall/exc，回边标红，循环头高亮。指令文本取自 chunk.dumpInstructions()。
+        [[nodiscard]] std::string dumpDot(vm::Chunk &chunk) const;
+
     private:
         void detectLoops();
 

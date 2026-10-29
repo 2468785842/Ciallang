@@ -44,7 +44,7 @@
 
 > 细节见各提交信息；字节码批次见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)，性能见 doc/performance.md。
 
-- 2026-10-29 常量传播与测试主线回归批次：整数常量 pass 升级为块间状态分析（唯一前驱块继承前驱出口常量状态，回边/多前驱/try handler 汇聚保守放弃）；CFG 增加支配树回边检测与自然循环识别（getLoops，循环体变换待后续）；CFG/常量传播/死代码消除/循环优化（回边检测）在 README 核心特性清单勾选；statement/type_system/ieee/integration 四个历史测试文件修复为现代 API 回归主线（120→149 用例）；Windows 首次双引擎基准与文档同步见 doc/performance.md
+- 2026-10-29 常量传播与测试主线回归批次：整数常量 pass 升级为块间状态分析（唯一前驱块继承前驱出口常量状态，回边/多前驱/try handler 汇聚保守放弃）；CFG 增加支配树回边检测与自然循环识别（getLoops，循环体变换待后续）+ `cial --dump-cfg` 导出各 chunk 控制流图 DOT（回边标红/循环头高亮，可视化调试-控制流部分）；README 核心特性清单勾选 CFG/常量传播/死代码消除/循环优化（回边检测）；statement/type_system/ieee/integration 四个历史测试文件修复为现代 API 回归主线（120→150 用例）；Windows 首次双引擎基准与文档同步见 doc/performance.md；CI 首次推送运行，修复三处移植性问题后六配置全绿
 - 2026-10-28 macOS 构建验证：修正 DateParser `::tzset()` 命名空间与系统头引用，fuzz 测试 CRT 断言重定向限定 MSVC，双配置 110/110 通过
 - 2026-10-28 性能批次：成员名 Atom 直引指令 GPropC/DPropC/GPropRawC/DPropRawC/DelPropC（86→92 条）+ CallV 实参直写 argWindowDirect 帧布局；fib 内部计时 -25%
 - 2026-10-27 源码前端补齐：`...`/`*` 语法（收拢参数/展开调用/省略透传），test_function 源码路径全量通过；连带修复 parseScope 深前视门控

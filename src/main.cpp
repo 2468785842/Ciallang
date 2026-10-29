@@ -14,10 +14,13 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
+#include <algorithm>
+
 #ifdef _MSC_VER
 #include <crtdbg.h>
 #endif
 
+#include "gen/ControlFlowGraph.hpp"
 #include "stdlib/ExceptionLib.hpp"
 #include "tjsbc/TjsBytecodeReader.hpp"
 #include "tjsbc/TjsTranslator.hpp"
@@ -42,7 +45,7 @@ static const bool g_redirectCrtReport = [] {
 
 int main(const int argc, char **argv) {
     if(argc < 2) {
-        fmt::println("Usage: cial <script-file>");
+        fmt::println("Usage: cial <script-file>\n       cial --dump-cfg <script-file>");
         return 0;
     }
 
@@ -119,6 +122,64 @@ var Debug = new __DebugShim();
         const auto end = std::chrono::high_resolution_clock::now();
         const auto duration = duration_cast<std::chrono::nanoseconds>(end - start);
         fmt::println("Time taken by function: {}ns", duration.count());
+        return 0;
+    }
+
+    // --dump-cfg <script.tjs>:编译(含优化)后输出各 chunk 控制流图 DOT,不执行脚本。
+    // 节点=基本块(带 TAC 区间与指令文本),回边标红,循环头高亮,可用于核对
+    // 优化器块划分与循环识别(ControlFlowGraph::getLoops)
+    if(std::string(argv[1]) == "--dump-cfg") {
+        if(argc < 3) {
+            fmt::println("Usage: cial --dump-cfg <script-file>");
+            return 1;
+        }
+        try {
+            Common::Result r{};
+            Common::SourceFile sf{ argv[2] };
+            sf.load(r);
+            if(r.isFailed())
+                throw std::runtime_error("cannot load source file");
+            syntax::Parser parser{ sf, context.pp() };
+            syntax::AstNode *node = parser.parse(r);
+            if(!node || r.isFailed())
+                throw std::runtime_error("cannot parse script");
+            inter::IRGenerator codeGen{ r, rt, sf };
+            OptReg ir{};
+            auto topLevel = codeGen.parseAst(node, ir);
+            if(!topLevel)
+                throw std::runtime_error("cannot compile script");
+            vm::Chunk *topChunk = &topLevel.value();
+
+            // 顶层 chunk + 常量池中 FuncMeta 指向的嵌套函数 chunk（递归、去重）
+            auto funcName = [&](const FuncMeta *meta) {
+                if(const auto *entry = rt.atomTable.get(meta->name); entry && entry->str && entry->str->length() > 0)
+                    return entry->str->toStdStr();
+                return std::string("func");
+            };
+            Vec<std::pair<std::string, vm::Chunk *>> pending{ { "top-level", topChunk } };
+            Vec<vm::Chunk *> visited;
+            while(!pending.empty()) {
+                auto [name, chunk] = pending.back();
+                pending.pop_back();
+                if(std::ranges::find(visited, chunk) != visited.end())
+                    continue;
+                visited.push_back(chunk);
+                for(const auto &constant : chunk->getConstants()) {
+                    if(constant.type() != ConstantType::FuncMeta)
+                        continue;
+                    const auto *meta = constant.value<FuncMeta *>();
+                    if(meta && meta->chunk)
+                        pending.emplace_back(funcName(meta), meta->chunk);
+                }
+                inter::ControlFlowGraph cfg;
+                cfg.buildCFG(*chunk);
+                fmt::println("// ===== {} =====", name);
+                fmt::println("{}", cfg.dumpDot(*chunk));
+            }
+        } catch(const std::exception &e) {
+            fmt::println(stderr, "cial: {}", e.what());
+            return 1;
+        }
         return 0;
     }
 

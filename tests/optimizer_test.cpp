@@ -186,6 +186,32 @@ TEST_CASE("optimizer - ignores loops inside unreachable blocks") {
     REQUIRE(cfg.getLoops().empty());
 }
 
+TEST_CASE("optimizer - dumpDot renders blocks, loop headers and back edges") {
+    vm::Chunk chunk;
+    chunk.emit<LoadImm>(Register{ 1 }, 5); // 0
+    chunk.emit<Jmp>(Label{ 3 }); // 1 → 循环头
+    chunk.emit<Add>(Register{ 1 }, Register{ 1 }, Register{ 1 }); // 2 latch
+    chunk.emit<LoadImm>(Register{ 2 }, 7); // 3 循环头
+    chunk.emit<JmpE>(Label{ 2 }); // 4 回边目标
+    chunk.emit<inter::Ret>(Register{ 1 }); // 5
+    chunk.setRegCount(3);
+
+    ControlFlowGraph cfg;
+    (void)cfg.buildCFG(chunk);
+    const auto dot = cfg.dumpDot(chunk);
+
+    REQUIRE(dot.rfind("digraph CFG", 0) == 0);
+    // 循环头节点高亮并带注记
+    REQUIRE(dot.find("(loop header)") != std::string::npos);
+    REQUIRE(dot.find("fillcolor=lightblue") != std::string::npos);
+    // latch→header 回边标红；其余边按终结指令标类别
+    REQUIRE(dot.find("B1 -> B2 [color=red label=\"back fall\"]") != std::string::npos);
+    REQUIRE(dot.find("B2 -> B1 [label=\"cond\"]") != std::string::npos);
+    REQUIRE(dot.find("B2 -> B3 [label=\"fall\"]") != std::string::npos);
+    // 指令文本进入节点 label（dump 的操作码名随版本可能是大写或小写）
+    REQUIRE((dot.find("load_imm") != std::string::npos || dot.find("LoadImm") != std::string::npos));
+}
+
 TEST_CASE("optimizer - remaps try ranges and source lines while compacting NOPs") {
     vm::Chunk chunk;
     chunk.emit<NOP>();

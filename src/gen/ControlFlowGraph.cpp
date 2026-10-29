@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 
 #include "vm/Chunk.hpp"
@@ -259,6 +260,107 @@ namespace cial::inter {
         }
 
         std::ranges::sort(_loops, [](const LoopInfo &lhs, const LoopInfo &rhs) { return lhs.header < rhs.header; });
+    }
+
+    std::string ControlFlowGraph::dumpDot(vm::Chunk &chunk) const {
+        const auto &code = chunk.getInstVec();
+
+        // dumpInstructions 每行形如 "@<idx>    : <text>"，按行前缀切出单条指令文本
+        Vec<std::string> instText(code.size());
+        std::istringstream dumpStream{chunk.dumpInstructions().toStdStr()};
+        std::string line;
+        while(std::getline(dumpStream, line)) {
+            if(line.size() < 2 || line[0] != '@')
+                continue;
+            size_t pos = 1;
+            size_t index = 0;
+            while(pos < line.size() && line[pos] >= '0' && line[pos] <= '9') {
+                index = index * 10 + static_cast<size_t>(line[pos] - '0');
+                ++pos;
+            }
+            if(pos == 1 || index >= code.size())
+                continue;
+            const size_t separator = line.find(':', pos);
+            if(separator == std::string::npos)
+                continue;
+            size_t begin = separator + 1;
+            while(begin < line.size() && line[begin] == ' ')
+                ++begin;
+            instText[index] = line.substr(begin);
+        }
+
+        auto escape = [](const std::string &text) {
+            std::string out;
+            out.reserve(text.size());
+            for(const char ch : text) {
+                if(ch == '"')
+                    out += "\\\"";
+                else if(ch == '\\')
+                    out += "\\\\";
+                else
+                    out += ch;
+            }
+            return out;
+        };
+
+        auto isLoopHeader = [&](const size_t block) {
+            return std::ranges::any_of(_loops, [&](const LoopInfo &loop) { return loop.header == block; });
+        };
+        // 边 u→v 是回边当且仅当 v 是某循环的 header 且 u 在该循环体内
+        auto isBackEdge = [&](const size_t source, const size_t target) {
+            return std::ranges::any_of(_loops, [&](const LoopInfo &loop) {
+                return loop.header == target &&
+                    std::ranges::find(loop.body, source) != loop.body.end();
+            });
+        };
+
+        std::ostringstream out;
+        out << "digraph CFG {\n  node [shape=box fontname=monospace fontsize=10];\n";
+        for(size_t i = 0; i < _basicBlocks.size(); ++i) {
+            const auto &block = _basicBlocks[i];
+            out << "  B" << i << " [label=\"B" << i << " [" << block.start << ".." << block.end << ")";
+            if(isLoopHeader(i))
+                out << " (loop header)";
+            out << "\\n";
+            for(size_t pc = block.start; pc < block.end; ++pc) {
+                out << escape(instText[pc]);
+                if(pc + 1 < block.end)
+                    out << "\\n";
+            }
+            out << "\"";
+            if(isLoopHeader(i))
+                out << " fillcolor=lightblue style=filled";
+            out << "];\n";
+        }
+
+        for(size_t i = 0; i < _basicBlocks.size(); ++i) {
+            const auto &block = _basicBlocks[i];
+            if(block.successors.empty())
+                continue;
+            // 按终结指令给边标注类别；try handler 的额外后继排在尾部，标 exc
+            const TacOpCode lastOp = code[block.end - 1]->opcode();
+            const char *kinds[2] = {"fall", "fall"};
+            size_t expected = 1;
+            if(lastOp == TacOpCode::Jmp)
+                kinds[0] = "jmp";
+            else if(isConditionalJump(lastOp)) {
+                kinds[0] = "cond";
+                kinds[1] = "fall";
+                expected = 2;
+            }
+            for(size_t successorIndex = 0; successorIndex < block.successors.size(); ++successorIndex) {
+                const size_t successor = block.successors[successorIndex];
+                const char *kind = successorIndex < expected ? kinds[successorIndex] : "exc";
+                out << "  B" << i << " -> B" << successor;
+                if(isBackEdge(i, successor))
+                    out << " [color=red label=\"back " << kind << "\"]";
+                else
+                    out << " [label=\"" << kind << "\"]";
+                out << ";\n";
+            }
+        }
+        out << "}\n";
+        return out.str();
     }
 
 } // namespace cial::inter
