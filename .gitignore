@@ -17,6 +17,7 @@ bench/results/
 
 # AI 会话工作目录
 .zcode/
+/.codex/
 
 # 其他
 **/.cache
