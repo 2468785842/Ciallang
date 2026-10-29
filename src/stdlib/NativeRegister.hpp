@@ -81,6 +81,7 @@ namespace cial {
         void registerMethod(const TypeId typeId, const Atom name, Callable &&fn) {
             auto *nativeFn = _rt.create<NativeFunction>(std::forward<Callable>(fn)).get();
             tables[typeId].instanceMethods[name] = nativeFn;
+            ++revision;
         }
 
         template <typename T, typename Callable>
@@ -97,6 +98,7 @@ namespace cial {
 
         void registerProperty(const TypeId typeId, const Atom name, const NativePropGetter getter) {
             tables[typeId].instanceProperties[name] = getter;
+            ++revision;
         }
 
         template <typename T>
@@ -133,6 +135,8 @@ namespace cial {
             const Atom a = _rt.atomTable.intern(name);
             return findMethod<T>(a);
         }
+
+        u64 revision{}; // VM 调用点缓存随宿主注册/替换方法失效
 
     private:
         Map<TypeId, MethodTable> tables{};

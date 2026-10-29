@@ -18,98 +18,104 @@
 #include "runtime/AtomTable.hpp"
 #include "vm/Constant.hpp"
 
-#define CIAL_TAC_OPCODE_ENUMS(O)                                                                                       \
-    O(NOP)                                                                                                             \
-    O(Debugger)                                                                                                        \
-    O(Push)                                                                                                            \
-    O(PopN)                                                                                                            \
-    O(Global)                                                                                                          \
-    O(Super)                                                                                                           \
-    O(This)                                                                                                            \
-    O(Test)                                                                                                            \
-    O(Inv)                                                                                                             \
-    O(Throw)                                                                                                           \
-    O(Ret)                                                                                                             \
-    O(Jmp)                                                                                                             \
-    O(JmpE)                                                                                                            \
-    O(JmpNE)                                                                                                           \
-    O(ToInt)                                                                                                           \
-    O(ToReal)                                                                                                          \
-    O(Asc)                                                                                                            \
-    O(Chr)                                                                                                             \
-    O(ToString)                                                                                                        \
-    O(TypeOf)                                                                                                           \
-    O(LNot)                                                                                                            \
-    O(ChgSign)                                                                                                         \
-    O(ChgThis)                                                                                                         \
-    O(ChkInv)                                                                                                          \
-    O(EvalStr)                                                                                                         \
-    O(ChkIns)                                                                                                          \
-    O(TestVoid)                                                                                                        \
-    O(Load)                                                                                                            \
-    O(LoadImm)                                                                                                         \
-    O(DGlobal)                                                                                                         \
-    O(GGlobal)                                                                                                         \
-    O(GThis)                                                                                                           \
-    O(DThis)                                                                                                           \
-    O(GLocal)                                                                                                          \
-    O(DLocal)                                                                                                          \
-    O(Add)                                                                                                             \
-    O(Sub)                                                                                                             \
-    O(Mul)                                                                                                             \
-    O(Div)                                                                                                             \
-    O(Idiv)                                                                                                            \
-    O(Mod)                                                                                                             \
-    O(BXor)                                                                                                            \
-    O(BOr)                                                                                                             \
-    O(BAnd)                                                                                                            \
-    O(BlShift)                                                                                                         \
-    O(BrShift)                                                                                                         \
-    O(BurShift)                                                                                                        \
-    O(EQ)                                                                                                              \
-    O(NEQ)                                                                                                             \
-    O(AbsEQ)                                                                                                           \
-    O(AbsNEQ)                                                                                                          \
-    O(LT)                                                                                                              \
-    O(LE)                                                                                                              \
-    O(GT)                                                                                                              \
-    O(GE)                                                                                                              \
-    O(LAnd)                                                                                                            \
-    O(LOr)                                                                                                             \
-    O(Call)                                                                                                            \
-    O(GProp)                                                                                                           \
-    O(DProp)                                                                                                           \
-    O(DelProp)                                                                                                         \
-    O(GPropRaw)                                                                                                        \
-    O(GRefRaw)                                                                                                         \
-    O(DPropRaw)                                                                                                        \
-    O(DerefGet)                                                                                                        \
-    O(DerefSet)                                                                                                        \
-    O(NewArray)                                                                                                        \
-    O(NewDict)                                                                                                         \
-    O(GetIndex)                                                                                                        \
-    O(SetIndex)                                                                                                        \
-    O(WithPush)                                                                                                        \
-    O(WithPop)                                                                                                         \
-    O(GetWith)                                                                                                         \
-    O(NewRegExp)                                                                                                            O(CallV)                                                                                                           \
-    O(CallOmit)                                                                                                        \
-    O(CallExpand)                                                                                                      \
-    O(CollapseArgs)                                                                                                    \
-    O(CmpEQ)                                                                                                           \
-    O(CmpDEQ)                                                                                                          \
-    O(CmpLT)                                                                                                           \
-    O(CmpGT)                                                                                                           \
-    O(Inc)                                                                                                             \
-    O(Dec)                                                                                                             \
-    O(BNot)                                                                                                            \
-    O(ToNumber)                                                                                                        \
-    O(ToOctet)                                                                                                         \
-    O(GPropC)                                                                                                          \
-    O(DPropC)                                                                                                          \
-    O(GPropRawC)                                                                                                       \
-    O(DPropRawC)                                                                                                       \
-    O(DelPropC)
+// clang-format off
+#define CIAL_TAC_OPCODE_ENUMS(O) \
+    O(NOP) \
+    O(Debugger) \
+    O(Push) \
+    O(PopN) \
+    O(Global) \
+    O(Super) \
+    O(This) \
+    O(Test) \
+    O(Inv) \
+    O(Throw) \
+    O(Ret) \
+    O(Jmp) \
+    O(JmpE) \
+    O(JmpNE) \
+    O(ToInt) \
+    O(ToReal) \
+    O(Asc) \
+    O(Chr) \
+    O(ToString) \
+    O(TypeOf) \
+    O(LNot) \
+    O(ChgSign) \
+    O(ChgThis) \
+    O(ChkInv) \
+    O(EvalStr) \
+    O(ChkIns) \
+    O(TestVoid) \
+    O(Load) \
+    O(LoadImm) \
+    O(DGlobal) \
+    O(GGlobal) \
+    O(GThis) \
+    O(DThis) \
+    O(GLocal) \
+    O(DLocal) \
+    O(Add) \
+    O(Sub) \
+    O(Mul) \
+    O(Div) \
+    O(Idiv) \
+    O(Mod) \
+    O(BXor) \
+    O(BOr) \
+    O(BAnd) \
+    O(BlShift) \
+    O(BrShift) \
+    O(BurShift) \
+    O(EQ) \
+    O(NEQ) \
+    O(AbsEQ) \
+    O(AbsNEQ) \
+    O(LT) \
+    O(LE) \
+    O(GT) \
+    O(GE) \
+    O(LAnd) \
+    O(LOr) \
+    O(Call) \
+    O(GProp) \
+    O(DProp) \
+    O(DelProp) \
+    O(GPropRaw) \
+    O(GRefRaw) \
+    O(DPropRaw) \
+    O(DerefGet) \
+    O(DerefSet) \
+    O(NewArray) \
+    O(NewDict) \
+    O(GetIndex) \
+    O(SetIndex) \
+    O(WithPush) \
+    O(WithPop) \
+    O(GetWith) \
+    O(NewRegExp) \
+    O(CallV) \
+    O(CallOmit) \
+    O(CallExpand) \
+    O(CollapseArgs) \
+    O(CmpEQ) \
+    O(CmpDEQ) \
+    O(CmpLT) \
+    O(CmpGT) \
+    O(Inc) \
+    O(Dec) \
+    O(BNot) \
+    O(ToNumber) \
+    O(ToOctet) \
+    O(GPropC) \
+    O(DPropC) \
+    O(GPropRawC) \
+    O(DPropRawC) \
+    O(DelPropC) \
+    O(CompareTest) \
+    O(GMethodC) \
+    O(CallMethodV)
+// clang-format on
 
 namespace cial::vm {
     class VMState;
@@ -402,6 +408,38 @@ namespace cial::inter {
         [[nodiscard]] TacOpCode opcode() const override { return TacOpCode::CallV; }
 
         [[nodiscard]] std::string dump(const vm::VMState *vmState) override;
+    };
+
+    struct CompareTest : Instruction {
+        TacOpCode comparison;
+        CompareTest(TacOpCode op, Register lhs, Register rhs, Register dst) : comparison(op) {
+            _ops[0] = Operand{ lhs };
+            _ops[1] = Operand{ rhs };
+            _ops[2] = Operand{ dst };
+        }
+        TacOpCode opcode() const override { return TacOpCode::CompareTest; }
+        std::string dump(const vm::VMState *) override;
+    };
+
+    // 方法读取先于实参求值。仅原生方法把接收者分开存放，避免绑定对象分配；
+    // getter/脚本方法等回落到原有属性读取协议，receiver 留 void。
+    struct GMethodC : Instruction {
+        Register receiver;
+        GMethodC(Register obj, Atom atom, Register dst, Register receiver) : receiver(receiver) {
+            _ops[0] = Operand{ obj };
+            _ops[1] = Operand{ atom };
+            _ops[2] = Operand{ dst };
+        }
+        TacOpCode opcode() const override { return TacOpCode::GMethodC; }
+        std::string dump(const vm::VMState *) override;
+    };
+
+    struct CallMethodV : CallV {
+        Register receiver;
+        CallMethodV(Register dst, Register func, Integer n, Vec<Register> args, Register receiver) :
+            CallV(dst, func, n, std::move(args)), receiver(receiver) {}
+        TacOpCode opcode() const override { return TacOpCode::CallMethodV; }
+        std::string dump(const vm::VMState *) override;
     };
 
     // 省略透传调用（旧版 argc=-1，TJS `f(...)`）：把当前帧的实际实参

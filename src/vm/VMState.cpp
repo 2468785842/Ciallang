@@ -13,9 +13,10 @@
 
 #include "VMState.hpp"
 
-#include "../gen/Instruction.hpp"
 #include "../gen/IRGenerator.hpp"
+#include "../gen/Instruction.hpp"
 #include "VMDebug.hpp"
+#include "common/Defer.hpp"
 #include "parser/Parser.hpp"
 #include "parser/ast/ExprNode.hpp"
 #include "stdlib/NativeRegister.hpp"
@@ -42,7 +43,20 @@ namespace cial::vm {
         return context.global()->hasProp(atom);
     }
 
-    [[nodiscard]] Value VMState::global(const Atom atom) const { return context.global()->getProp(atom); }
+    const Value *VMState::cachedGlobal(const Atom atom) const {
+        auto *global = context.global();
+        auto &entry = _globalCache[atom.v % 64];
+        const u64 revision = global->slotRevision();
+        if(entry.atom != atom || entry.revision != revision)
+            entry = { atom, revision, global->findPropRef(atom) };
+        return entry.slot;
+    }
+
+    [[nodiscard]] Value VMState::global(const Atom atom) const {
+        if(const auto *slot = cachedGlobal(atom))
+            return *slot;
+        throw std::runtime_error("in global object Not found property");
+    }
 
     void VMState::global(const Atom atom, const Value &value) const { context.global()->setProp(atom, value); }
 
@@ -342,6 +356,30 @@ namespace cial::vm {
      * entryStackTop 记录进入时的栈深：被调帧执行完毕（栈回落到入口之下）即返回，
      * 交还给触发嵌套调用的 dispatch 继续。
      */
+    void VMState::drainFinalizers() {
+        auto &gc = rt.markSweep;
+        if(gc.drainingFinalizers || gc.pendingFinalizers.empty())
+            return;
+        gc.drainingFinalizers = true;
+        const bool savedZF = _zf;
+        DEFER {
+            gc.drainingFinalizers = false;
+            _zf = savedZF;
+        };
+        // 新回调产生的垃圾留给下一安全点，避免一条指令无限延迟。
+        size_t remaining = gc.pendingFinalizers.size();
+        while(remaining-- && !gc.pendingFinalizers.empty()) {
+            auto *object = gc.pendingFinalizers.front();
+            if(!object->canFinalizeIn(*this)) {
+                gc.pendingFinalizers.erase(gc.pendingFinalizers.begin());
+                gc.pendingFinalizers.push_back(object);
+                continue;
+            }
+            DEFER { gc.pendingFinalizers.erase(gc.pendingFinalizers.begin()); };
+            object->finalizeDeferred(*this);
+        }
+    }
+
     void VMState::run0() {
         const size_t entryStackTop = _stackTop;
         if(entryStackTop == 0)
@@ -364,6 +402,10 @@ namespace cial::vm {
             while(pc < bcSize) {
                 DispatchRet r{};
                 try {
+                    if(!rt.markSweep.pendingFinalizers.empty() && !rt.markSweep.drainingFinalizers) {
+                        cur->pc = pc;
+                        drainFinalizers();
+                    }
                     switch(static_cast<VmOpCode>(ip[pc++])) {
 #define DISPATCH_CASE(op)                                                                                              \
     case VmOpCode::op:                                                                                                 \
@@ -855,7 +897,10 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(LoadImm) {
         const u16 r1 = read<u16>(ip, pc);
         const i64 imm = decodeSleb128(ip, pc, 10);
-        regs[r1] = Value{ imm };
+        if(regs[r1].isIntegerFast())
+            regs[r1].asIntegerStore(imm);
+        else
+            regs[r1] = Value{ imm };
         return DispatchRet::Continue;
     }
 
@@ -867,6 +912,10 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc);
         const Atom a{ atom };
         const Value &srcVal = regs[r1];
+        if(const Value *slot = cachedGlobal(a); slot && slot->isIntegerFast() && srcVal.isIntegerFast()) {
+            const_cast<Value *>(slot)->asIntegerStore(srcVal.asIntegerUnsafe());
+            return DispatchRet::Continue;
+        }
         if(globalHas(a) && propObjectSet(*this, srcVal, global(a))) {
             cur->pc = pc;
             return DispatchRet::Call;
@@ -875,28 +924,39 @@ namespace cial::vm {
         return DispatchRet::Continue;
     }
 
-    DISPATCH_OP_METHOD(GGlobal) {
-        const u32 atom = read<u32>(ip, pc);
-        const u16 r1 = read<u16>(ip, pc);
-        if(const Value *g = context.global()->findPropRef(Atom{ atom })) {
+    void VMState::loadGlobal(const Atom atom, Value &dst) {
+        if(const Value *g = cachedGlobal(atom)) {
             // Property 触发 getter 的慢路径之外,直接从槽位零拷贝取值。
             // 注意寄存器写入可能触发 setter 语义无关,只读安全;
             // Property 调用可能修改 _props(重入),先拷出再降级慢路径
             if(g->isObject() && dynamic_cast<const Property *>(g->asObject().unwrap()) != nullptr) {
                 Value srcVal = *g;
                 propObjectGet(*this, srcVal, srcVal);
-                regs[r1] = srcVal;
-                return DispatchRet::Continue;
+                dst = srcVal;
+                return;
             }
-            regs[r1] = *g;
-            return DispatchRet::Continue;
+            if(g->isIntegerFast() && dst.isIntegerFast())
+                dst.asIntegerStore(g->asIntegerUnsafe());
+            else
+                dst = *g;
+            return;
         }
         throw std::runtime_error("in global object Not found property");
+    }
+    DISPATCH_OP_METHOD(GGlobal) {
+        const Atom atom{ read<u32>(ip, pc) };
+        const u16 dst = read<u16>(ip, pc);
+        loadGlobal(atom, regs[dst]);
+        return DispatchRet::Continue;
     }
 
     DISPATCH_OP_METHOD(GThis) {
         const u32 atom = read<u32>(ip, pc);
         const u16 r1 = read<u16>(ip, pc);
+        if(!cur->thisData && (!cur->closure || !cur->closure->funcMeta)) {
+            loadGlobal(Atom{ atom }, regs[r1]);
+            return DispatchRet::Continue;
+        }
         Value srcVal = getThis({ atom });
         propObjectGet(*this, srcVal, srcVal);
         regs[r1] = srcVal;
@@ -908,6 +968,12 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc);
         const Atom a{ atom };
         const Value &srcVal = regs[r1];
+        if(!cur->thisData && (!cur->closure || !cur->closure->funcMeta) && srcVal.isIntegerFast()) {
+            if(const Value *slot = cachedGlobal(a); slot && slot->isIntegerFast()) {
+                const_cast<Value *>(slot)->asIntegerStore(srcVal.asIntegerUnsafe());
+                return DispatchRet::Continue;
+            }
+        }
 
         if(hasThis(a)) {
             if(propObjectSet(*this, srcVal, getThis(a))) {
@@ -950,7 +1016,9 @@ namespace cial::vm {
         Value &a = regs[r1]; \
         Value &b = regs[r2]; \
         if(a.isIntegerFast() && b.isIntegerFast()) { \
-            regs[r3] = Value{ a.asIntegerUnsafe() optr b.asIntegerUnsafe() }; \
+            const Integer result = a.asIntegerUnsafe() optr b.asIntegerUnsafe(); \
+            if(regs[r3].isIntegerFast()) regs[r3].asIntegerStore(result); \
+            else regs[r3] = Value{ result }; \
             return DispatchRet::Continue; \
         } \
         regs[r3] = (a.method(b)).unwrap(); \
@@ -1014,6 +1082,77 @@ namespace cial::vm {
     DISPATCH_CMP(LOr, regs[r1].logicalOr(regs[r2]))
 
     // ── M3：比较直写 _zf（省 %F 物化与 Test，配 JmpE/JmpNE 直连分支） ──
+    DISPATCH_OP_METHOD(CompareTest) {
+        const u8 kind = ip[pc++];
+        const u16 lhs = read<u16>(ip, pc);
+        const u16 rhs = read<u16>(ip, pc);
+        const u16 dst = read<u16>(ip, pc);
+        const Value &a = regs[lhs], &b = regs[rhs];
+        bool result{};
+        if(a.isIntegerFast() && b.isIntegerFast()) {
+            const Integer x = a.asIntegerUnsafe(), y = b.asIntegerUnsafe();
+            switch(kind) {
+                case 0:
+                case 2:
+                    result = x == y;
+                    break;
+                case 1:
+                case 3:
+                    result = x != y;
+                    break;
+                case 4:
+                    result = x < y;
+                    break;
+                case 5:
+                    result = x <= y;
+                    break;
+                case 6:
+                    result = x > y;
+                    break;
+                case 7:
+                    result = x >= y;
+                    break;
+                default:
+                    throw std::runtime_error("invalid fused comparison");
+            }
+        } else {
+            switch(kind) {
+                case 0:
+                    result = a.equals(b);
+                    break;
+                case 1:
+                    result = !a.equals(b);
+                    break;
+                case 2:
+                    result = a.discernEquals(b);
+                    break;
+                case 3:
+                    result = !a.discernEquals(b);
+                    break;
+                case 4:
+                    result = a.littlerThan(b).unwrap();
+                    break;
+                case 5:
+                    result = !a.greaterThan(b).unwrap();
+                    break;
+                case 6:
+                    result = a.greaterThan(b).unwrap();
+                    break;
+                case 7:
+                    result = !a.littlerThan(b).unwrap();
+                    break;
+                default:
+                    throw std::runtime_error("invalid fused comparison");
+            }
+        }
+        if(regs[dst].isIntegerFast())
+            regs[dst].asIntegerStore(Integer{ result });
+        else
+            regs[dst] = Value{ Integer{ result } };
+        _zf = result;
+        return DispatchRet::Continue;
+    }
+
     DISPATCH_OP_METHOD(CmpEQ) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
@@ -1137,6 +1276,24 @@ namespace cial::vm {
         for(u64 i = 0; i < argc; ++i)
             argRegs[i] = read<u16>(ip, pc);
 
+        return invokeCallV(cur, regs, dst, func, argRegs, argc, pc);
+    }
+
+    DISPATCH_OP_METHOD(CallMethodV) {
+        const u16 receiverReg = read<u16>(ip, pc);
+        const u16 dst = read<u16>(ip, pc);
+        const u16 func = read<u16>(ip, pc);
+        const u64 argc = decodeUleb128(ip, pc, 10);
+        if(argc > 64)
+            throw std::runtime_error("too many arguments");
+        u16 args[64]{};
+        for(u64 i = 0; i < argc; ++i)
+            args[i] = read<u16>(ip, pc);
+        return invokeCallV(cur, regs, dst, func, args, argc, pc, &regs[receiverReg]);
+    }
+
+    DispatchRet VMState::invokeCallV(CallFrame *cur, Value *regs, const u16 dst, const u16 func, const u16 *argRegs,
+                                     const u64 argc, const u64 pc, const Value *receiver) {
         const Value &funcVal = regs[func];
         if(funcVal.isObject()) {
             auto *callee = funcVal.asObject().unwrap();
@@ -1186,7 +1343,10 @@ namespace cial::vm {
         for(u64 i = 0; i < argc; ++i)
             push(regs[argRegs[i]]);
         cur->pc = pc;
-        regs[func].asObject().unwrap()->call(*this, dst, argc);
+        if(receiver && !receiver->isVoid())
+            static_cast<NativeFunction *>(regs[func].asObject().unwrap())->callWithThis(*this, dst, argc, *receiver);
+        else
+            regs[func].asObject().unwrap()->call(*this, dst, argc);
         return DispatchRet::Call;
     }
 
@@ -1315,6 +1475,37 @@ namespace cial::vm {
     }
 
     // 成员名编译期 Atom 直引（同 GProp，跳过名字寄存器与 dispatch 再 intern）
+    const VMState::NativeMemberCache &VMState::nativeMember(TypeId type, Atom atom, u64 site) {
+        auto &entry = _nativeCache[(site ^ atom.v ^ static_cast<u64>(type)) % 64];
+        const u64 revision = context.nativeRevision();
+        if(entry.type != type || entry.atom != atom || entry.revision != revision) {
+            entry = { type, atom, revision, context.findMethod(type, atom), context.findProperty(type, atom) };
+        }
+        return entry;
+    }
+
+    DISPATCH_OP_METHOD(GMethodC) {
+        const u16 obj = read<u16>(ip, pc);
+        const Atom atom{ read<u32>(ip, pc) };
+        const u16 dst = read<u16>(ip, pc);
+        const u16 receiver = read<u16>(ip, pc);
+        const Value value = regs[obj];
+        const TypeId type = ValueToTypeId::getId(value);
+        const bool native = !value.isObject() || type == TypeId::Array || type == TypeId::Dictionary ||
+            type == TypeId::RegExp || type == TypeId::Math || type == TypeId::Date || type == TypeId::RandomGen;
+        if(native) {
+            const auto &entry = nativeMember(type, atom, pc);
+            if(entry.method && !entry.getter) {
+                regs[receiver] = value;
+                regs[dst] = Value{ entry.method };
+                return DispatchRet::Continue;
+            }
+        }
+        regs[receiver] = Value{};
+        propGetMember(*this, cur, value, atom, regs[dst]);
+        return DispatchRet::Continue;
+    }
+
     DISPATCH_OP_METHOD(GPropC) {
         const u16 r1 = read<u16>(ip, pc);    // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
@@ -1677,7 +1868,9 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc);
         const u16 cIdx = read<u16>(ip, pc);
         const auto &constant = constants[cIdx];
-        const String &encoded = *constant.createValue(&rt).asString().unwrap();
+        // 短串内联在 Value 内，不能借用 createValue 临时对象的字符串。
+        const Value encodedValue = constant.createValue(&rt);
+        const String &encoded = *encodedValue.asString().unwrap();
         const char *data = encoded.getData();
         const u32 len = encoded.length();
         u32 sep = 0;

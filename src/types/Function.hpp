@@ -74,6 +74,8 @@ namespace cial {
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
+        void callWithThis(vm::VMState &vmState, u32 ret, size_t argCount, const Value &receiver);
+
         void marked() noexcept override {
             if(_marked)
                 return;

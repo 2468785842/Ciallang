@@ -16,9 +16,33 @@
 #include <fmt/format.h>
 
 #include "Property.hpp"
+#include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
 namespace cial {
+
+    bool DataObject::needsFinalization() const noexcept {
+        if(!_isValid || !_class || !_class->meta)
+            return false;
+        const auto idx = _class->meta->hasMember(_finalizeAtom);
+        if(idx < 0 || !_class->meta->getMemberShape(idx).isMethod)
+            return false;
+        const auto *method = _class->meta->getMember(idx).funcMeta;
+        return method && !method->syntheticFinalizer;
+    }
+
+    void DataObject::finalizeDeferred(vm::VMState &vmState) {
+        if(!_isValid)
+            return;
+        _isValid = false; // 回调重入/显式 invalidate/复活均不重复终结
+        const auto idx = _class->meta->hasMember(vmState.rt.atomTable.intern("finalize"_str));
+        if(idx < 0)
+            return;
+        auto fn = vmState.rt.create<Function>(_class->meta->getMember(idx).funcMeta);
+        fn->thisObj = this;
+        VM vm{ &vmState };
+        vm.callValue(Value{ fn.get() }, 0, nullptr);
+    }
 
     ClassObject::ClassObject(ClassMeta *classMeta, Runtime *rt) : meta(classMeta), _rt(rt) {}
     namespace {
@@ -205,7 +229,13 @@ namespace cial {
         vmState.regRef(ret) = Value{ dataObject.get() };
     }
 
-    void ClassObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
+    void ClassObject::setProp(const Atom a, const Value &v) {
+        const auto [it, inserted] = _props.try_emplace(a, v);
+        if(inserted)
+            ++_slotRevision;
+        else
+            it->second = v;
+    }
 
     Value ClassObject::getProp(const Atom a) {
         if(const auto it = _props.find(a); it != _props.end())
@@ -232,7 +262,12 @@ namespace cial {
 
     bool ClassObject::hasProp(const Atom a) const { return _props.contains(a); }
 
-    bool ClassObject::delProp(const Atom a) { return _props.erase(a) > 0; }
+    bool ClassObject::delProp(const Atom a) {
+        if(!_props.erase(a))
+            return false;
+        ++_slotRevision;
+        return true;
+    }
 
     void DataObject::setProp(const Atom a, const Value &v) { _props[a] = v; }
 

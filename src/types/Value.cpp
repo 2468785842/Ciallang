@@ -18,58 +18,72 @@
 
 namespace cial {
 
-    Value::Value(const Integer value) : _integer(value), _type(ValueType::Integer) {}
-
-    Value::Value(const Real value) : _real(value), _type(ValueType::Real) {}
-
-    Value::Value(String value) : _type(ValueType::String) {
-        _string = SharedPayload<String>::makeSingle(std::move(value));
+    Value::Value(const Integer value) {
+        _data.integer = value;
+        type(ValueType::Integer);
     }
-
-    Value::Value(Octet value) : _type(ValueType::Octet) {
-        _octet = SharedPayload<Octet>::makeSingle(std::move(value));
+    Value::Value(const Real value) {
+        new(&_data.real) Real(value);
+        type(ValueType::Real);
     }
-
-    Value::Value(Object *value) : _object(value), _type(ValueType::Object) {}
+    Value::Value(String value) {
+        if(value.length() <= String::SHORT_STR_LEN) {
+            new(&_smallString) String(std::move(value));
+            tag() |= inlineStringTag << 5;
+        } else {
+            _data.string = SharedPayload<String>::makeSingle(std::move(value));
+            type(ValueType::String);
+        }
+    }
+    Value::Value(Octet value) {
+        _data.octet = SharedPayload<Octet>::makeSingle(std::move(value));
+        type(ValueType::Octet);
+    }
+    Value::Value(Object *value) {
+        _data.object = value;
+        type(ValueType::Object);
+    }
 
     Value::~Value() {
-        switch(_type) {
-            case ValueType::String:
-                SharedPayload<String>::release(_string);
-                break;
-            case ValueType::Octet:
-                SharedPayload<Octet>::release(_octet);
-                break;
-            default:;
-        }
+        if(isInlineString())
+            _smallString.~String();
+        else if(isString())
+            SharedPayload<String>::release(_data.string);
+        else if(isOctet())
+            SharedPayload<Octet>::release(_data.octet);
     }
 
-    Value::Value(Value &&v) noexcept : _type(v._type) {
-        switch(_type) {
-            case ValueType::Integer:
-                _integer = v._integer;
-                break;
-            case ValueType::Real:
-                _real = v._real;
-                break;
-            case ValueType::String:
-                _string = v._string;
-                v._string = nullptr;
-                break;
-            case ValueType::Octet:
-                _octet = v._octet;
-                v._octet = nullptr;
-                break;
-            case ValueType::Object:
-                _object = v._object;
-                v._object = nullptr;
-                break;
-            case ValueType::Void:
-                break;
+    Value::Value(Value &&v) noexcept {
+        const auto kind = v.type();
+        if(v.isInlineString()) {
+            new(&_smallString) String(std::move(v._smallString));
+            v._smallString.~String();
+            tag() |= inlineStringTag << 5;
+        } else {
+            switch(kind) {
+                case ValueType::Integer:
+                    _data.integer = v._data.integer;
+                    break;
+                case ValueType::Real:
+                    new(&_data.real) Real(v._data.real);
+                    break;
+                case ValueType::String:
+                    _data.string = v._data.string;
+                    break;
+                case ValueType::Octet:
+                    _data.octet = v._data.octet;
+                    break;
+                case ValueType::Object:
+                    _data.object = v._data.object;
+                    break;
+                case ValueType::Void:
+                    _data.integer = 0;
+                    break;
+            }
+            type(kind);
         }
-        v._type = ValueType::Void;
+        v.type(ValueType::Void);
     }
-
     Value &Value::operator=(Value &&v) noexcept {
         if(this != &v) {
             this->~Value();
@@ -77,51 +91,55 @@ namespace cial {
         }
         return *this;
     }
-
     Value::Value(const Value &v) noexcept {
-        _type = v._type;
-
-        switch(v._type) {
-            case ValueType::String:
-                _string = v._string;
-                SharedPayload<String>::retain(_string);
-                break;
-            case ValueType::Octet:
-                _octet = v._octet;
-                SharedPayload<Octet>::retain(_octet);
-                break;
-            case ValueType::Integer:
-                _integer = v._integer;
-                break;
-            case ValueType::Real:
-                _real = v._real;
-                break;
-            case ValueType::Object:
-                _object = v._object;
-                break;
-            case ValueType::Void:
-                break;
+        const auto kind = v.type();
+        if(v.isInlineString()) {
+            new(&_smallString) String(v._smallString);
+            tag() |= inlineStringTag << 5;
+        } else {
+            switch(kind) {
+                case ValueType::Integer:
+                    _data.integer = v._data.integer;
+                    break;
+                case ValueType::Real:
+                    new(&_data.real) Real(v._data.real);
+                    break;
+                case ValueType::String:
+                    _data.string = v._data.string;
+                    SharedPayload<String>::retain(_data.string);
+                    break;
+                case ValueType::Octet:
+                    _data.octet = v._data.octet;
+                    SharedPayload<Octet>::retain(_data.octet);
+                    break;
+                case ValueType::Object:
+                    _data.object = v._data.object;
+                    break;
+                case ValueType::Void:
+                    _data.integer = 0;
+                    break;
+            }
+            type(kind);
         }
     }
-
-    Value &Value::operator=(const Value &value) noexcept {
-        if(this != &value) {
+    Value &Value::operator=(const Value &v) noexcept {
+        if(this != &v) {
             this->~Value();
-            new(this) Value(value);
+            new(this) Value(v);
         }
         return *this;
     }
 
     Ret<Integer> Value::asInteger() const noexcept {
-        switch(_type) {
+        switch(type()) {
             case ValueType::Void:
                 return Ret<Integer>::ok(0);
             case ValueType::Integer:
-                return Ret<Integer>::ok(_integer);
+                return Ret<Integer>::ok(_data.integer);
             case ValueType::Real:
-                return Ret<Integer>::ok(static_cast<Integer>(_real.value()));
+                return Ret<Integer>::ok(static_cast<Integer>(_data.real.value()));
             case ValueType::String:
-                return TypeConverter::stringToInteger(*_string->data);
+                return TypeConverter::stringToInteger(*asString().value());
             case ValueType::Octet:
                 // TJS2 语义:octet 不参与算术(语料 test_variant 期望 octet 算术
                 // 被 catch 捕获),这里必须报错而非取首字节
@@ -133,15 +151,15 @@ namespace cial {
     }
 
     Ret<Real> Value::asReal() const noexcept {
-        switch(_type) {
+        switch(type()) {
             case ValueType::Void:
                 return Ret<Real>::ok(Real{ 0.0 });
             case ValueType::Integer:
-                return Ret<Real>::ok(Real{ static_cast<double>(_integer) });
+                return Ret<Real>::ok(Real{ static_cast<double>(_data.integer) });
             case ValueType::Real:
-                return Ret<Real>::ok(_real);
+                return Ret<Real>::ok(_data.real);
             case ValueType::String:
-                return TypeConverter::stringToReal(*_string->data);
+                return TypeConverter::stringToReal(*asString().value());
             case ValueType::Object:
                 break;
             case ValueType::Octet:
@@ -152,40 +170,40 @@ namespace cial {
     }
 
     Ret<String *> Value::asString() const noexcept {
-        if(_type == ValueType::String) {
-            return Ret<String *>::ok(_string->data);
+        if(type() == ValueType::String) {
+            return Ret<String *>::ok(isInlineString() ? const_cast<String *>(&_smallString) : _data.string->data);
         }
         return Ret<String *>::err(ErrCode::TypeError, "Invalid type get as String"_str);
     }
 
     Ret<Octet *> Value::asOctet() const noexcept {
-        if(_type == ValueType::Octet) {
-            return Ret<Octet *>::ok(_octet->data);
+        if(type() == ValueType::Octet) {
+            return Ret<Octet *>::ok(_data.octet->data);
         }
         return Ret<Octet *>::err(ErrCode::TypeError, "Invalid type get as Octet"_str);
     }
 
     Ret<Object *> Value::asObject() const noexcept {
-        if(_type == ValueType::Object) {
-            return Ret<Object *>::ok(_object);
+        if(type() == ValueType::Object) {
+            return Ret<Object *>::ok(_data.object);
         }
         return Ret<Object *>::err(ErrCode::TypeError, "Invalid type get as Object"_str);
     }
 
     bool Value::asBool() const noexcept {
-        switch(this->_type) {
+        switch(this->type()) {
             case ValueType::Void:
                 return false;
             case ValueType::Object:
-                return _object != nullptr;
+                return _data.object != nullptr;
             case ValueType::String:
                 return asInteger().value() != 0;
             case ValueType::Octet:
-                return _octet != nullptr;
+                return _data.octet != nullptr;
             case ValueType::Integer:
-                return _integer != 0;
+                return _data.integer != 0;
             case ValueType::Real:
-                return _real.value() != 0;
+                return _data.real.value() != 0;
         }
         return false;
     }
@@ -214,9 +232,7 @@ namespace cial {
         if(r.isFailed())
             return Ret<void>::err(r.getErr());
 
-        this->~Value();
-        _integer = r.value();
-        _type = ValueType::Integer;
+        *this = Value{ Integer{ r.value() } };
         return Ret<void>::ok();
     }
 
@@ -225,17 +241,15 @@ namespace cial {
         if(r.isFailed())
             return Ret<void>::err(r.getErr());
 
-        this->~Value();
-        _real = r.value();
-        _type = ValueType::Real;
+        *this = Value{ r.value() };
         return Ret<void>::ok();
     }
 
     Ret<void> Value::toString() noexcept {
 
-        switch(_type) {
+        switch(type()) {
             case ValueType::Object: {
-                const String s = TypeConverter::objectToString(*_object);
+                const String s = TypeConverter::objectToString(*_data.object);
                 this->~Value();
                 new(this) Value{ s };
                 return Ret<void>::ok();
@@ -245,14 +259,14 @@ namespace cial {
                 return Ret<void>::ok();
 
             case ValueType::Integer: {
-                const String s = TypeConverter::integerToString(_integer);
+                const String s = TypeConverter::integerToString(_data.integer);
                 this->~Value();
                 new(this) Value{ s };
                 return Ret<void>::ok();
             }
 
             case ValueType::Real: {
-                const String s = TypeConverter::realToString(_real);
+                const String s = TypeConverter::realToString(_data.real);
                 this->~Value();
                 new(this) Value{ s };
                 return Ret<void>::ok();
@@ -267,13 +281,13 @@ namespace cial {
     }
 
     Ret<void> Value::toOctet() const noexcept {
-        if(_type == ValueType::Octet)
+        if(type() == ValueType::Octet)
             return Ret<void>::ok();
         return Ret<void>::err(ErrCode::InvalidCast, "Invalid type cast to Octet"_str);
     }
 
     Ret<void> Value::toObject() const noexcept {
-        if(_type == ValueType::Object)
+        if(type() == ValueType::Object)
             return Ret<void>::ok();
         return Ret<void>::err(ErrCode::InvalidCast, "Invalid type cast to Object"_str);
     }
@@ -282,35 +296,27 @@ namespace cial {
         const auto r = asInteger();
         if(r.isFailed())
             return Ret<void>::err(r.getErr());
-        this->~Value();
-        _type = ValueType::Integer;
-        _integer = ~r.value();
+        *this = Value{ Integer{ ~r.value() } };
         return Ret<void>::ok();
     }
 
     Ret<void> Value::toNumber() noexcept {
-        switch(_type) {
+        switch(type()) {
             case ValueType::Integer:
             case ValueType::Real:
                 return Ret<void>::ok();
             case ValueType::Void:
-                this->~Value();
-                _type = ValueType::Integer;
-                _integer = 0;
+                *this = Value{ Integer{ 0 } };
                 return Ret<void>::ok();
             case ValueType::String: {
-                const auto &str = *_string->data;
+                const auto &str = *asString().value();
                 // TJS String::ToNumber：整样貌解析为 int，否则 real
                 if(const auto i = TypeConverter::stringToInteger(str); !i.isFailed()) {
-                    this->~Value();
-                    _type = ValueType::Integer;
-                    _integer = i.value();
+                    *this = Value{ Integer{ i.value() } };
                     return Ret<void>::ok();
                 }
                 if(const auto d = TypeConverter::stringToReal(str); !d.isFailed()) {
-                    this->~Value();
-                    _type = ValueType::Real;
-                    _real = d.value();
+                    *this = Value{ d.value() };
                     return Ret<void>::ok();
                 }
                 return Ret<void>::err(ErrCode::InvalidCast, "cannot convert string to number"_str);
@@ -323,38 +329,37 @@ namespace cial {
 
     void Value::toLogicalNot() noexcept {
         const auto r = asBool();
-        this->~Value();
-        _integer = !r;
-        _type = ValueType::Integer;
+        *this = Value{ Integer{ !r } };
     }
 
     Ret<void> Value::toSignChange() noexcept {
         if(!this->isReal()) {
             if(const auto r = asInteger(); !r.isFailed()) {
-                this->~Value();
-                _integer = -r.value();
-                _type = ValueType::Integer;
+                *this = Value{ Integer{ -r.value() } };
                 return Ret<void>::ok();
             }
         }
         const auto r = asReal();
         if(r.isFailed())
             return Ret<void>::err(r.getErr());
-        this->~Value();
-        _real = Real{ -r.value().value() };
-        _type = ValueType::Real;
+        *this = Value{ Real{ -r.value().value() } };
         return Ret<void>::ok();
     }
 
     Ret<Value> Value::add(const Value &value) const noexcept {
         // 整数快路径：避开字符串检查与类型转换往返
-        if(_type == ValueType::Integer && value._type == ValueType::Integer)
-            return Ret<Value>::ok(Value{ _integer + value._integer });
+        if(isIntegerFast() && value.isIntegerFast())
+            return Ret<Value>::ok(Value{ _data.integer + value._data.integer });
 
         // String+String 快路径：直接取负载拼接，跳过下面通用分支的
         // 两次 Value 拷贝（payload 引用计数往返）与 toString no-op 调用
-        if(_type == ValueType::String && value._type == ValueType::String)
-            return Ret<Value>::ok(Value{ String::concat(*_string->data, *value._string->data) });
+        if(isString() && value.isString())
+            return Ret<Value>::ok(Value{ String::concat(*asString().value(), *value.asString().value()) });
+
+        if(isString() && value.isIntegerFast())
+            return Ret<Value>::ok(Value{ String::concat(*asString().value(), TypeConverter::integerToString(value._data.integer)) });
+        if(isIntegerFast() && value.isString())
+            return Ret<Value>::ok(Value{ String::concat(TypeConverter::integerToString(_data.integer), *value.asString().value()) });
 
         if(this->isString() || value.isString()) {
             Value lhs = *this;
@@ -376,9 +381,9 @@ namespace cial {
             return Ret<Value>::ok(Value{ String::concat(*s1.value(), *s2.value()) });
         }
 
-        if(this->_type == value._type) {
-            if(this->_type == ValueType::Octet) {
-                Octet oct{ *this->_octet->data, *value._octet->data };
+        if(this->type() == value.type()) {
+            if(this->type() == ValueType::Octet) {
+                Octet oct{ *this->_data.octet->data, *value._data.octet->data };
                 return Ret<Value>::ok(Value{ std::move(oct) });
             }
 
@@ -420,8 +425,8 @@ namespace cial {
     }
 
     Ret<Value> Value::sub(const Value &value) const noexcept {
-        if(_type == ValueType::Integer && value._type == ValueType::Integer)
-            return Ret<Value>::ok(Value{ _integer - value._integer });
+        if(isIntegerFast() && value.isIntegerFast())
+            return Ret<Value>::ok(Value{ _data.integer - value._data.integer });
         if(!this->isReal() && !value.isReal()) {
             const auto lhs = this->asInteger();
             const auto rhs = value.asInteger();
@@ -440,8 +445,8 @@ namespace cial {
     }
 
     Ret<Value> Value::mul(const Value &value) const noexcept {
-        if(_type == ValueType::Integer && value._type == ValueType::Integer)
-            return Ret<Value>::ok(Value{ _integer * value._integer });
+        if(isIntegerFast() && value.isIntegerFast())
+            return Ret<Value>::ok(Value{ _data.integer * value._data.integer });
         if(!this->isReal() && !value.isReal()) {
             const auto lhs = this->asInteger();
             const auto rhs = value.asInteger();
@@ -668,18 +673,18 @@ namespace cial {
     }
 
     bool Value::discernEquals(const Value &value) const noexcept {
-        if(this->_type == value._type) {
-            switch(this->_type) {
+        if(this->type() == value.type()) {
+            switch(this->type()) {
                 case ValueType::Object:
-                    return _object == value._object;
+                    return _data.object == value._data.object;
                 case ValueType::String:
                 case ValueType::Octet:
                     return equals(value);
                 case ValueType::Void:
                     return true;
                 case ValueType::Real: {
-                    const Real r1 = _real;
-                    const Real r2 = value._real;
+                    const Real r1 = _data.real;
+                    const Real r2 = value._data.real;
 
                     if(r1.isNan() || r2.isNan())
                         return false;
@@ -688,7 +693,7 @@ namespace cial {
                     return r1 == r2;
                 }
                 case ValueType::Integer:
-                    return _integer == value._integer;
+                    return _data.integer == value._data.integer;
             }
             return false;
         }
@@ -703,7 +708,7 @@ namespace cial {
 
         if(!this->isString() || !value.isString()) {
             if(this->isInteger() && value.isInteger()) {
-                return Ret<bool>::ok(this->_integer < value._integer);
+                return Ret<bool>::ok(this->_data.integer < value._data.integer);
             }
             const auto lhs = this->asReal();
             const auto rhs = value.asReal();
@@ -723,7 +728,7 @@ namespace cial {
 
         if(!this->isString() || !value.isString()) {
             if(this->isInteger() && value.isInteger()) {
-                return Ret<bool>::ok(this->_integer > value._integer);
+                return Ret<bool>::ok(this->_data.integer > value._data.integer);
             }
             const auto lhs = this->asReal();
             const auto rhs = value.asReal();

@@ -48,6 +48,7 @@ namespace cial {
     struct WellKnownAtoms {
         Atom count{};
         Atom length{};
+        Atom finalize{};
         // RegExp 匹配状态属性（tjsRegExp.cpp 同名属性）
         Atom reMatches{}, reStart{}, reIndex{}, reLastIndex{}, reInput{};
         Atom reLastMatch{}, reLastParen{}, reLeftContext{}, reRightContext{};
@@ -73,6 +74,7 @@ namespace cial {
             WellKnownAtoms w{};
             w.count = atomTable.intern("count"_str);
             w.length = atomTable.intern("length"_str);
+            w.finalize = atomTable.intern("finalize"_str);
             w.reMatches = atomTable.intern("matches"_str);
             w.reStart = atomTable.intern("start"_str);
             w.reIndex = atomTable.intern("index"_str);
@@ -96,6 +98,7 @@ namespace cial {
         MarkSweepHeader *lastRegExp{};
 
         explicit Runtime() = default;
+        ~Runtime() { markSweep.destroyObjects(); } // handles 等成员仍存活时析构原生闭包
 
         explicit Runtime(const u32 gcSize) noexcept : markSweep{ gcSize } {}
 
@@ -110,6 +113,8 @@ namespace cial {
             }
             if(lastRegExp)
                 lastRegExp->marked();
+            for(auto *pending : markSweep.pendingFinalizers)
+                pending->marked();
         }
 
         void addMarkRoot(const MarkRootProvider *provider) { _markRoots.push_back(provider); }

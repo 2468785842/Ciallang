@@ -6,15 +6,15 @@
 ## 项目定位
 
 **Ciallang** 是用 C++20 从零实现的 TJS2 兼容脚本语言解释器。兼容目标是原版 Kirikiri TJS2 引擎
-（参考实现在 `D:\Users\LiDon\CLionProjects\TJSCompiler`，本文档称其为 **TJSCompiler / 旧版**）。
+（参考实现在 `../TJSCompiler`，本文档称其为 **TJSCompiler / 旧版**）。
 
 兼容分三层，当前状态：
 
 | 层 | 目标 | 状态 |
 |---|---|---|
-| 源码兼容 | 直接运行 .tjs 源码 | 部分实现（核心语句/函数/类/property 已通，缺 Array/Dictionary 字面量、with、RegExp 等，见 [doc/compatibility.md](doc/compatibility.md)） |
-| 字节码兼容 | 加载 TJSCompiler 编译出的字节码文件（`"TJS2" "100\0"` 格式），**转译**为本项目内部指令后执行 | M2 完成（转译路线，`cial --tjsbc`；`test_class.tjs` 对拍一致；M4 缺 collapse/展开调用），见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md) |
-| 标准库兼容 | Array/Dictionary/String/Math/Date/RegExp/Exception/Octet | 仅 String 部分 |
+| 源码兼容 | 直接运行 .tjs 源码 | 核心语法已实现（含 Array/Dictionary 字面量、with、RegExp；已知差异见 [doc/compatibility.md](doc/compatibility.md)） |
+| 字节码兼容 | 加载 TJSCompiler 编译出的字节码文件（`"TJS2" "100\0"` 格式），**转译**为本项目内部指令后执行 | M1–M4 完成（转译路线，`cial --tjsbc`；含 collapse/展开调用），见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md) |
+| 标准库兼容 | Array/Dictionary/String/Math/Date/RegExp/Exception/Octet | 均已接入，语义差异见 `doc/compatibility.md` |
 
 官方语言参考（语法权威）：[TJS2 リファレンス](https://hydrozoa.felisworks.com/doc/tjs2doc/contents/index.html)。
 
@@ -24,6 +24,7 @@
 Ciallang/
 ├─ AGENTS.md            ← 本文件（AI 入口）
 ├─ CLAUDE.md            ← 指向 AGENTS.md
+├─ .github/workflows/ci.yml ← Linux/macOS/Windows 双配置 CI
 ├─ TODO.md              ← 后续任务清单（性能/正确性/特性缺口，改代码前先看）
 ├─ doc/                 ← 全部文档，索引见 doc/README.md
 │   ├─ architecture.md          架构设计（流水线/模块/关键类）
@@ -31,7 +32,7 @@ Ciallang/
 │   ├─ compatibility.md         兼容性矩阵与路线图
 │   ├─ bytecode/
 │   │   ├─ tjs2-bytecode.md     旧版 TJS2 字节码规范（128 操作码/序列化格式）
-│   │   ├─ ciallang-bytecode.md 本项目指令集规范（TAC 92 + 扁平字节码 92）
+│   │   ├─ ciallang-bytecode.md 本项目指令集规范（TAC 95 + 扁平字节码 95）
 │   │   └─ mapping.md           TJS2→Ciallang 转译设计（后续实现字节码兼容的蓝本）
 │   ├─ grammar/                 原版 bison 语法副本（tjs.y / tjsdate.y / tjspp.y）
 │   └─ language/                类语义/表达式运算符笔记
@@ -50,8 +51,8 @@ Ciallang/
 |---|---|---|
 | `src/common/` | 基础设施 | `Result.hpp`(错误收集)、`Ret.hpp`(ErrCode/Ret<T>)、`SourceFile`、`SourceLocation`、`UTF8`、`Hash.hpp`、`Defer.hpp` |
 | `src/parser/` | 词法+语法+预处理 | `Lexer`(手写 DFA)、`Parser`(Pratt 优先级)、`PreProcessor`(@set/@if)、`Token.hpp`、`OperatorTrie`、`ast/*`(AstNode 基类 + X-macro 节点枚举) |
-| `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**92 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`ControlFlowGraph`+`Optimizer`(基本块 CFG、整数常量折叠、死 `LoadImm` 清理；在 `parseAst()` 接线) |
-| `src/vm/` | 执行引擎 | `VMState`(**run0() 扁平字节码解释，唯一执行路径；多态 run() 已删除**)、`Chunk`(指令+常量池+双空间 try 表)、`Bytecode`(扁平 u8 编码, **92/92 全实现**)、`CallFrame`(含 thisData 缓存 + argWindowDirect 直写布局)、`FastRegisterPool`、`Constant.hpp`(FuncMeta/ClassMeta/PropMeta)、`Rlc`(行号表)、`VM.hpp`(宿主门面) |
+| `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**95 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`ControlFlowGraph`+`Optimizer`(基本块 CFG、整数常量折叠、死 `LoadImm` 清理、CompareTest 融合；在 `parseAst()` 接线) |
+| `src/vm/` | 执行引擎 | `VMState`(**run0() 扁平字节码解释，唯一执行路径；多态 run() 已删除**)、`Chunk`(指令+常量池+双空间 try 表)、`Bytecode`(扁平 u8 编码, **95/95 全实现**)、`CallFrame`(含 thisData 缓存 + argWindowDirect 直写布局)、`FastRegisterPool`、`Constant.hpp`(FuncMeta/ClassMeta/PropMeta)、`Rlc`(行号表)、`VM.hpp`(宿主门面) |
 | `src/runtime/` | 全局运行时 | `Runtime`(GC/RootGuard/atomTable)、`Context`(调用栈/全局对象, 深度上限 1024)、`AtomTable`(字符串驻留 Atom) |
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
 | `src/gc/` | 内存管理 | `MarkSweepHeader`、固定 512B 节点自由链表 + 标记清除 |
@@ -79,7 +80,7 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
 ```
 
 - 依赖经 vcpkg 管理（`vcpkg.json`）：Catch2、fmt、spdlog、utf8proc。
-- 测试共 110 个 TEST_CASE（18 文件；未启用的历史测试文件见 `tests/CMakeLists.txt`）。
+- 测试共 120 个 TEST_CASE（19 文件；未启用的历史测试文件见 `tests/CMakeLists.txt`）。
 - `tests/test_files/tjs2/` 下是原版 kirikiri 测试脚本，是兼容性的行为基准。
 
 ## 代码风格与惯例
@@ -111,11 +112,16 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
    `Call`——检测 `_stackTop` 变化后返回 `DispatchRet::Call` 让主循环接管；否则新帧永远不会执行。
    `Property::invokeGet` / `Class.cpp` 初始化与构造则用**嵌套 run0**（entryStackTop 语义）。
 5. **GC sweep 不得重入解释器**：`~DataObject` 不再触发 finalize（曾在 sweep 批量析构时压入
-   数百个无人执行的帧）。finalize 仅在脚本显式 `invalidate` 时执行。
-6. **优化器范围有限**：`IRGenerator::parseAst()` 已接入 CFG、溢出安全的整数 `Add/Sub/Mul` 常量折叠、死 `LoadImm` 清理和 NOP 压缩；常量池 `Load` 会实例化运行时对象，DCE 不得删除。压缩会重映射跳转、try 区间与 RLC 行号。DCE 对 try 保护块保守保留加载，其他指令按活跃性屏障处理。尚无跨块常量传播或 `LoadSub`，且当前基准显示 pass 编译开销会抵消部分运行收益；扩展优化前先做同机 Release 对拍基准并覆盖外部可观察寄存器、异常边与元数据重映射。
-7. **Value 字符串是共享负载块**（`SharedPayload<String>`：Value→payload(引用计数+String*)），
-   拷贝零堆分配；旧三层 RefCountPointer 布局已删除。
-8. **tests/CMakeLists.txt 有 5 个被注释的测试文件**（statement/type_system/ieee/integration），
+   数百个无人执行的帧）。不可达对象先进入保活队列，由所属 VM 的指令安全点执行；
+   回调期间再 GC、环和复活均受保护，终结一次，异常经脚本异常协议传播。
+   队列由 `Runtime::collectMark()` 标记，见 `src/gc/gc.hpp`、`src/vm/VMState.cpp`。
+   Runtime 销毁阶段不执行脚本；宿主主动收集后应让所属 VM 再运行或在有效帧中 drain。
+6. **优化器范围有限**：`IRGenerator::parseAst()` 已接入 CFG、溢出安全的整数 `Add/Sub/Mul` 常量折叠、死 `LoadImm` 清理、保留结果寄存器的 CompareTest 融合和 NOP 压缩；常量池 `Load` 会实例化运行时对象，DCE 不得删除。压缩会重映射跳转、try 区间与 RLC 行号。DCE 对 try 保护块保守保留加载，其他指令按活跃性屏障处理。尚无跨块常量传播或 `LoadSub`，性能结果以 `doc/performance.md` 的同机对照为准；扩展优化前先做同机 Release 对拍基准并覆盖外部可观察寄存器、异常边与元数据重映射。
+7. **Value 字符串分短串内联和长串共享两种**：14 字节内直接存 String，长串用
+   `SharedPayload<String>`；见 `src/types/Value.hpp`、`String.hpp`。`asString()` 借用指针
+   的寿命不能超过所属 Value，尤其禁止借用 `createValue()` 临时值（NewRegExp 曾因此丢 flags）。
+   原生方法直接调用用 GMethodC/CallMethodV 分离接收者；提取为一等值时仍创建独立绑定。
+8. **tests/CMakeLists.txt 有 4 个被注释的测试文件**（statement/type_system/ieee/integration），
    全绿 ≠ 全部测试通过，新增测试记得登记。
 
 ## "我想改 X，先读什么"
@@ -133,7 +139,7 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
 
 ## 对 TJSCompiler（旧版参考项目）的约定
 
-- 位置：`D:\Users\LiDon\CLionProjects\TJSCompiler`（原版 Kirikiri TJS2 提取版，CMake 重组）。
+- 位置：`../TJSCompiler`（原版 Kirikiri TJS2 提取版，CMake 重组）。
 - 关键源码：操作码定义 `src/syntax/lexer/tjsInterCodeGen.h:45-76`；执行器 `src/syntax/tjsInterCodeExec.cpp`；
   序列化 `src/syntax/tjsScriptBlock.cpp:460-510`（导出）/ `src/syntax/tjsByteCodeLoader.cpp`（加载）；
   常量池 `src/syntax/tjsConstArrayData.*`；语法 `src/syntax/bison/tjs.y`。

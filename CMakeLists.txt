@@ -7,6 +7,11 @@ option(CIAL_BUILD_BENCH "build benchmark & TJS2 conformance tooling" OFF)
 option(ENABLE_TESTS "enable tests execute build" ON)
 option(BUILD_EXECUTABLE "build executable file" ON)
 
+# Release 缓存污染会使性能测量失真；显式报错，避免静默以 -O0 运行。
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT CMAKE_CXX_FLAGS_RELEASE MATCHES "(^| )(-O[1-3sz]|/O[12x])($| )")
+    message(FATAL_ERROR "Release 缺少优化标志，请清理 CMAKE_CXX_FLAGS_RELEASE 缓存后重新配置")
+endif()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -130,13 +135,20 @@ endif ()
 if (${CIAL_BUILD_BENCH})
     # TJSCompiler 参考实现定位: CIAL_TJS_ROOT 环境变量(推荐经 UserPresets 提供)
     # 或兄弟目录约定;可执行文件可用 CIAL_TJS_EXE 缓存变量强制指定
-    set(TJS_ROOT "$ENV{CIAL_TJS_ROOT}" CACHE PATH "TJSCompiler 参考实现根目录")
+    set(TJS_ROOT "$ENV{CIAL_TJS_ROOT}" CACHE STRING "TJSCompiler 参考实现根目录")
     if(NOT TJS_ROOT)
         set(TJS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../TJSCompiler")
     endif()
-    set(CIAL_TJS_EXE "" CACHE FILEPATH "TJSCompiler 可执行文件(留空则按 TJS_ROOT 探测)")
-    if(NOT CIAL_TJS_EXE)
+    get_filename_component(TJS_ROOT "${TJS_ROOT}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    set(CIAL_TJS_EXE "" CACHE STRING "TJSCompiler 可执行文件(留空则按 TJS_ROOT 探测)")
+    if(CIAL_TJS_EXE)
+        get_filename_component(CIAL_TJS_EXE "${CIAL_TJS_EXE}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    else()
         foreach(candidate
+                "${TJS_ROOT}/build/${CMAKE_SYSTEM_NAME}/${CMAKE_BUILD_TYPE}/TJSCompiler${CMAKE_EXECUTABLE_SUFFIX}"
+                "${TJS_ROOT}/build/macos/TJSCompiler${CMAKE_EXECUTABLE_SUFFIX}"
+                "${TJS_ROOT}/build/linux/TJSCompiler${CMAKE_EXECUTABLE_SUFFIX}"
+                "${TJS_ROOT}/build/windows/TJSCompiler.exe"
                 "${TJS_ROOT}/bin/Windows/TJSCompiler-release.exe"
                 "${TJS_ROOT}/bin/Windows/TJSCompiler.exe")
             if(EXISTS "${candidate}")

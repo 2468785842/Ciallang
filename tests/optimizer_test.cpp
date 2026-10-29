@@ -106,3 +106,33 @@ TEST_CASE("optimizer - preserves constant-pool loads because materialization may
     REQUIRE(chunk.getInstVec().size() == 2);
     REQUIRE(chunk.getInstVec()[0]->opcode() == TacOpCode::Load);
 }
+
+TEST_CASE("optimizer - compare-test fusion preserves values and control-flow entries", "[optimizer]") {
+    vm::Chunk chunk;
+    chunk.setRegCount(3);
+    chunk.emit<LoadImm>(Register{ 0 }, 3);
+    chunk.emit<LoadImm>(Register{ 1 }, 4);
+    chunk.emit<LT>(Register{ 0 }, Register{ 1 }, Register{ 2 });
+    chunk.emit<Test>(Register{ 2 });
+    chunk.emit<JmpNE>(Label{ 6 });
+    chunk.emit<inter::Ret>(Register{ 2 });
+    chunk.emit<inter::Ret>(Register{ 0 });
+    OptimizerManager manager{ chunk };
+    manager.addOptimizer(std::make_unique<CompareTestFusionOptimizer>());
+    const auto stats = manager.applyOptimizations();
+    REQUIRE(stats.instructionsRemovedByCompaction == 1);
+    REQUIRE(chunk.inst(2)->opcode() == TacOpCode::CompareTest);
+    REQUIRE(chunk.inst(2)->getOp3().value<Register>() == Register{ 2 });
+    REQUIRE(chunk.inst(3)->getOp1().value<Label>().address() == 5);
+
+    vm::Chunk target;
+    target.setRegCount(3);
+    target.emit<LT>(Register{ 0 }, Register{ 1 }, Register{ 2 });
+    target.emit<Test>(Register{ 2 });
+    target.emit<Jmp>(Label{ 1 }); // Test 是独立入口，不得移除
+    OptimizerManager other{ target };
+    other.addOptimizer(std::make_unique<CompareTestFusionOptimizer>());
+    (void)other.applyOptimizations();
+    REQUIRE(target.inst(0)->opcode() == TacOpCode::LT);
+    REQUIRE(target.inst(1)->opcode() == TacOpCode::Test);
+}

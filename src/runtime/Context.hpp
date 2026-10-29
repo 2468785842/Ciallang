@@ -55,6 +55,8 @@ namespace cial {
             return nativeRegister().findProperty(typeId, a);
         }
 
+        [[nodiscard]] u64 nativeRevision() const { return nativeRegister().revision; }
+
         void registryGlobalFunc(const String &name, NativeFunction *func) const noexcept;
 
         [[nodiscard]] CallFrame *callStack() const;

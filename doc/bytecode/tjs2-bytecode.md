@@ -1,6 +1,6 @@
 # TJS2 字节码规范（旧版 TJSCompiler）
 
-> 本文描述**原版 Kirikiri TJS2**（参考实现 `D:\Users\LiDon\CLionProjects\TJSCompiler`）的虚拟机指令集
+> 本文描述**原版 Kirikiri TJS2**（参考实现 `../TJSCompiler`）的虚拟机指令集
 > 与编译产物序列化格式。是本项目实现"字节码兼容（加载 → 转译执行）"的规格依据。
 > 转译设计见 [mapping.md](mapping.md)；本项目自身指令集见 [ciallang-bytecode.md](ciallang-bytecode.md)。
 >

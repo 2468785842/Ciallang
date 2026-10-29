@@ -12,12 +12,14 @@
 
 #pragma once
 
+#include <cstddef>
 #include <fmt/ostream.h>
 
 #include "Types.hpp"
 
-#include "Real.hpp"
 #include "Octet.hpp"
+#include "Real.hpp"
+#include "String.hpp"
 
 #include "common/Ret.hpp"
 #include "gc/gc.hpp"
@@ -71,7 +73,7 @@ namespace cial {
     class Value {
 
     public:
-        Value() = default;
+        Value() noexcept = default;
 
         explicit Value(Integer value);
 
@@ -93,21 +95,25 @@ namespace cial {
 
         Value &operator=(const Value &value) noexcept;
 
-        [[nodiscard]] ValueType type() const noexcept { return _type; }
+        [[nodiscard]] ValueType type() const noexcept {
+            const u8 raw = tag() >> 5;
+            return raw == inlineStringTag ? ValueType::String : static_cast<ValueType>(raw);
+        }
 
-        void type(const ValueType type) noexcept { _type = type; }
+        void type(const ValueType type) noexcept { tag() = static_cast<u8>(type) << 5; }
 
-        [[nodiscard]] bool isVoid() const noexcept { return type() == ValueType::Void; }
+        [[nodiscard]] bool isVoid() const noexcept { return tag() == 0; }
 
-        [[nodiscard]] bool isInteger() const noexcept { return type() == ValueType::Integer; }
+        [[nodiscard]] bool isInteger() const noexcept { return tag() == (static_cast<u8>(ValueType::Integer) << 5); }
 
-        [[nodiscard]] bool isReal() const noexcept { return type() == ValueType::Real; }
+        [[nodiscard]] bool isReal() const noexcept { return tag() == (static_cast<u8>(ValueType::Real) << 5); }
 
-        [[nodiscard]] bool isString() const noexcept { return type() == ValueType::String; }
+        [[nodiscard]] bool isString() const noexcept { return (tag() & 0x60) == 0x40; }
+        [[nodiscard]] bool isInlineString() const noexcept { return (tag() >> 5) == inlineStringTag; }
 
-        [[nodiscard]] bool isOctet() const noexcept { return type() == ValueType::Octet; }
+        [[nodiscard]] bool isOctet() const noexcept { return tag() == (static_cast<u8>(ValueType::Octet) << 5); }
 
-        [[nodiscard]] bool isObject() const noexcept { return type() == ValueType::Object; }
+        [[nodiscard]] bool isObject() const noexcept { return tag() == (static_cast<u8>(ValueType::Object) << 5); }
 
         [[nodiscard]] const char *name() const;
 
@@ -115,13 +121,15 @@ namespace cial {
 
         // 热路径直取:调用方保证 isInteger() 为真(如 dispatch 整数特化),
         // 绕过 Ret<T> optional 装配
-        [[nodiscard]] Integer asIntegerUnsafe() const noexcept { return _integer; }
-        [[nodiscard]] bool isIntegerFast() const noexcept { return _type == ValueType::Integer; }
+        [[nodiscard]] Integer asIntegerUnsafe() const noexcept { return _data.integer; }
+        [[nodiscard]] bool isIntegerFast() const noexcept {
+            return tag() == (static_cast<u8>(ValueType::Integer) << 5);
+        }
         // 整数直写(调用方负责先把 type 置 Integer,避免覆盖堆持有类型的联合体)
-        void asIntegerStore(const Integer v) noexcept { _integer = v; }
+        void asIntegerStore(const Integer v) noexcept { _data.integer = v; }
 
         // octet 负载直装(Constant 常量缓存路径;调用方负责 retain 与置 type)
-        void octetStore(SharedPayload<Octet> *p) noexcept { _octet = p; }
+        void octetStore(SharedPayload<Octet> *p) noexcept { _data.octet = p; }
 
         [[nodiscard]] Ret<Real> asReal() const noexcept;
 
@@ -150,7 +158,7 @@ namespace cial {
         Ret<void> bitNot() noexcept;
 
         // 数值规范化（旧版 VM_NUM/tonumber）：int/real 不变、字符串解析为数值
-        //（整样貌→int 否则 real）、void → 0、其余报错；原地
+        // （整样貌→int 否则 real）、void → 0、其余报错；原地
         Ret<void> toNumber() noexcept;
 
         [[nodiscard]] Ret<void> toSignChange() noexcept;
@@ -186,19 +194,34 @@ namespace cial {
     private:
         friend struct Constant; // 常量字符串负载缓存直接装配 Value
 
+        struct Data {
+            union {
+                Integer integer{};
+                Real real;
+                SharedPayload<String> *string;
+                SharedPayload<Octet> *octet;
+                Object *object;
+            };
+            u8 reserved[7];
+            u8 control;
+            Data() noexcept : integer(0), control(0) {}
+        };
+        static_assert(sizeof(Data) == 16 && offsetof(Data, control) == 15);
         union {
-            Integer _integer{};
-            Real _real;
-            SharedPayload<String> *_string;
-            SharedPayload<Octet> *_octet;
-            Object *_object;
+            Data _data{};
+            String _smallString;
         };
 
-        ValueType _type{ ValueType::Void };
+        // String 保留的末字节高 3 位承载 Value 标签；内部标签 6 表示
+        // 内联 String，外部仍报告 ValueType::String。所有 Value 维持 16B。
+        static constexpr u8 inlineStringTag = 6;
+        u8 &tag() noexcept { return reinterpret_cast<u8 *>(this)[15]; }
+        u8 tag() const noexcept { return reinterpret_cast<const u8 *>(this)[15]; }
 
         friend std::ostream &operator<<(std::ostream &os, const Value &d);
     };
 
+    static_assert(sizeof(Value) == 16, "Value must fit two machine words");
 } // namespace cial
 
 // support fmt::format

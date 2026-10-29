@@ -6,6 +6,8 @@
 
 #include <catch.hpp>
 
+#include "StderrCapture.hpp"
+
 #include <filesystem>
 
 #include <fmt/core.h>
@@ -91,7 +93,10 @@ TEST_CASE("本地函数声明 - 字符串成员方法定义") {
     }
 
     SECTION("Method - reverse") {
-        REQUIRE(**vm.eval<String *>(R"(var str = "abc"; str.reverse(); return str;)"_str) == "cba"_str);
+        REQUIRE(**vm.eval<String *>(R"(var str = "abc"; var r = str.reverse(); return r;)"_str) == "cba"_str);
+        REQUIRE(**vm.eval<String *>(R"(var str = "abc"; str.reverse(); return str;)"_str) == "abc"_str);
+        REQUIRE(**vm.evalExpr<String *>(R"("abcdefghijklmnop".reverse())"_str) == "ponmlkjihgfedcba"_str);
+        REQUIRE(**vm.evalExpr<String *>(R"("漢字abc".reverse())"_str) == "cba字漢"_str);
         REQUIRE(**vm.eval<String *>(R"(var str = "a"; str.reverse(); return str;)"_str) == "a"_str);
         REQUIRE(**vm.eval<String *>(R"(var str = ""; str.reverse(); return str;)"_str) == ""_str);
     }
@@ -513,9 +518,15 @@ TEST_CASE("const 语义（对齐原版实测：必须初始化，赋值不强制
     VM vm{ &vmState };
 
     SECTION("const 无初始化为编译期错误") {
+        test::StderrCapture firstError;
         const auto r1 = vm.eval<Value>("const E; return 1;"_str);
+        const auto firstDiagnostic = firstError.finish();
+        REQUIRE(firstDiagnostic.find("const declaration must be initialized") != std::string::npos);
         REQUIRE(r1.get().isVoid()); // 编译失败不产出值
+        test::StderrCapture secondError;
         const auto r2 = vm.eval<Value>("const a = 1, b; return 2;"_str);
+        const auto secondDiagnostic = secondError.finish();
+        REQUIRE(secondDiagnostic.find("const declaration must be initialized") != std::string::npos);
         REQUIRE(r2.get().isVoid()); // 逗号链同样检查
     }
 
@@ -824,7 +835,7 @@ TEST_CASE("RegExp.last 静态属性 + 匹配位置码点语义") {
     }
 
     SECTION("未执行过任何 test/exec 时为 void") {
-        REQUIRE(vm.eval<Value>("RegExp.last"_str).get().isVoid());
+        REQUIRE(vm.evalExpr<Value>("RegExp.last"_str).get().isVoid());
     }
 
     SECTION("CJK 码点位置（index/lastIndex/start/上下文）") {
@@ -1121,4 +1132,45 @@ TEST_CASE("Math 标准库") {
         REQUIRE((*vm.evalExpr<Real>(R"(Math.SQRT2 * Math.SQRT2)"_str)).value() == Catch::Approx(2.0));
         REQUIRE(*vm.evalExpr<Integer>(R"((Math.random() >= 0 && Math.random() < 1) ? 1 : 0)"_str) == 1);
     }
+}
+
+TEST_CASE("Native method calls preserve receivers without allocating bound functions", "[native]") {
+    Runtime rt;
+    Context context{ rt };
+    context.initNativeMethod();
+    vm::VMState state{ context };
+    VM vm{ &state };
+    auto used =
+        rt.create<NativeFunction>([&](VM *, Value, size_t) { return Integer{ rt.markSweep.memoryInfo().first }; });
+    context.registryGlobalFunc("used"_str, used.get());
+    vm.eval(R"(
+        var a = [1];
+        var before = used();
+        for(var i = 0; i < 32; i++) { a.push(a.pop()); }
+        var after = used();
+        var result = a[0];
+        var b = [];
+        var f = a.push; var g = b.push;
+        f(2); g(3);
+        var ac = a.count; var bv = b[0];
+    )"_str);
+    REQUIRE(state.global("before").asInteger().unwrap() == state.global("after").asInteger().unwrap());
+    REQUIRE(state.global("result").asInteger().unwrap() == 1);
+    REQUIRE(state.global("ac").asInteger().unwrap() == 2);
+    REQUIRE(state.global("bv").asInteger().unwrap() == 3);
+
+    context.registerMethod<String>("probe"_str, [](VM *, Value, size_t) { return Integer{ 1 }; });
+    vm.eval("function callProbe() { return \"x\".probe(); } var p1 = callProbe();"_str);
+    context.registerMethod<String>("probe"_str, [](VM *, Value, size_t) { return Integer{ 2 }; });
+    vm.eval("var p2 = callProbe();"_str);
+    REQUIRE(state.global("p1").asInteger().unwrap() == 1);
+    REQUIRE(state.global("p2").asInteger().unwrap() == 2);
+
+    context.registerMethod<String>("echo"_str, [](VM *, const Value &self, size_t argc, Value *args) {
+        String text = *self.asString().unwrap();
+        if(argc)
+            text.append(*args[0].asString().unwrap());
+        return text;
+    });
+    REQUIRE(**vm.evalExpr<String *>(R"("outer".echo("inner".echo()))"_str) == "outerinner"_str);
 }

@@ -70,22 +70,29 @@ namespace cial {
         [[nodiscard]] bool delProp(Atom a) override;
 
         [[nodiscard]] const Map<Atom, Value> &props() const noexcept { return _props; }
+        [[nodiscard]] u64 slotRevision() const noexcept { return _slotRevision; }
 
     protected:
         Runtime *_rt;
         Map<Atom, Value> _props{}; // static
+        u64 _slotRevision{}; // 插入/删除使全局槽缓存失效，更新值不改变槽地址
     };
 
     class DataObject final : public Object {
     public:
         DataObject() = delete;
 
-        explicit DataObject(vm::VMState *vmState, ClassObject *klass) : _vmState(vmState), _class(klass) {}
+        explicit DataObject(vm::VMState *vmState, ClassObject *klass) :
+            _vmState(vmState), _class(klass), _finalizeAtom(vmState->rt.wkAtoms.finalize) {}
 
         // GC sweep 批量析构时不能触发 finalize：那会在回收器内部向解释器压入
         // 无人执行的调用帧（旧多态执行路径恰好会被外层循环顺带执行，掩盖了问题）。
-        // finalize 仅在脚本显式 invalidate 时调用。
+        // GC 终结走保活队列，在 VM 安全点执行；显式 invalidate 保持同步调用。
         ~DataObject() noexcept override = default;
+
+        bool needsFinalization() const noexcept override;
+        bool canFinalizeIn(const vm::VMState &state) const noexcept override { return _vmState == &state; }
+        void finalizeDeferred(vm::VMState &vmState) override;
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
@@ -142,6 +149,9 @@ namespace cial {
                 // 旧实现无条件 pushVoid(1) 却只在有 finalize 时 pop(1)，
                 // GC sweep 批量析构时池指针会被逐个顶穿
                 if(const i64 idx = _class->meta->hasMember(finalizeAtom); idx > -1) {
+                    if(!_class->meta->getMemberShape(idx).isMethod ||
+                       _class->meta->getMember(idx).funcMeta->syntheticFinalizer)
+                        return;
                     const size_t abs = _vmState->getRegPoolTop() - _vmState->curFrame()->getSP();
                     _vmState->pushVoid(1);
                     Function finalizeFun{ _class->meta->getMember(idx).funcMeta };
@@ -158,6 +168,7 @@ namespace cial {
         bool _isValid{ true }; // 保留这个字段只是为了兼容性,我们不需要使用它, 主要是配合invalidate
         vm::VMState *_vmState; // 保留vm以便析构函数调用finalize方法, 兼容性
         ClassObject *_class{};
+        Atom _finalizeAtom{};
         Map<Atom, Value> _props{};
         Map<Atom, ClassObject *> _superClass{};
         ClassObject *_lastSuperClass{};

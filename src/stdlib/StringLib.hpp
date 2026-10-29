@@ -43,7 +43,7 @@ namespace cial::stdlib {
 
     String stringTrim(VM *, const Value &thisObj, size_t);
 
-    void stringReverse(VM *, const Value &thisObj, size_t);
+    String stringReverse(VM *, const Value &thisObj, size_t);
 
     String stringRepeat(VM *, const Value &thisObj, size_t, Integer count);
 

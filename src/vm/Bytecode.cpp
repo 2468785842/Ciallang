@@ -414,6 +414,60 @@ namespace cial::vm {
         write<u16>(info.code, tac->dst().index());
     }
 
+    void Bytecode::encode(Info &info, const inter::CompareTest *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CompareTest));
+        // 稳定子码，不把 TAC 枚举值写入扁平字节码。
+        u8 kind{};
+        switch(tac->comparison) {
+            case inter::TacOpCode::EQ:
+                kind = 0;
+                break;
+            case inter::TacOpCode::NEQ:
+                kind = 1;
+                break;
+            case inter::TacOpCode::AbsEQ:
+                kind = 2;
+                break;
+            case inter::TacOpCode::AbsNEQ:
+                kind = 3;
+                break;
+            case inter::TacOpCode::LT:
+                kind = 4;
+                break;
+            case inter::TacOpCode::LE:
+                kind = 5;
+                break;
+            case inter::TacOpCode::GT:
+                kind = 6;
+                break;
+            case inter::TacOpCode::GE:
+                kind = 7;
+                break;
+            default:
+                throw std::runtime_error("invalid fused comparison");
+        }
+        info.code.push_back(kind);
+        write<u16>(info.code, tac->getOp1Val<inter::Register>().index());
+        write<u16>(info.code, tac->getOp2Val<inter::Register>().index());
+        write<u16>(info.code, tac->getOp3Val<inter::Register>().index());
+    }
+    void Bytecode::encode(Info &info, const inter::GMethodC *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::GMethodC));
+        write<u16>(info.code, tac->getOp1Val<inter::Register>().index());
+        write<u32>(info.code, static_cast<u32>(tac->getOp2Val<Atom>().v));
+        write<u16>(info.code, tac->getOp3Val<inter::Register>().index());
+        write<u16>(info.code, tac->receiver.index());
+    }
+    void Bytecode::encode(Info &info, const inter::CallMethodV *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CallMethodV));
+        write<u16>(info.code, tac->receiver.index());
+        write<u16>(info.code, tac->dst.index());
+        write<u16>(info.code, tac->func.index());
+        encodeUleb128(static_cast<u64>(tac->argCount), info.code);
+        for(const auto &r : tac->args)
+            write<u16>(info.code, r.index());
+    }
+
     void Bytecode::encode(Info &info, const inter::CallV *tac) {
         info.code.push_back(static_cast<u8>(VmOpCode::CallV));
         write<u16>(info.code, tac->dst.index());

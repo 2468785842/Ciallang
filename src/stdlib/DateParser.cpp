@@ -9,9 +9,7 @@
 #include <cstring>
 #include <stdexcept>
 
-#ifdef _WIN32
 #include <time.h>
-#endif
 
 namespace cial::stdlib {
 
@@ -21,7 +19,7 @@ namespace cial::stdlib {
         _get_timezone(&seconds);
         return seconds;
 #else
-        std::tzset();
+        ::tzset();
         return ::timezone;
 #endif
     }

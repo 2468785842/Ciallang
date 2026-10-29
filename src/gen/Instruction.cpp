@@ -186,6 +186,18 @@ namespace cial::inter {
     DEF_AUTO_DUMP(JmpNE, "jmp_ne");
     DEF_AUTO_DUMP(Call, "call");
 
+    std::string CompareTest::dump(const VMState *) {
+        return fmt::format("compare_test {} %{} %{} %{}", static_cast<int>(comparison), getOp1Val<Register>().index(),
+                           getOp2Val<Register>().index(), getOp3Val<Register>().index());
+    }
+    std::string GMethodC::dump(const VMState *) {
+        return fmt::format("g_method_c %{} atom_{} %{} %{}", getOp1Val<Register>().index(), getOp2Val<Atom>().v,
+                           getOp3Val<Register>().index(), receiver.index());
+    }
+    std::string CallMethodV::dump(const VMState *vm) {
+        return fmt::format("call_method receiver=%{} {}", receiver.index(), CallV::dump(vm));
+    }
+
     std::string CallV::dump(const VMState *vm) {
         std::string out = fmt::format("call_v     {:<4} {:<4} {}  ", func.index(), dst.index(),
                                       static_cast<i64>(argCount));

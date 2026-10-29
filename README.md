@@ -139,7 +139,9 @@
 ### ⚡ 基准与 TJS2 对拍
 
 内置双引擎基准与兼容性对拍设施（TJSCompiler 参考实现路径经
-`CMakeUserPresets.json` 的 `CIAL_TJS_ROOT` 注入，或兄弟目录自动探测）：
+默认从当前项目的兄弟目录 `../TJSCompiler` 探测；可用环境变量
+`CIAL_TJS_ROOT` 或 CMake 缓存变量 `TJS_ROOT` 覆盖，也可用 `CIAL_TJS_EXE`
+指定可执行文件。相对路径均以 Ciallang 源码根目录为基准解析，见 `CMakeLists.txt`）：
 
 ```sh
 # 基准（bench/*.tjs 内置 throw 自校验，TJS→Ciallang 交替执行取 min/mean）。
@@ -162,7 +164,7 @@ cmake --build build/Windows/Bench --target conformance-report
 * ~~完整实现 TJS2 标准库~~（已完成：Date.parse 完整文法 / RegExp.last+码点位置 / Array·Dictionary save·load·pack 系）
 * ~~字节码兼容~~（**已完成 M1–M4**：加载 TJS2 编译产物转译执行，`cial --tjsbc`；128 操作码转译覆盖，tjs2 语料全量通过，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)）
 * 性能追平原版（当前 112~155%，方向见 [TODO.md](TODO.md)：实参直写被调帧窗口、Value 内联 SSO、调用点内联缓存）
-* 编译优化 Pass 接线（CFG/Optimizer 已建成未启用：LoadSub、常量传播、DCE）
+* 扩展编译优化（CFG、整数常量折叠、死加载清理和比较/Test 融合已接入；见 `src/gen/Optimizer.cpp`）
 * 集成 **LSP (Language Server Protocol)**，支持 VSCode / IDEA 智能提示
 
 ---
@@ -199,3 +201,10 @@ cmake --build build/Windows/Bench --target conformance-report
 MIT License
 
 ---
+
+### 构建基线与 CI
+
+Windows 预设使用 `x64-windows-static` 与静态 CRT，测试无需复制依赖 DLL（`CMakePresets.json`）。
+Release 配置若缺少优化标志会直接报错，避免污染性能数据（`CMakeLists.txt`）。
+GitHub Actions 覆盖 Linux/macOS/Windows 的 Debug 与 Release，构建 CLI/测试并执行 CTest
+（`.github/workflows/ci.yml`）；本机验证结果与基准见 [TODO.md](TODO.md)。

@@ -1,0 +1,8 @@
+// 原生方法密集路径：验证接收者传递和重复访问缓存。
+var a = [];
+var sum = 0;
+for(var i = 0; i < 50000; i++) {
+    a.push(i);
+    sum += a.pop();
+}
+if(sum != 1249975000 || a.count != 0) throw "native method mismatch";

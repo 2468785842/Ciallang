@@ -26,6 +26,15 @@ namespace cial {
             collect(mark);
         find();
 
+        // 队列暂时保留了一整池对象时提供回调所需的分配空间。
+        if(!_nextFree && !pendingFinalizers.empty()) {
+            auto *extra = initFreeList(64);
+            auto *tail = extra;
+            while(tail->_next)
+                tail = tail->_next;
+            tail->_next = _head;
+            _head = _nextFree = extra;
+        }
         if(!_nextFree) {
             auto [used, total] = memoryInfo();
             CLL_LOG_FATAL("Allocation Failed! OutOfMemory(used/total): %d/%d(B)", used, total);
@@ -42,12 +51,29 @@ namespace cial {
             if(cursor->_marked)
                 cursor->_marked = false;
             else {
+                auto *next = cursor->_next;
+                cursor->~MarkSweepHeader();
+                new(cursor) MarkSweepHeader{};
+                cursor->_next = next;
                 cursor->_isFree = true;
                 cursor->_marked = false;
-                cursor->~MarkSweepHeader();
                 _nextFree = cursor;
             }
         }
+    }
+
+    void MarkSweep::destroyObjects() {
+        pendingFinalizers.clear();
+        for(auto *cursor = _head; cursor; cursor = cursor->_next) {
+            if(cursor->_isFree)
+                continue;
+            auto *next = cursor->_next;
+            cursor->~MarkSweepHeader();
+            new(cursor) MarkSweepHeader{};
+            cursor->_next = next;
+            cursor->_isFree = true;
+        }
+        _nextFree = _head;
     }
 
     std::pair<u32, u32> MarkSweep::memoryInfo() const {

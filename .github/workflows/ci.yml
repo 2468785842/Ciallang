@@ -1,0 +1,26 @@
+name: build-and-test
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, platform: Linux, configuration: Debug}
+          - {os: ubuntu-latest, platform: Linux, configuration: Release}
+          - {os: macos-latest, platform: MacOS, configuration: Debug}
+          - {os: macos-latest, platform: MacOS, configuration: Release}
+          - {os: windows-latest, platform: Windows, configuration: Debug}
+          - {os: windows-latest, platform: Windows, configuration: Release}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        shell: bash
+        run: |
+          export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
+          cmake --preset "${{ matrix.platform }} ${{ matrix.configuration }}"
+      - name: Build tests
+        run: cmake --build build/${{ matrix.platform }}/${{ matrix.configuration }} --target cial CiallangTests --parallel 4
+      - name: Test
+        run: ctest --test-dir build/${{ matrix.platform }}/${{ matrix.configuration }}/tests --output-on-failure

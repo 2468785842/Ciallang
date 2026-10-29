@@ -1,15 +1,11 @@
 # 后续任务清单
 
 > 已完成项只保留一句话摘要，细节见各提交信息与 [doc/bytecode/ciallang-bytecode.md](doc/bytecode/ciallang-bytecode.md)、[AGENTS.md](AGENTS.md)。
-> 当前性能：与原版 TJS2（Release）wall-time 比值（Ciallang/TJS min，2026-10-28）——
-> 类实例化 107% / 整数循环 120% / fib(25) 147% / 字符串拼接 141%
->（同机无 pass 对照为 114% / 119% / 150% / 151%；两次绝对耗时波动明显，暂不据此归因。
-> profile 覆盖四个基准的 46 个 chunk，常量折叠和 DCE 均未改写指令，所有 pass 合计约 0.2 ms；
-> 后续应先找到可稳定触发优化的热路径，再判断 pass 是否值得常开。）
-> ⚠️ 本机 Release 构建缓存曾丢失优化标志（`CMAKE_CXX_FLAGS_RELEASE`
-> 为空 → 实际 -O0），2026-10-28 重新以 `-O3 -DNDEBUG` 配置后基准才可比——此前一轮测量
-> 若与本表量级不符先查构建缓存。fib 内部 VM 计时 A/B：Atom 直引 + 实参直写后
-> 中位 63ms → 43ms（约 -25%））。
+> 2026-10-28 macOS arm64 Release 同机交替对照（1 轮预热 + 7 轮取 wall-time 中位数）：
+> 本批改动后/改动前：类实例化 100.4% / 整数循环 51.0% / fib 93.7% /
+> 原生方法 72.7% / 字符串拼接 70.5%。与本机 TJS2 的比例分别为
+> 104.0% / 68.8% / 147.7% / 185.5% / 98.0%；不同机器的历史比例不可直接比较。
+> 具体数据、方法与验证范围见 [doc/performance.md](doc/performance.md)。
 > TJS2 语料对拍（2026-10-25）：TJS_ONLY 0 / MATCH 3（class/function/with 全一致）/
 > DIFF 3（test_misc、test_variant 为异常消息格式差异，Ciallang 行为正确；
 > test_string 双方干净通过，Ciallang 侧无输出、参考实现多 25 行引擎转储）/
@@ -19,39 +15,33 @@
 > s1–s7；test.tjs 需宿主 Scripts 对象双方同位置失败、test_string 上游 --dump 崩溃）；
 > 128 操作码转译覆盖；现有 110 个用例双配置全绿。见 doc/bytecode/mapping.md。
 
-## 一、正确性（已知未修）
+## 一、正确性
 
-- [ ] GC 期 finalize 语义：当前 ~DataObject 禁止 sweep 中重入解释器；
-      若需 TJS2 完整语义需"回收队列 + 安全区 drain"
+- [x] GC finalize：不可达对象先入保活队列，由所属 VM 的安全点 drain，覆盖环、复活、回调内 GC、异常和一次性终结。跳过编译器合成的空 finalize；修正其寄存器计数；空闲节点重建 Header，Runtime 销毁释放 C++ 资源但不运行脚本。见 `src/gc/gc.*`、`src/types/Class.*`、`src/runtime/Runtime.hpp`、`tests/interpreter_test.cpp`。
 
-## 二、性能（剩余方向）
+## 二、性能
 
-- [ ] string_concat 剩余差距（148%）：payload 单块分配已做，剩余为 Value 内联 SSO
-      （小串零堆分配）
-- [ ] 优化器收益：CFG、整数常量折叠和死 `LoadImm` 清理已接入 `IRGenerator::parseAst()`；常量池 `Load` 可能实例化运行时对象，必须保留。profile 四个基准的 46 个 chunk 后零条指令被改写，pass 总耗时约 0.2 ms；无 pass/接线两次 wall-time 对照受测量波动影响，不能证明优化收益。先用 profile 找到 loop_int（当前约 120%）等热路径的实际 TAC 形态，再决定增加何种优化。
-- [ ] 方法访问 NativeFunction 每次分配（GProp 绑定拷贝）：正确修法是调用约定
-      携带 objthis（TJS2 同款），属调用点内联缓存的前置；现有基准不敏感
-      （stdlib 密集脚本受益）
-- [ ] fib 剩余差距（132%≈噪声，内部计时已 -25%）：调用点内联缓存
-      （typeId 判型已做，下一步缓存 GProp 方法查找结果）
+- [x] Value 内联 SSO：14 字节内无需字符串负载分配；String 与 Value 均保持 16B，长串共享负载不变。增加字符串+整数快路径，修正 NewRegExp 借用临时 Value 的字符串寿命。见 `src/types/Value.*`、`src/types/String.*`、`src/vm/Constant.cpp`、`tests/value_storage_test.cpp`。
+- [x] 优化器收益：profile 定位循环的比较/Test 与全局整数槽访问；增加 CompareTest 融合，保留结果寄存器并重映射跳转/try/RLC。配套整型槽直接读写减少 Value 临时对象。本批整数循环耗时约为原来的 51%，不单独归因于某个 pass。见 `src/gen/Optimizer.*`、`src/vm/VMState.cpp`、`tests/optimizer_test.cpp`。
+- [x] 原生方法调用分离 objthis：GMethodC/CallMethodV 直接携带接收者，避免每次调用分配 NativeFunction；提取方法为一等值时继续创建独立绑定。覆盖嵌套调用、宿主替换方法和分配数量测试。见 `src/gen/IRGenerator.cpp`、`src/types/Function.*`、`tests/native_function_test.cpp`。
+- [x] 访问缓存：64 项原生成员调用点缓存按注册版本失效；64 项全局槽缓存按插入/删除版本失效，函数替换读取最新值。本批 fib 耗时约为原来的 93.7%，仍有性能差距。见 `src/vm/VMState.*`、`src/types/Class.cpp`、`src/stdlib/NativeRegister.hpp`。
 
-## 三、语言特性缺口（对照 README）
+## 三、语言特性缺口
 
-（本节已清空——Array/Dictionary 标准库全量完成，见已完成摘要）
+本轮未新增语法；已知语义差异继续在 `doc/compatibility.md` 跟踪，不以本清单已完成代表完全兼容。
 
 ## 四、工程化
 
-- [ ] vcpkg 无 dumpbin 环境无法自动部署 DLL：Release tests 需手动
-      `cp build/Windows/Release/*.dll build/Windows/Release/tests/`（当前实践）；
-      长期改静态 triplet
-- [ ] CI 可跑 Debug 配置（CRT 断言已重定向 stderr，压力模式已可开）
-- [ ] 清理 Parser.cpp `argEndsWithTopLevelAsterisk` 里 e47ba4c 遗留的无条件
-      `[scan]` 调试打印（`fmt::println(stderr, ...)`，Release 也在输出）
-- [ ] 本机 Release 构建缓存曾丢失 `CMAKE_CXX_FLAGS_RELEASE`（为空 → -O0，
-      2026-10-28 发现并已用 `-O3 -DNDEBUG` 重新配置）；干净目录重配即恢复默认，
-      疑似历史缓存污染，留意复发
+- [x] Windows DLL 部署：Windows 预设改用 `x64-windows-static` 与静态 CRT，移除手动复制 DLL 的需求，见 `CMakePresets.json`。本机未执行 Windows 构建，待 CI 验证。
+- [x] Debug/Release CI：新增 Linux/macOS/Windows 六配置，构建 CLI 和测试并运行 CTest，见 `.github/workflows/ci.yml`。工作流尚未推送运行。
+- [x] Release 缓存防护：配置阶段拒绝缺少优化标志的 Release 缓存；空标志配置失败已验证，见 `CMakeLists.txt`。
+- [x] Parser 无条件 `[scan]` 打印：核实当前 `src/parser/Parser.cpp` 已不存在，关闭过时条目。
+
+本机最终验证：Debug、Release、UBSan 均 **120/120 通过**；12 个字节码样本全部成功；从 `/tmp` 配置时 TJSCompiler 相对路径解析通过。ASan 运行库在 macOS 初始化阶段自旋，尚未进入测试，不能计为通过。测试仍不包含 CMake 中注释禁用的历史文件。
 
 ## 已完成（摘要）
+
+- 2026-10-28 macOS 构建验证：修正 `src/stdlib/DateParser.cpp` 的 `::tzset()` 命名空间及系统头文件引用；`tests/fuzz_regress_test.cpp` 的 CRT 断言重定向限定为 MSVC。MacOS Debug/Release 的 `CiallangTests` 构建成功，CTest 各 110/110 通过；核实 `src/parser/Parser.cpp` 的 `argEndsWithTopLevelAsterisk` 已无 `[scan]` 调试打印，关闭过时条目。
 
 - 2026-10-28 性能专项批次——成员名 Atom 往返消除 + 调用点实参直写：
   新增 5 条 TAC/扁平字节码指令 `GPropC/DPropC/GPropRawC/DPropRawC/DelPropC`

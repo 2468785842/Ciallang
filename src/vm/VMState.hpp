@@ -53,6 +53,7 @@ namespace cial::vm {
         explicit VMState(Context &context) : rt(context.rt()), context(context) {}
 
         void run0();
+        void drainFinalizers();
 
         [[nodiscard]] const Value &reg(u16 reg) const;
 
@@ -192,6 +193,25 @@ namespace cial::vm {
         CallFrame *_curFrame{ context.callStack() };
         CallFrame *_callStack{ context.callStack() };
         size_t &_stackTop{ context.stackTop() }; // callFrame count
+        CIAL_INLINE DispatchRet invokeCallV(CallFrame *cur, Value *regs, u16 dst, u16 func, const u16 *argRegs, u64 argc, u64 pc,
+                                const Value *receiver = nullptr);
+        struct NativeMemberCache {
+            TypeId type{ TypeId::None };
+            Atom atom{};
+            u64 revision{};
+            NativeFunction *method{};
+            NativePropGetter getter{};
+        };
+        NativeMemberCache _nativeCache[64]{};
+        const NativeMemberCache &nativeMember(TypeId type, Atom atom, u64 site);
+        struct GlobalSlotCache {
+            Atom atom{};
+            u64 revision{};
+            const Value *slot{};
+        };
+        mutable GlobalSlotCache _globalCache[64]{};
+        const Value *cachedGlobal(Atom atom) const;
+        CIAL_INLINE void loadGlobal(Atom atom, Value &dst);
         bool _zf{ false };
         PendingCF _pending{};
         Value _exValue{};

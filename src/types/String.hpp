@@ -3,6 +3,7 @@
 //
 #pragma once
 
+#include <cstddef>
 #include <fmt/ostream.h>
 
 #include "common/Hash.hpp"
@@ -10,11 +11,11 @@
 namespace cial {
     class Value;
     class String final {
-        static constexpr int SHORT_STR_LEN = 21;
-
     public:
-        constexpr explicit String() : _len(0) {}
-        constexpr explicit String(const char c) : _shortStr{ c, '\0' }, _len(1) {}
+        static constexpr u32 SHORT_STR_LEN = 14;
+
+        constexpr explicit String() : _shortStr{} {}
+        constexpr explicit String(const char c) : _shortStr{ c, '\0' } { _shortStr[15] = 1; }
 
         template <size_t N>
         constexpr explicit String(const char (&arr)[N]) : String(arr, N - 1) {}
@@ -33,98 +34,105 @@ namespace cial {
 
         String &operator=(const String &str) {
             if(this != &str) {
+                const auto externalTag = flags() & 0xe0;
                 this->~String();
                 new(this) String(str);
+                flags() |= externalTag;
             }
             return *this;
         }
 
         void append(const String &str);
 
-        // 一次性拼接(单次分配,两段均拷贝并正确终止);热路径用这个而非 copy+append。
-        // SSO 阈值必须与构造/析构/move 的长串判据(len > SHORT_STR_LEN)一致:
-        // total == SHORT_STR_LEN 仍是短串(_shortStr 容量 22=21字符+NUL)。
-        // 旧判据 total < SHORT_STR_LEN 把恰好 21 字符的结果送进长串分支,
-        // _longStr 分配后 move/析构按短串处理——丢尾字符并泄漏缓冲
+        // 16B 表示：短串占前 15B（含 NUL），末字节低 4 位存长度、
+        // bit4 标识长串。高 3 位保留给内联 Value 的类型标签。
         [[nodiscard]] static String concat(const String &a, const String &b) {
-            const u32 total = a._len + b._len;
-            if(total <= SHORT_STR_LEN) {
-                String r{};
-                std::memcpy(r._shortStr, a.getData(), a._len);
-                std::memcpy(r._shortStr + a._len, b.getData(), b._len);
-                r._shortStr[total] = '\0';
-                r._len = total;
-                return r;
-            }
-            String r{ a };
+            String r{};
+            const u32 total = a.length() + b.length();
             r.reserveExact(total);
-            std::memcpy(r.getBuffer() + a._len, b.getData(), b._len);
+            std::memcpy(r.getBuffer(), a.getData(), a.length());
+            std::memcpy(r.getBuffer() + a.length(), b.getData(), b.length());
             r.getBuffer()[total] = '\0';
-            r._len = total;
+            if(r.isLong())
+                r._long.len = total;
+            else
+                r.flags() = static_cast<u8>(total);
             return r;
         }
 
-        // 保证长字符串缓冲至少可容纳 cap 字节(不含终止符);短串超限则转长串
         void reserveExact(const u32 cap) {
-            if(cap <= SHORT_STR_LEN)
-                return; // 短串足够(与 concat 的 SSO 阈值一致)
-            if(_longStr && cap < _lenCap)
-                return; // 容量已够
+            if(cap <= SHORT_STR_LEN || cap <= length())
+                return;
+            const u32 len = length();
+            const auto externalTag = flags() & 0xe0;
             auto *buf = new char[cap + 1];
-            std::memcpy(buf, getData(), _len);
-            buf[_len] = 0;
-            delete[] _longStr;
-            _longStr = buf;
-            _lenCap = cap;
+            std::memcpy(buf, getData(), len);
+            buf[len] = 0;
+            if(isLong())
+                delete[] _long.data;
+            _long.data = buf;
+            _long.len = len;
+            flags() = externalTag | 0x10;
         }
 
-        [[nodiscard]] u32 length() const { return _len; }
+        [[nodiscard]] u32 length() const { return isLong() ? _long.len : flags() & 0x0f; }
+        [[nodiscard]] char *getBuffer() { return isLong() ? _long.data : _shortStr; }
+        [[nodiscard]] const char *getData() const { return isLong() ? _long.data : _shortStr; }
 
-        [[nodiscard]] char *getBuffer() { return _longStr ? _longStr : _shortStr; }
-        [[nodiscard]] const char *getData() const { return _longStr ? _longStr : _shortStr; }
-
-        [[nodiscard]] std::string toStdStr() const { return std::string{ getData(), static_cast<size_t>(_len) }; }
+        [[nodiscard]] std::string toStdStr() const { return std::string{ getData(), static_cast<size_t>(length()) }; }
 
         bool operator==(const char *cStr) const {
-            if(std::strlen(cStr) != _len)
+            if(std::strlen(cStr) != length())
                 return false;
-            return std::memcmp(getData(), cStr, _len) == 0;
+            return std::memcmp(getData(), cStr, length()) == 0;
         }
 
         bool operator==(const String &str) const {
-            if(_len != str._len)
+            if(length() != str.length())
                 return false;
-            return std::memcmp(getData(), str.getData(), _len) == 0;
+            return std::memcmp(getData(), str.getData(), length()) == 0;
         }
 
         char operator[](const u32 index) const { return getData()[index]; }
 
         friend std::ostream &operator<<(std::ostream &os, const String &d) { return os.write(d.getData(), d.length()); }
 
-        [[nodiscard]] bool isEmpty() const { return _len == 0; }
+        [[nodiscard]] bool isEmpty() const { return length() == 0; }
 
         //---------------------------------------------------------------------------
         [[nodiscard]] String escapeBackSlash() const;
 
     private:
-        char *_longStr = nullptr;
-        char _shortStr[SHORT_STR_LEN + 1]{};
-        u32 _len;
-        u32 _lenCap{}; // 长字符串已分配容量(不含终止符);短串恒 0
+        struct LongData {
+            char *data;
+            u32 len;
+            u8 reserved[15 - sizeof(char *) - sizeof(u32)];
+            u8 control;
+        };
+        static_assert(sizeof(LongData) == 16 && offsetof(LongData, control) == 15);
+        union {
+            char _shortStr[16];
+            LongData _long;
+        };
+        [[nodiscard]] u8 &flags() noexcept { return reinterpret_cast<u8 *>(this)[15]; }
+        [[nodiscard]] u8 flags() const noexcept { return reinterpret_cast<const u8 *>(this)[15]; }
+        [[nodiscard]] bool isLong() const noexcept { return (flags() & 0x10) != 0; }
 
     public:
         using iterator = char *;
         using const_iterator = const char *;
 
         iterator begin() noexcept { return getBuffer(); }
-        iterator end() noexcept { return getBuffer() + _len; }
+        iterator end() noexcept { return getBuffer() + length(); }
 
         [[nodiscard]] const_iterator begin() const noexcept { return getData(); }
-        [[nodiscard]] const_iterator end() const noexcept { return getData() + _len; }
+        [[nodiscard]] const_iterator end() const noexcept { return getData() + length(); }
 
         [[nodiscard]] const_iterator cbegin() const noexcept { return begin(); }
         [[nodiscard]] const_iterator cend() const noexcept { return end(); }
     };
+
+    static_assert(sizeof(String) == 16, "String tag must remain at byte 15");
 
     inline String operator""_str(const char *str, const std::size_t len) { return String(str, len); }
 

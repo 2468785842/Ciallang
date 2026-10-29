@@ -60,6 +60,12 @@ namespace cial::inter {
         OptReg externallyObserved;
     };
 
+    class CompareTestFusionOptimizer final : public Optimizer {
+    public:
+        std::string_view name() const noexcept override { return "compare-test-fusion"; }
+        size_t optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) override;
+    };
+
     class OptimizerManager {
     public:
         explicit OptimizerManager(vm::Chunk &chunk) : chunk(chunk) {}

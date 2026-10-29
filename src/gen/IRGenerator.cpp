@@ -40,6 +40,7 @@ namespace cial::inter {
         OptimizerManager optimizerManager(*chunk);
         optimizerManager.addOptimizer(std::make_unique<IntegerConstantPropagationOptimizer>());
         optimizerManager.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>(optReg));
+        optimizerManager.addOptimizer(std::make_unique<CompareTestFusionOptimizer>());
         const OptimizerStats optimizerStats = optimizerManager.applyOptimizations();
         if(OptimizerManager::profilingEnabled()) {
             fmt::print(stderr,
@@ -697,6 +698,18 @@ namespace cial::inter {
             return;
         }
 
+        Opt<Register> receiver;
+        if(!omitCall && !expandCall && !_chunk->getInstVec().empty() &&
+           _chunk->getInstVec().back()->opcode() == TacOpCode::GPropC) {
+            const auto &get = *_chunk->getInstVec().back();
+            if(get.getOp3() == memberReg) {
+                const auto obj = get.getOp1().value<Register>();
+                const auto atom = get.getOp2().value<Atom>();
+                receiver = allocateRegister();
+                _chunk->getInstVec().back() = std::make_unique<GMethodC>(obj, atom, memberReg, *receiver);
+            }
+        }
+
         if(omitCall) {
             freeRegister(memberReg);
             _chunk->emitRaw<CallOmit>(dst, memberReg);
@@ -752,8 +765,13 @@ namespace cial::inter {
         }
         freeRegister(memberReg);
         // 变长实参单指令调用（消逐参 Push 派发；语义等价）
-        _chunk->emitRaw<CallV>(dst, memberReg, static_cast<Integer>(node->arguments.size()),
-                               std::move(argRegs));
+        if(receiver) {
+            _chunk->emitRaw<CallMethodV>(dst, memberReg, static_cast<Integer>(node->arguments.size()),
+                                         std::move(argRegs), *receiver);
+            freeRegister(*receiver);
+        } else {
+            _chunk->emitRaw<CallV>(dst, memberReg, static_cast<Integer>(node->arguments.size()), std::move(argRegs));
+        }
         optReg = dst;
     }
 
@@ -1146,13 +1164,13 @@ namespace cial::inter {
             OptReg ignoreReg{};
             IRGenerator genFinalize{ _r, _rt, _sourceFile };
             genFinalize.makeVirtualGlobalScope();
-            auto funChunk = _rt.createNoGC<vm::Chunk>(*genFinalize.parseAst(nullptr, ignoreReg));
-
             auto voidReg = genFinalize.loadVoidReg();
-            funChunk->emit<Ret>(voidReg);
-
+            genFinalize._chunk->emit<Ret>(voidReg);
+            auto funChunk = _rt.createNoGC<vm::Chunk>(*genFinalize.parseAst(nullptr, ignoreReg));
+            auto *finalize = _rt.createNoGC<FuncMeta>(0, funChunk, Vec<LocalVariable>{});
+            finalize->syntheticFinalizer = true;
             classMeta->setMember(MemberShapeMeta{ .name = finalizeAtom, .isMethod = true },
-                                 ClassFieldMeta{ _rt.createNoGC<FuncMeta>(0, funChunk, Vec<LocalVariable>{}) });
+                                 ClassFieldMeta{ finalize });
         }
         endScope();
         freeRegister(classReg);

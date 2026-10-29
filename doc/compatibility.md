@@ -27,7 +27,7 @@
 | 函数 | 默认参数（TestVoid 守卫，实参优先） | ✅ |
 | 函数 | 收拢 `*args`、省略调用 `...`、展开调用 `*expr` | ❌ |
 | 类 | 多继承/slot 链/super/构造函数/property（29 个语义测试） | ✅ |
-| 类 | static / finalize 触发语义 | ◐ |
+| 类 | static / finalize 触发语义 | ◐；GC finalize 已实现保活队列 + 所属 VM 安全点 drain，显式 invalidate 保持同步（`src/gc/gc.hpp`、`src/types/Class.cpp`、`src/vm/VMState.cpp`）；Runtime 销毁不执行脚本 |
 | 成员 | `delete obj.member`（实例自有成员） | ✅ |
 | 成员 | `str.length` 只读属性 | ✅ |
 | 异常 | Exception 类（message 成员）+ 原生错误转脚本可捕获异常 | ✅ |
@@ -95,3 +95,5 @@ P4  M3/M4：转译性能（比较写 zf、Inc/Dec 等新 TAC）与边缘语义�
 
 > P1 与 P2 的先后可互换：字节码路线先用"旧编译器编译"绕过前端缺口；
 > 源码路线独立推进。两条路线在语义层（Value/类系统/标准库）共享成果。
+
+- 2026-10-28：String.reverse 返回独立反转结果，接收者不变（UTF-8 按码点反转；TJS2 按 UTF-16 码元）。依据 `../TJSCompiler/src/syntax/tjsInterCodeExec.cpp` 的 reverse 分支及参考 CLI 对拍；实现见 `src/stdlib/StringLib.cpp`，回归见 `tests/native_function_test.cpp`。

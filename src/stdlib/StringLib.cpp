@@ -130,18 +130,21 @@ namespace cial::stdlib {
     }
 
     // reverse()
-    void stringReverse(VM *, const Value &thisObj, size_t) {
-        String *str = thisObj.asString().unwrap();
-        if(str->isEmpty())
-            return;
-
-        char *begin = str->getBuffer();
-        char *end = begin + str->length() - 1;
-        while(begin < end) {
-            std::swap(*begin, *end);
-            ++begin;
-            --end;
+    String stringReverse(VM *, const Value &thisObj, size_t) {
+        // TJS2 tjsInterCodeExec.cpp:2603：返回独立结果，不修改接收者。
+        const auto *str = thisObj.asString().unwrap();
+        std::string result;
+        result.reserve(str->length());
+        const char *data = str->getData();
+        size_t end = str->length();
+        while(end) {
+            size_t begin = end - 1;
+            while(begin && (static_cast<unsigned char>(data[begin]) & 0xc0) == 0x80)
+                --begin;
+            result.append(data + begin, end - begin);
+            end = begin;
         }
+        return String{ result };
     }
 
     // repeat(count)

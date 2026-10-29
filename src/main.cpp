@@ -14,7 +14,9 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
+#ifdef _MSC_VER
 #include <crtdbg.h>
+#endif
 
 #include "stdlib/ExceptionLib.hpp"
 #include "tjsbc/TjsBytecodeReader.hpp"
@@ -26,7 +28,7 @@
 
 using namespace cial;
 
-#ifdef _DEBUG
+#if defined(_MSC_VER) && defined(_DEBUG)
 // 把 Debug 断言从弹窗重定向到 stderr，终端/CI 下可见（Windows 断言弹窗在
 // 无交互环境表现为"挂起"）；与 tests/fuzz_regress_test.cpp 同款
 static const bool g_redirectCrtReport = [] {

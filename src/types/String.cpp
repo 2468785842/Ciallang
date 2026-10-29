@@ -8,37 +8,44 @@
 
 namespace cial {
 
-    String::String(const char *str, const u32 len) : _len(len) {
-        char *buf = _shortStr;
-        if(len > SHORT_STR_LEN) {
-            _longStr = new char[len + 1];
-            buf = _longStr;
+    String::String(const char *str, const u32 len) : _shortStr{} {
+        if(len <= SHORT_STR_LEN) {
+            std::memcpy(_shortStr, str, len);
+            _shortStr[len] = '\0';
+            flags() = static_cast<u8>(len);
+        } else {
+            _long.data = new char[len + 1];
+            _long.len = len;
+            std::memcpy(_long.data, str, len);
+            _long.data[len] = '\0';
+            flags() = 0x10;
         }
-        buf[len] = '\0';
-        std::memcpy(buf, str, len);
     }
-
 
     String::~String() noexcept {
-        if(this->_len > SHORT_STR_LEN) {
-            delete[] _longStr;
-        }
+        if(isLong())
+            delete[] _long.data;
     }
 
-    String::String(String &&str) noexcept : _len(str._len) {
-        if(this->_len > SHORT_STR_LEN) {
-            _longStr = str._longStr;
-            str._longStr = nullptr;
+    String::String(String &&str) noexcept : _shortStr{} {
+        const u8 mode = str.flags() & 0x1f;
+        if(str.isLong()) {
+            _long.data = str._long.data;
+            _long.len = str._long.len;
         } else {
-            _shortStr[this->_len] = '\0';
-            std::memcpy(this->_shortStr, str._shortStr, this->_len);
+            std::memcpy(_shortStr, str._shortStr, sizeof(_shortStr));
         }
+        flags() = mode;
+        str.flags() &= 0xe0;
+        str._shortStr[0] = '\0';
     }
 
     String &String::operator=(String &&str) noexcept {
         if(this != &str) {
+            const u8 externalTag = flags() & 0xe0;
             this->~String();
             new(this) String(std::move(str));
+            flags() |= externalTag;
         }
         return *this;
     }
@@ -201,7 +208,7 @@ namespace cial {
 
     String String::escapeBackSlash() const {
         std::string ret;
-        ret.reserve(_len * 2); // 预分配，避免频繁扩容
+        ret.reserve(length() * 2); // 预分配，避免频繁扩容
 
         auto appendHex = [&](const u8 c) {
             char buf[5]; // \xHH\0
@@ -209,7 +216,7 @@ namespace cial {
             ret += buf;
         };
 
-        for(u32 i = 0; i < _len; ++i) {
+        for(u32 i = 0; i < length(); ++i) {
             switch(char c = getData()[i]) {
                 case '\a':
                     ret += "\\a";
@@ -254,32 +261,6 @@ namespace cial {
         return String(ret.c_str(), static_cast<u32>(ret.size()));
     }
 
-    void String::append(const String &str) {
-        if(str.isEmpty())
-            return;
-
-        const u32 newLen = _len + str._len;
-
-        // SSO 阈值与构造/析护/move 的长串判据(len > SHORT_STR_LEN)一致:
-        // newLen == SHORT_STR_LEN(21 字符+NUL 恰满 _shortStr)走 SSO。
-        // 旧判据 < 会在 21 时分配 _longStr,随后析构/move 按短串处理——泄漏缓冲
-        if(newLen <= SHORT_STR_LEN) {
-            auto i = this->_len;
-            for(const char c : str) {
-                this->_shortStr[i++] = c;
-            }
-        } else {
-            auto *buf = new char[newLen + 1];
-            std::memcpy(buf, this->getData(), this->_len);
-            delete[] this->_longStr;
-            this->_longStr = buf;
-            _lenCap = newLen;
-            std::memcpy(this->_longStr + this->_len, str.getData(), str._len);
-        }
-
-        // 终止符写在 newLen 处(旧代码写 newLen+1:越界一位且真正终止符位置留垃圾)
-        this->getBuffer()[newLen] = '\0';
-        this->_len = newLen;
-    }
+    void String::append(const String &str) { *this = concat(*this, str); }
 
 } // namespace cial

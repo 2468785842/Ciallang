@@ -45,6 +45,12 @@ namespace cial::inter {
             addRegister(instruction.getOp3());
 
             switch(instruction.opcode()) {
+                case TacOpCode::GMethodC:
+                    callback(static_cast<const GMethodC &>(instruction).receiver);
+                    break;
+                case TacOpCode::CallMethodV:
+                    callback(static_cast<const CallMethodV &>(instruction).receiver);
+                    [[fallthrough]];
                 case TacOpCode::CallV: {
                     const auto &call = static_cast<const CallV &>(instruction);
                     callback(call.func);
@@ -228,6 +234,39 @@ namespace cial::inter {
         }
         lineEntries = std::move(remappedLines);
         return oldSize - instructions.size();
+    }
+
+    size_t CompareTestFusionOptimizer::optimize(Chunk &chunk, const Vec<BasicBlock> &blocks) {
+        size_t count = 0;
+        for(const auto &block : blocks) {
+            for(size_t pc = block.start; pc + 1 < block.end; ++pc) {
+                const auto &cmp = *chunk.inst(pc);
+                switch(cmp.opcode()) {
+                    case TacOpCode::EQ:
+                    case TacOpCode::NEQ:
+                    case TacOpCode::AbsEQ:
+                    case TacOpCode::AbsNEQ:
+                    case TacOpCode::LT:
+                    case TacOpCode::LE:
+                    case TacOpCode::GT:
+                    case TacOpCode::GE:
+                        break;
+                    default:
+                        continue;
+                }
+                const auto &test = *chunk.inst(pc + 1);
+                if(test.opcode() != TacOpCode::Test || test.getOp1() != cmp.getOp3().value<Register>())
+                    continue;
+                const auto op = cmp.opcode();
+                const auto lhs = cmp.getOp1().value<Register>();
+                const auto rhs = cmp.getOp2().value<Register>();
+                const auto dst = cmp.getOp3().value<Register>();
+                chunk.getInstVec()[pc] = std::make_unique<CompareTest>(op, lhs, rhs, dst);
+                chunk.repl<NOP>(pc + 1);
+                ++count;
+            }
+        }
+        return count;
     }
 
     size_t IntegerConstantPropagationOptimizer::optimize(Chunk &chunk, const Vec<BasicBlock> &blocks) {

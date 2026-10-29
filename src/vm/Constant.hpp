@@ -50,6 +50,7 @@ namespace cial {
         // 全部实际实参按调用序备份到窗口尾区（CollapseArgs/CallExpand 的
         // frameArg 读取源），避免 CollapseArgs 写参数槽覆盖原始实参
         bool hasCollapse{};
+        bool syntheticFinalizer{}; // 编译器生成的空 finalize，无需进入 GC 终结队列
         vm::Chunk *chunk; // manager for gc
         Vec<inter::LocalVariable> localVars; // the first vectorIndex = ScopeLevel; the second is vars
 

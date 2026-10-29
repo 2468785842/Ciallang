@@ -65,10 +65,11 @@
 - `IRGenerator`：核心类。AST→TAC 发射、寄存器分配（`_freeRegisters` 自由表 + 递增索引）、
   作用域栈（`_localVars` 即 FuncMeta 局部变量表）、循环 break/continue 标签回填、
   函数/类/属性的元数据（FuncMeta/ClassMeta/PropMeta）生成。
-- `Instruction.hpp/cpp`：**55 条 TAC 指令**（X-macro 生成类族），每条 `execute/dump/encode` 三虚函数。
+- `Instruction.hpp/cpp`：**95 条 TAC 指令**（X-macro 生成类族及变长操作数子类），仅保留 dump；
+  编码由 `src/vm/Bytecode.cpp` 完成，执行统一走 `VMState::run0()`。
 - `Register/Label/ConstIdx`：`%n`、`@n`、`*n` 强类型操作数。
-- `ControlFlowGraph` + `Optimizer`：CFG/BasicBlock 与优化 Pass 框架——**已建成未接线**
-  （`IRGenerator.cpp:40-43` 调用被注释）。
+- `ControlFlowGraph` + `Optimizer`：CFG/BasicBlock、整数常量折叠、死 LoadImm 清理与比较/Test 融合，
+  由 `src/gen/IRGenerator.cpp` 的 `parseAst()` 接入；NOP 压缩同步重映射跳转、try 表与行号。
 
 ### 2.4 `src/vm/` — 执行引擎
 
@@ -150,3 +151,19 @@
 加原生函数/标准库    → src/stdlib/*（NativeRegister 注册）
 GC/内存              → src/gc/gc.cpp, src/runtime/Runtime.*
 ```
+
+## 5. GC 终结与访问缓存（2026-10-28）
+
+`src/gc/gc.hpp` 的 collect 在标记根后先快照不可达且需要 finalize 的对象，再标记整个队列及其依赖，
+sweep 不运行脚本。`src/vm/VMState.cpp` 在指令安全点 drain 所属 VM 的队列并保存 `_zf`；
+`src/types/Class.cpp` 通过 `VM::callValue` 同步执行一次终结回调。队列是 Runtime 的根，支持环、
+回调内再次 GC 和复活；异常经过现有脚本异常协议传播。没有活动 VM 的 Runtime 销毁不运行脚本。
+
+`src/types/Value.hpp` 内联不超过 14 字节的字符串，较长字符串仍用共享 payload；`String` 与
+`Value` 均为 16B（当前 64 位构建）。字符串裸指针仅在所属 Value 存活期间有效。
+
+原生成员调用用 GMethodC/CallMethodV 分离函数与接收者，读取成员先于计算实参，避免每次调用复制
+NativeFunction。提取方法作为一等值时仍独立绑定，见 `src/gen/IRGenerator.cpp`、`src/types/Function.cpp`。
+VM 含 64 项原生成员缓存（按 NativeRegister 注册版本失效）和 64 项全局槽缓存（按 ClassObject
+插入/删除版本失效）。全局赋值更新同一槽，缓存读取最新值；不持有脱离全局对象的 Value，见
+`src/stdlib/NativeRegister.hpp`、`src/types/Class.cpp`、`src/vm/VMState.hpp`。

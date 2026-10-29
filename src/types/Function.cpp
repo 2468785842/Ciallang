@@ -17,6 +17,7 @@
 #include "Function.hpp"
 
 #include "Class.hpp"
+#include "common/Defer.hpp"
 #include "vm/CallFrame.hpp"
 #include "vm/Constant.hpp"
 #include "vm/VM.hpp"
@@ -77,18 +78,25 @@ namespace cial {
     }
 
     void NativeFunction::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {
+        callWithThis(vmState, ret, argCount, _thisObj);
+    }
+
+    void NativeFunction::callWithThis(vm::VMState &vmState, const u32 ret, const size_t argCount,
+                                      const Value &receiver) {
         const auto cnt = _arity > argCount ? _arity - argCount : 0;
         if(cnt > 0)
             vmState.pushVoid(cnt);
+        DEFER {
+            if(cnt > 0)
+                vmState.pop(cnt);
+        };
 
         const auto *curFrame = vmState.curFrame();
         VM vm{ &vmState };
 
-        const auto &value = callProc(&vm, argCount, curFrame->getArgs(cnt != 0 ? _arity : argCount));
+        // 接收者独立于共享 NativeFunction，嵌套调用不覆写绑定。
+        const auto &value = _callback(&vm, receiver, argCount, curFrame->getArgs(cnt != 0 ? _arity : argCount));
 
         vmState.regRef(ret) = value;
-
-        if(cnt > 0)
-            vmState.pop(cnt);
     }
 } // namespace cial

@@ -15,24 +15,24 @@
 ## 1. 两级结构总览
 
 ```
-AST ──IRGenerator──▶ TAC 指令序列（92 种，Instruction 对象）
+AST ──IRGenerator──▶ TAC 指令序列（95 种，Instruction 对象）
                         │  存于 Chunk::_instructions
                         ▼  Chunk::toBytecode()（幂等、惰性）
-                     扁平字节码 Vec<u8>（92 种 VmOpCode，与 TAC 一一对应）
+                     扁平字节码 Vec<u8>（95 种 VmOpCode，与 TAC 一一对应）
                         │  存于 Chunk::_code
                         ▼
                      VMState::run0() switch 解释（唯一执行路径）
 ```
 
 - 早期的 `run()` 多态执行路径（逐条虚调用 `Instruction::execute`）已删除；
-  语义全部收敛到 `run0()` 的 92 个 `dispatchXXX`。
+  语义全部收敛到 `run0()` 的 95 个 `dispatchXXX`。
 - `Instruction` 子类只作为 IR 载体与 dump 来源保留。
 
 ## 2. 执行模型
 
 - **寄存器**：`%n`（`u16`，`Register` 强类型），帧内 Value 槽，由 `FastRegisterPool` 分配
-  （4KB 分块、2 的幂移位寻址）。`Chunk::_registerCount` 决定帧窗口大小。
-- **零标志 `_zf`**：VM 级单 bool（`VMState::_zf`）。`Test` 写入，`JmpE`/`JmpNE` 消费。
+  （4096 个 Value 槽分块、2 的幂移位寻址）。`Chunk::_registerCount` 决定帧窗口大小。
+- **零标志 `_zf`**：VM 级单 bool（`VMState::_zf`）。`Test`、`Cmp*`、`CompareTest` 写入，`JmpE`/`JmpNE` 消费。
   ⚠️ 与 TAC 的 3 操作数比较指令（EQ/LT 等把 bool 写进寄存器）是**两套机制**：
   3 op 比较产出值，`Test`+`JmpNE` 做分支。
 - **实参栈**：实参经 `Push` 压入寄存器池顶部；`Call` 触发 `Function::call`：
@@ -47,7 +47,7 @@ AST ──IRGenerator──▶ TAC 指令序列（92 种，Instruction 对象）
 - **this**：`CallFrame::thisObj`；`Function::call` 设为函数对象的 `thisObj` 字段（可被
   `ChgThis`/`GProp` 的方法绑定改写）。`GThis`/`DThis` 做名字查找（thisObj → closure 局部 → global）。
 
-## 3. TAC 指令全表（92 条）
+## 3. TAC 指令全表（95 条）
 
 枚举值 = 表中顺序（X-macro `CIAL_TAC_OPCODE_ENUMS`）。操作数记号：
 `%r`=寄存器、`@l`=标签（TAC 指令下标）、`*c`=常量池下标、`imm`=立即整数、`atom`=驻留名。
@@ -173,7 +173,7 @@ IGNOREPROP/MEMBERENSURE 标志位由独立的 *Raw 指令承担（见 mapping.md
 ### 3.10 追加指令（TJS 字节码转译与性能批次，2026-10-27；编号续 3.9 表）
 
 > 本节指令为转译路线（mapping.md）与调用优化新增，3.9 之前表格的编号系历史快照；
-> 枚举顺序以 X-macro `CIAL_TAC_OPCODE_ENUMS` 为权威（92 条全量编码进扁平字节码）。
+> 枚举顺序以 X-macro `CIAL_TAC_OPCODE_ENUMS` 为权威（95 条全量编码进扁平字节码）。
 
 | 指令 | 操作数 | 语义 |
 |---|---|---|
@@ -199,6 +199,9 @@ IGNOREPROP/MEMBERENSURE 标志位由独立的 *Raw 指令承担（见 mapping.md
 | ToNumber | `%src, %dst` | 数值规范化（旧版 NUM：字符串解析、void→0） |
 | ToOctet | `%src, %dst` | 转 octet（旧版 OCTET：void→空 octet、其余报错） |
 | EvalStr | `%src, %dst` | 后缀 `!` 即时求值（见 3.4 表 #24） |
+| CompareTest | `kind, %lhs, %rhs, %dst` | 融合比较与紧随的 Test，保留 `%dst` 布尔值并同步 `_zf`；不跨 CFG 基本块边界（`src/gen/Optimizer.cpp`） |
+| GMethodC | `%obj, atom, %func, %receiver` | 调用前读取成员：原生方法不分配绑定对象，函数和接收者分开存入寄存器；其他成员走原有属性读取协议，receiver 为 void |
+| CallMethodV | `%receiver, %dst, %func, argc, %args...` | receiver 非 void 时按原生调用约定传递 objthis；否则复用 CallV 的脚本函数直写或通用调用。成员读取先于实参求值，提取为一等值的方法仍用 GPropC 绑定（`src/gen/IRGenerator.cpp`、`src/types/Function.cpp`） |
 
 ## 4. Chunk 结构（`src/vm/Chunk.hpp`）
 
@@ -220,14 +223,14 @@ IGNOREPROP/MEMBERENSURE 标志位由独立的 *Raw 指令承担（见 mapping.md
   （slot 化成员表；继承按名字查找，与 TJS2 行为一致）。
 - `PropMeta`：`setFunc / getFunc`。
 
-**无磁盘序列化**：当前 Chunk 只在内存；TJS 字节码加载/转译是唯一的二进制入口（规划中）。
+**无磁盘序列化**：当前 Chunk 只在内存；TJS 字节码加载/转译是唯一的二进制入口（已实现，见 `src/tjsbc/TjsTranslator.cpp`）。
 
 ## 5. 扁平字节码（`run0()` 路径）
 
-### 5.1 操作码（86 个，`VmOpCode : u8`）
+### 5.1 操作码（95 个，`VmOpCode : u8`）
 
 与 TAC 指令一一对应、编号一致（同一个 X-macro 序表 `CIAL_BYTECODE_OPCODE_ENUMS`，
-顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 86 条，无占位断言。
+顺序 = `CIAL_TAC_OPCODE_ENUMS`）。编码器覆盖全部 95 条，无占位断言。
 
 ### 5.2 立即数编码
 
@@ -237,7 +240,7 @@ IGNOREPROP/MEMBERENSURE 标志位由独立的 *Raw 指令承担（见 mapping.md
 - 操作数宽度约定：寄存器 `u16`、Atom `u32`（Atom.v 是顺序索引，远小于 2^32）、
   跳转目标 `u32`（编译期回填的绝对偏移）。
 
-### 5.3 指令编码表（86 条全覆盖）
+### 5.3 指令编码表（95 条全覆盖）
 
 | 类别 | 指令 | 编码 |
 |---|---|---|
@@ -251,6 +254,9 @@ IGNOREPROP/MEMBERENSURE 标志位由独立的 *Raw 指令承担（见 mapping.md
 | 装载 | Load（`dst, constIdx`）、LoadImm（`dst, imm`） | `op + u16 + u16` / `op + u16 + sLEB128` |
 | 名字访问 | DGlobal/GGlobal/GThis/DThis/GRefRaw | `op + u32 atom + u16 reg` |
 | 成员名直引 | GPropC/DPropC/GPropRawC/DPropRawC/DelPropC（`obj, atom, dst/src`） | `op + u16 obj + u32 atom + u16 dst/src` |
+| 比较测试融合 | CompareTest | `op + u8 kind + u16 lhs + u16 rhs + u16 dst`；kind 0..7 依次 EQ/NEQ/AbsEQ/AbsNEQ/LT/LE/GT/GE |
+| 原生方法读取 | GMethodC | `op + u16 obj + u32 atom + u16 func + u16 receiver` |
+| 接收者分离调用 | CallMethodV | `op + u16 receiver + u16 dst + u16 func + uleb(argc) + u16×n` |
 | 算术/位/比较 | Add..LOr 全部 22 条（§3.8） | `op + u16 src1 + u16 src2 + u16 dst`（**三寄存器非破坏性**） |
 | 调用/属性 | Call（`dst, func, sLEB argc`）、GProp/DProp/DelProp/GPropRaw/DPropRaw（`obj, name, dst/src`）、GetIndex/SetIndex（`obj, idx, dst/src`） | 见括号内顺序 |
 
