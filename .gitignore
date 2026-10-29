@@ -22,3 +22,6 @@ bench/results/
 # 其他
 **/.cache
 .DS_Store
+
+# 测试残留（saveStruct 相对路径曾漏 __tmpDir 前缀）
+t_o.bin

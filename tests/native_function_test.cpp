@@ -1001,9 +1001,9 @@ TEST_CASE("Array/Dictionary 结构化存取 + Octet pack 系（tjsBinarySerializ
             var innerV = c2[1]["v"];
             var backIsNull = c2[1]["back"] === void ? 1 : 0;
             var od = %[o: [0xde, 0xad].pack("C2")];
-            od.saveStruct("t_o.bin", "b");
+            od.saveStruct(__tmpDir + "/t_o.bin", "b");
             var od2 = %[];
-            od2.loadStruct("t_o.bin", "b");
+            od2.loadStruct(__tmpDir + "/t_o.bin", "b");
             var oh = od2["o"].unpack("H*")[0];
         )tjs"_str);
         REQUIRE(*vm.evalExpr<Integer>("txtErr"_str) == 1);
