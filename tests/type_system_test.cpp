@@ -91,6 +91,20 @@ TEST_CASE("类型系统 - as* 转换的 TJS2 语义") {
         REQUIRE(value.asString().unwrap()->toStdStr() == "abc");
     }
 
+    SECTION("toString：void → 空串、octet 抛错（原版 ToString，tjsVariant.cpp:411-445）") {
+        Value voidValue{};
+        REQUIRE(voidValue.toString().isOk());
+        REQUIRE(voidValue.asString().unwrap()->isEmpty());
+
+        Value intValue{ Integer{ 5 } };
+        REQUIRE(intValue.toString().isOk());
+        REQUIRE(intValue.asString().unwrap()->toStdStr() == "5");
+
+        const u8 bytes[]{ 0x01 };
+        Value octetValue{ Octet{ bytes, 1 } };
+        REQUIRE(octetValue.toString().isFailed());
+    }
+
     SECTION("octet 不参与算术转换") {
         const u8 bytes[]{ 0x01 };
         const Value value{ Octet{ bytes, 1 } };

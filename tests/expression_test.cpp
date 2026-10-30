@@ -431,3 +431,31 @@ TEST_CASE("表达式 - Array/Dictionary 字面量与下标") {
         REQUIRE(*vm.evalExpr<bool>("oob"_str) == true);
     }
 }
+
+// `+` 的 void 幺元语义（原版 tTJSVariant::operator+=，tjsVariant.cpp:1095-1178）：
+// 任一侧为 String 时两侧 AsString() 拼接（void→空串，AsString 对 void 返回 NULL）；
+// void±Integer/Real 为恒等；void+void 走 AsReal 兜底得 Real 0；octet+String 抛错。
+TEST_CASE("表达式 - 加法的 void 幺元与字符串化") {
+    Runtime rt{};
+    Context context{ rt };
+    stdlib::registerStandardLibrary(context);
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    vm.eval(R"(
+        var v;
+        var sv = "a" + v;
+        var vs = v + "b";
+        var vi = v + 1;
+        var iv = 1 + v;
+        var vr = v + 1.5;
+        var vv = v + v;
+    )"_str);
+
+    REQUIRE((**vm.evalExpr<String *>("sv"_str)) == "a"_str);
+    REQUIRE((**vm.evalExpr<String *>("vs"_str)) == "b"_str);
+    REQUIRE(*vm.evalExpr<Integer>("vi"_str) == 1);
+    REQUIRE(*vm.evalExpr<Integer>("iv"_str) == 1);
+    REQUIRE((*vm.evalExpr<Real>("vr"_str)).value() == Catch::Approx(1.5));
+    REQUIRE(vm.evalExpr<Value>("vv"_str)->isReal());
+}

@@ -275,6 +275,12 @@ namespace cial {
             }
 
             case ValueType::Void:
+                // 原版 ToString（tjsVariant.cpp:411-415）：void → 空串（String=NULL）；
+                // `(string)void` 与 `"a" + void` 同此路径，octet 仍抛错（:443-445）
+                this->~Value();
+                new(this) Value{ String{} };
+                return Ret<void>::ok();
+
             case ValueType::Octet:
                 break;
         }
