@@ -70,6 +70,27 @@ class ProtocolTest(unittest.TestCase):
         self.send("textDocument/definition", {"textDocument": {"uri": uri}, "position": position}, 21)
         return self.receive()["result"]
 
+    def position_of(self, text, needle, offset=0):
+        cursor = text.index(needle) + offset
+        before = text[:cursor]
+        return {"line": before.count("\n"), "character": utf16(before.rsplit("\n", 1)[-1])}
+
+    def complete(self, uri, text, needle, offset=0):
+        self.send("textDocument/completion", {"textDocument": {"uri": uri},
+                                              "position": self.position_of(text, needle, offset)}, 30)
+        return self.receive()["result"]
+
+    def prepare(self, uri, text, needle, offset=0):
+        self.send("textDocument/prepareRename", {"textDocument": {"uri": uri},
+                                                 "position": self.position_of(text, needle, offset)}, 31)
+        return self.receive()["result"]
+
+    def rename(self, uri, text, needle, offset, new_name):
+        self.send("textDocument/rename", {"textDocument": {"uri": uri},
+                                          "position": self.position_of(text, needle, offset),
+                                          "newName": new_name}, 32)
+        return self.receive()["result"]
+
     def assert_definition(self, location, uri, text, declaration, name):
         self.assertIsNotNone(location)
         before = text[:text.index(declaration)]
@@ -144,7 +165,9 @@ class Example { function method(arg) { arg; shared; } }
                 self.assertIsNone(self.definition(uri, text, reference, offset))
             duplicate = root / "duplicate.tjs"
             duplicate.write_text("function Shared() {}", encoding="utf-8")
-            self.assertIsNone(self.definition(uri, text, "Shared();"))
+            both = self.definition(uri, text, "Shared();")
+            self.assertEqual([place["uri"] for place in both],
+                             sorted([duplicate.as_uri(), library.as_uri()]))  # 多义返回全部，URI 排序
             duplicate.unlink()
             self.open_document(library.as_uri(), "function Renamed() {}")
             self.assertIsNone(self.definition(uri, text, "Shared();"))
@@ -157,6 +180,186 @@ class Example { function method(arg) { arg; shared; } }
         for version, text in enumerate(("var value; function broken( { value;", "@set(flag=1)\nvar value; value;"), 1):
             self.open_document(uri, text, version)
             self.assertIsNone(self.definition(uri, text, "value;", len("value;") - 2))
+
+    def test_definition_returns_all_top_level_matches_sorted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / "alpha.tjs").write_text("function Multi() {}", encoding="utf-8")
+            (root / "beta.tjs").write_text("class Multi {}", encoding="utf-8")
+            uri = (root / "main.tjs").as_uri()
+            text = "Multi();"
+            self.initialize({"rootUri": root.as_uri()})
+            self.open_document(uri, text)
+            result = self.definition(uri, text, "Multi();")
+            self.assertIsInstance(result, list)  # 多文件匹配：返回全部 Location
+            self.assertEqual([place["uri"] for place in result],
+                             [(root / "alpha.tjs").as_uri(), (root / "beta.tjs").as_uri()])
+            self.assertEqual(result[0]["range"]["start"], {"line": 0, "character": 9})
+            self.assertEqual(result[1]["range"]["start"], {"line": 0, "character": 6})
+            (root / "alpha.tjs").unlink()
+            self.assert_definition(self.definition(uri, text, "Multi();"), (root / "beta.tjs").as_uri(),
+                                   "class Multi {}", "Multi {}", "Multi")  # 唯一恢复单 Location
+
+    def test_completion_infers_builtin_member_lists(self):
+        self.initialize()
+        uri = "file:///members.tjs"
+        text = '''var arr = [];
+var dict = new Dictionary();
+var str = "lit";
+var reg = /pat/;
+var num = 1;
+var nope;
+arr.sort;
+arr.po
+dict.assign;
+str.charAt;
+reg.test;
+num.zero;
+nope.mystery;
+var tail = "";
+tail.'''
+        self.open_document(uri, text)
+        items = self.complete(uri, text, "arr.sort", offset=len("arr."))
+        info = {item["label"]: item for item in items}
+        self.assertIn("push", info)
+        self.assertNotIn("charAt", info)
+        self.assertEqual(info["push"]["kind"], 2)  # Method
+        self.assertEqual(info["count"]["kind"], 10)  # Property
+        self.assertTrue(info["push"]["detail"].startswith("push("))  # 内置成员带一行签名
+        self.assertEqual([item["label"] for item in self.complete(uri, text, "arr.po", offset=len("arr.po"))],
+                         ["pop"])  # 已输入前缀过滤（文档中就是半截词）
+        self.assertIn("assign", {item["label"] for item in self.complete(uri, text, "dict.assign", offset=len("dict."))})
+        self.assertNotIn("push", {item["label"] for item in self.complete(uri, text, "dict.assign", offset=len("dict."))})
+        string_items = {item["label"]: item for item in self.complete(uri, text, "str.charAt", offset=len("str."))}
+        self.assertIn("indexOf", string_items)
+        self.assertIn("charAt(index", string_items["charAt"]["detail"])
+        self.assertIn("test", {item["label"] for item in self.complete(uri, text, "reg.test", offset=len("reg."))})
+        # 推导不出类型的接收者（Integer 无成员表 / unknown 变量）：回落既有词法补全
+        fallback = self.complete(uri, text, "num.zero", offset=len("num."))
+        self.assertIn("function", {item["label"] for item in fallback})
+        self.assertNotIn("charAt", {item["label"] for item in fallback})
+        self.assertEqual(fallback, self.complete(uri, text, "nope.mystery", offset=len("nope.")))
+        self.assertEqual({item["label"] for item in self.complete(uri, text, 'tail.', offset=len("tail."))},
+                         set(string_items))  # 光标紧跟点号同样给出完整成员
+
+    def test_completion_workspace_class_inheritance_and_returns(self):
+        self.initialize()
+        uri = "file:///classes.tjs"
+        text = '''function makeArray() { return []; }
+class Point {
+    var x;
+    var y;
+    function norm() { return 0; }
+    property len { getter { return 1; } }
+}
+class Labeled extends Point {
+    function extra() {}
+}
+var viaReturn = makeArray();
+var p = new Point();
+var d = new Labeled();
+viaReturn.pop;
+p.x;
+d.extra;
+'''
+        self.open_document(uri, text)
+        members = {item["label"]: item for item in self.complete(uri, text, "p.x", offset=len("p."))}
+        self.assertEqual(set(members), {"x", "y", "norm", "len"})  # 工作区 class 的成员
+        self.assertEqual(members["norm"]["kind"], 2)
+        self.assertEqual(members["x"]["kind"], 5)  # Field
+        self.assertEqual(members["len"]["kind"], 10)
+        self.assertEqual({item["label"] for item in self.complete(uri, text, "d.extra", offset=len("d."))},
+                         {"x", "y", "norm", "len", "extra"})  # extends 链上的父类成员
+        self.assertIn("push", {item["label"] for item in
+                               self.complete(uri, text, "viaReturn.pop", offset=len("viaReturn."))})  # 函数返回值类型
+
+    def test_completion_cross_file_class_and_ambiguity_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / "defs.tjs").write_text("class Shared { function ping() {} }", encoding="utf-8")
+            uri = (root / "main.tjs").as_uri()
+            text = "var s = new Shared();\ns.ping;"
+            self.initialize({"rootUri": root.as_uri()})
+            self.open_document(uri, text)
+            self.assertEqual([item["label"] for item in self.complete(uri, text, "s.ping", offset=len("s."))],
+                             ["ping"])  # 跨文件唯一顶层类
+            (root / "dup.tjs").write_text("class Shared {}", encoding="utf-8")
+            fallback = self.complete(uri, text, "s.ping", offset=len("s."))
+            self.assertIn("function", {item["label"] for item in fallback})  # 多义回落词法补全，不报错
+
+    def test_prepare_rename_accepts_bindings_and_rejects_dynamic_forms(self):
+        self.initialize()
+        uri = "file:///prepare.tjs"
+        text = '''var value = 1;
+Math;
+var obj = %[ key: 1 ];
+obj.member;
+function target() {}
+target();
+stray;
+'''
+        self.open_document(uri, text)
+        place = self.prepare(uri, text, "value = 1", offset=len("value") - 1)
+        self.assertEqual(place["placeholder"], "value")
+        self.assertEqual(place["range"]["start"], {"line": 0, "character": 4})
+        self.assertEqual(self.prepare(uri, text, "target();")["placeholder"], "target")
+        for needle, offset in (("var value", 1),  # 关键字
+                               ("Math;", 1),  # 内置类名
+                               ("obj.member", len("obj.")),  # 动态成员
+                               ("key: 1", 0),  # 字典键
+                               ("stray;", 1)):  # 无声明的自由标识符
+            self.assertIsNone(self.prepare(uri, text, needle, offset), needle)
+
+    def test_rename_is_binding_precise_across_shadowing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = pathlib.Path(directory) / "rename.tjs"
+            uri = source.as_uri()
+            text = '''var value = 1;
+function f(value) { value; }
+value;
+var twice;
+{ var twice = 2; twice; }
+twice;
+var holder = %[ k: 1 ];
+holder.member;
+'''
+            self.initialize()
+            self.open_document(uri, text)
+            result = self.rename(uri, text, "value = 1", len("value") - 1, "renamed")
+            edits = result["changes"][uri]
+            self.assertEqual([edit["range"]["start"] for edit in edits],
+                             [{"line": 0, "character": 4}, {"line": 2, "character": 0}])  # 声明 + 外层引用；参数不受影响
+            self.assertTrue(all(edit["newText"] == "renamed" for edit in edits))
+            result = self.rename(uri, text, "function f(value)", len("function f("), "inner")
+            self.assertEqual([edit["range"]["start"] for edit in result["changes"][uri]],
+                             [{"line": 1, "character": 11}, {"line": 1, "character": 20}])  # 参数绑定自身与体内引用
+            result = self.rename(uri, text, "{ var twice = 2; twice; }", len("{ var "), "deep")
+            self.assertEqual([edit["range"]["start"] for edit in result["changes"][uri]],
+                             [{"line": 4, "character": 6}, {"line": 4, "character": 17}])  # 内层块绑定
+            result = self.rename(uri, text, "\ntwice;", 1, "outer")
+            self.assertEqual([edit["range"]["start"] for edit in result["changes"][uri]],
+                             [{"line": 3, "character": 4}, {"line": 5, "character": 0}])
+            self.assertIsNone(self.rename(uri, text, "value = 1", len("value") - 1, "1bad"))  # 非法新名
+            self.assertIsNone(self.rename(uri, text, "holder.member", len("holder."), "x"))  # 动态成员位置
+
+    def test_rename_cross_file_unique_and_ambiguous(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            library = root / "library.tjs"
+            library.write_text("var Counter = 1;\nCounter++;", encoding="utf-8")
+            uri = (root / "main.tjs").as_uri()
+            text = "Counter;"
+            self.initialize({"rootUri": root.as_uri()})
+            self.open_document(uri, text)
+            self.assertEqual(self.prepare(uri, text, "Counter;")["placeholder"], "Counter")
+            result = self.rename(uri, text, "Counter;", 0, "Total")
+            self.assertEqual(set(result["changes"]), {uri, library.as_uri()})  # 顶层全局 + 工作区唯一 → 跨文件
+            self.assertEqual(len(result["changes"][uri]), 1)
+            self.assertEqual([edit["range"]["start"] for edit in result["changes"][library.as_uri()]],
+                             [{"line": 0, "character": 4}, {"line": 1, "character": 0}])
+            (root / "other.tjs").write_text("var Counter = 2;", encoding="utf-8")
+            self.assertIsNone(self.rename(uri, text, "Counter;", 0, "Total"))  # 多义 → null
+            self.assertIsNone(self.prepare(uri, text, "Counter;"))
 
     def test_workspace_symbols_disk_buffers_and_folder_changes(self):
         with tempfile.TemporaryDirectory(prefix="cial workspace %20 空间 ") as directory:

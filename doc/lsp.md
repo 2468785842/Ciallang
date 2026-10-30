@@ -1,6 +1,6 @@
 # LSP 与编辑器接入
 
-`tools/lsp/cial_lsp.py` 使用 Python 3 标准库提供 stdio LSP：完整文本同步、实时语法/编译诊断、关键字与当前文档声明补全、内置关键字悬停说明、词法级文档符号列表，以及跨文件工作区符号搜索。诊断由 `cial --check-json file.tjs` 返回，检查过程不执行被检查脚本；位置从原生 UTF-8 字节列转换成 LSP UTF-16 列（`src/cli/Application.cpp`、`src/cli/Compilation.cpp`、`src/common/SourceFile.cpp`、`tools/lsp/cial_lsp.py`）。
+`tools/lsp/cial_lsp.py` 使用 Python 3 标准库提供 stdio LSP：完整文本同步、实时语法/编译诊断、关键字与当前文档声明补全、基于保守类型推导的语义成员补全、`textDocument/definition` 跳转（本文件作用域解析 + 跨文件顶层声明）、`textDocument/rename` 绑定级重命名、内置关键字悬停说明、词法级文档符号列表，以及跨文件工作区符号搜索。诊断由 `cial --check-json file.tjs` 返回，检查过程不执行被检查脚本；位置从原生 UTF-8 字节列转换成 LSP UTF-16 列（`src/cli/Application.cpp`、`src/cli/Compilation.cpp`、`src/common/SourceFile.cpp`、`tools/lsp/cial_lsp.py`）。
 
 启动命令（将路径替换为实际绝对路径）：
 
@@ -24,12 +24,24 @@ python tools/lsp/cial_lsp.py --cial build/Windows/Debug/cial.exe
 
 `workspace/symbol` 支持在工作区所有 `.tjs` 文件中按名称子串搜索函数、类、属性和变量声明，忽略大小写，结果包含文件 URI 与 UTF-16 名称范围。支持该请求的客户端可显示全局符号搜索入口，例如 VSCode 的“转到工作区中的符号”。初始化读取 `workspaceFolders`，兼容 `rootUri` / `rootPath`；`workspace/didChangeWorkspaceFolders` 可更新目录集合。没有工作区目录时只搜索已打开的文件，不自行扫描当前进程目录（`tools/lsp/cial_lsp.py` 的 `workspace_symbols`、`update_workspace_folders`）。
 
-未打开文件按磁盘内容索引，查询时检查文件时间与大小并缓存声明；未保存缓冲优先覆盖磁盘内容，关闭后恢复磁盘版本，删除文件会移出索引。扫描不跟随目录符号链接，并排除解析后位于工作区之外的文件链接；跳过 build、bin、ext、node_modules 以及常见编辑器/缓存目录。单文件上限 2 MB，每次查询最多检查 2000 个 `.tjs` 候选文件和 10000 个目录，源内容预算 20 MB，最多返回排序后的 200 个匹配；可收窄名称继续查找。无法读取、编码非法或超限的文件会跳过（`tools/lsp/cial_lsp.py` 的 `MAX_*`、`EXCLUDED_DIRECTORIES`、`workspace_symbols`）。
+未打开文件按磁盘内容索引，查询时检查文件时间与大小并缓存声明；未保存缓冲优先覆盖磁盘内容，关闭后恢复磁盘版本，删除文件会移出索引。扫描不跟随目录符号链接，并排除解析后位于工作区之外的文件链接；跳过 build、bin、ext、node_modules 以及常见编辑器/缓存目录。单文件上限 2 MB，每次查询最多检查 2000 个 `.tjs` 候选文件和 10000 个目录，源内容预算 20 MB，最多返回排序后的 200 个匹配；可收窄名称继续查找。无法读取、编码非法或超限的文件会跳过（`tools/lsp/cial_lsp.py` 的 `MAX_*`、`EXCLUDED_DIRECTORIES`、`workspace_symbols`）。每次完整文本更新触发独立的编译检查，单次超时 5 秒，诊断文档上限 2 MB；关闭文档清空诊断，过期版本不会覆盖新内容（`tools/lsp/cial_lsp.py` 的 `declarations`、`check`、`handle`）。
 
-这仍是基础语言服务，不包含类型推导、重命名或语义级成员补全。声明提取会隐藏注释、字符串和常规正则字面量，再匹配声明；同名局部声明可能产生多个搜索结果。每次完整文本更新触发独立的编译检查，单次超时 5 秒，诊断文档上限 2 MB；关闭文档清空诊断，过期版本不会覆盖新内容（`tools/lsp/cial_lsp.py` 的 `declarations`、`check`、`handle`）。
+### 保守类型推导与语义成员补全
 
-`textDocument/definition` 提供保守的作用域感知跳转：`DefinitionIndex` 对平衡的、未使用预处理指令的源码建立词法绑定索引——函数/getter/setter/catch 作用域、class/property 体、for/with 头部与单语句体、参数与 var/const 声明（含初始化表达式可见性、类型注解、收拢参数），按最近嵌套作用域解析标识符。成员访问（`.x` 前置点号）、关键字与内置类名、含 `@` 指令或括号不平衡的源码一律拒绝返回（宁缺毋错）。本文件解析不到的全局名再查工作区：仅当恰好一个文件的顶层存在同名声明时返回，多于一处则不跳转。函数/类体内的同名局部声明互相独立；该索引不做类型推导，也不解析 getter/setter 的动态绑定（`tools/lsp/cial_lsp.py` 的 `DefinitionIndex`、`resolve`、`definition`）。
+`textDocument/completion` 在 `receiver.` 形态（光标紧跟点号，或点号后已输入半截成员名）做类型推导：`DefinitionIndex.member_context` 识别接收者（仅支持标识符或单次 `foo()` 调用；`a.b.` 链式与下标结果一律 unknown），`infer_receiver_type` / `infer_expression` 按声明与调用点确定性推导——`new Array()/Dictionary()/RegExp()/Date()`、字符串/整实数/`[]`/`%[]`/正则字面量、`new MyClass()` 的工作区 class、`foo()` 的函数返回值（分析函数体 `return` 表达式，跨绑定递归深度 ≤ `MAX_INFER_DEPTH`=3，循环/多返回不一致/预算耗尽一律 unknown）。推导命中后按类型返回成员：内置类型走 `BUILTIN_MEMBERS` 名单（逐一核对自 `src/stdlib/ArrayLib.cpp`、`StringLib.cpp`、`DictLib.cpp`、`MathLib.cpp`、`DateLib.cpp`、`RegExpLib.cpp`、`SerializeLib.cpp`、`ExceptionLib.hpp` 的注册代码，含 kind 与一行签名）；工作区 class 给出类体内 var/function/property 声明（`DefinitionIndex` 现在把类体字段/property 名绑定进类作用域），并沿 `extends` 名字解析父类成员（`Server.type_members`、`unique_workspace_class`，层级上限 `MAX_CLASS_HIERARCHY`=8，派生类成员覆盖基类同名成员）。推导不出类型时原样回落既有词法补全（关键字 + 文档声明），不报错；非成员位置行为完全不变（`tools/lsp/cial_lsp.py` 的 `member_context`、`infer_*`、`BUILTIN_MEMBERS`、`type_members`）。
 
-`tools/lsp/test_protocol.py` 通过真正的子进程 stdio 测试初始化、诊断与修复、关闭、补全、悬停、符号、未知请求、shutdown/exit，以及 Unicode 位置转换；另外覆盖未打开文件的工作区搜索、磁盘修改/删除、未保存缓冲更新与关闭恢复、工作区目录切换、结果数量限制、超限/编码非法文件跳过，以及带空格、百分号和中文的 URI。跳转定义测试覆盖块/参数/函数边界、catch 与动态成员拒绝、跨文件唯一顶层声明，以及 `@` 预处理与不完整源码的拒绝路径。Python 可用时由 CTest 注册。VSCode 客户端已做依赖安装与 JavaScript 语法检查，图形编辑器中的交互仍需在目标 IDE 实测（`tools/lsp/test_protocol.py`、`tests/CMakeLists.txt`）。
+推导边界（如实声明）：非流敏感，不做控制流/赋值序列分析；不解析 `@` 预处理指令；成员访问链与下标之后 unknown；Integer/Real 无成员表，回落词法补全。单次请求推理有 `MAX_INFER_STEPS`=20000 步预算，超限宁可 unknown。
+
+### rename / prepareRename
+
+`textDocument/prepareRename` 对可重命名标识符（`DefinitionIndex.resolve` 命中的绑定，或能解析到工作区唯一顶层声明的自由标识符）返回该词范围与占位名；关键字、`.member` 动态成员、字典键、内置类名、无法唯一解析的自由标识符返回 null。`textDocument/rename` 做绑定级精确改写：本文件用 `references_of_binding` 复用 resolve 的作用域逻辑收集同一绑定的全部引用点（作用域遮蔽场景只改命中绑定）；绑定位于顶层全局时，要求与 definition 一致的工作区唯一性（`unique_workspace_binding`，含“作用域未知文件即视为多义”的保守拒绝），唯一时用 `free_references_of_name` 收集其他文件中的自由标识符引用。新名必须匹配 `[\w$]+$` 且非数字开头；总编辑数上限 `MAX_RENAME_EDITS`=5000，多义/超限返回 null（`tools/lsp/cial_lsp.py` 的 `prepare_rename`、`rename`、`build_rename`）。
+
+### 跨文件跳转定义
+
+`textDocument/definition` 保留保守的作用域感知解析：`DefinitionIndex` 对平衡的、未使用预处理指令的源码建立词法绑定索引——函数/getter/setter/catch 作用域、class/property 体、for/with 头部与单语句体、参数与 var/const 声明（含初始化表达式可见性、类型注解、收拢参数），按最近嵌套作用域解析标识符；成员访问（`.x` 前置点号）、关键字与内置类名、含 `@` 指令或括号不平衡的源码一律拒绝（宁缺毋错）。本文件解析不到的全局名再查工作区：命中的全部顶层声明按（同文件优先，URI，位置）确定性排序后**全部返回**（`Location[]`），唯一时保持单 `Location` 向后兼容，无匹配才返回 null；存在无法确认作用域（`@`/括号不平衡）又词法声明了该名字的文件时仍整体放弃（`tools/lsp/cial_lsp.py` 的 `DefinitionIndex`、`resolve`、`definition`）。
+
+### 测试
+
+`tools/lsp/test_protocol.py` 通过真正的子进程 stdio 测试初始化、诊断与修复、关闭、补全、悬停、符号、未知请求、shutdown/exit，以及 Unicode 位置转换；另外覆盖未打开文件的工作区搜索、磁盘修改/删除、未保存缓冲更新与关闭恢复、工作区目录切换、结果数量限制、超限/编码非法文件跳过，以及带空格、百分号和中文的 URI。新增能力测试覆盖：内置类型推导成员补全（Array/String/Dictionary/RegExp、前缀过滤、Integer/unknown 回落词法）、工作区 class 成员与 extends 继承、函数返回值类型、跨文件唯一类与多义回落、`prepareRename` 接受/拒绝形态（关键字、内置类名、动态成员、字典键、自由标识符）、绑定级 rename 的作用域遮蔽精度与非法新名拒绝、跨文件唯一 rename 与多义 null、definition 多文件返回全部并按 URI 排序、唯一时单 Location 兼容。Python 可用时由 CTest 注册（`CiallangLspProtocol`）。VSCode 客户端已做依赖安装与 JavaScript 语法检查，图形编辑器中的交互仍需在目标 IDE 实测（`tools/lsp/test_protocol.py`、`tests/CMakeLists.txt`）。
 
 协议参考：[LSP 3.17](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/)。
