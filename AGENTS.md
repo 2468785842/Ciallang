@@ -43,6 +43,7 @@ Ciallang/
 ├─ tests/               ← Catch2 测试 + test_files/*.tjs 脚本语料
 ├─ tools/lsp/          ← Python stdio LSP 与协议集成测试（doc/lsp.md）
 ├─ editors/vscode/     ← VSCode LSP 客户端源码
+├─ bench/               ← 性能基准语料（*.tjs）+ 字节码对拍工具（bytecode_conformance.py，见 doc/performance.md、doc/bytecode/mapping.md §9）
 ├─ fuzz/                ← libFuzzer 语料（fuzz_lexer/fuzz_parser）
 ├─ bin/                 ← 历史构建产物
 └─ build/               ← 构建输出（Windows/Linux/MacOS × Debug/Release）

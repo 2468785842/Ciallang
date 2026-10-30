@@ -20,6 +20,7 @@
 | [bytecode/mapping.md](bytecode/mapping.md) | **TJS2 字节码 → Ciallang 内部指令的转译设计**（字节码兼容的实现蓝本：操作码映射表、寄存器映射、调用约定、常量池转换、风险清单） |
 
 - [性能与验证记录](performance.md)：按日期保留的同机 Release 对照及验证范围。历史结果不代表当前构建结果。
+- [字节码对拍工具](../bench/)：`bench/bytecode_conformance.py` 源码 vs 字节码路径逐字节对拍（可独立运行，CTest 注册 CiallangBytecodeTool），设计与契约见 [bytecode/mapping.md §9](bytecode/mapping.md#9-对拍与工具链)。
 
 ## 优化与开发工具
 
