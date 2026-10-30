@@ -36,7 +36,7 @@
 
 - [x] 可选整数 JIT / Trace JIT 基础：x64 原生代码、热点路径录制、整数/溢出/分支守卫和未提交状态回退；默认关闭，尚不覆盖对象与调用优化。见 `src/vm/IntegerJit.*`、`tests/jit_test.cpp`、`doc/jit.md`。
 - [x] 数值自尾递归：显式启用后复用安全的自身调用帧，支持两万层递归；try、对象、闭包和外部副作用保守回落。见 `src/vm/VMState.cpp`、`tests/tail_recursion_test.cpp`。
-- [ ] 原版性能追平：可选后端的正确性验证不代表已达到全程序性能目标，继续按同机对拍记录收益与回退。2026-10-29 调用路径批次后 macOS 对照：**fib 94~97%（首次追平）**、loop_int 68%、string ~100%、class ~96% 均持平或反超；native_methods 135~140% 的 NativeFn 协议缺口已由 2026-10-30 函数指针化批次削减（Windows 同机 A/B +9~11%，macOS 相对 TJS2 的新比值待复测）；下一步候选为 GMethodC+CallMethodV 零实参融合（发射期就地改写，见 doc/performance.md 本批结论）；采样与削减记录见 doc/performance.md。
+- [ ] 原版性能追平：可选后端的正确性验证不代表已达到全程序性能目标，继续按同机对拍记录收益与回退。2026-10-29 调用路径批次后 macOS 对照：**fib 94~97%（首次追平）**、loop_int 68%、string ~100%、class ~96% 均持平或反超；native_methods 135~140% 的 NativeFn 协议缺口已由 2026-10-30 函数指针化批次削减（Windows 同机 A/B +9~11%，macOS 相对 TJS2 的新比值待复测）；GMethodC+CallMethodV 零实参融合已于 2026-10-30 实测否决（五项基准无可测收益，放大语料慢 1~3%——仅新增 dispatch 函数即造成 ~2.4% 代码布局损失，大于单次调用省一次主循环迭代的指令级节省，方案已回退，见 doc/performance.md 同日小节）；后续候选应优先与 dispatch 布局无关的调用路径（如调用帧窗口/实参寄存器直映），且新指令评估必须附"保留代码、禁用发射"的同源对照；采样与削减记录见 doc/performance.md。
 
 ## 三、语言特性缺口
 

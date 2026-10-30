@@ -234,3 +234,73 @@ native_methods 100.9%（拷贝版反而略快，噪声带内），未复现收�
 验证：Windows Debug/Release 全量构建通过；完整 CTest 4 套件全绿
 （C++ 224 用例/2168 断言，与批次前一致）。样本与工具位于本机忽略目录
 `bench/results/`（`bench_median.py` 为本轮使用的 A/B 中位数编排脚本）。
+
+## 2026-10-30 GMethodC+CallMethodV 零实参融合批次（未采纳，已回退）
+
+环境与上批一致：Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT；JIT、尾递归与
+执行记录关闭。基线为 `86a5b11`（HEAD）Release 构建（留档
+`bench/results/cial-fusion-before.exe`，SHA-256 e3d6d896…）。
+
+实现形态（已整体回退，此处留档供后续批参考）：新指令 `CallMethod0`（TAC/扁平字节码
+第 96 条，`op + u16 obj + u32 atom + u16 func + u16 receiver + u16 dst`），发射期在
+ProcCallExprNode 实参循环结束后若 `argRegs` 为空且尾指令仍是 GMethodC 则就地改写——
+零实参调用点两条指令之间无任何用户代码。语义逐项核对：方法缺失报错文本/行号、异常
+传播、GC 保根（方法值与接收者先落寄存器槽再进 invokeCallV，与两指令序列同协议）、
+Rlc 语句级行号（改写不位移指令下标）、Optimizer forEachRegisterOf/拷贝传播 def 杀灭、
+SSA def-use 登记全部同步；tjsbc 转译面不发射该指令（grep 证实），字节码样本回归不受
+影响。测试/语料在融合状态下亦全绿。
+
+同机 A/A 校准（同二进制自对照）：两批 94.7%~117.5%（string_concat 单批 117.5% 为
+当机漂移），安静时段补测 100.2%。本机单批噪声 ±6% 起，跨批 ±10%；同日无方法调用
+的 fib/loop_int 在 A/B 批次中摆动 92.5%~112.2%，即漂移界。
+
+五项基准 A/B 三批（前/后交替 7 轮取中位）：native_methods 101.7%/98.9%/96.8%、
+fib 104.6%/100.4%/112.2%、loop_int 105.6%/102.5%/98.7%、class 99.5%/98.3%/111.3%、
+string 101.2%/114.3%/99.0%——全部在噪声带内且与对照脚本同摆，无可归因信号。
+
+受控归因（放大语料 `bench/results/native_stress.tjs`，1e6 次 push/pop，pop 为零实参
+融合路径；script_method_stress 为 2e6 次零实参脚本方法）：
+
+1. 同源对照 C（融合指令保留、仅发射面禁用就地改写）vs 融合 B：13 轮 B/C=105.7%——
+   初版 dispatch（布尔标志合并两个 invokeCallV 调用点）存在真实代码生成病理。
+2. dispatch 改写为 GMethodC 同款早返回双调用点形态后 B2/C=98.7%（13 轮 10 胜），
+   病理消除。
+3. A/B2/C 三方同场：**C/A=102.4%——仅向 VMState.cpp 新增 dispatch 函数（不执行）
+   就使主循环热路径布局损失 ~2.4%**；单次调用省下的一个主循环迭代（估 5~8ns，
+   <170ns/次调用的 5%）不足以覆盖。
+4. 安静时段决胜（中位 + 逐轮胜率）：native_methods B2/A=102.7%（B2 胜 6/15）、
+   native_stress 101.0%（7/13），min 口径三方持平（±0.3%）；script_method_stress
+   B/A=99.3%（回落路径融合亦无可测收益）。
+
+结论：**零实参融合在五项基准无可测收益，放大语料相对基线慢 1~3%，按预登记规则
+整体回退**（指令、编码、dispatch、发射改写与 Opt/SSA 同步全部撤销），工作树回到
+`86a5b11`。被否决的中间方案：①布尔标志合并形态的 dispatch（+5.7% 病理，早返回
+形态修复 7 个百分点，说明融合指令的分支形态本身比指令数更关键）；②"复用现有指令+
+调整 invokeCallV 快路径"路线未展开——invokeCallV 的 Function 直写/Native 免池快路径
+上批已就位，剩余开销在调用帧建立而非指令派发。经验：评估新增指令必须做"保留代码、
+禁用发射"的同源对照，dispatch 主循环所在翻译单元对代码布局极敏感。
+
+### 同场 TJS2 三方对照（独立交付物）
+
+TJS2 为当日 `windows-release` 重建（工作树含本地适配，clang++ -O3，非 2026-10-26 旧
+二进制）。口径：预热 1 轮 + 三引擎交替 7 轮取中位，含进程启动与 TJS2 每脚本固定的
+上下文转储输出（其 stderr "Time taken by function" 标签实为微秒，不采用）。
+
+| 脚本 | HEAD 中位 ms | 融合构建中位 ms | TJS2 中位 ms | HEAD/TJS2 中位 | HEAD/TJS2 min 口径 |
+|---|---:|---:|---:|---:|---:|
+| class_instantiate | 14.95 | 14.64 | 16.81 | 88.9% | 81.4% |
+| fib | 56.34 | 52.13 | 50.21 | 112.2% | 113.8% |
+| loop_int | 423.70 | 385.16 | 771.92 | 54.9% | 51.6% |
+| native_methods | 24.79 | 28.05 | 27.54 | 90.0% | 92.0% |
+| string_concat | 19.52 | 20.59 | 26.15 | 74.6% | 74.4% |
+
+融合/HEAD 列受同场漂移影响（无方法调用的 fib/loop_int 摆动 90.9%~112.2%，即单场
+漂移界；融合批已被否决，该列仅留档）。HEAD/TJS2：class/loop/string/native 反超，
+fib 仍落后 ~13%；与 2026-10-29 批次（native 142%）相比 native_methods 大幅收窄——
+归因于 Ciallang NativeFn 批次收益与本场换用当日重建的 TJS2 二进制（其 native 耗时
+较 10-26 版升高），两个变量同向，比值不可与历史批次直接对齐。
+
+验证：回退后 Release/Debug 重建，CTest 4 套件全绿（230 用例/2159 断言与基线一致）；
+tjs2 语料 7 脚本 + tjsbc 字节码样本（仓库现存 7 个）rc=0；ASan 全量（MSVC
+/fsanitize=address，回退后 HEAD 状态重建）230/2159 全绿、语料零报告。样本 JSON：
+`bench/results/20261030-*.json`（aa-fusion×2、ab-fusion×3、threeway-fusion-rejected）。
