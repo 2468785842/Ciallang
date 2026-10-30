@@ -380,3 +380,18 @@ python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe   --ref
 `CmpEQ/CmpDEQ/CmpLT/CmpGT`（写 zf）、`Inc/Dec`、`Typeof`、`Asc/Chr`、`BNot`、`Num`、
 `DelProp`、`GetP/SetP`、`GPropI 已有(=GProp)`、`CallMethod(direct)` 可选、`ExpandCall`（M4）。
 每条按 AGENTS.md"新增指令清单"四处同步（X-macro/execute/encode/dispatch）。
+
+### 2026-10-31 加载期边界与成员变体修复
+
+`src/tjsbc/TjsTranslator.cpp` 的 decode 对固定长度指令和 CALL 族的参数表检查剩余
+码字，负参数计数（省略/展开标志以外）及负展开条目数直接报错；不再多读四码字属性
+指令和 INC/DEC 成员变体之后的码字。MUL 的 PD/PI/P 解码范围统一包含在四连组内。
+类体加载检查 DataArea 引用、superClassGetter context 与入口指针；索引相加采用
+size_t 或经 i64 检查后转换，避免先做窄类型加法。普通跳转及 ENTRY 目标必须在代码范围
+内，回填仍要求目标对应指令边界；TAC 映射使用 size_t / optional，try 元数据写入 u32
+前检查范围。未改变指令编码或现有语义。
+
+新增回归在 `tests/tjsbc_translator_test.cpp`：截断与负计数、非法常量/类成员槽、
+越界跳转/异常目标与 superclass 引用、末尾合法四码字指令，以及 MULPD 的属性写回
+和返回值。macOS Debug/Release 各 242 项 CTest 全过（2026-10-31）。这不是对所有
+未可信字节码输入的完整安全性证明，寄存器和其他元数据仍需遵循格式约束。

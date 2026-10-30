@@ -21,6 +21,8 @@
 
 ## 一、正确性
 
+- [x] 全项目诊断后续修复（2026-10-31）：转译器补齐截断/负计数/类槽及 superclass 引用检查，跳转与 TAC 下标避免窄化，修复成员指令多读和 MUL 变体解码遗漏；清理 RegExp 遮蔽、指令声明不一致、无用局部与调试循环。专项 4 用例/24 断言，Debug/Release 各 242 项 CTest 全过，见 `tests/tjsbc_translator_test.cpp`、`doc/project-warnings.md`、`doc/bytecode/mapping.md`。
+
 - [x] GC finalize：不可达对象先入保活队列，由所属 VM 的安全点 drain，覆盖环、复活、回调内 GC、异常和一次性终结。跳过编译器合成的空 finalize；修正其寄存器计数；空闲节点重建 Header，Runtime 销毁释放 C++ 资源但不运行脚本。见 `src/gc/gc.*`、`src/types/Class.*`、`src/runtime/Runtime.hpp`、`tests/interpreter_test.cpp`。
 
 ## 二、性能

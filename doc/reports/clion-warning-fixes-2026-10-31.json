@@ -1,0 +1,1901 @@
+{
+  "date": "2026-10-31",
+  "method": "CLion get_file_problems --errorsOnly false",
+  "deleted": [
+    "src/parser/ast/AstFormatter.hpp"
+  ],
+  "scope": "Only changed files; not a second whole-project scan",
+  "files": [
+    {
+      "file": "src/types/RegExp.cpp",
+      "diagnostics": [
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "namespace cial {",
+          "line": 10,
+          "column": 11
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'TJSNC'",
+          "lineContent": "        // last 为类对象静态只读属性（tTJSNC_RegExp::LastRegExp），此处挂在全局",
+          "line": 15,
+          "column": 29
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'args' can be made pointer to const",
+          "lineContent": "        Value *args = vmState.curFrame()->getArgs(argCount);",
+          "line": 59,
+          "column": 16
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'TJSNC'",
+          "lineContent": "                // tTJSNC_RegExp::LastRegExp：未执行过任何 test/exec 时为 void",
+          "line": 103,
+          "column": 21
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead",
+          "lineContent": "                    return Value{ static_cast<Object *>(_rt->lastRegExp) };",
+          "line": 105,
+          "column": 35
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "} // namespace cial",
+          "line": 117,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "file": "src/cli/Compilation.hpp",
+      "diagnostics": [
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "namespace cial::cli {",
+          "line": 8,
+          "column": 11
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "} // namespace cial::cli",
+          "line": 18,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "file": "src/cli/Compilation.cpp",
+      "diagnostics": [
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "namespace cial::cli {",
+          "line": 13,
+          "column": 11
+        },
+        {
+          "severity": "WARN",
+          "description": "Parameter 'context' can be made reference to const",
+          "lineContent": "    Compilation compile(Common::Result &diagnostics, Context &context, Common::SourceFile &source,",
+          "line": 14,
+          "column": 63
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'remaining' can be moved to if-init-statement",
+          "lineContent": "            syntax::Token *remaining{};",
+          "line": 28,
+          "column": 28
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'rooted' can be made const",
+          "lineContent": "        auto rooted = std::move(chunk).toHeap(state.rt);",
+          "line": 46,
+          "column": 14
+        },
+        {
+          "severity": "WARN",
+          "description": "Parameter 'runtime' can be made reference to const",
+          "lineContent": "    void dumpGraphs(Runtime &runtime, vm::Chunk &top, const bool ssa) {",
+          "line": 64,
+          "column": 30
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter has different names: 'top' and 'chunk'",
+          "lineContent": "    void dumpGraphs(Runtime &runtime, vm::Chunk &top, const bool ssa) {",
+          "line": 64,
+          "column": 50
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "} // namespace cial::cli",
+          "line": 94,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "file": "src/gen/Instruction.hpp",
+      "diagnostics": [
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CIAL'",
+          "lineContent": "#define CIAL_TAC_OPCODE_ENUMS(O) \\",
+          "line": 22,
+          "column": 9
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "namespace cial::vm {",
+          "line": 120,
+          "column": 11
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "} // namespace cial::vm",
+          "line": 123,
+          "column": 16
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "namespace cial::inter {",
+          "line": 125,
+          "column": 11
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'GETP'",
+          "lineContent": "    // *p 读:强制属性访问(调 getter,旧版 GETP);非 Property 报错",
+          "line": 355,
+          "column": 32
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'SETP'",
+          "lineContent": "    // *p = v 写:强制属性访问(调 setter,旧版 SETP);setter 压帧,需 Call 接管",
+          "line": 357,
+          "column": 36
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'op' can be made const",
+          "lineContent": "        CompareTest(TacOpCode op, Register lhs, Register rhs, Register dst) : comparison(op) {",
+          "line": 416,
+          "column": 31
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'lhs' can be made const",
+          "lineContent": "        CompareTest(TacOpCode op, Register lhs, Register rhs, Register dst) : comparison(op) {",
+          "line": 416,
+          "column": 44
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'rhs' can be made const",
+          "lineContent": "        CompareTest(TacOpCode op, Register lhs, Register rhs, Register dst) : comparison(op) {",
+          "line": 416,
+          "column": 58
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'dst' can be made const",
+          "lineContent": "        CompareTest(TacOpCode op, Register lhs, Register rhs, Register dst) : comparison(op) {",
+          "line": 416,
+          "column": 72
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Function 'opcode' should be marked [[nodiscard]]",
+          "lineContent": "        TacOpCode opcode() const override { return TacOpCode::CompareTest; }",
+          "line": 421,
+          "column": 9
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'obj' can be made const",
+          "lineContent": "        GMethodC(Register obj, Atom atom, Register dst, Register receiver) : receiver(receiver) {",
+          "line": 430,
+          "column": 27
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'atom' can be made const",
+          "lineContent": "        GMethodC(Register obj, Atom atom, Register dst, Register receiver) : receiver(receiver) {",
+          "line": 430,
+          "column": 37
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'dst' can be made const",
+          "lineContent": "        GMethodC(Register obj, Atom atom, Register dst, Register receiver) : receiver(receiver) {",
+          "line": 430,
+          "column": 52
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'receiver' can be made const",
+          "lineContent": "        GMethodC(Register obj, Atom atom, Register dst, Register receiver) : receiver(receiver) {",
+          "line": 430,
+          "column": 66
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Function 'opcode' should be marked [[nodiscard]]",
+          "lineContent": "        TacOpCode opcode() const override { return TacOpCode::GMethodC; }",
+          "line": 435,
+          "column": 9
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'dst' can be made const",
+          "lineContent": "        CallMethodV(Register dst, Register func, Integer n, Vec<Register> args, Register receiver) :",
+          "line": 442,
+          "column": 30
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'func' can be made const",
+          "lineContent": "        CallMethodV(Register dst, Register func, Integer n, Vec<Register> args, Register receiver) :",
+          "line": 442,
+          "column": 44
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'n' can be made const",
+          "lineContent": "        CallMethodV(Register dst, Register func, Integer n, Vec<Register> args, Register receiver) :",
+          "line": 442,
+          "column": 58
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'receiver' can be made const",
+          "lineContent": "        CallMethodV(Register dst, Register func, Integer n, Vec<Register> args, Register receiver) :",
+          "line": 442,
+          "column": 90
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Function 'opcode' should be marked [[nodiscard]]",
+          "lineContent": "        TacOpCode opcode() const override { return TacOpCode::CallMethodV; }",
+          "line": 444,
+          "column": 9
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CDEQ'",
+          "lineContent": "    // CmpEQ/CmpDEQ/CmpLT/CmpGT ↔ 旧版 CEQ/CDEQ/CLT/CGT（自然序，见转译器注）",
+          "line": 504,
+          "column": 42
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'BNOT'",
+          "lineContent": "    // 按位非（旧版 BNOT）：~asInteger（real 截断、字符串解析，与 TJS AsInteger 链一致）",
+          "line": 515,
+          "column": 15
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tonumber'",
+          "lineContent": "    // 数值规范化（旧版 NUM/tonumber）：int/real 不变、字符串解析为数值、",
+          "line": 518,
+          "column": 21
+        },
+        {
+          "severity": "INFO",
+          "description": "Redundant empty declaration",
+          "lineContent": "}; // namespace cial::inter",
+          "line": 531,
+          "column": 2
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "}; // namespace cial::inter",
+          "line": 531,
+          "column": 17
+        }
+      ]
+    },
+    {
+      "file": "src/gen/Optimizer.cpp",
+      "diagnostics": [
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "namespace cial::inter {",
+          "line": 14,
+          "column": 11
+        },
+        {
+          "severity": "INFO",
+          "description": "Redundant qualifier",
+          "lineContent": "    void optimizeDefaultChunk(vm::Chunk &chunk, const OptReg optReg) {",
+          "line": 17,
+          "column": 31
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter has different names: 'optReg' and 'externallyObserved'",
+          "lineContent": "    void optimizeDefaultChunk(vm::Chunk &chunk, const OptReg optReg) {",
+          "line": 17,
+          "column": 62
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'optimizerStats' can be replaced with structured bindings",
+          "lineContent": "        const OptimizerStats optimizerStats = optimizerManager.applyOptimizations();",
+          "line": 23,
+          "column": 30
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'pass' can be replaced with structured bindings",
+          "lineContent": "            for(const auto &pass : optimizerStats.passes)",
+          "line": 31,
+          "column": 29
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CIAL'",
+          "lineContent": "            if(_dupenv_s(&value, &length, \"CIAL_OPTIMIZER_STATS\") != 0)",
+          "line": 44,
+          "column": 44
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CIAL'",
+          "lineContent": "            const char *value = std::getenv(\"CIAL_OPTIMIZER_STATS\");",
+          "line": 50,
+          "column": 46
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead",
+          "lineContent": "                    callback(static_cast<const GMethodC &>(instruction).receiver);",
+          "line": 92,
+          "column": 30
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead",
+          "lineContent": "                    callback(static_cast<const CallMethodV &>(instruction).receiver);",
+          "line": 95,
+          "column": 30
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead",
+          "lineContent": "                    const auto &call = static_cast<const CallV &>(instruction);",
+          "line": 98,
+          "column": 40
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead",
+          "lineContent": "                    const auto &call = static_cast<const CallOmit &>(instruction);",
+          "line": 106,
+          "column": 40
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead",
+          "lineContent": "                    const auto &call = static_cast<const CallExpand &>(instruction);",
+          "line": 112,
+          "column": 40
+        },
+        {
+          "severity": "WARN",
+          "description": "views::values can be used",
+          "lineContent": "                    for(const auto &[_, reg] : call.entries)",
+          "line": 115,
+          "column": 37
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead",
+          "lineContent": "                    callback(static_cast<const CollapseArgs &>(instruction).dst);",
+          "line": 120,
+          "column": 30
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'word' can be moved to if-init-statement",
+          "lineContent": "            const size_t word = reg / 64;",
+          "line": 133,
+          "column": 26
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'word' can be moved to if-init-statement",
+          "lineContent": "            const size_t word = reg / 64;",
+          "line": 139,
+          "column": 26
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'max' can be moved to if-init-statement",
+          "lineContent": "            constexpr auto max = std::numeric_limits<Integer>::max();",
+          "line": 156,
+          "column": 28
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'max' can be moved to if-init-statement",
+          "lineContent": "            constexpr auto max = std::numeric_limits<Integer>::max();",
+          "line": 165,
+          "column": 28
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'instruction' can be made reference to const",
+          "lineContent": "        for(auto &instruction : instructions) {",
+          "line": 243,
+          "column": 19
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'newIndex' can be moved to if-init-statement",
+          "lineContent": "            const size_t newIndex = oldBoundaryToNew[oldIndex];",
+          "line": 272,
+          "column": 26
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'test' can be moved to if-init-statement",
+          "lineContent": "                const auto &test = *chunk.inst(pc + 1);",
+          "line": 300,
+          "column": 29
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'replaced' can be moved to if-init-statement",
+          "lineContent": "            const Register replaced = replaceUse(current);",
+          "line": 364,
+          "column": 28
+        },
+        {
+          "severity": "WARN",
+          "description": "Call to 'fill' can be replaced with a call to 'ranges::fill'",
+          "lineContent": "            std::fill(hasCopy.begin(), hasCopy.end(), 0);",
+          "line": 373,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'predecessor' can be moved to if-init-statement",
+          "lineContent": "                const size_t predecessor = predecessorIndex[blockIndex];",
+          "line": 375,
+          "column": 30
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead",
+          "lineContent": "                        auto &call = static_cast<CallV &>(instruction);",
+          "line": 439,
+          "column": 38
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'func' can be moved to if-init-statement",
+          "lineContent": "                        const Register func = replaceUse(call.func);",
+          "line": 440,
+          "column": 40
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'replaced' can be moved to if-init-statement",
+          "lineContent": "                            const Register replaced = replaceUse(arg);",
+          "line": 446,
+          "column": 44
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead",
+          "lineContent": "                        auto &call = static_cast<CallMethodV &>(instruction);",
+          "line": 455,
+          "column": 38
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'func' can be moved to if-init-statement",
+          "lineContent": "                        const Register func = replaceUse(call.func);",
+          "line": 456,
+          "column": 40
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'receiver' can be moved to if-init-statement",
+          "lineContent": "                        const Register receiver = replaceUse(call.receiver);",
+          "line": 461,
+          "column": 40
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'replaced' can be moved to if-init-statement",
+          "lineContent": "                            const Register replaced = replaceUse(arg);",
+          "line": 467,
+          "column": 44
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead",
+          "lineContent": "                        auto &method = static_cast<GMethodC &>(instruction);",
+          "line": 476,
+          "column": 40
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'source' can be moved to if-init-statement",
+          "lineContent": "                        const Register source = resolve(copySrc);",
+          "line": 492,
+          "column": 40
+        },
+        {
+          "severity": "WARN",
+          "description": "Call to 'fill' can be replaced with a call to 'ranges::fill'",
+          "lineContent": "            std::fill(known.begin(), known.end(), 0);",
+          "line": 543,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'predecessor' can be moved to if-init-statement",
+          "lineContent": "                const size_t predecessor = predecessorIndex[blockIndex];",
+          "line": 545,
+          "column": 30
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Use auto when initializing with a template cast to avoid duplicating the type name",
+          "lineContent": "                    const Register destination = instruction.getOp1().value<Register>();",
+          "line": 555,
+          "column": 27
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Use auto when initializing with a template cast to avoid duplicating the type name",
+          "lineContent": "                    const Integer value = instruction.getOp2().value<Integer>();",
+          "line": 556,
+          "column": 27
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Use auto when initializing with a template cast to avoid duplicating the type name",
+          "lineContent": "                    const Register lhsReg = instruction.getOp1().value<Register>();",
+          "line": 565,
+          "column": 27
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Use auto when initializing with a template cast to avoid duplicating the type name",
+          "lineContent": "                    const Register rhsReg = instruction.getOp2().value<Register>();",
+          "line": 566,
+          "column": 27
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Use auto when initializing with a template cast to avoid duplicating the type name",
+          "lineContent": "                    const Register destination = instruction.getOp3().value<Register>();",
+          "line": 567,
+          "column": 27
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'result' can be moved to if-init-statement",
+          "lineContent": "                    Integer result{};",
+          "line": 568,
+          "column": 29
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'Defs'",
+          "lineContent": "        Vec<RegisterSet> blockDefs(blockCount);",
+          "line": 608,
+          "column": 31
+        },
+        {
+          "severity": "INFO",
+          "description": "Template arguments can be deduced",
+          "lineContent": "        Vec<bool> preserveAll(blockCount, false);",
+          "line": 613,
+          "column": 12
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'destination' can be moved to if-init-statement",
+          "lineContent": "                Register destination{};",
+          "line": 627,
+          "column": 26
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'copyDst' can be moved to if-init-statement",
+          "lineContent": "                Register copyDst{}, copySrc{};",
+          "line": 632,
+          "column": 26
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'copySrc' can be moved to if-init-statement",
+          "lineContent": "                Register copyDst{}, copySrc{};",
+          "line": 632,
+          "column": 37
+        },
+        {
+          "severity": "WARN",
+          "description": "Call to 'fill' can be replaced with a call to 'ranges::fill'",
+          "lineContent": "                std::fill(out.begin(), out.end(), 0);",
+          "line": 651,
+          "column": 22
+        },
+        {
+          "severity": "WARN",
+          "description": "Call to 'fill' can be replaced with a call to 'ranges::fill'",
+          "lineContent": "                    std::fill(out.begin(), out.end(), ~u64{ 0 });",
+          "line": 660,
+          "column": 26
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'destination' can be moved to if-init-statement",
+          "lineContent": "                Register destination{};",
+          "line": 687,
+          "column": 26
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'copyDst' can be moved to if-init-statement",
+          "lineContent": "                Register copyDst{}, copySrc{};",
+          "line": 697,
+          "column": 26
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'copySrc' can be moved to if-init-statement",
+          "lineContent": "                Register copyDst{}, copySrc{};",
+          "line": 697,
+          "column": 37
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "} // namespace cial::inter",
+          "line": 716,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "file": "src/tjsbc/TjsTranslator.cpp",
+      "diagnostics": [
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "namespace cial::tjsbc {",
+          "line": 14,
+          "column": 11
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "namespace cial::tjsbc {",
+          "line": 14,
+          "column": 17
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'TJSVM'",
+          "lineContent": "        // TJS 操作码（tjsInterCodeGen.h tTJSVMCodes 枚举序）",
+          "line": 18,
+          "column": 39
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CDEQ'",
+          "lineContent": "            OP_TF = 6, OP_CEQ = 7, OP_CDEQ = 8, OP_CLT = 9, OP_CGT = 10,",
+          "line": 21,
+          "column": 39
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'SETF'",
+          "lineContent": "            OP_SETF = 11, OP_SETNF = 12, OP_LNOT = 13, OP_NF = 14, OP_JF = 15,",
+          "line": 22,
+          "column": 16
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'SETNF'",
+          "lineContent": "            OP_SETF = 11, OP_SETNF = 12, OP_LNOT = 13, OP_NF = 14, OP_JF = 15,",
+          "line": 22,
+          "column": 30
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'LNOT'",
+          "lineContent": "            OP_SETF = 11, OP_SETNF = 12, OP_LNOT = 13, OP_NF = 14, OP_JF = 15,",
+          "line": 22,
+          "column": 45
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'BXOR'",
+          "lineContent": "            OP_LOR = 26, OP_LAND = 30, OP_BOR = 34, OP_BXOR = 38, OP_BAND = 42,",
+          "line": 25,
+          "column": 56
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'BNOT'",
+          "lineContent": "            OP_BNOT = 82, OP_TYPEOF = 83, OP_TYPEOFD = 84, OP_TYPEOFI = 85,",
+          "line": 28,
+          "column": 16
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'TYPEOFD'",
+          "lineContent": "            OP_BNOT = 82, OP_TYPEOF = 83, OP_TYPEOFD = 84, OP_TYPEOFI = 85,",
+          "line": 28,
+          "column": 46
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'TYPEOFI'",
+          "lineContent": "            OP_BNOT = 82, OP_TYPEOF = 83, OP_TYPEOFD = 84, OP_TYPEOFI = 85,",
+          "line": 28,
+          "column": 63
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'EEXP'",
+          "lineContent": "            OP_EVAL = 86, OP_EEXP = 87, OP_CHKINS = 88, OP_ASC = 89, OP_CHR = 90,",
+          "line": 29,
+          "column": 30
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CHKINS'",
+          "lineContent": "            OP_EVAL = 86, OP_EEXP = 87, OP_CHKINS = 88, OP_ASC = 89, OP_CHR = 90,",
+          "line": 29,
+          "column": 44
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CHKINV'",
+          "lineContent": "            OP_NUM = 91, OP_CHS = 92, OP_INV = 93, OP_CHKINV = 94,",
+          "line": 30,
+          "column": 55
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CALLD'",
+          "lineContent": "            OP_CALL = 99, OP_CALLD = 100, OP_CALLI = 101, OP_NEW = 102,",
+          "line": 32,
+          "column": 30
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'SPDEH'",
+          "lineContent": "            OP_GPD = 103, OP_SPD = 104, OP_SPDE = 105, OP_SPDEH = 106,",
+          "line": 33,
+          "column": 59
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'GPIS'",
+          "lineContent": "            OP_SPDS = 111, OP_GPIS = 112, OP_SPIS = 113, OP_SETP = 114,",
+          "line": 35,
+          "column": 31
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'SETP'",
+          "lineContent": "            OP_SPDS = 111, OP_GPIS = 112, OP_SPIS = 113, OP_SETP = 114,",
+          "line": 35,
+          "column": 61
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'GETP'",
+          "lineContent": "            OP_GETP = 115, OP_DELD = 116, OP_DELI = 117, OP_SRV = 118,",
+          "line": 36,
+          "column": 16
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'DELD'",
+          "lineContent": "            OP_GETP = 115, OP_DELD = 116, OP_DELI = 117, OP_SRV = 118,",
+          "line": 36,
+          "column": 31
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'EXTRY'",
+          "lineContent": "            OP_RET = 119, OP_ENTRY = 120, OP_EXTRY = 121, OP_THROW = 122,",
+          "line": 37,
+          "column": 46
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CHGTHIS'",
+          "lineContent": "            OP_CHGTHIS = 123, OP_GLOBAL = 124, OP_ADDCI = 125,",
+          "line": 38,
+          "column": 16
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'REGMEMBER'",
+          "lineContent": "            OP_REGMEMBER = 126, OP_DEBUGGER = 127,",
+          "line": 39,
+          "column": 16
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Switch has 2 consecutive identical branches",
+          "lineContent": "                case OP_CONST:",
+          "line": 57,
+          "column": 17
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Switch has 2 consecutive identical branches",
+          "lineContent": "                case OP_ADDCI: return 3;",
+          "line": 77,
+          "column": 17
+        },
+        {
+          "severity": "INFO",
+          "description": "Redundant parentheses",
+          "lineContent": "                    return k4 == 0 ? 2 : (k4 == 3 ? 3 : 4);",
+          "line": 92,
+          "column": 42
+        },
+        {
+          "severity": "INFO",
+          "description": "Redundant parentheses",
+          "lineContent": "                    return k4 == 0 ? 2 : (k4 == 3 ? 3 : 4);",
+          "line": 92,
+          "column": 58
+        },
+        {
+          "severity": "INFO",
+          "description": "Redundant parentheses",
+          "lineContent": "                return k4 == 0 ? 3 : (k4 == 3 ? 4 : 5);",
+          "line": 93,
+          "column": 38
+        },
+        {
+          "severity": "INFO",
+          "description": "Redundant parentheses",
+          "lineContent": "                return k4 == 0 ? 3 : (k4 == 3 ? 4 : 5);",
+          "line": 93,
+          "column": 54
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CALLD'",
+          "lineContent": "            i32 dataIdx = -1;  // CONST/PD/CALLD 的常量槽下标",
+          "line": 103,
+          "column": 44
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'slot' can be replaced with structured bindings",
+          "lineContent": "            const auto &slot = ctx.data[static_cast<size_t>(dataIdx)];",
+          "line": 172,
+          "column": 25
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Switch has 2 consecutive identical branches",
+          "lineContent": "                case OP_CHGTHIS:",
+          "line": 204,
+          "column": 17
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Switch has 3 consecutive identical branches",
+          "lineContent": "                case OP_TT: case OP_TF:",
+          "line": 220,
+          "column": 17
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Switch has 3 consecutive identical branches",
+          "lineContent": "                case OP_CHKINS:",
+          "line": 243,
+          "column": 17
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'GPIS'",
+          "lineContent": "            //   GPD/GPDS: dst, obj, memberData    GPI/GPIS: dst, obj, memberReg",
+          "line": 347,
+          "column": 56
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'SPDEH'",
+          "lineContent": "            //   SPD/SPDE/SPDEH/SPDS: obj, memberData, src",
+          "line": 348,
+          "column": 27
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'DELD'",
+          "lineContent": "            //   DELD/TYPEOFD: dst, obj, memberData  DELI/TYPEOFI: dst, obj, memberReg",
+          "line": 350,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'TYPEOFD'",
+          "lineContent": "            //   DELD/TYPEOFD: dst, obj, memberData  DELI/TYPEOFI: dst, obj, memberReg",
+          "line": 350,
+          "column": 23
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'TYPEOFI'",
+          "lineContent": "            //   DELD/TYPEOFD: dst, obj, memberData  DELI/TYPEOFI: dst, obj, memberReg",
+          "line": 350,
+          "column": 59
+        },
+        {
+          "severity": "INFO",
+          "description": "Redundant const_cast",
+          "lineContent": "                rt.removeHandleVal(const_cast<MarkSweepHeader *>(root));",
+          "line": 413,
+          "column": 36
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'op' can be moved to if-init-statement",
+          "lineContent": "                    const i32 op = ctx.code[i2];",
+          "line": 475,
+          "column": 31
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CHGTHIS'",
+          "lineContent": "                        // super 初始化三连：GPD r,-2,<父类槽>; CHGTHIS r,-1; CALL 0,r,n",
+          "line": 487,
+          "column": 56
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'nameSlot' can be replaced with structured bindings",
+          "lineContent": "                        const auto &nameSlot = classData(memberData);",
+          "line": 504,
+          "column": 37
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::TjsDataSlot",
+          "lineContent": "                                                                                 : TjsDataSlot{ TJS_TYPE_VOID, 0 });",
+          "line": 515,
+          "column": 95
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'getter' can be moved to for-init-statement",
+          "lineContent": "                    const auto &getter = file.contexts[static_cast<size_t>(ctx.superClassGetter)];",
+          "line": 539,
+          "column": 33
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'objthis'",
+          "lineContent": "            // TJS2 的 ra[-2] 是 objthis-proxy（this 优先、global 回落）：方法/getter",
+          "line": 589,
+          "column": 32
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'd' can be replaced with structured bindings",
+          "lineContent": "                Decoded d = decode(ctx.code, i);",
+          "line": 631,
+          "column": 25
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'SETF'",
+          "lineContent": "                // （JF/JNF/SETF/SETNF/NF）紧邻生产者，非跳转消费者走旧路径 ──",
+          "line": 638,
+          "column": 28
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'SETNF'",
+          "lineContent": "                // （JF/JNF/SETF/SETNF/NF）紧邻生产者，非跳转消费者走旧路径 ──",
+          "line": 638,
+          "column": 33
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'isTTTF' can be moved to if-init-statement",
+          "lineContent": "                    const bool isTTTF = d.op == OP_TT || d.op == OP_TF;",
+          "line": 645,
+          "column": 32
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'TTTF'",
+          "lineContent": "                    const bool isTTTF = d.op == OP_TT || d.op == OP_TF;",
+          "line": 645,
+          "column": 34
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::JumpFixup",
+          "lineContent": "                        jumpFixups.push_back({ chunk.getInstVec().size(), target, kind });",
+          "line": 663,
+          "column": 46
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::EntryFixup",
+          "lineContent": "                            { chunk.getInstVec().size(), targetWord(d.word, d.r1), mapReg(d.r2).index() });",
+          "line": 677,
+          "column": 29
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'slot' can be replaced with structured bindings",
+          "lineContent": "                        const auto &slot = ctx.data[static_cast<size_t>(d.dataIdx)];",
+          "line": 682,
+          "column": 37
+        },
+        {
+          "severity": "WARN",
+          "description": "Clang-Tidy: Unnecessary temporary object created while calling emplace_back",
+          "lineContent": "                                consts.emplace_back(Constant{});",
+          "line": 726,
+          "column": 53
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::JumpFixup",
+          "lineContent": "                            jumpFixups.push_back({ chunk.getInstVec().size(), target, JumpKind::Jmp });",
+          "line": 791,
+          "column": 50
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::JumpFixup",
+          "lineContent": "                            jumpFixups.push_back({ chunk.getInstVec().size(), target, kind });",
+          "line": 799,
+          "column": 50
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'EEXP'",
+          "lineContent": "                        // 字符串即时求值（源码路径 EvalStr 同款；EEXP 内嵌表达式",
+          "line": 949,
+          "column": 52
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'IGNOREPROP'",
+          "lineContent": "                        // GPDS(IGNOREPROP) = 不触发 getter 的读 = GPropRaw",
+          "line": 1052,
+          "column": 33
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'SPDEH'",
+          "lineContent": "                        // SPDE/SPDEH(MEMBERENSURE)：Ciallang setThis/setProp 天然 ENSURE；",
+          "line": 1072,
+          "column": 33
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'MEMBERENSURE'",
+          "lineContent": "                        // SPDE/SPDEH(MEMBERENSURE)：Ciallang setThis/setProp 天然 ENSURE；",
+          "line": 1072,
+          "column": 39
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'IGNOREPROP'",
+          "lineContent": "                        // SPDS(IGNOREPROP) = 绕过 setter 写槽位 = DPropRaw",
+          "line": 1073,
+          "column": 33
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'DELD'",
+          "lineContent": "                        // dst = delete obj.member（bool）；DELD 成员名 Atom 直引",
+          "line": 1115,
+          "column": 58
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'fix' can be replaced with structured bindings",
+          "lineContent": "            for(const auto &fix : jumpFixups) {",
+          "line": 1169,
+          "column": 29
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'entry' can be replaced with structured bindings",
+          "lineContent": "            for(const auto &entry : entryFixups) {",
+          "line": 1187,
+          "column": 29
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::vm::ThrowHandler",
+          "lineContent": "                chunk.addThrowHandler({ static_cast<u32>(entry.tryStart), static_cast<u32>(*tac), entry.exValueReg });",
+          "line": 1193,
+          "column": 39
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'REGMEMBER'",
+          "lineContent": "            // 类成员：parent 为 ctClass → 注册进其 ClassMeta（REGMEMBER 加载期等价）。",
+          "line": 1229,
+          "column": 54
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'owner' can be moved to if-init-statement",
+          "lineContent": "                auto &owner = program.contexts[static_cast<size_t>(ctx.parent)];",
+          "line": 1235,
+          "column": 23
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'owner' can be moved to if-init-statement",
+          "lineContent": "                auto &owner = program.contexts[static_cast<size_t>(out.parent)];",
+          "line": 1336,
+          "column": 23
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'target' can be moved to if-init-statement",
+          "lineContent": "                auto &target = program.contexts[static_cast<size_t>(targetCtx)];",
+          "line": 1347,
+          "column": 23
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "} // namespace cial::tjsbc",
+          "line": 1365,
+          "column": 16
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "} // namespace cial::tjsbc",
+          "line": 1365,
+          "column": 22
+        }
+      ]
+    },
+    {
+      "file": "src/types/Class.cpp",
+      "diagnostics": [
+        {
+          "severity": "WARN",
+          "description": "Possibly unused #include directive",
+          "lineContent": "#include <fmt/format.h>",
+          "line": 16,
+          "column": 1
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "namespace cial {",
+          "line": 22,
+          "column": 11
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'fn' can be made const",
+          "lineContent": "        auto fn = vmState.rt.create<Function>(_class->meta->getMember(idx).funcMeta);",
+          "line": 41,
+          "column": 14
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'ext' can be made const",
+          "lineContent": "                for(Atom ext : currentClass->meta->extends) {",
+          "line": 62,
+          "column": 26
+        },
+        {
+          "severity": "WARN",
+          "description": "Variable 'parent' can be moved to if-statement",
+          "lineContent": "                    auto *parent = dynamic_cast<ClassObject *>(vmState.global(ext).asObject().unwrap());",
+          "line": 63,
+          "column": 27
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'memberShapeMeta' can be made const",
+          "lineContent": "                    auto memberShapeMeta = currentClass->meta->getMemberShape(i);",
+          "line": 70,
+          "column": 26
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'ext' can be made const",
+          "lineContent": "            for(Atom ext : clazz->meta->extends) {",
+          "line": 102,
+          "column": 22
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'memberShapeMeta' can be made const",
+          "lineContent": "                    auto memberShapeMeta = clazz->meta->getMemberShape(i);",
+          "line": 111,
+          "column": 26
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'curFrame' can be made pointer to const",
+          "lineContent": "        if(CallFrame *curFrame = vmState.curFrame(); curFrame->thisObj.isObject()) {",
+          "line": 185,
+          "column": 23
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable '<structured binding declaration>' can be moved to if-init-statement",
+          "lineContent": "        const auto [it, inserted] = _props.try_emplace(a, v);",
+          "line": 232,
+          "column": 20
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'shape' can be moved to if-init-statement",
+          "lineContent": "                auto shape = meta->getMemberShape(i);",
+          "line": 245,
+          "column": 22
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'shape' can be moved to if-init-statement",
+          "lineContent": "            auto shape = _class->meta->getMemberShape(i);",
+          "line": 283,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'clazz' can be made pointer to const",
+          "lineContent": "                    auto *clazz = dynamic_cast<ClassObject *>(_vmState->global(ext).asObject().unwrap());",
+          "line": 294,
+          "column": 27
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'shape' can be moved to if-init-statement",
+          "lineContent": "                        auto shape = clazz->meta->getMemberShape(i);",
+          "line": 297,
+          "column": 30
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'shape' can be moved to if-init-statement",
+          "lineContent": "            auto shape = _class->meta->getMemberShape(i);",
+          "line": 318,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'clazz' can be made pointer to const",
+          "lineContent": "                    auto *clazz = dynamic_cast<ClassObject *>(_vmState->global(ext).asObject().unwrap());",
+          "line": 327,
+          "column": 27
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'shape' can be moved to if-init-statement",
+          "lineContent": "                        auto shape = clazz->meta->getMemberShape(i);",
+          "line": 330,
+          "column": 30
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'vmState' is never used",
+          "lineContent": "    void DataObject::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {",
+          "line": 342,
+          "column": 40
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'ret' is never used",
+          "lineContent": "    void DataObject::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {",
+          "line": 342,
+          "column": 59
+        },
+        {
+          "severity": "INFO",
+          "description": "Parameter 'argCount' is never used",
+          "lineContent": "    void DataObject::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {",
+          "line": 342,
+          "column": 77
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "} // namespace cial",
+          "line": 346,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "file": "src/types/Function.cpp",
+      "diagnostics": [
+        {
+          "severity": "WARN",
+          "description": "Possibly unused #include directive",
+          "lineContent": "#include \"Class.hpp\"",
+          "line": 19,
+          "column": 1
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "namespace cial {",
+          "line": 26,
+          "column": 11
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'cnt' can be moved to if-init-statement",
+          "lineContent": "        const auto cnt = meta->arity > argCount ? meta->arity - argCount : 0;",
+          "line": 29,
+          "column": 20
+        },
+        {
+          "severity": "WARN",
+          "description": "Member function can be made const",
+          "lineContent": "    void NativeFunction::callWithThis(vm::VMState &vmState, const u32 ret, const size_t argCount,",
+          "line": 83,
+          "column": 10
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'cial'",
+          "lineContent": "} // namespace cial",
+          "line": 112,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "file": "tests/ssa_test.cpp",
+      "diagnostics": [
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'defs'",
+          "lineContent": "    SsaBlockFacts::Inst instFacts(const u32 pc, const Vec<u16> &defs, const Vec<u16> &uses = {}) {",
+          "line": 19,
+          "column": 65
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'instSsa' can be moved to for-init-statement",
+          "lineContent": "            const InstSsa &instSsa = form.instSsa(pc);",
+          "line": 30,
+          "column": 28
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'phi' can be replaced with structured bindings",
+          "lineContent": "    const SsaPhi &phi = form.phis()[0];",
+          "line": 87,
+          "column": 19
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::inter::SsaRef",
+          "lineContent": "    const Vec<SsaUse> &phiUses = form.usesOfDef({SsaRef::Kind::Phi, 0});",
+          "line": 96,
+          "column": 49
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'phi' can be replaced with structured bindings",
+          "lineContent": "    const SsaPhi &phi = form.phis()[0];",
+          "line": 120,
+          "column": 19
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'successors' can be made const",
+          "lineContent": "    Vec<Vec<size_t>> successors = {{0}};",
+          "line": 134,
+          "column": 22
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'successors' can be made const",
+          "lineContent": "    Vec<Vec<size_t>> successors = {{1, 2}, {3}, {3}, {}};",
+          "line": 144,
+          "column": 22
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'successors' can be made const",
+          "lineContent": "    Vec<Vec<size_t>> successors = {{1}, {}, {}};",
+          "line": 154,
+          "column": 22
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'defs'",
+          "lineContent": "    // 不可达指令保留静态 defs，但没有重命名结果",
+          "line": 163,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'successors' can be made const",
+          "lineContent": "    Vec<Vec<size_t>> successors = {{1}, {2}, {}};",
+          "line": 170,
+          "column": 22
+        },
+        {
+          "severity": "INFO",
+          "description": "Template arguments can be deduced",
+          "lineContent": "    const Vec<bool> exceptionEntries = {false, true, false};",
+          "line": 177,
+          "column": 14
+        },
+        {
+          "severity": "INFO",
+          "description": "Local variable 'successors' can be made const",
+          "lineContent": "    Vec<Vec<size_t>> successors = {{}};",
+          "line": 190,
+          "column": 22
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'defs'",
+          "lineContent": "TEST_CASE(\"ssa - straight-line chunk resolves uses to instruction defs\") {",
+          "line": 197,
+          "column": 67
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'phi' can be replaced with structured bindings",
+          "lineContent": "    const SsaPhi &phi = form.phis()[0];",
+          "line": 233,
+          "column": 19
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'phi' can be replaced with structured bindings",
+          "lineContent": "    const SsaPhi &phi = form.phis()[0];",
+          "line": 257,
+          "column": 19
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'chkins'",
+          "lineContent": "TEST_CASE(\"ssa - chkins redefines its value operand per VM semantics\") {",
+          "line": 288,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'chgthis'",
+          "lineContent": "TEST_CASE(\"ssa - chgthis reads both registers and defines none\") {",
+          "line": 308,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'gmethodc'",
+          "lineContent": "TEST_CASE(\"ssa - gmethodc defines dst and receiver as distinct identities\") {",
+          "line": 326,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::vm::ThrowHandler",
+          "lineContent": "    chunk.addThrowHandler(vm::ThrowHandler{1, 2, 4});",
+          "line": 352,
+          "column": 43
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'callv'",
+          "lineContent": "TEST_CASE(\"ssa - callv records func and arg uses precisely\") {",
+          "line": 365,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Template arguments can be deduced",
+          "lineContent": "        Vec<Register>{Register{1}, Register{2}});",
+          "line": 370,
+          "column": 12
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::inter::SsaRef",
+          "lineContent": "    const Vec<SsaUse> &funcUses = form.usesOfDef({SsaRef::Kind::Inst, 0});",
+          "line": 382,
+          "column": 50
+        },
+        {
+          "severity": "INFO",
+          "description": "Template arguments can be deduced",
+          "lineContent": "    chunk.emitRaw<CallV>(r4, r1, 2, Vec<Register>{r1, r2});",
+          "line": 503,
+          "column": 40
+        },
+        {
+          "severity": "INFO",
+          "description": "Template arguments can be deduced",
+          "lineContent": "    chunk.emitRaw<CallMethodV>(r4, r1, 1, Vec<Register>{r2}, r5);",
+          "line": 520,
+          "column": 46
+        }
+      ]
+    },
+    {
+      "file": "tests/tjsbc_translator_test.cpp",
+      "diagnostics": [
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "    // 语料端到端：加载 .tjsbc → 转译 → 执行顶层 context（main.cpp --tjsbc 同款流程，",
+          "line": 44,
+          "column": 18
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "    // 语料端到端：加载 .tjsbc → 转译 → 执行顶层 context（main.cpp --tjsbc 同款流程，",
+          "line": 44,
+          "column": 55
+        },
+        {
+          "severity": "INFO",
+          "description": "Redundant qualifier",
+          "lineContent": "        std::unique_ptr<tjsbc::TjsTranslator> translator;",
+          "line": 51,
+          "column": 25
+        },
+        {
+          "severity": "INFO",
+          "description": "Redundant qualifier",
+          "lineContent": "            translator = std::make_unique<tjsbc::TjsTranslator>(rt, file);",
+          "line": 68,
+          "column": 43
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::TjsDataSlot",
+          "lineContent": "                            {TjsDataSlot{TJS_TYPE_BYTE, 0}}, 1));",
+          "line": 99,
+          "column": 41
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'program' can be replaced with structured bindings",
+          "lineContent": "        const auto program = translator.translate();",
+          "line": 103,
+          "column": 20
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::TjsDataSlot",
+          "lineContent": "                            {TjsDataSlot{TJS_TYPE_BYTE, 0}}, 2));",
+          "line": 122,
+          "column": 41
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'program' can be replaced with structured bindings",
+          "lineContent": "        const auto program = translator.translate();",
+          "line": 126,
+          "column": 20
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "        CorpusRun run{ TEST_FILES_PATH R\"(/tjsbc/s6_class.tjsbc)\" };",
+          "line": 147,
+          "column": 44
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "        CorpusRun run{ TEST_FILES_PATH R\"(/tjsbc/s6_class.tjsbc)\" };",
+          "line": 147,
+          "column": 59
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "        CorpusRun run{ TEST_FILES_PATH R\"(/tjsbc/s7_ext.tjsbc)\" };",
+          "line": 157,
+          "column": 44
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "        CorpusRun run{ TEST_FILES_PATH R\"(/tjsbc/s7_ext.tjsbc)\" };",
+          "line": 157,
+          "column": 57
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'kirikiri'",
+          "lineContent": "    SECTION(\"test_class：kirikiri 原版类测试全量（property/闭包/继承/invalidate）\") {",
+          "line": 170,
+          "column": 25
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "        CorpusRun run{ TEST_FILES_PATH R\"(/tjsbc/test_class.tjsbc)\" };",
+          "line": 171,
+          "column": 44
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "        CorpusRun run{ TEST_FILES_PATH R\"(/tjsbc/test_class.tjsbc)\" };",
+          "line": 171,
+          "column": 61
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'classproptest'",
+          "lineContent": "        // 这里抽查 classproptest 经 property 闭包链写入的全局 propvalue==20",
+          "line": 173,
+          "column": 17
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'propvalue'",
+          "lineContent": "        // 这里抽查 classproptest 经 property 闭包链写入的全局 propvalue==20",
+          "line": 173,
+          "column": 51
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'kirikiri'",
+          "lineContent": "        // kirikiri 原版函数测试全量：成功时零输出（失败即 throw），走到尾即通过。",
+          "line": 180,
+          "column": 12
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "        CorpusRun run{ TEST_FILES_PATH R\"(/tjsbc/test_function.tjsbc)\" };",
+          "line": 182,
+          "column": 44
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "        CorpusRun run{ TEST_FILES_PATH R\"(/tjsbc/test_function.tjsbc)\" };",
+          "line": 182,
+          "column": 64
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'Faild'",
+          "lineContent": "        //（脚本尾部 isFaild 应为 false）",
+          "line": 184,
+          "column": 19
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'Faild'",
+          "lineContent": "        const Value isFaild =",
+          "line": 185,
+          "column": 23
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'TYPEOFD'",
+          "lineContent": "TEST_CASE(\"TJS2 字节码转译——TYPEOFD/DELD 直译\") {",
+          "line": 192,
+          "column": 24
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'DELD'",
+          "lineContent": "TEST_CASE(\"TJS2 字节码转译——TYPEOFD/DELD 直译\") {",
+          "line": 192,
+          "column": 32
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'TYPEOFD'",
+          "lineContent": "        // TYPEOFD r1,-3,0 (丢结果) ; DELD r1,-3,0 ; SRV r1 ; RET",
+          "line": 204,
+          "column": 12
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'DELD'",
+          "lineContent": "        // TYPEOFD r1,-3,0 (丢结果) ; DELD r1,-3,0 ; SRV r1 ; RET",
+          "line": 204,
+          "column": 36
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::TjsDataSlot",
+          "lineContent": "        {TjsDataSlot{TJS_TYPE_STRING, 0}}, 1));",
+          "line": 206,
+          "column": 21
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'program' can be replaced with structured bindings",
+          "lineContent": "    const auto program = translator.translate();",
+          "line": 209,
+          "column": 16
+        },
+        {
+          "severity": "INFO",
+          "description": "Type can be replaced with auto",
+          "lineContent": "    Value dict = Value{ rt.create<Dictionary>().get() };",
+          "line": 212,
+          "column": 5
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'BNOT'",
+          "lineContent": "TEST_CASE(\"TJS2 字节码转译——BNOT/NUM/OCTET 转换指令（M3）\") {",
+          "line": 223,
+          "column": 24
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'BNOT'",
+          "lineContent": "    SECTION(\"BNOT：~5 → -6\") {",
+          "line": 230,
+          "column": 14
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'BNOT'",
+          "lineContent": "        // CONST r1 ← BYTE(5) ; BNOT r1,r1 ; SRV r1 ; RET",
+          "line": 231,
+          "column": 33
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::TjsDataSlot",
+          "lineContent": "                                                {TjsDataSlot{TJS_TYPE_BYTE, 0}}, 1));",
+          "line": 236,
+          "column": 61
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'program' can be replaced with structured bindings",
+          "lineContent": "        const auto program = translator.translate();",
+          "line": 238,
+          "column": 20
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::TjsDataSlot",
+          "lineContent": "                                                {TjsDataSlot{TJS_TYPE_STRING, 0}}, 1));",
+          "line": 252,
+          "column": 61
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'program' can be replaced with structured bindings",
+          "lineContent": "        const auto program = translator.translate();",
+          "line": 254,
+          "column": 20
+        },
+        {
+          "severity": "INFO",
+          "description": "Type can be replaced with auto",
+          "lineContent": "        Value arg = Value{ \"42\"_str };",
+          "line": 256,
+          "column": 9
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'program' can be replaced with structured bindings",
+          "lineContent": "        const auto program = translator.translate();",
+          "line": 268,
+          "column": 20
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "TEST_CASE(\"TJS2 translator rejects truncated and invalid instruction operands\", \"[tjsbc][validation]\") {",
+          "line": 277,
+          "column": 83
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'CALLD'",
+          "lineContent": "        { 100, 1, 2, 0, -2, 1, 0 }, // CALLD 展开条目缺少寄存器",
+          "line": 283,
+          "column": 40
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "TEST_CASE(\"TJS2 class loading validates code and superclass references\", \"[tjsbc][validation]\") {",
+          "line": 298,
+          "column": 76
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "TEST_CASE(\"TJS2 fixed width members do not read a trailing extra word\", \"[tjsbc][validation]\") {",
+          "line": 350,
+          "column": 75
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::TjsDataSlot",
+          "lineContent": "        file.contexts.push_back(makeFuncContext(code, { { TJS_TYPE_STRING, 0 } }, 0));",
+          "line": 355,
+          "column": 57
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'tjsbc'",
+          "lineContent": "TEST_CASE(\"TJS2 MUL direct member variant updates and returns its result\", \"[tjsbc][validation]\") {",
+          "line": 361,
+          "column": 78
+        },
+        {
+          "severity": "INFO",
+          "description": "Typo: In word 'MULPD'",
+          "lineContent": "    // CONST r1,3; MULPD r2,arg0,*field,r1; SRV r2; RET",
+          "line": 370,
+          "column": 20
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::TjsDataSlot",
+          "lineContent": "                                            { { TJS_TYPE_BYTE, 0 }, { TJS_TYPE_STRING, 0 } }, 1));",
+          "line": 372,
+          "column": 47
+        },
+        {
+          "severity": "INFO",
+          "description": "Use designated initializers to initialize struct cial::tjsbc::TjsDataSlot",
+          "lineContent": "                                            { { TJS_TYPE_BYTE, 0 }, { TJS_TYPE_STRING, 0 } }, 1));",
+          "line": 372,
+          "column": 69
+        },
+        {
+          "severity": "INFO",
+          "description": "Variable 'program' can be replaced with structured bindings",
+          "lineContent": "    const auto program = translator.translate();",
+          "line": 374,
+          "column": 16
+        }
+      ]
+    }
+  ]
+}

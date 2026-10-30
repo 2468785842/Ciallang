@@ -8,7 +8,7 @@
 namespace cial::cli {
     struct Compilation {
         Opt<vm::Chunk> chunk{};
-        OptReg result;
+        OptReg result{};
     };
 
     Compilation compile(Common::Result &diagnostics, Context &context, Common::SourceFile &source,

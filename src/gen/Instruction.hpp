@@ -130,7 +130,7 @@ namespace cial::inter {
     };
 
     class Instruction;
-    class DumpInst;
+    struct DumpInst;
 
     struct Operand {
         enum class Type { None, Register, Label, ConstIndex, Number, Atom };
@@ -393,7 +393,8 @@ namespace cial::inter {
 
     // 变长实参调用：语义 = N×Push + Call（消逐参派发轮次）。Operand 三槽装不下
     // 寄存器列表，手写子类；args 为实参寄存器（缺位实参为 void 常量寄存器）
-    struct CallV : Instruction {
+    class CallV : public Instruction {
+    public:
         Register dst{};
         Register func{};
         Integer argCount{};
@@ -409,7 +410,8 @@ namespace cial::inter {
         [[nodiscard]] std::string dump(const vm::VMState *vmState) override;
     };
 
-    struct CompareTest : Instruction {
+    class CompareTest : public Instruction {
+    public:
         TacOpCode comparison;
         CompareTest(TacOpCode op, Register lhs, Register rhs, Register dst) : comparison(op) {
             _ops[0] = Operand{ lhs };
@@ -422,7 +424,8 @@ namespace cial::inter {
 
     // 方法读取先于实参求值。仅原生方法把接收者分开存放，避免绑定对象分配；
     // getter/脚本方法等回落到原有属性读取协议，receiver 留 void。
-    struct GMethodC : Instruction {
+    class GMethodC : public Instruction {
+    public:
         Register receiver;
         GMethodC(Register obj, Atom atom, Register dst, Register receiver) : receiver(receiver) {
             _ops[0] = Operand{ obj };
@@ -433,7 +436,8 @@ namespace cial::inter {
         std::string dump(const vm::VMState *) override;
     };
 
-    struct CallMethodV : CallV {
+    class CallMethodV : public CallV {
+    public:
         Register receiver;
         CallMethodV(Register dst, Register func, Integer n, Vec<Register> args, Register receiver) :
             CallV(dst, func, n, std::move(args)), receiver(receiver) {}
@@ -443,7 +447,8 @@ namespace cial::inter {
 
     // 省略透传调用（旧版 argc=-1，TJS `f(...)`）：把当前帧的实际实参
     //（%0..%actualArgc-1）原样转发给 func。actualArgc 由 CallFrame 记录
-    struct CallOmit : Instruction {
+    class CallOmit : public Instruction {
+    public:
         Register dst{};
         Register func{};
 
@@ -460,7 +465,8 @@ namespace cial::inter {
     // (fatType, 寄存器) 表——0=Normal 直传、1=Expand 展开 Array 元素、
     // 2=UnnamedExpand 转发本帧 unnamed 实参（%unnamedBase..%actualArgc-1）。
     // 与 CallV 同款手写子类
-    struct CallExpand : Instruction {
+    class CallExpand : public Instruction {
+    public:
         Register dst{};
         Register func{};
         Integer unnamedBase{};
@@ -480,7 +486,8 @@ namespace cial::inter {
     // collapse 参数收拢（旧版 FuncDeclCollapseBase，TJS `function f(a, b*)`）：
     // 把本帧实际实参 %base..%actualArgc-1 收拢成新 Array 写 dst（TJS 位置
     // ra[-3-base]）；无超额实参时写空 Array（TJS2 无条件建 Array）
-    struct CollapseArgs : Instruction {
+    class CollapseArgs : public Instruction {
+    public:
         Register dst{};
         Integer base{};
 

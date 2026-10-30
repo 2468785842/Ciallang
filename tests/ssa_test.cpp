@@ -425,7 +425,7 @@ TEST_CASE("ssa - implicit frame-arg call opcodes are rejected explicitly") {
 TEST_CASE("ssa - every supported tac opcode has a registered def/use entry") {
     // 支持集全量冒烟：未来新增 opcode 若未登记 def/use，此处直接抛错
     vm::Chunk chunk;
-    const Register r0{0}, r1{1}, r2{2}, r3{3}, r4{4}, r5{5};
+    const Register r1{ 1 }, r2{ 2 }, r3{ 3 }, r4{ 4 }, r5{ 5 };
     chunk.emit<NOP>();
     chunk.emit<Debugger>();
     chunk.emit<Push>(r1);

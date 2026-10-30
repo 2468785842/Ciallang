@@ -463,3 +463,30 @@ INFO 中 598 条为拼写提示，139 条为 DateWord 指定初始化建议，�
 | [tools/lsp/test_protocol.py:73](../tools/lsp/test_protocol.py#L73) | WEAK WARNING | Method 'position_of' may be 'static' |
 | [tools/lsp/test_protocol.py:19](../tools/lsp/test_protocol.py#L19) | WEAK WARNING | Function name should be lowercase |
 | [tools/lsp/test_protocol.py:24](../tools/lsp/test_protocol.py#L24) | WEAK WARNING | Function name should be lowercase |
+
+## 后续修复（2026-10-31）
+
+第一笔提交 `0757384` 已移除失效 AstFormatter，同时提交本次原生绑定重构。
+本轮后续改动处理了 RegExp 字段遮蔽、指令 class/struct 声明不一致、编译结果显式初始化、
+优化器输出寄存器初始化、未使用的局部变量和重复调试断言。没有为了消除提示而给
+Value 预留字节增加热路径清零，也没有改动测试中的自赋值/生命周期覆盖。
+
+偏移警告的源码复核进一步确认了转译器的边界问题，已增加：
+
+- 固定长度指令和 CALL/展开调用操作数边界检查；非法负计数在 reserve 前报错。
+- 类体常量/成员槽、superclass context 和 getter 指针检查，类体偏移采用 size_t。
+- 跳转/异常目标使用宽整数计算后检查代码边界，TAC 映射采用 size_t + optional，
+  不再用负值哨兵与窄化的 TAC 下标混用。
+- 删除四码字属性指令及 INC/DEC 成员变体对第五码字的多余读取。
+- 修复 MUL 的 PD/PI/P 解码范围遗漏，新增 direct-member 执行回归。
+
+源码与行为测试分别见 `src/tjsbc/TjsTranslator.cpp` 和
+`tests/tjsbc_translator_test.cpp`；专项 4 个用例 / 24 条断言通过，macOS Debug/Release
+各 242 项 CTest 全过。
+
+复查了 10 个修改文件，ERROR 为 0。对应文件在原始快照中的 ERROR/WARN/弱警告共
+69 条，修复后为 35 条；另删除的 AstFormatter 在原始快照中有 28 条。
+这是局部复查比较，不是全项目重新扫描后的剩余总数。
+原始 3 条 ERROR 对应的源位置已删除或更名处理。
+[修改文件复查 JSON](reports/clion-warning-fixes-2026-10-31.json) 保留剩余提示，主要为
+类型标记保护的 static_cast、const/ranges/auto 建议及 opcode 分组的重复 case 风格提示。

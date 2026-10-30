@@ -13,7 +13,7 @@
 namespace cial::cli {
     Compilation compile(Common::Result &diagnostics, Context &context, Common::SourceFile &source,
                         const bool expression) {
-        Compilation compilation;
+        Compilation compilation{};
         if(expression)
             compilation.result = inter::Register{ 0xFFFF }; // request a value, including postfix ++/--
         if(diagnostics.isFailed())

@@ -3,7 +3,6 @@
 
 #include "TjsTranslator.hpp"
 
-#include <cstring>
 #include <limits>
 #include <map>
 
@@ -178,11 +177,25 @@ namespace cial::tjsbc {
 
         // 解码单条 TJS 指令（CALL 族变长展开，TranslateCodeAddress 对齐）
         Decoded decode(const Vec<i16> &code, const i32 i) {
+            if(i < 0 || static_cast<size_t>(i) >= code.size())
+                trError("instruction offset out of range");
+            const auto position = static_cast<size_t>(i);
+            const size_t remaining = code.size() - position;
+            const auto need = [&](const size_t count) {
+                if(count > remaining)
+                    trError("truncated instruction");
+            };
             Decoded d{};
-            d.op = code[i];
+            d.op = code[position];
             d.word = i;
             d.size = opcodeSize(d.op); // 非 CALL 族默认；CALL 族在分支内覆盖
-            auto reg = [&](const i32 wordIdx) { return static_cast<i32>(code[i + wordIdx]); };
+            if(d.size > 0)
+                need(static_cast<size_t>(d.size));
+            auto reg = [&](const size_t wordIdx) {
+                if(wordIdx >= remaining)
+                    trError("truncated instruction operand");
+                return static_cast<i32>(code[position + wordIdx]);
+            };
 
             switch(d.op) {
                 case OP_NOP: case OP_NF: case OP_EXTRY: case OP_REGMEMBER:
@@ -249,12 +262,18 @@ namespace cial::tjsbc {
                     }
                     if(d.imm == -2) { // 展开调用：条目表 (fatType, reg) × count
                         const i32 count = reg(4);
+                        if(count < 0)
+                            trError("negative expanded argument count");
                         d.size = 5 + count * 2;
+                        need(static_cast<size_t>(d.size));
                         d.fatEntries.reserve(static_cast<size_t>(count));
                         for(i32 k = 0; k < count; ++k)
                             d.fatEntries.emplace_back(reg(5 + k * 2), reg(6 + k * 2));
                         return d;
                     }
+                    if(d.imm < 0)
+                        trError("invalid argument count");
+                    need(4 + static_cast<size_t>(d.imm));
                     d.args.reserve(static_cast<size_t>(d.imm));
                     for(i32 k = 0; k < d.imm; ++k)
                         d.args.push_back(reg(4 + k));
@@ -275,12 +294,18 @@ namespace cial::tjsbc {
                     }
                     if(d.imm == -2) {
                         const i32 count = reg(5);
+                        if(count < 0)
+                            trError("negative expanded argument count");
                         d.size = 6 + count * 2;
+                        need(static_cast<size_t>(d.size));
                         d.fatEntries.reserve(static_cast<size_t>(count));
                         for(i32 k = 0; k < count; ++k)
                             d.fatEntries.emplace_back(reg(6 + k * 2), reg(7 + k * 2));
                         return d;
                     }
+                    if(d.imm < 0)
+                        trError("invalid argument count");
+                    need(5 + static_cast<size_t>(d.imm));
                     d.args.reserve(static_cast<size_t>(d.imm));
                     for(i32 k = 0; k < d.imm; ++k)
                         d.args.push_back(reg(5 + k));
@@ -293,7 +318,7 @@ namespace cial::tjsbc {
             // 4 连组：base / PD / PI / P
             if(d.op == OP_ADDCI || d.op == OP_REGMEMBER)
                 trError("class construction opcodes are not supported outside class bodies");
-            if(d.op >= OP_INC && d.op <= OP_MUL) {
+            if(d.op >= OP_INC && d.op < OP_BNOT) {
                 const i32 k4 = (d.op - OP_INC) % 4;
                 if(k4 == 0) { // base：破坏性双目 r1 = r1 OP r2 / INC·DEC r1
                     d.r1 = reg(1);
@@ -307,7 +332,8 @@ namespace cial::tjsbc {
                         d.dataIdx = reg(3);
                     else
                         d.r3 = reg(3);
-                    d.r4 = reg(4); // rhs
+                    if(d.op >= OP_LOR)
+                        d.r4 = reg(4); // INC/DEC 变体没有 rhs
                     return d;
                 }
                 // P（属性闭包）：二目组 [dst, target, param]、INC/DEC 组 [dst, target]
@@ -326,56 +352,48 @@ namespace cial::tjsbc {
                 d.r1 = reg(1);      // dst
                 d.r2 = reg(2);      // obj
                 d.dataIdx = reg(3); // member 名（DataArea 槽）
-                d.r4 = reg(4);
                 return d;
             }
             if(d.op == OP_SPD || d.op == OP_SPDE || d.op == OP_SPDEH || d.op == OP_SPDS) {
                 d.r1 = reg(1);      // obj
                 d.dataIdx = reg(2); // member 名（DataArea 槽）
                 d.r3 = reg(3);      // src
-                d.r4 = reg(4);
                 return d;
             }
             if(d.op == OP_GPI || d.op == OP_GPIS) {
                 d.r1 = reg(1); // dst
                 d.r2 = reg(2); // obj
                 d.r3 = reg(3); // member reg
-                d.r4 = reg(4);
                 return d;
             }
             if(d.op == OP_SPI || d.op == OP_SPIE || d.op == OP_SPIS) {
                 d.r1 = reg(1); // obj
                 d.r2 = reg(2); // member reg
                 d.r3 = reg(3); // src
-                d.r4 = reg(4);
                 return d;
             }
             if(d.op == OP_DELD) { // [dst, obj, daIdx]
                 d.r1 = reg(1);      // dst（bool 结果）
                 d.r2 = reg(2);      // obj
                 d.dataIdx = reg(3); // member 名（DataArea 槽）
-                d.r4 = reg(4);
                 return d;
             }
             if(d.op == OP_DELI) { // [dst, obj, memberReg]
                 d.r1 = reg(1);
                 d.r2 = reg(2);
                 d.r3 = reg(3);
-                d.r4 = reg(4);
                 return d;
             }
             if(d.op == OP_TYPEOFD) { // [dst, obj, daIdx]
                 d.r1 = reg(1);
                 d.r2 = reg(2);
                 d.dataIdx = reg(3);
-                d.r4 = reg(4);
                 return d;
             }
             if(d.op == OP_TYPEOFI) { // [dst, obj, memberReg]
                 d.r1 = reg(1);
                 d.r2 = reg(2);
                 d.r3 = reg(3);
-                d.r4 = reg(4);
                 return d;
             }
             trError("unsupported instruction in M1 translator: opcode " + std::to_string(d.op));
@@ -420,6 +438,8 @@ namespace cial::tjsbc {
             deferredPerCtx.emplace_back();
             classVarsPerCtx.emplace_back();
             const TjsContext &ctx = file.contexts[ci];
+            if(ctx.code.size() > static_cast<size_t>(std::numeric_limits<i32>::max()))
+                trError("code size exceeds supported offset range");
             if(ctx.type == TjsContextType::SuperClassGetter)
                 continue; // 由 ctClass 经 superClassGetter 加载期解释消费，无产物
 
@@ -440,37 +460,48 @@ namespace cial::tjsbc {
                 // GPD+CHGTHIS+CALL 为编译器生成的 super 类体初始化三连（继承语义由
                 // superClassGetter 解释出的 extends 承担），整段跳过
                 std::map<i32, i32> regSlot; // 寄存器 → 常量槽
-                i32 i2 = 0;
-                while(i2 < static_cast<i32>(ctx.code.size())) {
-                    const i32 op = ctx.code[static_cast<size_t>(i2)];
+                size_t i2 = 0;
+                const auto classWord = [&](const size_t offset) {
+                    if(offset >= ctx.code.size() - i2)
+                        trError("truncated class instruction");
+                    return static_cast<i32>(ctx.code[i2 + offset]);
+                };
+                const auto classData = [&](const i32 index) -> const TjsDataSlot & {
+                    if(index < 0 || static_cast<size_t>(index) >= ctx.data.size())
+                        trError("class data slot index out of range");
+                    return ctx.data[static_cast<size_t>(index)];
+                };
+                while(i2 < ctx.code.size()) {
+                    const i32 op = ctx.code[i2];
                     if(op == OP_CONST) {
-                        regSlot[ctx.code[static_cast<size_t>(i2 + 1)]] =
-                            ctx.code[static_cast<size_t>(i2 + 2)];
+                        const auto slot = classWord(2);
+                        (void)classData(slot);
+                        regSlot[classWord(1)] = slot;
                         i2 += 3;
                     } else if(op == OP_CL || op == OP_ADDCI) {
+                        (void)classWord(op == OP_ADDCI ? 2 : 1);
                         if(op == OP_CL)
-                            regSlot.erase(ctx.code[static_cast<size_t>(i2 + 1)]);
+                            regSlot.erase(classWord(1));
                         i2 += op == OP_ADDCI ? 3 : 2;
                     } else if(op == OP_GPD) {
                         // super 初始化三连：GPD r,-2,<父类槽>; CHGTHIS r,-1; CALL 0,r,n
-                        const i32 callAt = i2 + 7;
-                        if(i2 + 11 <= static_cast<i32>(ctx.code.size())
-                           && ctx.code[static_cast<size_t>(i2 + 4)] == OP_CHGTHIS
-                           && ctx.code[static_cast<size_t>(callAt)] == OP_CALL) {
-                            i2 += 11 + ctx.code[static_cast<size_t>(callAt + 3)];
+                        if(ctx.code.size() - i2 >= 11 && classWord(4) == OP_CHGTHIS && classWord(7) == OP_CALL) {
+                            const auto count = classWord(10);
+                            if(count < 0 || static_cast<size_t>(count) > ctx.code.size() - i2 - 11)
+                                trError("invalid class superclass call argument count");
+                            i2 += 11 + static_cast<size_t>(count);
                         } else {
                             trError("class body contains unrecognized GPD pattern (M2)");
                         }
                     } else if(op == OP_SPDS || op == OP_SPDE || op == OP_SPDEH) {
                         // obj=%-1(this)，member=DataArea 槽（STRING 名），src=reg
                         //（src=r0 = void：无初值的 var 声明）
-                        const i32 memberData = ctx.code[static_cast<size_t>(i2 + 2)];
-                        const i32 srcReg = ctx.code[static_cast<size_t>(i2 + 3)];
+                        const i32 memberData = classWord(2);
+                        const i32 srcReg = classWord(3);
                         const auto slotIt = regSlot.find(srcReg);
-                        if(ctx.code[static_cast<size_t>(i2 + 1)] != -1
-                           || (slotIt == regSlot.end() && srcReg != 0))
+                        if(classWord(1) != -1 || (slotIt == regSlot.end() && srcReg != 0))
                             trError("class body contains non-static member pattern (M2)");
-                        const auto &nameSlot = ctx.data[static_cast<size_t>(memberData)];
+                        const auto &nameSlot = classData(memberData);
                         if(nameSlot.type != TJS_TYPE_STRING)
                             trError("class var member name is not a string");
                         const auto nameAtom =
@@ -479,13 +510,12 @@ namespace cial::tjsbc {
                             MemberShapeMeta{ .name = nameAtom, .isVar = true },
                             ClassFieldMeta{});
                         // 初值槽 = src 寄存器 CONST 跟踪的槽；r0 → void
-                        classVarsPerCtx[ci].emplace_back(
-                            nameAtom,
-                            slotIt != regSlot.end()
-                                ? ctx.data[static_cast<size_t>(slotIt->second)]
-                                : TjsDataSlot{TJS_TYPE_VOID, 0});
+                        classVarsPerCtx[ci].emplace_back(nameAtom,
+                                                         slotIt != regSlot.end() ? classData(slotIt->second)
+                                                                                 : TjsDataSlot{ TJS_TYPE_VOID, 0 });
                         i2 += 4;
                     } else if(op == OP_SRV) {
+                        (void)classWord(1);
                         i2 += 2;
                     } else if(op == OP_REGMEMBER || op == OP_RET || op == OP_NOP) {
                         // 方法注册经 parent 链在 Phase B 处理；RET 结束
@@ -504,14 +534,16 @@ namespace cial::tjsbc {
                 // 按 superClassGetterPointers 逐个取子程序，识别
                 // `GPD r,-2,<名字槽>; SRV r; RET` 得父类名，填 extends
                 if(ctx.superClassGetter >= 0) {
+                    if(static_cast<size_t>(ctx.superClassGetter) >= file.contexts.size())
+                        trError("superClassGetter context index out of range");
                     const auto &getter = file.contexts[static_cast<size_t>(ctx.superClassGetter)];
                     for(const i32 ptr : getter.superClassGetterPointers) {
-                        if(ptr < 0 || ptr + 7 > static_cast<i32>(getter.code.size())
-                           || getter.code[static_cast<size_t>(ptr)] != OP_GPD
-                           || getter.code[static_cast<size_t>(ptr + 4)] != OP_SRV
-                           || getter.code[static_cast<size_t>(ptr + 6)] != OP_RET)
+                        const auto position = static_cast<size_t>(ptr);
+                        if(ptr < 0 || position > getter.code.size() || getter.code.size() - position < 7 ||
+                           getter.code[position] != OP_GPD || getter.code[position + 4] != OP_SRV ||
+                           getter.code[position + 6] != OP_RET)
                             trError("superClassGetter contains unsupported pattern (M2)");
-                        const i32 memberData = getter.code[static_cast<size_t>(ptr + 3)];
+                        const i32 memberData = getter.code[position + 3];
                         meta->extends.push_back(rt.atomTable.intern(
                             dataSlotString(getter, file, memberData)));
                     }
@@ -581,17 +613,23 @@ namespace cial::tjsbc {
                     mapReg(-3 - ctx.funcDeclCollapseBase),
                     Integer{ctx.funcDeclCollapseBase});
 
-            const i32 tacBase = static_cast<i32>(chunk.getInstVec().size());
-            Vec<std::pair<i32, i32>> offsetMap{}; // 字偏移 → TAC 下标
+            Vec<std::pair<size_t, size_t>> offsetMap{}; // 字偏移 → TAC 下标
             Vec<JumpFixup> jumpFixups{};
             Vec<EntryFixup> entryFixups{};
             i32 srvTjsReg = -1;
+
+            const auto targetWord = [&](const i32 base, const i32 relative) {
+                const i64 target = static_cast<i64>(base) + relative;
+                if(target < 0 || static_cast<u64>(target) >= ctx.code.size())
+                    trError("jump target word out of range");
+                return static_cast<size_t>(target);
+            };
 
             // Pass 1 + 2 合流：解码即发射，跳转经 fixup 后填
             i32 i = 0;
             while(i < static_cast<i32>(ctx.code.size())) {
                 Decoded d = decode(ctx.code, i);
-                offsetMap.emplace_back(d.word, static_cast<i32>(chunk.getInstVec().size()));
+                offsetMap.emplace_back(static_cast<size_t>(d.word), chunk.getInstVec().size());
                 const auto r1 = mapReg(d.r1);
                 const auto r2 = mapReg(d.r2);
 
@@ -599,8 +637,8 @@ namespace cial::tjsbc {
                 // JmpE/JmpNE 直连，省 %F 物化与 Test。TJS 编译器保证 flag 消费者
                 // （JF/JNF/SETF/SETNF/NF）紧邻生产者，非跳转消费者走旧路径 ──
                 {
-                    const i32 next =
-                        i + d.size < static_cast<i32>(ctx.code.size()) ? ctx.code[static_cast<size_t>(i + d.size)] : -1;
+                    const auto nextWord = static_cast<size_t>(i) + static_cast<size_t>(d.size);
+                    const i32 next = nextWord < ctx.code.size() ? ctx.code[nextWord] : -1;
                     const bool nextIsJump = next == OP_JF || next == OP_JNF;
                     const bool isCmp = d.op == OP_CEQ || d.op == OP_CDEQ
                                     || d.op == OP_CLT || d.op == OP_CGT;
@@ -617,13 +655,12 @@ namespace cial::tjsbc {
                             chunk.emit<inter::Test>(r1); // TT/TF = _zf ← bool(r)
                         }
                         Decoded j = decode(ctx.code, i + d.size);
-                        offsetMap.emplace_back(j.word, static_cast<i32>(chunk.getInstVec().size()));
-                        const i32 target = j.word + j.imm;
+                        offsetMap.emplace_back(static_cast<size_t>(j.word), chunk.getInstVec().size());
+                        const auto target = targetWord(j.word, j.imm);
                         // JF=真跳 → JmpE；JNF=假跳 → JmpNE；TF 取反翻转方向
                         JumpKind kind = (next == OP_JF) != (d.op == OP_TF) ? JumpKind::JmpE
                                                                           : JumpKind::JmpNE;
-                        jumpFixups.push_back({chunk.getInstVec().size(),
-                                              static_cast<size_t>(target), kind});
+                        jumpFixups.push_back({ chunk.getInstVec().size(), target, kind });
                         chunk.emit<inter::JmpE>(Label{0}); // 占位，repl 按 kind 修正
                         i = j.word + j.size;
                         continue;
@@ -637,10 +674,11 @@ namespace cial::tjsbc {
                         break;
                     case OP_ENTRY:
                         entryFixups.push_back(
-                            {chunk.getInstVec().size(),
-                             static_cast<size_t>(d.word + d.r1), mapReg(d.r2).index()});
+                            { chunk.getInstVec().size(), targetWord(d.word, d.r1), mapReg(d.r2).index() });
                         break;
                     case OP_CONST: {
+                        if(d.dataIdx < 0 || static_cast<size_t>(d.dataIdx) >= ctx.data.size())
+                            trError("CONST data slot index out of range");
                         const auto &slot = ctx.data[static_cast<size_t>(d.dataIdx)];
                         switch(slot.type) {
                             case TJS_TYPE_VOID:
@@ -748,11 +786,9 @@ namespace cial::tjsbc {
                         chunk.emit<inter::LNot>(regF, regF);
                         break;
                     case OP_JF: case OP_JNF: case OP_JMP: {
-                        const i32 target = d.word + d.imm;
+                        const auto target = targetWord(d.word, d.imm);
                         if(d.op == OP_JMP) {
-                            jumpFixups.push_back(
-                                {chunk.getInstVec().size(), static_cast<size_t>(target),
-                                 JumpKind::Jmp});
+                            jumpFixups.push_back({ chunk.getInstVec().size(), target, JumpKind::Jmp });
                             chunk.emit<inter::Jmp>(Label{0});
                         } else {
                             chunk.emit<inter::Test>(regF);
@@ -760,8 +796,7 @@ namespace cial::tjsbc {
                             // JNF = 假则跳 → JmpNE。mapping.md §3 表格同款
                             const JumpKind kind =
                                 d.op == OP_JF ? JumpKind::JmpE : JumpKind::JmpNE;
-                            jumpFixups.push_back(
-                                {chunk.getInstVec().size(), static_cast<size_t>(target), kind});
+                            jumpFixups.push_back({ chunk.getInstVec().size(), target, kind });
                             chunk.emit<inter::JmpE>(Label{0}); // 占位，repl 时按 kind 修正
                         }
                         break;
@@ -1125,33 +1160,37 @@ namespace cial::tjsbc {
             chunk.emit<inter::Ret>(inter::Register{static_cast<u16>(k)});
 
             // 跳转回填（目标必须落在指令边界）
-            auto wordToTac = [&](const i32 word) -> i32 {
+            auto wordToTac = [&](const size_t word) -> Opt<size_t> {
                 for(const auto &[w, t] : offsetMap)
                     if(w == word)
                         return t;
-                return -1;
+                return std::nullopt;
             };
             for(const auto &fix : jumpFixups) {
-                const i32 tac = wordToTac(fix.targetWord);
-                if(tac < 0)
+                const auto tac = wordToTac(fix.targetWord);
+                if(!tac)
                     trError("jump target not at instruction boundary");
                 switch(fix.kind) {
-                    case JumpKind::Jmp: chunk.repl<inter::Jmp>(fix.instIdx, Label{static_cast<size_t>(tac)}); break;
-                    case JumpKind::JmpE: chunk.repl<inter::JmpE>(fix.instIdx, Label{static_cast<size_t>(tac)}); break;
+                    case JumpKind::Jmp:
+                        chunk.repl<inter::Jmp>(fix.instIdx, Label{ *tac });
+                        break;
+                    case JumpKind::JmpE:
+                        chunk.repl<inter::JmpE>(fix.instIdx, Label{ *tac });
+                        break;
                     case JumpKind::JmpNE:
-                        chunk.repl<inter::JmpNE>(fix.instIdx,
-                                                 Label{static_cast<size_t>(tac)});
+                        chunk.repl<inter::JmpNE>(fix.instIdx, Label{ *tac });
                         break;
                 }
             }
 
             // ENTRY 异常处理器登记（tryEnd = catch 地址 = 恢复点）
             for(const auto &entry : entryFixups) {
-                const i32 tac = wordToTac(entry.catchWord);
-                if(tac < 0)
+                const auto tac = wordToTac(entry.catchWord);
+                if(!tac)
                     trError("catch target not at instruction boundary");
-                chunk.addThrowHandler(
-                    {static_cast<u32>(entry.tryStart), static_cast<u32>(tac), entry.exValueReg});
+                if(entry.tryStart > std::numeric_limits<u32>::max() || *tac > std::numeric_limits<u32>::max())
+                    trError("throw handler TAC offset out of range");
+                chunk.addThrowHandler({ static_cast<u32>(entry.tryStart), static_cast<u32>(*tac), entry.exValueReg });
             }
 
             chunk.setRegCount(regCount);

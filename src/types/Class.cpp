@@ -158,7 +158,6 @@ namespace cial {
 
             if(cnt > 0)
                 vmState.pop(cnt);
-            for(auto &i : constructor.meta->chunk->getInstVec())
             assert(constructor.meta->chunk->getInstVec().back()->opcode() == inter::TacOpCode::Ret);
         }
     } // namespace

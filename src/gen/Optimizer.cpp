@@ -624,7 +624,7 @@ namespace cial::inter {
             preserveAll[i] = protectedByTry(chunk, block);
             for(size_t pc = block.start; pc < block.end; ++pc) {
                 const Instruction &instruction = *chunk.inst(pc);
-                Register destination;
+                Register destination{};
                 if(tryGetImmediateLoadDestination(instruction, destination)) {
                     setRegister(blockDefs[i], destination.index());
                     continue;
@@ -684,7 +684,7 @@ namespace cial::inter {
             for(size_t reverse = block.end; reverse > block.start; --reverse) {
                 const size_t pc = reverse - 1;
                 const Instruction &instruction = *chunk.inst(pc);
-                Register destination;
+                Register destination{};
                 if(tryGetImmediateLoadDestination(instruction, destination)) {
                     if(!isSet(live, destination.index())) {
                         chunk.repl<NOP>(pc);

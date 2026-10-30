@@ -48,7 +48,6 @@ namespace cial {
         auto *currentCallFrame = vmState.curFrame();
         currentCallFrame->actualArgc = static_cast<u32>(argCount);
         if(excess > 0) {
-            const u16 tail = meta->chunk->getRegCount();
             for(size_t i = 0; i < meta->arity; ++i)
                 vmState.regRef(static_cast<u16>(i)) = rawArgs[i];
         }

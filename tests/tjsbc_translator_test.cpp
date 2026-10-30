@@ -10,6 +10,7 @@
 #include "stdlib/StandardLibrary.hpp"
 
 #include <fmt/ostream.h>
+#include <limits>
 
 #include "stdlib/ExceptionLib.hpp"
 #include "stdlib/Print.hpp"
@@ -271,4 +272,111 @@ TEST_CASE("TJS2 字节码转译——BNOT/NUM/OCTET 转换指令（M3）") {
         REQUIRE(ret.isOctet());
         REQUIRE(ret.asOctet().unwrap()->getSize() == 0);
     }
+}
+
+TEST_CASE("TJS2 translator rejects truncated and invalid instruction operands", "[tjsbc][validation]") {
+    const Vec<Vec<i16>> invalidCode{
+        { 1 }, // CONST 缺少寄存器/常量槽
+        { 99, 1, 2, -3 }, // CALL 非法负实参数量
+        { 99, 1, 2, -2, -1 }, // CALL 展开表负条目数
+        { 99, 1, 2, 2, 0 }, // CALL 两个实参只存一个
+        { 100, 1, 2, 0, -2, 1, 0 }, // CALLD 展开条目缺少寄存器
+        { 1, 1, -1, 119 }, // CONST 负常量槽
+        { 17, -1 }, // JMP 指向代码之前
+        { 120, 32767, 1 }, // ENTRY catch 超出代码
+    };
+    for(size_t i = 0; i < invalidCode.size(); ++i) {
+        INFO("invalid instruction case " << i);
+        Runtime rt;
+        TjsBytecodeFile file;
+        file.contexts.push_back(makeFuncContext(invalidCode[i], {}, 0));
+        TjsTranslator translator{ rt, file };
+        REQUIRE_THROWS_WITH(translator.translate(), Catch::Matchers::ContainsSubstring("tjs translate:"));
+    }
+}
+
+TEST_CASE("TJS2 class loading validates code and superclass references", "[tjsbc][validation]") {
+    const Vec<Vec<i16>> invalidCode{
+        { 1, 1 }, // 截断 CONST
+        { 1, 1, 0 }, // CONST 指向不存在的 DataArea
+        { 111, -1, -1, 0 }, // 成员名负下标
+        { 118 }, // 截断 SRV
+        { 103, 1, -2, 0, 123, 1, -1, 99, 0, 1, -2 }, // 非法 super CALL 实参数量
+    };
+    for(size_t i = 0; i < invalidCode.size(); ++i) {
+        INFO("invalid class case " << i);
+        Runtime rt;
+        TjsBytecodeFile file;
+        file.pool.strings.push_back("Broken"_str);
+        TjsContext context;
+        context.type = TjsContextType::Class;
+        context.name = 0;
+        context.code = invalidCode[i];
+        file.contexts.push_back(std::move(context));
+        TjsTranslator translator{ rt, file };
+        REQUIRE_THROWS_WITH(translator.translate(), Catch::Matchers::ContainsSubstring("tjs translate:"));
+    }
+
+    SECTION("superclass context index must exist") {
+        Runtime rt;
+        TjsBytecodeFile file;
+        file.pool.strings.push_back("Broken"_str);
+        TjsContext context;
+        context.type = TjsContextType::Class;
+        context.name = 0;
+        context.superClassGetter = 1;
+        file.contexts.push_back(context);
+        TjsTranslator translator{ rt, file };
+        REQUIRE_THROWS_WITH(translator.translate(), Catch::Matchers::ContainsSubstring("context index out of range"));
+    }
+    SECTION("superclass code pointer uses checked unsigned bounds") {
+        Runtime rt;
+        TjsBytecodeFile file;
+        file.pool.strings.push_back("Broken"_str);
+        TjsContext context;
+        context.type = TjsContextType::Class;
+        context.name = 0;
+        context.superClassGetter = 1;
+        file.contexts.push_back(context);
+        TjsContext getter;
+        getter.type = TjsContextType::SuperClassGetter;
+        getter.superClassGetterPointers.push_back(std::numeric_limits<i32>::max());
+        file.contexts.push_back(getter);
+        TjsTranslator translator{ rt, file };
+        REQUIRE_THROWS_WITH(translator.translate(), Catch::Matchers::ContainsSubstring("unsupported pattern"));
+    }
+}
+
+TEST_CASE("TJS2 fixed width members do not read a trailing extra word", "[tjsbc][validation]") {
+    for(const Vec<i16> &code : { Vec<i16>{ 103, 1, -2, 0 }, Vec<i16>{ 19, 1, -2, 0 } }) {
+        Runtime rt;
+        TjsBytecodeFile file;
+        file.pool.strings.push_back("field"_str);
+        file.contexts.push_back(makeFuncContext(code, { { TJS_TYPE_STRING, 0 } }, 0));
+        TjsTranslator translator{ rt, file };
+        REQUIRE_NOTHROW(translator.translate());
+    }
+}
+
+TEST_CASE("TJS2 MUL direct member variant updates and returns its result", "[tjsbc][validation]") {
+    Runtime rt;
+    Context context{ rt };
+    stdlib::registerStandardLibrary(context);
+    vm::VMState state{ context };
+    VM vm{ &state };
+    TjsBytecodeFile file;
+    file.pool.bytes.push_back(3);
+    file.pool.strings.push_back("field"_str);
+    // CONST r1,3; MULPD r2,arg0,*field,r1; SRV r2; RET
+    file.contexts.push_back(makeFuncContext({ 1, 1, 0, 79, 2, -3, 1, 1, 118, 2, 119 },
+                                            { { TJS_TYPE_BYTE, 0 }, { TJS_TYPE_STRING, 0 } }, 1));
+    TjsTranslator translator{ rt, file };
+    const auto program = translator.translate();
+    auto function = rt.create<Function>(program.contexts[0].funcMeta);
+    auto dictionary = rt.create<Dictionary>();
+    const Atom field = rt.atomTable.intern("field"_str);
+    dictionary->setProp(field, Value{ Integer{ 7 } });
+    Value argument{ dictionary.get() };
+    REQUIRE(vm.callValue(Value{ function.get() }, 1, &argument).asInteger().unwrap() == 21);
+    REQUIRE(dictionary->getProp(field).asInteger().unwrap() == 21);
 }
