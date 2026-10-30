@@ -146,7 +146,7 @@ class 类名 extends 父类1, 父类2 … {   // 多继承，后面的覆盖前�
   - 成员解析走 **slot 链**（实例字段 → 本类 → 父类链），`super` 显式跨层；
   - 方法访问按对象绑定 this（字节码侧经闭包 objthis，本项目经 `DataObject::getProp` 克隆绑定）；
   - `invalidate obj` 置失效 + 引用计数归零时触发 `finalize`。
-- 状态：class/多继承/property/构造函数/super ✅；`static`/`finalize` 触发时机 ◐（以测试为准）。
+- 状态：class/多继承/property/构造函数/super ✅；`finalize` 触发时机 ✅（GC 保活队列 + VM 安全点 drain，tests/interpreter_test.cpp）；`static` ✅ 定论——原版保留字但无文法规则（tjs.y:116-120 零产生式），类内 `static` 原版即语法错误，本项目同为编译错误（tests/compat_reserved_test.cpp）。
 
 ## 8. 内联字面量（Array / Dictionary / 常量折叠形）
 

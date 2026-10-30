@@ -187,3 +187,23 @@ TEST_CASE("模板串 - 内嵌表达式展开") {
 
     SECTION("裸 $ 为普通文本") { REQUIRE(*(*vm.evalExpr<String *>(R"(@"d $x; end")"_str)) == "d $x; end"); }
 }
+
+// ── static/private/public/protected（tjs.y:116-120、tjsLex.cpp:926）──
+// 原版保留字但文法产生式零使用（与 `in` 同类）：类内 `static var` 等写法
+// 在原版即语法错误。Ciallang 同样拒绝编译——行为锁定，勿实现成 static 成员。
+TEST_CASE("保留字 - static/private/public/protected 无文法规则") {
+    Common::SourceFile sourceFile{};
+    Common::Result r{};
+
+    for(const char *decl :
+        {"class C { static var sv = 1; }", "class C { static function f() { } }", "class C { private var pv = 1; }",
+         "class C { public var uv = 1; }", "class C { protected var xv = 1; }", "static var top = 1;"}) {
+        sourceFile.load(r, decl);
+        Runtime rt{};
+        Context context{ rt };
+        syntax::Parser parser{ sourceFile, context.pp() };
+        parser.parse(r);
+        INFO("source: " << decl);
+        REQUIRE(r.isFailed());
+    }
+}
