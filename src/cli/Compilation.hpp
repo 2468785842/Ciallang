@@ -7,7 +7,7 @@
 
 namespace cial::cli {
     struct Compilation {
-        Opt<vm::Chunk> chunk;
+        Opt<vm::Chunk> chunk{};
         OptReg result;
     };
 
