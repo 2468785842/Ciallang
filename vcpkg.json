@@ -5,22 +5,29 @@
   "features": {
     "jit": {
       "description": "Optional x64 integer JIT backend",
-      "dependencies": ["asmjit"]
+      "dependencies": [
+        "asmjit"
+      ]
+    },
+    "cli": {
+      "description": "Command-line application and REPL",
+      "dependencies": [
+        "argparse"
+      ]
+    },
+    "tests": {
+      "description": "Catch2 test suite",
+      "dependencies": [
+        {
+          "name": "catch2",
+          "default-features": false
+        }
+      ]
     }
   },
   "dependencies": [
-    {
-      "name": "argparse",
-      "platform": "linux | windows | osx"
-    },
-    {
-      "name": "catch2",
-      "default-features": false,
-      "platform": "linux | windows | osx"
-    },
     "fmt",
     "utf8proc",
-    "frozen",
-    "spdlog"
+    "frozen"
   ]
 }

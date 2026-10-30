@@ -36,10 +36,17 @@ namespace cial {
 
         size_t stackTop{ 0 }; // callFrame count
 
-        explicit Impl(Runtime &rt) noexcept : rt(rt) {}
+        explicit Impl(Runtime &rt) : rt(rt) {}
     };
 
-    Context::Context(Runtime &rt) noexcept : MarkRootProvider(), _impl(new Impl{ rt }) { rt.addMarkRoot(this); }
+    Context::Context(Runtime &rt) : MarkRootProvider(), _impl(new Impl{ rt }) {
+        try {
+            rt.addMarkRoot(this);
+        } catch(...) {
+            delete _impl;
+            throw;
+        }
+    }
 
     Context::~Context() noexcept {
         _impl->rt.removeMarkRoot(this);
@@ -61,7 +68,7 @@ namespace cial {
         registerMethod<String>("reverse"_str, &stdlib::stringReverse);
         registerMethod<String>("repeat"_str, &stdlib::stringRepeat);
 
-        // 只读属性（str.length；与 charAt 一致的字节长度语义）
+        // 字符串长度按 UTF-8 码点计数。
         registerProperty<String>("length"_str, [](const Value &thisObj) {
             // TJS2 语义：字符数（UTF-16 码元数）；UTF-8 下按码点计数（"abc漢字" == 5）
             const String *str = thisObj.asString().unwrap();
@@ -89,7 +96,8 @@ namespace cial {
         registerMethod<Array>("assignStruct"_str, &stdlib::arrayAssignStruct);
         // count/length 属性（get；写走 Array::setProp）
         const auto arrayCount = [](const Value &thisObj) {
-            return Value{ Integer{ static_cast<Integer>(dynamic_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };
+            return Value{ Integer{
+                static_cast<Integer>(static_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };
         };
         registerProperty<Array>("count"_str, arrayCount);
         registerProperty<Array>("length"_str, arrayCount);
@@ -106,8 +114,8 @@ namespace cial {
         registerMethod<Dictionary>("assignStruct"_str, &stdlib::dictAssignStruct);
         // count 属性
         registerProperty<Dictionary>("count"_str, [](const Value &thisObj) {
-            return Value{ Integer{ static_cast<Integer>(
-                dynamic_cast<Dictionary &>(*thisObj.asObject().unwrap()).members.size()) } };
+            return Value{ Integer{
+                static_cast<Integer>(static_cast<Dictionary &>(*thisObj.asObject().unwrap()).members.size()) } };
         });
 
         // RegExp 方法（TJS2 tjsRegExp.cpp 对齐）；matches/start/index 等状态属性走 RegExp::getProp
@@ -146,11 +154,10 @@ namespace cial {
         registerProperty<MathNS>("PI"_str, [](const Value &) { return Value{ Real{ M_PI } }; });
         registerProperty<MathNS>("SQRT1_2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 / 2 } }; });
         registerProperty<MathNS>("SQRT2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 } }; });
-        auto *mathNS = _impl->rt.create<MathNS>().get();
+        auto *mathNS = registerClass<MathNS>("Math"_str);
         // Math.RandomGenerator 类对象（new Math.RandomGenerator(seed) 构造入口）
         mathNS->setRandomGenerator(_impl->rt.atomTable.intern("RandomGenerator"_str),
                                    _impl->rt.create<RandomGen>().get());
-        _impl->globalObject.setProp(_impl->rt.atomTable.intern("Math"_str), Value{ mathNS });
 
         // RandomGenerator 实例方法（TypeId::RandomGen 分派）
         registerMethod<RandomGen>("randomize"_str, &stdlib::rgRandomize);
@@ -167,13 +174,10 @@ namespace cial {
         // Dictionary.assign incontextof obj——取未绑定方法后 ChgThis 换 this）；
         // call() 即构造入口（new Array() / new Dictionary() / new RegExp(...)，
         // new 编译为透明调用——IRGenerator 对 New 直接求值 rhs）
-        _impl->globalObject.setProp(_impl->rt.atomTable.intern("Array"_str),
-                                    Value{ _impl->rt.create<Array>(&_impl->rt).get() });
-        _impl->globalObject.setProp(_impl->rt.atomTable.intern("Dictionary"_str),
-                                    Value{ _impl->rt.create<Dictionary>().get() });
+        registerClass<Array>("Array"_str, &rt());
+        registerClass<Dictionary>("Dictionary"_str);
         // RegExp 类对象：空模式占位实例，RegExp(pattern, flags?) 构造入口
-        _impl->globalObject.setProp(_impl->rt.atomTable.intern("RegExp"_str),
-                                    Value{ _impl->rt.create<RegExp>(&_impl->rt, ""_str).get() });
+        registerClass<RegExp>("RegExp"_str, &rt(), ""_str);
 
         // Date 方法（TJS2 tjsDate.cpp 对齐；get 系 localtime、set 系读改 mktime）
         registerMethod<DateNS>("getYear"_str, &stdlib::dateGetYear);
@@ -194,13 +198,16 @@ namespace cial {
         registerMethod<DateNS>("parse"_str, &stdlib::dateParse);
         registerMethod<DateNS>("getTimezoneOffset"_str, &stdlib::dateGetTimezoneOffset);
         // Date 类对象：占位实例（call 即构造：new Date()/分量/字符串）
-        _impl->globalObject.setProp(_impl->rt.atomTable.intern("Date"_str),
-                                    Value{ _impl->rt.create<DateNS>().get() });
+        registerClass<DateNS>("Date"_str);
     }
 
     void Context::collectMark() const {
         _impl->rt.collectMark();
         _impl->globalObject.marked();
+        // The global object lives outside the sweep pool; its mark bit is not
+        // cleared by sweep, so retain its proxy explicitly on every collection.
+        if(_impl->globalObject.proxy)
+            _impl->globalObject.proxy->marked();
 
         for(const auto &[instanceMethods, instanceProperties] : _impl->nativeRegister.tables | std::views::values) {
             for(const auto &method : instanceMethods | std::views::values) {
@@ -246,9 +253,13 @@ namespace cial {
         }
     }
 
-    void Context::registryGlobalFunc(const String &name, NativeFunction *func) const noexcept {
+    void Context::registerGlobal(const String &name, const Value &value) const {
         const Atom a = _impl->rt.atomTable.intern(name);
-        _impl->globalObject.setProp(a, Value{ func });
+        _impl->globalObject.setProp(a, value);
+    }
+
+    void Context::registryGlobalFunc(const String &name, NativeFunction *func) const {
+        registerGlobal(name, Value{ func });
     }
 
     NativeRegister &Context::nativeRegister() { return _impl->nativeRegister; }

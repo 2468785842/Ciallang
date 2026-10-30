@@ -28,15 +28,21 @@
 
 namespace cial::inter {
 
+    IRGenerator::IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile) :
+        _rt(rt), _sourceFile(sourceFile), _r(r) {}
+
+    IRGenerator::~IRGenerator() = default;
+
     Opt<vm::Chunk> IRGenerator::parseAst(const syntax::AstNode *node, OptReg &optReg) {
+        _rt.beginCompilation();
+        DEFER { _rt.endCompilation(); };
         if(node)
             node->generateBytecode(this, optReg);
         if(_r.isFailed())
             return {};
         _chunk->setRegCount(_regNextIndex);
         const auto chunk = std::move(_chunk);
-        // 字节码按需编译：编码器尚未覆盖全部指令（未覆盖的在 Debug 下会断言），
-        // 由 run0 调用方显式 toBytecode()
+        // 字节码由 VM 进入帧时按需生成。
         OptimizerManager optimizerManager(*chunk);
         optimizerManager.addOptimizer(std::make_unique<CopyPropagationOptimizer>());
         optimizerManager.addOptimizer(std::make_unique<IntegerConstantPropagationOptimizer>());
@@ -536,11 +542,13 @@ namespace cial::inter {
                 break;
             }
             case Isvalid: {
-                auto src = allocateRegister();
+                Register src{};
                 if(!expectValue(node->lhs, src)) {
                     return;
                 }
-                _chunk->emit<ChkInv>(src, *optReg);
+                const auto dst = allocateRegister();
+                _chunk->emit<ChkInv>(src, dst);
+                optReg = dst;
                 freeRegister(src);
                 break;
             }
@@ -923,11 +931,11 @@ namespace cial::inter {
         if(node->setter)
             setFuncMeta = generateFuncMeta(node->setter->parameters, node->setter->body);
 
-        FuncMeta *getFuncMeta;
+        FuncMeta *getFuncMeta{};
         if(node->getter)
             getFuncMeta = generateFuncMeta(node->getter->parameters, node->getter->body);
 
-        auto *propMeta = _rt.createNoGC<PropMeta>(setFuncMeta, getFuncMeta);
+        auto *propMeta = _rt.createCompilationObject<PropMeta>(setFuncMeta, getFuncMeta);
 
         const auto identifier = getAtomFromToken(node->token);
 
@@ -1020,7 +1028,7 @@ namespace cial::inter {
         const auto identifier = getAtomFromToken(node->token);
 
         auto classReg = allocateRegister();
-        auto *classMeta = _rt.createNoGC<ClassMeta>(identifier, 0);
+        auto *classMeta = _rt.createCompilationObject<ClassMeta>(identifier, 0);
         _chunk->emit<Load>(classReg, _chunk->addConstant(classMeta));
 
         // class is always global in current design
@@ -1048,11 +1056,11 @@ namespace cial::inter {
             if(propertyDeclNode->setter)
                 setFuncMeta = generateFuncMeta(propertyDeclNode->setter->parameters, propertyDeclNode->setter->body);
 
-            FuncMeta *getFuncMeta;
+            FuncMeta *getFuncMeta{};
             if(propertyDeclNode->getter)
                 getFuncMeta = generateFuncMeta(propertyDeclNode->getter->parameters, propertyDeclNode->getter->body);
 
-            auto *propMeta = _rt.createNoGC<PropMeta>(setFuncMeta, getFuncMeta);
+            auto *propMeta = _rt.createCompilationObject<PropMeta>(setFuncMeta, getFuncMeta);
 
             const auto varName = getAtomFromToken(propertyDeclNode->token);
 
@@ -1083,8 +1091,8 @@ namespace cial::inter {
                 return; // parseAst(nullptr) 不应失败,防御性判空(空 Opt 解引用是 UB)
             }
 
-            auto *chunk = _rt.createNoGC<vm::Chunk>(std::move(*funChunk));
-            auto *initFuncMeta = _rt.createNoGC<FuncMeta>(0, chunk, std::move(gen._localVars));
+            auto *chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
+            auto *initFuncMeta = _rt.createCompilationObject<FuncMeta>(0, chunk, std::move(gen._localVars));
             classMeta->initDefaultVal = initFuncMeta;
         }
 
@@ -1156,10 +1164,10 @@ namespace cial::inter {
                 auto voidReg = gen.loadVoidReg();
                 funChunk->emit<Ret>(voidReg);
 
-                auto *chunk = _rt.createNoGC<vm::Chunk>(std::move(*funChunk));
+                auto *chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
                 const size_t paramCount = node->constructor->parameters.size();
                 auto *initFuncMeta =
-                    _rt.createNoGC<FuncMeta>(static_cast<u32>(paramCount), chunk, std::move(gen._localVars));
+                    _rt.createCompilationObject<FuncMeta>(static_cast<u32>(paramCount), chunk, std::move(gen._localVars));
                 initFuncMeta->name = identifier;
                 classMeta->setConstructor(initFuncMeta);
             }
@@ -1172,8 +1180,8 @@ namespace cial::inter {
             genFinalize.makeVirtualGlobalScope();
             auto voidReg = genFinalize.loadVoidReg();
             genFinalize._chunk->emit<Ret>(voidReg);
-            auto funChunk = _rt.createNoGC<vm::Chunk>(*genFinalize.parseAst(nullptr, ignoreReg));
-            auto *finalize = _rt.createNoGC<FuncMeta>(0, funChunk, Vec<LocalVariable>{});
+            auto funChunk = _rt.createCompilationObject<vm::Chunk>(*genFinalize.parseAst(nullptr, ignoreReg));
+            auto *finalize = _rt.createCompilationObject<FuncMeta>(0, funChunk, Vec<LocalVariable>{});
             finalize->syntheticFinalizer = true;
             classMeta->setMember(MemberShapeMeta{ .name = finalizeAtom, .isMethod = true }, ClassFieldMeta{ finalize });
         }
@@ -1709,9 +1717,9 @@ namespace cial::inter {
             funChunk->emit<Ret>(gen.loadVoidReg());
         }
 
-        auto *chunk = _rt.createNoGC<vm::Chunk>(std::move(*funChunk));
+        auto *chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
         auto *funcMeta =
-            _rt.createNoGC<FuncMeta>(static_cast<u32>(parameters.size()), chunk, std::move(gen._localVars));
+            _rt.createCompilationObject<FuncMeta>(static_cast<u32>(parameters.size()), chunk, std::move(gen._localVars));
         funcMeta->hasCollapse = hasCollapse;
         return funcMeta;
     }

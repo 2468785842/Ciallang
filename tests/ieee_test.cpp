@@ -2,7 +2,7 @@
 //
 // IEEE 754 双精度位工具测试（对准 src/types/Real.hpp，原 lexer/IEEETypes.hpp 已并入该头）
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "types/Real.hpp"
 

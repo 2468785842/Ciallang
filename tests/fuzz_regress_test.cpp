@@ -10,8 +10,7 @@
 #include <fstream>
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"
-#include "runtime/Context.hpp"
-#include "runtime/Runtime.hpp"
+#include "parser/PreProcessor.hpp"
 #include "test_config.h"
 
 // 把 Debug 断言从弹窗重定向到 stderr，终端/CI 下可见
@@ -33,16 +32,15 @@ static std::string read_file(const fs::path &p) {
     return { std::istreambuf_iterator(in), std::istreambuf_iterator<char>() };
 }
 
-void run_lexer(const std::string &input) {
-    Runtime rt{ 0 };
-    Context context{ rt };
+static void run_lexer(const std::string &input) {
+    PreProcessor preProcessor;
     Common::SourceFile sourceFile;
     Common::Result r{};
     sourceFile.load(r, input);
     if(!r.isFailed()) {
-        syntax::Lexer lexer{ sourceFile, context.pp() };
+        syntax::Lexer lexer{ sourceFile, preProcessor };
         while(lexer.hasNext()) {
-            syntax::Token *t;
+            syntax::Token *t{};
             lexer.next(t);
             syntax::Token take;
             lexer.takeOverToken(take);
@@ -50,11 +48,25 @@ void run_lexer(const std::string &input) {
     }
 }
 
+static void run_parser(const std::string &input) {
+    PreProcessor preProcessor;
+    Common::SourceFile sourceFile;
+    Common::Result result;
+    sourceFile.load(result, input);
+    if(result.isFailed())
+        return;
+    syntax::Parser parser{ sourceFile, preProcessor };
+    parser.parse(result);
+}
+
 TEST_CASE("fuzz regression", "[fuzz]") {
 
     for(const auto &entry : fs::directory_iterator(TEST_FUZZ_REGRESS_PATH)) {
+        if(!entry.is_regular_file() || entry.path().extension() != ".tjs")
+            continue;
         INFO("file = " << entry.path());
 
         REQUIRE_NOTHROW(run_lexer(read_file(entry.path())));
+        REQUIRE_NOTHROW(run_parser(read_file(entry.path())));
     }
 }

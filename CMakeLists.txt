@@ -1,13 +1,40 @@
 cmake_minimum_required(VERSION 3.25)
 
-option(CIAL_ENABLE_JIT "Enable the optional x64 integer JIT backend" OFF)
-if(CIAL_ENABLE_JIT)
-    list(APPEND VCPKG_MANIFEST_FEATURES jit)
-    list(REMOVE_DUPLICATES VCPKG_MANIFEST_FEATURES)
+# vcpkg reads features during project(), so resolve optional targets first.
+set(CIAL_TOP_LEVEL OFF)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    set(CIAL_TOP_LEVEL ON)
 endif()
+# Preserve existing cache switches for callers using the original options.
+if(CIAL_TOP_LEVEL AND DEFINED ENABLE_TESTS AND NOT DEFINED CIAL_BUILD_TESTS)
+    set(CIAL_BUILD_TESTS "${ENABLE_TESTS}" CACHE BOOL "Build tests")
+endif()
+if(CIAL_TOP_LEVEL AND DEFINED BUILD_EXECUTABLE AND NOT DEFINED CIAL_BUILD_CLI)
+    set(CIAL_BUILD_CLI "${BUILD_EXECUTABLE}" CACHE BOOL "Build the command-line application")
+endif()
+if(CIAL_TOP_LEVEL AND DEFINED ENABLE_FUZZ AND NOT DEFINED CIAL_BUILD_FUZZ)
+    set(CIAL_BUILD_FUZZ "${ENABLE_FUZZ}" CACHE BOOL "Build libFuzzer targets")
+endif()
+option(CIAL_BUILD_TESTS "Build tests" ${CIAL_TOP_LEVEL})
+option(CIAL_BUILD_CLI "Build the command-line application" ${CIAL_TOP_LEVEL})
+option(CIAL_BUILD_FUZZ "Build libFuzzer targets" OFF)
+option(CIAL_BUILD_BENCH "Build benchmark and TJS2 conformance tooling" OFF)
+option(CIAL_ENABLE_JIT "Enable the optional x64 integer JIT backend" OFF)
+option(CIAL_WARNINGS_AS_ERRORS "Treat Ciallang compiler warnings as errors" ${CIAL_TOP_LEVEL})
+foreach(feature IN ITEMS cli tests jit)
+    if((feature STREQUAL "cli" AND CIAL_BUILD_CLI) OR
+       (feature STREQUAL "tests" AND CIAL_BUILD_TESTS) OR
+       (feature STREQUAL "jit" AND CIAL_ENABLE_JIT))
+        list(APPEND VCPKG_MANIFEST_FEATURES ${feature})
+    endif()
+endforeach()
+list(REMOVE_DUPLICATES VCPKG_MANIFEST_FEATURES)
 
-project(Ciallang CXX)
+project(Ciallang LANGUAGES CXX)
 
+if(CIAL_BUILD_BENCH AND NOT CIAL_BUILD_CLI)
+    message(FATAL_ERROR "CIAL_BUILD_BENCH requires CIAL_BUILD_CLI=ON")
+endif()
 if(CIAL_ENABLE_JIT)
     if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|amd64|x86_64|x64)$")
         message(FATAL_ERROR "CIAL_ENABLE_JIT currently requires x64")
@@ -15,33 +42,24 @@ if(CIAL_ENABLE_JIT)
     find_package(asmjit CONFIG REQUIRED)
 endif()
 
-option(ENABLE_FUZZ "enable fuzz execute build" OFF)
-option(CIAL_BUILD_BENCH "build benchmark & TJS2 conformance tooling" OFF)
-option(ENABLE_TESTS "enable tests execute build" ON)
-option(BUILD_EXECUTABLE "build executable file" ON)
-
-# Release 缓存污染会使性能测量失真；显式报错，避免静默以 -O0 运行。
-if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT CMAKE_CXX_FLAGS_RELEASE MATCHES "(^| )(-O[1-3sz]|/O[12x])($| )")
-    message(FATAL_ERROR "Release 缺少优化标志，请清理 CMAKE_CXX_FLAGS_RELEASE 缓存后重新配置")
-endif()
-
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-if(MSVC)
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/EHsc>" "/MP" "/utf-8")
-    add_link_options("/INCREMENTAL" "/DEBUG:FASTLINK")
+# Reject stale Release caches that silently disable optimization.
+if(CIAL_TOP_LEVEL AND CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT CMAKE_CXX_FLAGS_RELEASE MATCHES "(^| )(-O[1-3sz]|/O[12x])($| )")
+    message(FATAL_ERROR "Release requires optimization flags; clear CMAKE_CXX_FLAGS_RELEASE and reconfigure")
 endif()
 
 find_package(fmt CONFIG REQUIRED)
-find_package(utf8proc CONFIG QUIET)
-if(NOT TARGET utf8proc)
-    find_package(unofficial-utf8proc CONFIG)
-endif()
 find_package(frozen CONFIG REQUIRED)
-find_package(argparse CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED)
-find_package(spdlog CONFIG REQUIRED)
+find_package(utf8proc CONFIG QUIET)
+if(NOT TARGET utf8proc AND NOT TARGET utf8proc::utf8proc)
+    find_package(unofficial-utf8proc CONFIG REQUIRED)
+endif()
+if(TARGET utf8proc)
+    set(CIAL_UTF8PROC_TARGET utf8proc)
+elseif(TARGET utf8proc::utf8proc)
+    set(CIAL_UTF8PROC_TARGET utf8proc::utf8proc)
+else()
+    set(CIAL_UTF8PROC_TARGET unofficial::utf8proc::utf8proc)
+endif()
 
 set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/parser/PreProcessor.cpp
@@ -99,64 +117,46 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/logging/Logger.cpp
 )
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-add_library(${PROJECT_NAME} ${SOURCE_FILES})
-#target_precompile_headers(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/pch.h")
-
-target_link_libraries(
-        ${PROJECT_NAME}
-        PUBLIC
-        fmt::fmt utf8proc frozen::frozen argparse::argparse spdlog::spdlog
-)
-
-set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_WARNING_AS_ERROR ON)
-
-if(${BUILD_EXECUTABLE})
-    add_executable(cial
-            src/main.cpp
-            ${SOURCE_FILES}
-    )
-
-    set_target_properties(cial PROPERTIES COMPILE_WARNING_AS_ERROR ON)
-
-#    target_precompile_headers(cial PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/pch.h")
-    target_link_libraries(
-            cial
-            PRIVATE
-            fmt::fmt utf8proc frozen::frozen argparse::argparse spdlog::spdlog
-    )
-
-    add_executable(cial_bc
-            src/main0.cpp
-            ${SOURCE_FILES}
-    )
-
-    set_target_properties(cial_bc PROPERTIES COMPILE_WARNING_AS_ERROR ON)
-
-    #    target_precompile_headers(cial PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/pch.h")
-    target_link_libraries(
-            cial_bc
-            PRIVATE
-            fmt::fmt utf8proc frozen::frozen argparse::argparse spdlog::spdlog
-    )
+add_library(Ciallang ${SOURCE_FILES})
+add_library(Ciallang::Ciallang ALIAS Ciallang)
+target_compile_features(Ciallang PUBLIC cxx_std_20)
+set_target_properties(Ciallang PROPERTIES
+    CXX_EXTENSIONS OFF
+    COMPILE_WARNING_AS_ERROR ${CIAL_WARNINGS_AS_ERRORS})
+target_include_directories(Ciallang PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>")
+target_link_libraries(Ciallang PUBLIC fmt::fmt frozen::frozen ${CIAL_UTF8PROC_TARGET})
+if(MSVC)
+    target_compile_options(Ciallang PRIVATE /EHsc /MP /utf-8)
 endif()
-
 if(CIAL_ENABLE_JIT)
-    foreach(target Ciallang cial cial_bc)
-        if(TARGET ${target})
-            target_compile_definitions(${target} PUBLIC CIAL_ENABLE_JIT=1)
-            target_link_libraries(${target} PUBLIC asmjit::asmjit)
-        endif()
-    endforeach()
+    target_compile_definitions(Ciallang PUBLIC CIAL_ENABLE_JIT=1)
+    target_link_libraries(Ciallang PUBLIC asmjit::asmjit)
 endif()
 
-if (${ENABLE_TESTS})
+if(CIAL_BUILD_CLI)
+    find_package(argparse CONFIG REQUIRED)
+    add_executable(cial
+        src/main.cpp
+        src/cli/Options.cpp
+        src/cli/Application.cpp
+        src/cli/Compilation.cpp
+        src/cli/Diagnostics.cpp
+        src/cli/Repl.cpp)
+    target_link_libraries(cial PRIVATE Ciallang::Ciallang argparse::argparse)
+    set_target_properties(cial PROPERTIES COMPILE_WARNING_AS_ERROR ${CIAL_WARNINGS_AS_ERRORS})
+    if(MSVC)
+        target_compile_options(cial PRIVATE /EHsc /utf-8)
+    endif()
+endif()
+
+if(CIAL_BUILD_TESTS)
+    enable_testing()
     add_subdirectory(tests)
-endif ()
+endif()
 
 # ------------------------------ bench & conformance ------------------------------ #
-if (${CIAL_BUILD_BENCH})
+if(CIAL_BUILD_BENCH)
     # TJSCompiler 参考实现定位: CIAL_TJS_ROOT 环境变量(推荐经 UserPresets 提供)
     # 或兄弟目录约定;可执行文件可用 CIAL_TJS_EXE 缓存变量强制指定
     set(TJS_ROOT "$ENV{CIAL_TJS_ROOT}" CACHE STRING "TJSCompiler 参考实现根目录")
@@ -205,6 +205,6 @@ if (${CIAL_BUILD_BENCH})
         COMMENT "生成 TJS2 兼容性对拍报告(bench/results/conformance.txt)")
 endif ()
 
-if(${ENABLE_FUZZ})
+if(CIAL_BUILD_FUZZ)
     add_subdirectory(fuzz)
 endif ()

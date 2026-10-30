@@ -1,9 +1,3 @@
-cmake_minimum_required(VERSION 3.25)
-
-enable_testing()
-
-project(CiallangTests CXX)
-
 find_package(Catch2 3 REQUIRED)
 
 set(TEST_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}")
@@ -14,6 +8,7 @@ set(TEST_FUZZ_REGRESS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/fuzz_regress)
 configure_file(test_config.h.in test_config.h)
 
 set(SOURCES
+        runtime_lifetime_test.cpp
         fuzz_regress_test.cpp
         compat_reserved_test.cpp
         expression_test.cpp
@@ -44,6 +39,9 @@ set(SOURCES
 )
 
 add_executable(CiallangTests ${SOURCES})
+if(MSVC)
+    target_compile_options(CiallangTests PRIVATE /EHsc /MP /utf-8)
+endif()
 
 target_link_libraries(CiallangTests
     PRIVATE
@@ -53,7 +51,6 @@ target_link_libraries(CiallangTests
 
 target_include_directories(CiallangTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
-include(CTest)
 include(Catch)
 
 # Windows 下 CTest/CMake 按 ANSI 代码页转码测试名与过滤器（CI runner 为 1252），
@@ -67,8 +64,12 @@ endif()
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND AND TARGET cial)
+    add_test(NAME CiallangCli
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli_test.py"
+                --cial "$<TARGET_FILE:cial>")
+    set_tests_properties(CiallangCli PROPERTIES TIMEOUT 60)
     add_test(NAME CiallangLspProtocol
-        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/lsp/test_protocol.py"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/lsp/test_protocol.py"
                 --cial "$<TARGET_FILE:cial>")
     set_tests_properties(CiallangLspProtocol PROPERTIES TIMEOUT 30)
 endif()

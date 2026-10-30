@@ -3,6 +3,15 @@
 > 修改代码后请同步对应文档（约定见 [AGENTS.md](../AGENTS.md) 文档维护一节）。
 > AI/新成员从 [AGENTS.md](../AGENTS.md) 进入。
 
+## 使用与集成
+
+| 文档 | 内容 |
+|---|---|
+| [building.md](building.md) | CMake 构建、vcpkg 可选依赖、测试与基准 |
+| [cli.md](cli.md) | 脚本/字节码命令、编译诊断、退出码、REPL |
+| [embedding.md](embedding.md) | 作为库引入、宿主生命周期与类/属性/方法注册 |
+| [review.md](review.md) | 工程整理与运行时审查记录、验证范围 |
+
 ## 架构与设计
 
 | 文档 | 内容 |
@@ -10,7 +19,7 @@
 | [architecture.md](architecture.md) | Ciallang 架构设计：编译/执行流水线、模块职责、关键类、类型系统与 GC、与 TJSCompiler 的逐段对照 |
 | [bytecode/mapping.md](bytecode/mapping.md) | **TJS2 字节码 → Ciallang 内部指令的转译设计**（字节码兼容的实现蓝本：操作码映射表、寄存器映射、调用约定、常量池转换、风险清单） |
 
-- [本轮性能与验证](performance.md)：同机 Release 对照及验证范围（来源：`bench/*.tjs`、`src/vm/VMState.cpp`）。
+- [性能与验证记录](performance.md)：按日期保留的同机 Release 对照及验证范围。历史结果不代表当前构建结果。
 
 ## 优化与开发工具
 
@@ -46,3 +55,5 @@
 ## 任务追踪
 
 - [TODO.md](../TODO.md)：性能/正确性/语言特性缺口清单（改代码前先看）
+
+维护原则：使用说明放在 building/cli/embedding，当前实现放在架构与特性文档，历史测量放在 performance；会话交接、机器路径与临时协作状态不作为项目文档保存。

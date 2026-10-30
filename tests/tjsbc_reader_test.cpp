@@ -6,7 +6,7 @@
  * `TJSCompiler --dump script.tjs out.tjsbc` 生成（生成脚本见批次提交说明）。
  */
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <cstring>
 

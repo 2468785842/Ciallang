@@ -1155,7 +1155,7 @@ namespace cial::tjsbc {
             }
 
             chunk.setRegCount(regCount);
-            auto chunkGuard = rt.create<vm::Chunk>(std::move(chunk));
+            auto chunkGuard = std::move(chunk).toHeap(rt);
             auto *chunkPtr = chunkGuard.get();
             rt.addHandleVal(chunkPtr);
             _impl->roots.push_back(chunkPtr);
@@ -1254,9 +1254,9 @@ namespace cial::tjsbc {
                     MemberShapeMeta{ .name = nameAtom, .isVar = true },
                     ClassFieldMeta{});
             }
-            // initClassFields 契约：块以 Ret 结尾（空 var 表也要有，run0 不读越界码）
+            // initClassFields 契约：块以 Ret 结尾（空 var 表也要有，run 不读越界码）
             initChunk.emit<inter::Ret>(inter::Register{0});
-            auto initChunkGuard = rt.create<vm::Chunk>(std::move(initChunk));
+            auto initChunkGuard = std::move(initChunk).toHeap(rt);
             auto *initChunkPtr = initChunkGuard.get();
             auto initMetaGuard = rt.create<FuncMeta>(0, initChunkPtr, Vec<inter::LocalVariable>{});
             auto *initMeta = initMetaGuard.get();

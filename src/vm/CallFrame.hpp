@@ -13,6 +13,8 @@
  */
 #pragma once
 
+#include <utility>
+
 #include "vm/Chunk.hpp"
 #include "vm/FastRegisterPool.hpp"
 
@@ -72,10 +74,9 @@ namespace cial {
 
         CallFrame(CallFrame &&callFrame) noexcept :
             closure(callFrame.closure), chunk(callFrame.chunk), funcMeta(callFrame.funcMeta),
-            thisObj(std::move(callFrame.thisObj)), ret(callFrame.ret), pc(callFrame.pc), _pool(callFrame._pool),
-            _sp(callFrame._sp) {
-            new(&callFrame) CallFrame{};
-        }
+            thisObj(std::move(callFrame.thisObj)), thisData(callFrame.thisData), ret(callFrame.ret), pc(callFrame.pc),
+            actualArgc(callFrame.actualArgc), withDepth(callFrame.withDepth),
+            _pool(std::exchange(callFrame._pool, nullptr)), _sp(callFrame._sp) {}
 
         CallFrame &operator=(CallFrame &&callFrame) noexcept {
             if(this != &callFrame) {
@@ -93,7 +94,6 @@ namespace cial {
             if(_pool) {
                 _pool->maybeShrink(_sp);
             }
-            new(this) CallFrame{};
         }
 
         [[nodiscard]] u64 getSP() const noexcept { return _sp; }

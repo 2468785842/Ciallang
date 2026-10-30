@@ -1,6 +1,6 @@
 # 按需 SSA 分析
 
-`cial --dump-ssa script.tjs` 编译脚本并导出顶层与嵌套函数的 SSA 文本。它与 `--dump-cfg` 共用编译和函数遍历入口，不执行被分析脚本。默认 `IRGenerator::parseAst()` 优化管线不额外构造 SSA，现有 TAC 与字节码仍直接供解释器使用（`src/main.cpp`、`src/gen/IRGenerator.cpp`）。
+`cial --dump-ssa script.tjs` 编译脚本并导出顶层与嵌套函数的 SSA 文本。它与 `--dump-cfg` 共用编译和函数遍历入口，不执行被分析脚本。默认 `IRGenerator::parseAst()` 优化管线不额外构造 SSA，现有 TAC 与字节码仍直接供解释器使用（`src/cli/Application.cpp`、`src/cli/Compilation.cpp`、`src/gen/IRGenerator.cpp`）。
 
 `SsaBuilder` 基于基本块 CFG 构造直接支配者、支配树、支配边界和活跃性裁剪的 phi，再沿支配树解析每个寄存器使用点的到达定义及反向 def-use 链。phi 的输入对应前驱块顺序；循环需要同时保留进入循环前的定义与回边携带的定义。分析只读，不改写指令或重排异常区间（`src/gen/SSA.hpp`、`SSA.cpp`）。
 

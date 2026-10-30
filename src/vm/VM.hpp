@@ -95,17 +95,40 @@ namespace cial {
             Value _value;
 
         public:
-            Handle(Runtime *rt, const Value &value) noexcept : _rt(rt), _value(value) {
-                HandleConvert<T>::handleValue(rt, value);
+            Handle(Runtime *rt, const Value &value) : _rt(rt), _value(value) { retain(); }
+
+            Handle(const Handle &other) : Handle(other._rt, other._value) {}
+
+            Handle(Handle &&other) noexcept : _rt(std::exchange(other._rt, nullptr)), _value(std::move(other._value)) {}
+
+            Handle &operator=(const Handle &other) {
+                if(this != &other) {
+                    Handle copy{ other };
+                    std::swap(_rt, copy._rt);
+                    std::swap(_value, copy._value);
+                }
+                return *this;
             }
 
-            ~Handle() noexcept { HandleConvert<T>::releaseValue(_rt, _value); }
+            Handle &operator=(Handle &&other) noexcept {
+                if(this != &other) {
+                    Handle moved{ std::move(other) };
+                    std::swap(_rt, moved._rt);
+                    std::swap(_value, moved._value);
+                }
+                return *this;
+            }
+
+            ~Handle() noexcept {
+                if(_rt && _value.isObject())
+                    _rt->removeHandleVal(_value.asObject().value());
+            }
 
             [[nodiscard]] T get() const { return HandleConvert<T>::fromValue(_value); }
 
             T operator*() const { return get(); }
 
-            auto operator->() {
+            auto operator->() const {
                 if constexpr(std::is_same_v<T, Value>) {
                     return &_value;
                 } else if constexpr(std::is_pointer_v<T>) {
@@ -116,6 +139,12 @@ namespace cial {
                         "operator-> is only supported for Handle<Value> or Handle<T*> to access raw Value methods.");
                     return nullptr;
                 }
+            }
+
+        private:
+            void retain() {
+                if(_rt && _value.isObject())
+                    _rt->addHandleVal(_value.asObject().value());
             }
         };
 
@@ -131,10 +160,10 @@ namespace cial {
         // 原生代码同步调用脚本函数（TJS2 FuncCall 对应物）：Array.sort 比较器、
         // RegExp.replace 回调等"原生方法回调脚本"的统一底座。
         // 结构仿 eval：tmp 宿主帧承接返回值（reg0），不占用当前脚本帧的寄存器窗口；
-        // 嵌套 run0（entryStackTop 语义）。
+        // 嵌套 run（entryStackTop 语义）。
         // 回调异常：tmp 帧挂全区哨兵 throwHandler 截住 unwind（否则异常会恢复调用方
-        // 帧的 pc、在本次 run0 内执行其 catch 块，native 调用方控制流错乱）——
-        // 异常值落入哨兵 exValueReg(reg0)，func/tmp 帧由 run0 弹出（栈深比正常少 1，
+        // 帧的 pc、在本次 run 内执行其 catch 块，native 调用方控制流错乱）——
+        // 异常值落入哨兵 exValueReg(reg0)，func/tmp 帧由 run 弹出（栈深比正常少 1，
         // 以此判定），此处经 throwException 重新进入脚本异常协议向上传播
         Value callValue(const Value &callee, const size_t argCount, const Value *args) {
             if(!callee.isObject())
@@ -163,7 +192,7 @@ namespace cial {
             tmpChunk.toBytecode(); // 哨兵必须落进 bc 层 handlers 表：unwind 只查 bc 表，
                                    // 而哨兵表惰性编译由 FETCH_NEW_FRAME 触发、tmp 帧永不
                                    // 被派发执行——不显式编译哨兵形同虚设，异常会穿透直达
-                                   // 调用方帧的 handler（嵌套 run0 内执行其 catch，控制流错乱）
+                                   // 调用方帧的 handler（嵌套 run 内执行其 catch，控制流错乱）
             _vmState->allocCallFrame(&tmpChunk);
             _vmState->makeClosure();
             for(size_t i = 0; i < argCount; ++i)
@@ -173,9 +202,9 @@ namespace cial {
             fn->call(*_vmState, retReg, argCount);
             _vmState->makeClosure();
             const u32 stackTop = _vmState->context.stackTop();
-            _vmState->run0();
+            _vmState->run();
 
-            // 哨兵路径：func/tmp 帧均已被 run0 弹出（栈深 = 进入时 - 2）；
+            // 哨兵路径：func/tmp 帧均已被 run 弹出（栈深 = 进入时 - 2）；
             // 正常路径 Ret 只弹 func 帧（栈深 = 进入时 - 1，tmp 帧由 eval 同款平衡逻辑弹）
             if(_vmState->context.stackTop() == stackTop - 2) {
                 // 以专用载体解开 native 调用链（std::sort 等）；主循环 catch 接住后
@@ -237,7 +266,7 @@ namespace cial {
                 return Handle<T>{ &rt, Value{} };
             }
 
-            auto *evalChunk = _vmState->rt.create<vm::Chunk>(std::move(*chunk)).get();
+            auto evalChunk = std::move(*chunk).toHeap(rt);
 
             u16 retReg{ 0 };
             vm::Chunk tmpChunk{};
@@ -245,11 +274,11 @@ namespace cial {
 
             _vmState->allocCallFrame(&tmpChunk);
             _vmState->makeClosure();
-            _vmState->allocCallFrame(evalChunk, retReg);
+            _vmState->allocCallFrame(evalChunk.get(), retReg);
             _vmState->makeClosure();
             u32 stackTop = _vmState->context.stackTop();
             try {
-                _vmState->run0();
+                _vmState->run();
             } catch(...) {
                 // 未捕获脚本异常经 unwind 以 C++ 异常逃逸:
                 // 清理挂起状态(_pending/_exValue),否则毒害宿主的后续 eval
@@ -293,7 +322,7 @@ namespace cial {
 
             inter::IRGenerator codeGen{ r, rt, sourceFile };
 
-            OptReg retReg{};
+            OptReg retReg{ inter::Register{ 0xFFFF } };
             Opt<vm::Chunk> chunk = codeGen.parseAst(node, retReg);
 
             if(r.isFailed() || !chunk || !retReg || chunk->getRegCount() == 0 || chunk->getInstVec().empty()) {
@@ -304,10 +333,11 @@ namespace cial {
                 return Handle<T>{ &rt, Value{} };
             }
 
-            _vmState->allocCallFrame(&*chunk);
+            auto evalChunk = std::move(*chunk).toHeap(rt);
+            _vmState->allocCallFrame(evalChunk.get());
             _vmState->makeClosure();
             try {
-                _vmState->run0();
+                _vmState->run();
             } catch(...) {
                 _vmState->clearException();
                 throw;

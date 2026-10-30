@@ -86,6 +86,8 @@ namespace cial::syntax {
 
         [[nodiscard]] bool hasNext() const;
 
+        [[nodiscard]] bool incomplete() const noexcept { return _incomplete; }
+
         [[nodiscard]] size_t tokenSize() const { return _tokens.size(); }
 
         void peekToken(Token *&token) const { token = _tokens.front(); }
@@ -107,6 +109,7 @@ namespace cial::syntax {
 
         std::deque<Token *> _tokens{};
         bool _hasNext{ true };
+        bool _incomplete{};
 
         template <typename... Args>
         Token *makeToken(Args &&...args) {

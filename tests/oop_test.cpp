@@ -2,7 +2,7 @@
 // Created by LiDong on 2025/12/6.
 //
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "types/Class.hpp"
 #include "vm/VM.hpp"

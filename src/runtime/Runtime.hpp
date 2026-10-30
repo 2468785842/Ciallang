@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <ranges>
+#include <utility>
 
 #include "AtomTable.hpp"
 
@@ -164,17 +165,32 @@ namespace cial {
 
     private:
         friend class inter::IRGenerator;
+
+        size_t _compilationDepth{};
+        Vec<MarkSweepHeader *> _compilationRoots;
+
+        void beginCompilation() noexcept { ++_compilationDepth; }
+
+        void endCompilation() noexcept {
+            if(--_compilationDepth == 0) {
+                for(auto *root : _compilationRoots)
+                    removeHandleVal(root);
+                _compilationRoots.clear();
+            }
+        }
+
         template <typename T, typename... Args>
             requires std::is_base_of_v<MarkSweepHeader, T>
-        T *createNoGC(Args &&...args) {
-            if(!markSweep._nextFree || !markSweep._nextFree->_isFree) {
-                markSweep.find();
-                if(!markSweep._nextFree) {
-                    return nullptr;
-                }
+        T *createCompilationObject(Args &&...args) {
+            auto object = create<T>(std::forward<Args>(args)...);
+            addHandleVal(object.get());
+            try {
+                _compilationRoots.push_back(object.get());
+            } catch(...) {
+                removeHandleVal(object.get());
+                throw;
             }
-
-            return allocate<T>(std::forward<Args>(args)...);
+            return object.get();
         }
     };
 
@@ -192,6 +208,28 @@ namespace cial {
         ~RootGuard() {
             if(_ptr)
                 _rt->removeHandleVal(_ptr);
+        }
+
+        RootGuard(const RootGuard &other) : RootGuard(other._rt, other._ptr) {}
+
+        RootGuard(RootGuard &&other) noexcept : _rt(other._rt), _ptr(std::exchange(other._ptr, nullptr)) {}
+
+        RootGuard &operator=(const RootGuard &other) {
+            if(this != &other) {
+                RootGuard copy{ other };
+                std::swap(_rt, copy._rt);
+                std::swap(_ptr, copy._ptr);
+            }
+            return *this;
+        }
+
+        RootGuard &operator=(RootGuard &&other) noexcept {
+            if(this != &other) {
+                RootGuard moved{ std::move(other) };
+                std::swap(_rt, moved._rt);
+                std::swap(_ptr, moved._ptr);
+            }
+            return *this;
         }
 
         T *get() const { return _ptr; }

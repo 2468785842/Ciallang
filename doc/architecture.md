@@ -28,16 +28,14 @@
               Chunk               TAC 指令序列 + 常量池 + try 表 + 寄存器数
                     └──────────────────────────────────────────────────────────────────────┘
                     │
-        ┌───────────┴───────────────┐
-        ▼                           ▼
-  VMState::run0()（唯一路径）  Chunk::toBytecode()（惰性、幂等）→ Vec<u8>
-  TAC 多态解释执行                 │
-  （main.cpp / VM::eval）          ▼
-                          VMState::run0() 扁平字节码解释执行
-                          （main0.cpp / 部分测试；TODO：编码器 16/55）
+                    ▼
+              Chunk::toBytecode()   惰性生成 Vec<u8>，同时换算跳转、异常表与行号
+                    │
+                    ▼
+              VMState::run()        派发字节码指令，维护调用帧与异常展开
 ```
 
-两条执行路径语义一致；`run0()` 是性能路径（TODO.md 一节的首要任务）。
+源码和 TJS2 字节码转译均生成 Chunk，执行器与异常处理共用 `src/vm/VMState.cpp`。
 
 ## 2. 模块职责
 
@@ -66,14 +64,14 @@
   作用域栈（`_localVars` 即 FuncMeta 局部变量表）、循环 break/continue 标签回填、
   函数/类/属性的元数据（FuncMeta/ClassMeta/PropMeta）生成。
 - `Instruction.hpp/cpp`：**95 条 TAC 指令**（X-macro 生成类族及变长操作数子类），仅保留 dump；
-  编码由 `src/vm/Bytecode.cpp` 完成，执行统一走 `VMState::run0()`。
+  编码由 `src/vm/Bytecode.cpp` 完成，执行统一走 `VMState::run()`。
 - `Register/Label/ConstIdx`：`%n`、`@n`、`*n` 强类型操作数。
 - `ControlFlowGraph` + `Optimizer`：CFG/BasicBlock、整数常量折叠、死 LoadImm 清理与比较/Test 融合，
   由 `src/gen/IRGenerator.cpp` 的 `parseAst()` 接入；NOP 压缩同步重映射跳转、try 表与行号。
 
 ### 2.4 `src/vm/` — 执行引擎
 
-- `VMState`：解释器核心。`run0()`（扁平字节码 switch，唯一执行路径；多态 `run()` 已删除）；
+- `VMState`：解释器核心。字节码派发与调用帧调度；
   全局/this/闭包名字解析（`globalHas/getThis/setThis/getUpVal`）；异常 `unwind()`。
 - `Chunk`：编译产物容器（指令/常量池/ThrowHandler 表/寄存器数/惰性 `_code`）。
 - `Bytecode`：TAC→u8 编码器（uLEB128/sLEB128+ZigZag/定宽小端；跳转绝对地址回填）。
@@ -82,10 +80,11 @@
 - `Constant.hpp`：常量池条目 + `FuncMeta`（名字/arity/chunk/localVars）、`ClassMeta`
   （slot 化成员表 + 按名继承）、`PropMeta`（getter/setter）。
 - `VM.hpp`：宿主 API 门面，`eval/evalExpr<T>` 返回 GC 根保护的 `Handle<T>`。
+- `src/cli/`：argparse 参数校验、编译诊断、脚本/字节码执行、REPL；`src/main.cpp` 负责进程入口。
 
 ### 2.5 `src/runtime/` + `src/gc/` — 运行时
 
-- `Runtime`：全局单例式运行时——AtomTable、MarkSweep GC（固定 512B 节点 × 自由链表）、
+- `Runtime`：运行时资源所有者——AtomTable、MarkSweep GC（固定 512B 节点 × 自由链表）、
   GC 根句柄集合、`create<T>()`（返回 `RootGuard<T>`，析构摘根——**坑位见 AGENTS.md**）。
 - `Context`：执行上下文——调用栈（`_callStack`，深度上限 1024）、寄存器池、GlobalObject、
   原生方法注册表。

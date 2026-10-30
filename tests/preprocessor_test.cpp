@@ -2,7 +2,7 @@
 // Created by LiDong on 2026/1/14.
 //
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
@@ -168,4 +168,29 @@ TEST_CASE("preprocessor complex nested expressions") {
     )"_str);
 
     REQUIRE(**vm.evalExpr<String *>("n"_str) == "complex nested works"_str);
+}
+
+TEST_CASE("preprocessor integer boundaries and invalid directives", "[fuzz][preprocessor]") {
+    PreProcessor pp;
+    pp.onSet("a=2147483647+1"_str);
+    REQUIRE(pp.getVar("a"_str) == -2147483647 - 1);
+    pp.onSet("a=-2147483648/-1"_str);
+    REQUIRE(pp.getVar("a"_str) == -2147483647 - 1);
+    pp.onSet("a=-2147483648%-1"_str);
+    REQUIRE(pp.getVar("a"_str) == 0);
+    pp.onSet("a=0xffffffff+2"_str);
+    REQUIRE(pp.getVar("a"_str) == 1);
+    pp.onSet("a=2147483647*2147483647"_str);
+    REQUIRE(pp.getVar("a"_str) == 1);
+    REQUIRE_THROWS_AS(pp.onSet("a=1%0"_str), std::runtime_error);
+    REQUIRE_THROWS_AS(pp.onSet("a=1/0"_str), std::runtime_error);
+    for(const auto &input : { "@set(x=1/0)", "@set(x=1%0)", "@if(0x)", "@set(a=)", "class 0 { function f() {} }",
+                              "class A { function 0() {} }", "property foo {" }) {
+        Common::SourceFile source;
+        Common::Result result;
+        source.load(result, input);
+        syntax::Parser parser{ source, pp };
+        REQUIRE_NOTHROW(parser.parse(result));
+        REQUIRE(result.isFailed());
+    }
 }

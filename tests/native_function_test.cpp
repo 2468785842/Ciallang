@@ -4,7 +4,7 @@
  * 本地函数单元测试
  */
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "StderrCapture.hpp"
 

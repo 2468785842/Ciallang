@@ -347,7 +347,8 @@ namespace cial::syntax {
 
     AstNode *Parser::parse(Result &r) {
         auto *global = _astBuilder.makeNode<BlockStmtNode>();
-        parseScope(r, global);
+        if(!parseScope(r, global) && !r.isFailed())
+            r.error("incomplete or invalid declaration");
         return global;
     }
 
@@ -356,6 +357,8 @@ namespace cial::syntax {
         // 门控用缓冲计数而非 _lexer.hasNext()：深前视（如调用实参的 `*` 展开扫描）
         // 会提前把源读到 EOF 翻转 hasNext，若以此退出循环，块体将整体不解析
         while(_lexer.tokenSize() > 0 || _lexer.hasNext()) {
+            if(!lookAhead(r, 1))
+                break;
             if(peek(r, terminatorToken))
                 break;
             auto *statement = parseDeclaration(r);
@@ -513,6 +516,10 @@ namespace cial::syntax {
     /////////////////////////////////////////////////////////////////
 
     DeclNode *PropertyDeclParser::parse(Result &r, Parser *parser, Token *token) const {
+        if(!parser->peek(r, TokenType::Identifier)) {
+            parser->error(r, "property name must be identifier", token->location);
+            return nullptr;
+        }
         Token identifier{};
         if(!parser->consume(r, identifier))
             return nullptr;
@@ -618,7 +625,7 @@ namespace cial::syntax {
 
             Token *t{};
             parser->current(r, t);
-            parser->error(r, "expect getter or setter", t->location);
+            parser->error(r, "expect getter or setter", t ? t->location : token->location);
             return nullptr;
         }
 
@@ -692,6 +699,10 @@ namespace cial::syntax {
     }
 
     DeclNode *FunctionDeclParser::parse(Result &r, Parser *parser, Token *token) const {
+        if(!parser->peek(r, TokenType::Identifier)) {
+            parser->error(r, "function name must be identifier", token->location);
+            return nullptr;
+        }
         Token identifier{};
         if(!parser->consume(r, identifier))
             return nullptr;
@@ -727,6 +738,10 @@ namespace cial::syntax {
     }
 
     DeclNode *ClassDeclParser::parse(Result &r, Parser *parser, Token *token) const {
+        if(!parser->peek(r, TokenType::Identifier)) {
+            parser->error(r, "class name must be identifier", token->location);
+            return nullptr;
+        }
         Token identifier{};
         if(!parser->consume(r, identifier))
             return nullptr;

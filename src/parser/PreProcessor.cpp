@@ -14,6 +14,9 @@
 
 #include "PreProcessor.hpp"
 
+#include <bit>
+#include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -21,6 +24,10 @@
 #include "types/String.hpp"
 
 namespace {
+    // TJS preprocessor values are signed 32-bit integers. Express wrapping
+    // through unsigned arithmetic instead of overflowing signed C++ integers.
+    int wrap(const std::uint32_t value) { return std::bit_cast<std::int32_t>(value); }
+
     enum class TokenKind {
         End,
 
@@ -99,7 +106,7 @@ namespace {
                     // ---------- hexadecimal ----------
                     if(n == 'x' || n == 'X') {
                         pos += 2; // skip 0x
-                        int v = 0;
+                        std::uint32_t v = 0;
                         bool hasDigit = false;
 
                         while(pos < src.length() && std::isxdigit(src[pos])) {
@@ -111,13 +118,13 @@ namespace {
                         if(!hasDigit)
                             throw std::runtime_error("invalid hex literal");
 
-                        return { TokenKind::Number, v };
+                        return { TokenKind::Number, wrap(v) };
                     }
 
                     // ---------- binary ----------
                     if(n == 'b' || n == 'B') {
                         pos += 2; // skip 0b
-                        int v = 0;
+                        std::uint32_t v = 0;
                         bool hasDigit = false;
 
                         while(pos < src.length() && (src[pos] == '0' || src[pos] == '1')) {
@@ -128,16 +135,16 @@ namespace {
                         if(!hasDigit)
                             throw std::runtime_error("invalid binary literal");
 
-                        return { TokenKind::Number, v };
+                        return { TokenKind::Number, wrap(v) };
                     }
                 }
 
                 // ---------- decimal ----------
-                int v = 0;
+                std::uint32_t v = 0;
                 while(pos < src.length() && std::isdigit(src[pos])) {
                     v = v * 10 + (src[pos++] - '0');
                 }
-                return { TokenKind::Number, v };
+                return { TokenKind::Number, wrap(v) };
             }
 
             // symbol
@@ -295,7 +302,7 @@ namespace {
                     return ExprValue::r(+parseExpr(100).value);
 
                 case TokenKind::Minus:
-                    return ExprValue::r(-parseExpr(100).value);
+                    return ExprValue::r(wrap(0u - static_cast<std::uint32_t>(parseExpr(100).value)));
 
                 case TokenKind::Not:
                     return ExprValue::r(!parseExpr(100).value);
@@ -352,19 +359,30 @@ namespace {
                 case TokenKind::GE:
                     return ExprValue::r(left.value >= parseExpr(lbp(t.kind)).value);
                 case TokenKind::Plus:
-                    return ExprValue::r(left.value + parseExpr(lbp(t.kind)).value);
+                    return ExprValue::r(wrap(static_cast<std::uint32_t>(left.value) +
+                                             static_cast<std::uint32_t>(parseExpr(lbp(t.kind)).value)));
                 case TokenKind::Minus:
-                    return ExprValue::r(left.value - parseExpr(lbp(t.kind)).value);
+                    return ExprValue::r(wrap(static_cast<std::uint32_t>(left.value) -
+                                             static_cast<std::uint32_t>(parseExpr(lbp(t.kind)).value)));
                 case TokenKind::Mul:
-                    return ExprValue::r(left.value * parseExpr(lbp(t.kind)).value);
+                    return ExprValue::r(wrap(static_cast<std::uint32_t>(left.value) *
+                                             static_cast<std::uint32_t>(parseExpr(lbp(t.kind)).value)));
                 case TokenKind::Div: {
                     const ExprValue &r = parseExpr(lbp(t.kind));
                     if(r.value == 0)
                         throw std::runtime_error("divide by zero");
+                    if(left.value == std::numeric_limits<int>::min() && r.value == -1)
+                        return ExprValue::r(left.value);
                     return ExprValue::r(left.value / r.value);
                 }
-                case TokenKind::Mod:
-                    return ExprValue::r(left.value % parseExpr(lbp(t.kind)).value);
+                case TokenKind::Mod: {
+                    const auto right = parseExpr(lbp(t.kind)).value;
+                    if(right == 0)
+                        throw std::runtime_error("divide by zero");
+                    if(left.value == std::numeric_limits<int>::min() && right == -1)
+                        return ExprValue::r(0);
+                    return ExprValue::r(left.value % right);
+                }
                 default:
                     break;
             }

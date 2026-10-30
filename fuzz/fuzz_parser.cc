@@ -1,25 +1,23 @@
-// ReSharper disable CppDFAConstantFunctionResult
-// ReSharper disable CppDFAUnreachableCode
+#include <cstdlib>
+#include <string>
 #include "common/Result.hpp"
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"
-#include "runtime/Context.hpp"
-#include "runtime/Runtime.hpp"
+#include "parser/PreProcessor.hpp"
 
 using namespace cial;
 
 extern "C" int LLVMFuzzerTestOneInput(const u8 *data, size_t size) {
-    if(size == 0)
-        return 0;
     std::string input{ reinterpret_cast<const char *>(data), size };
 
-    Runtime rt{};
-    Context context{ rt };
+    PreProcessor preProcessor;
     Common::SourceFile sourceFile;
     Common::Result r{};
     sourceFile.load(r, input);
+    if(r.isFailed())
+        return 0;
 
-    syntax::Parser parser{ sourceFile, context.pp() };
+    syntax::Parser parser{ sourceFile, preProcessor };
     try {
         parser.parse(r);
     } catch(...) {

@@ -11,6 +11,7 @@
 ## 🚧 开发进度
 
 ### 🔧 核心特性
+  * [x] `REPL` 交互运行（多行输入、表达式回显、共享全局与错误恢复；见 [doc/cli.md](doc/cli.md)）
   * [x] `JIT` 即时编译基础（可选 x64 整数原生代码后端，默认关闭；`--jit`，范围与构建见 [doc/jit.md](doc/jit.md)）
   * [x] `CFG` 控制流图生成（基本块级，含跳转/终止/try 隐式异常边，`src/gen/ControlFlowGraph.cpp`）
   * [x] `SSA` 静态单赋值构造（按需分析：支配树/pruned phi/重命名/def-use 链，`--dump-ssa`，见 [doc/ssa.md](doc/ssa.md)；执行 IR 尚未切换为 SSA，基于 SSA 的优化待后续）
@@ -106,52 +107,44 @@
 * [x] RegExp // /pattern/flags 字面量 + test/match/exec/compile/replace(含函数回调)/split + 全部匹配状态属性(码点语义) + RegExp.last 静态属性 + new RegExp(pattern, flags) 构造器
 * [x] String // charAt/indexOf/toUpperCase/toLowerCase/substring/sprintf/replace(g 全局)/split/escape/trim/reverse/repeat/length
 
-## 编译与运行
+## 构建与使用
 
-1. 克隆项目到本地：
-   ```sh
-   git clone https://github.com/2468785842/Ciallang.git
-   ```
-2. 安装vcpkg设置VCPKG_ROOT变量
+要求 CMake 3.25+、C++20 编译器与 vcpkg；预设使用 Ninja，Linux 预设使用 Clang。
+设置 `VCPKG_ROOT` 后：
 
-3. 使用 CMake 编译：
-    - Windows
-       ```sh
-       cmake --preset="Windows Debug"
-       cmake --build --preset="Windows Debug"
-       ```
-    - Linux
-       ```sh
-       cmake --preset="Linux Debug"
-       cmake --build --preset="Linux Debug"
-       ```
-4. 运行解释器：
-   ```sh
-   ./cial <script-file>
-   ```
-5. 运行 TJS2 编译产物（字节码兼容，M1–M4 完成）：
-   ```sh
-   ./cial --tjsbc <compiled.tjsbc>
-   ```
-   加载 TJSCompiler 编译的 `"TJS2" "100\0"` 字节码文件，转译为内部指令后由同一
-   VM 执行。kirikiri 官方语料 test_class / test_function / test_misc / test_variant /
-   test_with 等全部通过（详见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)）。
+```sh
+cmake --preset "Linux Debug"
+cmake --build --preset "Linux Debug"
+ctest --preset "Linux Debug"
+./build/Linux/Debug/cial script.tjs
+./build/Linux/Debug/cial --repl
+./build/Linux/Debug/cial --tjsbc program.tjsbc
+```
+
+Windows/macOS 使用 `Windows Debug` / `MacOS Debug` 预设，Windows 产物带 `.exe`。
+无输入文件也会进入 REPL，支持多行代码、表达式回显和会话共享变量。
+运行成功返回 `0`，编译/运行失败返回 `1`，参数错误返回 `2`。
+`--help` 查看参数，`--time` 显式开启计时并写到 stderr。
+
+作为 CMake 子项目引入时默认只构建库，目标为 `Ciallang::Ciallang`。
+CLI 的 argparse、测试的 Catch2、JIT 的 asmjit 分别由 `cli`、`tests`、`jit` vcpkg feature 控制。
+构建开关和依赖见 [构建指南](doc/building.md)，宿主 API 见 [库集成](doc/embedding.md)，
+全部命令与 REPL 见 [命令行指南](doc/cli.md)。
 
 ### ⚡ 基准与 TJS2 对拍
 
-内置双引擎基准与兼容性对拍设施（TJSCompiler 参考实现路径经
+内置双引擎基准与兼容性对拍设施。TJSCompiler 参考实现路径
 默认从当前项目的兄弟目录 `../TJSCompiler` 探测；可用环境变量
 `CIAL_TJS_ROOT` 或 CMake 缓存变量 `TJS_ROOT` 覆盖，也可用 `CIAL_TJS_EXE`
-指定可执行文件。相对路径均以 Ciallang 源码根目录为基准解析，见 `CMakeLists.txt`）：
+指定可执行文件。相对路径均以 Ciallang 源码根目录为基准解析，见 `CMakeLists.txt`：
 
 ```sh
 # 基准（bench/*.tjs 内置 throw 自校验，TJS→Ciallang 交替执行取 min/mean）。
-# 本机预设 "Windows Local Bench" 定义在 CMakeUserPresets.json（不入库）；
-# 也可手动：cmake -B build/Windows/Bench -DCIAL_BUILD_BENCH=ON 后构建
-cmake --preset "Windows Local Bench" && cmake --build --preset "Windows Local Bench"
+cmake -S . -B build/bench -DCMAKE_BUILD_TYPE=Release -DCIAL_BUILD_BENCH=ON
+cmake --build build/bench --target bench
 
 # TJS2 兼容性对拍报告（tests/test_files/tjs2 语料双引擎 stdout 语义比对）
-cmake --build build/Windows/Bench --target conformance-report
+cmake --build build/bench --target conformance-report
 ```
 
 报告落盘 `bench/results/`。同机实测、统计口径与性能缺口见 [doc/performance.md](doc/performance.md)；不同机器和不同批次的历史比例不可直接比较。可选 JIT 与尾递归当前以受限子集的正确性为主，尚不能视为全程序性能追平。

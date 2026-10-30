@@ -24,4 +24,14 @@ jobs:
       - name: Build tests
         run: cmake --build build/${{ matrix.platform }}/${{ matrix.configuration }} --target cial CiallangTests --parallel 4
       - name: Test
-        run: ctest --test-dir build/${{ matrix.platform }}/${{ matrix.configuration }}/tests --output-on-failure
+        run: ctest --test-dir build/${{ matrix.platform }}/${{ matrix.configuration }} --output-on-failure
+      - name: Configure library consumer
+        if: matrix.os == 'ubuntu-latest' && matrix.configuration == 'Release'
+        shell: bash
+        run: |
+          cmake -S tests/embedding -B build/embedding -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_MANIFEST_INSTALL=OFF \
+            -DVCPKG_INSTALLED_DIR="$PWD/build/Linux/Release/vcpkg_installed"
+          cmake --build build/embedding --parallel 4
+          ctest --test-dir build/embedding --output-on-failure

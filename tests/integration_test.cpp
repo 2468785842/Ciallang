@@ -2,11 +2,11 @@
  * Copyright (c) 2024/12/18
  *
  * 集成测试 - 完整脚本执行流程
- * 源码 → Parser → IRGenerator → run0 扁平字节码 → VM，多特性组合场景
+ * 源码 → Parser → IRGenerator → run 扁平字节码 → VM，多特性组合场景
  * 经 VM 门面端到端执行后断言全局状态（与 interpreter_test 的单特性/错误路径互补）。
  */
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "stdlib/ExceptionLib.hpp"
 #include "vm/VM.hpp"

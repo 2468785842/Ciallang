@@ -38,6 +38,8 @@
 
 ## 四、工程化
 
+- [x] 2026-10-30 工程与运行时整理：字节码入口、统一原生类注册、argparse/REPL、库模式可选依赖、CLI 职责拆分；修复编译阶段 GC、句柄复制、调用帧资源、proxy 保根、setter-only 属性和输入诊断。验证范围见 [doc/review.md](doc/review.md)。
+
 - [x] Windows DLL 部署：Windows 预设改用 `x64-windows-static` 与静态 CRT，移除手动复制 DLL 的需求，见 `CMakePresets.json`。CI Windows 构建已验证。
 - [x] Debug/Release CI：新增 Linux/macOS/Windows 六配置，构建 CLI 和测试并运行 CTest，见 `.github/workflows/ci.yml`。2026-10-29 首次推送运行后修复三处移植性问题（缺 `<iterator>/<algorithm>/<cstring>/<limits>` 直接包含、LP64 下 `%lld` 格式匹配、Windows CTest 非 ASCII 用例名按 ANSI 代码页转码致过滤器失配→改单条测试跑整个套件），六配置全绿。
 - [x] Release 缓存防护：配置阶段拒绝缺少优化标志的 Release 缓存；空标志配置失败已验证，见 `CMakeLists.txt`。
@@ -76,5 +78,5 @@
 - 2026-10-24 with 语句批次（WithPush/WithPop/GetWith + 裸词链）；Array/Dictionary 容器批次（字面量/下标/方法表）；property 引用批次（`&`/`*`、成员后缀 `++`）
 - 2026-10-24 兼容性批次：前缀 `++ -- # $ delete`、const 声明、instanceof、Exception 内建类（TJS 源自举）、原生异常转脚本可捕获、默认参数 TestVoid 守卫等 17 项
 - 2026-10-22 语法批次（`^ | &` 及复合赋值、后缀 if、typeof、(int) 转型、octet 字面量、函数提升、catch()）+ 二轮热点 + 崩溃修复（generateFuncMeta、未捕获异常静默 terminate、异常后状态残留）
-- 2026-10-21 run0 扁平字节码唯一路径 + GC 根体系（MarkRootProvider + 6 处标记缺陷）+ Value SharedPayload；bench/ 对拍与 CMake 化基准
+- 2026-10-21 字节码执行 + GC 根体系（MarkRootProvider + 6 处标记缺陷）+ Value SharedPayload；bench/ 对拍与 CMake 化基准
 - 2026-10 上旬：Ret 惰性 Err、整数快路径、for(var)/增减运算符、Atom 跨 Runtime 缓存、FastRegisterPool `_sp`

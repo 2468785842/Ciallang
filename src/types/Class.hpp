@@ -85,8 +85,6 @@ namespace cial {
         explicit DataObject(vm::VMState *vmState, ClassObject *klass) :
             _vmState(vmState), _class(klass), _finalizeAtom(vmState->rt.wkAtoms.finalize) {}
 
-        // GC sweep 批量析构时不能触发 finalize：那会在回收器内部向解释器压入
-        // 无人执行的调用帧（旧多态执行路径恰好会被外层循环顺带执行，掩盖了问题）。
         // GC 终结走保活队列，在 VM 安全点执行；显式 invalidate 保持同步调用。
         ~DataObject() noexcept override = default;
 

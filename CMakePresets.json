@@ -108,5 +108,75 @@
         "CMAKE_BUILD_TYPE": "Release"
       }
     }
+  ],
+  "buildPresets": [
+    {
+      "name": "Linux Debug",
+      "configurePreset": "Linux Debug"
+    },
+    {
+      "name": "Linux Release",
+      "configurePreset": "Linux Release"
+    },
+    {
+      "name": "MacOS Debug",
+      "configurePreset": "MacOS Debug"
+    },
+    {
+      "name": "MacOS Release",
+      "configurePreset": "MacOS Release"
+    },
+    {
+      "name": "Windows Debug",
+      "configurePreset": "Windows Debug"
+    },
+    {
+      "name": "Windows Release",
+      "configurePreset": "Windows Release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "Linux Debug",
+      "configurePreset": "Linux Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "Linux Release",
+      "configurePreset": "Linux Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "MacOS Debug",
+      "configurePreset": "MacOS Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "MacOS Release",
+      "configurePreset": "MacOS Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "Windows Debug",
+      "configurePreset": "Windows Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "Windows Release",
+      "configurePreset": "Windows Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
   ]
 }

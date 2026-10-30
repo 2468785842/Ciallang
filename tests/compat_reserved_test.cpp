@@ -4,7 +4,7 @@
  * 保留字与文档性语法的行为锁定测试（对齐原版 TJS2 实测行为）
  */
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "common/SourceFile.hpp"
 #include "parser/Parser.hpp"

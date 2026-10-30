@@ -2,7 +2,7 @@
 // Created by LiDong on 2026/1/23.
 //
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "vm/VM.hpp"
 #include "stdlib/ExceptionLib.hpp"

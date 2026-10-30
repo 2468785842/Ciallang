@@ -1,4 +1,4 @@
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"

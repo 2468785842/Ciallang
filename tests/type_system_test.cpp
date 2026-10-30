@@ -5,7 +5,7 @@
  * 显式构造 / is* 谓词 / as* 转换（TJS2 语义）/ 算术与位运算）
  */
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "types/Octet.hpp"
 #include "types/Value.hpp"

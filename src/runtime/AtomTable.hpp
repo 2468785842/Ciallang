@@ -48,11 +48,7 @@ namespace cial {
             _atoms.push_back(new AtomEntry{ 0, 0, new String{} }); // Reserve index 0 as invalid
         }
 
-        ~AtomTable() {
-            for(auto [v] : _handleAtoms) {
-                delete _atoms[v];
-            }
-        }
+        ~AtomTable() { clearOwned(); }
 
         AtomTable(const AtomTable &) = delete;
         AtomTable &operator=(const AtomTable &) = delete;
@@ -62,6 +58,7 @@ namespace cial {
 
         AtomTable &operator=(AtomTable &&rhs) noexcept {
             if(this != &rhs) {
+                clearOwned();
                 _handleAtoms = std::move(rhs._handleAtoms);
                 _atoms = std::move(rhs._atoms);
                 _map = std::move(rhs._map);
@@ -76,6 +73,13 @@ namespace cial {
         [[nodiscard]] AtomEntry *get(Atom a) const;
 
     private:
+        void clearOwned() noexcept {
+            for(auto [v] : _handleAtoms)
+                delete _atoms[v];
+            if(!_atoms.empty())
+                delete _atoms.front(); // reserved invalid atom is outside the GC pool
+        }
+
         Vec<Atom> _handleAtoms{};
         Vec<AtomEntry *> _atoms{}; // index = Atom, atoms[0] = nullptr
         Map<u64, std::vector<Atom>> _map{}; // key to list of Atoms for collision handling

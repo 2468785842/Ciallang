@@ -12,9 +12,11 @@
  *
  */
 
-#include <algorithm>
-#include <fmt/format.h>
 #include "Lexer.hpp"
+#include <algorithm>
+#include <bit>
+#include <fmt/format.h>
+#include <stdexcept>
 
 #include "OperatorTrie.hpp"
 
@@ -123,11 +125,18 @@ namespace cial::syntax {
 
         // preprocessor
         if(enablePreProcessor && rune == '@') {
-            while(!_sourceFile.eof()) {
-                if(processor()) {
-                    continue;
+            const auto start = getRowCol(_sourceFile.pos());
+            try {
+                while(!_sourceFile.eof()) {
+                    if(processor()) {
+                        continue;
+                    }
+                    break;
                 }
-                break;
+            } catch(const std::runtime_error &error) {
+                token = makeToken(TokenType::Error, String{ error.what() });
+                patchTokenLoc(*token, start, getRowCol(_sourceFile.pos()));
+                return false;
             }
 
             rune = read();
@@ -509,18 +518,24 @@ namespace cial::syntax {
             auto blockCount = 1;
 
             while(!_sourceFile.eof()) {
-                const i32 ch = read();
-                if(ch == '/' && read(false) == '*') {
-                    blockCount++;
-                    continue;
-                }
-
-                if(ch == '*' && read(false) == '/') {
-                    if(--blockCount == 0)
-                        break;
+                const i32 ch = read(false);
+                if(ch == '/' || ch == '*') {
+                    const i32 next = read(false);
+                    if(ch == '/' && next == '*') {
+                        ++blockCount;
+                    } else if(ch == '*' && next == '/') {
+                        if(--blockCount == 0)
+                            break;
+                    } else {
+                        rewindOneChar();
+                    }
                 }
             }
-
+            if(blockCount != 0) {
+                _incomplete = true;
+                token = makeToken(TokenType::Error, "unterminated block comment"_str);
+                return false;
+            }
             token = makeToken(TokenType::BlockComment);
             return true;
         }
@@ -556,6 +571,7 @@ namespace cial::syntax {
     // 保证编码无歧义），NewRegExp 处解码。TJS2 flags：g=全局、i=忽略大小写、l=忽略
     bool Lexer::regexConstVal(Token *&token) {
         std::string pattern;
+        bool closed = false;
         // case '/' 的 peek+双 rewind 把 '/' 退了回来：这里先消费它
         if(read(false) != '/') {
             rewindOneChar();
@@ -569,6 +585,7 @@ namespace cial::syntax {
                 return false;
             }
             if(rune == '/') {
+                closed = true;
                 break;
             }
             if(rune == 0x5C) { // backslash：转义序列原样保留
@@ -592,6 +609,11 @@ namespace cial::syntax {
                 const auto encoded = utf8Encode(rune);
                 pattern.append(reinterpret_cast<const char *>(encoded.data), encoded.width);
             }
+        }
+
+        if(!closed) {
+            token = makeToken(TokenType::Error, "unterminated regex literal"_str);
+            return false;
         }
 
         // flags（TJS2: g/i/l）：读标识符尾巴，未知字母忽略（与 TJS2 一致）
@@ -672,8 +694,9 @@ namespace cial::syntax {
                     return false;
                 }
                 while(isdigit(num)) {
-                    bit *= 10;
-                    bit += num - '0';
+                    // Beyond this bound every finite double has already
+                    // overflowed/underflowed; keep consuming without int UB.
+                    bit = std::min(1000000, bit * 10 + num - '0');
                     num = read(false);
                 }
                 // 终止符不在此回退：break 出循环后函数末尾有统一 rewindOneChar
@@ -774,7 +797,7 @@ namespace cial::syntax {
                 }
                 int e = 0;
                 for(; i < decimalStr.length() && isdigit(static_cast<unsigned char>(decimalStr[i])); ++i)
-                    e = e * 10 + (decimalStr[i] - '0');
+                    e = std::min(1000000, e * 10 + (decimalStr[i] - '0'));
                 exp2 = neg ? -e : e;
                 break;
             } else {
@@ -790,12 +813,12 @@ namespace cial::syntax {
 
     bool Lexer::parseNonDecimalInteger(Token *&token, const std::string &decimalStr, i8 (*validDigits)(char),
                                        const i8 baseBits) {
-        Integer v = 0;
+        UInteger v = 0;
         for(const auto decimal : decimalStr) {
             v <<= baseBits;
             v += validDigits(decimal);
         }
-        token = makeToken(TokenType::ConstVal, v);
+        token = makeToken(TokenType::ConstVal, std::bit_cast<Integer>(v));
         return true;
     }
 
@@ -847,8 +870,8 @@ namespace cial::syntax {
                 break;
             }
             ch = static_cast<char>(read(false));
-        } while(validDigits(ch) != -1 || ch == expMark[0] || ch == expMark[1] ||
-                (!expFound && ch == '.') || (expFound && isdigit(ch)));
+        } while(validDigits(ch) != -1 || ch == expMark[0] || ch == expMark[1] || (!expFound && ch == '.') ||
+                (expFound && isdigit(ch)));
         // 循环条件以 validDigits 为权威：旧条件用固定十进制字符集（+".Pp"），
         // 十六进制字母 A-F/a-f 不在其中——0x1.07CCp14 解析到 'C' 即中断变标识符
 
@@ -1122,6 +1145,7 @@ namespace cial::syntax {
         }
 
         if(strPsState == TemplateStringContext::State::None) {
+            _incomplete = true;
             token = makeToken(TokenType::Error, "string value need close"_str);
         } else {
             token = makeToken(TokenType::ConstVal, String{ str.str() });

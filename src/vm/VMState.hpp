@@ -42,7 +42,7 @@ namespace cial::vm {
     // 脚本异常载体：VM::callValue 的回调异常（哨兵截获后）以此 C++ 异常解开
     // native 调用链（std::sort 等），主循环接住后转 _pending+unwind 恢复脚本
     // try/catch——不走 throwException+runtime_error 组合（那会被主循环
-    // 「传播中不吞噬」分支直接重抛出 run0，外层脚本 handler 永远接不到）
+    // 「传播中不吞噬」分支直接重抛出 run，外层脚本 handler 永远接不到）
     struct ScriptExceptionCarrier {
         Value value{};
     };
@@ -53,9 +53,11 @@ namespace cial::vm {
         Context &context;
 
         explicit VMState(Context &context) : rt(context.rt()), context(context) {}
+        VMState(const VMState &) = delete;
+        VMState &operator=(const VMState &) = delete;
 
-        void run0();
-        // 借用记录器；调用方保证它覆盖所有 run0（含原生回调）的执行期。
+        void run();
+        // 借用记录器；调用方保证它覆盖所有 run（含原生回调）的执行期。
         void setExecutionTrace(ExecutionTrace *trace) noexcept { _executionTrace = trace; }
         [[nodiscard]] u64 tailCallsEliminated() const noexcept { return _tailCallsEliminated; }
         void setTailRecursionEnabled(bool enabled) noexcept { _tailRecursionEnabled = enabled; }
@@ -88,7 +90,6 @@ namespace cial::vm {
         [[nodiscard]] bool getZF() const { return _zf; }
 
         // pc 语义：下一条待执行指令的偏移（扁平字节码空间）。
-        // 多态执行路径(run)删除后，唯一调用方是 unwind 的异常恢复
         void setPC(const u64 pc) const { _curFrame->pc = pc; }
 
         [[nodiscard]] u64 getPC() const { return _curFrame->pc; }
@@ -136,6 +137,7 @@ namespace cial::vm {
             // 不能写 &_callStack[-1]（会越界踩坏相邻成员）
             _curFrame = _stackTop > 0 ? &_callStack[_stackTop - 1] : nullptr;
             _callStack[_stackTop].~CallFrame();
+            new(&_callStack[_stackTop]) CallFrame{};
         }
 
         [[nodiscard]] size_t getRegPoolTop() const { return _pool.used(); }

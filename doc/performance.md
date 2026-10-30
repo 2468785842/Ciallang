@@ -137,6 +137,6 @@ Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT；可选 JIT、尾递�
 字符串项慢约 4.5%，需后续定位和复测；fib 与整数循环本轮较快。完整样本保留于本机
 `bench/results/20261029-readme-default.json`，二进制 SHA-256 记录于同名 `.metadata.json`
 （该目录按既有约定不入库）。本表只比较默认执行，不代表可选 JIT 或尾递归的加速比。
-为了避免每条指令和每次普通调用承担开关判断，`VMState::run0()` 在进入时选择模板化
+为了避免每条指令和每次普通调用承担开关判断，`VMState::run()` 在进入时选择模板化
 解释循环；尾递归仅显式启用，可选模式状态放在类末尾以保留已有热字段布局。
 实现见 `src/vm/VMState.cpp`、`VMState.hpp`；可选后端范围见 `doc/jit.md`、`doc/tail-recursion.md`。

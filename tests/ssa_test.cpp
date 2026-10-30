@@ -3,7 +3,7 @@
 //
 // SSA 构造测试：抽象 CFG 层（支配树/支配边界/phi 放置/重命名/异常边界）
 // 与 Chunk 层（精确 def/use、pruned phi、def-use 链、拒绝语义、opcode 冒烟）。
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <functional>
 

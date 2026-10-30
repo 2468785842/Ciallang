@@ -27,6 +27,9 @@ Ciallang/
 ├─ .github/workflows/ci.yml ← Linux/macOS/Windows 双配置 + Windows 可选 JIT CI
 ├─ TODO.md              ← 后续任务清单（性能/正确性/特性缺口，改代码前先看）
 ├─ doc/                 ← 全部文档，索引见 doc/README.md
+│   ├─ building.md              构建选项、vcpkg feature 与验证
+│   ├─ cli.md                   命令行、退出码与 REPL
+│   ├─ embedding.md             CMake 子项目与宿主注册 API
 │   ├─ architecture.md          架构设计（流水线/模块/关键类）
 │   ├─ syntax.md                TJS2 语法参考 + 本项目实现状态矩阵
 │   ├─ compatibility.md         兼容性矩阵与路线图
@@ -36,7 +39,7 @@ Ciallang/
 │   │   └─ mapping.md           TJS2→Ciallang 转译设计（后续实现字节码兼容的蓝本）
 │   ├─ grammar/                 原版 bison 语法副本（tjs.y / tjsdate.y / tjspp.y）
 │   └─ language/                类语义/表达式运算符笔记
-├─ src/                 ← 源码（模块职责见下表）
+├─ src/                 ← 源码（含 cli/ 命令行与 REPL，模块职责见下表）
 ├─ tests/               ← Catch2 测试 + test_files/*.tjs 脚本语料
 ├─ tools/lsp/          ← Python stdio LSP 与协议集成测试（doc/lsp.md）
 ├─ editors/vscode/     ← VSCode LSP 客户端源码
@@ -54,15 +57,14 @@ Ciallang/
 | `src/common/` | 基础设施 | `Result.hpp`(错误收集)、`Ret.hpp`(ErrCode/Ret<T>)、`SourceFile`、`SourceLocation`、`UTF8`、`Hash.hpp`、`Defer.hpp` |
 | `src/parser/` | 词法+语法+预处理 | `Lexer`(手写 DFA)、`Parser`(Pratt 优先级)、`PreProcessor`(@set/@if)、`Token.hpp`、`OperatorTrie`、`ast/*`(AstNode 基类 + X-macro 节点枚举) |
 | `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**95 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`SSA`(按需静态单赋值分析，`--dump-ssa`，见 doc/ssa.md)、`ControlFlowGraph`+`Optimizer`(基本块 CFG+自然循环识别（支配树回边检测，getLoops()）、拷贝传播（GLocal/DLocal 纯拷贝改写+死拷贝清除，管线首位）、整数常量传播（块内折叠+唯一前驱跨块继承）、死 `LoadImm`/死拷贝清理、CompareTest 融合；在 `parseAst()` 接线) |
-| `src/vm/` | 执行引擎 | `VMState`(**run0() 扁平字节码解释，唯一执行路径；多态 run() 已删除**)、`Chunk`(指令+常量池+双空间 try 表)、`Bytecode`(扁平 u8 编码, **95/95 全实现**)、`CallFrame`(含 thisData 缓存 + argWindowDirect 直写布局)、`FastRegisterPool`、`Constant.hpp`(FuncMeta/ClassMeta/PropMeta)、`Rlc`(行号表)、`VM.hpp`(宿主门面)、`ExecutionTrace`(真实路径 DOT)、`IntegerJit`(可选 x64 整数 JIT/热路径守卫；默认关闭) |
+| `src/vm/` | 执行引擎 | `VMState`(字节码派发与调用帧调度)、`Chunk`(指令+常量池+双空间 try 表)、`Bytecode`(扁平 u8 编码, **95/95 全实现**)、`CallFrame`(含 thisData 缓存 + argWindowDirect 直写布局)、`FastRegisterPool`、`Constant.hpp`(FuncMeta/ClassMeta/PropMeta)、`Rlc`(行号表)、`VM.hpp`(宿主门面)、`ExecutionTrace`(真实路径 DOT)、`IntegerJit`(可选 x64 整数 JIT/热路径守卫；默认关闭) |
 | `src/runtime/` | 全局运行时 | `Runtime`(GC/RootGuard/atomTable)、`Context`(调用栈/全局对象, 深度上限 1024)、`AtomTable`(字符串驻留 Atom) |
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
 | `src/gc/` | 内存管理 | `MarkSweepHeader`、固定 512B 节点自由链表 + 标记清除 |
 | `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`NativeRegister`(按 TypeId 分派原生方法)、`Debug` |
 | `src/tjsbc/` | TJS2 字节码转译（阶段 2，M1–M4 完成） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(恒等平移/标志物化与 M3 前瞻融合（Cmp 族直写 zf）/属性全族（含整数成员名；direct 名走 *C Atom 直引指令）/类 context 加载期解释/NEW→Call/P 变体与 GETP·SETP/DELD·TYPEOFD/proxy 回落链/省略透传·展开调用·collapse 参数/BNOT·NUM·OCTET/dst=0 丢弃语义——tjs2 语料 12 文件字节码路径全量通过，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
 | `src/logging/` | 日志 | `Logger`（fmt 实际输出） |
-| `src/main.cpp` | `--dump-ssa`、`--jit`/`--trace-jit`、`--tail-recursion`、`--trace-execution` 与只编译的 `--check-json`，详见 doc/jit.md、tail-recursion.md、execution-trace.md、lsp.md；可执行 `cial`：`cial <script.tjs>` 走 run0()；`cial --dump-cfg <script.tjs>` 编译后输出各 chunk 控制流图 DOT（回边标红/循环头高亮，不执行） | |
-| `src/main0.cpp` | 可执行 `cial_bc`：fib 基准，走 run0() 扁平字节码路径 | |
+| `src/main.cpp` / `src/cli/` | 进程入口；argparse 参数、编译/诊断、执行与 REPL 分模块，见 [doc/cli.md](doc/cli.md) |
 
 ## 构建与测试
 
@@ -78,11 +80,13 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
 ./build/Windows/Debug/cial.exe tests/test_files/fib_test.tjs
 
 # fuzz（仅 Clang，可选）
-# 见 fuzz/run_fuzz_lexer.sh
+# 见 doc/building.md 的“有界 fuzz”，默认每项 60 秒
+bash fuzz/run_fuzz_lexer.sh
+bash fuzz/run_fuzz_parser.sh
 ```
 
-- 依赖经 vcpkg 管理（`vcpkg.json`）：Catch2、fmt、spdlog、utf8proc。
-- 测试共 198 个 TEST_CASE（24 文件，全部登记在 `tests/CMakeLists.txt`）。
+- 依赖经 vcpkg 管理（`vcpkg.json`）：fmt、frozen、utf8proc 为基础依赖；CLI 的 argparse、测试的 Catch2、JIT 的 asmjit 由 feature 控制，见 [doc/building.md](doc/building.md)。
+- C++ 测试文件登记在 `tests/CMakeLists.txt`；Python CLI/LSP 集成测试也由 CTest 注册。
 - `tests/test_files/tjs2/` 下是原版 kirikiri 测试脚本，是兼容性的行为基准。
 
 ## 代码风格与惯例
@@ -102,17 +106,17 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
 1. **GC 根与标记协议**：`Runtime::create<T>()` 返回 `RootGuard<T>` 临时对象，析构即摘根；
    执行期 GC 由 `Runtime::collectAllMark()` 驱动——RootGuard 句柄 + `MarkRootProvider`
    （`Context` 构造时注册，覆盖寄存器池/调用栈/全局对象/原生方法表）。
+   编译期对象由 Runtime 的编译作用域临时保根，允许编译分配触发 GC；移入堆的 Chunk 使用 `toHeap()` 保护常量图。
    **新增持有 GC 对象的全局数据时必须接入标记**；**所有 `marked()` 覆盖必须以
    `if(_marked) return;` 开头并调用基类**（对象图有环：FuncMeta↔Chunk、DataObject↔ClassObject；
    不检查标志会无限递归，漏调基类则对象必被清扫）。
-2. **唯一执行路径 run0**：`VM::eval`/`Property::invokeGet`/`Class.cpp` 全部走 `run0()` 扁平字节码。
-   `run()` 多态路径与 `Instruction::execute` 已删除。改指令语义 = 改 `Bytecode.cpp` encode +
-   `VMState.cpp` dispatchXXX 两处。
-3. **惰性 toBytecode**：`Chunk::toBytecode()` 幂等，run0 取帧点触发，同时生成字节码空间的
+2. **指令语义**：修改指令时同步检查 `Bytecode.cpp` 编码与 `VMState.cpp` 派发，
+   并覆盖异常恢复、属性访问和原生回调。
+3. **惰性 toBytecode**：`Chunk::toBytecode()` 幂等，run 取帧点触发，同时生成字节码空间的
    `_bcThrowHandlers`（unwind 用）。不要在编译期提前调。
 4. **压帧不执行的三类 dispatch**：`DLocal/DThis/DGlobal`（属性 setter）、`Inv`（finalize）、
    `Call`——检测 `_stackTop` 变化后返回 `DispatchRet::Call` 让主循环接管；否则新帧永远不会执行。
-   `Property::invokeGet` / `Class.cpp` 初始化与构造则用**嵌套 run0**（entryStackTop 语义）。
+   `Property::invokeGet` / `Class.cpp` 初始化与构造则用**嵌套 run**（entryStackTop 语义）。
 5. **GC sweep 不得重入解释器**：`~DataObject` 不再触发 finalize（曾在 sweep 批量析构时压入
    数百个无人执行的帧）。不可达对象先进入保活队列，由所属 VM 的指令安全点执行；
    回调期间再 GC、环和复活均受保护，终结一次，异常经脚本异常协议传播。
@@ -153,10 +157,11 @@ ctest --test-dir build/Windows/Debug/tests --output-on-failure
 - 关键源码：操作码定义 `src/syntax/lexer/tjsInterCodeGen.h:45-76`；执行器 `src/syntax/tjsInterCodeExec.cpp`；
   序列化 `src/syntax/tjsScriptBlock.cpp:460-510`（导出）/ `src/syntax/tjsByteCodeLoader.cpp`（加载）；
   常量池 `src/syntax/tjsConstArrayData.*`；语法 `src/syntax/bison/tjs.y`。
-- `TJSCompiler.exe --dump <script.tjs> <out.tjsbc>` 已实现（2026-10-26，仅改对方 main.cpp，公开 API `tTJS::CompileScript` 落盘），样本在 `tests/test_files/tjsbc/`。
-  本项目侧的字节码兼容走**转译路线**（加载 `"TJS2" "100\0"` 文件 → 转成 TAC → 现有 VM 执行），
-  设计见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)。
-- 修改本项目语义拿不准时，**以 TJSCompiler 实际行为为准**（跑 `TJSCompiler.exe <script>` 对拍）。
+- 当前下载的 TJSCompiler 上游入口 `src/main.cpp` 使用硬编码启动路径，不接受脚本路径或 `--dump` 参数。
+  历史记录中的对拍/导出命令依赖本地 CLI 适配入口，不能直接当成上游能力；公开导出 API 为 `tTJS::CompileScript`。
+  本项目已有 `tests/test_files/tjsbc/` 样本，可独立验证加载、转译与执行。
+- 本项目侧采用转译：加载 `"TJS2" "100\0"` 文件 → TAC → VM，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)。
+- 语义拿不准时，先对照参考实现源码；执行对拍前确认参考入口确实支持命令行参数，并记录所用版本。
 
 ## 文档维护约定
 

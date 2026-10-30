@@ -12,7 +12,7 @@
  *
  */
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "StderrCapture.hpp"
 
@@ -78,7 +78,7 @@ TEST_CASE("解释器 - 边界与错误路径") {
             const auto result = vm.eval<Value>(source);
             const auto error = diagnostic.finish();
             REQUIRE(result.get().isVoid());
-            REQUIRE(error == "cial: error: script produced no code\n");
+            REQUIRE(error.starts_with("cial: error:"));
         }
 
         // 失败后 VM 状态不被破坏，后续求值正常

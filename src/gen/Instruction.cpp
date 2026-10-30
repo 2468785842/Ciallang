@@ -24,8 +24,7 @@
 #include "vm/VMDebug.hpp"
 #include "vm/VMState.hpp"
 
-// 指令语义(执行)已全部迁移到 src/vm/VMState.cpp 的扁平字节码解释器 run0，
-// 本文件只保留 TAC 指令的 dump（调试输出）。
+// TAC 指令的调试输出。
 
 namespace cial::inter {
     using namespace cial::vm;

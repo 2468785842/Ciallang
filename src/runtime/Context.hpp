@@ -29,13 +29,24 @@ namespace cial {
         // Stack Max Depth Is 1024
         static constexpr auto maxCallDepth = 1024;
 
-        explicit Context(Runtime &rt) noexcept;
+        explicit Context(Runtime &rt);
         ~Context() noexcept override;
+        Context(const Context &) = delete;
+        Context &operator=(const Context &) = delete;
 
         // GC 运行时根入口：供 Runtime 在分配触发回收时调用
         void collectMark() const override;
 
         void initNativeMethod();
+
+        void registerGlobal(const String &name, const Value &value) const;
+
+        template <typename T, typename... Args>
+        T *registerClass(const String &name, Args &&...args) {
+            auto object = rt().create<T>(std::forward<Args>(args)...);
+            registerGlobal(name, Value{ object.get() });
+            return object.get();
+        }
 
         template <typename T, typename Callable>
         void registerMethod(const String &name, Callable &&fn) {
@@ -57,7 +68,7 @@ namespace cial {
 
         [[nodiscard]] u64 nativeRevision() const { return nativeRegister().revision; }
 
-        void registryGlobalFunc(const String &name, NativeFunction *func) const noexcept;
+        void registryGlobalFunc(const String &name, NativeFunction *func) const;
 
         [[nodiscard]] CallFrame *callStack() const;
 

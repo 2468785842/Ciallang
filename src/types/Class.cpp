@@ -90,8 +90,8 @@ namespace cial {
                 vmState.allocCallFrame(init.meta);
                 auto *currentCallFrame = vmState.curFrame();
                 currentCallFrame->setThisObj(Value{ init.thisObj });
-                // run0 执行到帧结束（Ret 或代码耗尽）时自行释放该帧
-                vmState.run0();
+                // run 执行到帧结束（Ret 或代码耗尽）时自行释放该帧
+                vmState.run();
 
                 // 标记为已处理
                 visited.insert(currentClass);
@@ -130,8 +130,8 @@ namespace cial {
                 vmState.allocCallFrame(init.meta);
                 auto *currentCallFrame = vmState.curFrame();
                 currentCallFrame->setThisObj(Value{ init.thisObj });
-                // run0 执行到帧结束时自行释放该帧
-                vmState.run0();
+                // run 执行到帧结束时自行释放该帧
+                vmState.run();
             }
         }
 
@@ -153,8 +153,8 @@ namespace cial {
             currentCallFrame->actualArgc = static_cast<u32>(argCount);
             currentCallFrame->setThisObj(Value{ constructor.thisObj });
 
-            // 构造函数块保证以 Ret 结尾，run0 执行完自行释放帧
-            vmState.run0();
+            // 构造函数块保证以 Ret 结尾，run 执行完自行释放帧
+            vmState.run();
 
             if(cnt > 0)
                 vmState.pop(cnt);
@@ -201,7 +201,7 @@ namespace cial {
                         currentCallFrame->actualArgc = static_cast<u32>(argCount);
                         currentCallFrame->setThisObj(Value{ constructor.thisObj });
 
-                        vmState.run0();
+                        vmState.run();
 
                         if(cnt > 0)
                             vmState.pop(cnt);

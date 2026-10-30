@@ -8,6 +8,26 @@
 
 namespace cial::vm {
 
+    RootGuard<Chunk> Chunk::toHeap(Runtime &runtime) && {
+        Vec<RootGuard<MarkSweepHeader>> roots;
+        for(const auto &constant : _constants) {
+            switch(constant.type()) {
+                case ConstantType::FuncMeta:
+                    roots.emplace_back(&runtime, constant.value<FuncMeta *>());
+                    break;
+                case ConstantType::ClassMeta:
+                    roots.emplace_back(&runtime, constant.value<ClassMeta *>());
+                    break;
+                case ConstantType::PropMeta:
+                    roots.emplace_back(&runtime, constant.value<PropMeta *>());
+                    break;
+                default:
+                    break;
+            }
+        }
+        return runtime.create<Chunk>(std::move(*this));
+    }
+
     [[nodiscard]] String Chunk::dumpConstant(const Runtime *rt, const ConstIdx idx) const {
         std::stringstream ss{ "" };
         switch(const auto &constant = _constants[idx.index()]; constant.type()) {

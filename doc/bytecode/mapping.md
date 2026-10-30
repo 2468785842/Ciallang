@@ -2,7 +2,7 @@
 
 > **已选定的技术路线**（2026-10 决策）：Ciallang 加载 TJSCompiler 编译出的字节码文件
 > （`"TJS2" "100\0"` 格式，见 [tjs2-bytecode.md](tjs2-bytecode.md) §5），**转译（转义）为
-> Ciallang 的 TAC 指令**，进入现有 `Chunk`，由现有 VM（`run0()`）执行。
+> Ciallang 的 TAC 指令**，进入现有 `Chunk`，由现有 VM（`run()`）执行。
 > 不采用"独立 TJS 解释器"方案（被否决原因：保留两条执行路径不如统一到现有 VM，
 > 且本项目 TAC 本就对标 TJS 指令集）。
 >
@@ -131,7 +131,7 @@ TJS 的 VM 级单 bool `flag`（CEQ/TT 写、JF/JNF 读、NF 取反、SETF/SETNF
 | JF addr / JNF addr | `Test %F` + `JmpE @l` / `Test %F` + `JmpNE @l` |
 | JMP addr | `Jmp @l` |
 
-优点：完全用现有 55 条 TAC，语义逐条可对拍；缺点：每分支多一条 `Test`。
+优点：用现有 TAC 指令，语义逐条可对拍；缺点：每分支多一条 `Test`。
 M3 优化提案：新增 2 操作数"比较写 zf"指令族（`CmpEQ %r1,%r2` 直写 `_zf`），可省 `%F` 与 `Test`。
 
 ## 4. 操作码转译总表
@@ -324,7 +324,7 @@ propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 
 |---|---|---|
 | **M1** ✅ | Reader（容器+常量池+context 骨架）；顶层/函数 context 转译（§4.1/4.2 基型/4.5 CALL/4.6）；flag 物化；prologue；`cial --tjsbc` | fib/循环/算术/字符串拼接/print 的 .bc 对拍全绿（s1–s5） |
 | **M2** ✅ | 属性全族（GPI/SPI/GPDS…模板）、ctClass 加载期解释、NEW、try/catch、property、P 变体、DELD/DELI、TYPEOFD/I、octet 常量、proxy 回落链 | kirikiri `test_class.tjs` 编译产物对拍全绿（2026-10-27，与源码路径逐字节一致）；`test_function.tjs` 前半通过，展开/收拢调用部分留 M4 |
-| **M3** ✅ | 比较写 zf 指令族（CmpEQ/DEQ/LT/GT + 前瞻融合）、Inc/Dec 单指令、BNot/ToNumber/ToOctet（Typeof/Asc/Chr/DelProp/GetP·SetP 已随 M1/M2 提前落地） | 指令转译覆盖 128/128（2026-10-27）；全部语料 run0 路径全绿 |
+| **M3** ✅ | 比较写 zf 指令族（CmpEQ/DEQ/LT/GT + 前瞻融合）、Inc/Dec 单指令、BNot/ToNumber/ToOctet（Typeof/Asc/Chr/DelProp/GetP·SetP 已随 M1/M2 提前落地） | 指令转译覆盖 128/128（2026-10-27）；全部语料 run 路径全绿 |
 | **M4** ✅ | collapse 参数（CollapseArgs）、展开调用（CallExpand）、省略透传（CallOmit）、EVAL/EEXP→EvalStr、CLT/CGT 序修正、dst=0 丢弃语义 | `test_function.tjs` 全量通过（2026-10-27）；test_misc/test_with/test_variant 与源码路径一致；`test.tjs` 双方同位置失败（需宿主 Scripts 对象）。遗留：test_string 原版导出崩溃 |
 
 **新增 TAC 指令提案汇总**（M3 落地，命名沿用现有风格）：

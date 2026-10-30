@@ -1,6 +1,6 @@
 # LSP 与编辑器接入
 
-`tools/lsp/cial_lsp.py` 使用 Python 3 标准库提供 stdio LSP：完整文本同步、实时语法/编译诊断、关键字与当前文档声明补全、内置关键字悬停说明，以及词法级文档符号列表。诊断由 `cial --check-json file.tjs` 返回，检查过程不执行被检查脚本；位置从原生 UTF-8 字节列转换成 LSP UTF-16 列（`src/main.cpp`、`src/common/SourceFile.cpp`、`tools/lsp/cial_lsp.py`）。
+`tools/lsp/cial_lsp.py` 使用 Python 3 标准库提供 stdio LSP：完整文本同步、实时语法/编译诊断、关键字与当前文档声明补全、内置关键字悬停说明，以及词法级文档符号列表。诊断由 `cial --check-json file.tjs` 返回，检查过程不执行被检查脚本；位置从原生 UTF-8 字节列转换成 LSP UTF-16 列（`src/cli/Application.cpp`、`src/cli/Compilation.cpp`、`src/common/SourceFile.cpp`、`tools/lsp/cial_lsp.py`）。
 
 启动命令（将路径替换为实际绝对路径）：
 

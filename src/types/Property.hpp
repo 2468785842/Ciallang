@@ -69,7 +69,7 @@ namespace cial {
             getFunc.thisObj = thisObj;
             getFunc.call(vmState, ret, 0);
             // 嵌套执行 getter 帧直至其返回（栈回落到入口之下即返回）
-            vmState.run0();
+            vmState.run();
             return vmState.reg(ret);
         }
 

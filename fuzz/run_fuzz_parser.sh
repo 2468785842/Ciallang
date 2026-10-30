@@ -1,2 +1,3 @@
-mkdir -p "out/crash"
-./bin/fuzz_parser ./corpus -artifact_prefix=out/crash/
+#!/usr/bin/env bash
+set -euo pipefail
+exec bash "$(dirname -- "${BASH_SOURCE[0]}")/run_fuzz.sh" parser "$@"

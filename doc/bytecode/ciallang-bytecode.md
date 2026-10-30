@@ -1,11 +1,11 @@
 # Ciallang 指令集规范（TAC + 扁平字节码）
 
 > 本项目（Ciallang）的两级指令集：**TAC 三地址码**（编译产物、IR 载体）与
-> **扁平 u8 字节码**（TAC 的紧凑编码，`run0()` 唯一执行路径，按需惰性生成）。
+> **扁平 u8 字节码**（TAC 的紧凑编码，按需惰性生成）。
 > 与旧版 TJS2 指令集的对照见 [mapping.md](mapping.md)。
 >
 > 事实来源：
-> - TAC 指令定义：`src/gen/Instruction.hpp`（X-macro）、`Instruction.cpp`（dump；execute 多态执行路径已删除）
+> - TAC 指令定义：`src/gen/Instruction.hpp`（X-macro）、`Instruction.cpp`（dump）
 > - 扁平字节码：`src/vm/Bytecode.hpp`（X-macro）、`Bytecode.cpp`（encode）、`src/vm/VMState.cpp`（dispatch）
 > - Chunk 结构：`src/vm/Chunk.hpp`、`src/vm/Constant.hpp`
 > - 旧版 TJS2 指令集参考：[tjs2-bytecode.md](tjs2-bytecode.md)
@@ -21,11 +21,10 @@ AST ──IRGenerator──▶ TAC 指令序列（95 种，Instruction 对象）
                      扁平字节码 Vec<u8>（95 种 VmOpCode，与 TAC 一一对应）
                         │  存于 Chunk::_code
                         ▼
-                     VMState::run0() switch 解释（唯一执行路径）
+                     VMState::run() switch 派发
 ```
 
-- 早期的 `run()` 多态执行路径（逐条虚调用 `Instruction::execute`）已删除；
-  语义全部收敛到 `run0()` 的 95 个 `dispatchXXX`。
+- 指令语义由 `src/vm/VMState.cpp` 中的 `dispatchXXX` 实现。
 - `Instruction` 子类只作为 IR 载体与 dump 来源保留。
 
 ## 2. 执行模型
@@ -87,7 +86,7 @@ AST ──IRGenerator──▶ TAC 指令序列（95 种，Instruction 对象）
 | 9 | Inv | `%src` | invalidate 对象（DataObject::invalidate） |
 | 10 | Throw | `%src` | 抛异常值（触发 unwind） |
 | 20 | ChkInv | `%src, %dst` | `dst = isvalid(src)` |
-| 24 | EvalStr | `%src, %dst` | 后缀 `!` 即时求值：src 字符串化为 TJS 表达式编译执行（嵌套双帧 run0），结果写 dst；空串/非串原值不变（tjs.y T_EVAL → VM_EVAL 对应物） |
+| 24 | EvalStr | `%src, %dst` | 后缀 `!` 即时求值：src 字符串化为 TJS 表达式编译执行（嵌套双帧 run），结果写 dst；空串/非串原值不变（tjs.y T_EVAL → VM_EVAL 对应物） |
 
 ### 3.5 常量装入
 
@@ -120,7 +119,7 @@ AST ──IRGenerator──▶ TAC 指令序列（95 种，Instruction 对象）
 | 20 | Chr | `%src, %dst` | `$n`：字符码转 1 字符字符串 |
 | 21 | ChkIns | `%name, %obj` | `obj = (obj instanceof name)`（基础类型按类型名匹配：Number 覆盖 Integer/Real；结果原地写回 obj 槽） |
 | 22 | TestVoid | `%src, %dst` | `dst = (src is void)`；函数默认参数守卫用 |
-| 23 | DerefGet | `%prop, %dst` | `*p` 强制属性访问读：Property 调 getter（嵌套 run0），非 Property 报错 |
+| 23 | DerefGet | `%prop, %dst` | `*p` 强制属性访问读：Property 调 getter（嵌套 run），非 Property 报错 |
 | 24 | DerefSet | `%prop, %src` | `*p = v` 强制属性访问写：调 setter（压帧 → Call 接管），非 Property 报错 |
 | 25 | NewArray | `%dst, sLEB count` | `[...]` 字面量：新建 count 长度 Array（元素 void，随后逐个 SetIndex） |
 | 26 | NewDict | `%dst` | `%[...]` 字面量：新建空 Dictionary |
@@ -210,7 +209,7 @@ IGNOREPROP/MEMBERENSURE 标志位由独立的 *Raw 指令承担（见 mapping.md
 | `_instructions` | `Vec<Box<inter::Instruction>>`，TAC 序列（`emit/repl/inst`） |
 | `_constants` | 常量池：`Vec<Constant>`；**index 0 恒为 Void**；去重；上限 u16（65535） |
 | `_throwHandlers` | `Vec<ThrowHandler>`：`{tryStart, tryEnd, exValueReg}` 线性表，**TAC 下标空间**（**非** TJS 的 entry/extry 栈） |
-| `_bcThrowHandlers` | 同上但已换算到**扁平字节码 pc 空间**（`toBytecode()` 时生成，`run0` 的 unwind 使用） |
+| `_bcThrowHandlers` | 同上但已换算到**扁平字节码 pc 空间**（`toBytecode()` 时生成，`run` 的 unwind 使用） |
 | `_registerCount` | 帧寄存器需求（CallFrame 据此开窗） |
 | `_code` + `_isBytecode` | 惰性扁平字节码（`toBytecode()` 幂等） |
 
@@ -225,7 +224,7 @@ IGNOREPROP/MEMBERENSURE 标志位由独立的 *Raw 指令承担（见 mapping.md
 
 **无磁盘序列化**：当前 Chunk 只在内存；TJS 字节码加载/转译是唯一的二进制入口（已实现，见 `src/tjsbc/TjsTranslator.cpp`）。
 
-## 5. 扁平字节码（`run0()` 路径）
+## 5. 扁平字节码（`run()` 路径）
 
 ### 5.1 操作码（95 个，`VmOpCode : u8`）
 
@@ -280,10 +279,10 @@ IGNOREPROP/MEMBERENSURE 标志位由独立的 *Raw 指令承担（见 mapping.md
 （字节码偏移空间，区间 `[tacStartPos[start], tacStartPos[end])`），
 `unwind()` 只查后者。
 
-### 5.6 run0 主循环（`VMState.cpp`）
+### 5.6 run 主循环（`VMState.cpp`）
 
 ```
-run0(entryStackTop = 进入时栈深):
+run(entryStackTop = 进入时栈深):
 FETCH_NEW_FRAME:
   取当前 CallFrame；chunk->toBytecode()（幂等惰性）
   while pc < bcSize:
@@ -299,7 +298,7 @@ FETCH_NEW_FRAME:
 
 注意三个"压帧不执行"的点都返回 `DispatchRet::Call` 让主循环接管：
 `DLocal/DThis/DGlobal` 触发属性 setter、`Inv` 触发 finalize、`Call` 本身。
-（`Property::invokeGet` 与 `Class.cpp` 的初始化/构造走**嵌套 run0**，自释放帧。）
+（`Property::invokeGet` 与 `Class.cpp` 的初始化/构造走**嵌套 run**，自释放帧。）
 
 ## 6. 异常模型
 

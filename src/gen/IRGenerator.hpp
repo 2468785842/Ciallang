@@ -26,8 +26,10 @@ namespace cial::inter {
     class IRGenerator {
 
     public:
-        explicit IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile) :
-            _rt(rt), _sourceFile(sourceFile), _r(r) {}
+        explicit IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile);
+        ~IRGenerator();
+        IRGenerator(const IRGenerator &) = delete;
+        IRGenerator &operator=(const IRGenerator &) = delete;
 
         Opt<vm::Chunk> parseAst(const syntax::AstNode *node, OptReg &optReg);
 

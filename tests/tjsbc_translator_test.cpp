@@ -6,7 +6,7 @@
  * - M2：类/NEW/property 闭包/P 变体（参考实现语料端到端，对拍源码路径语义）。
  */
 
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <fmt/ostream.h>
 
@@ -72,7 +72,7 @@ var Debug = new __DebugShim();
             vmState.curFrame()->setThisObj(
                 Value{ static_cast<Object *>(vmState.context.global()) });
             try {
-                vmState.run0();
+                vmState.run();
             } catch(...) {
                 vmState.clearException();
                 throw;

@@ -1,4 +1,4 @@
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
@@ -25,7 +25,7 @@ TEST_CASE("execution trace counts actual loop edges", "[trace]") {
     vm::ExecutionTrace trace;
     state.setExecutionTrace(&trace);
     state.allocCallFrame(&chunk);
-    state.run0();
+    state.run();
     REQUIRE(state.reg(0).asIntegerUnsafe() == 3);
     state.freeCallFrame();
     REQUIRE(trace.instructions() == 22);
@@ -119,7 +119,7 @@ TEST_CASE("execution trace source lines use predecessor and consecutive compress
     REQUIRE_FALSE(chunk.lineAtBc(0));
 }
 
-TEST_CASE("execution trace supports nested run0 from native callbacks", "[trace]") {
+TEST_CASE("execution trace supports nested run from native callbacks", "[trace]") {
     Runtime rt;
     Context context{ rt };
     context.initNativeMethod();

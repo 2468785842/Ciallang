@@ -1,42 +1,19 @@
-cmake_minimum_required(VERSION 3.12)
-project(CialFuzz C CXX)
-
-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     message(FATAL_ERROR "libFuzzer requires Clang compiler")
 endif()
 
-add_executable(fuzz_lexer fuzz_lexer.cc)
+# Instrument the implementation as well as the entry points. Propagate the
+# sanitizer runtime to other consumers built in this dedicated configuration.
+target_compile_options(Ciallang PRIVATE
+    -fsanitize=fuzzer-no-link,address,undefined
+    -fno-sanitize-recover=all -fno-omit-frame-pointer -g -O1)
+target_link_options(Ciallang INTERFACE -fsanitize=address,undefined)
 
-target_link_libraries(fuzz_lexer
-        PRIVATE
-        Ciallang
-)
-
-target_link_libraries(fuzz_lexer
-        PRIVATE
-        Ciallang
-)
-
-target_compile_options(fuzz_lexer PRIVATE
+foreach(name IN ITEMS lexer parser)
+    add_executable(fuzz_${name} fuzz_${name}.cc)
+    target_link_libraries(fuzz_${name} PRIVATE Ciallang::Ciallang)
+    target_compile_options(fuzz_${name} PRIVATE
         -fsanitize=fuzzer,address,undefined
-        -g
-        -O1)
-
-target_link_options(fuzz_lexer PRIVATE -fsanitize=fuzzer,address,undefined)
-
-add_executable(fuzz_parser fuzz_parser.cc)
-
-target_link_libraries(fuzz_parser
-        PRIVATE
-        Ciallang
-)
-
-target_compile_options(fuzz_parser PRIVATE
-        -fsanitize=fuzzer,address,leak,undefined
-        -g
-        -O1)
-
-target_link_options(fuzz_parser PRIVATE -fsanitize=fuzzer,address,leak,undefined)
-
-set_target_properties(fuzz_lexer fuzz_parser PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
+        -fno-sanitize-recover=all -fno-omit-frame-pointer -g -O1)
+    target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer,address,undefined)
+endforeach()

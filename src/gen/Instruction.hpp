@@ -209,8 +209,7 @@ namespace cial::inter {
             return _ops[2].value<T>();
         }
 
-        // 多态执行路径(run)与 encode 虚函数已删除：TAC 指令仅作为 IR 载体与 dump 来源，
-        // 执行统一走 VMState::run0 的扁平字节码
+        // TAC 指令用于中间表示和调试输出。
         virtual std::string dump(const vm::VMState *vmState) = 0;
 
     protected:

@@ -25,6 +25,11 @@
 #include "gen/Instruction.hpp"
 #include "logging/Logger.hpp"
 
+namespace cial {
+    template <typename T>
+    class RootGuard;
+}
+
 namespace cial::vm {
     class VMState;
 
@@ -48,7 +53,7 @@ namespace cial::vm {
             return {};
         }
 
-        // 扁平字节码 pc 空间的 try 区间表（run0 使用）
+        // 扁平字节码 pc 空间的 try 区间表（run 使用）
         [[nodiscard]] Opt<ThrowHandler> findBcThrowHandler(const u64 pc) const {
             for(const auto &h : _bcThrowHandlers) {
                 if(h.tryStart <= pc && pc < h.tryEnd) {
@@ -96,6 +101,9 @@ namespace cial::vm {
 
         Chunk(Chunk &&chunk) = default;
         Chunk &operator=(Chunk &&chunk) = default;
+
+        // Preserve constants while allocation may trigger a collection.
+        RootGuard<Chunk> toHeap(Runtime &runtime) &&;
 
         [[nodiscard]] auto &getInstVec() noexcept { return _instructions; }
 
@@ -160,7 +168,7 @@ namespace cial::vm {
             auto result = Bytecode::compile(_instructions, _throwHandlers);
             _code = std::move(result.code);
             _bcThrowHandlers = std::move(result.handlers);
-            // 行号表换算：IRGen 记录的是 TAC 下标，run0 的 pc 是 bc 偏移
+            // 行号表换算：IRGen 记录的是 TAC 下标，run 的 pc 是 bc 偏移
             for(auto &[idx, loc] : _rlc.rawEntries())
                 idx = result.tacStartPos[idx];
             _isBytecode = true;

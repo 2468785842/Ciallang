@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iterator>
 #include <sstream>
+#include <stdexcept>
 
 #include "SourceFile.hpp"
 
@@ -132,6 +133,9 @@ namespace cial::Common {
     void SourceFile::seek(const size_t index) { _index = index; }
 
     bool SourceFile::load(Result &r, const std::string &buffer) {
+        _index = 0;
+        _lastWidth = 0;
+        _markStack = {};
         _buffer.clear();
         _linesByNumber.clear();
         _linesByIndexRange.clear();
@@ -156,6 +160,9 @@ namespace cial::Common {
     }
 
     bool SourceFile::load(Result &r) {
+        _index = 0;
+        _lastWidth = 0;
+        _markStack = {};
         _buffer.clear();
         _linesByNumber.clear();
         _linesByIndexRange.clear();
@@ -230,11 +237,11 @@ namespace cial::Common {
     const std::filesystem::path &SourceFile::path() const { return _path; }
 
     std::string SourceFile::substring(const size_t start, const size_t end) const {
-        const auto length = end - start;
-        std::string value;
-        value.reserve(length);
-        value.assign(reinterpret_cast<const char *>(_buffer.data()), start, length);
-        return value;
+        if(start > end || end > _buffer.size())
+            throw std::out_of_range("source substring range");
+        if(start == end)
+            return {};
+        return { reinterpret_cast<const char *>(_buffer.data() + start), end - start };
     }
 
     const SourceFileLineType *SourceFile::lineByNumber(const size_t line) const {

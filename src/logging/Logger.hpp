@@ -33,8 +33,8 @@
             std::abort();                                                                                              \
         }                                                                                                              \
     } while(false)
-#define CLL_LOG_TRACE(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kTrace, fmt, ##__VA_ARGS__)
-#define CLL_LOG_DEBUG(fmt, ...) ::Ciallang::logFmt(::Ciallang::Level::kDebug, fmt, ##__VA_ARGS__)
+#define CLL_LOG_TRACE(fmt, ...) ::cial::logFmt(::cial::Level::kTrace, fmt, ##__VA_ARGS__)
+#define CLL_LOG_DEBUG(fmt, ...) ::cial::logFmt(::cial::Level::kDebug, fmt, ##__VA_ARGS__)
 #else
 #define CLL_ASSERT(cond, fmt, ...)
 #define CLL_LOG_TRACE(fmt, ...)

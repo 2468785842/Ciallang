@@ -182,7 +182,7 @@ namespace cial::vm {
         u64 lastPc{};
         while(true) {
             const CallFrame *cFrame = _curFrame;
-            // run0 的 pc 是扁平字节码偏移，因此这里查询字节码空间的 try 区间表
+            // run 的 pc 是扁平字节码偏移，因此这里查询字节码空间的 try 区间表
             const Opt<ThrowHandler> th = cFrame->chunk->findBcThrowHandler(getPC());
             if(!th) {
                 if(cFrame->ret)
@@ -248,7 +248,7 @@ namespace cial::vm {
     // 寄存器成员名形态先做整数成员名分支（数组下标）并 intern，随后进入此处
 
     // obj.member 读：原生成员（方法/count 属性）→ Global/Class/普通对象分支 →
-    // 非对象值的原生 property 表。getter 经 invokeGet 嵌套 run0 同步完成，恒 Continue
+    // 非对象值的原生 property 表。getter 经 invokeGet 嵌套 run 同步完成，恒 Continue
     static void propGetMember(VMState &vmState, CallFrame *cur, const Value &val, const Atom atom, Value &dst) {
         if(val.isObject()) {
             auto *obj = val.asObject().value();
@@ -379,7 +379,7 @@ namespace cial::vm {
         }
     }
 
-    void VMState::run0() {
+    void VMState::run() {
         if(_executionTrace) {
             if(_tailRecursionEnabled)
                 runLoop<true, false, true>();
@@ -622,7 +622,7 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(Inv) {
         const u16 r1 = read<u16>(ip, pc);
         // invalidate 会把 finalize 帧压栈（如果类定义了 finalize）；
-        // run0 缓存了当前帧，必须跳到新帧执行完再回来
+        // run 缓存了当前帧，必须跳到新帧执行完再回来
         const size_t top = _stackTop;
         dynamic_cast<DataObject *>(regs[r1].asObject().unwrap())->invalidate();
         if(_stackTop != top) {
@@ -644,9 +644,8 @@ namespace cial::vm {
         if(_stackTop > 1 && cur->ret) {
             Value &value = regs[r1];
             Value &dst = (cur - 1)->getReg(*cur->ret);
-            if(value.isIntegerFast()) {
+            if(value.isIntegerFast() && dst.isIntegerFast()) {
                 // 整数直写:跳过 Value 拷贝构造/析构(数值递归的返回主路径)
-                dst.type(ValueType::Integer);
                 dst.asIntegerStore(value.asIntegerUnsafe());
             } else {
                 dst = value;
@@ -831,7 +830,7 @@ namespace cial::vm {
         // 后缀 `!` 即时求值（tjs.y priority_expr "!" → T_EVAL → VM_EVAL 对应物）：
         // src 字符串化为 TJS 表达式编译执行；空串/非串原值不变（原版 Eval 语义）。
         // 嵌套执行用 eval() 同款双帧模式（tmp 宿主帧承接返回值 + 栈平衡）——外层
-        // 脚本帧存活时不能用单帧模式，否则嵌套 run0 会继续执行外层帧
+        // 脚本帧存活时不能用单帧模式，否则嵌套 run 会继续执行外层帧
         const u16 src = read<u16>(ip, pc); // 与 encode 同序：先 src 后 dst
         const u16 dst = read<u16>(ip, pc);
         const Value &val = regs[src];
@@ -852,15 +851,15 @@ namespace cial::vm {
         if(r.isFailed() || !node)
             throw std::runtime_error("cannot evaluate expression");
         inter::IRGenerator codeGen{ r, rt, sourceFile };
-        OptReg retReg{};
+        OptReg retReg{ inter::Register{ 0xFFFF } };
         Opt<vm::Chunk> compiled = codeGen.parseAst(node, retReg);
         if(r.isFailed() || !compiled || !retReg || compiled->getRegCount() == 0 || compiled->getInstVec().empty())
             throw std::runtime_error("cannot evaluate expression");
-        // 表达式块以 Ret 收尾：返回值经 Ret 写回 tmp 帧槽位，嵌套 run0 在本帧
-        // 弹出后即停（callValue 的帧契约——无 Ret 的块会由 run0 的"代码到末尾"
+        // 表达式块以 Ret 收尾：返回值经 Ret 写回 tmp 帧槽位，嵌套 run 在本帧
+        // 弹出后即停（callValue 的帧契约——无 Ret 的块会由 run 的"代码到末尾"
         // 路径自行弹帧，返回值无人回写）
         compiled->emit<inter::Ret>(*retReg);
-        auto *evalChunk = rt.create<vm::Chunk>(std::move(*compiled)).get();
+        auto evalChunk = std::move(*compiled).toHeap(rt);
 
         constexpr u16 retSlot = 0;
         vm::Chunk tmpChunk{};
@@ -872,10 +871,10 @@ namespace cial::vm {
         const size_t tmpSp = getRegPoolTop(); // tmp 帧 reg0 的池内位置（异常值落点）
         allocCallFrame(&tmpChunk);
         makeClosure();
-        allocCallFrame(evalChunk, retSlot);
+        allocCallFrame(evalChunk.get(), retSlot);
         makeClosure();
         const size_t stackTop = context.stackTop();
-        run0();
+        run();
 
         // 哨兵路径：eval/tmp 帧均被弹出（栈深 -2）→ 载体解开 native 调用链
         if(context.stackTop() == stackTop - 2)
@@ -946,7 +945,7 @@ namespace cial::vm {
 
     // ── 全局/this/局部变量访问 ────────────────────────────────
     // 属性 setter（Property::invokeSet）只压帧不执行，需要返回 Call
-    // 让主循环跳到新帧；getter（invokeGet）内部嵌套 run0 执行完毕，不影响本帧。
+    // 让主循环跳到新帧；getter（invokeGet）内部嵌套 run 执行完毕，不影响本帧。
     DISPATCH_OP_METHOD(DGlobal) {
         const u32 atom = read<u32>(ip, pc);
         const u16 r1 = read<u16>(ip, pc);
@@ -1544,6 +1543,10 @@ namespace cial::vm {
                 Value *const localArgs = reinterpret_cast<Value *>(argBuf);
                 const u64 n = argc < maxDirectArgs ? argc : maxDirectArgs;
                 u64 built = 0;
+                DEFER {
+                    while(built > 0)
+                        localArgs[--built].~Value();
+                };
                 for(; built < n; ++built)
                     new(argBuf + built * sizeof(Value)) Value(regs[argRegs[built]]);
                 // 缺省参数：槽补 void 到 _arity（argCount 仍传实际 argc，
@@ -1556,8 +1559,6 @@ namespace cial::vm {
                 cur->pc = pc;
                 const Value recv = receiver && !receiver->isVoid() ? *receiver : nativeFn->boundThis();
                 regs[dst] = nativeFn->callDirect(*this, recv, n, localArgs);
-                while(built > 0)
-                    localArgs[--built].~Value();
                 return DispatchRet::Continue;
             }
         }
@@ -1898,7 +1899,7 @@ namespace cial::vm {
         return DispatchRet::Continue;
     }
 
-    // *p：强制属性访问读（旧版 GETP）——Property 调 getter（invokeGet 内嵌套 run0
+    // *p：强制属性访问读（旧版 GETP）——Property 调 getter（invokeGet 内嵌套 run
     // 同步完成）；非 Property 按 TJS2 语义报错
     DISPATCH_OP_METHOD(DerefGet) {
         const u16 r1 = read<u16>(ip, pc); // prop

@@ -10,7 +10,7 @@
 #include "types/Types.hpp"
 
 // 扁平字节码指令集：与 TAC 指令集(CIAL_TAC_OPCODE_ENUMS)一一对应，
-// 共 55 条。编码约定：
+// 操作码由下方 X-macro 定义。编码约定：
 //   - 寄存器操作数：u16
 //   - Atom：u32（Atom.v 是顺序索引，实际范围远小于 2^32）
 //   - 立即数：sLEB128（变长）
