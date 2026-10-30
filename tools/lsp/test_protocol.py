@@ -4,10 +4,11 @@ import json
 import pathlib
 import subprocess
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from cial_lsp import source_position, line_prefix
+from cial_lsp import source_position, line_prefix, utf16
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--cial", required=True)
@@ -44,12 +45,91 @@ class ProtocolTest(unittest.TestCase):
             headers[key.lower()] = value.strip()
         return json.loads(self.process.stdout.read(int(headers["content-length"])))
 
-    def initialize(self):
-        self.send("initialize", identifier=1)
+    def initialize(self, params=None):
+        self.send("initialize", params, identifier=1)
         capabilities = self.receive()["result"]["capabilities"]
         self.assertEqual(capabilities["positionEncoding"], "utf-16")
         self.assertEqual(capabilities["textDocumentSync"]["change"], 1)
+        self.assertTrue(capabilities["workspaceSymbolProvider"])
+        self.assertTrue(capabilities["workspace"]["workspaceFolders"]["supported"])
         self.send("initialized")
+
+    def symbols(self, query=""):
+        self.send("workspace/symbol", {"query": query}, 20)
+        return self.receive()["result"]
+
+    def test_workspace_symbols_disk_buffers_and_folder_changes(self):
+        with tempfile.TemporaryDirectory(prefix="cial workspace %20 空间 ") as directory:
+            workspace = pathlib.Path(directory) / "first"
+            second = pathlib.Path(directory) / "second"
+            workspace.mkdir()
+            second.mkdir()
+            source = workspace / "declarations.tjs"
+            text = '"😀"; function Find中文() {}\n'
+            source.write_text(text, encoding="utf-8")
+            (workspace / "comments.tjs").write_text(
+                '// function FindComment() {}\n/* class FindBlock {} */\n'
+                'var text = "function FindString() {}";\nvar regex = /function FindRegex()/;\n',
+                encoding="utf-8")
+            (workspace / "build").mkdir()
+            (workspace / "build/ignored.tjs").write_text("function FindBuild() {}", encoding="utf-8")
+            (workspace / "invalid.tjs").write_bytes(b"function FindInvalid() {}\xff")
+            (workspace / "large.tjs").write_text("function FindLarge() {}" + " " * 2_000_000, encoding="utf-8")
+            (second / "extra.tjs").write_text("class FindSecond {}", encoding="utf-8")
+            self.initialize({"workspaceFolders": [{"uri": workspace.as_uri(), "name": "first"}]})
+            symbols = self.symbols("find")
+            self.assertEqual([symbol["name"] for symbol in symbols], ["Find中文"])
+            self.assertEqual(symbols[0]["location"]["uri"], source.as_uri())
+            self.assertEqual(symbols[0]["location"]["range"]["start"],
+                             {"line": 0, "character": utf16(text[:text.index("Find中文")])})
+
+            # An unopened file is refreshed directly from disk, without a watcher dependency.
+            source.write_text("function FindDiskChanged() {}", encoding="utf-8")
+            self.assertEqual([symbol["name"] for symbol in self.symbols("find")], ["FindDiskChanged"])
+            self.send("textDocument/didOpen", {"textDocument": {
+                "uri": source.as_uri(), "version": 1, "text": "function FindBuffer() {}"}})
+            self.receive()
+            self.assertEqual([symbol["name"] for symbol in self.symbols("find")], ["FindBuffer"])
+            self.send("textDocument/didChange", {"textDocument": {"uri": source.as_uri(), "version": 2},
+                                                "contentChanges": [{"text": "function FindEdited() {}"}]})
+            self.receive()
+            self.assertEqual([symbol["name"] for symbol in self.symbols("find")], ["FindEdited"])
+            self.send("textDocument/didClose", {"textDocument": {"uri": source.as_uri()}})
+            self.receive()
+            self.assertEqual([symbol["name"] for symbol in self.symbols("find")], ["FindDiskChanged"])
+            source.unlink()
+            self.assertEqual(self.symbols("find"), [])
+
+            self.send("workspace/didChangeWorkspaceFolders", {"event": {
+                "added": [{"uri": second.as_uri(), "name": "second"}],
+                "removed": [{"uri": workspace.as_uri(), "name": "first"}]}})
+            self.assertEqual([symbol["name"] for symbol in self.symbols("find")], ["FindSecond"])
+
+    def test_workspace_symbols_root_uri_and_result_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            (workspace / "many.tjs").write_text(
+                "\n".join("var Find%03d = 0;" % index for index in range(205)), encoding="utf-8")
+            self.initialize({"rootUri": workspace.as_uri()})
+            symbols = self.symbols("find")
+            self.assertEqual(len(symbols), 200)
+            self.assertEqual(symbols[0]["name"], "Find000")
+            self.assertEqual(symbols[-1]["name"], "Find199")
+            self.assertEqual([symbol["name"] for symbol in self.symbols("FIND204")], ["Find204"])
+
+    def test_workspace_symbols_without_roots_only_search_open_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = pathlib.Path(directory) / "outside.tjs"
+            source.write_text("function FindDisk() {}", encoding="utf-8")
+            self.initialize()
+            self.assertEqual(self.symbols("find"), [])
+            self.send("textDocument/didOpen", {"textDocument": {
+                "uri": source.as_uri(), "version": 1, "text": "function FindOpen() {}"}})
+            self.receive()
+            self.assertEqual([symbol["name"] for symbol in self.symbols("find")], ["FindOpen"])
+            self.send("textDocument/didClose", {"textDocument": {"uri": source.as_uri()}})
+            self.receive()
+            self.assertEqual(self.symbols("find"), [])
 
     def test_diagnostics_fix_and_close(self):
         self.initialize()

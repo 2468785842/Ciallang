@@ -2,12 +2,15 @@
 """Dependency-free stdio LSP server backed by Ciallang's compile-only checker."""
 import argparse
 import json
+import os
 import pathlib
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+from urllib.parse import urlsplit
+from urllib.request import url2pathname
 
 KEYWORDS = {
     "function": "定义函数：function name(parameters) { ... }",
@@ -40,6 +43,91 @@ KEYWORDS = {
 }
 DECLARATION = re.compile(r"\b(function|var|const|class|property)\s+([\w$]+)")
 WORD = re.compile(r"[\w$]+")
+SYMBOL_KINDS = {"function": 12, "class": 5, "property": 7}
+MAX_DOCUMENT_BYTES = 2_000_000
+MAX_WORKSPACE_BYTES = 20_000_000
+MAX_WORKSPACE_FILES = 2000
+MAX_WORKSPACE_DIRECTORIES = 10000
+MAX_WORKSPACE_SYMBOLS = 200
+EXCLUDED_DIRECTORIES = {".git", ".idea", ".vscode", ".venv", ".cache", "build", "bin", "ext", "node_modules", "__pycache__"}
+
+
+def file_path(uri):
+    parsed = urlsplit(uri)
+    if parsed.scheme != "file" or parsed.query or parsed.fragment:
+        return None
+    value = parsed.path
+    if parsed.netloc and parsed.netloc != "localhost":
+        value = "//" + parsed.netloc + value
+    path = pathlib.Path(url2pathname(value))
+    if not path.is_absolute():
+        return None
+    try:
+        return path.resolve()
+    except (OSError, RuntimeError):
+        return None
+
+
+def declarations(text):
+    """Lexical declarations, with literal/comment bodies hidden but offsets preserved."""
+    masked = list(text)
+    index, expression = 0, True
+    while index < len(text):
+        start = index
+        character = text[index]
+        if character.isspace():
+            index += 1
+            continue
+        if text.startswith("//", index):
+            index = text.find("\n", index)
+            if index < 0:
+                index = len(text)
+        elif text.startswith("/*", index):
+            end = text.find("*/", index + 2)
+            index = len(text) if end < 0 else end + 2
+        elif character in "\"'" or (character == "/" and expression):
+            quote, in_class = character, False
+            index += 1
+            while index < len(text):
+                current = text[index]
+                index += 1
+                if current == "\\":
+                    index = min(index + 1, len(text))
+                elif quote == "/" and current == "[":
+                    in_class = True
+                elif quote == "/" and current == "]":
+                    in_class = False
+                elif current == quote and not in_class:
+                    break
+            expression = False
+        else:
+            word = WORD.match(text, index)
+            if word:
+                index = word.end()
+                expression = word[0] in {"return", "throw", "case", "delete", "typeof", "in"}
+            else:
+                expression = character not in ")]}."
+                index += 1
+            continue
+        for offset in range(start, index):
+            if masked[offset] != "\n":
+                masked[offset] = " "
+    source = "".join(masked)
+    symbols = []
+    offset, row, column = 0, 0, 0
+    for match in DECLARATION.finditer(source):
+        before = text[offset:match.start(2)]
+        if "\n" in before:
+            row += before.count("\n")
+            column = utf16(before.rsplit("\n", 1)[-1])
+        else:
+            column += utf16(before)
+        offset = match.start(2)
+        span = {"start": {"line": row, "character": column},
+                "end": {"line": row, "character": column + utf16(match[2])}}
+        symbols.append({"name": match[2], "kind": SYMBOL_KINDS.get(match[1], 13),
+                        "range": span, "selectionRange": span})
+    return symbols
 
 
 def utf16(text):
@@ -72,6 +160,8 @@ class Server:
         self.source = source or sys.stdin.buffer
         self.sink = sink or sys.stdout.buffer
         self.documents = {}
+        self.workspace_roots = set()
+        self.symbol_cache = {}
         self.initialized = False
         self.shutdown = False
 
@@ -85,6 +175,81 @@ class Server:
 
     def error(self, identifier, code, message):
         self.send({"jsonrpc": "2.0", "id": identifier, "error": {"code": code, "message": message}})
+
+    def update_workspace_folders(self, added, removed=()):
+        for folders, operation in ((removed, self.workspace_roots.discard), (added, self.workspace_roots.add)):
+            for folder in folders:
+                path = file_path(folder["uri"])
+                if path is not None:
+                    operation(path)
+        self.symbol_cache.clear()
+
+    def workspace_symbols(self, query):
+        def in_workspace(path):
+            return not self.workspace_roots or any(path == root or root in path.parents for root in self.workspace_roots)
+
+        # Canonical paths make an unsaved buffer override its on-disk spelling/URI.
+        overlays = {}
+        for uri, document in self.documents.items():
+            path = file_path(uri)
+            if path is not None and path.suffix.lower() == ".tjs" and in_workspace(path):
+                overlays[path] = document["text"]
+        sources, visited, total_bytes, file_count, directory_count = [], {}, 0, 0, 0
+        # Reserve the budget for current buffers before looking at disk files.
+        for path, text in sorted(overlays.items()):
+            size = len(text.encode("utf-8"))
+            if size <= MAX_DOCUMENT_BYTES and total_bytes + size <= MAX_WORKSPACE_BYTES:
+                total_bytes += size
+                sources.append((path.as_uri(), declarations(text)))
+        for root in sorted(self.workspace_roots):
+            if file_count >= MAX_WORKSPACE_FILES or directory_count >= MAX_WORKSPACE_DIRECTORIES:
+                break
+            for directory, folders, names in os.walk(root, followlinks=False):
+                directory_count += 1
+                folders[:] = sorted(name for name in folders if name not in EXCLUDED_DIRECTORIES)
+                for name in sorted(names):
+                    if file_count >= MAX_WORKSPACE_FILES:
+                        break
+                    if not name.lower().endswith(".tjs"):
+                        continue
+                    file_count += 1
+                    try:
+                        path = (pathlib.Path(directory) / name).resolve()
+                        if not in_workspace(path) or path in visited or path in overlays:
+                            continue
+                        stat = path.stat()
+                        if stat.st_size > MAX_DOCUMENT_BYTES or total_bytes + stat.st_size > MAX_WORKSPACE_BYTES:
+                            continue
+                        signature = (stat.st_mtime_ns, stat.st_size)
+                        size = stat.st_size
+                        cached = self.symbol_cache.get(path)
+                        if cached and cached[0] == signature:
+                            symbols = cached[1]
+                        else:
+                            with path.open("rb") as stream:
+                                data = stream.read(MAX_DOCUMENT_BYTES + 1)
+                            if len(data) > MAX_DOCUMENT_BYTES:
+                                continue
+                            size = len(data)
+                            symbols = declarations(data.decode("utf-8-sig"))
+                    except (OSError, UnicodeError, RuntimeError):
+                        continue
+                    if total_bytes + size > MAX_WORKSPACE_BYTES:
+                        continue
+                    total_bytes += size
+                    visited[path] = (signature, symbols)
+                    sources.append((path.as_uri(), symbols))
+                if file_count >= MAX_WORKSPACE_FILES or directory_count >= MAX_WORKSPACE_DIRECTORIES:
+                    break
+        self.symbol_cache = visited
+        query = query.casefold()
+        results = [{"name": symbol["name"], "kind": symbol["kind"],
+                    "location": {"uri": uri, "range": symbol["selectionRange"]}}
+                   for uri, symbols in sources for symbol in symbols if query in symbol["name"].casefold()]
+        results.sort(key=lambda symbol: (symbol["name"].casefold(), symbol["location"]["uri"],
+                                         symbol["location"]["range"]["start"]["line"],
+                                         symbol["location"]["range"]["start"]["character"]))
+        return results[:MAX_WORKSPACE_SYMBOLS]
 
     def check(self, text):
         with tempfile.TemporaryDirectory(prefix="cial-lsp-") as directory:
@@ -130,16 +295,34 @@ class Server:
                 self.error(identifier, -32600, "Server was already initialized")
                 return None
             self.initialized = True
+            folders = params.get("workspaceFolders")
+            if folders is None:
+                root_uri = params.get("rootUri")
+                if root_uri:
+                    folders = [{"uri": root_uri}]
+                elif params.get("rootPath"):
+                    folders = [{"uri": pathlib.Path(params["rootPath"]).resolve().as_uri()}]
+            self.update_workspace_folders(folders or [])
             self.result(identifier, {"capabilities": {"positionEncoding": "utf-16", "textDocumentSync": {"openClose": True, "change": 1},
                                                      "completionProvider": {}, "hoverProvider": True,
-                                                     "documentSymbolProvider": True},
-                                     "serverInfo": {"name": "Ciallang LSP", "version": "0.1.0"}})
+                                                     "documentSymbolProvider": True, "workspaceSymbolProvider": True,
+                                                     "workspace": {"workspaceFolders": {"supported": True,
+                                                                                         "changeNotifications": True}}},
+                                     "serverInfo": {"name": "Ciallang LSP", "version": "0.2.0"}})
         elif not self.initialized or self.shutdown:
             if "id" in request:
                 self.error(identifier, -32002 if not self.initialized else -32600, "Server is not active")
         elif method == "shutdown":
             self.shutdown = True
             self.result(identifier, None)
+        elif method == "workspace/didChangeWorkspaceFolders":
+            event = params["event"]
+            self.update_workspace_folders(event.get("added", []), event.get("removed", []))
+        elif method == "workspace/symbol":
+            query = params.get("query", "")
+            if not isinstance(query, str):
+                raise ValueError("Workspace symbol query must be a string")
+            self.result(identifier, self.workspace_symbols(query))
         elif method in ("initialized", "$/cancelRequest", "$/setTrace"):
             pass
         elif method in ("textDocument/didOpen", "textDocument/didChange"):
@@ -166,7 +349,7 @@ class Server:
             document = self.documents.get(params["textDocument"]["uri"], {"text": ""})
             text = document["text"]
             if method.endswith("completion"):
-                names = set(KEYWORDS) | {match[2] for match in DECLARATION.finditer(text)}
+                names = set(KEYWORDS) | {symbol["name"] for symbol in declarations(text)}
                 prefix = line_prefix(text, params["position"])
                 match = re.search(r"[\w$]+$", prefix)
                 prefix = match[0] if match else ""
@@ -181,16 +364,7 @@ class Server:
                 help_text = KEYWORDS.get(match[0]) if match else None
                 self.result(identifier, {"contents": {"kind": "plaintext", "value": help_text}} if help_text else None)
             else:
-                symbols = []
-                for match in DECLARATION.finditer(text):
-                    before = text[:match.start(2)]
-                    row = before.count("\n")
-                    column = utf16(before.rsplit("\n", 1)[-1])
-                    span = {"start": {"line": row, "character": column},
-                            "end": {"line": row, "character": column + utf16(match[2])}}
-                    symbols.append({"name": match[2], "kind": {"function": 12, "class": 5, "property": 7}.get(match[1], 13),
-                                    "range": span, "selectionRange": span})
-                self.result(identifier, symbols)
+                self.result(identifier, declarations(text))
         elif "id" in request:
             self.error(identifier, -32601, "Method not found: " + str(method))
         return None
