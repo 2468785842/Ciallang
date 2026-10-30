@@ -67,7 +67,7 @@
   编码由 `src/vm/Bytecode.cpp` 完成，执行统一走 `VMState::run()`。
 - `Register/Label/ConstIdx`：`%n`、`@n`、`*n` 强类型操作数。
 - `ControlFlowGraph` + `Optimizer`：CFG/BasicBlock、整数常量折叠、死 LoadImm 清理与比较/Test 融合，
-  由 `src/gen/IRGenerator.cpp` 的 `parseAst()` 接入；NOP 压缩同步重映射跳转、try 表与行号。
+  由 `src/gen/Optimizer.cpp` 的 `optimizeDefaultChunk()` 组装，通过 `IRGenerator` 构造参数注入并传递给嵌套 Chunk；NOP 压缩同步重映射跳转、try 表与行号。
 
 ### 2.4 `src/vm/` — 执行引擎
 

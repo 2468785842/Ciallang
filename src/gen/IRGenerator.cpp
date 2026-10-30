@@ -16,7 +16,6 @@
 
 #include <fmt/format.h>
 
-#include "Optimizer.hpp"
 #include "common/Defer.hpp"
 #include "runtime/Runtime.hpp"
 
@@ -28,8 +27,8 @@
 
 namespace cial::inter {
 
-    IRGenerator::IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile) :
-        _rt(rt), _sourceFile(sourceFile), _r(r) {}
+    IRGenerator::IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile, ChunkOptimizer optimize) :
+        _rt(rt), _sourceFile(sourceFile), _r(r), _optimize(optimize) {}
 
     IRGenerator::~IRGenerator() = default;
 
@@ -43,25 +42,8 @@ namespace cial::inter {
         _chunk->setRegCount(_regNextIndex);
         const auto chunk = std::move(_chunk);
         // 字节码由 VM 进入帧时按需生成。
-        OptimizerManager optimizerManager(*chunk);
-        optimizerManager.addOptimizer(std::make_unique<CopyPropagationOptimizer>());
-        optimizerManager.addOptimizer(std::make_unique<IntegerConstantPropagationOptimizer>());
-        optimizerManager.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>(optReg));
-        optimizerManager.addOptimizer(std::make_unique<CompareTestFusionOptimizer>());
-        const OptimizerStats optimizerStats = optimizerManager.applyOptimizations();
-        if(OptimizerManager::profilingEnabled()) {
-            fmt::print(stderr,
-                       "[optimizer] TAC {} -> {}, removed={} by compaction, CFG {:.3f} us, compaction {:.3f} us",
-                       optimizerStats.instructionsBefore, optimizerStats.instructionsAfter,
-                       optimizerStats.instructionsRemovedByCompaction,
-                       static_cast<double>(optimizerStats.cfgNanoseconds) / 1000.0,
-                       static_cast<double>(optimizerStats.compactionNanoseconds) / 1000.0);
-            for(const auto &pass : optimizerStats.passes)
-                fmt::print(stderr, ", {} {:.3f} us (TAC {} -> {}, transforms={})", pass.name,
-                           static_cast<double>(pass.nanoseconds) / 1000.0, pass.instructionsBefore,
-                           pass.instructionsAfter, pass.transformations);
-            fmt::print(stderr, "\n");
-        }
+        if(_optimize)
+            _optimize(*chunk, optReg);
 
         _chunk = std::make_unique<vm::Chunk>();
         return vm::Chunk{ std::move(*chunk) };
@@ -1068,7 +1050,7 @@ namespace cial::inter {
         }
 
         {
-            auto gen = IRGenerator{ _r, _rt, _sourceFile };
+            auto gen = IRGenerator{ _r, _rt, _sourceFile, _optimize };
             gen.makeVirtualGlobalScope();
 
             for(const auto *varDeclNode : node->varDeclVec) {
@@ -1097,7 +1079,7 @@ namespace cial::inter {
         }
 
         {
-            auto gen = IRGenerator{ _r, _rt, _sourceFile };
+            auto gen = IRGenerator{ _r, _rt, _sourceFile, _optimize };
             gen.makeVirtualGlobalScope();
 
             // must init var in begin state
@@ -1176,7 +1158,7 @@ namespace cial::inter {
         // finalize function placeholder
         if(Atom finalizeAtom = _rt.atomTable.intern("finalize"_str); classMeta->hasMember(finalizeAtom) < 0) {
             OptReg ignoreReg{};
-            IRGenerator genFinalize{ _r, _rt, _sourceFile };
+            IRGenerator genFinalize{ _r, _rt, _sourceFile, _optimize };
             genFinalize.makeVirtualGlobalScope();
             auto voidReg = genFinalize.loadVoidReg();
             genFinalize._chunk->emit<Ret>(voidReg);
@@ -1647,7 +1629,7 @@ namespace cial::inter {
     FuncMeta *IRGenerator::generateFuncMeta(const syntax::Parameters &parameters,
                                             const syntax::BlockStmtNode *body) const {
 
-        auto gen = IRGenerator{ _r, _rt, _sourceFile };
+        auto gen = IRGenerator{ _r, _rt, _sourceFile, _optimize };
         gen.makeVirtualGlobalScope();
 
         // 调用约定：实参按位置落入帧寄存器 0..arity-1，参数寄存器必须连续分配，

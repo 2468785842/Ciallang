@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include "stdlib/StandardLibrary.hpp"
 
 #include "common/SourceFile.hpp"
 #include "types/Array.hpp"
@@ -76,7 +77,7 @@ TEST_CASE("Value handles keep objects alive after their evaluation and copied ha
 TEST_CASE("Class registration and builtins survive allocation-triggered collection", "[runtime][gc]") {
     Runtime runtime;
     Context context{ runtime };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     // Fill the pool with garbage so a subsequent registration triggers GC.
     auto [used, total] = runtime.markSweep.memoryInfo();
     for(auto remaining = (total - used) / NODE_SIZE; remaining > 1; --remaining)

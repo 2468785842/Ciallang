@@ -7,10 +7,13 @@
 #include "types/Value.hpp"
 
 namespace cial {
+    class Context;
     class VM;
 }
 
 namespace cial::stdlib {
+
+    void registerArrayLib(Context &context);
 
     // push(...values)：尾部追加，返回新 count
     Value arrayPush(VM *vm, const Value &thisObj, size_t argCount, Value *args);

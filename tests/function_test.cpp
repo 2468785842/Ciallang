@@ -5,6 +5,7 @@
  */
 
 #include <catch2/catch_all.hpp>
+#include "stdlib/StandardLibrary.hpp"
 
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
@@ -237,7 +238,7 @@ TEST_CASE("函数声明 - 递归函数") {
 TEST_CASE("省略透传 / collapse 参数 / 展开调用（源码路径，对齐 tjs.y func_decl_arg_collapse）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 

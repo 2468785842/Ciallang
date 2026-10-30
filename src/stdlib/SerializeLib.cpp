@@ -10,6 +10,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "SerializeLib.hpp"
+#include "runtime/Context.hpp"
 
 #include <bit>
 #include <cmath>
@@ -23,6 +24,20 @@
 #include "vm/VM.hpp"
 
 namespace cial::stdlib {
+    void registerSerializeLib(Context &context) {
+        context.registerMethod<Array>("load"_str, &stdlib::arrayLoad);
+        context.registerMethod<Array>("save"_str, &stdlib::arraySave);
+        context.registerMethod<Array>("loadStruct"_str, &stdlib::arrayLoadStruct);
+        context.registerMethod<Array>("saveStruct"_str, &stdlib::arraySaveStruct);
+        context.registerMethod<Array>("pack"_str, &stdlib::arrayPack);
+        context.registerMethod<Array>("assignStruct"_str, &stdlib::arrayAssignStruct);
+        context.registerMethod<Dictionary>("load"_str, &stdlib::dictLoad);
+        context.registerMethod<Dictionary>("save"_str, &stdlib::dictSave);
+        context.registerMethod<Dictionary>("loadStruct"_str, &stdlib::dictLoadStruct);
+        context.registerMethod<Dictionary>("saveStruct"_str, &stdlib::dictSaveStruct);
+        context.registerMethod<Dictionary>("assignStruct"_str, &stdlib::dictAssignStruct);
+        context.registerMethod<Octet>("unpack"_str, &stdlib::octetUnpack);
+    }
 
     namespace {
 

@@ -4,6 +4,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "DateLib.hpp"
+#include "runtime/Context.hpp"
 
 #include <ctime>
 #include <stdexcept>
@@ -12,6 +13,27 @@
 #include "vm/VMState.hpp"
 
 namespace cial::stdlib {
+    void registerDateLib(Context &context) {
+        context.registerMethod<DateNS>("getYear"_str, &stdlib::dateGetYear);
+        context.registerMethod<DateNS>("getMonth"_str, &stdlib::dateGetMonth);
+        context.registerMethod<DateNS>("getDate"_str, &stdlib::dateGetDate);
+        context.registerMethod<DateNS>("getDay"_str, &stdlib::dateGetDay);
+        context.registerMethod<DateNS>("getHours"_str, &stdlib::dateGetHours);
+        context.registerMethod<DateNS>("getMinutes"_str, &stdlib::dateGetMinutes);
+        context.registerMethod<DateNS>("getSeconds"_str, &stdlib::dateGetSeconds);
+        context.registerMethod<DateNS>("getTime"_str, &stdlib::dateGetTime);
+        context.registerMethod<DateNS>("setYear"_str, &stdlib::dateSetYear);
+        context.registerMethod<DateNS>("setMonth"_str, &stdlib::dateSetMonth);
+        context.registerMethod<DateNS>("setDate"_str, &stdlib::dateSetDate);
+        context.registerMethod<DateNS>("setHours"_str, &stdlib::dateSetHours);
+        context.registerMethod<DateNS>("setMinutes"_str, &stdlib::dateSetMinutes);
+        context.registerMethod<DateNS>("setSeconds"_str, &stdlib::dateSetSeconds);
+        context.registerMethod<DateNS>("setTime"_str, &stdlib::dateSetTime);
+        context.registerMethod<DateNS>("parse"_str, &stdlib::dateParse);
+        context.registerMethod<DateNS>("getTimezoneOffset"_str, &stdlib::dateGetTimezoneOffset);
+        // Date 类对象：占位实例（call 即构造：new Date()/分量/字符串）
+        context.registerClass<DateNS>("Date"_str);
+    }
 
     namespace {
         DateNS *asDate(const Value &thisObj) {

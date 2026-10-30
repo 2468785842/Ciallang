@@ -2,11 +2,23 @@
 //
 
 #include "DictLib.hpp"
+#include "runtime/Context.hpp"
 
 #include "types/Dictionary.hpp"
 #include "vm/VM.hpp"
 
 namespace cial::stdlib {
+    void registerDictLib(Context &context) {
+        context.registerMethod<Dictionary>("assign"_str, &stdlib::dictAssign);
+        context.registerMethod<Dictionary>("clear"_str, &stdlib::dictClear);
+        context.registerMethod<Dictionary>("erase"_str, &stdlib::dictErase);
+        // count 属性
+        context.registerProperty<Dictionary>("count"_str, [](const Value &thisObj) {
+            return Value{ Integer{
+                static_cast<Integer>(dynamic_cast<Dictionary &>(*thisObj.asObject().unwrap()).members.size()) } };
+        });
+        context.registerClass<Dictionary>("Dictionary"_str);
+    }
 
     namespace {
         Dictionary *asDict(const Value &thisObj) {

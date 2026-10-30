@@ -14,11 +14,12 @@ target_link_libraries(host PRIVATE Ciallang::Ciallang)
 
 ```cpp
 #include "vm/VM.hpp"
+#include "stdlib/StandardLibrary.hpp"
 
 int main() {
     cial::Runtime runtime;
     cial::Context context{ runtime };
-    context.initNativeMethod();
+    cial::stdlib::registerStandardLibrary(context);
     cial::vm::VMState state{ context };
     cial::VM vm{ &state };
     return *vm.evalExpr<cial::Integer>(cial::String{ "40 + 2" }) == 42 ? 0 : 1;
@@ -28,6 +29,17 @@ int main() {
 Runtime 的生命周期必须覆盖 Context、VMState 和所有 Handle。Handle/RootGuard 拷贝会独立保根，移动转移根；`Handle<Value>` 同样保护对象值。Value 句柄的箭头访问提供只读值视图，避免直接改写值后与已登记的根失配。`get()` 返回的裸指针仍受句柄生命周期约束（`src/runtime/Runtime.hpp`、`src/vm/VM.hpp`）。
 
 ## 统一宿主注册
+
+内建库由 `stdlib::registerStandardLibrary(context)` 显式安装；也可只调用所需库的
+`registerStringLib`、`registerArrayLib` 等入口。方法、属性和类对象的注册细节位于各自
+`src/stdlib/*Lib.cpp`，结构化存取方法由 `registerSerializeLib` 安装。
+汇总入口见 `src/stdlib/StandardLibrary.hpp/.cpp`；Context 只提供注册机制。
+
+IRGenerator 构造函数接受 `ChunkOptimizer` 函数指针，默认使用
+`optimizeDefaultChunk`，传入 `nullptr` 可生成未优化 TAC。自定义策略会传递到函数、
+构造器和属性访问器；策略收到的 `OptReg` 是必须保留的外部结果寄存器。
+默认 pass 组装与性能统计位于 `src/gen/Optimizer.cpp`，注入接口见
+`src/gen/IRGenerator.hpp`。
 
 ```cpp
 using namespace cial;

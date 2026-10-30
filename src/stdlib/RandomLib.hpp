@@ -14,6 +14,7 @@
 #include "types/Value.hpp"
 
 namespace cial {
+    class Context;
 
     class VM;
 
@@ -68,6 +69,8 @@ namespace cial {
 } // namespace cial
 
 namespace cial::stdlib {
+
+    void registerRandomLib(Context &context);
 
     Value rgRandomize(VM *, const Value &thisObj, size_t argCount, Value *args);
     Value rgRandom(VM *, const Value &thisObj, size_t, Value *);

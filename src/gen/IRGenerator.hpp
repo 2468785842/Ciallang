@@ -23,10 +23,15 @@
 
 namespace cial::inter {
 
+    // 每个生成的 Chunk（含函数/构造器/访问器）使用同一外部优化策略。
+    using ChunkOptimizer = void (*)(vm::Chunk &, OptReg);
+    void optimizeDefaultChunk(vm::Chunk &chunk, OptReg externallyObserved);
+
     class IRGenerator {
 
     public:
-        explicit IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile);
+        explicit IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile,
+                             ChunkOptimizer optimize = optimizeDefaultChunk);
         ~IRGenerator();
         IRGenerator(const IRGenerator &) = delete;
         IRGenerator &operator=(const IRGenerator &) = delete;
@@ -74,6 +79,7 @@ namespace cial::inter {
         Runtime &_rt;
         Common::SourceFile &_sourceFile;
         Common::Result &_r;
+        ChunkOptimizer _optimize;
 
         OptReg _empty{};
 

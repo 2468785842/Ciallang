@@ -6,10 +6,13 @@
 #include "types/Value.hpp"
 
 namespace cial {
+    class Context;
     class VM;
 }
 
 namespace cial::stdlib {
+
+    void registerDictLib(Context &context);
 
     // assign(src)：把 src 字典内容浅拷贝到 this（替换现有成员）
     void dictAssign(VM *vm, const Value &thisObj, size_t argCount, Value *args);

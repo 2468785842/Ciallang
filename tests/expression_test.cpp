@@ -5,6 +5,7 @@
  */
 
 #include <catch2/catch_all.hpp>
+#include "stdlib/StandardLibrary.hpp"
 
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
@@ -352,7 +353,7 @@ TEST_CASE("表达式 - instanceof 基础类型") {
 TEST_CASE("表达式 - Array/Dictionary 字面量与下标") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 

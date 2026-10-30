@@ -9,8 +9,32 @@
 #include <limits>
 #include <stdexcept>
 
+#include <fmt/format.h>
+
 namespace cial::inter {
     using namespace vm;
+
+    void optimizeDefaultChunk(vm::Chunk &chunk, const OptReg optReg) {
+        OptimizerManager optimizerManager(chunk);
+        optimizerManager.addOptimizer(std::make_unique<CopyPropagationOptimizer>());
+        optimizerManager.addOptimizer(std::make_unique<IntegerConstantPropagationOptimizer>());
+        optimizerManager.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>(optReg));
+        optimizerManager.addOptimizer(std::make_unique<CompareTestFusionOptimizer>());
+        const OptimizerStats optimizerStats = optimizerManager.applyOptimizations();
+        if(OptimizerManager::profilingEnabled()) {
+            fmt::print(stderr,
+                       "[optimizer] TAC {} -> {}, removed={} by compaction, CFG {:.3f} us, compaction {:.3f} us",
+                       optimizerStats.instructionsBefore, optimizerStats.instructionsAfter,
+                       optimizerStats.instructionsRemovedByCompaction,
+                       static_cast<double>(optimizerStats.cfgNanoseconds) / 1000.0,
+                       static_cast<double>(optimizerStats.compactionNanoseconds) / 1000.0);
+            for(const auto &pass : optimizerStats.passes)
+                fmt::print(stderr, ", {} {:.3f} us (TAC {} -> {}, transforms={})", pass.name,
+                           static_cast<double>(pass.nanoseconds) / 1000.0, pass.instructionsBefore,
+                           pass.instructionsAfter, pass.transformations);
+            fmt::print(stderr, "\n");
+        }
+    }
 
     bool OptimizerManager::profilingEnabled() noexcept {
         static const bool enabled = [] {

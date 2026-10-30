@@ -2,6 +2,7 @@
 //
 
 #include "RandomLib.hpp"
+#include "runtime/Context.hpp"
 
 #include <cstring>
 #include <ctime>
@@ -204,6 +205,15 @@ namespace cial {
 } // namespace cial
 
 namespace cial::stdlib {
+    void registerRandomLib(Context &context) {
+        context.registerMethod<RandomGen>("randomize"_str, &stdlib::rgRandomize);
+        context.registerMethod<RandomGen>("random"_str, &stdlib::rgRandom);
+        context.registerMethod<RandomGen>("random32"_str, &stdlib::rgRandom32);
+        context.registerMethod<RandomGen>("random63"_str, &stdlib::rgRandom63);
+        context.registerMethod<RandomGen>("random64"_str, &stdlib::rgRandom64);
+        context.registerMethod<RandomGen>("serialize"_str, &stdlib::rgSerialize);
+    }
+
 
     Value rgRandomize(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
         auto *rg = dynamic_cast<RandomGen *>(thisObj.asObject().unwrap());

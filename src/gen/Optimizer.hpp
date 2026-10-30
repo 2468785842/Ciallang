@@ -79,6 +79,8 @@ namespace cial::inter {
         size_t optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) override;
     };
 
+    void optimizeDefaultChunk(vm::Chunk &chunk, OptReg externallyObserved = {});
+
     class OptimizerManager {
     public:
         explicit OptimizerManager(vm::Chunk &chunk) : chunk(chunk) {}

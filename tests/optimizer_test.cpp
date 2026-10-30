@@ -3,11 +3,48 @@
 #include <algorithm>
 
 #include "gen/ControlFlowGraph.hpp"
+#include "gen/IRGenerator.hpp"
 #include "gen/Optimizer.hpp"
+#include "parser/Parser.hpp"
+#include "runtime/Context.hpp"
 #include "vm/Chunk.hpp"
 
 using namespace cial;
 using namespace cial::inter;
+
+TEST_CASE("optimizer - external strategy reaches nested chunks") {
+    Runtime runtime;
+    Context context{ runtime };
+    Common::Result diagnostics;
+    Common::SourceFile source;
+    static size_t calls;
+    calls = 0;
+    size_t expectedCalls = 3;
+    SECTION("nested functions") {
+        source.load(diagnostics, "function outer() { function inner() { return 42; } return inner(); }");
+    }
+    SECTION("class constructor and property accessors") {
+        expectedCalls = 6;
+        source.load(diagnostics, "class A { function A() {} property x { getter() { return 1; } setter(v) {} } }");
+    }
+    syntax::Parser parser{ source, context.pp() };
+    auto *node = parser.parse(diagnostics);
+    REQUIRE_FALSE(diagnostics.isFailed());
+    IRGenerator generator{ diagnostics, runtime, source, [](vm::Chunk &chunk, OptReg result) {
+                              ++calls;
+                              optimizeDefaultChunk(chunk, result);
+                          } };
+    OptReg result;
+    auto chunk = generator.parseAst(node, result);
+    REQUIRE_FALSE(diagnostics.isFailed());
+    REQUIRE(chunk.has_value());
+    REQUIRE(calls == expectedCalls);
+
+    calls = 0;
+    IRGenerator unoptimized{ diagnostics, runtime, source, nullptr };
+    REQUIRE(unoptimized.parseAst(node, result).has_value());
+    REQUIRE(calls == 0);
+}
 
 TEST_CASE("optimizer - CFG builds branch and fallthrough edges") {
     vm::Chunk chunk;

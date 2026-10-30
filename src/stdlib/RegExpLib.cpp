@@ -2,12 +2,22 @@
 //
 
 #include "RegExpLib.hpp"
+#include "runtime/Context.hpp"
 
 #include "common/UTF8.hpp"
 #include "types/Array.hpp"
 #include "vm/VM.hpp"
 
 namespace cial::stdlib {
+    void registerRegExpLib(Context &context) {
+        context.registerMethod<RegExp>("test"_str, &stdlib::regexpTest);
+        context.registerMethod<RegExp>("match"_str, &stdlib::regexpMatch);
+        context.registerMethod<RegExp>("exec"_str, &stdlib::regexpExec);
+        context.registerMethod<RegExp>("compile"_str, &stdlib::regexpCompile);
+        context.registerMethod<RegExp>("replace"_str, &stdlib::regexpReplace);
+        context.registerMethod<RegExp>("split"_str, &stdlib::regexpSplit);
+        context.registerClass<RegExp>("RegExp"_str, &context.rt(), ""_str);
+    }
 
     namespace {
         RegExp *asRegExp(const Value &thisObj) {

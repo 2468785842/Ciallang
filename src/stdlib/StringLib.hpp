@@ -16,10 +16,13 @@
 #include "types/Value.hpp"
 
 namespace cial {
+    class Context;
     class VM;
 }
 
 namespace cial::stdlib {
+
+    void registerStringLib(Context &context);
 
     String stringCharAt(VM *, const Value &thisObj, size_t argCount, Integer index);
 

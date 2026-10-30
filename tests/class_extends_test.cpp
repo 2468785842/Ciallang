@@ -3,6 +3,7 @@
 //
 
 #include <catch2/catch_all.hpp>
+#include "stdlib/StandardLibrary.hpp"
 
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
@@ -775,7 +776,7 @@ TEST_CASE("TJS2 - super.<Ctor>() 显式基类构造调用") {
 TEST_CASE("无构造器类 new 走默认构造（原版 UB，按参考实现实测对齐）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 

@@ -1,4 +1,5 @@
 #include <catch2/catch_all.hpp>
+#include "stdlib/StandardLibrary.hpp"
 
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
@@ -122,7 +123,7 @@ TEST_CASE("execution trace source lines use predecessor and consecutive compress
 TEST_CASE("execution trace supports nested run from native callbacks", "[trace]") {
     Runtime rt;
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState state{ context };
     VM vm{ &state };
     vm::ExecutionTrace trace;

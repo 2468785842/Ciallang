@@ -7,6 +7,7 @@
  */
 
 #include <catch2/catch_all.hpp>
+#include "stdlib/StandardLibrary.hpp"
 
 #include <fmt/ostream.h>
 
@@ -50,7 +51,7 @@ namespace {
         TjsTranslatedProgram program;
 
         explicit CorpusRun(const std::string &path) : context(rt), vmState(context) {
-            context.initNativeMethod();
+            stdlib::registerStandardLibrary(context);
             context.registryGlobalFunc("print"_str, &stdlib::S_PrintFunction);
             context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
             VM vm{ &vmState };
@@ -85,7 +86,7 @@ var Debug = new __DebugShim();
 TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -190,7 +191,7 @@ TEST_CASE("TJS2 字节码转译——M2 语料端到端（类/NEW/property/继�
 TEST_CASE("TJS2 字节码转译——TYPEOFD/DELD 直译") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -221,7 +222,7 @@ TEST_CASE("TJS2 字节码转译——TYPEOFD/DELD 直译") {
 TEST_CASE("TJS2 字节码转译——BNOT/NUM/OCTET 转换指令（M3）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 

@@ -10,10 +10,13 @@
 #include "types/Value.hpp"
 
 namespace cial {
+    class Context;
     class VM;
 }
 
 namespace cial::stdlib {
+
+    void registerRegExpLib(Context &context);
 
     // /re/.test(target)：搜索并更新匹配状态（g 时推进 start），返回是否命中
     Value regexpTest(VM *vm, const Value &thisObj, size_t argCount, Value *args);

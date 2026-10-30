@@ -11,6 +11,7 @@
 #include "types/Value.hpp"
 
 namespace cial {
+    class Context;
 
     class VM;
 
@@ -45,6 +46,8 @@ namespace cial {
 } // namespace cial
 
 namespace cial::stdlib {
+
+    void registerMathLib(Context &context);
 
     // 全部方法语义对齐 tjsMath.cpp：参数经 AsReal 转换、返回 Real
     Value mathAbs(VM *, const Value &, size_t, Value *args);

@@ -13,6 +13,7 @@
  */
 
 #include <catch2/catch_all.hpp>
+#include "stdlib/StandardLibrary.hpp"
 
 #include "StderrCapture.hpp"
 
@@ -105,7 +106,7 @@ TEST_CASE("解释器 - 边界与错误路径") {
 TEST_CASE("with 语句与裸词链") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
     stdlib::initExceptionClass(vm);
@@ -236,7 +237,7 @@ TEST_CASE("GC automatic collection drains finalizers without growing the VM stac
 TEST_CASE("GC finalizers run at VM safe points and retain cyclic dependencies", "[gc]") {
     Runtime rt{ 512 };
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState state{ context };
     VM vm{ &state };
     vm.eval(R"(

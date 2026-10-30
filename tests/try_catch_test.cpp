@@ -3,6 +3,7 @@
 //
 
 #include <catch2/catch_all.hpp>
+#include "stdlib/StandardLibrary.hpp"
 
 #include "vm/VM.hpp"
 #include "stdlib/ExceptionLib.hpp"
@@ -106,7 +107,7 @@ TEST_CASE("异常处理 - 执行") {
 TEST_CASE("Exception 内建类与原生异常包装") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
     stdlib::initExceptionClass(vm);

@@ -37,8 +37,6 @@ namespace cial {
         // GC 运行时根入口：供 Runtime 在分配触发回收时调用
         void collectMark() const override;
 
-        void initNativeMethod();
-
         void registerGlobal(const String &name, const Value &value) const;
 
         template <typename T, typename... Args>

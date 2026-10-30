@@ -1,6 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "Application.hpp"
+#include "stdlib/StandardLibrary.hpp"
 
 #include <chrono>
 #include <cstdlib>
@@ -22,7 +23,7 @@
 namespace cial::cli {
     namespace {
         void initializeSession(Context &context, VM &vm) {
-            context.initNativeMethod();
+            stdlib::registerStandardLibrary(context);
             context.registryGlobalFunc("print"_str, &stdlib::S_PrintFunction);
             context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
             vm.eval(R"(class __DebugShim {

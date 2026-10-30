@@ -12,6 +12,7 @@
 #include "types/Value.hpp"
 
 namespace cial {
+    class Context;
 
     class VM;
 
@@ -33,6 +34,8 @@ namespace cial {
 } // namespace cial
 
 namespace cial::stdlib {
+
+    void registerDateLib(Context &context);
 
     // 实例方法（thisObj 为 DateNS；get 系走 localtime，set 系读改 mktime）
     Value dateGetYear(VM *, const Value &, size_t, Value *);

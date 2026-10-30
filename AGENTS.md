@@ -56,12 +56,12 @@ Ciallang/
 |---|---|---|
 | `src/common/` | 基础设施 | `Result.hpp`(错误收集)、`Ret.hpp`(ErrCode/Ret<T>)、`SourceFile`、`SourceLocation`、`UTF8`、`Hash.hpp`、`Defer.hpp` |
 | `src/parser/` | 词法+语法+预处理 | `Lexer`(手写 DFA)、`Parser`(Pratt 优先级)、`PreProcessor`(@set/@if)、`Token.hpp`、`OperatorTrie`、`ast/*`(AstNode 基类 + X-macro 节点枚举) |
-| `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**95 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`SSA`(按需静态单赋值分析，`--dump-ssa`，见 doc/ssa.md)、`ControlFlowGraph`+`Optimizer`(基本块 CFG+自然循环识别（支配树回边检测，getLoops()）、拷贝传播（GLocal/DLocal 纯拷贝改写+死拷贝清除，管线首位）、整数常量传播（块内折叠+唯一前驱跨块继承）、死 `LoadImm`/死拷贝清理、CompareTest 融合；在 `parseAst()` 接线) |
+| `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**95 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`SSA`(按需静态单赋值分析，`--dump-ssa`，见 doc/ssa.md)、`ControlFlowGraph`+`Optimizer`(基本块 CFG+自然循环识别（支配树回边检测，getLoops()）、拷贝传播（GLocal/DLocal 纯拷贝改写+死拷贝清除，管线首位）、整数常量传播（块内折叠+唯一前驱跨块继承）、死 `LoadImm`/死拷贝清理、CompareTest 融合；由外部 `optimizeDefaultChunk` 组装，`parseAst()` 调用注入策略) |
 | `src/vm/` | 执行引擎 | `VMState`(字节码派发与调用帧调度)、`Chunk`(指令+常量池+双空间 try 表)、`Bytecode`(扁平 u8 编码, **95/95 全实现**)、`CallFrame`(含 thisData 缓存 + argWindowDirect 直写布局)、`FastRegisterPool`、`Constant.hpp`(FuncMeta/ClassMeta/PropMeta)、`Rlc`(行号表)、`VM.hpp`(宿主门面)、`ExecutionTrace`(真实路径 DOT)、`IntegerJit`(可选 x64 整数 JIT/热路径守卫；默认关闭) |
 | `src/runtime/` | 全局运行时 | `Runtime`(GC/RootGuard/atomTable)、`Context`(调用栈/全局对象, 深度上限 1024)、`AtomTable`(字符串驻留 Atom) |
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
 | `src/gc/` | 内存管理 | `MarkSweepHeader`、固定 512B 节点自由链表 + 标记清除 |
-| `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`NativeRegister`(按 TypeId 分派原生方法)、`Debug` |
+| `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`NativeRegister`(按 TypeId 分派原生方法)、`StandardLibrary`(汇总各 `*Lib` 的 Context 注册入口)、`Debug` |
 | `src/tjsbc/` | TJS2 字节码转译（阶段 2，M1–M4 完成） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(恒等平移/标志物化与 M3 前瞻融合（Cmp 族直写 zf）/属性全族（含整数成员名；direct 名走 *C Atom 直引指令）/类 context 加载期解释/NEW→Call/P 变体与 GETP·SETP/DELD·TYPEOFD/proxy 回落链/省略透传·展开调用·collapse 参数/BNOT·NUM·OCTET/dst=0 丢弃语义——tjs2 语料 12 文件字节码路径全量通过，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
 | `src/logging/` | 日志 | `Logger`（fmt 实际输出） |
 | `src/main.cpp` / `src/cli/` | 进程入口；argparse 参数、编译/诊断、执行与 REPL 分模块，见 [doc/cli.md](doc/cli.md) |
@@ -122,7 +122,7 @@ bash fuzz/run_fuzz_parser.sh
    回调期间再 GC、环和复活均受保护，终结一次，异常经脚本异常协议传播。
    队列由 `Runtime::collectMark()` 标记，见 `src/gc/gc.hpp`、`src/vm/VMState.cpp`。
    Runtime 销毁阶段不执行脚本；宿主主动收集后应让所属 VM 再运行或在有效帧中 drain。
-6. **优化器范围有限**：`IRGenerator::parseAst()` 已接入 CFG、溢出安全的整数 `Add/Sub/Mul` 常量传播（块内折叠 + 唯一前驱块间继承出口状态；回边与多前驱保守放弃）、死 `LoadImm` 清理、保留结果寄存器的 CompareTest 融合和 NOP 压缩；常量池 `Load` 会实例化运行时对象，DCE 不得删除。压缩会重映射跳转、try 区间与 RLC 行号。DCE 对 try 保护块保守保留加载，其他指令按活跃性屏障处理。默认优化管线尚无 SSA、跨块汇合点传播或 `LoadSub`，性能结果以 `doc/performance.md` 的同机对照为准；扩展优化前先做同机 Release 对拍基准并覆盖外部可观察寄存器、异常边与元数据重映射。
+6. **优化器范围有限**：`src/gen/Optimizer.cpp` 的默认策略已接入 CFG、溢出安全的整数 `Add/Sub/Mul` 常量传播（块内折叠 + 唯一前驱块间继承出口状态；回边与多前驱保守放弃）、死 `LoadImm` 清理、保留结果寄存器的 CompareTest 融合和 NOP 压缩；常量池 `Load` 会实例化运行时对象，DCE 不得删除。压缩会重映射跳转、try 区间与 RLC 行号。DCE 对 try 保护块保守保留加载，其他指令按活跃性屏障处理。默认优化管线尚无 SSA、跨块汇合点传播或 `LoadSub`，性能结果以 `doc/performance.md` 的同机对照为准；扩展优化前先做同机 Release 对拍基准并覆盖外部可观察寄存器、异常边与元数据重映射。
 7. **Value 字符串分短串内联和长串共享两种**：14 字节内直接存 String，长串用
    `SharedPayload<String>`；见 `src/types/Value.hpp`、`String.hpp`。`asString()` 借用指针
    的寿命不能超过所属 Value，尤其禁止借用 `createValue()` 临时值（NewRegExp 曾因此丢 flags）。

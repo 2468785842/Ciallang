@@ -7,6 +7,7 @@
  */
 
 #include <catch2/catch_all.hpp>
+#include "stdlib/StandardLibrary.hpp"
 
 #include "stdlib/ExceptionLib.hpp"
 #include "vm/VM.hpp"
@@ -17,7 +18,7 @@ using namespace cial;
 TEST_CASE("集成 - 函数与控制流组合") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -48,7 +49,7 @@ TEST_CASE("集成 - 函数与控制流组合") {
 TEST_CASE("集成 - 容器与字符串组合") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -77,7 +78,7 @@ TEST_CASE("集成 - 容器与字符串组合") {
 TEST_CASE("集成 - 类、继承、property 与异常组合") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
     stdlib::initExceptionClass(vm);
@@ -115,7 +116,7 @@ TEST_CASE("集成 - 类、继承、property 与异常组合") {
 TEST_CASE("集成 - with 语句写实例成员") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -136,7 +137,7 @@ TEST_CASE("集成 - with 语句写实例成员") {
 TEST_CASE("集成 - 同一 VM 跨脚本共享全局与函数") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 

@@ -5,6 +5,7 @@
  */
 
 #include <catch2/catch_all.hpp>
+#include "stdlib/StandardLibrary.hpp"
 
 #include "StderrCapture.hpp"
 
@@ -22,7 +23,7 @@ using namespace cial::stdlib;
 TEST_CASE("本地函数声明 - 字符串成员方法定义") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     const VM vm{ &vmState };
 
@@ -110,7 +111,7 @@ TEST_CASE("本地函数声明 - 字符串成员方法定义") {
 TEST_CASE("本地函数声明 - 字符串 length 只读属性") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     const VM vm{ &vmState };
 
@@ -123,7 +124,7 @@ TEST_CASE("本地函数声明 - 字符串 length 只读属性") {
 TEST_CASE("本地函数声明 - Array/Dictionary 内建方法") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -190,7 +191,7 @@ TEST_CASE("本地函数声明 - Array/Dictionary 内建方法") {
 TEST_CASE("本地函数声明 - RegExp 内建方法") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -296,7 +297,7 @@ TEST_CASE("本地函数声明 - RegExp 内建方法") {
 TEST_CASE("字符串拼接 SSO 边界回归（SHORT_STR_LEN 一致性）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -315,7 +316,7 @@ TEST_CASE("字符串拼接 SSO 边界回归（SHORT_STR_LEN 一致性）") {
 TEST_CASE("原生回调脚本函数（VM::callValue 底座）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -404,7 +405,7 @@ TEST_CASE("原生回调脚本函数（VM::callValue 底座）") {
 TEST_CASE("数字字面量——进制/浮点/科学计数法") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -442,7 +443,7 @@ TEST_CASE("数字字面量——进制/浮点/科学计数法") {
 TEST_CASE("with 内 try/catch（对齐原版：catch 内 with 上下文丢失）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -484,7 +485,7 @@ TEST_CASE("with 内 try/catch（对齐原版：catch 内 with 上下文丢失）
 TEST_CASE("(const)[...] / (const)%[...] 常量内联形态（对齐原版：无只读/无共享）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -513,7 +514,7 @@ TEST_CASE("(const)[...] / (const)%[...] 常量内联形态（对齐原版：无�
 TEST_CASE("const 语义（对齐原版实测：必须初始化，赋值不强制）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -550,7 +551,7 @@ TEST_CASE("const 语义（对齐原版实测：必须初始化，赋值不强制
 TEST_CASE("Math.RandomGenerator（MT19937，序列与原版逐位一致）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -581,7 +582,7 @@ TEST_CASE("Math.RandomGenerator（MT19937，序列与原版逐位一致）") {
 TEST_CASE("Date 标准库") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -625,7 +626,7 @@ TEST_CASE("Date 标准库") {
 TEST_CASE("Date.parse 完整文法（tjsdate.y 全形态，对拍 TJSCompiler 一致）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -799,7 +800,7 @@ TEST_CASE("Date.parse 完整文法（tjsdate.y 全形态，对拍 TJSCompiler �
 TEST_CASE("RegExp.last 静态属性 + 匹配位置码点语义") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -872,7 +873,7 @@ TEST_CASE("RegExp.last 静态属性 + 匹配位置码点语义") {
 TEST_CASE("Array/Dictionary 结构化存取 + Octet pack 系（tjsBinarySerializer/tjsOctPack 对齐）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -1029,7 +1030,7 @@ TEST_CASE("Array/Dictionary 结构化存取 + Octet pack 系（tjsBinarySerializ
 TEST_CASE("后缀 ! 即时求值（tjs.y T_EVAL 对齐）") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -1082,7 +1083,7 @@ TEST_CASE("后缀 ! 即时求值（tjs.y T_EVAL 对齐）") {
 TEST_CASE("Math 标准库") {
     Runtime rt{};
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
@@ -1137,7 +1138,7 @@ TEST_CASE("Math 标准库") {
 TEST_CASE("Native method calls preserve receivers without allocating bound functions", "[native]") {
     Runtime rt;
     Context context{ rt };
-    context.initNativeMethod();
+    stdlib::registerStandardLibrary(context);
     vm::VMState state{ context };
     VM vm{ &state };
     auto used =

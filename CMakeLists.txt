@@ -99,6 +99,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/types/RegExp.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/NativeRegister.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/StandardLibrary.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/Debug.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/StringLib.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/ArrayLib.cpp

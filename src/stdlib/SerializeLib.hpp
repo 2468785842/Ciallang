@@ -9,10 +9,13 @@
 #include "types/Value.hpp"
 
 namespace cial {
+    class Context;
 
     class VM;
 
     namespace stdlib {
+
+        void registerSerializeLib(Context &context);
 
         // ---- Array（tjsArray.cpp）----
         // load：文本逐行读入（行分隔 \r\n|\r|\n，元素一律字符串）；返回 objthis

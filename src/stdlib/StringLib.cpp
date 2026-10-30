@@ -11,6 +11,8 @@
 //
 
 #include <regex>
+#include "common/UTF8.hpp"
+#include "runtime/Context.hpp"
 
 #include "RegExpLib.hpp"
 #include "StringLib.hpp"
@@ -20,6 +22,29 @@
 // TODO: UTF-8 support
 // TODO: length property support
 namespace cial::stdlib {
+    void registerStringLib(Context &context) {
+        context.registerMethod<String>("charAt"_str, &stdlib::stringCharAt);
+        context.registerMethod<String>("indexOf"_str, &stdlib::stringIndexOf);
+        context.registerMethod<String>("toUpperCase"_str, &stdlib::stringToUpperCase);
+        context.registerMethod<String>("toLowerCase"_str, &stdlib::stringToLowerCase);
+        context.registerMethod<String>("substring"_str, &stdlib::stringSubstring);
+        context.registerMethod<String>("substr"_str, &stdlib::stringSubstring);
+        context.registerMethod<String>("sprintf"_str, &stdlib::stringSprintf);
+        context.registerMethod<String>("replace"_str, &stdlib::stringReplace);
+        context.registerMethod<String>("split"_str, &stdlib::stringSplitWith);
+        context.registerMethod<String>("escape"_str, &stdlib::stringEscape);
+        context.registerMethod<String>("trim"_str, &stdlib::stringTrim);
+        context.registerMethod<String>("reverse"_str, &stdlib::stringReverse);
+        context.registerMethod<String>("repeat"_str, &stdlib::stringRepeat);
+
+        // 字符串长度按 UTF-8 码点计数。
+        context.registerProperty<String>("length"_str, [](const Value &thisObj) {
+            // TJS2 语义：字符数（UTF-16 码元数）；UTF-8 下按码点计数（"abc漢字" == 5）
+            const String *str = thisObj.asString().unwrap();
+            return Value{ Integer{ Common::utf8Strlen(std::string(str->getData(), str->length())) } };
+        });
+    }
+
 
     String stringCharAt(VM *, const Value &thisObj, size_t, const Integer index) {
         const String *str = thisObj.asString().unwrap();

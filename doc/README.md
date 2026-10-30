@@ -9,7 +9,7 @@
 |---|---|
 | [building.md](building.md) | CMake 构建、vcpkg 可选依赖、测试与基准 |
 | [cli.md](cli.md) | 脚本/字节码命令、编译诊断、退出码、REPL |
-| [embedding.md](embedding.md) | 作为库引入、宿主生命周期与类/属性/方法注册 |
+| [embedding.md](embedding.md) | 作为库引入、宿主生命周期、分模块标准库注册与优化策略注入 |
 | [review.md](review.md) | 工程整理与运行时审查记录、验证范围 |
 
 ## 架构与设计
