@@ -21,6 +21,8 @@
 
 ## 二、性能
 
+- [x] 原生接收者拷贝候选验证（2026-10-30）：转换层借用快照可减少两层 `Value` 拷贝，但同机 Release 两轮对照出现约 5% 整数循环回退，候选未采用；保留长串接收者重新绑定、嵌套回调及按值局部修改测试。结果与下一步见 `doc/performance.md`、`tests/native_function_test.cpp`。
+
 - [x] Value 内联 SSO：14 字节内无需字符串负载分配；String 与 Value 均保持 16B，长串共享负载不变。增加字符串+整数快路径，修正 NewRegExp 借用临时 Value 的字符串寿命。见 `src/types/Value.*`、`src/types/String.*`、`src/vm/Constant.cpp`、`tests/value_storage_test.cpp`。
 - [x] 优化器收益：profile 定位循环的比较/Test 与全局整数槽访问；增加 CompareTest 融合，保留结果寄存器并重映射跳转/try/RLC。配套整型槽直接读写减少 Value 临时对象。本批整数循环耗时约为原来的 51%，不单独归因于某个 pass。见 `src/gen/Optimizer.*`、`src/vm/VMState.cpp`、`tests/optimizer_test.cpp`。
 - [x] 原生方法调用分离 objthis：GMethodC/CallMethodV 直接携带接收者，避免每次调用分配 NativeFunction；提取方法为一等值时继续创建独立绑定。覆盖嵌套调用、宿主替换方法和分配数量测试。见 `src/gen/IRGenerator.cpp`、`src/types/Function.*`、`tests/native_function_test.cpp`。

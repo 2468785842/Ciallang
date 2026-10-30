@@ -140,3 +140,39 @@ Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT；可选 JIT、尾递�
 为了避免每条指令和每次普通调用承担开关判断，`VMState::run()` 在进入时选择模板化
 解释循环；尾递归仅显式启用，可选模式状态放在类末尾以保留已有热字段布局。
 实现见 `src/vm/VMState.cpp`、`VMState.hpp`；可选后端范围见 `doc/jit.md`、`doc/tail-recursion.md`。
+
+
+## 2026-10-30 原生接收者拷贝候选验证（未采用）
+
+基线为 `7ad212a`，Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT；
+JIT、尾递归与执行记录关闭。候选只把 `src/types/NativeFunDetail.hpp` 的
+`invokeCallable` / `invokeCallableImpl` 接收者改为 `const Value &`，消除转换层的
+两次中间拷贝；`src/types/Function.hpp` 的 `NativeFn` 按值协议与入口快照保持不变。
+
+停止构建后，每项预热一次，交替运行前/后 Release 二进制九轮，逐轮反转先后顺序，
+记录含进程启动的 wall-time 中位数；第二批反转起始顺序。所有脚本均通过自校验。
+`native_stress` 为 `bench/native_methods.tjs` 的一百万次迭代变体，校验和改为
+499999500000；其余脚本直接使用 `bench/*.tjs`。
+
+| 脚本 | 第一批前 ms | 第一批后 ms | 后/前 | 第二批前 ms | 第二批后 ms | 后/前 |
+|---|---:|---:|---:|---:|---:|---:|
+| class_instantiate | 10.541 | 10.681 | 101.3% | 10.704 | 10.210 | 95.4% |
+| fib | 43.597 | 46.467 | 106.6% | 45.709 | 46.038 | 100.7% |
+| loop_int | 358.858 | 377.552 | 105.2% | 351.054 | 369.020 | 105.1% |
+| native_methods | 23.857 | 26.426 | 110.8% | 23.553 | 22.814 | 96.9% |
+| string_concat | 16.102 | 15.851 | 98.4% | 16.265 | 16.070 | 98.8% |
+| native_stress | 384.356 | 348.367 | 90.6% | 361.627 | 334.843 | 92.6% |
+
+百万次原生调用耗时下降 7.4%～9.4%，五万次原生调用则跨批波动，无法给出稳定收益。
+整数循环在两批中均慢约 5.1%～5.2%，因此本轮候选未采用，生产代码恢复基线；
+表中是被撤回候选的数据，不代表当前提交的性能。没有进行新的 TJS2 对照，整体
+“原版性能追平”任务保持未完成。下一步优先评估保持回调协议的函数指针快路径，
+并继续覆盖这五项基准，不能仅凭原生调用单项收益接受默认执行回退。
+
+新增 `tests/native_function_test.cpp` 接收者快照测试：长串 this 在重新绑定及嵌套
+`callProc` 后保持原值，按值宿主回调修改自身副本不改变绑定；测试在原有实现上通过。
+候选阶段 Windows Debug、Release 的完整 CTest 均通过，C++ 套件为 214 个用例、
+1550 条断言；撤回后 Debug、Release 完整 CTest（C++、CLI、LSP）再次全部通过。
+
+完整样本及二进制 SHA-256 位于本机忽略目录 `bench/results/` 下的
+`20261030-native-receiver-final1.json`、`20261030-native-receiver.json`。

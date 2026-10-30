@@ -20,6 +20,42 @@
 using namespace cial;
 using namespace cial::stdlib;
 
+TEST_CASE("Native receiver snapshots survive rebinding and nested callbacks", "[native]") {
+    Runtime runtime;
+    const Value outer{ "outer receiver longer than inline storage"_str };
+    const Value inner{ "inner receiver longer than inline storage"_str };
+
+    SECTION("reference callback keeps its snapshot during a nested call") {
+        NativeFunction *function{};
+        bool nested = false;
+        auto rooted = runtime.create<NativeFunction>([&](VM *, const Value &self, size_t) {
+            if(!nested) {
+                nested = true;
+                function->setThisObj(inner);
+                const auto value = function->callProc(nullptr, 0, nullptr);
+                REQUIRE(*value.asString().unwrap() == *inner.asString().unwrap());
+            }
+            return self;
+        });
+        function = rooted.get();
+        function->setThisObj(outer);
+        const auto value = function->callProc(nullptr, 0, nullptr);
+        REQUIRE(*value.asString().unwrap() == *outer.asString().unwrap());
+        REQUIRE(*function->boundThis().asString().unwrap() == *inner.asString().unwrap());
+    }
+
+    SECTION("value callback can replace its local receiver") {
+        auto rooted = runtime.create<NativeFunction>([&](VM *, Value self, size_t) {
+            self = inner;
+            return self;
+        });
+        rooted->setThisObj(outer);
+        const auto value = rooted->callProc(nullptr, 0, nullptr);
+        REQUIRE(*value.asString().unwrap() == *inner.asString().unwrap());
+        REQUIRE(*rooted->boundThis().asString().unwrap() == *outer.asString().unwrap());
+    }
+}
+
 TEST_CASE("本地函数声明 - 字符串成员方法定义") {
     Runtime rt{};
     Context context{ rt };
