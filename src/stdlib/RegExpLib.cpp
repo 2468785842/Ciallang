@@ -10,12 +10,12 @@
 
 namespace cial::stdlib {
     void registerRegExpLib(Context &context) {
-        context.registerMethod<RegExp>("test"_str, &stdlib::regexpTest);
-        context.registerMethod<RegExp>("match"_str, &stdlib::regexpMatch);
-        context.registerMethod<RegExp>("exec"_str, &stdlib::regexpExec);
-        context.registerMethod<RegExp>("compile"_str, &stdlib::regexpCompile);
-        context.registerMethod<RegExp>("replace"_str, &stdlib::regexpReplace);
-        context.registerMethod<RegExp>("split"_str, &stdlib::regexpSplit);
+        context.nativeType<RegExp>().method("test"_str, &stdlib::regexpTest);
+        context.nativeType<RegExp>().method("match"_str, &stdlib::regexpMatch);
+        context.nativeType<RegExp>().method("exec"_str, &stdlib::regexpExec);
+        context.nativeType<RegExp>().method("compile"_str, &stdlib::regexpCompile);
+        context.nativeType<RegExp>().method("replace"_str, &stdlib::regexpReplace);
+        context.nativeType<RegExp>().method("split"_str, &stdlib::regexpSplit);
         context.registerClass<RegExp>("RegExp"_str, &context.rt(), ""_str);
     }
 
@@ -40,7 +40,7 @@ namespace cial::stdlib {
 
         String makeString(const std::string &s) { return String(s.c_str(), static_cast<u32>(s.size())); }
 
-        void pushString(Array *arr, const std::string &s) { arr->elements.push_back(Value{ makeString(s) }); }
+        void pushString(Array *arr, const std::string &s) { arr->elements.emplace_back(makeString(s)); }
 
         // TJS2 split_regex：反复搜索，把每段匹配前的片段入数组；purgeempty 丢弃空片段。
         // 空匹配时前进 1 字节防死循环（TJS2 依赖 oniguruma FIND_NOT_EMPTY 规避，std::regex 无此选项）

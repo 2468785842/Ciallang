@@ -131,13 +131,13 @@ namespace cial {
 
             if(result) {
                 const std::string whole = m[0].str();
-                result->elements.push_back(Value{ String(whole.c_str(), static_cast<u32>(whole.size())) });
+                result->elements.emplace_back(String(whole.c_str(), static_cast<u32>(whole.size())));
             }
             for(size_t i = 1; i < m.size(); ++i) {
                 if(!result)
                     continue;
                 const std::string g = m[i].str(); // 未匹配组为空串（TJS2 num_regs 全量填充语义）
-                result->elements.push_back(Value{ String(g.c_str(), static_cast<u32>(g.size())) });
+                result->elements.emplace_back(String(g.c_str(), static_cast<u32>(g.size())));
             }
 
             const std::string wholeMatch = m[0].str();
@@ -156,6 +156,7 @@ namespace cial {
             return true;
         }
 
+        static constexpr TypeId nativeTypeId = TypeId::RegExp;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::RegExp; }
 
         // instanceof "RegExp"（TJS2 tTJSNC_RegExp::IsInstanceOf 同语义）

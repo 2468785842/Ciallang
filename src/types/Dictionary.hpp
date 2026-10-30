@@ -19,6 +19,7 @@ namespace cial {
 
         explicit Dictionary() = default;
 
+        static constexpr TypeId nativeTypeId = TypeId::Dictionary;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Dictionary; }
 
         // instanceof "Dictionary"（TJS2 原生类链按名匹配）

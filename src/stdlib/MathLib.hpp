@@ -6,7 +6,6 @@
 #pragma once
 
 #include "types/Object.hpp"
-#include "types/String.hpp"
 #include "types/TypeId.hpp"
 #include "types/Value.hpp"
 
@@ -23,6 +22,7 @@ namespace cial {
     public:
         MathNS() = default;
 
+        static constexpr TypeId nativeTypeId = TypeId::Math;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Math; }
 
         void call(vm::VMState &, u32, size_t) override { throw std::runtime_error("Math is not callable"); }

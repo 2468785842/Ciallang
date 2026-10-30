@@ -4,13 +4,8 @@
 #pragma once
 
 #include "runtime/Runtime.hpp"
-#include "stdlib/DateLib.hpp"
-#include "stdlib/MathLib.hpp"
-#include "stdlib/RandomLib.hpp"
-#include "types/Array.hpp"
-#include "types/Dictionary.hpp"
 #include "types/Function.hpp"
-#include "types/RegExp.hpp"
+#include "types/NativeObject.hpp"
 #include "types/TypeId.hpp"
 
 namespace cial {
@@ -18,37 +13,29 @@ namespace cial {
     template <typename T>
     struct TypeTraits {
         static constexpr TypeId id = [] {
-            if constexpr(std::is_same_v<T, Integer>) {
+            if constexpr(requires { T::nativeTypeId; })
+                return T::nativeTypeId;
+            else if constexpr(std::is_same_v<T, Integer>)
                 return TypeId::Integer;
-            } else if constexpr(std::is_same_v<T, Real>) {
+            else if constexpr(std::is_same_v<T, Real>)
                 return TypeId::Real;
-            } else if constexpr(std::is_same_v<T, Object>) {
-                return TypeId::Object;
-            } else if constexpr(std::is_same_v<T, Octet>) {
-                return TypeId::Octet;
-            } else if constexpr(std::is_same_v<T, String>) {
+            else if constexpr(std::is_same_v<T, String>)
                 return TypeId::String;
-            } else if constexpr(std::is_same_v<T, Array>) {
-                return TypeId::Array;
-            } else if constexpr(std::is_same_v<T, Dictionary>) {
-                return TypeId::Dictionary;
-            } else if constexpr(std::is_same_v<T, RegExp>) {
-                return TypeId::RegExp;
-            } else if constexpr(std::is_same_v<T, MathNS>) {
-                return TypeId::Math;
-            } else if constexpr(std::is_same_v<T, DateNS>) {
-                return TypeId::Date;
-            } else if constexpr(std::is_same_v<T, RandomGen>) {
-                return TypeId::RandomGen;
-            } else {
-                static_assert(!std::is_same_v<T, T> && "type is not support");
+            else if constexpr(std::is_same_v<T, Octet>)
+                return TypeId::Octet;
+            else
                 return TypeId::None;
-            }
         }();
+        static NativeTypeKey key() noexcept {
+            if constexpr(id != TypeId::None)
+                return id;
+            else
+                return nativeTypeKeyFor<std::remove_cvref_t<T>>();
+        }
     };
 
-    struct ValueToTypeId {
-        static TypeId getId(const Value &v) {
+    struct ValueToNativeTypeKey {
+        static NativeTypeKey getId(const Value &v) {
             if(v.isInteger())
                 return TypeTraits<Integer>::id;
             if(v.isReal())
@@ -58,18 +45,31 @@ namespace cial {
             if(v.isString())
                 return TypeTraits<String>::id;
             if(v.isObject())
-                // 容器对象（Array/Dictionary/RegExp 的原生方法表分派）：
-                // 一次虚调用，替代逐个 dynamic_cast 的 RTTI 链
-                return v.asObject().unwrap()->typeId();
+                // 对象提供开放的原生类型身份；VM 内部判型仍使用 TypeId。
+                return v.asObject().unwrap()->nativeTypeKey();
             return TypeId::None;
         }
     };
 
+    using ValueToTypeId = ValueToNativeTypeKey; // 旧名称兼容
+
     // 原生只读属性 getter：thisObj 为宿主值（如 String），返回属性值（如 str.length）
     using NativePropGetter = Value (*)(const Value &thisObj);
 
+    struct NativeAccessor {
+        NativeFunction *getter{};
+        NativeFunction *setter{};
+    };
+
+    struct NativeMember {
+        NativeFunction *method{};
+        NativePropGetter getter{};
+        NativeAccessor accessor{};
+    };
+
     struct MethodTable {
         Map<Atom, NativeFunction *> instanceMethods; // instance method，like `arr.push()`
+        Map<Atom, NativeAccessor> accessors;
         Map<Atom, NativePropGetter> instanceProperties; // 只读属性，like `str.length`
     };
 
@@ -78,7 +78,7 @@ namespace cial {
         explicit NativeRegister(Runtime &rt) : _rt(rt) {}
 
         template <typename Callable>
-        void registerMethod(const TypeId typeId, const Atom name, Callable &&fn) {
+        void registerMethod(const NativeTypeKey typeId, const Atom name, Callable &&fn) {
             auto *nativeFn = _rt.create<NativeFunction>(std::forward<Callable>(fn)).get();
             tables[typeId].instanceMethods[name] = nativeFn;
             ++revision;
@@ -86,7 +86,7 @@ namespace cial {
 
         template <typename T, typename Callable>
         void registerMethod(const Atom name, Callable &&fn) {
-            const TypeId type = TypeTraits<T>::id;
+            const NativeTypeKey type = TypeTraits<T>::key();
             registerMethod(type, name, std::forward<Callable>(fn));
         }
 
@@ -96,17 +96,33 @@ namespace cial {
             return registerMethod<T>(a, std::forward<Callable>(fn));
         }
 
-        void registerProperty(const TypeId typeId, const Atom name, const NativePropGetter getter) {
+        void registerProperty(const NativeTypeKey typeId, const Atom name, const NativePropGetter getter) {
             tables[typeId].instanceProperties[name] = getter;
             ++revision;
         }
 
         template <typename T>
         void registerProperty(const String &name, const NativePropGetter getter) {
-            registerProperty(TypeTraits<T>::id, _rt.atomTable.intern(name), getter);
+            registerProperty(TypeTraits<T>::key(), _rt.atomTable.intern(name), getter);
         }
 
-        [[nodiscard]] NativeFunction *findMethod(const TypeId typeId, const Atom name) const {
+        // 一次类型表定位，同时取得三类成员供 VM 读取及调用点缓存使用。
+        [[nodiscard]] NativeMember findMember(const NativeTypeKey type, const Atom name) const {
+            const auto table = tables.find(type);
+            if(table == tables.end())
+                return {};
+            const auto &members = table->second;
+            const auto method = members.instanceMethods.find(name);
+            const auto getter = members.instanceProperties.find(name);
+            const auto accessor = members.accessors.find(name);
+            return {
+                .method = method == members.instanceMethods.end() ? nullptr : method->second,
+                .getter = getter == members.instanceProperties.end() ? nullptr : getter->second,
+                .accessor = accessor == members.accessors.end() ? NativeAccessor{} : accessor->second,
+            };
+        }
+
+        [[nodiscard]] NativeFunction *findMethod(const NativeTypeKey typeId, const Atom name) const {
             const auto it = tables.find(typeId);
             if(it == tables.end())
                 return nullptr;
@@ -115,7 +131,7 @@ namespace cial {
             return fnIt != methods.end() ? fnIt->second : nullptr;
         }
 
-        [[nodiscard]] NativePropGetter findProperty(const TypeId typeId, const Atom name) const {
+        [[nodiscard]] NativePropGetter findProperty(const NativeTypeKey typeId, const Atom name) const {
             const auto it = tables.find(typeId);
             if(it == tables.end())
                 return nullptr;
@@ -126,7 +142,7 @@ namespace cial {
 
         template <typename T>
         [[nodiscard]] NativeFunction *findMethod(const Atom name) const {
-            const TypeId type = TypeTraits<T>::id;
+            const NativeTypeKey type = TypeTraits<T>::key();
             return findMethod(type, name);
         }
 
@@ -136,10 +152,25 @@ namespace cial {
             return findMethod<T>(a);
         }
 
+        void registerAccessor(NativeTypeKey type, Atom name, NativeFunction *getter, NativeFunction *setter) {
+            tables[type].accessors[name] = { getter, setter };
+            ++revision;
+        }
+
+        [[nodiscard]] NativeAccessor findAccessor(NativeTypeKey type, Atom name) const {
+            const auto table = tables.find(type);
+            if(table == tables.end())
+                return {};
+            const auto it = table->second.accessors.find(name);
+            return it == table->second.accessors.end() ? NativeAccessor{} : it->second;
+        }
+
+        Map<NativeTypeKey, std::shared_ptr<NativeTypeBinding>> bindings;
+
         u64 revision{}; // VM 调用点缓存随宿主注册/替换方法失效
 
     private:
-        Map<TypeId, MethodTable> tables{};
+        Map<NativeTypeKey, MethodTable> tables{};
         Runtime &_rt;
 
         friend class Context;

@@ -97,6 +97,39 @@ SEH 异常的工具链缺陷（30 行纯标准库程序可复现，静态/动态
 与本项目代码无关；其配置需静态 CRT + 注解对齐旗标，历史脚本中的 `-shared-asan`
 为无效旗标。
 
+## ASan（macOS ARM64）
+
+**ARM 芯片并非不支持 ASan。** LLVM 系工具链支持 `aarch64-apple-darwin` 的
+AddressSanitizer；支持范围可对照 [Rust 官方 sanitizer 文档](https://doc.rust-lang.org/unstable-book/compiler-flags/sanitizer.html#addresssanitizer)
+与 [Clang ASan 文档](https://clang.llvm.org/docs/AddressSanitizer.html)。
+ASan 地址检查与 LeakSanitizer 泄漏检查是不同功能；本机运行库拒绝
+`detect_leaks=1`，不能由此推断 ASan 不支持 ARM64。
+
+2026-10-30 本机环境为 macOS 26.5.1（25F80）、arm64、Apple clang 17.0.0
+（clang-1700.3.19.1）。ASan 插桩程序在 main 前的运行库初始化中死锁；
+空 main 同样复现，关闭泄漏检查仍卡住。采样显示初始化 shadow memory 时，经
+`get_dyld_hdr` / `_Block_copy` 再次调用 malloc，重入 ASan 初始化锁。
+这与 [LLVM issue #200447](https://github.com/llvm/llvm-project/issues/200447)
+报告的 macOS 26 与特定 ASan 运行库组合故障吻合；本机归因属于根据最小复现及栈的
+判断，不能扩大为所有 macOS ARM64 工具链均不可用。
+
+排查时先用与项目相同的编译器/运行库验证空程序，再运行项目测试：
+
+```cpp
+// asan_smoke.cpp
+int main() { return 0; }
+```
+
+```bash
+clang++ -fsanitize=address -g asan_smoke.cpp -o asan_smoke
+ASAN_OPTIONS=detect_leaks=0 ./asan_smoke
+```
+
+如果空程序也挂起，应停止该次运行，使用修复后的工具链重新验证，或转到已验证的
+平台执行内存检查；不要将本轮测试记为通过。本项目最小复现和采样记录见
+[native-binding-refactor.md](native-binding-refactor.md#asan-验证限制)。未在本机验证任何
+替代工具链的修复效果。
+
 ## 有界 fuzz
 
 使用 Clang 与 libFuzzer，单独建立带覆盖率、ASan/UBSan 的构建目录；核心库与入口均插桩，不影响其他构建。入口仅做词法/语法解析，不执行脚本（`fuzz/CMakeLists.txt`、`fuzz/fuzz_*.cc`）。

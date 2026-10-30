@@ -2,7 +2,6 @@
 //
 
 #include <algorithm>
-#include <cstring>
 #include "RegExpLib.hpp"
 #include "runtime/Context.hpp"
 
@@ -14,24 +13,24 @@
 
 namespace cial::stdlib {
     void registerArrayLib(Context &context) {
-        context.registerMethod<Array>("push"_str, &stdlib::arrayPush);
-        context.registerMethod<Array>("pop"_str, &stdlib::arrayPop);
-        context.registerMethod<Array>("unshift"_str, &stdlib::arrayUnshift);
-        context.registerMethod<Array>("shift"_str, &stdlib::arrayShift);
-        context.registerMethod<Array>("insert"_str, &stdlib::arrayInsert);
-        context.registerMethod<Array>("remove"_str, &stdlib::arrayRemove);
-        context.registerMethod<Array>("erase"_str, &stdlib::arrayErase);
-        context.registerMethod<Array>("reverse"_str, &stdlib::arrayReverse);
-        context.registerMethod<Array>("join"_str, &stdlib::arrayJoin);
-        context.registerMethod<Array>("split"_str, &stdlib::arraySplitWith);
-        context.registerMethod<Array>("sort"_str, &stdlib::arraySort);
+        context.nativeType<Array>().method("push"_str, &stdlib::arrayPush);
+        context.nativeType<Array>().method("pop"_str, &stdlib::arrayPop);
+        context.nativeType<Array>().method("unshift"_str, &stdlib::arrayUnshift);
+        context.nativeType<Array>().method("shift"_str, &stdlib::arrayShift);
+        context.nativeType<Array>().method("insert"_str, &stdlib::arrayInsert);
+        context.nativeType<Array>().method("remove"_str, &stdlib::arrayRemove);
+        context.nativeType<Array>().method("erase"_str, &stdlib::arrayErase);
+        context.nativeType<Array>().method("reverse"_str, &stdlib::arrayReverse);
+        context.nativeType<Array>().method("join"_str, &stdlib::arrayJoin);
+        context.nativeType<Array>().method("split"_str, &stdlib::arraySplitWith);
+        context.nativeType<Array>().method("sort"_str, &stdlib::arraySort);
         // count/length 属性（get；写走 Array::setProp）
         const auto arrayCount = [](const Value &thisObj) {
             return Value{ Integer{
                 static_cast<Integer>(dynamic_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };
         };
-        context.registerProperty<Array>("count"_str, arrayCount);
-        context.registerProperty<Array>("length"_str, arrayCount);
+        context.nativeType<Array>().property("count"_str, arrayCount);
+        context.nativeType<Array>().property("length"_str, arrayCount);
         context.registerClass<Array>("Array"_str, &context.rt());
     }
 

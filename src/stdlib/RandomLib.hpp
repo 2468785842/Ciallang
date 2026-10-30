@@ -9,7 +9,6 @@
 
 #include "runtime/AtomTable.hpp"
 #include "types/Object.hpp"
-#include "types/String.hpp"
 #include "types/TypeId.hpp"
 #include "types/Value.hpp"
 
@@ -24,6 +23,7 @@ namespace cial {
 
         RandomGen() = default;
 
+        static constexpr TypeId nativeTypeId = TypeId::RandomGen;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::RandomGen; }
 
         // 类对象构造入口：new Math.RandomGenerator([seed])（同 randomize 语义）

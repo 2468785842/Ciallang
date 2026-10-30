@@ -13,7 +13,6 @@
 
 #include "types/Function.hpp"
 #include "types/Object.hpp"
-#include "types/String.hpp"
 #include "types/TypeId.hpp"
 #include "types/Value.hpp"
 
@@ -32,6 +31,7 @@ namespace cial {
     public:
         ScriptsNS() = default;
 
+        static constexpr TypeId nativeTypeId = TypeId::Scripts;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Scripts; }
 
         void call(vm::VMState &, u32, size_t) override { throw std::runtime_error("Scripts is not callable"); }

@@ -46,6 +46,7 @@ namespace cial {
 
         bool instanceOf(const Atom a) override { return a == Runtime::ATOM_CLASS; }
 
+        static constexpr TypeId nativeTypeId = TypeId::Class;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Class; }
 
         [[nodiscard]] FuncMeta *getFunc(const Atom a) const {
@@ -88,8 +89,8 @@ namespace cial {
         // GC 终结走保活队列，在 VM 安全点执行；显式 invalidate 保持同步调用。
         ~DataObject() noexcept override = default;
 
-        bool needsFinalization() const noexcept override;
-        bool canFinalizeIn(const vm::VMState &state) const noexcept override { return _vmState == &state; }
+        [[nodiscard]] bool needsFinalization() const noexcept override;
+        [[nodiscard]] bool canFinalizeIn(const vm::VMState &state) const noexcept override { return _vmState == &state; }
         void finalizeDeferred(vm::VMState &vmState) override;
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
@@ -179,6 +180,7 @@ namespace cial {
         explicit GlobalObject(Runtime *rt) : ClassObject(nullptr, rt) {}
 
         // Global 判定优先于 Class（继承链上 Global ⊂ Class，dynamic_cast 语义等价）
+        static constexpr TypeId nativeTypeId = TypeId::Global;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Global; }
 
         void marked() noexcept override {

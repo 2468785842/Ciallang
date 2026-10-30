@@ -96,7 +96,7 @@ namespace cial {
             Value _value;
 
         public:
-            Handle(Runtime *rt, const Value &value) : _rt(rt), _value(value) { retain(); }
+            Handle(Runtime *rt, Value value) : _rt(rt), _value(std::move(value)) { retain(); }
 
             Handle(const Handle &other) : Handle(other._rt, other._value) {}
 
@@ -143,13 +143,15 @@ namespace cial {
             }
 
         private:
-            void retain() {
+            void retain() const {
                 if(_rt && _value.isObject())
                     _rt->addHandleVal(_value.asObject().value());
             }
         };
 
         explicit VM(vm::VMState *vmState) : _vmState(vmState) {}
+
+        [[nodiscard]] Context &context() const { return _vmState->context; }
 
         [[nodiscard]] Runtime &rt() const { return _vmState->rt; }
 
@@ -190,7 +192,7 @@ namespace cial {
                 // 实参 GC 根由上方 argumentRoots 承接，栈副本无需注册。
                 if(argCount <= 64 && arity <= 64) {
                     alignas(Value) unsigned char argBuf[64 * sizeof(Value)];
-                    Value *const argv = reinterpret_cast<Value *>(argBuf);
+                    auto *const argv = reinterpret_cast<Value *>(argBuf);
                     size_t built = 0;
                     DEFER {
                         while(built > 0)
@@ -255,9 +257,6 @@ namespace cial {
             if(_vmState->context.stackTop() == stackTop - 2) {
                 // 以专用载体解开 native 调用链（std::sort 等）；主循环 catch 接住后
                 // 转 _pending + unwind，外层脚本 try/catch 正常接续
-                {
-                    const Value &pv = _vmState->poolAt(tmpBase + excReg);
-                }
                 throw vm::ScriptExceptionCarrier{ _vmState->poolAt(tmpBase + excReg) }; // unwind 写 tmp 帧 reg1
             }
 

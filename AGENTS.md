@@ -59,10 +59,11 @@ Ciallang/
 | `src/parser/` | 词法+语法+预处理 | `Lexer`(手写 DFA)、`Parser`(Pratt 优先级)、`PreProcessor`(@set/@if)、`Token.hpp`、`OperatorTrie`、`ast/*`(AstNode 基类 + X-macro 节点枚举) |
 | `src/gen/` | AST→中间代码 | `IRGenerator`(寄存器分配/作用域/回填)、`Instruction.hpp`(**95 条 TAC 指令 X-macro**)、`Register.hpp`(%n)、`Label.hpp`(@n)、`LocalVariable`、`SSA`(按需静态单赋值分析，`--dump-ssa`，见 doc/ssa.md)、`ControlFlowGraph`+`Optimizer`(基本块 CFG+自然循环识别（支配树回边检测，getLoops()）、拷贝传播（GLocal/DLocal 纯拷贝改写+死拷贝清除，管线首位）、整数常量传播（块内折叠+唯一前驱跨块继承）、死 `LoadImm`/死拷贝清理、CompareTest 融合；由外部 `optimizeDefaultChunk` 组装，`parseAst()` 调用注入策略) |
 | `src/vm/` | 执行引擎 | `VMState`(字节码派发与调用帧调度)、`Chunk`(指令+常量池+双空间 try 表)、`Bytecode`(扁平 u8 编码, **95/95 全实现**)、`CallFrame`(含 thisData 缓存 + argWindowDirect 直写布局)、`FastRegisterPool`、`Constant.hpp`(FuncMeta/ClassMeta/PropMeta)、`Rlc`(行号表)、`VM.hpp`(宿主门面)、`ExecutionTrace`(真实路径 DOT)、`IntegerJit`(可选 x64 整数 JIT/热路径守卫；默认关闭) |
+| `src/Binding.hpp` | 宿主声明式绑定 | `binding::Module` / `ClassBuilder<T>`：构造、方法、静态函数、属性、转换与 trace |
 | `src/runtime/` | 全局运行时 | `Runtime`(GC/RootGuard/atomTable)、`Context`(调用栈/全局对象, 深度上限 1024)、`AtomTable`(字符串驻留 Atom) |
-| `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
+| `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`NativeTypeKey`(开放宿主类型身份)、`NativeObject`(普通 C++ payload 包装)、`NativeObjectType<T>`(外部 Object 注册基类)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
 | `src/gc/` | 内存管理 | `MarkSweepHeader`、固定 512B 节点自由链表 + 标记清除 |
-| `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`ScriptsLib`(宿主 Scripts 类：execStorage/evalStorage 嵌套哨兵执行，krkr2 tTJSNC_Scripts 对应)、`NativeRegister`(按 TypeId 分派原生方法)、`StandardLibrary`(汇总各 `*Lib` 的 Context 注册入口)、`Debug` |
+| `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`ScriptsLib`(宿主 Scripts 类：execStorage/evalStorage 嵌套哨兵执行，krkr2 tTJSNC_Scripts 对应)、`NativeRegister`(按开放 NativeTypeKey 分派原生方法)、`StandardLibrary`(汇总各 `*Lib` 的 Context 注册入口)、`Debug` |
 | `src/tjsbc/` | TJS2 字节码转译（阶段 2，M1–M4 完成） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(恒等平移/标志物化与 M3 前瞻融合（Cmp 族直写 zf）/属性全族（含整数成员名；direct 名走 *C Atom 直引指令）/类 context 加载期解释/NEW→Call/P 变体与 GETP·SETP/DELD·TYPEOFD/proxy 回落链/省略透传·展开调用·collapse 参数/BNOT·NUM·OCTET/dst=0 丢弃语义——tjs2 语料 7 个有源码 fixture 字节码路径全量通过（s1–s5 无源码样本已清理），见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
 | `src/logging/` | 日志 | `Logger`（fmt 实际输出） |
 | `src/main.cpp` / `src/cli/` | 进程入口；argparse 参数、编译/诊断、执行与 REPL 分模块，见 [doc/cli.md](doc/cli.md) |
@@ -134,10 +135,11 @@ bash fuzz/run_fuzz_parser.sh
    初始化并逐槽析构——热路径的变长实参缓冲必须 placement new 只构造实际数量
    （见 `invokeCallV` 原生快路径；初版全槽默认初始化曾致 native 基准回退 256%）。
    槽内 Value 的对象引用在调用期间由调用者寄存器槽保根，无需额外注册 GC 根。
-10. **新增 Object 子类判型走 TypeId**：热路径禁止 `dynamic_cast`（RTTI 遍历），
+10. **VM 内部 Object 子类判型走 TypeId**：热路径禁止 `dynamic_cast`（RTTI 遍历），
    在 `TypeId`（`src/types/TypeId.hpp`）加专有值并 override `typeId()`，用一次
    虚调用判型（Function/NativeFunction/Property 先例）；Property/NativeFunction
-   均为 final，static_cast 与 dynamic_cast 等价。
+   均为 final，static_cast 与 dynamic_cast 等价。外部宿主类型注册使用 `NativeObjectType<T>` /
+   `NativeTypeKey`，无需修改 TypeId；见 `doc/embedding.md`。
 
 ## "我想改 X，先读什么"
 

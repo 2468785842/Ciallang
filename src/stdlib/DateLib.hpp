@@ -24,6 +24,7 @@ namespace cial {
 
         explicit DateNS(const time_t t) : dateTime(t) {}
 
+        static constexpr TypeId nativeTypeId = TypeId::Date;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Date; }
 
         // 类对象构造入口：Date() / new Date(...)——0 参 now；字符串解析；

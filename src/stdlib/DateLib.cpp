@@ -14,23 +14,23 @@
 
 namespace cial::stdlib {
     void registerDateLib(Context &context) {
-        context.registerMethod<DateNS>("getYear"_str, &stdlib::dateGetYear);
-        context.registerMethod<DateNS>("getMonth"_str, &stdlib::dateGetMonth);
-        context.registerMethod<DateNS>("getDate"_str, &stdlib::dateGetDate);
-        context.registerMethod<DateNS>("getDay"_str, &stdlib::dateGetDay);
-        context.registerMethod<DateNS>("getHours"_str, &stdlib::dateGetHours);
-        context.registerMethod<DateNS>("getMinutes"_str, &stdlib::dateGetMinutes);
-        context.registerMethod<DateNS>("getSeconds"_str, &stdlib::dateGetSeconds);
-        context.registerMethod<DateNS>("getTime"_str, &stdlib::dateGetTime);
-        context.registerMethod<DateNS>("setYear"_str, &stdlib::dateSetYear);
-        context.registerMethod<DateNS>("setMonth"_str, &stdlib::dateSetMonth);
-        context.registerMethod<DateNS>("setDate"_str, &stdlib::dateSetDate);
-        context.registerMethod<DateNS>("setHours"_str, &stdlib::dateSetHours);
-        context.registerMethod<DateNS>("setMinutes"_str, &stdlib::dateSetMinutes);
-        context.registerMethod<DateNS>("setSeconds"_str, &stdlib::dateSetSeconds);
-        context.registerMethod<DateNS>("setTime"_str, &stdlib::dateSetTime);
-        context.registerMethod<DateNS>("parse"_str, &stdlib::dateParse);
-        context.registerMethod<DateNS>("getTimezoneOffset"_str, &stdlib::dateGetTimezoneOffset);
+        context.nativeType<DateNS>().method("getYear"_str, &stdlib::dateGetYear);
+        context.nativeType<DateNS>().method("getMonth"_str, &stdlib::dateGetMonth);
+        context.nativeType<DateNS>().method("getDate"_str, &stdlib::dateGetDate);
+        context.nativeType<DateNS>().method("getDay"_str, &stdlib::dateGetDay);
+        context.nativeType<DateNS>().method("getHours"_str, &stdlib::dateGetHours);
+        context.nativeType<DateNS>().method("getMinutes"_str, &stdlib::dateGetMinutes);
+        context.nativeType<DateNS>().method("getSeconds"_str, &stdlib::dateGetSeconds);
+        context.nativeType<DateNS>().method("getTime"_str, &stdlib::dateGetTime);
+        context.nativeType<DateNS>().method("setYear"_str, &stdlib::dateSetYear);
+        context.nativeType<DateNS>().method("setMonth"_str, &stdlib::dateSetMonth);
+        context.nativeType<DateNS>().method("setDate"_str, &stdlib::dateSetDate);
+        context.nativeType<DateNS>().method("setHours"_str, &stdlib::dateSetHours);
+        context.nativeType<DateNS>().method("setMinutes"_str, &stdlib::dateSetMinutes);
+        context.nativeType<DateNS>().method("setSeconds"_str, &stdlib::dateSetSeconds);
+        context.nativeType<DateNS>().method("setTime"_str, &stdlib::dateSetTime);
+        context.nativeType<DateNS>().method("parse"_str, &stdlib::dateParse);
+        context.nativeType<DateNS>().method("getTimezoneOffset"_str, &stdlib::dateGetTimezoneOffset);
         // Date 类对象：占位实例（call 即构造：new Date()/分量/字符串）
         context.registerClass<DateNS>("Date"_str);
     }

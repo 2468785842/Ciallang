@@ -130,7 +130,7 @@ namespace cial {
 
     Value RandomGen::serialize(VM *vm) {
         auto *dic = vm->create<Dictionary>();
-        static const char hex[] = "0123456789abcdef";
+        static constexpr char hex[] = "0123456789abcdef";
         std::string s;
         s.reserve(MT_N * 8);
         for(int i = 0; i < MT_N; ++i)
@@ -206,12 +206,12 @@ namespace cial {
 
 namespace cial::stdlib {
     void registerRandomLib(Context &context) {
-        context.registerMethod<RandomGen>("randomize"_str, &stdlib::rgRandomize);
-        context.registerMethod<RandomGen>("random"_str, &stdlib::rgRandom);
-        context.registerMethod<RandomGen>("random32"_str, &stdlib::rgRandom32);
-        context.registerMethod<RandomGen>("random63"_str, &stdlib::rgRandom63);
-        context.registerMethod<RandomGen>("random64"_str, &stdlib::rgRandom64);
-        context.registerMethod<RandomGen>("serialize"_str, &stdlib::rgSerialize);
+        context.nativeType<RandomGen>().method("randomize"_str, &stdlib::rgRandomize);
+        context.nativeType<RandomGen>().method("random"_str, &stdlib::rgRandom);
+        context.nativeType<RandomGen>().method("random32"_str, &stdlib::rgRandom32);
+        context.nativeType<RandomGen>().method("random63"_str, &stdlib::rgRandom63);
+        context.nativeType<RandomGen>().method("random64"_str, &stdlib::rgRandom64);
+        context.nativeType<RandomGen>().method("serialize"_str, &stdlib::rgSerialize);
     }
 
 

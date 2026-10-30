@@ -48,9 +48,16 @@ namespace cial {
         if(_impl->globalObject.proxy)
             _impl->globalObject.proxy->marked();
 
-        for(const auto &[instanceMethods, instanceProperties] : _impl->nativeRegister.tables | std::views::values) {
+        for(const auto &[instanceMethods, accessors, instanceProperties] :
+            _impl->nativeRegister.tables | std::views::values) {
             for(const auto &method : instanceMethods | std::views::values) {
                 method->marked();
+            }
+            for(const auto &[getter, setter] : accessors | std::views::values) {
+                if(getter)
+                    getter->marked();
+                if(setter)
+                    setter->marked();
             }
             // instanceProperties 是原生函数指针（非 GC 对象），无需标记
         }

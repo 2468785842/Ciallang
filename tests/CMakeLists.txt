@@ -14,6 +14,8 @@ set(SOURCES
         compat_reserved_test.cpp
         expression_test.cpp
         function_test.cpp
+        native_binding_test.cpp
+        native_registration_test.cpp
         native_function_test.cpp
         value_storage_test.cpp
         preprocessor_test.cpp

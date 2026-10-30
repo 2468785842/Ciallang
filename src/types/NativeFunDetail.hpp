@@ -4,6 +4,7 @@
 #pragma once
 
 #include <bit>
+#include <tuple>
 #include <type_traits>
 
 #include "Octet.hpp"
@@ -35,6 +36,12 @@ namespace cial::native {
     template <typename Ret, typename... Args>
     struct NativeFunTraits<Ret (*)(VM *, Value, size_t, Args...)> : NativeFunTraits<Ret (*)(Args...)> {};
 
+    template <typename Ret, typename... Args>
+    struct NativeFunTraits<Ret (*)(const VM *, const Value &, size_t, Args...)> : NativeFunTraits<Ret (*)(Args...)> {};
+
+    template <typename Ret, typename... Args>
+    struct NativeFunTraits<Ret (*)(const VM *, Value, size_t, Args...)> : NativeFunTraits<Ret (*)(Args...)> {};
+
     // 成员函数指针（非 const）
     template <typename C, typename Ret, typename... Args>
     struct NativeFunTraits<Ret (C::*)(Args...)> : NativeFunTraits<Ret (*)(Args...)> {};
@@ -50,6 +57,13 @@ namespace cial::native {
     // 成员函数指针（const 可变组合）
     template <typename C, typename Ret, typename... Args>
     struct NativeFunTraits<Ret (C::*)(Args...) const &> : NativeFunTraits<Ret (*)(Args...)> {};
+
+    template <typename R, typename... A>
+    struct NativeFunTraits<R (*)(A...) noexcept> : NativeFunTraits<R (*)(A...)> {};
+    template <typename C, typename R, typename... A>
+    struct NativeFunTraits<R (C::*)(A...) noexcept> : NativeFunTraits<R (C::*)(A...)> {};
+    template <typename C, typename R, typename... A>
+    struct NativeFunTraits<R (C::*)(A...) const noexcept> : NativeFunTraits<R (C::*)(A...) const> {};
 
     // lambda / 仿函数
     template <typename F>

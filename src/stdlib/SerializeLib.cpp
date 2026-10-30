@@ -25,18 +25,18 @@
 
 namespace cial::stdlib {
     void registerSerializeLib(Context &context) {
-        context.registerMethod<Array>("load"_str, &stdlib::arrayLoad);
-        context.registerMethod<Array>("save"_str, &stdlib::arraySave);
-        context.registerMethod<Array>("loadStruct"_str, &stdlib::arrayLoadStruct);
-        context.registerMethod<Array>("saveStruct"_str, &stdlib::arraySaveStruct);
-        context.registerMethod<Array>("pack"_str, &stdlib::arrayPack);
-        context.registerMethod<Array>("assignStruct"_str, &stdlib::arrayAssignStruct);
-        context.registerMethod<Dictionary>("load"_str, &stdlib::dictLoad);
-        context.registerMethod<Dictionary>("save"_str, &stdlib::dictSave);
-        context.registerMethod<Dictionary>("loadStruct"_str, &stdlib::dictLoadStruct);
-        context.registerMethod<Dictionary>("saveStruct"_str, &stdlib::dictSaveStruct);
-        context.registerMethod<Dictionary>("assignStruct"_str, &stdlib::dictAssignStruct);
-        context.registerMethod<Octet>("unpack"_str, &stdlib::octetUnpack);
+        context.nativeType<Array>().method("load"_str, &stdlib::arrayLoad);
+        context.nativeType<Array>().method("save"_str, &stdlib::arraySave);
+        context.nativeType<Array>().method("loadStruct"_str, &stdlib::arrayLoadStruct);
+        context.nativeType<Array>().method("saveStruct"_str, &stdlib::arraySaveStruct);
+        context.nativeType<Array>().method("pack"_str, &stdlib::arrayPack);
+        context.nativeType<Array>().method("assignStruct"_str, &stdlib::arrayAssignStruct);
+        context.nativeType<Dictionary>().method("load"_str, &stdlib::dictLoad);
+        context.nativeType<Dictionary>().method("save"_str, &stdlib::dictSave);
+        context.nativeType<Dictionary>().method("loadStruct"_str, &stdlib::dictLoadStruct);
+        context.nativeType<Dictionary>().method("saveStruct"_str, &stdlib::dictSaveStruct);
+        context.nativeType<Dictionary>().method("assignStruct"_str, &stdlib::dictAssignStruct);
+        context.nativeType<Octet>().method("unpack"_str, &stdlib::octetUnpack);
     }
 
     namespace {

@@ -13,7 +13,6 @@
  */
 #pragma once
 
-#include <cstdlib>
 #include <fmt/format.h>
 #include <type_traits>
 
@@ -216,14 +215,15 @@ namespace cial::vm {
         CIAL_INLINE DispatchRet invokeCallV(CallFrame *cur, Value *regs, u16 dst, u16 func, const u16 *argRegs,
                                             u64 argc, u64 pc, const Value *receiver = nullptr);
         struct NativeMemberCache {
-            TypeId type{ TypeId::None };
+            NativeTypeKey type{};
             Atom atom{};
             u64 revision{};
             NativeFunction *method{};
             NativePropGetter getter{};
+            NativeAccessor accessor{};
         };
         NativeMemberCache _nativeCache[64]{};
-        const NativeMemberCache &nativeMember(TypeId type, Atom atom, u64 site);
+        const NativeMemberCache &nativeMember(NativeTypeKey type, Atom atom, u64 site);
         struct GlobalSlotCache {
             Atom atom{};
             u64 revision{};

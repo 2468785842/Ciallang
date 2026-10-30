@@ -304,3 +304,46 @@ fib 仍落后 ~13%；与 2026-10-29 批次（native 142%）相比 native_methods
 tjs2 语料 7 脚本 + tjsbc 字节码样本（仓库现存 7 个）rc=0；ASan 全量（MSVC
 /fsanitize=address，回退后 HEAD 状态重建）230/2159 全绿、语料零报告。样本 JSON：
 `bench/results/20261030-*.json`（aa-fusion×2、ab-fusion×3、threeway-fusion-rejected）。
+
+## 2026-10-30 原生绑定层重构对照
+
+本轮基线为同机已构建的“开放 NativeTypeKey 分派第一阶段”Release CLI（保存在
+`/tmp/cial-before-native-binding`），候选为新增声明式绑定、NativeAccessor、标准库统一
+注册后的 Release CLI。不是相对于原始 HEAD 或 TJSCompiler 的比较。
+macOS arm64，同一套 `bench/*.tjs`，每项预热 1 次、7 次交替执行取进程 wall-time
+中位数，独立重复两轮；脚本自身校验均通过。比值为候选/基线，低于 100% 更快。
+
+| 语料 | 第一轮 | 第二轮 |
+|---|---:|---:|
+| class_instantiate | 99.6% | 102.0% |
+| loop_int | 103.4% | 102.6% |
+| fib | 98.9% | 101.0% |
+| native_methods | 101.0% | 99.1% |
+| string_concat | 102.4% | 103.0% |
+
+原生方法在两轮中近似持平；整数循环和字符串存在约 2.4%–3.4% 的耗时回退，尚未定位
+原因，不作“性能无回退”结论。新增功能保留无捕获 NativeFunction 快路径和
+GMethodC/CallMethodV 的接收者分离；访问器缓存增加 getter/setter 信息，实际影响需
+后续 profile 区分布局变化与派发成本（`src/vm/VMState.hpp/.cpp`、
+`src/stdlib/NativeRegister.hpp`、`src/types/Function.hpp`）。
+
+### 同日 CLion 检查后的整理与查询合并
+
+对照基线为完整绑定重构、CLion 整理之前的 Release CLI
+（`/tmp/cial-before-ide`），候选为整理后的同机 Release。各项预热 1 次、交替执行
+7 次取进程 wall-time 中位数；与上表的基线不同，不能直接拼接成累计收益。
+
+| 语料 | 整理前 ms | 整理后 ms | 后/前 |
+|---|---:|---:|---:|
+| class_instantiate | 3.985 | 4.038 | 101.3% |
+| loop_int | 179.146 | 174.699 | 97.5% |
+| fib | 26.012 | 26.008 | 100.0% |
+| native_methods | 10.868 | 10.784 | 99.2% |
+| string_concat | 8.290 | 8.081 | 97.5% |
+
+`NativeRegister::findMember` 将原生方法、只读 getter、访问器的三次类型表定位合并为
+一次，供普通对象成员读取与 VM 调用点缓存填充使用；成员优先级与注册版本失效不变
+（`src/stdlib/NativeRegister.hpp`、`src/runtime/Context.hpp`、`src/vm/VMState.cpp`）。
+同时去除临时 Value 与重复函数适配代码（`src/types/RegExp.hpp`、
+`src/stdlib/RegExpLib.cpp`、`src/Binding.hpp`）。本轮比值范围为 97.5%–101.3%；单轮
+短脚本结果不用于声称稳定提速，也不撤销上一节尚待定位的回退记录。

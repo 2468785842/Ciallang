@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "NativeTypeKey.hpp"
 #include "TypeId.hpp"
 #include "Value.hpp"
 #include "gc/gc.hpp"
@@ -27,6 +28,7 @@ namespace cial {
         friend class Context;
 
     public:
+        static constexpr TypeId nativeTypeId = TypeId::Object;
         explicit Object() = default;
         explicit Object(const Atom name) : _name{ name } {}
 
@@ -39,6 +41,10 @@ namespace cial {
         // 动态类型标识：一次虚调用替代 NativeRegister 分派处的 dynamic_cast 链
         // （Array/Dictionary/RegExp 等有原生方法表的子类覆写）
         [[nodiscard]] virtual TypeId typeId() const noexcept { return TypeId::Object; }
+
+        [[nodiscard]] virtual NativeTypeKey nativeTypeKey() const noexcept { return typeId(); }
+
+        [[nodiscard]] virtual void *nativePayload(NativeTypeKey) const noexcept { return nullptr; }
 
         virtual void call(vm::VMState &vmState, u32 ret, size_t argCount) = 0;
 
@@ -55,6 +61,15 @@ namespace cial {
 
     private:
         Atom _name = ATOM_INVALID;
+    };
+
+    // 外部 Object 子类可直接使用此基类，无需修改 TypeId / TypeTraits。
+    template <typename Derived, typename Base = Object>
+    class NativeObjectType : public Base {
+    public:
+        static constexpr TypeId nativeTypeId = TypeId::None;
+        using Base::Base;
+        [[nodiscard]] NativeTypeKey nativeTypeKey() const noexcept override { return nativeTypeKeyFor<Derived>(); }
     };
 
 } // namespace cial

@@ -37,6 +37,7 @@ namespace cial {
 
         // 专有 TypeId：loadGlobal/propObjectGet·Set 等热路径用一次虚调用
         // 替代 dynamic_cast 的 RTTI 遍历
+        static constexpr TypeId nativeTypeId = TypeId::Property;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Property; }
 
         explicit Property(Object *thisObj, PropMeta *propMeta) : thisObj{ thisObj }, propMeta{ propMeta } {}

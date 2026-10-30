@@ -253,23 +253,27 @@ namespace cial::vm {
         if(val.isObject()) {
             auto *obj = val.asObject().value();
 
-            // Array/Dictionary/RegExp 的原生成员（方法 / count 属性）：与字符串原生表同机制；
-            // 未命中落到对象自身 getProp（RegExp 的 matches/index 等状态属性走此路径）
+            // 原生成员统一通过开放类型键查表；
+            // 未命中落到对象自身 getProp。
             const TypeId tid = obj->typeId();
-            if(tid == TypeId::Array || tid == TypeId::Dictionary || tid == TypeId::RegExp || tid == TypeId::Math ||
-               tid == TypeId::Date || tid == TypeId::RandomGen) {
-                if(auto *getter = vmState.context.findProperty(tid, atom)) {
-                    dst = getter(val);
-                    return;
-                }
-                if(auto *nativeFn = vmState.context.findMethod(tid, atom)) {
-                    nativeFn = vmState.rt.create<NativeFunction>(*nativeFn).get();
-                    nativeFn->setThisObj(val);
-                    dst = Value{ nativeFn };
-                    return;
-                }
-                // 未命中落到对象自身 getProp（count 读在 Array::getProp 有兜底）
+            const auto member = vmState.context.findNativeMember(obj->nativeTypeKey(), atom);
+            if(auto *getter = member.getter) {
+                dst = getter(val);
+                return;
             }
+            const auto accessor = member.accessor;
+            if(accessor.getter) {
+                const RootGuard<NativeFunction> activeGetter{ &vmState.rt, accessor.getter };
+                dst = activeGetter->callDirect(vmState, val, 0, nullptr);
+                return;
+            }
+            if(auto *nativeFn = member.method) {
+                nativeFn = vmState.rt.create<NativeFunction>(*nativeFn).get();
+                nativeFn->setThisObj(val);
+                dst = Value{ nativeFn };
+                return;
+            }
+            // 未命中落到对象自身 getProp（count 读在 Array::getProp 有兜底）
 
             if(tid == TypeId::Global) {
                 // for global, proxy object, maybe get extends object in dataObject?
@@ -307,7 +311,7 @@ namespace cial::vm {
         // Release 走 findProperty/None 落空后 throw——两配置行为不一致）
         if(val.isVoid())
             throw std::runtime_error("cannot access member of void");
-        const TypeId tId = ValueToTypeId::getId(val);
+        const NativeTypeKey tId = ValueToNativeTypeKey::getId(val);
         if(auto *getter = vmState.context.findProperty(tId, atom)) {
             dst = getter(val);
             return;
@@ -335,6 +339,15 @@ namespace cial::vm {
             throw std::runtime_error("dprop obj is not object");
         }
         auto *obj = objVal.asObject().unwrap();
+        const auto accessor = vmState.context.findAccessor(obj->nativeTypeKey(), atom);
+        if(accessor.getter || accessor.setter) {
+            if(!accessor.setter)
+                throw std::runtime_error("native property is read-only");
+            Value argument = src;
+            const RootGuard<NativeFunction> activeSetter{ &vmState.rt, accessor.setter };
+            activeSetter->callDirect(vmState, objVal, 1, &argument);
+            return false;
+        }
         Value curVal{};
         bool hasCur = false;
         if(obj->hasProp(atom)) {
@@ -1548,7 +1561,7 @@ namespace cial::vm {
                 auto *nativeFn = static_cast<NativeFunction *>(callee);
                 constexpr u64 maxDirectArgs = 64;
                 alignas(Value) unsigned char argBuf[maxDirectArgs * sizeof(Value)];
-                Value *const localArgs = reinterpret_cast<Value *>(argBuf);
+                auto *const localArgs = reinterpret_cast<Value *>(argBuf);
                 const u64 n = argc < maxDirectArgs ? argc : maxDirectArgs;
                 u64 built = 0;
                 DEFER {
@@ -1594,7 +1607,7 @@ namespace cial::vm {
     // 本帧实际实参读取：超额调用（argCount > arity）时全部实参由
     // Function::call 按调用顺序复制在窗口顶部保留区 regCount..；
     // 未超额时 %0..%actualArgc-1 即实参（与池顶重合）
-    static Value frameArg(CallFrame *cur, const Value *regs, const u32 i) {
+    static Value frameArg(const CallFrame *cur, const Value *regs, const u32 i) {
         // collapse 声明的帧：Function::call 已把全部实参按调用序备份到尾区
         // （CollapseArgs 会覆盖参数槽，原始值只在尾区）
         if(cur->funcMeta && cur->funcMeta->hasCollapse)
@@ -1702,11 +1715,12 @@ namespace cial::vm {
     }
 
     // 成员名编译期 Atom 直引（同 GProp，跳过名字寄存器与 dispatch 再 intern）
-    const VMState::NativeMemberCache &VMState::nativeMember(TypeId type, Atom atom, u64 site) {
-        auto &entry = _nativeCache[(site ^ atom.v ^ static_cast<u64>(type)) % 64];
+    const VMState::NativeMemberCache &VMState::nativeMember(NativeTypeKey type, Atom atom, u64 site) {
+        auto &entry = _nativeCache[(site ^ atom.v ^ type.hash()) % 64];
         const u64 revision = context.nativeRevision();
         if(entry.type != type || entry.atom != atom || entry.revision != revision) {
-            entry = { type, atom, revision, context.findMethod(type, atom), context.findProperty(type, atom) };
+            const auto member = context.findNativeMember(type, atom);
+            entry = { type, atom, revision, member.method, member.getter, member.accessor };
         }
         return entry;
     }
@@ -1718,12 +1732,9 @@ namespace cial::vm {
         const u16 receiver = read<u16>(ip, pc);
         // 只读引用替代栈拷贝：native 判定/propGetMember 均不修改源槽
         const Value &value = regs[obj];
-        const TypeId type = ValueToTypeId::getId(value);
-        const bool native = !value.isObject() || type == TypeId::Array || type == TypeId::Dictionary ||
-            type == TypeId::RegExp || type == TypeId::Math || type == TypeId::Date || type == TypeId::RandomGen;
-        if(native) {
-            const auto &entry = nativeMember(type, atom, pc);
-            if(entry.method && !entry.getter) {
+        {
+            const auto &entry = nativeMember(ValueToNativeTypeKey::getId(value), atom, pc);
+            if(entry.method && !entry.getter && !entry.accessor.getter) {
                 regs[receiver] = value;
                 regs[dst] = Value{ entry.method };
                 return DispatchRet::Continue;

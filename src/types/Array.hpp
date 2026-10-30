@@ -23,6 +23,7 @@ namespace cial {
 
         explicit Array(Runtime *runtime, const size_t count) : rt(runtime) { elements.resize(count); }
 
+        static constexpr TypeId nativeTypeId = TypeId::Array;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Array; }
 
         // instanceof "Array"（TJS2 原生类链按名匹配，tjsArray 派生自 Array 类）

@@ -35,6 +35,7 @@ namespace cial {
 
         // 脚本函数专有标识（NativeFunction 不覆写、保持 Object）：CallV 直写路径
         // 据此一次虚调用判型后 static_cast，替代热路径 dynamic_cast
+        static constexpr TypeId nativeTypeId = TypeId::Function;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Function; }
 
         // instanceof "Function"（TJS2 tTJSInterCodeContext::IsInstanceOf，
@@ -69,6 +70,7 @@ namespace cial {
         NativeFunction(NativeFunction &&) = delete;
 
         // 专有 TypeId：CallV/CallMethodV 用一次虚调用判型走原生同步快路径
+        static constexpr TypeId nativeTypeId = TypeId::NativeFunction;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::NativeFunction; }
 
         NativeFunction(const NativeFunction &rhs) noexcept :

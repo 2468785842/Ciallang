@@ -46,6 +46,14 @@
 
 ## 四、工程化
 
+- [x] 删除旧 AST 格式化器：`src/parser/ast/AstFormatter.hpp` 已与当前节点/visitor 协议脱节且无调用点，移除失效头；删除前扫描记录见 `doc/project-warnings.md`。
+
+- [x] CLion 原生绑定检查整理（2026-10-30）：11 个核心文件复查 WARN/ERROR 为零；修正 include/未用变量/nodiscard/const/Value 移动，统一函数适配并合并类型表查询。Debug/Release 各 238 项 CTest 全过；性能与保留提示原因见 `doc/native-binding-refactor.md`、`doc/performance.md`。
+
+- [x] 原生注册开放分派第一阶段（2026-10-30）：NativeTypeKey 分离宿主类型身份与 VM TypeId，移除成员读取/GMethodC 的内置类型白名单；外部 Object 子类用 NativeObjectType<T> 注册，跨动态库可显式传入宿主 token。覆盖类型隔离、Context 隔离、回调替换缓存失效、方法提取和 GC 保活；macOS Debug/Release CTest 各 235 项（LSP 使用 TMPDIR=/private/tmp 规避 /var 别名差异），见 `src/types/NativeTypeKey.hpp`、`src/types/Object.hpp`、`tests/native_registration_test.cpp`、`doc/embedding.md`。未测量性能变化。
+- [x] 原生绑定层与标准库迁移（2026-10-30）：普通 C++ payload 包装与 shared_ptr 所有权/trace、class_<T>()、模块/静态函数、转换与接收者检查、NativeAccessor 可写属性；标准库使用 nativeType<T>() 并移除注册头的对象类型清单。macOS Debug/Release 各 238 项 CTest 全过，独立宿主构建运行通过；统一报告见 `doc/native-binding-refactor.md`；ASan 在本机运行库初始化卡住，空 main 同样复现，未完成。
+- [ ] 原生绑定性能跟进：相对第一阶段 Release 的两轮对照中，loop_int / string_concat 耗时约回退 2.4%–3.4%，原生方法近似持平；定位布局与新增分派成本，见 `doc/performance.md`。
+
 - [x] 2026-10-30 工程与运行时整理：字节码入口、统一原生类注册、argparse/REPL、库模式可选依赖、CLI 职责拆分；修复编译阶段 GC、句柄复制、调用帧资源、proxy 保根、setter-only 属性和输入诊断。验证范围见 [doc/review.md](doc/review.md)。
 
 - [x] Windows DLL 部署：Windows 预设改用 `x64-windows-static` 与静态 CRT，移除手动复制 DLL 的需求，见 `CMakePresets.json`。CI Windows 构建已验证。

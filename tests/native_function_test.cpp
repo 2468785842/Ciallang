@@ -14,6 +14,7 @@
 #include <fmt/core.h>
 
 #include "stdlib/StringLib.hpp"
+#include "types/Dictionary.hpp"
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 

@@ -15,33 +15,33 @@
 
 namespace cial::stdlib {
     void registerMathLib(Context &context) {
-        context.registerMethod<MathNS>("abs"_str, &stdlib::mathAbs);
-        context.registerMethod<MathNS>("acos"_str, &stdlib::mathAcos);
-        context.registerMethod<MathNS>("asin"_str, &stdlib::mathAsin);
-        context.registerMethod<MathNS>("atan"_str, &stdlib::mathAtan);
-        context.registerMethod<MathNS>("atan2"_str, &stdlib::mathAtan2);
-        context.registerMethod<MathNS>("ceil"_str, &stdlib::mathCeil);
-        context.registerMethod<MathNS>("exp"_str, &stdlib::mathExp);
-        context.registerMethod<MathNS>("floor"_str, &stdlib::mathFloor);
-        context.registerMethod<MathNS>("log"_str, &stdlib::mathLog);
-        context.registerMethod<MathNS>("pow"_str, &stdlib::mathPow);
-        context.registerMethod<MathNS>("max"_str, &stdlib::mathMax);
-        context.registerMethod<MathNS>("min"_str, &stdlib::mathMin);
-        context.registerMethod<MathNS>("random"_str, &stdlib::mathRandom);
-        context.registerMethod<MathNS>("round"_str, &stdlib::mathRound);
-        context.registerMethod<MathNS>("sin"_str, &stdlib::mathSin);
-        context.registerMethod<MathNS>("cos"_str, &stdlib::mathCos);
-        context.registerMethod<MathNS>("sqrt"_str, &stdlib::mathSqrt);
-        context.registerMethod<MathNS>("tan"_str, &stdlib::mathTan);
+        context.nativeType<MathNS>().method("abs"_str, &stdlib::mathAbs);
+        context.nativeType<MathNS>().method("acos"_str, &stdlib::mathAcos);
+        context.nativeType<MathNS>().method("asin"_str, &stdlib::mathAsin);
+        context.nativeType<MathNS>().method("atan"_str, &stdlib::mathAtan);
+        context.nativeType<MathNS>().method("atan2"_str, &stdlib::mathAtan2);
+        context.nativeType<MathNS>().method("ceil"_str, &stdlib::mathCeil);
+        context.nativeType<MathNS>().method("exp"_str, &stdlib::mathExp);
+        context.nativeType<MathNS>().method("floor"_str, &stdlib::mathFloor);
+        context.nativeType<MathNS>().method("log"_str, &stdlib::mathLog);
+        context.nativeType<MathNS>().method("pow"_str, &stdlib::mathPow);
+        context.nativeType<MathNS>().method("max"_str, &stdlib::mathMax);
+        context.nativeType<MathNS>().method("min"_str, &stdlib::mathMin);
+        context.nativeType<MathNS>().method("random"_str, &stdlib::mathRandom);
+        context.nativeType<MathNS>().method("round"_str, &stdlib::mathRound);
+        context.nativeType<MathNS>().method("sin"_str, &stdlib::mathSin);
+        context.nativeType<MathNS>().method("cos"_str, &stdlib::mathCos);
+        context.nativeType<MathNS>().method("sqrt"_str, &stdlib::mathSqrt);
+        context.nativeType<MathNS>().method("tan"_str, &stdlib::mathTan);
         // 常量属性 getter 须为无捕获 lambda（NativePropGetter 是裸函数指针）
-        context.registerProperty<MathNS>("E"_str, [](const Value &) { return Value{ Real{ M_E } }; });
-        context.registerProperty<MathNS>("LOG2E"_str, [](const Value &) { return Value{ Real{ M_LOG2E } }; });
-        context.registerProperty<MathNS>("LOG10E"_str, [](const Value &) { return Value{ Real{ M_LOG10E } }; });
-        context.registerProperty<MathNS>("LN10"_str, [](const Value &) { return Value{ Real{ M_LN10 } }; });
-        context.registerProperty<MathNS>("LN2"_str, [](const Value &) { return Value{ Real{ M_LN2 } }; });
-        context.registerProperty<MathNS>("PI"_str, [](const Value &) { return Value{ Real{ M_PI } }; });
-        context.registerProperty<MathNS>("SQRT1_2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 / 2 } }; });
-        context.registerProperty<MathNS>("SQRT2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 } }; });
+        context.nativeType<MathNS>().property("E"_str, [](const Value &) { return Value{ Real{ M_E } }; });
+        context.nativeType<MathNS>().property("LOG2E"_str, [](const Value &) { return Value{ Real{ M_LOG2E } }; });
+        context.nativeType<MathNS>().property("LOG10E"_str, [](const Value &) { return Value{ Real{ M_LOG10E } }; });
+        context.nativeType<MathNS>().property("LN10"_str, [](const Value &) { return Value{ Real{ M_LN10 } }; });
+        context.nativeType<MathNS>().property("LN2"_str, [](const Value &) { return Value{ Real{ M_LN2 } }; });
+        context.nativeType<MathNS>().property("PI"_str, [](const Value &) { return Value{ Real{ M_PI } }; });
+        context.nativeType<MathNS>().property("SQRT1_2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 / 2 } }; });
+        context.nativeType<MathNS>().property("SQRT2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 } }; });
         auto *mathNS = context.registerClass<MathNS>("Math"_str);
         // Math.RandomGenerator 类对象（new Math.RandomGenerator(seed) 构造入口）
         mathNS->setRandomGenerator(context.rt().atomTable.intern("RandomGenerator"_str),
@@ -51,10 +51,10 @@ namespace cial::stdlib {
     namespace {
         // TJS2 tTJSXorshift 同款（tjsMath.cpp）：4 种子 Xorshift，time 播散
         struct Xorshift {
-            std::uint32_t seeds[4];
+            std::uint32_t seeds[4]{};
 
             Xorshift() {
-                std::uint32_t seed = static_cast<std::uint32_t>(std::time(nullptr));
+                auto seed = static_cast<std::uint32_t>(std::time(nullptr));
                 for(int i = 0; i < 4; ++i)
                     seeds[i] = seed = 1812433253 * (seed ^ (seed >> 30)) + static_cast<std::uint32_t>(i);
             }
