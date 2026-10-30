@@ -21,6 +21,7 @@ namespace cial {
         Math,
         Date,
         RandomGen,
+        Scripts,
         // 以下不进 NativeRegister 方法表，仅作 GProp/DProp 的分派标识
         // （替代热路径上的 dynamic_cast）
         Global,

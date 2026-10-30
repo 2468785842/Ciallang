@@ -4,6 +4,7 @@ import base64
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -95,7 +96,8 @@ class ComparisonContractTest(unittest.TestCase):
             self.assertFalse(report["ok"])
             self.assertEqual(report["summary"], {"EXECUTION_FAILED": 1})
 
-    def test_missing_sources_are_counted_but_cannot_make_a_successful_report(self):
+    def test_missing_source_is_a_tool_error_not_a_skip(self):
+        # 无源码 fixture 已清理：缺源码不再产生降级覆盖（SKIPPED_NO_SOURCE 已移除）
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             executable = directory / "cial"
@@ -107,46 +109,26 @@ class ComparisonContractTest(unittest.TestCase):
                                   "--source-dir", str(directory), "--case", "missing"])
             report = json.loads(output.getvalue())
             self.assertEqual(code, 1)
-            self.assertEqual(report["summary"], {"SKIPPED_NO_SOURCE": 1})
+            self.assertEqual(report["summary"], {"TOOL_ERROR": 1})
+            self.assertFalse(report["ok"])
             runner.assert_not_called()
-
-    def test_execution_mode_never_claims_source_equivalence(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            directory = Path(temporary)
-            executable = directory / "cial"
-            executable.write_bytes(b"binary")
-            (directory / "missing.tjsbc").write_bytes(tool.MAGIC)
-            output = io.StringIO()
-            with contextlib.redirect_stdout(output), mock.patch.object(tool, "run", return_value=result(b"done")):
-                code = tool.main(["--cial", str(executable), "--fixture-dir", str(directory), "--mode", "execute"])
-            report = json.loads(output.getvalue())
-            self.assertEqual(code, 0)
-            self.assertEqual(report["coverage_mode"], "bytecode_execution")
-            self.assertEqual(report["summary"], {"EXECUTED": 1})
-            self.assertNotIn("source_run", report["cases"][0])
-
-    def test_execution_mode_rejects_failure_and_timeout(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            fixture = Path(temporary) / "case.tjsbc"
-            fixture.write_bytes(tool.MAGIC)
-            for process, expected in [(result(returncode=1), "EXECUTION_FAILED"),
-                                      (result(timed_out=True), "TIMEOUT")]:
-                with self.subTest(expected=expected), mock.patch.object(tool, "run", return_value=process):
-                    self.assertEqual(tool.execute_case(Path("cial"), fixture, 1, Path(temporary))["status"], expected)
 
 
 @unittest.skipUnless(CIAL, "provide --cial to test the actual CLI and fixtures")
 class CliIntegrationTest(unittest.TestCase):
-    def test_original_fixtures_without_source_have_execution_coverage(self):
-        command = [sys.executable, str(Path(tool.__file__).resolve()), "--cial", str(CIAL), "--mode", "execute"]
-        for name in ("s1", "s2", "s3", "s4", "s5"):
-            command.extend(("--case", name))
+    def test_real_fixture_export_via_reference_matches_source(self):
+        # --reference：对保留的（有源码）fixture 现导出字节码再对拍，
+        # 校验导出工具链端到端而不依赖入库副本
+        reference = os.environ.get("TJS_REFERENCE")
+        if not reference:
+            self.skipTest("set TJS_REFERENCE to the reference compiler for export probing")
+        command = [sys.executable, str(Path(tool.__file__).resolve()), "--cial", str(CIAL),
+                   "--case", "s6_class", "--reference", reference]
         with tempfile.TemporaryDirectory() as temporary:
-            process = subprocess.run(command, cwd=temporary, capture_output=True, timeout=30)
+            process = subprocess.run(command, cwd=temporary, capture_output=True, timeout=60)
         self.assertEqual(process.returncode, 0, process.stderr)
         report = json.loads(process.stdout)
-        self.assertEqual(report["summary"], {"EXECUTED": 5})
-        self.assertEqual(report["coverage_mode"], "bytecode_execution")
+        self.assertEqual(report["summary"], {"MATCH": 1})
 
     def test_real_fixture_from_another_working_directory(self):
         with tempfile.TemporaryDirectory() as temporary:

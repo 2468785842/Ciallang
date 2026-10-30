@@ -212,7 +212,7 @@ namespace cial::vm {
                 continue;
             }
 
-            if(th->exValueReg)
+            if(th->exValueReg != ThrowHandler::exValueRegNone)
                 regRef(th->exValueReg) = _exValue;
 
             setPC(th->tryEnd);
@@ -868,13 +868,15 @@ namespace cial::vm {
         auto evalChunk = std::move(*compiled).toHeap(rt);
 
         constexpr u16 retSlot = 0;
+        constexpr u16 excSlot = 1; // 异常值槽：须非 0（unwind 以 exValueRegNone 判"无槽位"，
+        // 但 0 是合法寄存器——回归 2026-10-30 前的 exValueReg=0 哨兵会丢失异常值）
         vm::Chunk tmpChunk{};
-        tmpChunk.setRegCount(1); // reg0 = 返回值槽 / 哨兵异常值槽
+        tmpChunk.setRegCount(2); // reg0 = 返回值槽，reg1 = 哨兵异常值槽
         tmpChunk.emit<inter::NOP>();
-        tmpChunk.addThrowHandler({ 0, 1, retSlot }); // 全区哨兵：截住 unwind
+        tmpChunk.addThrowHandler({ 0, 1, excSlot }); // 全区哨兵：截住 unwind
         tmpChunk.toBytecode(); // 哨兵表必须显式落 bc 层（callValue 同款陷阱）
 
-        const size_t tmpSp = getRegPoolTop(); // tmp 帧 reg0 的池内位置（异常值落点）
+        const size_t tmpSp = getRegPoolTop(); // tmp 帧 reg0 的池内位置（异常值落点 = tmpSp + excSlot）
         allocCallFrame(&tmpChunk);
         makeClosure();
         allocCallFrame(evalChunk.get(), retSlot);
@@ -884,7 +886,7 @@ namespace cial::vm {
 
         // 哨兵路径：eval/tmp 帧均被弹出（栈深 -2）→ 载体解开 native 调用链
         if(context.stackTop() == stackTop - 2)
-            throw ScriptExceptionCarrier{ poolAt(tmpSp) };
+            throw ScriptExceptionCarrier{ poolAt(tmpSp + excSlot) };
 
         const Value ret = reg(retSlot);
         if(stackTop - 1 != context.stackTop())

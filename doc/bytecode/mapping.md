@@ -8,7 +8,7 @@
 >
 > 本文是**实现前的设计文档**。实施进度（2026-10-27）：阶段 0（--dump）与阶段 1（Reader）完成；
 > 阶段 2（TjsTranslator）**M1+M2 完成**：kirikiri `test_class.tjs` 编译产物对拍通过
-> （字节码路径与源码路径输出逐字节一致；s1–s7 语料全绿）。M2 落地：类 context 加载期解释
+> （字节码路径与源码路径输出逐字节一致；s6/s7 + kirikiri test_* 语料全绿）。M2 落地：类 context 加载期解释
 > （var 成员 + initDefaultVal（无成员类也产出，initClassFields 契约）+ 构造器 setConstructor
 > （不入成员表，保 super.<Ctor>() 经类对象调用进 super 分支）+ 成员 property 注册 +
 > superClassGetter 加载期解释为 extends）、NEW→Call（ClassObject::call 构造）、
@@ -313,48 +313,34 @@ propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 
 
 ### 已有 fixture 与严格源码/字节码对拍
 
-Reader 与转译执行回归位于 `tests/tjsbc_reader_test.cpp`、`tests/tjsbc_translator_test.cpp`；
-12 个已导出的 `.tjsbc` 位于 `tests/test_files/tjsbc/`，CI 不需要参考引擎即可运行。
+Reader 回归位于 `tests/tjsbc_reader_test.cpp`（畸形输入拒绝 + 手工构造最小文件），
+转译执行回归位于 `tests/tjsbc_translator_test.cpp`；入库的 `.tjsbc` 语料位于
+`tests/test_files/tjsbc/`（s6_class/s7_ext/test_class/test_function/test_misc/
+test_variant/test_with，**全部有对应源码**），CI 不需要参考引擎即可运行。
 `cial --tjsbc` 的 CLI 路径另由 `tests/cli_test.py` 覆盖。
+
+> 历史清理（2026-10-30）：早期入库的 s1–s5 `.tjsbc` 无对应 `.tjs` 源码（初始提交即只含
+> 二进制，Git 历史不可恢复源码），按"无源码 fixture 一并清理"的约定删除；仅针对它们的
+> Reader 断言（常量池/签名/context 结构 SECTION）与对比工具的降级覆盖路径同步移除。
+> 语料级结构覆盖由有源码的 s6/s7/test_* 承担，必要时可用
+> `TJSCompiler --dump <script.tjs> <out.tjsbc>` 从源码再生成。
 
 `bench/bytecode_conformance.py` 默认运行同一个 Ciallang 的源码路径和字节码路径，
 要求两边都以 0 退出，并按字节比较 stdout，不剥引号、时间戳、空行或诊断文本。
 源码先在 fixture 同目录寻找，再按同名文件在 `tests/test_files/tjs2/` 寻找；
-s1–s5 缺少入库源码，明确报告 `SKIPPED_NO_SOURCE`，不会把它们计作匹配。
-
-这些原始脚本不能从当前仓库可信恢复：初始提交 `7e2fe8a` 只加入 s1–s3 二进制，
-`660b9a6` 只加入 s4/s5 二进制及覆盖描述；Git 文件历史未包含对应 `.tjs`。
-`tests/tjsbc_reader_test.cpp` 的常量池、签名与 context 断言只能约束部分结构，
-不能作为原始源码的证据，因此不补造只打印同样输出的替代脚本。
+**找不到源码即报 `TOOL_ERROR` 并整体判失败**——工具不再提供任何"仅执行"性质的
+降级覆盖（原 `--mode execute` 与 `SKIPPED_NO_SOURCE` 分支随 s1–s5 清理一并移除）。
 
 ```sh
-python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
-  --report bench/results/bytecode-conformance.json
+python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe   --report bench/results/bytecode-conformance.json
 # 只复核指定用例（--case 可重复），目录和输出文件都可含空格
-python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
-  --case s7_ext --case test_class
+python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe   --case s7_ext --case test_class
 ```
-
-无源码 fixture 仍可由独立执行模式覆盖。`--mode execute` 对所选字节码运行
-`cial --tjsbc`，检查退出码与超时并保存原始输出；例如复核 s1–s5：
-
-```sh
-python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
-  --mode execute --case s1 --case s2 --case s3 --case s4 --case s5 \
-  --report bench/results/bytecode-execution.json
-```
-
-执行模式报告 `coverage_mode: "bytecode_execution"`，成功项为 `EXECUTED`；默认比较模式
-报告 `coverage_mode: "source_vs_bytecode"`，成功比较才是 `MATCH`。两种模式的
-`comparison` 字段也明确区分覆盖含义。`EXECUTED` 只说明字节码成功执行，不能证明
-源码等价；全量执行模式覆盖 12 个 fixture，但默认比较模式仍如实跳过缺失源码项。
-`--mode execute` 不接受 `--reference`，避免将执行检查混为重新导出的对拍。
 
 报告为 JSON，记录执行器、源码及字节码 SHA-256、退出码、超时、stdout 首个不同字节位置，
 并同时保留 stdout/stderr 的可读文本和无损 Base64。`MATCH` 以外的实际比较结果均返回 1，
-包括双方都执行失败；比较模式只选中缺失源码的用例也返回 1。执行模式只有所选项全部
-为 `EXECUTED` 才返回 0。参数错误返回 2。每个子进程默认
-15 秒超时，可由 `--timeout` 设置（`bench/bytecode_conformance.py`）。
+包括双方都执行失败；选中用例存在缺源码/工具错误也返回 1。参数错误返回 2。
+每个子进程默认 15 秒超时，可由 `--timeout` 设置（`bench/bytecode_conformance.py`）。
 
 严格报告会暴露 `test_misc` 的异常文本差异：源码路径携带源码行号，已有字节码 fixture
 缺少相同源码位置，输出中没有该行号。此项仍为 `OUTPUT_DIFF`，不通过归一化或删除源码
@@ -362,22 +348,24 @@ python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
 
 ### 可选参考导出与入口能力探测
 
-添加 `--reference /path/to/TJSCompiler` 后，工具在临时目录内生成两个随机标记的最小
-`Debug.message` 脚本，先确认参考 CLI 确实执行不同的路径参数，再验证
-`--dump <script.tjs> <out.tjsbc>` 生成 `TJS2 100\0` 头且能被 Ciallang 执行并输出对应标记。
-任一探测失败即停止并返回失败，不能把忽略参数、固定执行脚本的旧入口当成有效对照。
-探测通过后才临时导出选中语料并做上述源码/字节码对拍；不会覆盖入库 fixture。
+`--reference /path/to/TJSCompiler` 对**有源码的入库 fixture**（清理后即全部 fixture）有意义：
+工具在临时目录内生成两个随机标记的最小 `Debug.message` 脚本，先确认参考 CLI 确实执行
+不同的路径参数，再验证 `--dump <script.tjs> <out.tjsbc>` 生成 `TJS2 100 ` 头且能被
+Ciallang 执行并输出对应标记。任一探测失败即停止并返回失败，不能把忽略参数、固定执行
+脚本的旧入口当成有效对照。探测通过后才从源码临时导出选中语料并做上述源码/字节码对拍；
+不会覆盖入库 fixture。该模式验证"参考导出 → 转译执行"工具链端到端，不依赖入库副本
+的时效性。
 
 ```sh
-python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
-  --reference /path/to/verified/TJSCompiler --case s7_ext \
-  --report bench/results/bytecode-fresh-export.json
+python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe   --reference /path/to/verified/TJSCompiler --case s7_ext   --report bench/results/bytecode-fresh-export.json
 ```
 
 报告记录参考执行器 SHA-256 和两类探测结果。此模式验证**参考导出 → 转译执行**，
-不是参考引擎完整语料 stdout 与 Ciallang 的三方语义对拍；后者仍须单独处理参考引擎的
-宿主、输出协议与行为差异。参考项目的 CLI 适配不作为本仓库能力或上游默认行为承诺。
-工具契约及真实 CLI/fixture 测试见 `bench/test_bytecode_conformance.py`。
+不是参考引擎完整语料 stdout 与 Ciallang 的三方语义对拍；后者已由宿主 `Scripts` 类
+双侧实现后达成的 `test.tjs` 双引擎对拍覆盖（2026-10-30，见 doc/compatibility.md）。
+参考项目的 CLI 适配（`--dump` 与脚本路径参数）不作为本仓库能力或上游默认行为承诺。
+工具契约及真实 CLI/fixture 测试见 `bench/test_bytecode_conformance.py`
+（设置 `TJS_REFERENCE` 环境变量可启用参考导出的真实子进程测试，否则跳过）。
 
 ## 10. 里程碑
 
@@ -386,7 +374,7 @@ python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
 | **M1** ✅ | Reader（容器+常量池+context 骨架）；顶层/函数 context 转译（§4.1/4.2 基型/4.5 CALL/4.6）；flag 物化；prologue；`cial --tjsbc` | fib/循环/算术/字符串拼接/print 的 .bc 对拍全绿（s1–s5） |
 | **M2** ✅ | 属性全族（GPI/SPI/GPDS…模板）、ctClass 加载期解释、NEW、try/catch、property、P 变体、DELD/DELI、TYPEOFD/I、octet 常量、proxy 回落链 | kirikiri `test_class.tjs` 编译产物对拍全绿（2026-10-27，与源码路径逐字节一致）；`test_function.tjs` 前半通过，展开/收拢调用部分留 M4 |
 | **M3** ✅ | 比较写 zf 指令族（CmpEQ/DEQ/LT/GT + 前瞻融合）、Inc/Dec 单指令、BNot/ToNumber/ToOctet（Typeof/Asc/Chr/DelProp/GetP·SetP 已随 M1/M2 提前落地） | 指令转译覆盖 128/128（2026-10-27）；全部语料 run 路径全绿 |
-| **M4** ✅ | collapse 参数（CollapseArgs）、展开调用（CallExpand）、省略透传（CallOmit）、EVAL/EEXP→EvalStr、CLT/CGT 序修正、dst=0 丢弃语义 | `test_function.tjs` 全量通过（2026-10-27）；test_misc/test_with/test_variant 与源码路径一致；`test.tjs` 双方同位置失败（需宿主 Scripts 对象）。遗留：test_string 原版导出崩溃 |
+| **M4** ✅ | collapse 参数（CollapseArgs）、展开调用（CallExpand）、省略透传（CallOmit）、EVAL/EEXP→EvalStr、CLT/CGT 序修正、dst=0 丢弃语义 | `test_function.tjs` 全量通过（2026-10-27）；test_misc/test_with/test_variant 与源码路径一致；`test.tjs` 双引擎对拍通过（2026-10-30 宿主 Scripts 类双侧落地，见 doc/compatibility.md）。遗留：test_string 原版导出崩溃（`--dump` segfault，2026-10-30 复核仍现，不影响对拍主路径） |
 
 **新增 TAC 指令提案汇总**（M3 落地，命名沿用现有风格）：
 `CmpEQ/CmpDEQ/CmpLT/CmpGT`（写 zf）、`Inc/Dec`、`Typeof`、`Asc/Chr`、`BNot`、`Num`、

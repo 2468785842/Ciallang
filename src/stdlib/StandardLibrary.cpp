@@ -5,6 +5,7 @@
 #include "MathLib.hpp"
 #include "RandomLib.hpp"
 #include "RegExpLib.hpp"
+#include "ScriptsLib.hpp"
 #include "SerializeLib.hpp"
 #include "StringLib.hpp"
 
@@ -18,5 +19,6 @@ namespace cial::stdlib {
         registerRandomLib(context);
         registerDateLib(context);
         registerSerializeLib(context);
+        registerScriptsLib(context);
     }
 } // namespace cial::stdlib

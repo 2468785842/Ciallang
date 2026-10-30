@@ -219,10 +219,15 @@ namespace cial {
                 throw std::runtime_error("value is not callable");
 
             constexpr u16 retReg = 0;
+            constexpr u16 excReg = 1; // 异常值槽：须非 0——unwind 以 if(exValueReg) 判"有无槽位"
             vm::Chunk tmpChunk{};
-            tmpChunk.setRegCount(1); // reg0 = 返回值槽 / 哨兵异常值槽
+            tmpChunk.setRegCount(2); // reg0 = 返回值槽，reg1 = 哨兵异常值槽
             tmpChunk.emit<inter::NOP>(); // 哨兵区间 [0,1) 覆盖的 1 字节指令
-            tmpChunk.addThrowHandler({ 0, 1, retReg }); // 全区哨兵：截住 unwind
+            tmpChunk.addThrowHandler({ 0, 1, excReg }); // 全区哨兵：截住 unwind
+            // 既有缺陷（2026-10-30 修复）：旧版 exValueReg=retReg=0 被 unwind 的
+            // if(th->exValueReg) 判为"无槽位"，异常值从未写入，哨兵路径经
+            // ScriptExceptionCarrier 抛出的实为窗口槽陈旧值（sort 比较器抛异常
+            // 时外层 catch 曾收到池内旧对象/void）
 
             // 压栈顺序必须是 tmp 帧 → 实参 → func 帧：CallFrame 构造以
             // allocFrame(regCount) - arity 回退对齐参数寄存器，前提是实参
@@ -234,9 +239,11 @@ namespace cial {
             _vmState->allocCallFrame(&tmpChunk);
             _vmState->makeClosure();
             _vmState->curFrame()->setThisObj(*receiverRoot);
+            // tmp 帧窗口基（reg0 槽）：压实参前捕获——压实参后池顶已越过窗口，
+            // 旧版在此之后取 poolTop-argCount 实为首个实参槽（陈旧值来源之一）
+            const size_t tmpBase = _vmState->getRegPoolTop() - tmpChunk.getRegCount();
             for(size_t i = 0; i < argCount; ++i)
                 _vmState->push(args[i]);
-            const size_t tmpSp = _vmState->getRegPoolTop() - argCount; // tmp 帧窗口起点（异常值落点）
 
             fn->call(*_vmState, retReg, argCount);
             _vmState->makeClosure();
@@ -248,7 +255,10 @@ namespace cial {
             if(_vmState->context.stackTop() == stackTop - 2) {
                 // 以专用载体解开 native 调用链（std::sort 等）；主循环 catch 接住后
                 // 转 _pending + unwind，外层脚本 try/catch 正常接续
-                throw vm::ScriptExceptionCarrier{ _vmState->poolAt(tmpSp) };
+                {
+                    const Value &pv = _vmState->poolAt(tmpBase + excReg);
+                }
+                throw vm::ScriptExceptionCarrier{ _vmState->poolAt(tmpBase + excReg) }; // unwind 写 tmp 帧 reg1
             }
 
             Value ret = _vmState->reg(retReg);

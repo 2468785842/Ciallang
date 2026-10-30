@@ -41,14 +41,14 @@
 | 项 | 状态 |
 |---|---|
 | 容器/常量池/context 解析（Reader） | ✅ M1 |
-| 顶层/函数 context 转译（算术/比较/跳转/调用/flag 物化） | ✅ M1（s1–s5 对拍） |
+| 顶层/函数 context 转译（算术/比较/跳转/调用/flag 物化） | ✅ M1（历史基准 s1–s5 对拍；该批无源码样本已于 2026-10-30 清理，见下方 fixture 说明） |
 | 属性访问全族（GPD/GPI/SPD/…/S 变体 + P 变体/GETP/SETP/DELD/TYPEOFD） | ✅ M2 |
 | 类（ctClass 加载期解释）/ NEW / try-catch / property / extends | ✅ M2（`test_class.tjs` 对拍一致） |
 | 新增 TAC（比较写 zf、Inc/Dec 单指令、BNOT/NUM/OCTET 等） | ✅ M3（2026-10-27，128 操作码转译覆盖闭环） |
 | collapse/展开/省略调用、EVAL/EEXP、CLT/CGT 序修正、`test_function.tjs` 全量 | ✅ M4（CallOmit/CallExpand/CollapseArgs 三条新 TAC + 超额实参保留区；test_misc/test_with 同步一致） |
 | test_variant（octet 语料） | ✅ 2026-10-27（Reader OCTET 段 pos 推进修复 + dst=0 丢弃语义修复后全量通过） |
 | test_string（原版 --dump 崩溃，无法产出字节码） | 📐 受上游阻塞 |
-| 对拍工具链：TJSCompiler `--dump` 导出选项 + `cial --tjsbc` + 语料入库 | ✅ `--dump` + 语料（tests/test_files/tjsbc/ s1–s7 + test_class/test_function）+ 转译器 + `cial --tjsbc`（`CIAL_TJSBC_DUMP=1` 可打印顶层转译 TAC） |
+| 对拍工具链：TJSCompiler `--dump` 导出选项 + `cial --tjsbc` + 语料入库 | ✅ `--dump` + 语料（tests/test_files/tjsbc/ s6_class/s7_ext/test_class/test_function/test_misc/test_variant/test_with，均有源码；s1–s5 无源码样本已于 2026-10-30 清理）+ 转译器 + `cial --tjsbc`（`CIAL_TJSBC_DUMP=1` 可打印顶层转译 TAC） |
 
 ## 3. 标准库兼容
 
@@ -63,6 +63,24 @@
 | Date | get/set 系列 + 字符串 parse（tjsdate.y 文法） | ✅ 全部方法+构造+parse 完整文法（tjsdate.y 全 11 形态/月名/星期/AMPM/时区名与 ±hhmm/括号忽略段/两位年/小数秒，2026-10-26 对拍逐位一致）；注意：进程首个字符串构造因 CRT `_timezone` 惰性初始化偏移 +2×\|tz\|（原版同款怪癖，已同步保留，见 DateParser.cpp build() 注释） |
 | RegExp | compile/test/match/exec/replace/split（oniguruma）；属性 matches/start/index/lastIndex/input/lastMatch/lastParen/leftContext/rightContext | ✅ /pattern/flags 字面量（g/i）+ 全部方法 + 全部实例属性 + 静态属性 `RegExp.last`（仅 test/exec 更新且失败也更新）；`new RegExp(pattern, flags?)` ✅；replace 回调保留已有 this 绑定（含全局函数声明）；未绑定函数表达式/原生回调以 regexp 作 objthis（原版 `replace_regex` 同语义；实现 `src/stdlib/RegExpLib.cpp`、`src/vm/VM.hpp`，回归 `tests/native_function_test.cpp`）。位置语义：UTF-8 码点（TJS2 为 UTF-16 码元，BMP 内一致；2026-10-26 从字节偏移改定）。已知偏差：`index` 属性成功匹配的非 ASCII 值——原版 tjsRegExp.cpp:669 少除 sizeof(tjs_char)（UTF-16 单位+字节混加，start>0 时可与 lastIndex 相等），本项目为纯码点 |
 | Octet | 字节流 + pack 系 | ◐ 类型+字面量+unpack ✅（2026-10-26，tjsOctPack 全类型；Octet 仅有的方法即 unpack）；偏差：原版 BinToHex 负 len 钳位 bug 使 unpack h\*/H\* 恒返回空串，本项目返回正确 hex（同 tjsOctPack.cpp HexToBin 大写仅收 A-E 的漏写按特性同步） |
+| Scripts | execStorage/evalStorage/compileStorage/exec/eval/dump/getTraceString/setCallMissing/getClassNames/textEncoding（tTJSNC_Scripts，ScriptMgnIntf.cpp:1295-1570） | ◐ execStorage ✅（语句脚本执行，全局上下文，嵌套双帧哨兵协议，`src/stdlib/ScriptsLib.cpp`）；evalStorage ✅（表达式求值返回值）；**compileStorage ❌ 不实现**——Ciallang 无库内字节码导出能力（`--tjsbc` 是 CLI 加载方向，非导出），按偏差记录；exec/eval/dump 等其余成员未实现。路径解析：绝对路径直用，相对路径相对当前执行脚本所在目录（krkr2 TVPSearchPlacedPath 的 CLI 简化，无 xp3 归档）；缺失文件抛可捕获 Exception（消息含路径）。回归 `tests/scripts_test.cpp` |
+
+### Scripts 双引擎对拍（2026-10-30）
+
+`tests/test_files/tjs2/test.tjs`（execStorage 加载 6 个兄弟语料 + 解析器/实数语料断言）
+已在本仓库 `cial.exe` 与参考适配版 `TJSCompiler.exe` 双侧通过（均退出码 0）。语义消息
+序列 17/17 对齐；差异仅为输出协议/诊断格式类：
+
+1. 参考引擎 Debug.message 带时间戳前缀、被捕获异常打印 VM 转储、退出前转储脚本块
+   （其 main 的 Dump 流程）——输出协议差异，非行为差异（§4"原生错误报告"同类）。
+2. test_misc.tjs:149 octet 除法异常的 `e.message`：参考引擎为空串，本项目为
+   "unsupported operand types for \`/\` (line 149)"（原生错误包装 + 行号装饰）——
+   异常消息文案差异，控制流（catch 触发、后续消息序）一致。
+3. `success: class ClassA::finalize` 双方均不打印（SubClass 实例未 invalidate，GC 时机
+   不触发 finalize）——双方一致。
+
+TJSCompiler 侧实现在其仓库 `src/syntax/library/ScriptsInterface.{h,cpp}` +
+`src/main.cpp` REGISTER_OBJECT 注入（工作区本地适配，未提交）。
 
 ## 4. 运行时行为差异（已知，须保持记录）
 
@@ -80,6 +98,7 @@
 | `isvalid` 非对象值 | 恒 true（VM_CHKINV：`Type() != tvtObject` 即 true，tjsInterCodeExec.cpp:1177） | 一致（2026-10-30 修正——曾对非对象抛"Invalid type get as Object"）；对象按 IsValid 判定，invalidate 后 false | 无差异 |
 | `instanceof` 内置对象 | `TJSDefaultIsInstanceOf` 沿原生类链按名匹配：Array/Dictionary/RegExp 实例与函数对象对各自类名恒真 | 一致（2026-10-30 修正——基类 instanceOf 曾恒 false）；保留 Atom + 各类型覆写（`src/runtime/Runtime.hpp`、`src/types/*.hpp`） | 无差异 |
 | 无 return 函数返回值 | void（编译器补 ret 读 void 常量） | 一致（2026-10-30 修正潜伏缺陷——补丁 ret 的 void Load 曾发射到 parseAst 后的暂存 chunk，返回寄存器池陈旧值；`src/gen/IRGenerator.cpp` patchVoidRet） | 无差异 |
+| 回调异常值传播 | 宿主回调（sort 比较器/replace 回调/即时求值）抛出的脚本异常，外层 catch(e) 收到抛出值本身（try handler 的 exValueReg 回写） | 一致（2026-10-30 修正——ThrowHandler 以 0 表示"无槽位"与寄存器 0 冲突，异常值曾丢失、catch 读到池内陈旧值；现以 0xFFFF 为无槽位哨兵，寄存器 0 合法；`src/vm/VMState.cpp` unwind、`src/vm/Bytecode.hpp`、回归 tests/try_catch_test.cpp） | 无差异 |
 | `+` 的 void 幺元 / `(string)void` | `operator+=`：任一侧为 String 时两侧 `AsString()`（void→NULL 即空串，tjsVariant.cpp:1095-1128、683-686）；void±Integer/Real 恒等；void+void → AsReal 兜底得 Real 0；octet+String 抛错。`ToString()` 对 void 给空串（:411-415）、octet 抛错（:443-445） | 一致（2026-10-30 修正——`(string)void` 与 `"a"+void` 曾报 "Invalid type cast / unsupported operand"；`src/types/Value.cpp` toString Void 分支） | 无差异 |
 | `&` 引用作用域 | 全局/局部/对象成员均可存属性引用；普通全局/成员读取触发 getter，局部读取仅复制引用 | 一致；`&name` / `&obj.member` 取引用本体，`*(&name)` 可显式解引用全局槽 | 无差异；回归见 `tests/property_test.cpp` |
 

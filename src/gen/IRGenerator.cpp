@@ -93,7 +93,7 @@ namespace cial::inter {
         } else {
             node->catchBlock->generateBytecode(this, optReg);
             _chunk->repl<Jmp>(jmpIdx, makeLabel());
-            _chunk->addThrowHandler({ tryStartIp.address(), tryEndIp.address() });
+            _chunk->addThrowHandler({ tryStartIp.address(), tryEndIp.address(), vm::ThrowHandler::exValueRegNone });
         }
 
         optReg = {};

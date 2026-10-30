@@ -2,8 +2,9 @@
  * Copyright (c) 2026/10/26
  *
  * TJS2 字节码文件读取（阶段 1：纯格式解析）单元测试。
- * 语料：tests/test_files/tjsbc/*.tjsbc 由参考实现
- * `TJSCompiler --dump script.tjs out.tjsbc` 生成（生成脚本见批次提交说明）。
+ * 参考实现导出语料（s1-s5）无源码归档，已按"无源码 fixture 清理"约定移除；
+ * 保留畸形输入拒绝与手工构造用例，语料级覆盖见 tjsbc_translator_test.cpp
+ * （s6_class/s7_ext/test_* 均有源码，可用 `TJSCompiler --dump` 再生成）。
  */
 
 #include <catch2/catch_all.hpp>
@@ -16,103 +17,6 @@
 
 using namespace cial;
 using namespace cial::tjsbc;
-
-TEST_CASE("TJS2 字节码读取——参考实现导出语料") {
-    SECTION("s1：整数/函数 context") {
-        const auto file = readTjsBytecodeFile(TEST_FILES_PATH R"(/tjsbc/s1.tjsbc)");
-        REQUIRE(file.fileSize == 484);
-        // 字符串段含驻留的 global / 成员名 / 字符串字面量
-        bool hasGlobal = false, hasF = false, hasB = false;
-        for(const auto &str : file.pool.strings) {
-            if(str == "global"_str)
-                hasGlobal = true;
-            if(str == "f"_str)
-                hasF = true;
-            if(str == "b"_str)
-                hasB = true;
-        }
-        REQUIRE(hasGlobal);
-        REQUIRE(hasF);
-        REQUIRE(hasB);
-        // 整数段含字面量 2（x * 2）
-        // 值域分型：小整数进 BYTE 段（|v|<=127），2 ∈ BYTE
-        bool hasTwo = false;
-        for(const auto v : file.pool.bytes)
-            if(v == 2)
-                hasTwo = true;
-        REQUIRE(hasTwo);
-        // 至少 2 个 context（顶层 + 函数 f）；topLevel 指向有效索引
-        REQUIRE(file.contexts.size() >= 2);
-        REQUIRE(file.topLevel >= 0);
-        REQUIRE(file.topLevel < static_cast<i32>(file.contexts.size()));
-        // 顶层 context 类型
-        REQUIRE(file.contexts[static_cast<size_t>(file.topLevel)].type == TjsContextType::TopLevel);
-        // 函数 context 存在且签名正确（1 个声明参数）
-        bool hasFunc = false;
-        for(const auto &ctx : file.contexts) {
-            if(ctx.type == TjsContextType::Function) {
-                hasFunc = true;
-                REQUIRE(ctx.funcDeclArgCount == 1);
-                REQUIRE(ctx.maxVariableCount > 0);
-            }
-        }
-        REQUIRE(hasFunc);
-    }
-
-    SECTION("s2：实数/长整数/中文字符串/octet") {
-        const auto file = readTjsBytecodeFile(TEST_FILES_PATH R"(/tjsbc/s2.tjsbc)");
-        bool hasPi = false, hasBig = false, hasCjk = false, hasDead = false;
-        for(const auto v : file.pool.reals)
-            if(v == 3.14)
-                hasPi = true;
-        for(const auto v : file.pool.longs)
-            if(v == 5000000000LL)
-                hasBig = true; // 超 int32 → LONG 段
-        for(const auto &str : file.pool.strings)
-            if(str == "中文"_str)
-                hasCjk = true; // UTF-16LE → UTF-8 转换
-        for(const auto &o : file.pool.octets)
-            if(o.size() == 2 && o[0] == 0xDE && o[1] == 0xAD)
-                hasDead = true;
-        REQUIRE(hasPi);
-        REQUIRE(hasBig);
-        REQUIRE(hasCjk);
-        REQUIRE(hasDead);
-    }
-
-    SECTION("s3：class / property context 结构") {
-        const auto file = readTjsBytecodeFile(TEST_FILES_PATH R"(/tjsbc/s3.tjsbc)");
-        bool hasClass = false, hasGetter = false;
-        for(const auto &ctx : file.contexts) {
-            if(ctx.type == TjsContextType::Class)
-                hasClass = true;
-            if(ctx.type == TjsContextType::PropertyGetter)
-                hasGetter = true;
-        }
-        REQUIRE(hasClass);
-        REQUIRE(hasGetter);
-        // 成员函数表挂在其所属 context 上（此语料：Function `get` 携带 1 条）
-        bool memberOnFunc = false;
-        for(const auto &ctx : file.contexts) {
-            if(ctx.type == TjsContextType::Function && ctx.propMembers.size() == 1)
-                memberOnFunc = true;
-        }
-        REQUIRE(memberOnFunc);
-        // data 槽的 INTER_OBJECT 指向有效 context 索引
-        for(const auto &ctx : file.contexts) {
-            for(const auto &slot : ctx.data) {
-                if(slot.type == TJS_TYPE_INTER_OBJECT)
-                    REQUIRE(slot.index >= 0);
-            }
-        }
-    }
-
-    SECTION("码字保持文件态（i16、未换算）") {
-        const auto file = readTjsBytecodeFile(TEST_FILES_PATH R"(/tjsbc/s1.tjsbc)");
-        for(const auto &ctx : file.contexts)
-            REQUIRE_FALSE(ctx.code.empty()); // 顶层与函数均有码字
-    }
-}
 
 TEST_CASE("TJS2 字节码读取——畸形输入拒绝") {
     SECTION("魔数不符") {

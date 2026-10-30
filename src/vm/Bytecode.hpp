@@ -125,6 +125,11 @@ namespace cial::vm {
 
     // try 区间表（pc 语义由使用者决定：TAC 下标或扁平字节码偏移）
     struct ThrowHandler {
+        // "无异常值槽位"哨兵：寄存器 0 是合法分配结果（catch 变量/eval 帧槽都
+        // 可能落 0），不能用 0 表示缺省——unwind 曾把 exValueReg==0 判为"不回写"，
+        // catch(e) 变量由此读到寄存器槽 0 的陈旧值（2026-10-30 修正）
+        static constexpr u16 exValueRegNone = 0xFFFF;
+
         u64 tryStart;
         u64 tryEnd;
         u16 exValueReg;

@@ -53,7 +53,7 @@ cmake --build build/bench --target conformance-report
 
 参考引擎默认从 `../TJSCompiler` 探测，也可设置 `CIAL_TJS_ROOT` 环境变量或 `TJS_ROOT` 缓存项；报告放在 `bench/results/`。性能记录与统计口径见 [performance.md](performance.md)。
 
-当前上游 TJSCompiler 的 `src/main.cpp` 尚未提供脚本路径/`--dump` 命令；历史对拍依赖本地适配入口。使用 `CIAL_TJS_EXE` 前确认该程序支持路径参数，避免将固定脚本的输出误当作对拍结果。已有字节码 fixture 不依赖参考引擎即可执行。
+当前 TJSCompiler 上游入口不接受脚本路径/`--dump` 参数；本地适配版（含 `--dump <script.tjs> <out.tjsbc>` 导出与宿主 `Scripts` 类）是工作区未提交改动，使用 `CIAL_TJS_EXE` 前确认该程序支持路径参数，避免将固定脚本的输出误当作对拍结果。入库字节码 fixture（均有源码）不依赖参考引擎即可对拍。
 
 严格源码/字节码对拍可独立运行，无需启用 bench 构建选项或安装参考引擎：
 
@@ -65,7 +65,8 @@ python bench/test_bytecode_conformance.py --cial build/Windows/Debug/cial.exe
 
 工具逐字节比较两条 Ciallang 路径的 stdout，失败、超时或输出差异返回 1；已有
 `test_misc` fixture 的诊断行号差异也会如实报告，不能把该命令默认等同于“全绿”。
-`--case` 可筛选用例，`--reference` 可使用经随机脚本及导出执行探测的参考 CLI 生成临时
+`--case` 可筛选用例；fixture 必须有源码（s1–s5 无源码样本已清理，缺源码报
+`TOOL_ERROR`），`--reference` 可使用经随机脚本及导出执行探测的参考 CLI 从源码生成临时
 字节码，入库 fixture 不受影响。JSON 含退出码、无损输出与 SHA-256；详见
 [字节码转译 §9](bytecode/mapping.md#9-对拍与工具链) 和 `bench/bytecode_conformance.py`。
 

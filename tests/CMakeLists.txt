@@ -33,6 +33,7 @@ set(SOURCES
         property_test.cpp
         tjsbc_reader_test.cpp
         tjsbc_translator_test.cpp
+        scripts_test.cpp
         scope_test.cpp
         statement_test.cpp
         try_catch_test.cpp

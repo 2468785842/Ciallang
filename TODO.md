@@ -14,6 +14,10 @@
 > 字节码路径全量通过（test_class/test_function/test_misc/test_variant/test_with +
 > s1–s7；test.tjs 需宿主 Scripts 对象双方同位置失败、test_string 上游 --dump 崩溃）；
 > 128 操作码转译覆盖。见 doc/bytecode/mapping.md。
+> **宿主 Scripts 类双侧落地（2026-10-30）**：`test.tjs` 在 cial.exe 与参考适配版
+> TJSCompiler.exe 双侧通过（语义消息 17/17 对齐，差异均为输出协议/异常文案类，
+> 见 doc/compatibility.md）；无源码字节码样本 s1–s5 已按约定清理（fixture 与工具
+> 降级路径同步移除，见 doc/bytecode/mapping.md §9）。
 
 ## 一、正确性
 
@@ -53,7 +57,7 @@
 - [x] 执行路径 DOT：按代码位置与边聚合次数，覆盖嵌套原生回调、异常和 GC 后快照，见 `src/vm/ExecutionTrace.hpp`、`doc/execution-trace.md`。
 - [x] LSP 基础：只编译的 `--check-json` + Python stdio 服务 + VSCode 客户端；诊断使用 UTF-16 位置，提供词法补全、内置提示与符号。真实 stdio 协议测试已接 CTest，跨文件语义和 IDE UI 验证待后续。见 `tools/lsp/`、`editors/vscode/`、`doc/lsp.md`。
 
-本机最终验证：macOS Debug、Release 均 **198/198 通过**（2026-10-29，保留字/类型注解批次 + 24 测试文件；UBSan 数字 120/120 为上一批次时点）；Windows Debug **154/154 通过**（2026-10-29，测试主线回归 + 常量传播/回边检测/拷贝传播后）。tjs2 语料 7 文件中 6 个通过，`test.tjs` 需宿主 Scripts 对象（基线同样失败，非回归）；12 个字节码样本全部成功；从 `/tmp` 配置时 TJSCompiler 相对路径解析通过。ASan 运行库在 macOS 初始化阶段自旋，尚未进入测试，不能计为通过。
+本机最终验证：Windows Debug **224 用例 / 2168 断言全绿 + CTest 4 套件全过**（2026-10-30，回调绑定/语义修正/函数指针化批次后）；tjs2 语料 6 文件通过（`test.tjs` 需宿主 Scripts 对象，基线同样失败，非回归）；12 个字节码样本全部成功；native_methods 同机 A/B 见 doc/performance.md。历史：macOS Debug/Release 198/198（2026-10-29）；ASan 在 macOS 初始化自旋未获结果，改于 Windows 重试（进行中）。
 
 ## 已完成（摘要）
 

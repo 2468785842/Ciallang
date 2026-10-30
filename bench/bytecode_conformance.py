@@ -85,19 +85,9 @@ def compare_case(cial, source, bytecode, timeout, cwd):
             "source_run": encoded_run(source_result), "bytecode_run": encoded_run(bytecode_result)}
 
 
-def execute_case(cial, bytecode, timeout, cwd):
-    result = run([cial, "--tjsbc", bytecode], timeout, cwd)
-    status = "TIMEOUT" if result["timed_out"] else "EXECUTED" if result["returncode"] == 0 else "EXECUTION_FAILED"
-    return {"status": status, "bytecode": str(bytecode),
-            "bytecode_sha256": hashlib.sha256(bytecode.read_bytes()).hexdigest(),
-            "bytecode_run": encoded_run(result)}
-
-
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cial", required=True, type=Path)
-    parser.add_argument("--mode", choices=("compare", "execute"), default="compare",
-                        help="compare source/bytecode stdout, or only check bytecode execution")
     parser.add_argument("--fixture-dir", type=Path, default=ROOT / "tests/test_files/tjsbc")
     parser.add_argument("--source-dir", type=Path, default=ROOT / "tests/test_files/tjs2")
     parser.add_argument("--case", action="append", default=[], help="fixture stem; repeat to select cases")
@@ -107,8 +97,6 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
-    if args.mode == "execute" and args.reference:
-        parser.error("--reference requires --mode compare")
     args.cial = args.cial.resolve()
     if not args.cial.is_file():
         parser.error("--cial must name an executable file")
@@ -118,9 +106,8 @@ def main(argv=None):
     unknown = set(args.case) - {path.stem for path in fixtures}
     if unknown:
         parser.error(f"unknown cases: {', '.join(sorted(unknown))}")
-    report = {"coverage_mode": "source_vs_bytecode" if args.mode == "compare" else "bytecode_execution",
-              "comparison": ("Ciallang source versus bytecode; stdout compared byte for byte" if args.mode == "compare"
-                             else "Bytecode execution smoke check; no source equivalence assertion"),
+    report = {"coverage_mode": "source_vs_bytecode",
+              "comparison": "Ciallang source versus bytecode; stdout compared byte for byte",
               "cial": {"executable": str(args.cial),
                        "sha256": hashlib.sha256(args.cial.read_bytes()).hexdigest()},
               "reference": None, "cases": []}
@@ -136,19 +123,15 @@ def main(argv=None):
             for fixture in fixtures:
                 if args.case and fixture.stem not in args.case:
                     continue
-                if args.mode == "execute":
-                    case = {"name": fixture.stem}
-                    try:
-                        case.update(execute_case(args.cial, fixture, args.timeout, directory))
-                    except (OSError, RuntimeError) as error:
-                        case.update(status="TOOL_ERROR", error=str(error))
-                    report["cases"].append(case)
-                    continue
                 source = fixture.with_suffix(".tjs")
                 if not source.is_file():
                     source = args.source_dir.resolve() / f"{fixture.stem}.tjs"
-                case = {"name": fixture.stem, "status": "SKIPPED_NO_SOURCE", "bytecode": str(fixture)}
-                if source.is_file():
+                case = {"name": fixture.stem, "bytecode": str(fixture)}
+                if not source.is_file():
+                    # 无源码 fixture 不再受支持（s1-s5 已清理）：缺源码即工具错误，
+                    # 不产生任何"仅执行"性质的降级覆盖
+                    case.update(status="TOOL_ERROR", error=f"missing source: {source}")
+                else:
                     try:
                         bytecode = fixture
                         if args.reference:
@@ -160,10 +143,8 @@ def main(argv=None):
                 report["cases"].append(case)
     report["summary"] = {status: sum(case["status"] == status for case in report["cases"])
                          for status in sorted({case["status"] for case in report["cases"]})}
-    compared = [case for case in report["cases"] if case["status"] != "SKIPPED_NO_SOURCE"]
-    success_status = "MATCH" if args.mode == "compare" else "EXECUTED"
-    report["ok"] = ("error" not in report and bool(compared)
-                    and all(case["status"] == success_status for case in compared))
+    report["ok"] = ("error" not in report and bool(report["cases"])
+                    and all(case["status"] == "MATCH" for case in report["cases"]))
     payload = json.dumps(report, ensure_ascii=True, indent=2)
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)

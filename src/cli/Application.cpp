@@ -15,6 +15,7 @@
 #include "common/Defer.hpp"
 #include "stdlib/ExceptionLib.hpp"
 #include "stdlib/Print.hpp"
+#include "stdlib/ScriptsLib.hpp"
 #include "tjsbc/TjsBytecodeReader.hpp"
 #include "tjsbc/TjsTranslator.hpp"
 #include "types/Class.hpp"
@@ -22,7 +23,7 @@
 
 namespace cial::cli {
     namespace {
-        void initializeSession(Context &context, VM &vm) {
+        void initializeSession(Context &context, VM &vm, vm::VMState &state, const Options &options) {
             stdlib::registerStandardLibrary(context);
             context.registryGlobalFunc("print"_str, &stdlib::S_PrintFunction);
             context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
@@ -32,6 +33,11 @@ namespace cial::cli {
 var Debug = new __DebugShim();
 )"_str);
             stdlib::initExceptionClass(vm);
+            // 重绑定 Scripts：嵌套执行所需的 VMState + 存储基目录（相对路径
+            // 相对当前执行脚本所在目录，krkr2 TVPSearchPlacedPath 的 CLI 语义）
+            stdlib::registerScriptsLib(
+                context, &state,
+                options.input.empty() ? std::filesystem::path{} : std::filesystem::path{options.input}.parent_path());
         }
 
         int runSource(const Options &options, vm::VMState &state) {
@@ -109,7 +115,7 @@ var Debug = new __DebugShim();
         const bool compileOnly =
             options.mode == Mode::CheckJson || options.mode == Mode::DumpCfg || options.mode == Mode::DumpSsa;
         if(!compileOnly)
-            initializeSession(context, vm);
+            initializeSession(context, vm, state, options);
         state.setJitMode(options.jit);
         state.setTailRecursionEnabled(options.tailRecursion);
 

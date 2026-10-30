@@ -62,8 +62,8 @@ Ciallang/
 | `src/runtime/` | 全局运行时 | `Runtime`(GC/RootGuard/atomTable)、`Context`(调用栈/全局对象, 深度上限 1024)、`AtomTable`(字符串驻留 Atom) |
 | `src/types/` | 动态类型系统 | `Value`(六类型动态值+全部运算)、`String`/`Octet`/`Real`、`Object`(hasProp/getProp/setProp/call 虚接口)、`Class`(ClassObject/DataObject/GlobalObject, slot 化)、`Function`+`NativeFunction`、`Property`(getter/setter)、`TypeConverter`、`Array`/`Dictionary`(容器)、`RegExp`(std::regex+TJS2 匹配状态机) |
 | `src/gc/` | 内存管理 | `MarkSweepHeader`、固定 512B 节点自由链表 + 标记清除 |
-| `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`NativeRegister`(按 TypeId 分派原生方法)、`StandardLibrary`(汇总各 `*Lib` 的 Context 注册入口)、`Debug` |
-| `src/tjsbc/` | TJS2 字节码转译（阶段 2，M1–M4 完成） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(恒等平移/标志物化与 M3 前瞻融合（Cmp 族直写 zf）/属性全族（含整数成员名；direct 名走 *C Atom 直引指令）/类 context 加载期解释/NEW→Call/P 变体与 GETP·SETP/DELD·TYPEOFD/proxy 回落链/省略透传·展开调用·collapse 参数/BNOT·NUM·OCTET/dst=0 丢弃语义——tjs2 语料 12 文件字节码路径全量通过，见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
+| `src/stdlib/` | 内置库 | `Print`(print/println)、`StringLib`、`ArrayLib`/`DictLib`/`RegExpLib`(容器与正则方法)、`SerializeLib`(结构化存取 save/load 系 + Octet pack/unpack)、`MathLib`、`DateLib`+`DateParser`、`RandomLib`、`ScriptsLib`(宿主 Scripts 类：execStorage/evalStorage 嵌套哨兵执行，krkr2 tTJSNC_Scripts 对应)、`NativeRegister`(按 TypeId 分派原生方法)、`StandardLibrary`(汇总各 `*Lib` 的 Context 注册入口)、`Debug` |
+| `src/tjsbc/` | TJS2 字节码转译（阶段 2，M1–M4 完成） | `TjsBytecodeReader`(格式解析)+`TjsTranslator`(恒等平移/标志物化与 M3 前瞻融合（Cmp 族直写 zf）/属性全族（含整数成员名；direct 名走 *C Atom 直引指令）/类 context 加载期解释/NEW→Call/P 变体与 GETP·SETP/DELD·TYPEOFD/proxy 回落链/省略透传·展开调用·collapse 参数/BNOT·NUM·OCTET/dst=0 丢弃语义——tjs2 语料 7 个有源码 fixture 字节码路径全量通过（s1–s5 无源码样本已清理），见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)) |
 | `src/logging/` | 日志 | `Logger`（fmt 实际输出） |
 | `src/main.cpp` / `src/cli/` | 进程入口；argparse 参数、编译/诊断、执行与 REPL 分模块，见 [doc/cli.md](doc/cli.md) |
 

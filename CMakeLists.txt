@@ -110,6 +110,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/DateParser.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/RandomLib.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/SerializeLib.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/stdlib/ScriptsLib.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/tjsbc/TjsBytecodeReader.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/tjsbc/TjsTranslator.cpp
 
