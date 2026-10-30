@@ -55,6 +55,20 @@ cmake --build build/bench --target conformance-report
 
 当前上游 TJSCompiler 的 `src/main.cpp` 尚未提供脚本路径/`--dump` 命令；历史对拍依赖本地适配入口。使用 `CIAL_TJS_EXE` 前确认该程序支持路径参数，避免将固定脚本的输出误当作对拍结果。已有字节码 fixture 不依赖参考引擎即可执行。
 
+严格源码/字节码对拍可独立运行，无需启用 bench 构建选项或安装参考引擎：
+
+```sh
+python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
+  --report bench/results/bytecode-conformance.json
+python bench/test_bytecode_conformance.py --cial build/Windows/Debug/cial.exe
+```
+
+工具逐字节比较两条 Ciallang 路径的 stdout，失败、超时或输出差异返回 1；已有
+`test_misc` fixture 的诊断行号差异也会如实报告，不能把该命令默认等同于“全绿”。
+`--case` 可筛选用例，`--reference` 可使用经随机脚本及导出执行探测的参考 CLI 生成临时
+字节码，入库 fixture 不受影响。JSON 含退出码、无损输出与 SHA-256；详见
+[字节码转译 §9](bytecode/mapping.md#9-对拍与工具链) 和 `bench/bytecode_conformance.py`。
+
 ## 有界 fuzz
 
 使用 Clang 与 libFuzzer，单独建立带覆盖率、ASan/UBSan 的构建目录；核心库与入口均插桩，不影响其他构建。入口仅做词法/语法解析，不执行脚本（`fuzz/CMakeLists.txt`、`fuzz/fuzz_*.cc`）。

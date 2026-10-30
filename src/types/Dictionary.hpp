@@ -9,6 +9,7 @@
 
 #include "Object.hpp"
 #include "Value.hpp"
+#include "runtime/Runtime.hpp"
 
 namespace cial {
 
@@ -19,6 +20,9 @@ namespace cial {
         explicit Dictionary() = default;
 
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Dictionary; }
+
+        // instanceof "Dictionary"（TJS2 原生类链按名匹配）
+        bool instanceOf(const Atom a) override { return a == Runtime::ATOM_DICTIONARY; }
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 

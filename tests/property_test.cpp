@@ -290,7 +290,7 @@ TEST_CASE("property - & 引用与 * 解引用（TJS2 &/* 语义）") {
             var tmp = new test();
             function f() {
                 tmp.prop = 4;
-                var p = &tmp.prop;   // 引用（不触发 getter；引用须存局部变量）
+                var p = &tmp.prop;   // 局部变量纯拷贝；全局/成员槽需用 & 取得引用本体
                 *p = 20;
                 return (*p) * 100 + tmp.prop;
             }
@@ -317,4 +317,52 @@ TEST_CASE("property - & 引用与 * 解引用（TJS2 &/* 语义）") {
         REQUIRE(*vm.evalExpr<Integer>("old"_str) == 5);
         REQUIRE(*vm.evalExpr<Integer>("now"_str) == 6);
     }
+}
+
+TEST_CASE("property - reference slots match TJS2 global local and member access") {
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    VM vm{ &state };
+    vm.eval(R"(
+        var reads = 0;
+        var stored = 3;
+        property p {
+            getter() { reads++; return stored; }
+            setter(v) { stored = v; }
+        }
+        var reference = &p;
+        var readsAfterBinding = reads;
+        var first = reference;
+        var readsAfterGlobalRead = reads;
+        *(&reference) = 9;
+        var forced = *(&reference);
+        function useLocal() {
+            var local = &p;
+            var before = *local;
+            *local = 11;
+            return before;
+        }
+        var localResult = useLocal();
+        var holder = %[];
+        &holder.alias = &p;
+        var readsAfterMemberBinding = reads;
+        var memberRead = holder.alias;
+        reference = 13;
+        var memberForced = *(&holder.alias);
+        *(&holder.alias) = 17;
+        function readReference(r) { return *r; }
+        var passed = readReference(&reference);
+    )"_str);
+    REQUIRE(*vm.evalExpr<Integer>("readsAfterBinding"_str) == 0);
+    REQUIRE(*vm.evalExpr<Integer>("first"_str) == 3);
+    REQUIRE(*vm.evalExpr<Integer>("readsAfterGlobalRead"_str) == 1);
+    REQUIRE(*vm.evalExpr<Integer>("forced"_str) == 9);
+    REQUIRE(*vm.evalExpr<Integer>("localResult"_str) == 9);
+    REQUIRE(*vm.evalExpr<Integer>("readsAfterMemberBinding"_str) == 3);
+    REQUIRE(*vm.evalExpr<Integer>("memberRead"_str) == 11);
+    REQUIRE(*vm.evalExpr<Integer>("memberForced"_str) == 13);
+    REQUIRE(*vm.evalExpr<Integer>("passed"_str) == 17);
+    REQUIRE(*vm.evalExpr<Integer>("stored"_str) == 17);
+    REQUIRE(*vm.evalExpr<Integer>("reads"_str) == 6);
 }

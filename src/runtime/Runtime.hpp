@@ -62,12 +62,20 @@ namespace cial {
         static constexpr Atom ATOM_OBJECT{ 1 };
         static constexpr Atom ATOM_FUNCTION{ 2 };
         static constexpr Atom ATOM_CLASS{ 3 };
+        // 内置容器的类名 Atom：instanceof（VM_CHKINS）按名字匹配（TJS2
+        // TJSDefaultIsInstanceOf 沿原生类链），Array/Dictionary/RegExp 需常量可比
+        static constexpr Atom ATOM_ARRAY{ 4 };
+        static constexpr Atom ATOM_DICTIONARY{ 5 };
+        static constexpr Atom ATOM_REGEXP{ 6 };
 
         AtomTable atomTable = [] {
             AtomTable at{};
             at.intern("Object"_str); // ATOM_OBJECT
             at.intern("Function"_str); // ATOM_FUNCTION
             at.intern("Class"_str); // ATOM_CLASS
+            at.intern("Array"_str); // ATOM_ARRAY
+            at.intern("Dictionary"_str); // ATOM_DICTIONARY
+            at.intern("RegExp"_str); // ATOM_REGEXP
             return std::move(at);
         }();
 

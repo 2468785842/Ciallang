@@ -7,6 +7,7 @@
 
 #include "Object.hpp"
 #include "Value.hpp"
+#include "runtime/Runtime.hpp"
 
 namespace cial {
     class Runtime;
@@ -23,6 +24,9 @@ namespace cial {
         explicit Array(Runtime *runtime, const size_t count) : rt(runtime) { elements.resize(count); }
 
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Array; }
+
+        // instanceof "Array"（TJS2 原生类链按名匹配，tjsArray 派生自 Array 类）
+        bool instanceOf(const Atom a) override { return a == Runtime::ATOM_ARRAY; }
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 

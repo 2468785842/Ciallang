@@ -1211,3 +1211,85 @@ TEST_CASE("Native method calls preserve receivers without allocating bound funct
     });
     REQUIRE(**vm.evalExpr<String *>(R"("outer".echo("inner".echo()))"_str) == "outerinner"_str);
 }
+
+TEST_CASE("RegExp replacement callbacks preserve bindings and use regexp as fallback", "[native][regexp]") {
+    Runtime runtime;
+    Context context{ runtime };
+    stdlib::registerStandardLibrary(context);
+    vm::VMState state{ context };
+    VM vm{ &state };
+
+    SECTION("unbound expressions receive the regexp for both replace entry points") {
+        vm.eval(R"(
+            var re = /x/g;
+            var direct = re.replace("xx", function(m) {
+                return this instanceof "RegExp" ? "R" : "bad";
+            });
+            var stringEntry = "xx".replace(re, function(m) {
+                return this instanceof "RegExp" ? "S" : "bad";
+            });
+        )"_str);
+        REQUIRE(**vm.evalExpr<String *>("direct"_str) == "RR"_str);
+        REQUIRE(**vm.evalExpr<String *>("stringEntry"_str) == "SS"_str);
+    }
+
+    SECTION("global function declarations retain their global binding") {
+        vm.eval(R"(
+            var start = 41;
+            function replacement(m) { return this.start; }
+            var result = /x/g.replace("xx", replacement);
+        )"_str);
+        REQUIRE(**vm.evalExpr<String *>("result"_str) == "4141"_str);
+    }
+
+    SECTION("an explicitly bound function keeps its receiver") {
+        vm.eval(R"(
+            var holder = %[marker: "B"];
+            var replacement = (function(m) { return this.marker; }) incontextof holder;
+            var result = /x/g.replace("xx", replacement);
+        )"_str);
+        REQUIRE(**vm.evalExpr<String *>("result"_str) == "BB"_str);
+    }
+
+    SECTION("nested global replacements do not overwrite the outer receiver") {
+        vm.eval(R"(
+            var outer = /x/g;
+            var inner = /y/g;
+            outer.test("Ox");
+            inner.test("Iy");
+            outer.start = 0;
+            inner.start = 0;
+            var result = outer.replace("xx", function(m) {
+                var before = this.input;
+                var middle = inner.replace("yy", function(n) { return this.input; });
+                return before + middle + this.input;
+            });
+        )"_str);
+        REQUIRE(**vm.evalExpr<String *>("result"_str) == "OxIyIyOxOxIyIyOx"_str);
+        REQUIRE(*vm.evalExpr<Integer>("outer.start"_str) == 0);
+        REQUIRE(*vm.evalExpr<Integer>("inner.start"_str) == 0);
+    }
+
+    SECTION("native callbacks also distinguish fallback and explicit bindings") {
+        vm.eval("var nativeRegexp = /x/g;"_str);
+        Object *expected = state.global("nativeRegexp").asObject().unwrap();
+        Vec<Object *> receivers;
+        Vec<size_t> argumentCounts;
+        auto callback = runtime.create<NativeFunction>([&](VM *, const Value &self, size_t argc, Value *) {
+            receivers.push_back(self.isObject() ? self.asObject().unwrap() : nullptr);
+            argumentCounts.push_back(argc);
+            return "N"_str;
+        });
+        auto holder = runtime.create<Dictionary>();
+        SECTION("unbound") {}
+        SECTION("bound") {
+            expected = holder.get();
+            callback->setThisObj(Value{ expected });
+        }
+        context.registryGlobalFunc("nativeReplacement"_str, callback.get());
+        vm.eval("var result = nativeRegexp.replace(\"xx\", nativeReplacement);"_str);
+        REQUIRE(**vm.evalExpr<String *>("result"_str) == "NN"_str);
+        REQUIRE(receivers == Vec<Object *>{ expected, expected });
+        REQUIRE(argumentCounts == Vec<size_t>{ 1, 1 });
+    }
+}

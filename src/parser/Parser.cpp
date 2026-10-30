@@ -109,7 +109,8 @@ namespace cial::syntax {
                     parser->consume(r, omitToken);
                     node->arguments.push_back(parser->astBuilder()->makeNode<OmitArgExprNode>(omitToken));
                     expectArgument = false;
-                } else if(parser->peek(r, TokenType::Asterisk)) {
+                } else if(parser->peek(r, TokenType::Asterisk) &&
+                          (parser->peekAt(r, 2, TokenType::Comma) || parser->peekAt(r, 2, TokenType::RParenthesis))) {
                     // 裸 `*`：未命名展开（旧版 fatUnnamedExpand）
                     Token starToken{};
                     parser->consume(r, starToken);

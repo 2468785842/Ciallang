@@ -956,13 +956,18 @@ namespace cial::inter {
             }
 
             // already have this variable, in same scope
-            if(const auto variable = resolveLocalVariable(identifier)) {
+            if(const auto variable = resolveCurrentLocalVariable(identifier)) {
                 freeRegister(src);
                 _chunk->emit<DLocal>(src, variable->reg);
                 return;
             }
 
             // not found but can init
+            if(_empty && src == *_empty) {
+                const auto local = allocateRegister();
+                _chunk->emit<DLocal>(src, local);
+                src = local;
+            }
             addLocalVar(LocalVariable{ identifier, src, makeLabel() });
             return;
         }
@@ -970,6 +975,11 @@ namespace cial::inter {
         // global
         if(isTopScope()) {
             _chunk->emit<DGlobal>(identifier, loadVoidReg());
+            return;
+        }
+
+        if(const auto variable = resolveCurrentLocalVariable(identifier)) {
+            _chunk->emit<Load>(variable->reg, ConstIdx{ 0 });
             return;
         }
 
@@ -996,6 +1006,13 @@ namespace cial::inter {
         _chunk->emit<Load>(funReg, _chunk->addConstant(funcMeta));
 
         if(isTopScope()) {
+            // 顶层声明的函数以 global 作 objthis（TJS2 闭包捕获声明处 objthis，
+            // tjsInterCodeExec.cpp:3023 同语义）：回调经 VM::callValue 调用时
+            // Function::call 的显式绑定优先于 fallbackThis/callerThis 继承。
+            const Register globalReg = allocateRegister();
+            _chunk->emit<Global>(globalReg);
+            _chunk->emit<ChgThis>(funReg, globalReg);
+            freeRegister(globalReg);
             freeRegister(funReg);
             _chunk->emit<DGlobal>(identifier, funReg);
             return;
@@ -1143,8 +1160,10 @@ namespace cial::inter {
                 }
 
                 // the last patch one ret
-                auto voidReg = gen.loadVoidReg();
-                funChunk->emit<Ret>(voidReg);
+                if(auto &instVec = funChunk->getInstVec();
+                   instVec.empty() || instVec.back()->opcode() != TacOpCode::Ret) {
+                    gen.patchVoidRet(*funChunk);
+                }
 
                 auto *chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
                 const size_t paramCount = node->constructor->parameters.size();
@@ -1376,12 +1395,14 @@ namespace cial::inter {
 
     void IRGenerator::generate(const syntax::ForStmtNode *node, OptReg &) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
+        beginScope(); // TJS2 的 for 初始化子句拥有独立块作用域。
         _breakStack.emplace_back();
         _continueStack.emplace_back();
 
         DEFER {
             _breakStack.pop_back();
             _continueStack.pop_back();
+            endScope();
         };
         OptReg ignore{};
         if(node->init)
@@ -1618,10 +1639,20 @@ namespace cial::inter {
     void IRGenerator::generate(const syntax::DebuggerStmtNode *, OptReg &) { _chunk->emit<Debugger>(); }
 
     LocalVariable *IRGenerator::resolveLocalVariable(const Atom identifier) {
-        for(auto &var : std::ranges::reverse_view(_localVars)) {
-            if(var.endPC.address() == 0 && var.identifier.v == identifier.v) {
+        for(const auto index : std::ranges::reverse_view(_activeLocals)) {
+            auto &var = _localVars[index];
+            if(var.identifier == identifier) {
                 return &var;
             }
+        }
+        return nullptr;
+    }
+
+    LocalVariable *IRGenerator::resolveCurrentLocalVariable(const Atom identifier) {
+        for(size_t index = _activeLocals.size(); index > _scopeLocalStarts.back(); --index) {
+            auto &variable = _localVars[_activeLocals[index - 1]];
+            if(variable.identifier == identifier)
+                return &variable;
         }
         return nullptr;
     }
@@ -1696,7 +1727,7 @@ namespace cial::inter {
 
         // the last instruction is not ret, patch one ret
         if(auto &instVec = funChunk->getInstVec(); instVec.empty() || instVec.back()->opcode() != TacOpCode::Ret) {
-            funChunk->emit<Ret>(gen.loadVoidReg());
+            gen.patchVoidRet(*funChunk);
         }
 
         auto *chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
@@ -1712,6 +1743,20 @@ namespace cial::inter {
             _chunk->emit<Load>(_empty.value(), ConstIdx{ 0 });
         }
         return _empty.value();
+    }
+
+    void IRGenerator::patchVoidRet(vm::Chunk &funChunk) {
+        // 给 parseAst 返回的 chunk 补"返回 void"的 ret。不能复用 loadVoidReg()：
+        // parseAst 返回后 _chunk 已替换为丢弃用暂存 chunk，其 Load 会发射错位，
+        // Ret 读到寄存器池陈旧值（无 return 函数/构造器曾泄漏池内旧对象）。
+        // 体生成期已装载的 _empty 寄存器可直接复用。
+        const Register voidReg = _empty.has_value() ? *_empty : [&] {
+            const Register reg = allocateRegister();
+            funChunk.emit<Load>(reg, ConstIdx{ 0 });
+            return reg;
+        }();
+        funChunk.emit<Ret>(voidReg);
+        funChunk.setRegCount(_regNextIndex);
     }
 
     Atom IRGenerator::getAtomFromToken(const syntax::Token &token) const {

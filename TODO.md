@@ -57,6 +57,8 @@
 
 > 细节见各提交信息；字节码批次见 [doc/bytecode/mapping.md](doc/bytecode/mapping.md)，性能见 doc/performance.md。
 
+- 2026-10-30 回调绑定与语义修正批次：RegExp replace 回调 this 绑定（保留既有绑定、未绑定以 regexp 作 objthis，VM::callValue 增 fallbackThis + GC 保根）+ 顶层函数声明经 ChgThis 绑定 global objthis + instanceof 内置对象（Array/Dictionary/RegExp/Function 按类名匹配）+ isvalid 非对象恒 true 对齐 VM_CHKINV + patchVoidRet 修复无 return 函数泄漏寄存器池陈旧值（parseAst 后 Load 发射错位）+ 作用域边界改活跃绑定栈（空块/参数/catch 共享 PC 不再误判）+ ULEB128 u64 溢出防护 + LSP 作用域感知跳转定义（textDocument/definition）+ 字节码对拍工具 bench/bytecode_conformance.py（源码 vs 字节码 stdout 逐字节比较 + 参考导出探测）；判定/表达式回归 tests/judgment_test.cpp、tests/expression_test.cpp
+
 - 2026-10-29 调用路径批次：原生同步调用免池快路径（NativeFunction dispatch 内同步完成返回 Continue，免主循环 FETCH_NEW_FRAME 重取）+ TypeId 增加 NativeFunction/Property 专有值并替换 loadGlobal/propObjectGet·Set 等六处热路径 dynamic_cast + 实参 placement new 栈直传（NativeFunction::callDirect，免池压弹与 getArgs 中转）；fib 与 TJS2 同机比值首次进入 ≤100%（94~97%），native_methods 183%→135~140%；留意栈数组禁默认初始化全槽的教训（Value 非平凡构造/析构）
 
 - 2026-10-29 保留字与文档性语法批次：`in` 保留字语义（void/不求值）+ 类型注解全位解析忽略 + 裸 `new` 编译错误对齐 + 模板串 `${}` 定论；文档状态修正（README SSA 勾选、syntax.md Octet 字面量/内联字面量/标准库滞后项）

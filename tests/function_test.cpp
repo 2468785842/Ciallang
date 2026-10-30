@@ -271,6 +271,23 @@ TEST_CASE("省略透传 / collapse 参数 / 展开调用（源码路径，对齐
         REQUIRE(*vm.evalExpr<Integer>("r2"_str) == 1 + 2 * 100 + 3 * 10000);
     }
 
+    SECTION("前导属性解引用与裸展开区分") {
+        vm.eval(R"(
+            class Holder {
+                var value = 4;
+                property item { getter { return value; } }
+            }
+            var holder = new Holder();
+            function sum(a, b) { return a * 10 + b; }
+            function dereference() {
+                var ref = &holder.item;
+                return sum(*ref, sum(1, *ref));
+            }
+            var r = dereference();
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("r"_str) == 54);
+    }
+
     SECTION("裸 `*` 未命名收拢/展开对") {
         vm.eval(R"(
             function wrap(*) { return passthrough(*); }

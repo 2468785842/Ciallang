@@ -32,6 +32,10 @@ namespace cial::vm {
                 throw std::runtime_error("ULEB128 overflow or truncated");
             }
             const u8 byte = p[bytes++];
+            // 第十个字节只剩 bit 63；更高有效位不能静默截断为 u64。
+            if(shift == 63 && (byte & 0x7E) != 0) {
+                throw std::runtime_error("ULEB128 too large for u64");
+            }
             result |= static_cast<u64>(byte & 0x7F) << shift;
             if((byte & 0x80) == 0)
                 break;

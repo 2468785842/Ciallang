@@ -165,18 +165,35 @@ namespace cial {
         // 帧的 pc、在本次 run 内执行其 catch 块，native 调用方控制流错乱）——
         // 异常值落入哨兵 exValueReg(reg0)，func/tmp 帧由 run 弹出（栈深比正常少 1，
         // 以此判定），此处经 throwException 重新进入脚本异常协议向上传播
-        Value callValue(const Value &callee, const size_t argCount, const Value *args) {
+        Value callValue(const Value &callee, const size_t argCount, const Value *args,
+                        const Value &fallbackThis = Value{}) {
             if(!callee.isObject())
                 throw std::runtime_error("value is not callable");
+            // 回调可重入并触发 GC；宿主栈上的实参和接收者在压入脚本帧前也须保根。
+            Handle<Value> calleeRoot{ &rt(), callee };
+            Handle<Value> receiverRoot{ &rt(), fallbackThis };
+            Vec<Handle<Value>> argumentRoots;
+            argumentRoots.reserve(argCount);
+            for(size_t i = 0; i < argCount; ++i)
+                argumentRoots.emplace_back(&rt(), args[i]);
             auto *obj = callee.asObject().unwrap();
+            if(!obj)
+                throw std::runtime_error("value is not callable");
 
             // 原生函数：无帧直调（callProc 同步返回）
-            if(auto *native = dynamic_cast<NativeFunction *>(obj)) {
-                Vec<Value> argv{ args, args + argCount };
+            if(obj->typeId() == TypeId::NativeFunction) {
+                auto *native = static_cast<NativeFunction *>(obj);
+                Vec<Value> argv;
+                if(argCount)
+                    argv.assign(args, args + argCount);
+                if(argv.size() < native->arity())
+                    argv.resize(native->arity());
+                if(native->boundThis().isVoid() && !fallbackThis.isVoid())
+                    return native->callDirect(*_vmState, *receiverRoot, argCount, argv.data());
                 return native->callProc(this, argCount, argv.data());
             }
 
-            auto *fn = dynamic_cast<Function *>(obj);
+            auto *fn = obj->typeId() == TypeId::Function ? static_cast<Function *>(obj) : nullptr;
             if(!fn)
                 throw std::runtime_error("value is not callable");
 
@@ -195,6 +212,7 @@ namespace cial {
                                    // 调用方帧的 handler（嵌套 run 内执行其 catch，控制流错乱）
             _vmState->allocCallFrame(&tmpChunk);
             _vmState->makeClosure();
+            _vmState->curFrame()->setThisObj(*receiverRoot);
             for(size_t i = 0; i < argCount; ++i)
                 _vmState->push(args[i]);
             const size_t tmpSp = _vmState->getRegPoolTop() - argCount; // tmp 帧窗口起点（异常值落点）

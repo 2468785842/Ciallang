@@ -8,6 +8,7 @@ set(TEST_FUZZ_REGRESS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/fuzz_regress)
 configure_file(test_config.h.in test_config.h)
 
 set(SOURCES
+        bytecode_test.cpp
         runtime_lifetime_test.cpp
         fuzz_regress_test.cpp
         compat_reserved_test.cpp
@@ -72,4 +73,8 @@ if(Python3_Interpreter_FOUND AND TARGET cial)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/lsp/test_protocol.py"
                 --cial "$<TARGET_FILE:cial>")
     set_tests_properties(CiallangLspProtocol PROPERTIES TIMEOUT 30)
+    add_test(NAME CiallangBytecodeTool
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../bench/test_bytecode_conformance.py"
+                --cial "$<TARGET_FILE:cial>")
+    set_tests_properties(CiallangBytecodeTool PROPERTIES TIMEOUT 60)
 endif()

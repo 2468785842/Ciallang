@@ -38,7 +38,10 @@ namespace cial::inter {
 
         Opt<vm::Chunk> parseAst(const syntax::AstNode *node, OptReg &optReg);
 
-        void addLocalVar(LocalVariable variable) { _localVars.emplace_back(variable); }
+        void addLocalVar(LocalVariable variable) {
+            _activeLocals.push_back(_localVars.size());
+            _localVars.emplace_back(variable);
+        }
 
         // 当前函数的未命名实参基（旧版 FuncDeclUnnamedArgArrayBase）：
         // `*` 展开实参转发本帧 %base.. 的实际实参；无 collapse 声明时 = 具名参数个数
@@ -61,13 +64,17 @@ namespace cial::inter {
             return reg;
         }
 
-        void freeRegister(const Register reg) { _freeRegisters.push_back(reg); }
+        void freeRegister(const Register reg) {
+            // loadVoidReg() 的常驻槽不能被临时值回收或由局部声明接管。
+            if(!_empty || reg != *_empty)
+                _freeRegisters.push_back(reg);
+        }
 
         /**
          * create a global scope
          * ensue we don't get variable from the global scope
          */
-        void makeVirtualGlobalScope() { _scopeStartPC.emplace_back(0); }
+        void makeVirtualGlobalScope() { beginScope(); }
 
 #define DECLARE_AST_NODE_VISIT(name) void generate(const syntax::name *node, OptReg &optReg);
         CIAL_AST_NODE_ENUMS(DECLARE_AST_NODE_VISIT)
@@ -95,7 +102,9 @@ namespace cial::inter {
 
         Vec<ContinueContext> _continueStack{};
 
-        Vec<u32> _scopeStartPC{};
+        // 按绑定栈边界判定作用域；空块/参数/catch 可共享同一 PC，不能比较源码 PC。
+        Vec<size_t> _scopeLocalStarts{};
+        Vec<size_t> _activeLocals{};
         Vec<LocalVariable> _localVars{};
 
         u16 _regNextIndex{};
@@ -104,27 +113,31 @@ namespace cial::inter {
 
         Label makeLabel() const { return Label{ getNextInstPos() }; }
 
-        [[nodiscard]] bool isTopScope() const noexcept { return _scopeStartPC.size() == 1; }
+        [[nodiscard]] bool isTopScope() const noexcept { return _scopeLocalStarts.size() == 1; }
 
-        void beginScope() { _scopeStartPC.emplace_back(getNextInstPos()); }
+        void beginScope() { _scopeLocalStarts.push_back(_activeLocals.size()); }
 
         void endScope() {
-            for(auto &localVar : _localVars) {
-                if(localVar.startPC.address() > _scopeStartPC.back()) {
-                    freeRegister(Register{ localVar.reg });
-                    localVar.endPC = Label{ getNextInstPos() };
-                }
+            while(_activeLocals.size() > _scopeLocalStarts.back()) {
+                auto &localVar = _localVars[_activeLocals.back()];
+                freeRegister(localVar.reg);
+                localVar.endPC = makeLabel();
+                _activeLocals.pop_back();
             }
-            _scopeStartPC.pop_back();
+            _scopeLocalStarts.pop_back();
         }
 
         LocalVariable *resolveLocalVariable(Atom identifier);
+        LocalVariable *resolveCurrentLocalVariable(Atom identifier);
 
         // TJS 函数提升:把块内(顶层/函数体)的 FunctionDeclNode 声明注册
         // (Load + DGlobal)前置到块代码之前,调用先于声明文本位置也能命中
         void emitFunctionHoisting(const syntax::BlockStmtNode *node);
 
         Register loadVoidReg();
+
+        // 补"返回 void"的 ret 到 parseAst 产出的 chunk（void Load 必须写入该 chunk 本体）
+        void patchVoidRet(vm::Chunk &funChunk);
 
         FuncMeta *generateFuncMeta(const syntax::Parameters &parameters, const syntax::BlockStmtNode *body) const;
 

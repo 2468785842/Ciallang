@@ -61,7 +61,7 @@
 | Exception | 异常类（message 成员），脚本异常载体 | ✅（TJS 源自举，main.cpp 注入；原生错误自动包装为 Exception 实例） |
 | Math / Math.RandomGenerator | abs/floor/…；Xorshift / MT19937 | ◐ Math 方法+常量+random ✅；Math.RandomGenerator ✅（MT19937 序列与原版逐位一致、serialize 格式互认） |
 | Date | get/set 系列 + 字符串 parse（tjsdate.y 文法） | ✅ 全部方法+构造+parse 完整文法（tjsdate.y 全 11 形态/月名/星期/AMPM/时区名与 ±hhmm/括号忽略段/两位年/小数秒，2026-10-26 对拍逐位一致）；注意：进程首个字符串构造因 CRT `_timezone` 惰性初始化偏移 +2×\|tz\|（原版同款怪癖，已同步保留，见 DateParser.cpp build() 注释） |
-| RegExp | compile/test/match/exec/replace/split（oniguruma）；属性 matches/start/index/lastIndex/input/lastMatch/lastParen/leftContext/rightContext | ✅ /pattern/flags 字面量（g/i）+ 全部方法 + 全部实例属性 + 静态属性 `RegExp.last`（仅 test/exec 更新且失败也更新）；`new RegExp(pattern, flags?)` ✅；replace 回调 this 绑定为函数自身（TJS2 以 regexp 作 objthis）。位置语义：UTF-8 码点（TJS2 为 UTF-16 码元，BMP 内一致；2026-10-26 从字节偏移改定）。已知偏差：`index` 属性成功匹配的非 ASCII 值——原版 tjsRegExp.cpp:669 少除 sizeof(tjs_char)（UTF-16 单位+字节混加，start>0 时可与 lastIndex 相等），本项目为纯码点 |
+| RegExp | compile/test/match/exec/replace/split（oniguruma）；属性 matches/start/index/lastIndex/input/lastMatch/lastParen/leftContext/rightContext | ✅ /pattern/flags 字面量（g/i）+ 全部方法 + 全部实例属性 + 静态属性 `RegExp.last`（仅 test/exec 更新且失败也更新）；`new RegExp(pattern, flags?)` ✅；replace 回调保留已有 this 绑定（含全局函数声明）；未绑定函数表达式/原生回调以 regexp 作 objthis（原版 `replace_regex` 同语义；实现 `src/stdlib/RegExpLib.cpp`、`src/vm/VM.hpp`，回归 `tests/native_function_test.cpp`）。位置语义：UTF-8 码点（TJS2 为 UTF-16 码元，BMP 内一致；2026-10-26 从字节偏移改定）。已知偏差：`index` 属性成功匹配的非 ASCII 值——原版 tjsRegExp.cpp:669 少除 sizeof(tjs_char)（UTF-16 单位+字节混加，start>0 时可与 lastIndex 相等），本项目为纯码点 |
 | Octet | 字节流 + pack 系 | ◐ 类型+字面量+unpack ✅（2026-10-26，tjsOctPack 全类型；Octet 仅有的方法即 unpack）；偏差：原版 BinToHex 负 len 钳位 bug 使 unpack h\*/H\* 恒返回空串，本项目返回正确 hex（同 tjsOctPack.cpp HexToBin 大写仅收 A-E 的漏写按特性同步） |
 
 ## 4. 运行时行为差异（已知，须保持记录）
@@ -77,7 +77,20 @@
 | `const` 只读性 | 仅编译期要求初始化；赋值/自增/for 递增放行——tjs.y:320 原作者注释明确"current version does not actually disallow re-assigning"（非 UB，官方设计现状） | 一致（2026-10-25 对齐，tjs.y 佐证） | 无差异 |
 | `#`/`$` 操作数 | 严格类型（字符串/整数） | `#` 对非字符串先字符串化（`#65 == 54`，对齐 kirikiri 语料期望） | 记录差异 |
 | 后缀 `i++` 表达式值 | 返回自增前旧值 | 同（旧值，2026-10-24 修正） | 一致 |
-| `&` 引用作用域 | 全局/局部变量均可持引用 | 仅局部变量可持引用（全局槽位读取会触发 getter） | 记录差异 |
+| `isvalid` 非对象值 | 恒 true（VM_CHKINV：`Type() != tvtObject` 即 true，tjsInterCodeExec.cpp:1177） | 一致（2026-10-30 修正——曾对非对象抛"Invalid type get as Object"）；对象按 IsValid 判定，invalidate 后 false | 无差异 |
+| `instanceof` 内置对象 | `TJSDefaultIsInstanceOf` 沿原生类链按名匹配：Array/Dictionary/RegExp 实例与函数对象对各自类名恒真 | 一致（2026-10-30 修正——基类 instanceOf 曾恒 false）；保留 Atom + 各类型覆写（`src/runtime/Runtime.hpp`、`src/types/*.hpp`） | 无差异 |
+| 无 return 函数返回值 | void（编译器补 ret 读 void 常量） | 一致（2026-10-30 修正潜伏缺陷——补丁 ret 的 void Load 曾发射到 parseAst 后的暂存 chunk，返回寄存器池陈旧值；`src/gen/IRGenerator.cpp` patchVoidRet） | 无差异 |
+| `&` 引用作用域 | 全局/局部/对象成员均可存属性引用；普通全局/成员读取触发 getter，局部读取仅复制引用 | 一致；`&name` / `&obj.member` 取引用本体，`*(&name)` 可显式解引用全局槽 | 无差异；回归见 `tests/property_test.cpp` |
+
+属性引用作用域已于 2026-10-30 复核：原版 `TJSDefaultPropGet` 在未设 `TJS_IGNOREPROP`
+时调用属性默认 getter，`VM_GPDS` / `VM_GPIS` 则以该标志取本体；局部变量走 `VM_CP`
+纯复制（`../TJSCompiler/src/syntax/tjsObject.cpp`、`../TJSCompiler/src/syntax/tjsInterCodeExec.cpp`）。
+因此“只有局部变量能持引用”不是两引擎差异。全局槽中的引用应通过 `&reference` 取出，
+再用 `*` 或作为函数参数传递；普通读取仍按属性调用语义执行。
+已用两份不同最小脚本确认本地参考 CLI 适配二进制接收脚本路径，再以含自校验的
+全局/局部/对象成员脚本对拍，两引擎均成功。参考二进制报告 TJS2 2.4.28，SHA-256 为
+`D404F11D5E173194E02AD92F5F2C13A0161F5A99CC49F6B23838076D2D5D5BCA`；
+当前上游 `src/main.cpp` 的硬编码入口不具备此 CLI 能力（见 [building.md](building.md)）。
 
 ## 5. 路线图
 

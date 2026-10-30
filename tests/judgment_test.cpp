@@ -4,6 +4,7 @@
 
 #include <catch2/catch_all.hpp>
 
+#include "stdlib/StandardLibrary.hpp"
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
@@ -212,4 +213,44 @@ TEST_CASE("switch - execution") {
                                       "function { return true; }"
                                       ")"_str) == 1);
     }
+}
+// `isvalid` 后缀/前缀形态：非对象值恒有效（原版 VM_CHKINV，tjsInterCodeExec.cpp:1177
+// — Type() != tvtObject 恒 true）；对象按 IsValid 判定，invalidate 后为 false。
+TEST_CASE("isvalid - non-objects are always valid, invalidated objects are not") {
+    Runtime rt{};
+    Context context{ rt };
+    stdlib::registerStandardLibrary(context);
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    vm.eval(R"(
+        var num = 1;
+        var str = "s";
+        var nothing;
+        var d = %[m: 5];
+        var arr = [1];
+        var fn = function() { };
+        class C { function initialize() { } }
+        var o = new C();
+        var isInt = num isvalid;
+        var isVoid = nothing isvalid;
+        var isStr = str isvalid;
+        var isDict = d isvalid;
+        var isArray = arr isvalid;
+        var isFunc = fn isvalid;
+        var isMember = d.m isvalid;
+        var isObj = o isvalid;
+        invalidate o;
+        var isInvalidated = o isvalid;
+    )"_str);
+
+    CHECK(vmState.global("isInt").asInteger().unwrap() == 1);
+    CHECK(vmState.global("isVoid").asInteger().unwrap() == 1);
+    CHECK(vmState.global("isStr").asInteger().unwrap() == 1);
+    CHECK(vmState.global("isDict").asInteger().unwrap() == 1);
+    CHECK(vmState.global("isArray").asInteger().unwrap() == 1);
+    CHECK(vmState.global("isFunc").asInteger().unwrap() == 1);
+    CHECK(vmState.global("isMember").asInteger().unwrap() == 1);
+    CHECK(vmState.global("isObj").asInteger().unwrap() == 1);
+    CHECK(vmState.global("isInvalidated").asInteger().unwrap() == 0);
 }

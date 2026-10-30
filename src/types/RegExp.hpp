@@ -13,6 +13,7 @@
 #include "Array.hpp"
 #include "Object.hpp"
 #include "Value.hpp"
+#include "runtime/Runtime.hpp"
 
 namespace cial {
 
@@ -156,6 +157,9 @@ namespace cial {
         }
 
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::RegExp; }
+
+        // instanceof "RegExp"（TJS2 tTJSNC_RegExp::IsInstanceOf 同语义）
+        bool instanceOf(const Atom a) override { return a == Runtime::ATOM_REGEXP; }
 
         // 类对象构造入口：RegExp(pattern, flags?) / new RegExp(...)（TJS2 无 new 亦可）。
         // 全局 "RegExp" 挂一个空模式占位实例，call 时按实参构造新对象

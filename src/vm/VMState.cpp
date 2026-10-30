@@ -822,7 +822,13 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(ChkInv) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
-        regs[r2] = Value{ dynamic_cast<DataObject *>(regs[r1].asObject().unwrap())->isValid() };
+        // 原版 VM_CHKINV（tjsInterCodeExec.cpp:1177）：非对象值恒有效（true）；
+        // 对象按 IsValid 判定——本引擎仅 DataObject 跟踪失效状态，其余对象恒有效。
+        if(auto *data = regs[r1].isObject() ? dynamic_cast<DataObject *>(regs[r1].asObject().unwrap()) : nullptr) {
+            regs[r2] = Value{ Integer{ data->isValid() } };
+        } else {
+            regs[r2] = Value{ Integer{ true } };
+        }
         return DispatchRet::Continue;
     }
 

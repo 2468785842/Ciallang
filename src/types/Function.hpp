@@ -34,6 +34,10 @@ namespace cial {
         // 据此一次虚调用判型后 static_cast，替代热路径 dynamic_cast
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Function; }
 
+        // instanceof "Function"（TJS2 tTJSInterCodeContext::IsInstanceOf，
+        // tjsInterCodeExec.cpp:3023——ctFunction/ctExprFunction 恒真）
+        bool instanceOf(const Atom a) override { return a == Runtime::ATOM_FUNCTION; }
+
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
         void marked() noexcept override {

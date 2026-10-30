@@ -350,6 +350,23 @@ TEST_CASE("表达式 - instanceof 基础类型") {
     }
 }
 
+TEST_CASE("表达式 - instanceof 内置对象与函数") {
+    Runtime rt{};
+    Context context{ rt };
+    stdlib::registerStandardLibrary(context);
+    vm::VMState vmState{ context };
+    VM vm{ &vmState };
+
+    // TJS2 TJSDefaultIsInstanceOf 沿原生类链按名字匹配：
+    // Array/Dictionary/RegExp 实例与函数对象对各自类名恒真
+    REQUIRE(*vm.evalExpr<bool>(R"([1] instanceof "Array")"_str) == true);
+    REQUIRE(*vm.evalExpr<bool>(R"(%[k: 1] instanceof "Dictionary")"_str) == true);
+    REQUIRE(*vm.evalExpr<bool>(R"(/x/g instanceof "RegExp")"_str) == true);
+    REQUIRE(*vm.evalExpr<bool>(R"((function() { }) instanceof "Function")"_str) == true);
+    REQUIRE(*vm.evalExpr<bool>(R"([1] instanceof "Dictionary")"_str) == false);
+    REQUIRE(*vm.evalExpr<bool>(R"(/x/g instanceof "Array")"_str) == false);
+}
+
 TEST_CASE("表达式 - Array/Dictionary 字面量与下标") {
     Runtime rt{};
     Context context{ rt };

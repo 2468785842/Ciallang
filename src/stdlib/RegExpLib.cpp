@@ -169,7 +169,7 @@ namespace cial::stdlib {
 
     // TJS2 replace_regex：replacement 为字符串直接拼接；为函数则每次匹配回调
     // （参数=匹配数组 [整体,组...]，返回值字符串化后拼接）。忽略 start、不改状态。
-    // 回调 this 绑定差异记 TODO：TJS2 以 regexp 作 objthis，这里沿用函数自身绑定
+    // TJS2 replace_regex：优先保留回调已有绑定，未绑定时以 regexp 作 objthis。
     String regexpReplaceIn(VM *vm, const RegExp *re, const String &targetStr, const Value &replacement) {
         const bool isFunc = replacement.isObject();
         String rep{};
@@ -197,7 +197,8 @@ namespace cial::stdlib {
                 for(size_t i = 0; i < m.size(); ++i)
                     pushString(arr, m[i].str()); // 与 GetResultArray 同：全组填充，未匹配组空串
                 const Value argVal{ arr };
-                const String piece = valueToString(vm->callValue(replacement, 1, &argVal));
+                const Value fallbackThis{ const_cast<RegExp *>(re) };
+                const String piece = valueToString(vm->callValue(replacement, 1, &argVal, fallbackThis));
                 out.append(piece.getData(), piece.length());
             } else {
                 out.append(rep.getData(), rep.length());

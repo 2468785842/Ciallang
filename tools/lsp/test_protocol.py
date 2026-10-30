@@ -51,12 +51,112 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(capabilities["positionEncoding"], "utf-16")
         self.assertEqual(capabilities["textDocumentSync"]["change"], 1)
         self.assertTrue(capabilities["workspaceSymbolProvider"])
+        self.assertTrue(capabilities["definitionProvider"])
         self.assertTrue(capabilities["workspace"]["workspaceFolders"]["supported"])
         self.send("initialized")
 
     def symbols(self, query=""):
         self.send("workspace/symbol", {"query": query}, 20)
         return self.receive()["result"]
+
+    def open_document(self, uri, text, version=1):
+        self.send("textDocument/didOpen", {"textDocument": {"uri": uri, "text": text, "version": version}})
+        self.receive()
+
+    def definition(self, uri, text, needle, offset=0):
+        cursor = text.index(needle) + offset
+        before = text[:cursor]
+        position = {"line": before.count("\n"), "character": utf16(before.rsplit("\n", 1)[-1])}
+        self.send("textDocument/definition", {"textDocument": {"uri": uri}, "position": position}, 21)
+        return self.receive()["result"]
+
+    def assert_definition(self, location, uri, text, declaration, name):
+        self.assertIsNotNone(location)
+        before = text[:text.index(declaration)]
+        start = {"line": before.count("\n"), "character": utf16(before.rsplit("\n", 1)[-1])}
+        self.assertEqual(location, {"uri": uri, "range": {"start": start,
+                         "end": {"line": start["line"], "character": start["character"] + utf16(name)}}})
+
+    def test_definitions_respect_blocks_parameters_and_function_boundaries(self):
+        self.initialize()
+        uri = "file:///definitions.tjs"
+        text = '''var value = 0;
+function outer(value:int, other = value) {
+    value; // parameter
+    { var value = value + 1; value; } // inner
+    value; // restored
+    target();
+    function target(arg) { return arg; }
+    { var local; local; }
+    local; // out of scope
+    function nested() { return other; }
+}
+value; // global
+'''
+        self.open_document(uri, text)
+        for reference in ("value; // parameter", "value + 1", "value; // restored"):
+            self.assert_definition(self.definition(uri, text, reference), uri, text, "value:int", "value")
+        self.assert_definition(self.definition(uri, text, "value; } // inner"), uri, text,
+                               "value = value + 1", "value")
+        self.assert_definition(self.definition(uri, text, "target();"), uri, text, "target(arg)", "target")
+        self.assert_definition(self.definition(uri, text, "arg;"), uri, text, "arg)", "arg")
+        self.assert_definition(self.definition(uri, text, "local; }"), uri, text, "local; local", "local")
+        self.assertIsNone(self.definition(uri, text, "local; // out"))
+        self.assertIsNone(self.definition(uri, text, "other;"))  # TJS does not capture outer locals.
+        self.assert_definition(self.definition(uri, text, "value; // global"), uri, text, "value = 0", "value")
+
+    def test_definitions_for_catch_and_dynamic_member_contexts(self):
+        self.initialize()
+        uri = "file:///control-definitions.tjs"
+        text = '''var index = 99;
+for(var index = 0; index < 2; index++) { index; }
+index; // after loop
+try { throw 1; } catch(error) { error; }
+error; // after catch
+var shared = 1;
+with(global) { shared; }
+class Example { function method(arg) { arg; shared; } }
+'''
+        self.open_document(uri, text)
+        self.assert_definition(self.definition(uri, text, "index; }"), uri, text, "index = 0", "index")
+        self.assert_definition(self.definition(uri, text, "index; // after"), uri, text, "index = 99", "index")
+        self.assert_definition(self.definition(uri, text, "error; }"), uri, text, "error)", "error")
+        self.assertIsNone(self.definition(uri, text, "error; // after"))
+        self.assertIsNone(self.definition(uri, text, "shared; }"))
+        self.assertIsNone(self.definition(uri, text, "shared; } }"))
+        self.assert_definition(self.definition(uri, text, "arg;"), uri, text, "arg)", "arg")
+
+    def test_definitions_only_use_unique_top_level_workspace_declarations(self):
+        with tempfile.TemporaryDirectory(prefix="cial definition %20 中文 ") as directory:
+            root = pathlib.Path(directory)
+            library = root / "library.tjs"
+            library_text = '"😀"; function Shared() {}\nfunction Owner() { var Hidden; }\nvar First=1, Tail=2;'
+            library.write_text(library_text, encoding="utf-8")
+            uri = (root / "main.tjs").as_uri()
+            text = 'Shared(); Tail; Hidden; shared(); var receiver; receiver.Shared(); "Shared"; // Shared\nRenamed();'
+            self.initialize({"rootUri": root.as_uri()})
+            self.open_document(uri, text)
+            self.assert_definition(self.definition(uri, text, "Shared();"), library.as_uri(), library_text,
+                                   "Shared()", "Shared")
+            self.assert_definition(self.definition(uri, text, "Tail;"), library.as_uri(), library_text, "Tail=2", "Tail")
+            for reference, offset in (("Hidden;", 0), ("shared();", 0), ("receiver.Shared", len("receiver.")),
+                                      ('"Shared"', 1), ("// Shared", 3)):
+                self.assertIsNone(self.definition(uri, text, reference, offset))
+            duplicate = root / "duplicate.tjs"
+            duplicate.write_text("function Shared() {}", encoding="utf-8")
+            self.assertIsNone(self.definition(uri, text, "Shared();"))
+            duplicate.unlink()
+            self.open_document(library.as_uri(), "function Renamed() {}")
+            self.assertIsNone(self.definition(uri, text, "Shared();"))
+            self.assert_definition(self.definition(uri, text, "Renamed();"), library.as_uri(),
+                                   "function Renamed() {}", "Renamed()", "Renamed")
+
+    def test_definitions_decline_incomplete_and_preprocessed_source(self):
+        self.initialize()
+        uri = "file:///unsupported-definitions.tjs"
+        for version, text in enumerate(("var value; function broken( { value;", "@set(flag=1)\nvar value; value;"), 1):
+            self.open_document(uri, text, version)
+            self.assertIsNone(self.definition(uri, text, "value;", len("value;") - 2))
 
     def test_workspace_symbols_disk_buffers_and_folder_changes(self):
         with tempfile.TemporaryDirectory(prefix="cial workspace %20 空间 ") as directory:

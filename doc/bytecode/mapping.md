@@ -309,14 +309,75 @@ propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 
 | INC/DEC 基型 | increment（int/real，字符串报错） | `Inc`/`Dec` 单指令，同语义 | 旧译法 LoadImm+Add 对字符串会误拼接 |
 | BNOT/NUM/OCTET | bitnot / tonumber / ToOctet | `BNot`/`ToNumber`/`ToOctet`（Value 增 bitNot/toNumber） | OCTET：void→空 octet、octet 不变、其余报错 |
 
-## 9. 对拍与工具链（已立项，未实现）
+## 9. 对拍与工具链
 
-1. **TJSCompiler 加 `--dump <out>` 导出选项**（仅改 `src/main.cpp`，默认行为不变）：
-   调 `tTJS::CompileScript(text, NULL, NULL, &stream)`（`tjs.cpp:571`）产出 `"TJS2 100\0"` 文件；
-2. **语料**：`tests/test_files/tjs2bc/*.tjs` + 对应 `.bc` 产物入库（生成后提交，CI 不依赖 TJSCompiler）；
-3. **对拍用例**：同一脚本分别跑 `TJSCompiler.exe x.tjs` 与 `cial --tjsbc x.bc`，stdout 逐字节比对
-   （`cial` 增加 `--tjsbc` 入口为 M1 任务）；
-4. 分组用例与 §10 里程碑一一对应，进 Catch2（`tests/tjsbc_test.cpp`）。
+### 已有 fixture 与严格源码/字节码对拍
+
+Reader 与转译执行回归位于 `tests/tjsbc_reader_test.cpp`、`tests/tjsbc_translator_test.cpp`；
+12 个已导出的 `.tjsbc` 位于 `tests/test_files/tjsbc/`，CI 不需要参考引擎即可运行。
+`cial --tjsbc` 的 CLI 路径另由 `tests/cli_test.py` 覆盖。
+
+`bench/bytecode_conformance.py` 默认运行同一个 Ciallang 的源码路径和字节码路径，
+要求两边都以 0 退出，并按字节比较 stdout，不剥引号、时间戳、空行或诊断文本。
+源码先在 fixture 同目录寻找，再按同名文件在 `tests/test_files/tjs2/` 寻找；
+s1–s5 缺少入库源码，明确报告 `SKIPPED_NO_SOURCE`，不会把它们计作匹配。
+
+这些原始脚本不能从当前仓库可信恢复：初始提交 `7e2fe8a` 只加入 s1–s3 二进制，
+`660b9a6` 只加入 s4/s5 二进制及覆盖描述；Git 文件历史未包含对应 `.tjs`。
+`tests/tjsbc_reader_test.cpp` 的常量池、签名与 context 断言只能约束部分结构，
+不能作为原始源码的证据，因此不补造只打印同样输出的替代脚本。
+
+```sh
+python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
+  --report bench/results/bytecode-conformance.json
+# 只复核指定用例（--case 可重复），目录和输出文件都可含空格
+python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
+  --case s7_ext --case test_class
+```
+
+无源码 fixture 仍可由独立执行模式覆盖。`--mode execute` 对所选字节码运行
+`cial --tjsbc`，检查退出码与超时并保存原始输出；例如复核 s1–s5：
+
+```sh
+python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
+  --mode execute --case s1 --case s2 --case s3 --case s4 --case s5 \
+  --report bench/results/bytecode-execution.json
+```
+
+执行模式报告 `coverage_mode: "bytecode_execution"`，成功项为 `EXECUTED`；默认比较模式
+报告 `coverage_mode: "source_vs_bytecode"`，成功比较才是 `MATCH`。两种模式的
+`comparison` 字段也明确区分覆盖含义。`EXECUTED` 只说明字节码成功执行，不能证明
+源码等价；全量执行模式覆盖 12 个 fixture，但默认比较模式仍如实跳过缺失源码项。
+`--mode execute` 不接受 `--reference`，避免将执行检查混为重新导出的对拍。
+
+报告为 JSON，记录执行器、源码及字节码 SHA-256、退出码、超时、stdout 首个不同字节位置，
+并同时保留 stdout/stderr 的可读文本和无损 Base64。`MATCH` 以外的实际比较结果均返回 1，
+包括双方都执行失败；比较模式只选中缺失源码的用例也返回 1。执行模式只有所选项全部
+为 `EXECUTED` 才返回 0。参数错误返回 2。每个子进程默认
+15 秒超时，可由 `--timeout` 设置（`bench/bytecode_conformance.py`）。
+
+严格报告会暴露 `test_misc` 的异常文本差异：源码路径携带源码行号，已有字节码 fixture
+缺少相同源码位置，输出中没有该行号。此项仍为 `OUTPUT_DIFF`，不通过归一化或删除源码
+诊断来强行判为匹配；这不等价于算术或异常捕获行为不兼容。
+
+### 可选参考导出与入口能力探测
+
+添加 `--reference /path/to/TJSCompiler` 后，工具在临时目录内生成两个随机标记的最小
+`Debug.message` 脚本，先确认参考 CLI 确实执行不同的路径参数，再验证
+`--dump <script.tjs> <out.tjsbc>` 生成 `TJS2 100\0` 头且能被 Ciallang 执行并输出对应标记。
+任一探测失败即停止并返回失败，不能把忽略参数、固定执行脚本的旧入口当成有效对照。
+探测通过后才临时导出选中语料并做上述源码/字节码对拍；不会覆盖入库 fixture。
+
+```sh
+python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
+  --reference /path/to/verified/TJSCompiler --case s7_ext \
+  --report bench/results/bytecode-fresh-export.json
+```
+
+报告记录参考执行器 SHA-256 和两类探测结果。此模式验证**参考导出 → 转译执行**，
+不是参考引擎完整语料 stdout 与 Ciallang 的三方语义对拍；后者仍须单独处理参考引擎的
+宿主、输出协议与行为差异。参考项目的 CLI 适配不作为本仓库能力或上游默认行为承诺。
+工具契约及真实 CLI/fixture 测试见 `bench/test_bytecode_conformance.py`。
 
 ## 10. 里程碑
 
