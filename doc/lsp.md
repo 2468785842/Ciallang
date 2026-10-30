@@ -26,8 +26,10 @@ python tools/lsp/cial_lsp.py --cial build/Windows/Debug/cial.exe
 
 未打开文件按磁盘内容索引，查询时检查文件时间与大小并缓存声明；未保存缓冲优先覆盖磁盘内容，关闭后恢复磁盘版本，删除文件会移出索引。扫描不跟随目录符号链接，并排除解析后位于工作区之外的文件链接；跳过 build、bin、ext、node_modules 以及常见编辑器/缓存目录。单文件上限 2 MB，每次查询最多检查 2000 个 `.tjs` 候选文件和 10000 个目录，源内容预算 20 MB，最多返回排序后的 200 个匹配；可收窄名称继续查找。无法读取、编码非法或超限的文件会跳过（`tools/lsp/cial_lsp.py` 的 `MAX_*`、`EXCLUDED_DIRECTORIES`、`workspace_symbols`）。
 
-这仍是基础语言服务，不包含类型推导、作用域感知的跨文件名称解析、重命名、跳转定义或语义级成员补全。声明提取会隐藏注释、字符串和常规正则字面量，再匹配声明；不会求值预处理条件、解析模板插值或建立作用域绑定，同名局部声明可能产生多个搜索结果。每次完整文本更新触发独立的编译检查，单次超时 5 秒，诊断文档上限 2 MB；关闭文档清空诊断，过期版本不会覆盖新内容（`tools/lsp/cial_lsp.py` 的 `declarations`、`check`、`handle`）。
+这仍是基础语言服务，不包含类型推导、重命名或语义级成员补全。声明提取会隐藏注释、字符串和常规正则字面量，再匹配声明；同名局部声明可能产生多个搜索结果。每次完整文本更新触发独立的编译检查，单次超时 5 秒，诊断文档上限 2 MB；关闭文档清空诊断，过期版本不会覆盖新内容（`tools/lsp/cial_lsp.py` 的 `declarations`、`check`、`handle`）。
 
-`tools/lsp/test_protocol.py` 通过真正的子进程 stdio 测试初始化、诊断与修复、关闭、补全、悬停、符号、未知请求、shutdown/exit，以及 Unicode 位置转换；另外覆盖未打开文件的工作区搜索、磁盘修改/删除、未保存缓冲更新与关闭恢复、工作区目录切换、结果数量限制、超限/编码非法文件跳过，以及带空格、百分号和中文的 URI。Python 可用时由 CTest 注册。VSCode 客户端已做依赖安装与 JavaScript 语法检查，图形编辑器中的交互仍需在目标 IDE 实测（`tools/lsp/test_protocol.py`、`tests/CMakeLists.txt`）。
+`textDocument/definition` 提供保守的作用域感知跳转：`DefinitionIndex` 对平衡的、未使用预处理指令的源码建立词法绑定索引——函数/getter/setter/catch 作用域、class/property 体、for/with 头部与单语句体、参数与 var/const 声明（含初始化表达式可见性、类型注解、收拢参数），按最近嵌套作用域解析标识符。成员访问（`.x` 前置点号）、关键字与内置类名、含 `@` 指令或括号不平衡的源码一律拒绝返回（宁缺毋错）。本文件解析不到的全局名再查工作区：仅当恰好一个文件的顶层存在同名声明时返回，多于一处则不跳转。函数/类体内的同名局部声明互相独立；该索引不做类型推导，也不解析 getter/setter 的动态绑定（`tools/lsp/cial_lsp.py` 的 `DefinitionIndex`、`resolve`、`definition`）。
+
+`tools/lsp/test_protocol.py` 通过真正的子进程 stdio 测试初始化、诊断与修复、关闭、补全、悬停、符号、未知请求、shutdown/exit，以及 Unicode 位置转换；另外覆盖未打开文件的工作区搜索、磁盘修改/删除、未保存缓冲更新与关闭恢复、工作区目录切换、结果数量限制、超限/编码非法文件跳过，以及带空格、百分号和中文的 URI。跳转定义测试覆盖块/参数/函数边界、catch 与动态成员拒绝、跨文件唯一顶层声明，以及 `@` 预处理与不完整源码的拒绝路径。Python 可用时由 CTest 注册。VSCode 客户端已做依赖安装与 JavaScript 语法检查，图形编辑器中的交互仍需在目标 IDE 实测（`tools/lsp/test_protocol.py`、`tests/CMakeLists.txt`）。
 
 协议参考：[LSP 3.17](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/)。
