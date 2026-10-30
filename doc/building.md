@@ -70,6 +70,33 @@ python bench/test_bytecode_conformance.py --cial build/Windows/Debug/cial.exe
 字节码，入库 fixture 不受影响。JSON 含退出码、无损输出与 SHA-256；详见
 [字节码转译 §9](bytecode/mapping.md#9-对拍与工具链) 和 `bench/bytecode_conformance.py`。
 
+## ASan（Windows MSVC）
+
+Windows 下可用的 ASan 组合是 MSVC 前端 `/fsanitize=address`（其运行库完整支持
+SEH/C++ 异常）；构建目录 `build/Windows/ASanMsvc`，须在 vcvars 环境里配置：
+
+```bat
+call vcvars64.bat
+cmake -B build/Windows/ASanMsvc -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
+  -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake ^
+  -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
+  -DVCPKG_INSTALLED_DIR=<repo>/build/Windows/ASan/vcpkg_installed ^
+  -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
+  -DCMAKE_CXX_FLAGS="/fsanitize=address /Zi /utf-8 /D_DISABLE_STRING_ANNOTATION=1 /D_DISABLE_VECTOR_ANNOTATION=1"
+cmake --build build/Windows/ASanMsvc -j
+```
+
+要点：运行库必须与 vcpkg 依赖一致（静态 MT + `_DISABLE_{STRING,VECTOR}_ANNOTATION=1`
+对齐未插桩依赖的容器注解）；部署需把
+`<VC>/Tools/MSVC/<ver>/bin/Hostx64/x64/clang_rt.asan_dynamic-x86_64.dll`
+复制到可执行文件旁。验证基线（2026-10-30）：Catch2 全量 + tjs2 语料零报告。
+
+clang++ 前端的 `-fsanitize=address` 在 Windows 可构建并通过编译期测试组
+（optimizer/LEB128/IEEE），但执行 C++ 异常路径即崩：Clang 19 Windows 运行库对
+SEH 异常的工具链缺陷（30 行纯标准库程序可复现，静态/动态运行时与优化级别均同），
+与本项目代码无关；其配置需静态 CRT + 注解对齐旗标，历史脚本中的 `-shared-asan`
+为无效旗标。
+
 ## 有界 fuzz
 
 使用 Clang 与 libFuzzer，单独建立带覆盖率、ASan/UBSan 的构建目录；核心库与入口均插桩，不影响其他构建。入口仅做词法/语法解析，不执行脚本（`fuzz/CMakeLists.txt`、`fuzz/fuzz_*.cc`）。

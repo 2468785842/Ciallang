@@ -57,7 +57,7 @@
 - [x] 执行路径 DOT：按代码位置与边聚合次数，覆盖嵌套原生回调、异常和 GC 后快照，见 `src/vm/ExecutionTrace.hpp`、`doc/execution-trace.md`。
 - [x] LSP 基础：只编译的 `--check-json` + Python stdio 服务 + VSCode 客户端；诊断使用 UTF-16 位置，提供词法补全、内置提示与符号。真实 stdio 协议测试已接 CTest，跨文件语义和 IDE UI 验证待后续。见 `tools/lsp/`、`editors/vscode/`、`doc/lsp.md`。
 
-本机最终验证：Windows Debug **224 用例 / 2168 断言全绿 + CTest 4 套件全过**（2026-10-30，回调绑定/语义修正/函数指针化批次后）；tjs2 语料 6 文件通过（`test.tjs` 需宿主 Scripts 对象，基线同样失败，非回归）；12 个字节码样本全部成功；native_methods 同机 A/B 见 doc/performance.md。历史：macOS Debug/Release 198/198（2026-10-29）；ASan 在 macOS 初始化自旋未获结果，改于 Windows 重试（进行中）。
+本机最终验证：Windows Debug **224 用例 / 2168 断言全绿 + CTest 4 套件全过**（2026-10-30，回调绑定/语义修正/函数指针化批次后）；tjs2 语料 6 文件通过（`test.tjs` 需宿主 Scripts 对象，基线同样失败，非回归）；12 个字节码样本全部成功；native_methods 同机 A/B 见 doc/performance.md。历史：macOS Debug/Release 198/198（2026-10-29）；ASan 已于 2026-10-30 在 Windows MSVC /fsanitize=address 下首次全量通过（230 用例/2159 断言 + 7 个 tjs2 语料脚本零报告；clang ASan 因其 Windows 运行库对 C++ 异常的工具链缺陷不可用，30 行最小复现与项目代码无关，构建配方见 doc/building.md）。
 
 ## 已完成（摘要）
 
