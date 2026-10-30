@@ -40,6 +40,7 @@ KEYWORDS = {
     "Date": "日期构造、解析及分量方法。",
     "RegExp": "正则表达式，支持 /pattern/flags 字面量。",
     "Exception": "异常对象，包含 message 成员。",
+    "Scripts": "宿主脚本存储：execStorage 执行脚本文件，evalStorage 求值脚本文件（src/stdlib/ScriptsLib.cpp）。",
 }
 DECLARATION = re.compile(r"\b(function|var|const|class|property)\s+([\w$]+)")
 WORD = re.compile(r"[\w$]+")
@@ -64,7 +65,7 @@ MAX_RENAME_EDITS = 5_000     # 单次 rename 产生的编辑总数上限
 #   RegExp     src/stdlib/RegExpLib.cpp:13-18
 #   RandomGen  src/stdlib/RandomLib.cpp:209-214（当前无全局构造入口，仅备查）
 #   Exception  src/stdlib/ExceptionLib.hpp:15-21（TJS 自举类，message 成员）
-BUILTIN_TYPE_NAMES = {"Array", "String", "Dictionary", "Math", "Date", "RegExp", "Exception"}
+BUILTIN_TYPE_NAMES = {"Array", "String", "Dictionary", "Math", "Date", "RegExp", "Exception", "Scripts"}
 MEMBER_METHOD, MEMBER_FIELD, MEMBER_PROPERTY = 2, 5, 10  # LSP CompletionItemKind
 BUILTIN_MEMBERS = {
     "Array": {
@@ -142,6 +143,10 @@ BUILTIN_MEMBERS = {
         "PI": (MEMBER_PROPERTY, "PI: Real — 圆周率"),
         "SQRT1_2": (MEMBER_PROPERTY, "SQRT1_2: Real — 1/√2"),
         "SQRT2": (MEMBER_PROPERTY, "SQRT2: Real — √2"),
+    },
+    "Scripts": {
+        "execStorage": (MEMBER_METHOD, "execStorage(name): 执行存储中的脚本文件（相对当前脚本目录，全局上下文）"),
+        "evalStorage": (MEMBER_METHOD, "evalStorage(name): 值 — 求值存储中的表达式并返回结果"),
     },
     "Date": {
         "getYear": (MEMBER_METHOD, "getYear(): Integer — 年"),
