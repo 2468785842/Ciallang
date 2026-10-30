@@ -15,6 +15,7 @@
 
 
 #include "VMState.hpp"
+#include "common/Defer.hpp"
 #include "runtime/Runtime.hpp"
 
 #include "gen/IRGenerator.hpp"
@@ -183,11 +184,31 @@ namespace cial {
             // 原生函数：无帧直调（callProc 同步返回）
             if(obj->typeId() == TypeId::NativeFunction) {
                 auto *native = static_cast<NativeFunction *>(obj);
-                Vec<Value> argv;
+                const size_t arity = native->arity();
+                // 实参 placement new 到栈缓冲直传（与 invokeCallV 原生分支同款），
+                // 免每次回调的 Vec 堆分配；Value 非平凡构造/析构，只构造实际数量。
+                // 实参 GC 根由上方 argumentRoots 承接，栈副本无需注册。
+                if(argCount <= 64 && arity <= 64) {
+                    alignas(Value) unsigned char argBuf[64 * sizeof(Value)];
+                    Value *const argv = reinterpret_cast<Value *>(argBuf);
+                    size_t built = 0;
+                    DEFER {
+                        while(built > 0)
+                            argv[--built].~Value();
+                    };
+                    for(; built < argCount; ++built)
+                        new(argBuf + built * sizeof(Value)) Value(args[built]);
+                    for(; built < arity; ++built) // 缺省参数补 void（布局与 resize 等价）
+                        new(argBuf + built * sizeof(Value)) Value();
+                    if(native->boundThis().isVoid() && !fallbackThis.isVoid())
+                        return native->callDirect(*_vmState, *receiverRoot, argCount, argv);
+                    return native->callProc(this, argCount, argv);
+                }
+                Vec<Value> argv; // 超宽调用（>64 实参，罕见）回落堆缓冲
                 if(argCount)
                     argv.assign(args, args + argCount);
-                if(argv.size() < native->arity())
-                    argv.resize(native->arity());
+                if(argv.size() < arity)
+                    argv.resize(arity);
                 if(native->boundThis().isVoid() && !fallbackThis.isVoid())
                     return native->callDirect(*_vmState, *receiverRoot, argCount, argv.data());
                 return native->callProc(this, argCount, argv.data());

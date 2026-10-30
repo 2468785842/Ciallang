@@ -3,6 +3,9 @@
 //
 #pragma once
 
+#include <bit>
+#include <type_traits>
+
 #include "Octet.hpp"
 #include "RegExp.hpp"
 #include "String.hpp"
@@ -112,6 +115,25 @@ namespace cial::native {
         constexpr size_t N = Traits::arity;
         return invokeCallableImpl<Callable, Tuple>(std::forward<Callable>(callable), vm, thisObj, argCount, args,
                                                    std::make_index_sequence<N>{});
+    }
+
+    // 无捕获回调的形状适配跳板（NativeFunction 快路径，见 Function.hpp 的
+    // NativeThinFn 注释）：在构造点按 callable 具体类型静态实例化，把
+    // NativeFunTraits 支持的全部签名形态统一到 {trampoline, thunkCtx} 两指针
+    // 直派发。接收者以 const 引用跨 ABI 直传（零拷贝）；尾随实参提取/分发与
+    // std::function 路径共用 invokeCallable，语义一致（按值接收者仍是可改写副本）。
+    // 函数指针形态的指针值经 thunkCtx 以 bit_cast 往返（x64/ARM64 与 void* 同宽）；
+    // 无捕获 lambda / 空仿函数形态零存储（C++20 空闭包可默认构造）。
+    template <typename F>
+    Value nativeThinTrampoline(void *thunkCtx, VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
+        if constexpr(std::is_pointer_v<F> && std::is_function_v<std::remove_pointer_t<F>>) {
+            static_assert(sizeof(F) == sizeof(void *), "function pointer must be thin-castable to void*");
+            return invokeCallable(std::bit_cast<F>(thunkCtx), vm, thisObj, argCount, args);
+        } else {
+            static_assert(std::is_empty_v<F> && std::is_default_constructible_v<F>,
+                          "thin path requires a captureless callable");
+            return invokeCallable(F{}, vm, thisObj, argCount, args);
+        }
     }
 
 } // namespace cial::native

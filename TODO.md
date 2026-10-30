@@ -21,6 +21,8 @@
 
 ## 二、性能
 
+- [x] NativeFn 无捕获回调函数指针化（2026-10-30）：NativeFunction 增加 {trampoline, thunkCtx} small-closure 快路径，stdlib 注册面（函数指针/无捕获 lambda）免 std::function 调度链且接收者 const 引用 ABI 直传；有捕获回调按值协议不变。`VM::callValue` 原生分支实参改栈缓冲。Windows 同机 A/B：native_methods 稳定 +9~11%，其余四项噪声带内；接收者引用化中间方案（无收益）与 GMethodC+CallMethodV 合并（发射形态不支持无条件融合，仅零实参可专用指令）结论见 `doc/performance.md`。
+
 - [x] 原生接收者拷贝候选验证（2026-10-30）：转换层借用快照可减少两层 `Value` 拷贝，但同机 Release 两轮对照出现约 5% 整数循环回退，候选未采用；保留长串接收者重新绑定、嵌套回调及按值局部修改测试。结果与下一步见 `doc/performance.md`、`tests/native_function_test.cpp`。
 
 - [x] Value 内联 SSO：14 字节内无需字符串负载分配；String 与 Value 均保持 16B，长串共享负载不变。增加字符串+整数快路径，修正 NewRegExp 借用临时 Value 的字符串寿命。见 `src/types/Value.*`、`src/types/String.*`、`src/vm/Constant.cpp`、`tests/value_storage_test.cpp`。
@@ -30,7 +32,7 @@
 
 - [x] 可选整数 JIT / Trace JIT 基础：x64 原生代码、热点路径录制、整数/溢出/分支守卫和未提交状态回退；默认关闭，尚不覆盖对象与调用优化。见 `src/vm/IntegerJit.*`、`tests/jit_test.cpp`、`doc/jit.md`。
 - [x] 数值自尾递归：显式启用后复用安全的自身调用帧，支持两万层递归；try、对象、闭包和外部副作用保守回落。见 `src/vm/VMState.cpp`、`tests/tail_recursion_test.cpp`。
-- [ ] 原版性能追平：可选后端的正确性验证不代表已达到全程序性能目标，继续按同机对拍记录收益与回退。2026-10-29 调用路径批次后 macOS 对照：**fib 94~97%（首次追平）**、loop_int 68%、string ~100%、class ~96% 均持平或反超；native_methods 135~140% 为剩余缺口——大头在 NativeFn 回调协议（std::function 间接调用 + Value 拷贝语义），后续可评估函数指针化与 GMethodC+CallMethodV 合并单指令；采样与削减记录见 doc/performance.md。
+- [ ] 原版性能追平：可选后端的正确性验证不代表已达到全程序性能目标，继续按同机对拍记录收益与回退。2026-10-29 调用路径批次后 macOS 对照：**fib 94~97%（首次追平）**、loop_int 68%、string ~100%、class ~96% 均持平或反超；native_methods 135~140% 的 NativeFn 协议缺口已由 2026-10-30 函数指针化批次削减（Windows 同机 A/B +9~11%，macOS 相对 TJS2 的新比值待复测）；下一步候选为 GMethodC+CallMethodV 零实参融合（发射期就地改写，见 doc/performance.md 本批结论）；采样与削减记录见 doc/performance.md。
 
 ## 三、语言特性缺口
 

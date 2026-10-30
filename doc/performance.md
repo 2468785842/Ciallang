@@ -176,3 +176,61 @@ JIT、尾递归与执行记录关闭。候选只把 `src/types/NativeFunDetail.h
 
 完整样本及二进制 SHA-256 位于本机忽略目录 `bench/results/` 下的
 `20261030-native-receiver-final1.json`、`20261030-native-receiver.json`。
+
+## 2026-10-30 NativeFn 函数指针化批次
+
+环境：Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT；JIT、尾递归与执行记录关闭。
+基线为批次前 Release 二进制（改动前 `git` 工作树构建，留档 `bench/results/cial-baseline.exe`）。
+方法：每项预热 1 轮后交替运行前/后二进制 7 轮、逐轮反转先后顺序，统计含进程启动的
+wall-time 中位数；比值 = 改动前中位数 / 改动后中位数（>100% 即改动后更快）。样本落盘
+`bench/results/20261030-*.json`。
+
+改动（语义零变化，全部注册面不受影响）：
+
+1. **无捕获回调函数指针化**（`src/types/Function.hpp`、`src/types/NativeFunDetail.hpp`、
+   `src/types/Function.cpp`）：NativeFunction 增加 small-closure 快路径
+   `{NativeThinFn _thin, void *_thunkCtx}`——构造点按 callable 具体类型静态实例化
+   `native::nativeThinTrampoline<F>`，stdlib 注册面（`&stdlib::fn` 函数指针与无捕获
+   lambda，覆盖 Array/String/Math/Date/RegExp/Serialize/Random 全部方法）构造时不再
+   包装 std::function；调用经两指针直派发，接收者以 `const Value &` 跨 ABI 直传
+   （零拷贝）。有捕获回调保持 `NativeFn`（std::function 按值协议）不变；`invokeCallable`
+   共用，实参提取/void 返回适配/按值接收者副本语义一致。
+2. **`VM::callValue` 原生分支栈缓冲**（`src/vm/VM.hpp`）：宿主回调实参从每次
+   `Vec<Value>` 堆分配改为 placement new 栈直传（≤64 实参，缺省补 void，超宽回落堆
+   缓冲）；GC 根仍由 `argumentRoots` 承接。基准语料不覆盖此路径（受益者为
+   Array.sort 比较器、RegExp.replace 回调等宿主回调）。
+
+同机对照（预热 1 轮 + 交替 7 轮取中位数比值；轮 1–3 为批次中间态=仅改动 1，
+轮 4 为最终态=改动 1+2，五项基准在两态下的基准路径相同）：
+
+| 脚本 | 轮1 | 轮2 | 轮3 | 轮4（最终态） | 结论 |
+|---|---:|---:|---:|---:|---|
+| native_methods | 108.7% | 110.0% | 108.8% | 111.3% | 稳定 +9~11%，远超噪声 |
+| class_instantiate | 102.6% | 100.2% | 101.8% | 97.0% | 噪声带内 |
+| fib | 104.8% | 101.8% | 103.7% | 101.7% | 噪声带内（基准不含原生调用） |
+| loop_int | 100.2% | 95.2% | 98.8% | 102.7% | 噪声带内（见下 A/A 校准） |
+| string_concat | 97.3% | 102.0% | 102.1% | 102.5% | 噪声带内 |
+
+噪声校准：同二进制 A/A 对照两轮为 class 98.9%/100.1%、fib 99.0%/98.1%、
+loop_int 99.0%/**93.8%**、native_methods 98.3%/97.9%、string 100.6%/100.0%——本机
+单批中位数噪声可达 ±6%（loop_int），故轮 2 的 95.2% 不足以判回退；native_methods
+的 +9~11% 在全部轮次（含后台繁忙批次的 106.5%/108.6%）一致复现，接受改动。
+绝对值口径：改动前基线（安静批次）native_methods 25.136/24.936 ms → 最终态 23.074 ms
+（由轮 4 比值折算）；跨批次绝对值受负载漂移影响，以上述交替比值为准。
+
+**被否决的中间方案**：`invokeCallV` 原生分支接收者改引用绑定（`const Value &recv`
+三元左值，消一次 16B 拷贝）。与改动 1 叠加后直接对拍（两改动态互为 A/B，7 轮）：
+native_methods 100.9%（拷贝版反而略快，噪声带内），未复现收益——与上一节被否决的
+转换层借用快照同因：接收者拷贝本身廉价（对象值 16B 指针拷贝），引用化引入的间接
+加载抵消收益。已回退为按值拷贝原形。
+
+**GMethodC+CallMethodV 合并单指令（未实施）**：核结是发射形态不支持无条件融合——
+`IRGenerator.cpp` 的方法调用先改写 GPropC→GMethodC（方法加载），随后**逐个实参
+表达式求值**，最后才发射 CallMethodV（`src/gen/IRGenerator.cpp:699-770`），二者之间
+存在任意脚本代码（副作用/异常/方法表替换），融合需跨任意语句的副作用分析或仅限
+零实参调用点的专用指令（预计收益 ~5%，成本为指令集四处同步+异常点重验证）。
+自然后续是把零实参情形折入现有 GPropC→GMethodC 就地改写模式，另批验证。
+
+验证：Windows Debug/Release 全量构建通过；完整 CTest 4 套件全绿
+（C++ 224 用例/2168 断言，与批次前一致）。样本与工具位于本机忽略目录
+`bench/results/`（`bench_median.py` 为本轮使用的 A/B 中位数编排脚本）。

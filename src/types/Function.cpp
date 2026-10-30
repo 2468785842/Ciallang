@@ -94,15 +94,20 @@ namespace cial {
         const auto *curFrame = vmState.curFrame();
         VM vm{ &vmState };
 
-        // 接收者独立于共享 NativeFunction，嵌套调用不覆写绑定。
-        const auto &value = _callback(&vm, receiver, argCount, curFrame->getArgs(cnt != 0 ? _arity : argCount));
-
-        vmState.regRef(ret) = value;
+        // 接收者独立于共享 NativeFunction，嵌套调用不覆写绑定；
+        // 无捕获走 _thin 直派发（接收者 const 引用 ABI 直传，零拷贝）
+        if(_thin)
+            vmState.regRef(ret) =
+                _thin(_thunkCtx, &vm, receiver, argCount, curFrame->getArgs(cnt != 0 ? _arity : argCount));
+        else
+            vmState.regRef(ret) = _callback(&vm, receiver, argCount, curFrame->getArgs(cnt != 0 ? _arity : argCount));
     }
 
     Value NativeFunction::callDirect(vm::VMState &vmState, const Value &receiver, const size_t argCount,
                                      Value *args) const {
         VM vm{ &vmState };
+        if(_thin)
+            return _thin(_thunkCtx, &vm, receiver, argCount, args);
         return _callback(&vm, receiver, argCount, args);
     }
 } // namespace cial

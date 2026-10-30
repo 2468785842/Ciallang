@@ -13,6 +13,9 @@
  */
 #pragma once
 
+#include <bit>
+#include <type_traits>
+
 #include "NativeFunDetail.hpp"
 #include "Object.hpp"
 #include "Value.hpp"
@@ -54,6 +57,13 @@ namespace cial {
 
     class NativeFunction final : public Object {
     public:
+        // 无捕获回调快路径（small closure：{trampoline, thunkCtx} 两指针直派发）。
+        // stdlib 注册面（&stdlib::fn / 无捕获 lambda）全部走此路径：接收者以
+        // const 引用跨 ABI 直传（零拷贝），免 std::function 调度链；trampoline
+        // 在构造点按 callable 类型静态实例化（native::nativeThinTrampoline）。
+        // 有捕获回调保持 NativeFn 按值协议不变（_thin 为空即回落）。
+        using NativeThinFn = Value (*)(void *thunkCtx, VM *vm, const Value &thisObj, size_t argCount, Value *args);
+
         NativeFunction() = delete;
 
         NativeFunction(NativeFunction &&) = delete;
@@ -62,18 +72,32 @@ namespace cial {
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::NativeFunction; }
 
         NativeFunction(const NativeFunction &rhs) noexcept :
-            Object(Runtime::ATOM_FUNCTION), _callback(rhs._callback), _arity(rhs._arity) {}
+            Object(Runtime::ATOM_FUNCTION), _thin(rhs._thin), _thunkCtx(rhs._thunkCtx), _arity(rhs._arity),
+            _thisObj(rhs._thisObj), _callback(rhs._callback) {}
 
         template <typename Callable>
             requires(!std::same_as<std::decay_t<Callable>, NativeFunction>)
         explicit NativeFunction(Callable &&callable) :
-            Object(Runtime::ATOM_FUNCTION), _callback([callable = std::forward<Callable>(callable)](
-                                                          VM *vm, Value thisObj, size_t argCount, Value *args) {
-                return native::invokeCallable(callable, vm, thisObj, argCount, args);
-            }),
-            _arity(native::NativeFunTraits<Callable>::arity) {}
+            Object(Runtime::ATOM_FUNCTION), _arity(native::NativeFunTraits<std::decay_t<Callable>>::arity) {
+            using C = std::decay_t<Callable>;
+            if constexpr(std::is_pointer_v<C> && std::is_function_v<std::remove_pointer_t<C>>) {
+                _thin = &native::nativeThinTrampoline<C>;
+                _thunkCtx = std::bit_cast<void *>(callable);
+            } else if constexpr(std::is_empty_v<C> && std::is_default_constructible_v<C>) {
+                _thin = &native::nativeThinTrampoline<C>; // 无捕获 lambda：trampoline 内默认构造
+            } else {
+                // 有捕获：保持原 std::function 按值协议（invokeCallable 包装同时
+                // 把 void 返回适配为 Value，与旧实现一致）
+                _callback = [callable = std::forward<Callable>(callable)](VM *vm, Value thisObj, size_t argCount,
+                                                                          Value *args) {
+                    return native::invokeCallable(callable, vm, thisObj, argCount, args);
+                };
+            }
+        }
 
         Value callProc(VM *vm, const size_t argCount, Value *args) const {
+            if(_thin)
+                return _thin(_thunkCtx, vm, _thisObj, argCount, args);
             return _callback(vm, _thisObj, argCount, args);
         }
 
@@ -104,9 +128,13 @@ namespace cial {
         ~NativeFunction() noexcept override = default;
 
     private:
-        const NativeFn _callback;
-        const size_t _arity;
+        // 布局：热字段在前（callProc 直派发读 _thin/_thunkCtx/_thisObj），
+        // 冷的 std::function（32B）垫尾
+        NativeThinFn _thin{}; // 非空 → 无捕获快路径
+        void *_thunkCtx{}; // trampoline 状态（函数指针值）；空闭包为 null
+        size_t _arity;
         Value _thisObj{};
+        NativeFn _callback{}; // 有捕获回调（按值协议不变）；无捕获为空
     };
 
 } // namespace cial
