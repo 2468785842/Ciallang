@@ -10,12 +10,13 @@
 
 namespace cial::stdlib {
     void registerRegExpLib(Context &context) {
-        context.nativeType<RegExp>().method("test"_str, &stdlib::regexpTest);
-        context.nativeType<RegExp>().method("match"_str, &stdlib::regexpMatch);
-        context.nativeType<RegExp>().method("exec"_str, &stdlib::regexpExec);
-        context.nativeType<RegExp>().method("compile"_str, &stdlib::regexpCompile);
-        context.nativeType<RegExp>().method("replace"_str, &stdlib::regexpReplace);
-        context.nativeType<RegExp>().method("split"_str, &stdlib::regexpSplit);
+        context.nativeType<RegExp>()
+            .method("test"_str, &stdlib::regexpTest)
+            .method("match"_str, &stdlib::regexpMatch)
+            .method("exec"_str, &stdlib::regexpExec)
+            .method("compile"_str, &stdlib::regexpCompile)
+            .method("replace"_str, &stdlib::regexpReplace)
+            .method("split"_str, &stdlib::regexpSplit);
         context.registerClass<RegExp>("RegExp"_str, &context.rt(), ""_str);
     }
 

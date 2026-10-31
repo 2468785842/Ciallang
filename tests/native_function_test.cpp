@@ -14,12 +14,121 @@
 #include <fmt/core.h>
 
 #include "stdlib/StringLib.hpp"
+#include "stdlib/RandomLib.hpp"
 #include "types/Dictionary.hpp"
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
 using namespace cial;
 using namespace cial::stdlib;
+
+TEST_CASE("String search and slices reject unsafe bounds", "[stdlib][regression]") {
+    Runtime rt;
+    Context context{ rt };
+    registerStandardLibrary(context);
+    vm::VMState state{ context };
+    VM vm{ &state };
+    vm.eval(R"(var text = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijkl";)"_str);
+    REQUIRE(*vm.evalExpr<Integer>(R"(text.indexOf("b", -1))"_str) == -1);
+    REQUIRE(*vm.evalExpr<Integer>(R"(text.indexOf("b", -9223372036854775807 - 1))"_str) == -1);
+    REQUIRE(*vm.evalExpr<Integer>(R"(text.indexOf("b", 0))"_str) == 1);
+    REQUIRE(*vm.evalExpr<Integer>(R"(text.indexOf("b", 2))"_str) == 27);
+    REQUIRE(*vm.evalExpr<Integer>(R"(text.indexOf("b", 9223372036854775807))"_str) == -1);
+    REQUIRE(**vm.evalExpr<String *>(R"("abc".substring(1, 9223372036854775807))"_str) == "bc"_str);
+    REQUIRE(**vm.evalExpr<String *>(R"("abc".substr(2, 9223372036854775807))"_str) == "c"_str);
+    REQUIRE(**vm.evalExpr<String *>(R"("abc".substring(1, -1))"_str) == ""_str);
+}
+
+TEST_CASE("Random state restoration validates metadata and preserves rejected state", "[stdlib][regression]") {
+    Runtime rt;
+    Context context{ rt };
+    registerStandardLibrary(context);
+    vm::VMState state{ context };
+    VM vm{ &state };
+
+    SECTION("valid checkpoints span initialization and block boundaries") {
+        for(const int count : { 0, 1, 623, 624, 625 }) {
+            CAPTURE(count);
+            vm.eval(String{ fmt::format(R"(
+                var source = new Math.RandomGenerator(123);
+                for(var i = 0; i < {}; i++) source.random32();
+                var restored = new Math.RandomGenerator(source.serialize());
+                var equal = 1;
+                for(var j = 0; j < 630; j++)
+                    if(source.random32() != restored.random32()) equal = 0;
+            )",
+                                        count) });
+            REQUIRE(*vm.evalExpr<Integer>("equal"_str) == 1);
+        }
+    }
+
+    SECTION("invalid metadata is rejected before narrowing or modifying the generator") {
+        vm.eval(R"(
+            var r = new Math.RandomGenerator(123);
+            var expected = new Math.RandomGenerator(r.serialize());
+        )"_str);
+        const std::pair<Integer, Integer> invalid[] = {
+            { 2, 624 }, { 0, 0 },   { -1, 0 },           { 625, 0 },          { 1, -1 },
+            { 1, 625 }, { 624, 2 }, { 4294967297LL, 0 }, { 1, 4294967296LL }, { 9223372036854775807LL, 0 },
+        };
+        for(const auto &[left, next] : invalid) {
+            CAPTURE(left, next);
+            vm.eval(String{ fmt::format("var bad = r.serialize(); bad.left = {}; bad.next = {};", left, next) });
+            REQUIRE_THROWS(vm.eval<Value>("r.randomize(bad);"_str));
+            REQUIRE_THROWS(vm.eval<Value>("var rejected = new Math.RandomGenerator(bad);"_str));
+            REQUIRE(*vm.evalExpr<Integer>("r.random32() == expected.random32()"_str) == 1);
+        }
+    }
+
+    SECTION("a malformed late hex digit cannot partially overwrite the current state") {
+        vm.eval(R"(
+            var r = new Math.RandomGenerator(123);
+            var expected = new Math.RandomGenerator(r.serialize());
+            var bad = r.serialize();
+            bad.state = "00000000" + bad.state.substring(8, 4983) + "z";
+        )"_str);
+        REQUIRE_THROWS(vm.eval<Value>("r.randomize(bad);"_str));
+        vm.eval(R"(
+            var equal = 1;
+            for(var i = 0; i < 630; i++)
+                if(r.random32() != expected.random32()) equal = 0;
+        )"_str);
+        REQUIRE(*vm.evalExpr<Integer>("equal"_str) == 1);
+    }
+
+    SECTION("the public restore entry validates indices") {
+        RandomGen generator;
+        const String hex{ std::string(RandomGen::MT_N * 8, '0') };
+        REQUIRE_THROWS_AS(generator.restoreFrom(hex, 2, RandomGen::MT_N), std::runtime_error);
+        REQUIRE_THROWS_AS(generator.restoreFrom(hex, 0, 0), std::runtime_error);
+        REQUIRE_NOTHROW(generator.restoreFrom(hex, 1, 0));
+        REQUIRE(generator.random32() == 0);
+    }
+}
+
+TEST_CASE("Floating unpack consumes each field once and bounds truncated inputs", "[stdlib][regression]") {
+    Runtime rt;
+    Context context{ rt };
+    registerStandardLibrary(context);
+    vm::VMState state{ context };
+    VM vm{ &state };
+    for(const char *format : { "dC", "fC", "dCdC", "fCfC", "d2C", "f2C" }) {
+        CAPTURE(format);
+        const bool interleaved = std::strlen(format) == 4;
+        const bool repeated = format[1] == '2';
+        const auto values = interleaved ? "[1.5,7,2.5,9]" : repeated ? "[1.5,2.5,7]" : "[1.5,7]";
+        const auto expected = interleaved ? "1.5,7,2.5,9" : repeated ? "1.5,2.5,7" : "1.5,7";
+        const String expr{ fmt::format(R"({}.pack("{}").unpack("{}").join(","))", values, format, format) };
+        REQUIRE((**vm.evalExpr<String *>(expr)).toStdStr() == expected);
+    }
+    // 不完整的浮点字段仍按既有语义补零；后续字段不能读取缓冲区之外的字节。
+    for(const char *format : { "d2C", "f2C", "d2147483647C", "f2147483647C" }) {
+        CAPTURE(format);
+        vm.eval(String{ fmt::format(R"(var partial = [0,0,0].pack("C3").unpack("{}");)", format) });
+        REQUIRE(*vm.evalExpr<Integer>("partial.count"_str) == 1);
+        REQUIRE((*vm.evalExpr<Real>("partial[0]"_str)).value() == 0.0);
+    }
+}
 
 TEST_CASE("Native receiver snapshots survive rebinding and nested callbacks", "[native]") {
     Runtime runtime;

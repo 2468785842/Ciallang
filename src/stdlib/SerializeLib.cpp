@@ -25,17 +25,19 @@
 
 namespace cial::stdlib {
     void registerSerializeLib(Context &context) {
-        context.nativeType<Array>().method("load"_str, &stdlib::arrayLoad);
-        context.nativeType<Array>().method("save"_str, &stdlib::arraySave);
-        context.nativeType<Array>().method("loadStruct"_str, &stdlib::arrayLoadStruct);
-        context.nativeType<Array>().method("saveStruct"_str, &stdlib::arraySaveStruct);
-        context.nativeType<Array>().method("pack"_str, &stdlib::arrayPack);
-        context.nativeType<Array>().method("assignStruct"_str, &stdlib::arrayAssignStruct);
-        context.nativeType<Dictionary>().method("load"_str, &stdlib::dictLoad);
-        context.nativeType<Dictionary>().method("save"_str, &stdlib::dictSave);
-        context.nativeType<Dictionary>().method("loadStruct"_str, &stdlib::dictLoadStruct);
-        context.nativeType<Dictionary>().method("saveStruct"_str, &stdlib::dictSaveStruct);
-        context.nativeType<Dictionary>().method("assignStruct"_str, &stdlib::dictAssignStruct);
+        context.nativeType<Array>()
+            .method("load"_str, &stdlib::arrayLoad)
+            .method("save"_str, &stdlib::arraySave)
+            .method("loadStruct"_str, &stdlib::arrayLoadStruct)
+            .method("saveStruct"_str, &stdlib::arraySaveStruct)
+            .method("pack"_str, &stdlib::arrayPack)
+            .method("assignStruct"_str, &stdlib::arrayAssignStruct);
+        context.nativeType<Dictionary>()
+            .method("load"_str, &stdlib::dictLoad)
+            .method("save"_str, &stdlib::dictSave)
+            .method("loadStruct"_str, &stdlib::dictLoadStruct)
+            .method("saveStruct"_str, &stdlib::dictSaveStruct)
+            .method("assignStruct"_str, &stdlib::dictAssignStruct);
         context.nativeType<Octet>().method("unpack"_str, &stdlib::octetUnpack);
     }
 
@@ -1482,9 +1484,9 @@ namespace cial::stdlib {
 
         template<typename TRet, int NBYTE, typename TBits>
         void binToRealLE(std::vector<TRet> &result, const u8 *&cur, const u8 *tail, i32 len) {
-            if(len < 0)
-                len = static_cast<i32>((tail - cur + NBYTE - 1) / NBYTE);
-            if(cur + static_cast<size_t>(len) * NBYTE < tail)
+            const size_t available = static_cast<size_t>(tail - cur);
+            // 先限制字节数，再形成指针，截断输入也不会越过缓冲区末尾。
+            if(len >= 0 && static_cast<size_t>(len) <= available / NBYTE)
                 tail = cur + static_cast<size_t>(len) * NBYTE;
             TBits val = 0;
             u32 bytes = 0;
@@ -1583,7 +1585,6 @@ namespace cial::stdlib {
                         binToRealLE<double, 8, u64>(vals, cur, tail, len);
                         for(const double v : vals)
                             result->elements.push_back(Value{ Real{ v } });
-                        cur += static_cast<size_t>(len) * 8;
                         break;
                     }
                     case OctPackType::flt: {
@@ -1593,7 +1594,6 @@ namespace cial::stdlib {
                         binToRealLE<float, 4, u32>(vals, cur, tail, len);
                         for(const float v : vals)
                             result->elements.push_back(Value{ Real{ static_cast<double>(v) } });
-                        cur += static_cast<size_t>(len) * 4;
                         break;
                     }
                     case OctPackType::hex:

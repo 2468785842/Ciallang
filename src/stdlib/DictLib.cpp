@@ -9,14 +9,15 @@
 
 namespace cial::stdlib {
     void registerDictLib(Context &context) {
-        context.nativeType<Dictionary>().method("assign"_str, &stdlib::dictAssign);
-        context.nativeType<Dictionary>().method("clear"_str, &stdlib::dictClear);
-        context.nativeType<Dictionary>().method("erase"_str, &stdlib::dictErase);
-        // count 属性
-        context.nativeType<Dictionary>().property("count"_str, [](const Value &thisObj) {
-            return Value{ Integer{
-                static_cast<Integer>(dynamic_cast<Dictionary &>(*thisObj.asObject().unwrap()).members.size()) } };
-        });
+        context.nativeType<Dictionary>()
+            .method("assign"_str, &stdlib::dictAssign)
+            .method("clear"_str, &stdlib::dictClear)
+            .method("erase"_str, &stdlib::dictErase)
+            // count 属性
+            .property("count"_str, [](const Value &thisObj) {
+                return Value{ Integer{
+                    static_cast<Integer>(dynamic_cast<Dictionary &>(*thisObj.asObject().unwrap()).members.size()) } };
+            });
         context.registerClass<Dictionary>("Dictionary"_str);
     }
 

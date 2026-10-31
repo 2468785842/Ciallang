@@ -65,6 +65,13 @@
 | Octet | 字节流 + pack 系 | ◐ 类型+字面量+unpack ✅（2026-10-26，tjsOctPack 全类型；Octet 仅有的方法即 unpack）；偏差：原版 BinToHex 负 len 钳位 bug 使 unpack h\*/H\* 恒返回空串，本项目返回正确 hex（同 tjsOctPack.cpp HexToBin 大写仅收 A-E 的漏写按特性同步） |
 | Scripts | execStorage/evalStorage/compileStorage/exec/eval/dump/getTraceString/setCallMissing/getClassNames/textEncoding（tTJSNC_Scripts，ScriptMgnIntf.cpp:1295-1570） | ◐ execStorage ✅（语句脚本执行，全局上下文，嵌套双帧哨兵协议，`src/stdlib/ScriptsLib.cpp`）；evalStorage ✅（表达式求值返回值）；**compileStorage ❌ 不实现**——Ciallang 无库内字节码导出能力（`--tjsbc` 是 CLI 加载方向，非导出），按偏差记录；exec/eval/dump 等其余成员未实现。路径解析：绝对路径直用，相对路径相对当前执行脚本所在目录（krkr2 TVPSearchPlacedPath 的 CLI 简化，无 xp3 归档）；缺失文件抛可捕获 Exception（消息含路径）。回归 `tests/scripts_test.cpp` |
 
+### 标准库边界处理（2026-10-31）
+
+- `String.indexOf` 对负数起点返回 `-1`；`substring/substr` 的超大正长度裁剪到剩余串长，避免有符号加法溢出。参考实现 `tjsInterCodeExec.cpp` 的 `indexOf` 分支未检查负数起点，本项目显式拒绝此越界输入（`src/stdlib/StringLib.cpp`）。
+- `Math.RandomGenerator` 恢复只接受初始化状态 `{left=1,next=0}`，或 `1 <= next <= 624` 且 `left + next = 625` 的取数状态；拒绝整数窄化、非法游标及损坏的状态串，失败时保留原有序列。正常 `serialize()` 检查点及跨块序列不变（`src/stdlib/RandomLib.cpp`）。
+- 浮点 `unpack` 的 `d/f` 字段仅按实际读取字节推进一次游标；显式长度超过输入时按既有规则补零形成最后一个字段，后续字段不越界读取（`src/stdlib/SerializeLib.cpp`）。
+- 上述行为回归见 `tests/native_function_test.cpp` 的 `[stdlib][regression]` 用例。
+
 ### Scripts 双引擎对拍（2026-10-30）
 
 `tests/test_files/tjs2/test.tjs`（execStorage 加载 6 个兄弟语料 + 解析器/实数语料断言）

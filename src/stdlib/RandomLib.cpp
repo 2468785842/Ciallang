@@ -4,8 +4,10 @@
 #include "RandomLib.hpp"
 #include "runtime/Context.hpp"
 
+#include <array>
 #include <cstring>
 #include <ctime>
+#include <utility>
 
 #include "types/Dictionary.hpp"
 #include "vm/VM.hpp"
@@ -144,9 +146,12 @@ namespace cial {
     }
 
     void RandomGen::restoreFrom(const String &stateHex, const int leftVal, const int nextIdx) {
-        ensureState();
-        if(stateHex.length() != MT_N * 8)
+        // 刚播种为 {left=1,next=0}；取数后 next + left = MT_N + 1。
+        const bool initial = leftVal == 1 && nextIdx == 0;
+        const bool active = nextIdx >= 1 && nextIdx <= MT_N && leftVal == MT_N - nextIdx + 1;
+        if(stateHex.length() != MT_N * 8 || (!initial && !active))
             throw std::runtime_error("not reconstructible randomize data");
+        std::array<u32, MT_N> restoredState{};
         const char *p = stateHex.getData();
         for(int i = 0; i < MT_N; ++i) {
             u32 n = 0;
@@ -157,8 +162,11 @@ namespace cial {
                     throw std::runtime_error("not reconstructible randomize data");
                 n = (n << 4) | static_cast<u32>(d);
             }
-            state[i] = n;
+            restoredState[i] = n;
         }
+        // 所有校验成功后才替换状态，失败的 randomize 不破坏原有序列。
+        ensureState();
+        std::memcpy(state, restoredState.data(), sizeof(u32) * MT_N);
         left = leftVal;
         next = state + nextIdx;
         inited = true;
@@ -183,8 +191,11 @@ namespace cial {
         const Value nextVal = dic->getProp(at.intern("next"_str));
         if(!stateVal.isString() || !leftVal.isInteger() || !nextVal.isInteger())
             throw std::runtime_error("not reconstructible randomize data");
-        restoreFrom(*stateVal.asString().unwrap(), static_cast<int>(leftVal.asInteger().value()),
-                    static_cast<int>(nextVal.asInteger().value()));
+        const Integer leftCount = leftVal.asInteger().unwrap();
+        const Integer nextIndex = nextVal.asInteger().unwrap();
+        if(!std::in_range<int>(leftCount) || !std::in_range<int>(nextIndex))
+            throw std::runtime_error("not reconstructible randomize data");
+        restoreFrom(*stateVal.asString().unwrap(), static_cast<int>(leftCount), static_cast<int>(nextIndex));
     }
 
     void RandomGen::call(vm::VMState &vmState, const u32 ret, const size_t argCount) {
@@ -206,12 +217,13 @@ namespace cial {
 
 namespace cial::stdlib {
     void registerRandomLib(Context &context) {
-        context.nativeType<RandomGen>().method("randomize"_str, &stdlib::rgRandomize);
-        context.nativeType<RandomGen>().method("random"_str, &stdlib::rgRandom);
-        context.nativeType<RandomGen>().method("random32"_str, &stdlib::rgRandom32);
-        context.nativeType<RandomGen>().method("random63"_str, &stdlib::rgRandom63);
-        context.nativeType<RandomGen>().method("random64"_str, &stdlib::rgRandom64);
-        context.nativeType<RandomGen>().method("serialize"_str, &stdlib::rgSerialize);
+        context.nativeType<RandomGen>()
+            .method("randomize"_str, &stdlib::rgRandomize)
+            .method("random"_str, &stdlib::rgRandom)
+            .method("random32"_str, &stdlib::rgRandom32)
+            .method("random63"_str, &stdlib::rgRandom63)
+            .method("random64"_str, &stdlib::rgRandom64)
+            .method("serialize"_str, &stdlib::rgSerialize);
     }
 
 

@@ -23,26 +23,26 @@
 // TODO: length property support
 namespace cial::stdlib {
     void registerStringLib(Context &context) {
-        context.nativeType<String>().method("charAt"_str, &stdlib::stringCharAt);
-        context.nativeType<String>().method("indexOf"_str, &stdlib::stringIndexOf);
-        context.nativeType<String>().method("toUpperCase"_str, &stdlib::stringToUpperCase);
-        context.nativeType<String>().method("toLowerCase"_str, &stdlib::stringToLowerCase);
-        context.nativeType<String>().method("substring"_str, &stdlib::stringSubstring);
-        context.nativeType<String>().method("substr"_str, &stdlib::stringSubstring);
-        context.nativeType<String>().method("sprintf"_str, &stdlib::stringSprintf);
-        context.nativeType<String>().method("replace"_str, &stdlib::stringReplace);
-        context.nativeType<String>().method("split"_str, &stdlib::stringSplitWith);
-        context.nativeType<String>().method("escape"_str, &stdlib::stringEscape);
-        context.nativeType<String>().method("trim"_str, &stdlib::stringTrim);
-        context.nativeType<String>().method("reverse"_str, &stdlib::stringReverse);
-        context.nativeType<String>().method("repeat"_str, &stdlib::stringRepeat);
-
-        // 字符串长度按 UTF-8 码点计数。
-        context.nativeType<String>().property("length"_str, [](const Value &thisObj) {
-            // TJS2 语义：字符数（UTF-16 码元数）；UTF-8 下按码点计数（"abc漢字" == 5）
-            const String *str = thisObj.asString().unwrap();
-            return Value{ Integer{ Common::utf8Strlen(std::string(str->getData(), str->length())) } };
-        });
+        context.nativeType<String>()
+            .method("charAt"_str, &stdlib::stringCharAt)
+            .method("indexOf"_str, &stdlib::stringIndexOf)
+            .method("toUpperCase"_str, &stdlib::stringToUpperCase)
+            .method("toLowerCase"_str, &stdlib::stringToLowerCase)
+            .method("substring"_str, &stdlib::stringSubstring)
+            .method("substr"_str, &stdlib::stringSubstring)
+            .method("sprintf"_str, &stdlib::stringSprintf)
+            .method("replace"_str, &stdlib::stringReplace)
+            .method("split"_str, &stdlib::stringSplitWith)
+            .method("escape"_str, &stdlib::stringEscape)
+            .method("trim"_str, &stdlib::stringTrim)
+            .method("reverse"_str, &stdlib::stringReverse)
+            .method("repeat"_str, &stdlib::stringRepeat)
+            // 字符串长度按 UTF-8 码点计数。
+            .property("length"_str, [](const Value &thisObj) {
+                // TJS2 语义：字符数（UTF-16 码元数）；UTF-8 下按码点计数（"abc漢字" == 5）
+                const String *str = thisObj.asString().unwrap();
+                return Value{ Integer{ Common::utf8Strlen(std::string(str->getData(), str->length())) } };
+            });
     }
 
 
@@ -65,7 +65,7 @@ namespace cial::stdlib {
         if(!vStart.isVoid())
             start = vStart.asInteger().unwrap();
 
-        if(start >= str->length()) {
+        if(start < 0 || start >= str->length()) {
             return -1;
         }
 
@@ -109,7 +109,7 @@ namespace cial::stdlib {
             if(count < 0) {
                 return ""_str;
             }
-            if(start + count > sLen)
+            if(count > sLen - start)
                 count = sLen - start;
             return String(str->getData() + start, count);
         }
