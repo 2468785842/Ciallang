@@ -10,6 +10,8 @@ add_executable(host main.cpp)
 target_link_libraries(host PRIVATE Ciallang::Ciallang)
 ```
 
+配置源码工程需 Python 3.10+，用于从 `vcpkg.json` 生成构建目录中的版本定义；运行脚本本身不依赖 Python。
+
 依赖必须由父项目先准备好。如果父项目使用 vcpkg manifest，应在自己的 `vcpkg.json` 中声明 fmt、frozen、utf8proc；父项目的 `project()` 已完成后，子项目不能追溯安装依赖。需要 CLI/测试/JIT 时也由父项目同步声明相应依赖，或独立构建 Ciallang。开关表见 [building.md](building.md)。
 
 ```cpp

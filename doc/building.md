@@ -1,6 +1,6 @@
 # 构建与验证
 
-要求 CMake 3.25+、C++20 编译器、Ninja（预设使用）与 vcpkg。预设从 `VCPKG_ROOT` 读取工具链；Linux 预设使用 clang/clang++。已有依赖也可通过 `CMAKE_PREFIX_PATH` 提供，无需 vcpkg（`CMakeLists.txt`、`CMakePresets.json`）。
+要求 CMake 3.25+、Python 3.10+、C++20 编译器、Ninja（预设使用）与 vcpkg。Python 在配置期从 `vcpkg.json` 生成版本文件，CLI 运行时不需要 Python。预设从 `VCPKG_ROOT` 读取工具链；Linux 预设使用 clang/clang++。已有依赖也可通过 `CMAKE_PREFIX_PATH` 提供，无需 vcpkg（`CMakeLists.txt`、`CMakePresets.json`）。
 
 ```sh
 export VCPKG_ROOT=/path/to/vcpkg
@@ -9,7 +9,7 @@ cmake --build --preset "Linux Debug"
 ctest --preset "Linux Debug"
 ```
 
-平台预设为 `Linux`、`MacOS`、`Windows` 的 Debug/Release。Windows 使用静态 CRT 与 `x64-windows-static`。也可直接指定生成器与编译器：
+平台预设为 `Linux`、`MacOS`、`Windows` 的 Debug/Release。Windows 使用静态 CRT 与 `x64-windows-static`；首次配置在 VS x64 开发者命令环境中运行，保证 C++ 工具链和 `rc.exe` 可见。也可直接指定生成器与编译器：
 
 ```sh
 cmake -S . -B build/local -DCMAKE_BUILD_TYPE=Release \
@@ -27,6 +27,7 @@ ctest --test-dir build/local --output-on-failure
 | `CIAL_ENABLE_JIT` | OFF | OFF | `jit` / asmjit，仅 x64 |
 | `CIAL_BUILD_FUZZ` | OFF | OFF | 无；需 Clang/libFuzzer |
 | `CIAL_BUILD_BENCH` | OFF | OFF | 无；要求 CLI 开启 |
+| `CIAL_ENABLE_PACKAGING` | OFF | OFF | CLI 压缩包，要求独立工程、静态依赖与许可，见[发布指南](releasing.md) |
 | `CIAL_WARNINGS_AS_ERRORS` | ON | OFF | 无；只影响本项目目标 |
 
 基础依赖为 fmt、frozen、utf8proc。开关在 `project()` 之前映射到 `VCPKG_MANIFEST_FEATURES`，避免库模式安装 CLI/测试/JIT 依赖；spdlog 未被代码使用，已移除。独立构建时，原 `BUILD_EXECUTABLE`、`ENABLE_TESTS`、`ENABLE_FUZZ` 在新开关未设置时作为初始兼容值读取；两者都设置时以 `CIAL_*` 为准；子项目不读取父项目的这些通用旧开关（`CMakeLists.txt`、`vcpkg.json`）。
@@ -42,9 +43,9 @@ cmake --preset "Linux Release" -DCIAL_ENABLE_JIT=ON
 
 ## 测试与基准
 
-C++ 测试由 Catch2 注册；Python 可用且 CLI 开启时，CTest 还运行 `tests/cli_test.py` 和 `tools/lsp/test_protocol.py`。测试从顶层启用，可在整个构建目录运行（`tests/CMakeLists.txt`）。
+C++ 测试由 Catch2 注册；CLI 开启时，CTest 还运行 `tests/cli_test.py` 和 `tools/lsp/test_protocol.py`。测试从顶层启用，可在整个构建目录运行（`tests/CMakeLists.txt`）。
 
-语言和标准库行为已迁到 [TJS 脚本单元测试](../tests/tjs/README.md)，启用 CLI 和 Python 时
+语言和标准库行为已迁到 [TJS 脚本单元测试](../tests/tjs/README.md)，启用 CLI 时
 逐文件注册为 CTest；原生绑定、AST、GC 及宿主接口仍使用 Catch2。脚本可直接交给
 Ciallang 或 TJSCompiler，也可用 `python tests/run_tjs_tests.py --engine <executable>` 批量运行。
 可选 `CIAL_TJS_TEST_REFERENCE` 注册参考引擎测试；参考侧失败会如实使 CTest 失败，不默认启用。

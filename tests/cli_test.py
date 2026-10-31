@@ -9,6 +9,7 @@ import unittest
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--cial", required=True)
+parser.add_argument("--expected-version")
 args, rest = parser.parse_known_args()
 CIAL = str(pathlib.Path(args.cial).resolve())
 
@@ -32,7 +33,10 @@ class CliTest(unittest.TestCase):
     def test_help_version_and_arguments(self):
         self.assertEqual(self.run_cial("--help").returncode, 0)
         self.assertIn("--repl", self.run_cial("--help").stdout)
-        self.assertEqual(self.run_cial("--version").returncode, 0)
+        version = self.run_cial("--version")
+        self.assertEqual(version.returncode, 0)
+        if args.expected_version:
+            self.assertEqual(version.stdout.strip(), args.expected_version)
         for flags in [("--unknown",), ("--tjsbc",), (self.script, "extra"),
                       ("--jit", "--trace-jit", self.script),
                       ("--check-json", "--dump-cfg", self.script),

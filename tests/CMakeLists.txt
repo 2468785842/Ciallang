@@ -92,7 +92,7 @@ if(Python3_Interpreter_FOUND AND TARGET cial)
     set_tests_properties(CiallangTjsRunner PROPERTIES TIMEOUT 30)
     add_test(NAME CiallangCli
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli_test.py"
-                --cial "$<TARGET_FILE:cial>")
+                --cial "$<TARGET_FILE:cial>" --expected-version "${CIAL_VERSION_STRING}")
     set_tests_properties(CiallangCli PROPERTIES TIMEOUT 60)
     add_test(NAME CiallangLspProtocol
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/lsp/test_protocol.py"
@@ -102,4 +102,10 @@ if(Python3_Interpreter_FOUND AND TARGET cial)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../bench/test_bytecode_conformance.py"
                 --cial "$<TARGET_FILE:cial>")
     set_tests_properties(CiallangBytecodeTool PROPERTIES TIMEOUT 60)
+endif()
+
+if(Python3_Interpreter_FOUND)
+    add_test(NAME CiallangPackaging
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_packaging.py")
+    set_tests_properties(CiallangPackaging PROPERTIES TIMEOUT 30)
 endif()

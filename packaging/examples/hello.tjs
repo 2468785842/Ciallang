@@ -1,0 +1,4 @@
+// An archive smoke example: execution and assertion should work without the source tree.
+function answer() { return 40 + 2; }
+if(answer() != 42) throw "example failed";
+println("Hello from Ciallang: " + answer());

@@ -20,7 +20,7 @@
 
 ## 快速开始
 
-准备 CMake 3.25+、C++20 编译器、Ninja 和 [vcpkg](https://github.com/microsoft/vcpkg)，
+准备 CMake 3.25+、Python 3.10+、C++20 编译器、Ninja 和 [vcpkg](https://github.com/microsoft/vcpkg)，
 并设置 `VCPKG_ROOT`。Linux 预设使用 Clang。
 
 ```sh
@@ -55,6 +55,8 @@ println([1, 2, 3].join(", "));
 | [命令行](doc/cli.md) · [宿主集成](doc/embedding.md) · [LSP](doc/lsp.md) | 使用与集成 |
 | [语法](doc/syntax.md) · [兼容性](doc/compatibility.md) · [FAQ](doc/faq.md) | 语言支持与常见问题 |
 | [架构](doc/architecture.md) · [性能记录](doc/performance.md) | 实现与测量依据 |
+| [打包与发布](doc/releasing.md) | CLI 预览版、版本来源与 Release CI |
+| [路线图](doc/roadmap.md) | SDK、`.d.tjs` 声明、工具拆仓、模块与调试器规划 |
 | [文档索引](doc/README.md) · [待办](TODO.md) · [开发约定](AGENTS.md) | 查阅与贡献 |
 
 提交前运行相关测试，并按 `.clang-format` 格式化修改的 C++ 文件。

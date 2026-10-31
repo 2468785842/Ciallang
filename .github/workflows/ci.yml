@@ -25,6 +25,16 @@ jobs:
         run: cmake --build build/${{ matrix.platform }}/${{ matrix.configuration }} --target cial CiallangTests --parallel 4
       - name: Test
         run: ctest --test-dir build/${{ matrix.platform }}/${{ matrix.configuration }} --output-on-failure
+      - name: Save build and test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.platform }}-${{ matrix.configuration }}-jit-${{ matrix.jit || 'OFF' }}
+          path: |
+            build/${{ matrix.platform }}/${{ matrix.configuration }}/Testing/Temporary/
+            build/${{ matrix.platform }}/${{ matrix.configuration }}/cial
+            build/${{ matrix.platform }}/${{ matrix.configuration }}/cial.exe
+          if-no-files-found: ignore
       - name: Configure library consumer
         if: matrix.os == 'ubuntu-latest' && matrix.configuration == 'Release'
         shell: bash

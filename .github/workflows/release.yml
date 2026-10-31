@@ -1,0 +1,113 @@
+name: package-and-release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate version and release tag
+        id: version
+        shell: bash
+        env:
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+        run: |
+          tag_args=()
+          if [[ "$RELEASE_REF_TYPE" == tag ]]; then
+            tag_args=(--tag "$RELEASE_REF_NAME")
+          fi
+          version=$(python tools/package.py --check-version --require-clean "${tag_args[@]}")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  package:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-22.04, platform: Linux}
+          - {os: windows-2022, platform: Windows}
+          - {os: macos-15, platform: MacOS}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Build, test, package and verify extraction
+        shell: bash
+        env:
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+        run: |
+          export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
+          tag_args=()
+          if [[ "$RELEASE_REF_TYPE" == tag ]]; then
+            tag_args=(--tag "$RELEASE_REF_NAME")
+          fi
+          python tools/package.py --preset "${{ matrix.platform }} Release" --require-clean "${tag_args[@]}"
+      - name: Upload verified packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciallang-cli-${{ matrix.platform }}
+          path: |
+            build/packages/*.zip
+            build/packages/*.tar.gz
+            build/packages/*.sha256
+          if-no-files-found: error
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-tests-${{ matrix.platform }}
+          path: build/${{ matrix.platform }}/Release/Testing/Temporary/
+          if-no-files-found: ignore
+
+  draft-release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [validate, package]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ciallang-cli-*
+          merge-multiple: true
+          path: build/release-assets
+      - name: Create draft after all native package jobs pass
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          cd build/release-assets
+          sha256sum --check ./*.sha256
+          sha256sum ./*.zip ./*.tar.gz > SHA256SUMS
+          cd ../..
+          release_flags=()
+          if [[ "$RELEASE_VERSION" == *-* ]]; then
+            release_flags=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" build/release-assets/* \
+            --verify-tag --draft "${release_flags[@]}" \
+            --title "Ciallang $RELEASE_VERSION" --notes-file packaging/RELEASE_NOTES.md

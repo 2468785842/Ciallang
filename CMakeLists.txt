@@ -30,7 +30,20 @@ foreach(feature IN ITEMS cli tests jit)
 endforeach()
 list(REMOVE_DUPLICATES VCPKG_MANIFEST_FEATURES)
 
-project(Ciallang LANGUAGES CXX)
+# Version metadata is generated before project(); Python is a source-build dependency only.
+find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_version.py"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/cial/Version.hpp")
+execute_process(
+    COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_version.py"
+        --manifest "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg.json"
+        --output-dir "${CMAKE_CURRENT_BINARY_DIR}/generated"
+    COMMAND_ERROR_IS_FATAL ANY)
+include("${CMAKE_CURRENT_BINARY_DIR}/generated/Version.cmake")
+project(Ciallang VERSION ${CIAL_VERSION} LANGUAGES CXX)
+option(CIAL_ENABLE_PACKAGING "Enable standalone CLI archive packaging" OFF)
 
 if(CIAL_BUILD_BENCH AND NOT CIAL_BUILD_CLI)
     message(FATAL_ERROR "CIAL_BUILD_BENCH requires CIAL_BUILD_CLI=ON")
@@ -146,6 +159,7 @@ if(CIAL_BUILD_CLI)
         src/cli/Diagnostics.cpp
         src/cli/Repl.cpp)
     target_link_libraries(cial PRIVATE Ciallang::Ciallang argparse::argparse)
+    target_include_directories(cial PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
     set_target_properties(cial PROPERTIES COMPILE_WARNING_AS_ERROR ${CIAL_WARNINGS_AS_ERRORS})
     if(MSVC)
         target_compile_options(cial PRIVATE /EHsc /utf-8)
@@ -210,3 +224,10 @@ endif ()
 if(CIAL_BUILD_FUZZ)
     add_subdirectory(fuzz)
 endif ()
+
+if(CIAL_ENABLE_PACKAGING)
+    if(NOT CIAL_TOP_LEVEL OR NOT CIAL_BUILD_CLI)
+        message(FATAL_ERROR "CLI packaging requires a standalone build with CIAL_BUILD_CLI=ON")
+    endif()
+    include(cmake/Packaging.cmake)
+endif()

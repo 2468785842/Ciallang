@@ -3,10 +3,11 @@
 #include <argparse/argparse.hpp>
 #include <stdexcept>
 #include <vector>
+#include "cial/Version.hpp"
 
 namespace cial::cli {
     Options parseOptions(const int argc, char **argv) {
-        argparse::ArgumentParser parser{ "cial", "1.0.0" };
+        argparse::ArgumentParser parser{ "cial", CIAL_VERSION_STRING };
         parser.add_description("TJS2-compatible interpreter. With no input, start the REPL.");
         for(const auto &[name, help] : { std::pair{ "--tjsbc", "execute TJS2 bytecode" },
                                          { "--check-json", "compile only; emit JSON diagnostics" },
