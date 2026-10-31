@@ -18,6 +18,7 @@ set(SOURCES
         native_function_test.cpp
         value_storage_test.cpp
         preprocessor_test.cpp
+        diagnostics_test.cpp
         ieee_test.cpp
         integration_test.cpp
         interpreter_test.cpp

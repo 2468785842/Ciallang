@@ -16,7 +16,6 @@
 #include <utf8proc.h>
 
 namespace cial::Common {
-
     bool isRuneDigit(const i32 r) {
         if(r < 0x80) {
             return isdigit(r) != 0;
@@ -65,19 +64,23 @@ namespace cial::Common {
             e.value = runeInvalid;
         }
 
-        if(r <= 0x7F) { // 1 字节
+        if(r <= 0x7F) {
+            // 1 字节
             e.data[0] = static_cast<u8>(r);
             e.width = 1;
-        } else if(r <= 0x7FF) { // 2 字节
+        } else if(r <= 0x7FF) {
+            // 2 字节
             e.data[0] = 0xC0 | ((r >> 6) & 0x1F);
             e.data[1] = 0x80 | (r & 0x3F);
             e.width = 2;
-        } else if(r <= 0xFFFF) { // 3 字节
+        } else if(r <= 0xFFFF) {
+            // 3 字节
             e.data[0] = 0xE0 | ((r >> 12) & 0x0F);
             e.data[1] = 0x80 | ((r >> 6) & 0x3F);
             e.data[2] = 0x80 | (r & 0x3F);
             e.width = 3;
-        } else { // 4 字节
+        } else {
+            // 4 字节
             e.data[0] = 0xF0 | ((r >> 18) & 0x07);
             e.data[1] = 0x80 | ((r >> 12) & 0x3F);
             e.data[2] = 0x80 | ((r >> 6) & 0x3F);
@@ -89,7 +92,7 @@ namespace cial::Common {
     }
 
 
-    int64_t utf8Strlen(const std::string &str) {
+    int64_t utf8Strlen(const std::string& str) {
         int64_t len = 0;
         for(auto p = str.data(); *p; len++) {
             const auto c = static_cast<u8>(*p);
@@ -110,17 +113,36 @@ namespace cial::Common {
         }
         return len;
     }
-    CodePointType utf8Decode(const char *str, size_t length) {
+
+    size_t utf8DisplayWidth(const char* str, const size_t length) {
+        size_t width = 0;
+        size_t i = 0;
+        while(i < length) {
+            const auto cp = utf8Decode(str + i, length - i);
+            if(cp.value == runeInvalid || cp.width <= 0) {
+                ++width; // 非法字节按 1 列，保证有界且单调
+                ++i;
+                continue;
+            }
+            width += static_cast<size_t>(utf8proc_charwidth(cp.value));
+            i += static_cast<size_t>(cp.width);
+        }
+        return width;
+    }
+
+    CodePointType utf8Decode(const char* str, size_t length) {
         CodePointType cp;
         if(length == 0)
             return cp;
 
         u8 b0 = static_cast<u8>(str[0]);
 
-        if(b0 <= 0x7F) { // 1 字节 ASCII
+        if(b0 <= 0x7F) {
+            // 1 字节 ASCII
             cp.value = b0;
             cp.width = 1;
-        } else if((b0 & 0xE0) == 0xC0) { // 2 字节
+        } else if((b0 & 0xE0) == 0xC0) {
+            // 2 字节
             if(length < 2)
                 return cp;
             u8 b1 = static_cast<u8>(str[1]);
@@ -132,7 +154,8 @@ namespace cial::Common {
                 r = runeInvalid; // 避免过长编码
             cp.value = r;
             cp.width = 2;
-        } else if((b0 & 0xF0) == 0xE0) { // 3 字节
+        } else if((b0 & 0xF0) == 0xE0) {
+            // 3 字节
             if(length < 3)
                 return cp;
             u8 b1 = static_cast<u8>(str[1]);
@@ -145,7 +168,8 @@ namespace cial::Common {
                 r = runeInvalid;
             cp.value = r;
             cp.width = 3;
-        } else if((b0 & 0xF8) == 0xF0) { // 4 字节
+        } else if((b0 & 0xF8) == 0xF0) {
+            // 4 字节
             if(length < 4)
                 return cp;
             u8 b1 = static_cast<u8>(str[1]);
@@ -163,5 +187,4 @@ namespace cial::Common {
 
         return cp;
     }
-
 } // namespace cial::Common

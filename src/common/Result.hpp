@@ -18,7 +18,6 @@
 #include "SourceLocation.hpp"
 
 namespace cial::Common {
-
     class [[nodiscard]] Result {
     public:
         Result() = default;
@@ -27,22 +26,28 @@ namespace cial::Common {
 
         void succeed() noexcept { _success = true; }
 
-        void info(const std::string &message, const SourceLocation &loc = {}, const std::string &details = {}) {
-            _messages.emplace_back(message, loc, details, ResultMessage::Types::info);
+        void info(const std::string& message, const SourceLocation& loc = {}, const std::string& details = {},
+                  const std::string& code = {}, const std::string& source = {}, const SourceSpan& span = {},
+                  const bool located = false) {
+            _messages.emplace_back(message, loc, details, ResultMessage::Types::info, code, source, span, located);
         }
 
-        void error(const std::string &message, const SourceLocation &loc = {}, const std::string &details = {}) {
-            _messages.emplace_back(message, loc, details, ResultMessage::Types::error);
+        void error(const std::string& message, const SourceLocation& loc = {}, const std::string& details = {},
+                   const std::string& code = {}, const std::string& source = {}, const SourceSpan& span = {},
+                   const bool located = false) {
+            _messages.emplace_back(message, loc, details, ResultMessage::Types::error, code, source, span, located);
             fail();
         }
 
-        void warning(const std::string &message, const SourceLocation &loc = {}, const std::string &details = {}) {
-            _messages.emplace_back(message, loc, details, ResultMessage::Types::warning);
+        void warning(const std::string& message, const SourceLocation& loc = {}, const std::string& details = {},
+                     const std::string& code = {}, const std::string& source = {}, const SourceSpan& span = {},
+                     const bool located = false) {
+            _messages.emplace_back(message, loc, details, ResultMessage::Types::warning, code, source, span, located);
         }
 
         [[nodiscard]] bool isFailed() const noexcept { return !_success; }
 
-        [[nodiscard]] const ResultMessageList &messages() const noexcept { return _messages; }
+        [[nodiscard]] const ResultMessageList& messages() const noexcept { return _messages; }
 
     private:
         bool _success = true;
