@@ -1,6 +1,15 @@
 name: build-and-test
 on: [push, pull_request]
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # clang-format 输出随版本变化，锁定与 tools/check-format.sh 建议一致的版本
+      - name: Install clang-format
+        run: pip install "clang-format==20.1.0"
+      - name: Check formatting
+        run: tools/check-format.sh
   test:
     strategy:
       fail-fast: false

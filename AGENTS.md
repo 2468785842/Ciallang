@@ -41,7 +41,10 @@ CLI、LSP 与字节码工具测试也通过 CTest 运行。
 ## 代码惯例
 
 - C++20，命名空间 `cial`；遵循现有 `Integer`、`Vec<T>`、`Map<K,V>` 等别名。
-- 修改的 C++ 文件使用仓库 `.clang-format` 格式化。
+- 修改的 C++ 文件使用仓库 `.clang-format` 格式化（指针声明为右对齐，
+  `Fun &&f` / `const ScopeGuard &`）。提交前用 `tools/check-format.sh` 校验，
+  `-i` 就地格式化；CI 以 `clang-format --dry-run -Werror` 强制检查，版本
+  锁定 20.1.0（输出随版本变化，勿用未锁定版本重排全库）。
 - 编译期错误使用 `Common::Result` / `Ret<T>`；运行期遵循现有 `Err` / 脚本异常传播协议。
 - 标准库注册使用一次 `context.nativeType<T>()`，后续 `.method()` / `.property()` 链式调用。
 - 新增指令同步修改 `Instruction.hpp` 与 `Bytecode.hpp` 的 X-macro、`DEF_INST` 声明、
