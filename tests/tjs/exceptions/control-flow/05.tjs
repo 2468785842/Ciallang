@@ -1,0 +1,13 @@
+// 异常对象传递
+Scripts.execStorage("../../assert.tjs");
+
+var msg = "";
+try {
+    throw "hello";
+}
+catch(e) {
+    msg = e;
+}
+assertTrue((msg) == "hello");
+
+finishTests();

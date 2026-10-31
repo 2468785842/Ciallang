@@ -1,0 +1,12 @@
+// OOP - 类访问变量 / 实例成员方法初始化变量访问
+Scripts.execStorage("../../assert.tjs");
+
+var a = 1;
+class A {
+    function A() {}
+    function b() { return a; }
+}
+var o = new A().b();
+assertTrue(((int)(o)) == 1);
+
+finishTests();

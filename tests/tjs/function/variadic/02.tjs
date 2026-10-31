@@ -1,0 +1,8 @@
+// 省略透传 / collapse 参数 / 展开调用（源码路径，对齐 tjs.y func_decl_arg_collapse） / `name*` collapse 参数：超额实参收拢成 Array
+Scripts.execStorage("../../assert.tjs");
+
+function arrayArg(a*) { return a[0] + a[1] * 10; }
+var r = arrayArg(2, 7);
+assertTrue(((int)(r)) == 72);
+
+finishTests();

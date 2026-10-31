@@ -1,0 +1,7 @@
+// 表达式 - 三元与后缀 if 优先级 / cond ? a : b
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((int)(1 == 1 ? 7 : 9)) == 7);
+assertTrue(((int)(1 != 1 ? 7 : 9)) == 9);
+
+finishTests();

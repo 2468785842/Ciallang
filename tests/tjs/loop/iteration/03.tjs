@@ -1,0 +1,7 @@
+// 循环 - 执行 / for执行
+Scripts.execStorage("../../assert.tjs");
+
+var k = 0; var i; for (i = 0; i < 3; i = i + 1) { k = k + 1; }
+assertTrue(((int)(k)) == 3);
+
+finishTests();

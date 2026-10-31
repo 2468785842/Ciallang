@@ -1,0 +1,15 @@
+// 异常会中断try剩余代码
+Scripts.execStorage("../../assert.tjs");
+
+var x = 0;
+try {
+    x = 1;
+    throw "boom";
+    x = 2; // 不应执行
+}
+catch {
+    x = 3;
+}
+assertTrue(((int)(x)) == 3);
+
+finishTests();

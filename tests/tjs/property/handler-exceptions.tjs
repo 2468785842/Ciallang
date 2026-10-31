@@ -1,0 +1,20 @@
+// 恢复原注释中的处理器异常传播，并验证失败赋值没有写入。
+Scripts.execStorage("../assert.tjs");
+
+var stored = 7, caught = "";
+property checked {
+    getter() { throw "getter failure"; }
+    setter(v) {
+        if (v < 0) throw "negative not allowed";
+        stored = v;
+    }
+}
+try { checked = -1; } catch (error) { caught = error; }
+assertTrue(caught == "negative not allowed");
+assertTrue(stored == 7);
+try { var result = checked; } catch (error) { caught = error; }
+assertTrue(caught == "getter failure");
+checked = 9;
+assertTrue(stored == 9);
+
+finishTests();

@@ -1,0 +1,8 @@
+// 循环 - 执行 / for首子句var声明
+Scripts.execStorage("../../assert.tjs");
+
+var sum = 0;
+for(var i = 0; i < 5; i = i + 1) { sum = sum + i; }
+assertTrue(((int)(sum)) == 10);
+
+finishTests();

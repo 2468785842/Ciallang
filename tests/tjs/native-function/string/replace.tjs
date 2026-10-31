@@ -1,0 +1,9 @@
+// 恢复原注释用例的替换意图；TJS 接收 RegExp，g 决定是否替换全部。
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue("foo bar foo".replace(/foo/g, "baz") == "baz bar baz");
+assertTrue("foo bar foo".replace(/foo/, "baz") == "baz bar foo");
+assertTrue("hello".replace(/x/, "y") == "hello");
+assertTrue("aaa".replace(/a/g, "") == "");
+
+finishTests();

@@ -1,0 +1,9 @@
+// 函数声明 - 函数调用 / 带参数函数调用
+Scripts.execStorage("../../assert.tjs");
+
+function add(a, b) { return a + b; }
+var ret = (void);
+assertTrue(((add instanceof "Function")));
+assertTrue(((int)(add(1, 2))) == 3);
+
+finishTests();

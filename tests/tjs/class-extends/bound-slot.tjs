@@ -1,0 +1,14 @@
+// TJS2 - 方法不是闭包而是绑定 slot 的函数
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x = 1;
+    function A() {}
+    function getX() { return x; }
+}
+var o = new A();
+var f = o.getX;
+var res = f();
+assertTrue(((int)(res)) == 1);
+
+finishTests();

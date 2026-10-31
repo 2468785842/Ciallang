@@ -1,0 +1,19 @@
+// property - & 引用与 * 解引用（TJS2 &/* 语义） / 成员后缀 ++ 走 getter/setter 且返回旧值
+Scripts.execStorage("../../assert.tjs");
+
+class C {
+    function C() { a = 0; }
+    var a;
+    property x {
+        getter() { return a; }
+        setter(v) { a = v; }
+    }
+}
+var o = new C();
+o.x = 5;
+var old = o.x++;
+var now = o.x;
+assertTrue(((int)(old)) == 5);
+assertTrue(((int)(now)) == 6);
+
+finishTests();

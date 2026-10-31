@@ -1,0 +1,26 @@
+// switch - execution / nested switch
+Scripts.execStorage("../../assert.tjs");
+
+function testSwitch(x, y) {
+    var r;
+    switch (x) {
+        case 1:
+            switch (y) {
+                case 10:
+                    r = 110;
+                    break;
+                case 20:
+                    r = 111;
+            }
+            break;
+        default:
+            r = 0;
+    }
+    return r;
+}
+assertTrue(((int)(testSwitch(1, 10))) == 110);
+assertTrue(((int)(testSwitch(1, 20))) == 111);
+assertTrue((typeof (testSwitch(1, 30)) == "void"));
+assertTrue(((int)(testSwitch(0))) == 0);
+
+finishTests();

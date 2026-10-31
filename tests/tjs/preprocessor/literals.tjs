@@ -1,0 +1,11 @@
+// preprocessor binary/hex literals
+Scripts.execStorage("../assert.tjs");
+
+@set(x = 0x10)
+@set(y = 0b1010)
+@if(x == 16 && y == 10)
+    var e = "literals ok";
+@endif
+assertTrue((e) == "literals ok");
+
+finishTests();

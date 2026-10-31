@@ -1,0 +1,26 @@
+// 类作用域 - 上下文静态变量访问
+Scripts.execStorage("../assert.tjs");
+
+var x = 1;
+
+class Derived {
+
+    function Derived() { }
+
+    function getX() {
+        /* If x is in the local scope, use x;
+         * Else dynamically look it up in `this`, `super`, or the global scope.
+         * NOTE: So how would a context mechanism like `incontextof` change classes?
+         * NOTE: Perhaps nothing would happen;
+         * NOTE: maybe context mechanisms are not applicable to class scenarios.
+         */
+        return x;
+    }
+}
+
+// old TJS2 will be Failed use `return (new Derived()).getX();`
+var __result1 = new Derived().getX();
+var r = ((int)(__result1));
+assertTrue(r == 1);
+
+finishTests();

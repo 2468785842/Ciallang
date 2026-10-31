@@ -1,0 +1,15 @@
+// TJS2 - 多层 slot 同名字段解析
+Scripts.execStorage("../assert.tjs");
+
+class C { var x = 3; function C() {} }
+class B extends C { var x = 2; function B() { C(); } }
+class A extends B {
+    var x = 1;
+    function A() { B(); }
+    function getX() { return x; }
+}
+var o = new A();
+var res = o.getX();
+assertTrue(((int)(res)) == 1);
+
+finishTests();

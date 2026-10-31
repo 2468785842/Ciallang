@@ -1,0 +1,18 @@
+// OOP - incontextof 修改闭包上下文
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x = 0;
+    function A() {}
+    function inc() { x++; }
+}
+var a1 = new A();
+var a2 = new A();
+var f = a1.inc;
+(f incontextof a2)();
+var res1 = a1.x;
+var res2 = a2.x;
+assertTrue(((int)(res1)) == 0);
+assertTrue(((int)(res2)) == 1);
+
+finishTests();

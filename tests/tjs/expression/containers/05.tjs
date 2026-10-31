@@ -1,0 +1,13 @@
+// 表达式 - Array/Dictionary 字面量与下标 / 字符串下标：str[len] 空串、str[>len] 报错（TJS2 语义）
+Scripts.execStorage("../../assert.tjs");
+
+var s = "abc";
+var c0 = s[0];
+var c3 = s[3];
+var oob = false;
+try { var x = s[9]; } catch { oob = true; }
+assertTrue(((c0)) == "a");
+assertTrue(((c3)) == "");
+assertTrue((!!(oob)) == true);
+
+finishTests();

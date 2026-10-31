@@ -1,0 +1,134 @@
+// OOP - Legacy TJS2 Class/Slot/Constructor/Lookup 行为全集
+Scripts.execStorage("../assert.tjs");
+
+// --- 构造函数参数传递 ---
+class A1 {
+    var x;
+    function A1(v) { x = v; }
+}
+var o1 = new A1(42);
+var r1 = o1.x;
+
+// --- 成员初始化先于构造 ---
+class A2 {
+    var x = 10;
+    function A2() { x += 5; }
+}
+var o2 = new A2();
+var r2 = o2.x;
+
+// --- getter 行为 ---
+class A3 {
+    var x = 3;
+    property p {
+        getter() { return x * 2; }
+    }
+    function A3() {}
+}
+var o3 = new A3();
+var r3 = o3.p;
+
+// --- instanceof ---
+class A4 { function A4(){} }
+var o4 = new A4();
+var r4 = (A4 instanceof "Class") && (o4 instanceof "A4");
+
+// --- 方法闭包绑定 this ---
+class A5 {
+    var x = 1;
+    function A5() {}
+    function inc() { x++; }
+}
+var o5 = new A5();
+var f5 = o5.inc;
+f5();
+var r5 = o5.x;
+
+// --- incontextof ---
+class A6 {
+    var x = 0;
+    function A6() {}
+    function inc() { x++; }
+}
+var a6_1 = new A6();
+var a6_2 = new A6();
+var f6 = a6_1.inc;
+(f6 incontextof a6_2)();
+var r6_1 = a6_1.x;
+var r6_2 = a6_2.x;
+
+// --- override ---
+class A7 {
+    function A7() {}
+    function foo() { return 1; }
+}
+class B7 extends A7 {
+    function B7() { A7(); }
+    function foo() { return 2; }
+}
+var o7 = new B7();
+var r7 = o7.foo();
+
+// --- slot 查找优先定义类 ---
+class A8 {
+    var x = 1;
+    function A8() { }
+    function getX() { return x; }
+}
+class B8 extends A8 {
+    var x = 2;
+    function B8() { A8(); }
+}
+var o8 = new B8();
+var r8 = o8.getX(); // == 2
+
+// --- fallback 到 instance ---
+class A9 {
+    function A9() {}
+    function getX() { return x; }
+}
+class B9 extends A9 {
+    var x = 2;
+    function B9() { A9(); }
+}
+var o9 = new B9();
+var r9 = o9.getX(); // == 2
+
+// --- super slot 优先于 instance ---
+class C10 { var x = 4; function C10() {} }
+class A10 extends C10 {
+    function A10() { C10(); }
+    function getX() { return x; }
+}
+class B10 extends A10 {
+    var x = 2;
+    function B10() { A10(); }
+}
+var o10 = new B10();
+var r10 = o10.getX(); // == 2
+
+// --- 构造函数不会覆盖子类字段 ---
+class A11 {
+    var x = 1;
+    function A11() { x = 10; }
+}
+class B11 extends A11 {
+    var x = 2;
+    function B11() { A11(); }
+}
+var o11 = new B11();
+var r11 = o11.x;
+assertTrue(((int)(r1)) == 42);
+assertTrue(((int)(r2)) == 15);
+assertTrue(((int)(r3)) == 6);
+assertTrue(((int)(r4)) == 1);
+assertTrue(((int)(r5)) == 2);
+assertTrue(((int)(r6_1)) == 0);
+assertTrue(((int)(r6_2)) == 1);
+assertTrue(((int)(r7)) == 2);
+assertTrue(((int)(r8)) == 2);
+assertTrue(((int)(r9)) == 2);
+assertTrue(((int)(r10)) == 2);
+assertTrue(((int)(r11)) == 10);
+
+finishTests();

@@ -1,0 +1,8 @@
+// 循环 - 执行 / for空子句与break
+Scripts.execStorage("../../assert.tjs");
+
+var n = 0;
+for(;;) { n = n + 1; if(n == 3) break; }
+assertTrue(((int)(n)) == 3);
+
+finishTests();

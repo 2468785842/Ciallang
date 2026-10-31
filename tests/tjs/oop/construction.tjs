@@ -1,0 +1,10 @@
+// OOP - 类声明与实例化
+Scripts.execStorage("../assert.tjs");
+
+class A { function A() {} }
+var o = new A();
+var __result1 = o;
+var r = ((typeof (__result1) == "Object"));
+assertTrue(r);
+
+finishTests();

@@ -1,0 +1,7 @@
+// 循环 - const 声明与 for(const) 首子句 / const 顶层声明
+Scripts.execStorage("../../assert.tjs");
+
+const K = 42;
+assertTrue(((int)(K)) == 42);
+
+finishTests();

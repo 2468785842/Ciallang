@@ -1,0 +1,6 @@
+// 表达式 - 前缀递增递减 / # / $ / delete / $n 字符码转单字符字符串
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue((($66)) == "B");
+
+finishTests();

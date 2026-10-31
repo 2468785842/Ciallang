@@ -1,0 +1,7 @@
+// 本地函数声明 - 字符串成员方法定义 / Method - escape
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(("a\nb\tc".escape()) == "a\\nb\\tc");
+assertTrue(("".escape()) == "");
+
+finishTests();

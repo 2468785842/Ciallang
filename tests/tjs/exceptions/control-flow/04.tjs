@@ -1,0 +1,20 @@
+// catch中再次throw-由上层捕捉
+Scripts.execStorage("../../assert.tjs");
+
+var x = 0;
+
+try {
+    try {
+        throw "inner";
+    }
+    catch(e) {
+        x = 1;
+        throw e;
+    }
+}
+catch {
+    x = 2;
+}
+assertTrue(((int)(x)) == 2);
+
+finishTests();

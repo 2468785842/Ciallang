@@ -1,0 +1,14 @@
+// property - only setter
+Scripts.execStorage("../assert.tjs");
+
+var last;
+property p_writeonly {
+    setter(v) {
+        last = v;
+    }
+}
+
+p_writeonly = 7;   // OK
+assertTrue(((int)(last)) == 7);
+
+finishTests();

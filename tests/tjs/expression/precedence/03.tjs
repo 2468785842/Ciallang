@@ -1,0 +1,6 @@
+// 表达式 - 复杂表达式组合 / 逻辑表达式组合
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((!!(1 > 0 && 5 < 10 || 6 == 5))) == true);
+
+finishTests();

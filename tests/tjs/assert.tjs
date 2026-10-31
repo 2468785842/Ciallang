@@ -1,0 +1,24 @@
+// 两个引擎共用；每个测试文件在独立进程中运行，保留全局与局部作用域语义。
+var __testAssertions = 0;
+
+function assertTrue(value, message = "") {
+    __testAssertions++;
+    if (!value) {
+        var failure = "assertion " + __testAssertions + " failed: " + message;
+        Debug.message(failure);
+        throw failure;
+    }
+}
+
+function near(actual, expected, tolerance = 0.00001) {
+    var scale = expected < 0 ? -expected : expected;
+    if (scale < 1) scale = 1;
+    var difference = actual - expected;
+    if (difference < 0) difference = -difference;
+    return difference <= tolerance * scale;
+}
+
+function finishTests() {
+    if (__testAssertions < 1) throw "test file contained no assertions";
+    Debug.message("__TJS_TEST_PASS__:" + __testAssertions);
+}

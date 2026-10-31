@@ -1,0 +1,24 @@
+// Math.RandomGenerator（MT19937，序列与原版逐位一致）
+Scripts.execStorage("../assert.tjs");
+
+var r = new Math.RandomGenerator(123);
+var v1 = r.random64();
+var v2 = r.random32();
+var v3 = r.random63();
+var f = r.random();
+r.randomize(777);
+var v4 = r.random32();
+var v5 = r.random64();
+var dic = r.serialize();
+var seq1 = r.random64();
+var r2 = new Math.RandomGenerator(dic);
+var restored = r2.random64() == seq1;
+assertTrue(((int)(v1)) == 7311485051347868734);
+assertTrue(((int)(v2)) == 4088668458);
+assertTrue(((int)(v3)) == 7907280711022731305);
+assertTrue(((int)(v4)) == 78096651);
+assertTrue(((int)(v5)) == -1466894912068952260);
+assertTrue(near((((real)(f))), 0.457861570107705, 1e-12));
+assertTrue(((int)(restored)) == 1);
+
+finishTests();

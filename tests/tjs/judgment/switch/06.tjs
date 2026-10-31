@@ -1,0 +1,21 @@
+// switch - execution / optional break
+Scripts.execStorage("../../assert.tjs");
+
+function testSwitch(x) {
+    var r = 0;
+    switch (x) {
+        case 1:
+            r += 1;
+        case 2:
+            r += 2;
+            break;
+        default:
+            r = 0;
+    }
+    return r;
+}
+assertTrue(((int)(testSwitch(1))) == 3);
+assertTrue(((int)(testSwitch(2))) == 2);
+assertTrue(((int)(testSwitch(3))) == 0);
+
+finishTests();

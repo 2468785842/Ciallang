@@ -1,0 +1,11 @@
+// 函数声明 - 函数调用 / 嵌套函数调用
+Scripts.execStorage("../../assert.tjs");
+
+function outer(a) { return a; }
+function inner(b) { return b; }
+var ret = (void);
+assertTrue(((outer instanceof "Function")));
+assertTrue(((inner instanceof "Function")));
+assertTrue(((int)(outer(inner(42)))) == 42);
+
+finishTests();

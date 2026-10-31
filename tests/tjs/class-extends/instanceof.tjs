@@ -1,0 +1,9 @@
+// OOP - instanceof Class 判断
+Scripts.execStorage("../assert.tjs");
+
+class A { function A() {} }
+var o = new A();
+var res = (A instanceof "Class") && (o instanceof "A");
+assertTrue(((int)(res)) == 1);
+
+finishTests();

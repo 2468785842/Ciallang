@@ -1,0 +1,15 @@
+// OOP - invalidate 调用 finalize
+Scripts.execStorage("../assert.tjs");
+
+var flag = 0;
+class A {
+    function A() {}
+    function finalize() {
+        flag = 1;
+    }
+}
+var o = new A();
+invalidate o;
+assertTrue(((int)(flag)) == 1);
+
+finishTests();

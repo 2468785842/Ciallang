@@ -1,0 +1,15 @@
+// OOP - 成员属性 getter 行为
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x = 3;
+    function A() {}
+    property p {
+        getter() { return x * 2; }
+    }
+}
+var o = new A();
+var res = o.p;
+assertTrue(((int)(res)) == 6);
+
+finishTests();

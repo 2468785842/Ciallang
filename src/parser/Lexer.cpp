@@ -452,8 +452,8 @@ namespace cial::syntax {
             SYMBOL_LIST(LIST_TO_TOKEN_TYPE_PAIR)
 #undef LIST_TO_TOKEN_TYPE_PAIR
         };
-        // TJS2 词法怪癖："=>" 词形化为 ">="（tjsInterCodeGen 字典键 "k" >= v 的
-        // 唯一入口；saveStruct 文本写 " => "，载入端依赖此别名回环）
+        // 字典分隔符 => 在本解析器中借用 GtOrEqual；参考 tjsLex.cpp 将其映射为
+        // T_COMMA。内部 token 复用不表示源代码中 => 与 >= 可互换；可移植脚本使用 =>。
         OpTrie.insert("=>"_str, TokenType::GtOrEqual);
 
         const size_t start = _sourceFile.pos();

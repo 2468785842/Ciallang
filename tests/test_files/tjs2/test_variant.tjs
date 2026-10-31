@@ -1213,8 +1213,6 @@ function testVariant() {
 	// 次はOctet の加算をやる
 	var iscatch;
 	if( (oct5 + oct10) != <% 05 10 %> ) {
-		//tmp = (oct5 + oct10);
-		//throw new Exception( tmp );
 		throw new Exception("faild:(oct5 + oct10) != <% 5 10 %>");
 		isFaild = true;
 	}

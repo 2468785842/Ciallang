@@ -1,0 +1,6 @@
+// 表达式 - 函数表达式 / 带参数调用
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue((((int)(function(a, b, c) { return a + b + c; }(1, 2, 3)))) == 6);
+
+finishTests();

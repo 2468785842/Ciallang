@@ -1,0 +1,14 @@
+// 表达式 - 前缀递增递减 / # / $ / delete / delete 成员
+Scripts.execStorage("../../assert.tjs");
+
+class Foo { var a; function Foo() {} }
+var o = new Foo();
+o.a = 3;
+var r1 = delete o.a;
+var r2 = delete o.a;
+var r3 = delete o.nosuch;
+assertTrue((!!(r1)) == true);
+assertTrue((!!(r2)) == false);
+assertTrue((!!(r3)) == false);
+
+finishTests();

@@ -1,0 +1,11 @@
+// 表达式 - 赋值表达式 / 逻辑复合赋值
+Scripts.execStorage("../../assert.tjs");
+
+var x = 0; x ||= 42; var __result1 = x;
+assertTrue(((!!(__result1))) == true);
+var x = 1; x ||= 0; var __result2 = x;
+assertTrue(((!!(__result2))) == true);
+var x = false; x ||= false; var __result3 = x;
+assertTrue(((!!(__result3))) == false);
+
+finishTests();

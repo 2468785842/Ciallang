@@ -1,0 +1,8 @@
+// 本地函数声明 - 字符串成员方法定义 / Method - repeat
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(("ab".repeat(3)) == "ababab");
+assertTrue(("ab".repeat(0)) == "");
+assertTrue(("ab".repeat(-1)) == "");
+
+finishTests();

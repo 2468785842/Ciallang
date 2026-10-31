@@ -1,0 +1,18 @@
+// switch - execution / single case + default
+Scripts.execStorage("../../assert.tjs");
+
+function testSwitch(x) {
+    var r;
+    switch (x) {
+        case 1:
+            r = 1;
+            break;
+        default:
+            r = 0;
+    }
+    return r;
+}
+assertTrue(((int)(testSwitch(1))) == 1);
+assertTrue(((int)(testSwitch(0))) == 0);
+
+finishTests();

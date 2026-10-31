@@ -65,7 +65,7 @@ var a=-1; // 第三次：不报错，a 被赋 -1
 `../TJSCompiler/src/syntax/lexer/tjsInterCodeGen.cpp` 的
 `InitLocalVariable`/`EnterBlock`/`ExitBlock`/`EnterForCode`。
 Ciallang 通过活跃绑定栈记录每层边界，避免用指令位置猜测空块、参数或 catch 的作用域；
-实现见 `src/gen/IRGenerator.hpp/.cpp`，回归见 `tests/scope_test.cpp`。
+实现见 `src/gen/IRGenerator.hpp/.cpp`，回归见 `tests/tjs/scope/`。
 
 ```tjs
 while(t--)

@@ -1,0 +1,6 @@
+// 表达式 - 二元运算表达式 / 算术运算
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue((((int)(1 + 2))) == 3);
+
+finishTests();

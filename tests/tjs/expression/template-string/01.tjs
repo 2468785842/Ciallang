@@ -1,0 +1,6 @@
+// 模版字符串 / 混合表达式（模板字符串）
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((@"1 + &2 * 3; - &4 / 4;")) == "1 + 6 - 1");
+
+finishTests();

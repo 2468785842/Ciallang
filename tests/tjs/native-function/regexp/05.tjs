@@ -1,0 +1,11 @@
+// 本地函数声明 - RegExp 内建方法 / Method - compile
+Scripts.execStorage("../../assert.tjs");
+
+var pat = /foo/;
+pat.compile("b(a)r", "i");
+var t = pat.test("BAR");
+var lm = pat.lastMatch;
+assertTrue(((int)(t)) == 1);
+assertTrue(((lm)) == "BAR");
+
+finishTests();

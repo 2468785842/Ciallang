@@ -1,0 +1,16 @@
+// OOP - override 隐藏父类方法
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    function A() {}
+    function foo() { return 1; }
+}
+class B extends A {
+    function B() { A(); }
+    function foo() { return 2; }
+}
+var o = new B();
+var res = o.foo();
+assertTrue(((int)(res)) == 2);
+
+finishTests();

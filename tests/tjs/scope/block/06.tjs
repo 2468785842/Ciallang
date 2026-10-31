@@ -1,0 +1,16 @@
+// 块作用域 - 遮蔽、重新声明与退出后寄存器复用 / catch 参数和局部声明退出后恢复外层绑定
+Scripts.execStorage("../../assert.tjs");
+
+function f() {
+    var e=1, seen=0;
+    try { throw 2; } catch(e) {
+        var e=3;
+        seen=e;
+    }
+    { var a=5,b=7; seen+=a+b; }
+    return e*100+seen;
+}
+var __result1 = f();
+assertTrue(((int)(__result1)) == 115);
+
+finishTests();

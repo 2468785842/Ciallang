@@ -1,0 +1,7 @@
+// 表达式 - 前缀递增递减 / # / $ / delete / #s 取首字符码(含字符串化)
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((int)(#"A")) == 65);
+assertTrue(((int)(#65)) == 54);
+
+finishTests();

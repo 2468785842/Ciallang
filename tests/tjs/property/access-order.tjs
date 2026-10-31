@@ -1,0 +1,25 @@
+// property - read/write behavior
+Scripts.execStorage("../assert.tjs");
+
+var log = "";
+var value;
+property p1 {
+    setter(v) {
+        log += "set(" + v + ");";
+        value = v;
+    }
+
+    getter {
+        log += "get();";
+        return value;
+    }
+}
+
+p1 = 10;          // 只调用 setter
+var a = p1;       // 只调用 getter
+p1 = p1 + 1;      // getter → setter
+assertTrue(((int)(a)) == 10);
+assertTrue(((int)(value)) == 11);
+assertTrue((log) == "set(10);get();get();set(11);");
+
+finishTests();

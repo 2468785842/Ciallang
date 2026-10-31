@@ -1,0 +1,17 @@
+// property - base read/write
+Scripts.execStorage("../assert.tjs");
+
+var value;
+property p1 {
+    setter(v) {
+        value = v;
+    }
+
+    getter() {
+        return value;
+    }
+}
+p1 = 1;
+assertTrue(((int)(p1)) == 1);
+
+finishTests();

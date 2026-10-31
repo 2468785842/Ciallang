@@ -1,0 +1,14 @@
+// TJS2 - super.<Ctor>() 显式基类构造调用 / 单继承构造链
+Scripts.execStorage("../../assert.tjs");
+
+class base {
+    var v;
+    function base() { v = 3; }
+}
+class derived extends base {
+    function derived() { super.base(); }
+}
+var d = new derived();
+assertTrue(((int)(d.v)) == 3);
+
+finishTests();

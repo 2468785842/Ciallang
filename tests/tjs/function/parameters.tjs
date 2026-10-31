@@ -1,0 +1,21 @@
+// 函数声明 - 参数列表
+Scripts.execStorage("../assert.tjs");
+
+function single(x) { return x; }
+var rSingle = single(1);
+function multi(a, b, c) { return a + b + c; }
+var rMulti = multi(1, 2, 3);
+function complex(param1, param_2, param3) { return param1; }
+var rComplex1 = complex();
+var rComplex2 = complex(1);
+var rComplex3 = complex(1, 2, 3);
+assertTrue(((single instanceof "Function")));
+assertTrue(((multi instanceof "Function")));
+assertTrue(((complex instanceof "Function")));
+assertTrue(((int)(rSingle)) == 1);
+assertTrue(((int)(rMulti)) == 6);
+assertTrue((typeof (rComplex1) == "void"));
+assertTrue(((int)(rComplex2)) == 1);
+assertTrue(((int)(rComplex3)) == 1);
+
+finishTests();

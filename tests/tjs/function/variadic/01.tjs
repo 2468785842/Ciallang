@@ -1,0 +1,9 @@
+// 省略透传 / collapse 参数 / 展开调用（源码路径，对齐 tjs.y func_decl_arg_collapse） / `...` 省略透传（旧版 argc=-1）
+Scripts.execStorage("../../assert.tjs");
+
+function argMul(a, b) { return a * b; }
+function argThrough() { return argMul(...); }
+var r = argThrough(5, 3);
+assertTrue(((int)(r)) == 15);
+
+finishTests();

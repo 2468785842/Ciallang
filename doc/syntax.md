@@ -70,11 +70,11 @@
 | 12 | 加减 `+ -`（`+` 对字符串为连接） | ✅ |
 | 13 | 乘除类 `% / \ *`（`\` 整除；`*` 与前缀属性访问歧义经专门产生式 `mul_div_expr_and_asterisk` 消解） | ✅ |
 | 14 | **一元前缀** `! ~ ++ -- new invalidate isvalid delete typeof # $ + - & *` | ✅（`&` 取属性本体，`*` 调 getter/setter；全局和成员槽的普通读取会触发 getter） |
-| 14′ | **一元中缀式** `A instanceof B`（B 为类名）、`A in B` | instanceof ✅（基础类型按类型名匹配，Number 覆盖 Integer/Real；2026-10-30 补内置对象：Array/Dictionary/RegExp/函数对象对各自类名恒真——TJS2 TJSDefaultIsInstanceOf 沿原生类链按名匹配，`src/runtime/Runtime.hpp` 保留 Atom + 各类型 instanceOf 覆写，`tests/expression_test.cpp`）；`in` ✅（保留字行为对齐：原版 codegen 无 T_IN 分支，节点与操作数均不求值、结果为 void，2026-10-29 实测定论；勿实现成成员存在判断） |
-| 15 | `A isvalid`（**后缀**形态，与前缀并存）、`A incontextof B`（**右结合**，替换函数闭包的 this） | ✅：incontextof ✅；isvalid 前/后缀 ✅（2026-10-30 对齐原版 VM_CHKINV 语义：非对象值恒 true（tjsInterCodeExec.cpp:1177），对象按 IsValid 判定，invalidate 后 false；`src/vm/VMState.cpp` ChkInv、`tests/judgment_test.cpp`） |
+| 14′ | **一元中缀式** `A instanceof B`（B 为类名）、`A in B` | instanceof ✅（基础类型按类型名匹配，Number 覆盖 Integer/Real；2026-10-30 补内置对象：Array/Dictionary/RegExp/函数对象对各自类名恒真——TJS2 TJSDefaultIsInstanceOf 沿原生类链按名匹配，`src/runtime/Runtime.hpp` 保留 Atom + 各类型 instanceOf 覆写，`tests/tjs/expression/`）；`in` ✅（保留字行为对齐：原版 codegen 无 T_IN 分支，节点与操作数均不求值、结果为 void，2026-10-29 实测定论；勿实现成成员存在判断） |
+| 15 | `A isvalid`（**后缀**形态，与前缀并存）、`A incontextof B`（**右结合**，替换函数闭包的 this） | ✅：incontextof ✅；isvalid 前/后缀 ✅（2026-10-30 对齐原版 VM_CHKINV 语义：非对象值恒 true（tjsInterCodeExec.cpp:1177），对象按 IsValid 判定，invalidate 后 false；`src/vm/VMState.cpp` ChkInv、`tests/tjs/judgment/`） |
 | 16 | **类型转换** `(int)A (real)A (string)A` 或裸 `int A real A string A` | ✅ |
 | 17 | **后缀**：调用 `f(args)`、成员 `.sym`（含 `.` 起始的裸词链）、下标 `a[i]`（通用路径：数组/字典/字符串；可写，越界扩展）、后缀 `++ --`（表达式值为旧值；成员形态走 getter/setter 链）、**即时求值 `A !`**（把 A 的字符串值作为 TJS 表达式编译执行） | 全部 ✅：`() . -- ++ []`；后缀 `!` 即时求值（A 字符串化为表达式编译执行，空串原值不变，2026-10-26） |
-| 18 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]`（键形式 `sym :` 与 `"k" >= v`，=> 词形即 >=）/ 正则 `/pattern/` / 常量式 `(const)[...]` `(const)%[...]` | ◐ 普通字面量已实现；`(const)` 的编译期容器、常量元素限制与重复求值共享尚未对齐（见 §8） |
+| 18 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]`（键形式 `sym :` 与 `"k" => v`）/ 正则 `/pattern/` / 常量式 `(const)[...]` `(const)%[...]` | ◐ 普通字面量已实现；`(const)` 的编译期容器、常量元素限制与重复求值共享尚未对齐（见 §8） |
 
 前缀一元语义速查（原版）：
 
@@ -94,7 +94,7 @@
 |---|---|---|
 | 空语句 `;` | | ✅ |
 | 表达式语句 | | ✅ |
-| `var` 声明 | `var a, b = expr;`；可带类型注解 `var a:int`（注解仅文档性） | ✅ 块级遮蔽、同层重新声明（无初值重置 void）、for 初始化作用域（`src/gen/IRGenerator.*`、`tests/scope_test.cpp`）；const 与 var 等价，只读性不强制；类型注解 ✅（2026-10-29：var/函数参数/函数返回值/getter/setter 全位解析并丢弃，对齐 tjs.y "Ignore types"） |
+| `var` 声明 | `var a, b = expr;`；可带类型注解 `var a:int`（注解仅文档性） | ✅ 块级遮蔽、同层重新声明（无初值重置 void）、for 初始化作用域（`src/gen/IRGenerator.*`、`tests/tjs/scope/`）；const 与 var 等价，只读性不强制；类型注解 ✅（2026-10-29：var/函数参数/函数返回值/getter/setter 全位解析并丢弃，对齐 tjs.y "Ignore types"） |
 | `if (e) s [else s]` | | ✅ |
 | `while (e) s` | | ✅ |
 | `do s while (e);` | | ✅ |
@@ -150,7 +150,7 @@ class 类名 extends 父类1, 父类2 … {   // 多继承，后面的覆盖前�
 
 ```
 [ e1, e2, e3 ]                // Array
-%[ key: v, "key2": v2, … ]    // Dictionary（key 可为裸符号或字符串；尾逗号合法）
+%[ key: v, "key2" => v2, … ]  // Dictionary：裸符号用 :，表达式键用 =>；尾逗号合法
 (const)[ … ] / (const)%[ … ]  // 参考文法的常量容器形态；本项目支持范围见下
 ```
 

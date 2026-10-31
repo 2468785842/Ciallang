@@ -1,0 +1,10 @@
+// OOP - 子类成员变量覆盖父类成员变量
+Scripts.execStorage("../assert.tjs");
+
+class A { var x = 1; function A() {} }
+class B extends A { var x = 2; function B() { A(); } }
+var o = new B();
+var res = o.x;
+assertTrue(((int)(res)) == 2);
+
+finishTests();

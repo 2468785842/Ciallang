@@ -1,0 +1,16 @@
+// with 语句与裸词链 / 嵌套 with 栈顶优先
+Scripts.execStorage("../assert.tjs");
+
+var d1 = %[v : 1];
+var d2 = %[v : 2];
+var hit1, hit2;
+with(d1) {
+    with(d2) {
+        hit2 = .v;
+    }
+    hit1 = .v;
+}
+assertTrue(((int)(hit1)) == 1);
+assertTrue(((int)(hit2)) == 2);
+
+finishTests();

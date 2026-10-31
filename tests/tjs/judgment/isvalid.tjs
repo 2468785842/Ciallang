@@ -1,0 +1,32 @@
+// isvalid - non-objects are always valid, invalidated objects are not
+Scripts.execStorage("../assert.tjs");
+
+var num = 1;
+var str = "s";
+var nothing;
+var d = %[m: 5];
+var arr = [1];
+var fn = function() { };
+class C { function initialize() { } }
+var o = new C();
+var isInt = num isvalid;
+var isVoid = nothing isvalid;
+var isStr = str isvalid;
+var isDict = d isvalid;
+var isArray = arr isvalid;
+var isFunc = fn isvalid;
+var isMember = d.m isvalid;
+var isObj = o isvalid;
+invalidate o;
+var isInvalidated = o isvalid;
+assertTrue((int)(isInt) == 1);
+assertTrue((int)(isVoid) == 1);
+assertTrue((int)(isStr) == 1);
+assertTrue((int)(isDict) == 1);
+assertTrue((int)(isArray) == 1);
+assertTrue((int)(isFunc) == 1);
+assertTrue((int)(isMember) == 1);
+assertTrue((int)(isObj) == 1);
+assertTrue((int)(isInvalidated) == 0);
+
+finishTests();

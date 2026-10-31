@@ -1,0 +1,12 @@
+// 表达式 - Array/Dictionary 字面量与下标 / 字典字面量（sym: 与 "k" => v 两种键形式）
+Scripts.execStorage("../../assert.tjs");
+
+var d = %["k" => 1, num : 2];
+var c = d.count;
+var vk = d["k"];
+var vn = d.num;
+assertTrue(((int)(c)) == 2);
+assertTrue(((int)(vk)) == 1);
+assertTrue(((int)(vn)) == 2);
+
+finishTests();

@@ -1,0 +1,15 @@
+// TJS2 - 多继承 slot 不存在时 fallback 到 instance
+Scripts.execStorage("../assert.tjs");
+
+class A { function A() {} }
+class B { function B() {} }
+class C extends A, B {
+    var x = 3;
+    function C() { A(); B(); }
+    function getX() { return x; }
+}
+var o = new C();
+var res = o.getX();
+assertTrue(((int)(res)) == 3);
+
+finishTests();

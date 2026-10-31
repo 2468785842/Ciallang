@@ -1,0 +1,44 @@
+// property - reference slots match TJS2 global local and member access
+Scripts.execStorage("../assert.tjs");
+
+var reads = 0;
+var stored = 3;
+property p {
+    getter() { reads++; return stored; }
+    setter(v) { stored = v; }
+}
+var reference = &p;
+var readsAfterBinding = reads;
+var first = reference;
+var readsAfterGlobalRead = reads;
+*(&reference) = 9;
+var forced = *(&reference);
+function useLocal() {
+    var local = &p;
+    var before = *local;
+    *local = 11;
+    return before;
+}
+var localResult = useLocal();
+var holder = %[];
+&holder.alias = &p;
+var readsAfterMemberBinding = reads;
+var memberRead = holder.alias;
+reference = 13;
+var memberForced = *(&holder.alias);
+*(&holder.alias) = 17;
+function readReference(r) { return *r; }
+var passed = readReference(&reference);
+assertTrue(((int)(readsAfterBinding)) == 0);
+assertTrue(((int)(first)) == 3);
+assertTrue(((int)(readsAfterGlobalRead)) == 1);
+assertTrue(((int)(forced)) == 9);
+assertTrue(((int)(localResult)) == 9);
+assertTrue(((int)(readsAfterMemberBinding)) == 3);
+assertTrue(((int)(memberRead)) == 11);
+assertTrue(((int)(memberForced)) == 13);
+assertTrue(((int)(passed)) == 17);
+assertTrue(((int)(stored)) == 17);
+assertTrue(((int)(reads)) == 6);
+
+finishTests();

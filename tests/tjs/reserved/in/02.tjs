@@ -1,0 +1,13 @@
+// 保留字 - in 运算符为无代码 void / 两侧操作数不求值
+// 参考代码生成器没有 T_IN 分支：两侧均不求值，结果为 void。
+Scripts.execStorage("../../assert.tjs");
+
+var count = 0;
+function f() { count++; return "a"; }
+var d = %[a:1];
+var x = f() in d;
+var inCond = 0;
+if("a" in d) inCond = 1;
+assertTrue(((int)(count)) == 0);
+
+finishTests();

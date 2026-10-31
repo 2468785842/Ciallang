@@ -1,0 +1,11 @@
+// preprocessor complex nested expressions
+Scripts.execStorage("../assert.tjs");
+
+@set(flag = 1)
+@set(version = 0x02040009)
+@if(version >= 0x02040009 && flag)
+    var n = "complex nested works";
+@endif
+assertTrue((n) == "complex nested works");
+
+finishTests();

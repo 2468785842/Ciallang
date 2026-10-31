@@ -1,0 +1,27 @@
+// RegExp.last 静态属性 + 匹配位置码点语义 / last：test/exec 更新（失败也更新），match/replace 不更新
+Scripts.execStorage("../../assert.tjs");
+
+var r1 = /(\d+)/;
+r1.test("a123b");
+var l1 = RegExp.last.lastMatch;
+/zzz/.test("aaa");
+var l2 = RegExp.last.lastMatch;
+var r3 = /b/;
+r3.match("abc");
+var l3 = RegExp.last.lastMatch;
+"xxx".replace(/x/, "y");
+var l4 = RegExp.last.lastMatch;
+var r5 = /(\d+)-(\d+)/;
+r5.exec("77-42");
+var l5 = RegExp.last.lastParen;
+var r6 = /zzz/;
+r6.exec("aaa");
+var l6 = RegExp.last.lastMatch;
+assertTrue(((l1)) == "123");
+assertTrue(((l2)) == "");
+assertTrue(((l3)) == "");
+assertTrue(((l4)) == "");
+assertTrue(((l5)) == "42");
+assertTrue(((l6)) == "");
+
+finishTests();

@@ -1,0 +1,13 @@
+// 循环 - 执行 / for嵌套与break
+Scripts.execStorage("../../assert.tjs");
+
+var count = 0;
+for(var i = 0; i < 3; i++) {
+    for(var j = 0; j < 5; j++) {
+        if(j == 2) break;
+        count = count + 1;
+    }
+}
+assertTrue(((int)(count)) == 6);
+
+finishTests();

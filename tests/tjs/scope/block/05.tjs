@@ -1,0 +1,16 @@
+// 块作用域 - 遮蔽、重新声明与退出后寄存器复用 / void 初值的局部槽独立于常驻 void 槽
+Scripts.execStorage("../../assert.tjs");
+
+function f() {
+    var a=void,b=void;
+    a=7;
+    { var c=void; c=8; }
+    var d=11;
+    if(b!==void) return -1;
+    if(void!==void) return -2;
+    return a+d;
+}
+var __result1 = f();
+assertTrue(((int)(__result1)) == 18);
+
+finishTests();

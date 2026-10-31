@@ -1,0 +1,6 @@
+// 类型转换 / convert real
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(near((((real)(real "1.1"))), 1.1));
+
+finishTests();

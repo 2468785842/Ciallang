@@ -1,0 +1,6 @@
+// 表达式 - 函数表达式 / 逗号表示隐式void参数 - 混合情况
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((!!(function (a, b, c, d, e) { return a == 1 && !b && c == 2 && !d && e == 3; }(1, , 2, , 3)))) == true);
+
+finishTests();

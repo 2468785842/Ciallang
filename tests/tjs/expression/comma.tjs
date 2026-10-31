@@ -1,0 +1,9 @@
+// 表达式 - 顺序运算符
+Scripts.execStorage("../assert.tjs");
+
+var a, b, c;
+assertTrue(((int)(c = (a = 1, b = 2))) == 2);
+assertTrue(((int)(c)) == 2);
+assertTrue(((int)(a = 1, b = 2, c = 3)) == 3);
+
+finishTests();

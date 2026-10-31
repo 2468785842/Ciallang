@@ -1,0 +1,17 @@
+// OOP - 类方法内 new 必须使用 global.ClassName
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    function A() {}
+    function create() {
+        // We can use A() instead of global.A()
+        // return new A(); // ok
+        return new global.A();
+    }
+}
+var o = new A();
+var obj2 = o.create();
+var res = (obj2 instanceof "A");
+assertTrue(((int)(res)) == 1);
+
+finishTests();

@@ -1,0 +1,12 @@
+// switch - execution / empty switch body
+Scripts.execStorage("../../assert.tjs");
+
+function testSwitch(x) {
+    var r;
+    switch (x) {
+    }
+    return r;
+}
+assertTrue((typeof (testSwitch(1)) == "void"));
+
+finishTests();

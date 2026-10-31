@@ -1,0 +1,24 @@
+// 本地函数声明 - RegExp 内建方法 / Method - exec 与匹配状态
+Scripts.execStorage("../../assert.tjs");
+
+var g = /x(\d+)x/g;
+var first = g.exec("a1x22x b x333x c");
+var f0 = first[0];
+var f1 = first[1];
+var idx1 = g.index;
+var last1 = g.lastIndex;
+var second = g.exec("a1x22x b x333x c");
+var s0 = second[0];
+var idx2 = g.index;
+var miss = g.exec("a1x22x b x333x c");
+var missCount = miss.count;
+var lastMatch = g.lastMatch;
+assertTrue(((f0)) == "x22x");
+assertTrue(((f1)) == "22");
+assertTrue(((int)(idx1)) == 2);
+assertTrue(((int)(last1)) == 6);
+assertTrue(((s0)) == "x333x");
+assertTrue(((int)(idx2)) == 9);
+assertTrue(((int)(missCount)) == 0);
+
+finishTests();

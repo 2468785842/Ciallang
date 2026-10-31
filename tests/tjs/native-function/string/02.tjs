@@ -1,0 +1,10 @@
+// 本地函数声明 - 字符串成员方法定义 / Method - indexOf
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((int)("hello".indexOf("e"))) == 1);
+assertTrue(((int)("hello".indexOf("l"))) == 2);
+assertTrue(((int)("hello".indexOf("x"))) == -1);
+assertTrue(((int)("hello".indexOf(""))) == -1);
+assertTrue(((int)("".indexOf("a"))) == -1);
+
+finishTests();

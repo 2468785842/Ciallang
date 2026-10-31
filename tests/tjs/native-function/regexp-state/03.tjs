@@ -1,0 +1,30 @@
+// RegExp.last 静态属性 + 匹配位置码点语义 / CJK 码点位置（index/lastIndex/start/上下文）
+Scripts.execStorage("../../assert.tjs");
+
+var g = /x(\d+)x/g;
+var m1 = g.exec("中文x22x b x333x");
+var i1 = g.index; var li1 = g.lastIndex;
+var m2 = g.exec("中文x22x b x333x");
+var i2 = g.index; var li2 = g.lastIndex;
+var e3 = /b/;
+e3.exec("中文b文文");
+var lc = e3.leftContext; var rc = e3.rightContext; var ei = e3.index;
+var s1 = /a/;
+s1.start = 2;
+var sm = s1.exec("中文abc")[0]; var si = s1.index;
+var r7 = /x(\d+)x/;
+r7.exec("中文x88x尾");
+var l7m = RegExp.last.lastMatch; var l7i = RegExp.last.index;
+assertTrue(((int)(i1)) == 2);
+assertTrue(((int)(li1)) == 6);
+assertTrue(((int)(i2)) == 9);
+assertTrue(((int)(li2)) == 14);
+assertTrue(((lc)) == "中文");
+assertTrue(((rc)) == "文文");
+assertTrue(((int)(ei)) == 2);
+assertTrue(((sm)) == "a");
+assertTrue(((int)(si)) == 2);
+assertTrue(((l7m)) == "x88x");
+assertTrue(((int)(l7i)) == 2);
+
+finishTests();

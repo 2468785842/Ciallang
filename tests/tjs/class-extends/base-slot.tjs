@@ -1,0 +1,16 @@
+// TJS2 - 父构造函数仅初始化父 slot
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x = 0;
+    function A() { x = 5; }
+}
+class B extends A {
+    function B() { A(); }
+    function getX() { return x; }
+}
+var o = new B();
+var res = o.getX();
+assertTrue(((int)(res)) == 5);
+
+finishTests();

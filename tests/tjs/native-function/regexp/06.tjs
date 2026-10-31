@@ -1,0 +1,9 @@
+// 本地函数声明 - RegExp 内建方法 / Method - replace（g 全局/单次）
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue((("a1b22c333d".replace(/\d+/, "N"))) == "aNb22c333d");
+assertTrue((("a1b22c333d".replace(/\d+/g, "N"))) == "aNbNcNd");
+assertTrue((("no digits".replace(/\d+/g, "N"))) == "no digits");
+assertTrue(((/o/.replace("foo bar", "0"))) == "f0o bar");
+
+finishTests();

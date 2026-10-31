@@ -1,0 +1,8 @@
+// 表达式 - Array/Dictionary 字面量与下标 / 嵌套字面量
+Scripts.execStorage("../../assert.tjs");
+
+var n = [[1, 2], [3, 4]];
+var v = n[1][0];
+assertTrue(((int)(v)) == 3);
+
+finishTests();

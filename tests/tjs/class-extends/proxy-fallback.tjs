@@ -1,0 +1,17 @@
+// TJS2 - 仅当 slot 链完全无字段才访问 proxy
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    function A(){}
+    function getX() { return x; }
+}
+class B extends A {
+    var x;
+    function B() { A(); }
+}
+var o = new B();
+o.x = 9;
+var res = o.getX();
+assertTrue(((int)(res)) == 9);
+
+finishTests();

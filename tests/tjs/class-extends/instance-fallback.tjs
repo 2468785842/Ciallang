@@ -1,0 +1,16 @@
+// TJS2 - 字段仅在 slot 链不存在时 fallback 到 instance
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    function A() {}
+    function getX() { return x; }
+}
+class B extends A {
+    var x = 2;
+    function B() { A(); }
+}
+var o = new B();
+var res = o.getX();
+assertTrue(((int)(res)) == 2);
+
+finishTests();

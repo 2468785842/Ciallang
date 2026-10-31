@@ -1,0 +1,10 @@
+// 后缀 ! 即时求值（tjs.y T_EVAL 对齐） / 空串原值不变 + 非字符串字符串化
+Scripts.execStorage("../../assert.tjs");
+
+var e = "";
+var c = (e!);
+var f = (5)!;
+assertTrue(((c)) == "");
+assertTrue(((int)(f)) == 5);
+
+finishTests();

@@ -1,0 +1,15 @@
+// OOP - 方法闭包保持对象上下文
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x = 1;
+    function A() {}
+    function inc() { x++; }
+}
+var o = new A();
+var f = o.inc;
+f();
+var res = o.x;
+assertTrue(((int)(res)) == 2);
+
+finishTests();

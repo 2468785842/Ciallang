@@ -1,0 +1,18 @@
+// with 语句与裸词链 / with(obj) 块内裸词链读写与调用
+Scripts.execStorage("../assert.tjs");
+
+class C {
+    var a, b;
+    function C() { a = b = 0; }
+    function bump() { a = a + 1; }
+}
+var o = new C();
+with(o) {
+    .a = 5;
+    .b = .a + 1;
+    .bump();
+}
+assertTrue(((int)(o.a)) == 6);
+assertTrue(((int)(o.b)) == 6);
+
+finishTests();

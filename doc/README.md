@@ -10,6 +10,7 @@
 | 字节码 | [TJS2 格式](bytecode/tjs2-bytecode.md) · [内部指令](bytecode/ciallang-bytecode.md) · [转译](bytecode/mapping.md) |
 | 测量与诊断 | [性能记录](performance.md) · [历史静态检查数据](reports/) |
 | 参与开发 | [待办](../TODO.md) · [开发约定](../AGENTS.md) |
+| 脚本单元测试 | [TJS 用例与双引擎运行](../tests/tjs/README.md) |
 
 官方语法参考：[TJS2 リファレンス](https://hydrozoa.felisworks.com/doc/tjs2doc/contents/index.html)。
 TJSCompiler 的 Bison 文法见[文法快照与来源](grammar/README.md)。

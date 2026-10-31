@@ -1,0 +1,10 @@
+// 表达式 - 三元与后缀 if 优先级 / 后缀 if 绑定整个赋值
+Scripts.execStorage("../../assert.tjs");
+
+var t = 5;
+t = 8 if 1 != 1;
+assertTrue(((int)(t)) == 5);
+t = 8 if 1 == 1;
+assertTrue(((int)(t)) == 8);
+
+finishTests();

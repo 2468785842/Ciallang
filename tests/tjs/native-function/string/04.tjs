@@ -1,0 +1,14 @@
+// 本地函数声明 - 字符串成员方法定义 / Method - substring
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(("abcdef".substring(1, 4)) == "bcde");
+assertTrue(("abcdef".substring(0, 6)) == "abcdef");
+assertTrue(("abcdef".substring(3, 3)) == "def");
+assertTrue(("abcdef".substring(4, 2)) == "ef");
+assertTrue(("abcdef".substring(-1, 3)) == "");
+assertTrue(("abcdef".substring(2)) == "cdef");
+assertTrue(("abcdef".substring(6, 2)) == "");
+assertTrue(("abcdef".substring(5, 10)) == "f");
+assertTrue(("abcdef".substring(0, 0)) == "");
+
+finishTests();

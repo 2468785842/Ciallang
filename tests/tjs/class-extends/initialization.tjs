@@ -1,0 +1,12 @@
+// OOP - 成员变量初始化发生在构造函数之前
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x = 10;
+    function A() { x += 5; }
+}
+var o = new A();
+var res = o.x;
+assertTrue(((int)(res)) == 15);
+
+finishTests();

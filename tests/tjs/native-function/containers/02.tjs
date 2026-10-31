@@ -1,0 +1,16 @@
+// 本地函数声明 - Array/Dictionary 内建方法 / Array insert/remove/erase/join/reverse
+Scripts.execStorage("../../assert.tjs");
+
+var a = [1, 2, 3];
+a.insert(1, 9);
+var j1 = a.join("-");
+a.remove(1);
+a.reverse();
+var j2 = a.join(",");
+a.erase();
+var c = a.count;
+assertTrue(((j1)) == "1-9-2-3");
+assertTrue(((j2)) == "3,2,1");
+assertTrue(((int)(c)) == 0);
+
+finishTests();

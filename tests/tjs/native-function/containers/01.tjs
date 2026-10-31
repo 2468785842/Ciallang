@@ -1,0 +1,14 @@
+// 本地函数声明 - Array/Dictionary 内建方法 / Array push/pop/unshift/shift
+Scripts.execStorage("../../assert.tjs");
+
+var a = [1, 2];
+var c1 = a.push(3, 4);
+var p = a.pop();
+var c2 = a.unshift(0);
+var s = a.shift();
+assertTrue(((int)(c1)) == 4);
+assertTrue(((int)(p)) == 4);
+assertTrue(((int)(c2)) == 4);
+assertTrue(((int)(s)) == 0);
+
+finishTests();

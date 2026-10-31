@@ -1,0 +1,9 @@
+// 表达式 - 三元运算符
+Scripts.execStorage("../assert.tjs");
+
+var a;
+assertTrue(((int)(a ? 2 : 4)) == 4);
+assertTrue(((int)(a = 1)) == 1);
+assertTrue(((int)(a ? 2 : 4)) == 2);
+
+finishTests();

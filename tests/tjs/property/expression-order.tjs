@@ -1,0 +1,14 @@
+// 恢复原注释中的 getter 顺序与最终一次 setter。
+Scripts.execStorage("../assert.tjs");
+
+var trace = "", stored;
+property tracked {
+    getter() { trace += "G"; return stored; }
+    setter(v) { trace += "S(" + v + ")"; stored = v; }
+}
+tracked = 1;
+tracked = tracked * 2 + tracked;
+assertTrue(trace == "S(1)GGS(3)");
+assertTrue(stored == 3);
+
+finishTests();

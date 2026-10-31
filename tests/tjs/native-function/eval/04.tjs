@@ -1,0 +1,9 @@
+// 后缀 ! 即时求值（tjs.y T_EVAL 对齐） / 编译失败抛脚本异常可捕获
+Scripts.execStorage("../../assert.tjs");
+
+var bad = "1 +";
+var caught = 0;
+try { bad!; } catch(ex) { caught = 1; }
+assertTrue(((int)(caught)) == 1);
+
+finishTests();

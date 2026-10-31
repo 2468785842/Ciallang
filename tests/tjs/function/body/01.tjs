@@ -1,0 +1,13 @@
+// 函数声明 - 函数体内容 / 带变量声明的函数体
+Scripts.execStorage("../../assert.tjs");
+
+function test() {
+    var x = 10;
+    var y = 20;
+    return x + y;
+}
+var rTest = test();
+assertTrue(((test instanceof "Function")));
+assertTrue(((int)(rTest)) == 30);
+
+finishTests();

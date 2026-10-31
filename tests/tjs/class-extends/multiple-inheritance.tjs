@@ -1,0 +1,11 @@
+// OOP - 多重继承方法覆盖顺序
+Scripts.execStorage("../assert.tjs");
+
+class A { function A() {} function foo() { return 1; } }
+class B { function B() {} function foo() { return 2; } }
+class C extends A, B { function C() { A(); B(); } }
+var o = new C();
+var res = o.foo();
+assertTrue(((int)(res)) == 2);
+
+finishTests();

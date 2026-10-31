@@ -1,0 +1,13 @@
+// 循环 - 后缀 ++/-- 表达式值为旧值（TJS2 语义） / 局部变量
+Scripts.execStorage("../../assert.tjs");
+
+function f() {
+    var i = 5;
+    var a = i++;
+    var b = i--;
+    return a * 100 + b * 10 + i;
+}
+var r = f();
+assertTrue(((int)(r)) == 565);
+
+finishTests();

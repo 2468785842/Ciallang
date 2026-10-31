@@ -1,0 +1,21 @@
+// 循环 - 执行 / 函数内for与后缀递增递减
+Scripts.execStorage("../../assert.tjs");
+
+function f() {
+    var sum = 0;
+    for(var i = 0; i < 5; i++) { sum = sum + i; }
+    return sum;
+}
+var r1 = f();
+
+function g() {
+    var n = 5;
+    var cnt = 0;
+    while(n > 0) { n--; cnt = cnt + 1; }
+    return cnt;
+}
+var r2 = g();
+assertTrue(((int)(r1)) == 10);
+assertTrue(((int)(r2)) == 5);
+
+finishTests();

@@ -1,0 +1,7 @@
+// with 语句与裸词链 / 顶层裸词链写全局
+Scripts.execStorage("../assert.tjs");
+
+.gvarl = 7;
+assertTrue(((int)(gvarl)) == 7);
+
+finishTests();

@@ -1,0 +1,11 @@
+// 表达式 - 赋值表达式 / 移位复合赋值
+Scripts.execStorage("../../assert.tjs");
+
+var x = 1; x <<= 3; var __result1 = x;
+assertTrue((((int)(__result1))) == 8);
+var x = 8; x >>= 2; var __result2 = x;
+assertTrue((((int)(__result2))) == 2);
+var x = -1; x >>>= 1; var __result3 = x;
+assertTrue((((int)(__result3))) >= 0);
+
+finishTests();

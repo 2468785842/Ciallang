@@ -1,0 +1,22 @@
+// 集成 - 容器与字符串组合
+Scripts.execStorage("../assert.tjs");
+
+var arr = [3, 1, 2];
+arr.push(4);
+arr.sort();
+var s = "";
+for (var i = 0; i < arr.count; i++) {
+    s += arr[i] + ",";
+}
+var d = %["a" => 1, "b" => 2];
+d["c"] = 3;
+var dc = d.count;
+var up = "abc".toUpperCase();
+assertTrue(((int)(arr[0])) == 1);
+assertTrue(((int)(arr[3])) == 4);
+assertTrue(((s)) == "1,2,3,4,");
+assertTrue(((int)(dc)) == 3);
+assertTrue(((int)(d["c"])) == 3);
+assertTrue(((up)) == "ABC");
+
+finishTests();

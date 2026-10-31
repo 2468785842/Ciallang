@@ -1,0 +1,13 @@
+// property - only getter
+Scripts.execStorage("../assert.tjs");
+
+property p_readonly {
+    getter {
+        return 42;
+    }
+}
+
+var x = p_readonly;   // OK
+assertTrue(((int)(x)) == 42);
+
+finishTests();

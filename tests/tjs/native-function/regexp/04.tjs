@@ -1,0 +1,13 @@
+// 本地函数声明 - RegExp 内建方法 / 状态属性 lastMatch/lastParen/leftContext/rightContext/start
+Scripts.execStorage("../../assert.tjs");
+
+var e = /(a)(b)?/;
+e.exec("za");
+assertTrue(((e.lastMatch)) == "a");
+assertTrue(((e.lastParen)) == "");
+assertTrue(((e.leftContext)) == "z");
+assertTrue(((e.rightContext)) == "");
+assertTrue(((int)((function(){ var m = /b/; m.start = 3; return m.match("abcb").count; })())) == 1);
+assertTrue(((int)((function(){ var m = /b/; m.start = 3; return m.start; })())) == 3);
+
+finishTests();

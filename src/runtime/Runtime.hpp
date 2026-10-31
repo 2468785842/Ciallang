@@ -67,6 +67,7 @@ namespace cial {
         static constexpr Atom ATOM_ARRAY{ 4 };
         static constexpr Atom ATOM_DICTIONARY{ 5 };
         static constexpr Atom ATOM_REGEXP{ 6 };
+        static constexpr Atom ATOM_PROPERTY{ 7 };
 
         AtomTable atomTable = [] {
             AtomTable at{};
@@ -76,6 +77,7 @@ namespace cial {
             at.intern("Array"_str); // ATOM_ARRAY
             at.intern("Dictionary"_str); // ATOM_DICTIONARY
             at.intern("RegExp"_str); // ATOM_REGEXP
+            at.intern("Property"_str); // ATOM_PROPERTY
             return std::move(at);
         }();
 

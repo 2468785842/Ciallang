@@ -1,0 +1,8 @@
+// 模板串 - 内嵌表达式展开 / 转义 \& 不展开
+Scripts.execStorage("../../assert.tjs");
+
+var x = 3;
+function f() { return 7; }
+assertTrue(((@"lit \& end")) == "lit & end");
+
+finishTests();

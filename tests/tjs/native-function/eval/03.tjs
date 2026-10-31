@@ -1,0 +1,9 @@
+// 后缀 ! 即时求值（tjs.y T_EVAL 对齐） / 表达式语句形态（结果不被需要）
+Scripts.execStorage("../../assert.tjs");
+
+var hit = 0;
+var q = "hit = 1";
+q!;
+assertTrue(((int)(hit)) == 1);
+
+finishTests();

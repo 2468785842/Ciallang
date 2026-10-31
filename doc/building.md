@@ -44,6 +44,11 @@ cmake --preset "Linux Release" -DCIAL_ENABLE_JIT=ON
 
 C++ 测试由 Catch2 注册；Python 可用且 CLI 开启时，CTest 还运行 `tests/cli_test.py` 和 `tools/lsp/test_protocol.py`。测试从顶层启用，可在整个构建目录运行（`tests/CMakeLists.txt`）。
 
+语言和标准库行为已迁到 [TJS 脚本单元测试](../tests/tjs/README.md)，启用 CLI 和 Python 时
+逐文件注册为 CTest；原生绑定、AST、GC 及宿主接口仍使用 Catch2。脚本可直接交给
+Ciallang 或 TJSCompiler，也可用 `python tests/run_tjs_tests.py --engine <executable>` 批量运行。
+可选 `CIAL_TJS_TEST_REFERENCE` 注册参考引擎测试；参考侧失败会如实使 CTest 失败，不默认启用。
+
 ```sh
 cmake -S . -B build/bench -DCMAKE_BUILD_TYPE=Release -DCIAL_BUILD_BENCH=ON \
   -DCIAL_TJS_EXE=/path/to/TJSCompiler

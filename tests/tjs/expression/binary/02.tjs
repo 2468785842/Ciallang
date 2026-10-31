@@ -1,0 +1,11 @@
+// 表达式 - 二元运算表达式 / 比较运算
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((!!(1 > 2))) == false);
+assertTrue(((!!(1 < 2))) == true);
+assertTrue(((!!(1 >= 2))) == false);
+assertTrue(((!!(2 >= 2))) == true);
+assertTrue(((!!(2 <= 2))) == true);
+assertTrue(((!!(3 <= 2))) == false);
+
+finishTests();

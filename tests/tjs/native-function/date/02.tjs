@@ -1,0 +1,19 @@
+// Date 标准库 / set 系
+Scripts.execStorage("../../assert.tjs");
+
+var d = new Date(2023, 0, 15, 10, 30, 5);
+var y = d.getYear(); var mo = d.getMonth(); var da = d.getDate();
+var h = d.getHours(); var mi = d.getMinutes(); var se = d.getSeconds();
+d.setMonth(11); d.setDate(25);
+var mo2 = d.getMonth(); var da2 = d.getDate();
+var now = new Date();
+var nowOk = now.getYear() >= 2026;
+var p = new Date("2024/6/1 12:30:00");
+var py = p.getYear(); var pmo = p.getMonth(); var pd = p.getDate(); var ph = p.getHours();
+var q = new Date(2023, 0, 1);
+q.setTime(1700000000000);
+var qy = q.getYear();
+assertTrue(((int)(mo2)) == 11);
+assertTrue(((int)(da2)) == 25);
+
+finishTests();

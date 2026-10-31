@@ -1,0 +1,9 @@
+// Math 标准库 / 常量与 random
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(near((((real)(Math.PI))), 3.141592653589793, 1e-15));
+assertTrue(near((((real)(Math.E))), 2.718281828459045, 1e-15));
+assertTrue(near((((real)(Math.SQRT2 * Math.SQRT2))), 2.0));
+assertTrue(((int)((Math.random() >= 0 && Math.random() < 1) ? 1 : 0)) == 1);
+
+finishTests();

@@ -1,0 +1,10 @@
+// with 语句与裸词链 / with 对象可为表达式且每次求值
+Scripts.execStorage("../assert.tjs");
+
+var d = %[v : 3];
+var r;
+with(d) .v = .v + 1;
+r = d.v;
+assertTrue(((int)(r)) == 4);
+
+finishTests();

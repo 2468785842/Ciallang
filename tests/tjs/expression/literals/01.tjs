@@ -1,0 +1,6 @@
+// 表达式 - 字面量表达式 / 整数字面量
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((int)(123)) == 123);
+
+finishTests();

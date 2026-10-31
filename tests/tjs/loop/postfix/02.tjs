@@ -1,0 +1,11 @@
+// 循环 - 后缀 ++/-- 表达式值为旧值（TJS2 语义） / 全局变量
+Scripts.execStorage("../../assert.tjs");
+
+var g = 7;
+var a = g--;
+var b = g++;
+assertTrue(((int)(a)) == 7);
+assertTrue(((int)(b)) == 6);
+assertTrue(((int)(g)) == 7);
+
+finishTests();

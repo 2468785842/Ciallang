@@ -1,0 +1,20 @@
+// switch - execution / exclude default
+Scripts.execStorage("../../assert.tjs");
+
+function testSwitch(x) {
+    var r;
+    switch (x) {
+        case 1:
+            r = 1;
+            break;
+        case 2:
+            r = 2;
+            break;
+    }
+    return r;
+}
+assertTrue(((int)(testSwitch(1))) == 1);
+assertTrue(((int)(testSwitch(2))) == 2);
+assertTrue((typeof (testSwitch(3)) == "void"));
+
+finishTests();

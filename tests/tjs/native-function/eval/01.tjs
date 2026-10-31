@@ -1,0 +1,14 @@
+// 后缀 ! 即时求值（tjs.y T_EVAL 对齐） / 基础求值/动态表达式/嵌套
+Scripts.execStorage("../../assert.tjs");
+
+var x = "1 + 2";
+var a = (x!);
+var n = 7;
+var d = (("n * n")! + 1);
+var nest = "\"1+1\"!";
+var g = (nest!);
+assertTrue(((int)(a)) == 3);
+assertTrue(((int)(d)) == 50);
+assertTrue(((int)(g)) == 2);
+
+finishTests();

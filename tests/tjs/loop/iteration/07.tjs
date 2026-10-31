@@ -1,0 +1,8 @@
+// 循环 - 执行 / for首子句多变量声明
+Scripts.execStorage("../../assert.tjs");
+
+var r = 0;
+for(var i = 0, j = 5; i < j; i = i + 1) { r = r + 1; }
+assertTrue(((int)(r)) == 5);
+
+finishTests();

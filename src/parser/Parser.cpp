@@ -1563,7 +1563,7 @@ namespace cial::syntax {
                 key = parser->astBuilder()->makeNode<ValueExprNode>(Token{ TokenType::ConstVal, sym.getString() });
             }
             if(!key) {
-                // "k >= v" 形式（=> 的词形即 >=）：key 解析 floor 用 relational，
+                // => 借用 GtOrEqual token：key 解析 floor 用 relational，
                 // 阻止 k 后的 >= 被当作比较运算符吸进 key 表达式
                 key = parser->parseExpression(r, false, Precedence::relational);
                 if(!key) {
@@ -1573,7 +1573,7 @@ namespace cial::syntax {
             }
 
             if(!consumedSeparator) {
-                // "k >= v" 分隔——TJS2 中 => 在词法上就是 >=（GtOrEqual），
+                // => 分隔符在当前 Lexer 中映射为 GtOrEqual，
                 // 由字典字面量上下文区分
                 if(!parser->expect(r, TokenType::GtOrEqual)) {
                     return nullptr;

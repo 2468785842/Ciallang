@@ -1,0 +1,14 @@
+// try内发生异常-catch执行
+Scripts.execStorage("../../assert.tjs");
+
+var x = 0;
+try {
+    throw "error";
+    x = 1; // 不应执行
+}
+catch {
+    x = 2;
+}
+assertTrue(((int)(x)) == 2);
+
+finishTests();

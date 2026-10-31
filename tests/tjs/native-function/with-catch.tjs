@@ -1,0 +1,31 @@
+// with 内 try/catch（对齐原版：catch 内 with 上下文丢失）
+Scripts.execStorage("../assert.tjs");
+
+var o = %[m: 7];
+var r = "";
+function f() {
+    with(o) {
+        try {
+            r = r + "A";
+            throw "e";
+        } catch(e) {
+            r = r + "B";
+        }
+    }
+    with(o) {
+        r = r + "|" + .m;
+    }
+    return "done";
+}
+var st = f();
+var g = %[n: 1];
+var out = "";
+with(g) {
+    try { out = "n=" + .n; throw "y"; } catch(e) { out = out + "|c"; }
+    out = out + "|" + .n;
+}
+assertTrue(((r)) == "AB|7");
+assertTrue(((st)) == "done");
+assertTrue(((out)) == "n=1|c|1");
+
+finishTests();

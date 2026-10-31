@@ -1,0 +1,8 @@
+// 循环 - const 声明与 for(const) 首子句 / for 首子句 const 声明
+Scripts.execStorage("../../assert.tjs");
+
+var sum = 0;
+for(const i = 0; i < 4; i = i + 1) { sum = sum + i; }
+assertTrue(((int)(sum)) == 6);
+
+finishTests();

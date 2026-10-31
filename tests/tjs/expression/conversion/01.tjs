@@ -1,0 +1,6 @@
+// 类型转换 / convert int
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue((((int)(int "1"))) == 1);
+
+finishTests();

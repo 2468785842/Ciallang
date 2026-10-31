@@ -1,0 +1,13 @@
+// 表达式 - 前缀递增递减 / # / $ / delete / 前缀 ++/-- 顶层与函数内
+Scripts.execStorage("../../assert.tjs");
+
+var i = 5;
+var r1 = ++i; var r2 = --i;
+function f() { var n = 10; ++n; --n; return n; }
+var r3 = f();
+assertTrue(((int)(i)) == 5);
+assertTrue(((int)(r1)) == 6);
+assertTrue(((int)(r2)) == 5);
+assertTrue(((int)(r3)) == 10);
+
+finishTests();

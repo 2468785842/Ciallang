@@ -1,0 +1,11 @@
+// 循环 - 未初始化多变量声明相互独立
+Scripts.execStorage("../assert.tjs");
+
+function f() { var a, b, c; a = 1; b = 2; c = 3; return a + b * 10 + c * 100; }
+var r = f();
+var x, y; x = 7; y = 8;
+assertTrue(((int)(r)) == 321);
+assertTrue(((int)(x)) == 7);
+assertTrue(((int)(y)) == 8);
+
+finishTests();

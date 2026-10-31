@@ -1,0 +1,26 @@
+// 取引用、显式访问和跨对象重新注册，均不把全局槽误当作局部变量。
+Scripts.execStorage("../assert.tjs");
+
+var trace = "", stored = 0;
+property source {
+    getter() { trace += "G"; return stored; }
+    setter(v) { trace += "S"; stored = v; }
+}
+{
+    var reference = &source;
+    assertTrue(trace == "");
+    assertTrue(reference instanceof "Property");
+    *reference = 10;
+    assertTrue(*reference == 10);
+    assertTrue(trace == "SG");
+    var holder = %[];
+    &holder.alias = reference;
+    assertTrue(trace == "SG");
+    holder.alias = 123;
+    assertTrue(holder.alias == 123);
+    assertTrue(stored == 123);
+    assertTrue(trace == "SGSG");
+}
+assertTrue(!((source) instanceof "Property"));
+
+finishTests();

@@ -1,0 +1,22 @@
+// property - & 引用与 * 解引用（TJS2 &/* 语义） / &成员写入绕过 setter 注册引用
+Scripts.execStorage("../../assert.tjs");
+
+class test {
+    function test() { variable = 0; }
+    var variable;
+    property prop {
+        getter() { return variable; }
+        setter(v) { variable = v; }
+    }
+}
+var tmp = new test();
+function f() {
+    tmp.prop = 4;
+    var p = &tmp.prop;   // 局部变量纯拷贝；全局/成员槽需用 & 取得引用本体
+    *p = 20;
+    return (*p) * 100 + tmp.prop;
+}
+var r = f();
+assertTrue(((int)(r)) == 2020);
+
+finishTests();

@@ -1,0 +1,22 @@
+// 未声明自定义构造函数时，仍初始化字段与属性；不自动调用基类构造函数。
+Scripts.execStorage("../assert.tjs");
+
+class B { var b = 1; function B() { b = 2; } }
+class C extends B { var c = 3; }
+class D { var d = 4; }
+class E { property p { getter { return 55; } } }
+var d1 = new D();
+var dv = d1.d;
+var c1 = new C();
+var bv = c1.b;
+var cv = c1.c;
+var e1 = new E();
+var ev = e1.p;
+var eok = isvalid e1;
+assertTrue(((int)(dv)) == 4);
+assertTrue(((int)(bv)) == 1);
+assertTrue(((int)(cv)) == 3);
+assertTrue(((int)(ev)) == 55);
+assertTrue(((int)(eok)) == 1);
+
+finishTests();

@@ -1,0 +1,22 @@
+// switch - execution / function call expr
+Scripts.execStorage("../../assert.tjs");
+
+function testSwitch(f, g, h) {
+    var r;
+    switch (f()) {
+        case g():
+            r = 1;
+            break;
+        case h():
+            r = 2;
+            break;
+    }
+    return r;
+}
+assertTrue(((int)(testSwitch(function { return true; },function { return true; },function { return true; }))) == 1);
+assertTrue(((int)(testSwitch(function { return true; },function { return false; },function { return true; }))) == 2);
+assertTrue((typeof (testSwitch(function { return false; },function { return true; },function { return true; }))
+                     == "void"));
+assertTrue(((int)(testSwitch(function { return false; },function { return false; },function { return true; }))) == 1);
+
+finishTests();

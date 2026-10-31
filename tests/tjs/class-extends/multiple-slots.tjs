@@ -1,0 +1,14 @@
+// TJS2 - 多继承 slot 查找顺序
+Scripts.execStorage("../assert.tjs");
+
+class A { var x = 1; function A() {} }
+class B { var x = 2; function B() {} }
+class C extends A, B {
+    function C() { A(); B(); }
+    function getX() { return x; }
+}
+var o = new C();
+var res = o.getX();
+assertTrue(((int)(res)) == 2);
+
+finishTests();

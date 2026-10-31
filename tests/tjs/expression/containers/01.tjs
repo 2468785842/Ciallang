@@ -1,0 +1,13 @@
+// 表达式 - Array/Dictionary 字面量与下标 / 数组字面量与下标读写
+Scripts.execStorage("../../assert.tjs");
+
+var a = [1, 2, 3];
+var c0 = a.count;
+var v0 = a[0];
+a[1] = 20;
+var v1 = a[1];
+assertTrue(((int)(c0)) == 3);
+assertTrue(((int)(v0)) == 1);
+assertTrue(((int)(v1)) == 20);
+
+finishTests();

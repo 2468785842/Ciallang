@@ -1,0 +1,7 @@
+// 本地函数声明 - 字符串 length 只读属性 / Property - length
+Scripts.execStorage("../assert.tjs");
+
+assertTrue(((int)("hello".length)) == 5);
+assertTrue(((int)("".length)) == 0);
+
+finishTests();

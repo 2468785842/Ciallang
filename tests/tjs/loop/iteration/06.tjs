@@ -1,0 +1,8 @@
+// 循环 - 执行 / 顶层后缀递减操作数顺序
+Scripts.execStorage("../../assert.tjs");
+
+var a = 5; a--; var b = 5; b++;
+assertTrue(((int)(a)) == 4);
+assertTrue(((int)(b)) == 6);
+
+finishTests();

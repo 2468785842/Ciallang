@@ -1,0 +1,12 @@
+// 省略透传 / collapse 参数 / 展开调用（源码路径，对齐 tjs.y func_decl_arg_collapse） / `expr*` 展开调用与混合形态
+Scripts.execStorage("../../assert.tjs");
+
+function sum3(a, b, c) { return a + b * 100 + c * 10000; }
+var arr = [2];
+var r1 = sum3(1, arr*, 4);
+var args = [1, 2, 3];
+var r2 = sum3(args*);
+assertTrue(((int)(r1)) == 1 + 2 * 100 + 4 * 10000);
+assertTrue(((int)(r2)) == 1 + 2 * 100 + 3 * 10000);
+
+finishTests();

@@ -1,0 +1,10 @@
+// preprocessor @set and variable usage
+Scripts.execStorage("../assert.tjs");
+
+@set(flag = 1)
+@if(flag)
+    var b = "flag is set";
+@endif
+assertTrue((b) == "flag is set");
+
+finishTests();

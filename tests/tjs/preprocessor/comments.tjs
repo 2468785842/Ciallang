@@ -1,0 +1,18 @@
+// preprocessor comments ignored
+Scripts.execStorage("../assert.tjs");
+
+// @set(flag=1)
+/* @set(x=42) */
+var g;
+@set(flag=0)
+@if(flag)
+    g = "should not appear";
+@endif
+@set(flag=1)
+@if(flag)
+    var h = "should appear";
+@endif
+assertTrue((typeof (g) == "void"));
+assertTrue((h) == "should appear");
+
+finishTests();

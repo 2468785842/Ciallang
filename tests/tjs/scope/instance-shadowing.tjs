@@ -1,0 +1,13 @@
+// 恢复原先注释掉的实例字段遮蔽全局变量用例。
+Scripts.execStorage("../assert.tjs");
+
+var x = 1;
+class Derived {
+    var x = 2;
+    function getX() { return x; }
+}
+var instance = new Derived();
+assertTrue(instance.getX() == 2);
+assertTrue(x == 1);
+
+finishTests();

@@ -1,0 +1,6 @@
+// 表达式 - 函数表达式 / 无参数调用
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((!!(function { return true; }()))) == true);
+
+finishTests();

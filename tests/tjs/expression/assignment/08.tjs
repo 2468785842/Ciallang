@@ -1,0 +1,7 @@
+// 表达式 - 赋值表达式 / 左值只求值一次
+Scripts.execStorage("../../assert.tjs");
+
+var i = 0; function f { i += 1; return i; } var a = 0; a += f(); var __result1 = i;
+assertTrue((((int)(__result1))) == 1);
+
+finishTests();

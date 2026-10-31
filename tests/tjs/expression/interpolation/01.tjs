@@ -1,0 +1,8 @@
+// 模板串 - 内嵌表达式展开 / &表达式; 展开
+Scripts.execStorage("../../assert.tjs");
+
+var x = 3;
+function f() { return 7; }
+assertTrue(((@"1+2=&1+2;")) == "1+2=3");
+
+finishTests();

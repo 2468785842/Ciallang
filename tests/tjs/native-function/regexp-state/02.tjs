@@ -1,0 +1,6 @@
+// RegExp.last 静态属性 + 匹配位置码点语义 / 未执行过任何 test/exec 时为 void
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue((typeof (RegExp.last) == "void"));
+
+finishTests();

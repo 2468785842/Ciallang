@@ -1,0 +1,11 @@
+// preprocessor disabled code via @if
+Scripts.execStorage("../assert.tjs");
+
+@set(flag = 0)
+var f;
+@if(flag)
+    f = "should not appear";
+@endif
+assertTrue((typeof (f) == "void"));
+
+finishTests();

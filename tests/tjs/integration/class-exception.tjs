@@ -1,0 +1,30 @@
+// 集成 - 类、继承、property 与异常组合
+Scripts.execStorage("../assert.tjs");
+
+class Animal {
+    function speak() { return "..."; }
+}
+class Dog extends Animal {
+    property tag { getter() { return "dog"; } }
+    function speak() { return "woof"; }
+    function describe() { return tag + " says " + this.speak(); }
+}
+var d = new Dog();
+var sp = d.speak();
+var de = d.describe();
+var caught = 0;
+var msg = "";
+try {
+    throw new Exception("boom");
+} catch(e) {
+    caught = 1;
+    msg = e.message;
+}
+var after = 1;
+assertTrue(((sp)) == "woof");
+assertTrue(((de)) == "dog says woof");
+assertTrue(((int)(caught)) == 1);
+assertTrue(((msg)) == "boom");
+assertTrue(((int)(after)) == 1);
+
+finishTests();

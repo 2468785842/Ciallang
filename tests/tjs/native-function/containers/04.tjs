@@ -1,0 +1,12 @@
+// 本地函数声明 - Array/Dictionary 内建方法 / count 属性可写（调整长度）
+Scripts.execStorage("../../assert.tjs");
+
+var a = [1, 2, 3];
+a.count = 5;
+var c1 = a.count;
+a.length = 1;
+var c2 = a.count;
+assertTrue(((int)(c1)) == 5);
+assertTrue(((int)(c2)) == 1);
+
+finishTests();

@@ -1,0 +1,12 @@
+// split 返回 Array；原注释的 String* / length 断言类型错误，改查元素与 count。
+Scripts.execStorage("../../assert.tjs");
+
+var fields = "a,b,c".split(",");
+assertTrue(fields.count == 3);
+assertTrue(fields[0] == "a" && fields[1] == "b" && fields[2] == "c");
+fields = "a,,b".split(",");
+assertTrue(fields.count == 3);
+assertTrue(fields[1] == "");
+assertTrue("".split(",").count == 1);
+
+finishTests();

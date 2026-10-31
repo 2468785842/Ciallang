@@ -144,7 +144,7 @@ function testMisc() {
 	}
 	isSuccess = false;
 	try {
-		//tmp = 3%0; これは落ちるので使えない
+		// 原版的模零路径可能崩溃；Ciallang 的错误返回由 type_system_test.cpp 验证。
 		var oct5 = <% 5 %>;
 		tmp = <% 10 %> / oct5;
 	} catch(e) {

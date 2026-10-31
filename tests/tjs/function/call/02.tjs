@@ -1,0 +1,9 @@
+// 函数声明 - 函数调用 / 无参数函数调用
+Scripts.execStorage("../../assert.tjs");
+
+function foo() { return 1; }
+var rFoo = foo();
+assertTrue(((foo instanceof "Function")));
+assertTrue(((int)(rFoo)) == 1);
+
+finishTests();

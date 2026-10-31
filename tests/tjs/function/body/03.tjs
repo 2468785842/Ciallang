@@ -1,0 +1,13 @@
+// 函数声明 - 函数体内容 / 带循环的函数体
+Scripts.execStorage("../../assert.tjs");
+
+function loop() {
+    var i = 0;
+    while (i < 10) i = i + 1;
+    return i;
+}
+var rLoop = loop();
+assertTrue(((loop instanceof "Function")));
+assertTrue(((int)(rLoop)) == 10);
+
+finishTests();

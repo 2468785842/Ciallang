@@ -1,0 +1,12 @@
+// OOP - 构造函数调用与参数传递
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x;
+    function A(v) { x = v; }
+}
+var o = new A(42);
+var res = o.x;
+assertTrue(((int)(res)) == 42);
+
+finishTests();

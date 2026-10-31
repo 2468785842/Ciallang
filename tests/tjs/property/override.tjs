@@ -1,0 +1,8 @@
+// 恢复原注释中的同名属性覆盖：后一次定义成为最终注册项。
+Scripts.execStorage("../assert.tjs");
+
+property overwritten { getter() { return 1; } }
+property overwritten { getter() { return 2; } }
+assertTrue(overwritten == 2);
+
+finishTests();

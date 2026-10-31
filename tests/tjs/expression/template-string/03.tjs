@@ -1,0 +1,6 @@
+// 模版字符串 / 逻辑表达式组合（模板字符串）
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((@"&1 > 0; \&\& &5 < 10; || &6 == 5;")) == "1 && 1 || 0");
+
+finishTests();

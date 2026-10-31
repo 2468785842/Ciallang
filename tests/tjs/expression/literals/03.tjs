@@ -1,0 +1,6 @@
+// 表达式 - 字面量表达式 / 字符串字面量
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue((("hello world")) == "hello world");
+
+finishTests();

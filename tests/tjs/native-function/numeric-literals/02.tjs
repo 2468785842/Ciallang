@@ -1,0 +1,12 @@
+// 数字字面量——进制/浮点/科学计数法 / 十六进制/二进制浮点（p 指数）
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue((((real)(0x1p4))) == 16.0);
+assertTrue((((real)(0x1p-2))) == 0.25);
+assertTrue((((real)(0x1.8p1))) == 3.0);
+assertTrue((((real)(0X1.8P1))) == 3.0);
+assertTrue((((real)(0x1.07CCp14))) == 16883.0);
+assertTrue((((real)(0b1.1))) == 1.5);
+assertTrue((((real)(0b1p-1))) == 0.5);
+
+finishTests();

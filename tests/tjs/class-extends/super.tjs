@@ -1,0 +1,16 @@
+// OOP - 单继承与 super 方法调用
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    function A() {}
+    function foo() { return 1; }
+}
+class B extends A {
+    function B() { A(); }
+    function foo() { return super.foo() + 1; }
+}
+var o = new B();
+var res = o.foo();
+assertTrue(((int)(res)) == 2);
+
+finishTests();

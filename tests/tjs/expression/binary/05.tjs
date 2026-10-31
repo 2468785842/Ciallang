@@ -1,0 +1,14 @@
+// 表达式 - 二元运算表达式 / 交换运算
+Scripts.execStorage("../../assert.tjs");
+
+var a = 1, b = 2; a <-> b;
+assertTrue((((int)(a))) == 2);
+assertTrue((((int)(b))) == 1);
+var gA, gB; { var a = 1, b = 2; a <-> b; gA = a, gB = b; }
+assertTrue((((int)(gA))) == 2);
+assertTrue((((int)(gB))) == 1);
+var a = 1, c = 3; { var b = 2; a <-> b; c = b; }
+assertTrue((((int)(a))) == 2);
+assertTrue((((int)(c))) == 1);
+
+finishTests();

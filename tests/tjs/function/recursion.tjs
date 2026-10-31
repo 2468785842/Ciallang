@@ -1,0 +1,13 @@
+// 函数声明 - 递归函数 / 直接递归
+Scripts.execStorage("../assert.tjs");
+
+function factorial(n) {
+    if (n <= 1) return 1;
+    else return n * factorial(n - 1);
+}
+var __result1 = factorial(3);
+var ret = ((int)(__result1));
+assertTrue(((factorial instanceof "Function")));
+assertTrue(ret == 6);
+
+finishTests();

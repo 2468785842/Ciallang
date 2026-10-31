@@ -1,0 +1,8 @@
+// 表达式 - 二元运算表达式 / 逻辑或运算
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((!!(true || false))) == true);
+assertTrue(((!!(false || true))) == true);
+assertTrue(((!!(false || false))) == false);
+
+finishTests();

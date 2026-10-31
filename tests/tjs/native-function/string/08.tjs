@@ -1,0 +1,15 @@
+// 本地函数声明 - 字符串成员方法定义 / Method - reverse
+Scripts.execStorage("../../assert.tjs");
+
+var str = "abc"; var r = str.reverse(); var __result1 = r;
+assertTrue((__result1) == "cba");
+var str = "abc"; str.reverse(); var __result2 = str;
+assertTrue((__result2) == "abc");
+assertTrue(("abcdefghijklmnop".reverse()) == "ponmlkjihgfedcba");
+assertTrue(("漢字abc".reverse()) == "cba字漢");
+var str = "a"; str.reverse(); var __result3 = str;
+assertTrue((__result3) == "a");
+var str = ""; str.reverse(); var __result4 = str;
+assertTrue((__result4) == "");
+
+finishTests();

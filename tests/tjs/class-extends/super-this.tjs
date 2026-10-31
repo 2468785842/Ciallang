@@ -1,0 +1,18 @@
+// OOP - super 方法应作用于子类对象
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    function A() {}
+    function set() { x = 5; }
+}
+class B extends A {
+    var x = 1;
+    function B() { A(); }
+    function f() { super.set(); }
+}
+var o = new B();
+o.f();
+var res = o.x;
+assertTrue(((int)(res)) == 5);
+
+finishTests();

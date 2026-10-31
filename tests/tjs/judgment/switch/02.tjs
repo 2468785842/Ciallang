@@ -1,0 +1,20 @@
+// switch - execution / depth break
+Scripts.execStorage("../../assert.tjs");
+
+function testSwitch(x, y) {
+    var r = 0;
+    switch (x) {
+        case 1:
+            if (y > 10)
+                break;
+            r = 1;
+            break;
+    }
+    return r;
+}
+assertTrue(((int)(testSwitch(1, 1))) == 1);
+assertTrue(((int)(testSwitch(2, 10))) == 0);
+assertTrue(((int)(testSwitch(1, 10))) == 1);
+assertTrue(((int)(testSwitch(1, 11))) == 0);
+
+finishTests();

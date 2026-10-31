@@ -1,0 +1,17 @@
+// TJS2 - 子类字段不 override 父类字段
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x = 1;
+    function A() {}
+    function getX() { return x; }
+}
+class B extends A {
+    var x = 100;
+    function B() { A(); }
+}
+var o = new B();
+var res = o.getX();
+assertTrue(((int)(res)) == 100);
+
+finishTests();

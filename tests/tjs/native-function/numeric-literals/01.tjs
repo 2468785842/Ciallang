@@ -1,0 +1,9 @@
+// 数字字面量——进制/浮点/科学计数法 / 进制前缀整数
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((int)(0x10)) == 16);
+assertTrue(((int)(0xFF)) == 255);
+assertTrue(((int)(0b101)) == 5);
+assertTrue(((int)(010)) == 8);
+
+finishTests();

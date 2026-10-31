@@ -1,0 +1,15 @@
+// 本地函数声明 - RegExp 内建方法 / Method - split
+Scripts.execStorage("../../assert.tjs");
+
+var p1 = "a,b;c".split(",;");
+var p2 = "a,,b".split(",", void, true);
+var p3 = "a1b22c".split(/\d+/);
+var a4 = [].split(/,/, "x,y,z");
+assertTrue(((int)(p1.count)) == 3);
+assertTrue(((p1[2])) == "c");
+assertTrue(((int)(p2.count)) == 2);
+assertTrue(((int)(p3.count)) == 3);
+assertTrue(((p3[1])) == "b");
+assertTrue(((int)(a4.count)) == 3);
+
+finishTests();

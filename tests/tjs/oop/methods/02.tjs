@@ -1,0 +1,9 @@
+// OOP - 类方法定义与调用 / 实例成员访问
+Scripts.execStorage("../../assert.tjs");
+
+class A { var a = 1; function A() {} }
+var o = new A();
+var res = o.a;
+assertTrue(((int)(res)) == 1);
+
+finishTests();

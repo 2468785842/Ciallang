@@ -1,0 +1,11 @@
+// 本地函数声明 - 字符串成员方法定义 / Method - charAt
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(("123".charAt(2)) == "3");
+assertTrue(("cab".charAt(0)) == "c");
+assertTrue(("cab".charAt(3)) == "");
+assertTrue(("".charAt(0)) == "");
+assertTrue(("abc".charAt(-1)) == "");
+assertTrue(("abc".charAt(100)) == "");
+
+finishTests();

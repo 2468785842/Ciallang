@@ -1,0 +1,9 @@
+// 表达式 - instanceof 基础类型 / Number/String 匹配
+Scripts.execStorage("../assert.tjs");
+
+assertTrue((!!(10 instanceof "Number")) == true);
+assertTrue((!!(1.5 instanceof "Number")) == true);
+assertTrue((!!("s" instanceof "String")) == true);
+assertTrue((!!("s" instanceof "Number")) == false);
+
+finishTests();

@@ -1,0 +1,7 @@
+// 表达式 - 赋值表达式 / 赋值表达式的值
+Scripts.execStorage("../../assert.tjs");
+
+var a = 1; var b; b = (a += 2); var __result1 = a * 10 + b;
+assertTrue((((int)(__result1))) == 33);
+
+finishTests();

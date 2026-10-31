@@ -1,0 +1,15 @@
+// 块作用域 - 遮蔽、重新声明与退出后寄存器复用 / 相邻块和嵌套空块退出只释放自身局部槽一次
+Scripts.execStorage("../../assert.tjs");
+
+function f(p) {
+    var sum=0;
+    { { var a=1; sum+=a; } }
+    { var b=10,c=20; b+=1; sum+=b+c; }
+    { {} }
+    { var c=100; sum+=c; }
+    return sum+p;
+}
+var __result1 = f(2);
+assertTrue(((int)(__result1)) == 134);
+
+finishTests();

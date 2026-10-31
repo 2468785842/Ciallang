@@ -1,0 +1,6 @@
+// 表达式 - 复杂表达式组合 / 带括号的表达式
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue((((int)((1 + 2) * (1 - 2)))) == -3);
+
+finishTests();

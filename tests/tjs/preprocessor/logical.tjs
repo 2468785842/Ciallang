@@ -1,0 +1,27 @@
+// preprocessor logical operators
+Scripts.execStorage("../assert.tjs");
+
+@set(a = 1)
+@set(b = 0)
+@if(a && !b)
+    var i = "logical && ! works";
+@endif
+@if(a || b)
+    var j = "logical || works";
+@endif
+@if(a & 1)
+    var k = "bitwise & works";
+@endif
+@if(a | 0)
+    var l = "bitwise | works";
+@endif
+@if(a ^ 0)
+    var m = "bitwise ^ works";
+@endif
+assertTrue((i) == "logical && ! works");
+assertTrue((j) == "logical || works");
+assertTrue((k) == "bitwise & works");
+assertTrue((l) == "bitwise | works");
+assertTrue((m) == "bitwise ^ works");
+
+finishTests();

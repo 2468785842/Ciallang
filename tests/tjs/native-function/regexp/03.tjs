@@ -1,0 +1,12 @@
+// 本地函数声明 - RegExp 内建方法 / exec 无 g 重复执行不推进
+Scripts.execStorage("../../assert.tjs");
+
+var e = /b/;
+var m1 = e.exec("abcb");
+var i1 = e.index;
+var m2 = e.exec("abcb");
+var i2 = e.index;
+assertTrue(((int)(i1)) == 1);
+assertTrue(((int)(i2)) == 1);
+
+finishTests();

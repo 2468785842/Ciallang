@@ -14,37 +14,6 @@
 
 using namespace cial;
 
-// ── `in` 运算符（tjs.y:661，保留字）──
-// 原版 tjsInterCodeGen 无 T_IN 分支：节点与两侧操作数均不求值，整体为 void。
-// 参考实现实测（2026-10-29）：`var x = "a" in %[a:1];` → x 为 void；
-// `if("a" in d)` 恒假；官方リファレンス亦无 in 运算符章节。
-TEST_CASE("保留字 - in 运算符为无代码 void") {
-    Runtime rt{};
-    Context context{ rt };
-    vm::VMState vmState{ context };
-    VM vm{ &vmState };
-
-    vm.eval(R"(
-        var count = 0;
-        function f() { count++; return "a"; }
-        var d = %[a:1];
-        var x = f() in d;
-        var inCond = 0;
-        if("a" in d) inCond = 1;
-    )"_str);
-
-    SECTION("表达式结果为 void") { REQUIRE(*vm.evalExpr<Integer>("x === void"_str) == 1); }
-
-    SECTION("两侧操作数不求值") { REQUIRE(*vm.evalExpr<Integer>("count"_str) == 0); }
-
-    SECTION("作条件恒假") { REQUIRE(*vm.evalExpr<Integer>("inCond"_str) == 0); }
-
-    SECTION("嵌套时 in 子式等价 void 字面量") {
-        // 原版 `1 + (d in d)` 生成 `add %r, %0(void)`：与 1 + void 完全同码
-        REQUIRE(*vm.evalExpr<Integer>("(1 + (d in d)) === (1 + void)"_str) == 1);
-    }
-}
-
 // ── 类型注解（tjs.y:339 variable_type）──
 // 原版注释 "It is not currently effect. Ignore types."：`: symbol|void|int|real|string|octet`
 // 出现在 var 声明/函数参数/函数返回值/getter/setter，全部仅解析并丢弃。
@@ -163,31 +132,6 @@ TEST_CASE("new - 无调用形态为编译错误") {
     }
 }
 
-// ── 模板串内嵌表达式（官方 Token.md：@ 字符串字面量）──
-// `&expr;` 与 `${expr}` 求值展开；`\&`/`\$` 转义不展开；裸 `$`（无紧跟 `{`）
-// 为普通文本（参考 tjsLex.cpp:315 '$' 分支）。
-TEST_CASE("模板串 - 内嵌表达式展开") {
-    Runtime rt{};
-    Context context{ rt };
-    vm::VMState vmState{ context };
-    VM vm{ &vmState };
-
-    vm.eval(R"(
-        var x = 3;
-        function f() { return 7; }
-    )"_str);
-
-    SECTION("&表达式; 展开") { REQUIRE(*(*vm.evalExpr<String *>(R"(@"1+2=&1+2;")"_str)) == "1+2=3"); }
-
-    SECTION("&局部变量; 与 &函数调用;") { REQUIRE(*(*vm.evalExpr<String *>(R"(@"x=&x; f=&f();")"_str)) == "x=3 f=7"); }
-
-    SECTION("${表达式} 展开") { REQUIRE(*(*vm.evalExpr<String *>(R"(@"v=${f()}")"_str)) == "v=7"); }
-
-    SECTION("转义 \\& 不展开") { REQUIRE(*(*vm.evalExpr<String *>(R"(@"lit \& end")"_str)) == "lit & end"); }
-
-    SECTION("裸 $ 为普通文本") { REQUIRE(*(*vm.evalExpr<String *>(R"(@"d $x; end")"_str)) == "d $x; end"); }
-}
-
 // ── static/private/public/protected（tjs.y:116-120、tjsLex.cpp:926）──
 // 原版保留字但文法产生式零使用（与 `in` 同类）：类内 `static var` 等写法
 // 在原版即语法错误。Ciallang 同样拒绝编译——行为锁定，勿实现成 static 成员。
@@ -196,8 +140,8 @@ TEST_CASE("保留字 - static/private/public/protected 无文法规则") {
     Common::Result r{};
 
     for(const char *decl :
-        {"class C { static var sv = 1; }", "class C { static function f() { } }", "class C { private var pv = 1; }",
-         "class C { public var uv = 1; }", "class C { protected var xv = 1; }", "static var top = 1;"}) {
+        { "class C { static var sv = 1; }", "class C { static function f() { } }", "class C { private var pv = 1; }",
+          "class C { public var uv = 1; }", "class C { protected var xv = 1; }", "static var top = 1;" }) {
         sourceFile.load(r, decl);
         Runtime rt{};
         Context context{ rt };

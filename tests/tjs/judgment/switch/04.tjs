@@ -1,0 +1,22 @@
+// switch - execution / multi case + default
+Scripts.execStorage("../../assert.tjs");
+
+function testSwitch(x) {
+    var r;
+    switch (x) {
+        case 1:
+        case 2:
+        case 3:
+            r = 123;
+            break;
+        default:
+            r = 0;
+    }
+    return r;
+}
+assertTrue(((int)(testSwitch(1))) == 123);
+assertTrue(((int)(testSwitch(2))) == 123);
+assertTrue(((int)(testSwitch(3))) == 123);
+assertTrue(((int)(testSwitch(4))) == 0);
+
+finishTests();

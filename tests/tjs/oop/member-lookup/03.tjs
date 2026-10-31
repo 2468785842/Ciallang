@@ -1,0 +1,12 @@
+// OOP - 类访问变量 / 实例成员函数访问成员变量
+Scripts.execStorage("../../assert.tjs");
+
+class A {
+    var a = 1;
+    function A() {}
+    function b() { return a; }
+}
+var o = new A().b();
+assertTrue(((int)(o)) == 1);
+
+finishTests();

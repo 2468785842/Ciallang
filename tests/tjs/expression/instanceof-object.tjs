@@ -1,0 +1,11 @@
+// 表达式 - instanceof 内置对象与函数
+Scripts.execStorage("../assert.tjs");
+
+assertTrue((!!([1] instanceof "Array")) == true);
+assertTrue((!!(%[k: 1] instanceof "Dictionary")) == true);
+assertTrue((!!(/x/g instanceof "RegExp")) == true);
+assertTrue((!!((function() { }) instanceof "Function")) == true);
+assertTrue((!!([1] instanceof "Dictionary")) == false);
+assertTrue((!!(/x/g instanceof "Array")) == false);
+
+finishTests();

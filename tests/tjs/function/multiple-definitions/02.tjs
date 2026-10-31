@@ -1,0 +1,15 @@
+// 函数声明 - 多个函数定义 / 函数与变量混合
+Scripts.execStorage("../../assert.tjs");
+
+var x = 10;
+function getX() { return x; }
+function setX(val) { x = val; }
+var ret = (void);
+assertTrue(((getX instanceof "Function")));
+assertTrue(((setX instanceof "Function")));
+assertTrue(((int)(x)) == 10);
+assertTrue(((int)(getX())) == 10);
+setX(20); var __result1 = getX();
+assertTrue(((int)(__result1)) == 20);
+
+finishTests();

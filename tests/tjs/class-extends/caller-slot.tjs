@@ -1,0 +1,18 @@
+// TJS2 - 方法不绑定 slot 而不是调用者
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x = 1;
+    function A() {}
+    function getX() { return x; }
+}
+class B extends A {
+    var x = 2;
+    function B() { A(); }
+}
+var o = new B();
+var f = o.getX;
+var res = f();
+assertTrue(((int)(res)) == 2);
+
+finishTests();

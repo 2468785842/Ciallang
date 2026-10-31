@@ -87,9 +87,7 @@ TEST_CASE("解释器 - 边界与错误路径") {
         REQUIRE(*vm.evalExpr<Integer>("ok"_str) == 7);
     }
 
-    SECTION("evalExpr空表达式") {
-        REQUIRE_NOTHROW(vm.evalExpr(""_str));
-    }
+    SECTION("evalExpr空表达式") { REQUIRE_NOTHROW(vm.evalExpr(""_str)); }
 
     SECTION("函数体含不支持语法不崩溃") {
         // 回归:前缀 &/*/未支持时 generateFuncMeta 曾对空 Opt 解引用段错误
@@ -100,74 +98,6 @@ TEST_CASE("解释器 - 边界与错误路径") {
         REQUIRE_THROWS_AS(vm.eval("throw \"boom\";"_str), std::exception);
         // 失败后状态未破坏,后续求值正常
         REQUIRE(*vm.evalExpr<Integer>("40 + 2"_str) == 42);
-    }
-}
-
-TEST_CASE("with 语句与裸词链") {
-    Runtime rt{};
-    Context context{ rt };
-    stdlib::registerStandardLibrary(context);
-    vm::VMState vmState{ context };
-    VM vm{ &vmState };
-    stdlib::initExceptionClass(vm);
-
-    SECTION("with(obj) 块内裸词链读写与调用") {
-        vm.eval(R"(
-            class C {
-                var a, b;
-                function C() { a = b = 0; }
-                function bump() { a = a + 1; }
-            }
-            var o = new C();
-            with(o) {
-                .a = 5;
-                .b = .a + 1;
-                .bump();
-            }
-        )"_str);
-        REQUIRE(*vm.evalExpr<Integer>("o.a"_str) == 6);
-        REQUIRE(*vm.evalExpr<Integer>("o.b"_str) == 6);
-    }
-
-    SECTION("with 单语句形式") {
-        vm.eval(R"(
-            var o = %[x : 0];
-            with(o) .x = 7;
-        )"_str);
-        REQUIRE(*vm.evalExpr<Integer>("o.x"_str) == 7);
-    }
-
-    SECTION("嵌套 with 栈顶优先") {
-        vm.eval(R"(
-            var d1 = %[v : 1];
-            var d2 = %[v : 2];
-            var hit1, hit2;
-            with(d1) {
-                with(d2) {
-                    hit2 = .v;
-                }
-                hit1 = .v;
-            }
-        )"_str);
-        REQUIRE(*vm.evalExpr<Integer>("hit1"_str) == 1);
-        REQUIRE(*vm.evalExpr<Integer>("hit2"_str) == 2);
-    }
-
-    SECTION("顶层裸词链写全局") {
-        vm.eval(R"(
-            .gvarl = 7;
-        )"_str);
-        REQUIRE(*vm.evalExpr<Integer>("gvarl"_str) == 7);
-    }
-
-    SECTION("with 对象可为表达式且每次求值") {
-        vm.eval(R"(
-            var d = %[v : 3];
-            var r;
-            with(d) .v = .v + 1;
-            r = d.v;
-        )"_str);
-        REQUIRE(*vm.evalExpr<Integer>("r"_str) == 4);
     }
 }
 
@@ -329,10 +259,14 @@ TEST_CASE("GC ignores synthetic empty finalizers", "[gc]") {
     int destroyed = 0;
     {
         Runtime owner{ 8 };
-        { auto probe = owner.create<Probe>(&destroyed); }
+        {
+            auto probe = owner.create<Probe>(&destroyed);
+        }
         owner.markSweep.collect([&] { owner.collectAllMark(); });
         REQUIRE(destroyed == 1);
-        { auto probe = owner.create<Probe>(&destroyed); }
+        {
+            auto probe = owner.create<Probe>(&destroyed);
+        }
     }
     REQUIRE(destroyed == 2);
 }

@@ -1,0 +1,8 @@
+// 循环 - 执行 / while执行
+Scripts.execStorage("../../assert.tjs");
+
+var i = 0;
+while (i < 10) i = i + 1;
+assertTrue(((int)(i)) == 10);
+
+finishTests();

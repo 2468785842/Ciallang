@@ -1,0 +1,15 @@
+// 表达式 - 赋值表达式 / 算术复合赋值
+Scripts.execStorage("../../assert.tjs");
+
+var x = 10; x += 5; var __result1 = x;
+assertTrue((((int)(__result1))) == 15);
+var x = 10; x -= 3; var __result2 = x;
+assertTrue((((int)(__result2))) == 7);
+var x = 6; x *= 7; var __result3 = x;
+assertTrue((((int)(__result3))) == 42);
+var x = 20; x /= 4; var __result4 = x;
+assertTrue((((int)(__result4))) == 5);
+var x = 17; x %= 5; var __result5 = x;
+assertTrue((((int)(__result5))) == 2);
+
+finishTests();

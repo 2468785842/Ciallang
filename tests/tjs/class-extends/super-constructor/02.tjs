@@ -1,0 +1,19 @@
+// TJS2 - super.<Ctor>() 显式基类构造调用 / 构造器内 super 调用后基类 property 可用
+Scripts.execStorage("../../assert.tjs");
+
+class test {
+    function test() { variable = 0; }
+    var variable;
+    property prop {
+        getter() { return variable; }
+        setter(v) { variable = v; }
+    }
+}
+class testInherited extends test {
+    function testInherited() { super.test(); }
+}
+var tmp2 = new testInherited();
+tmp2.prop = 5;
+assertTrue(((int)(tmp2.prop)) == 5);
+
+finishTests();

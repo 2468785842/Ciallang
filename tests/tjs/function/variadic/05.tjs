@@ -1,0 +1,9 @@
+// 省略透传 / collapse 参数 / 展开调用（源码路径，对齐 tjs.y func_decl_arg_collapse） / 裸 `*` 未命名收拢/展开对
+Scripts.execStorage("../../assert.tjs");
+
+function wrap(*) { return passthrough(*); }
+function passthrough(a, b) { return a + b; }
+var r = wrap(30, 12);
+assertTrue(((int)(r)) == 42);
+
+finishTests();

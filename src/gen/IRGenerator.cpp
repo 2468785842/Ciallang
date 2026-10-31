@@ -925,8 +925,12 @@ namespace cial::inter {
         _chunk->emit<Load>(propReg, _chunk->addConstant(propMeta));
 
         if(isTopScope()) {
+            // 声明注册替换属性对象本体；普通 DGlobal 会误调用旧属性的 setter。
+            const auto globalReg = allocateRegister();
+            _chunk->emit<Global>(globalReg);
+            _chunk->emit<DPropRawC>(globalReg, identifier, propReg);
+            freeRegister(globalReg);
             freeRegister(propReg);
-            _chunk->emit<DGlobal>(identifier, propReg);
             return;
         }
 
@@ -1167,8 +1171,8 @@ namespace cial::inter {
 
                 auto *chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
                 const size_t paramCount = node->constructor->parameters.size();
-                auto *initFuncMeta =
-                    _rt.createCompilationObject<FuncMeta>(static_cast<u32>(paramCount), chunk, std::move(gen._localVars));
+                auto *initFuncMeta = _rt.createCompilationObject<FuncMeta>(static_cast<u32>(paramCount), chunk,
+                                                                           std::move(gen._localVars));
                 initFuncMeta->name = identifier;
                 classMeta->setConstructor(initFuncMeta);
             }
@@ -1731,8 +1735,8 @@ namespace cial::inter {
         }
 
         auto *chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
-        auto *funcMeta =
-            _rt.createCompilationObject<FuncMeta>(static_cast<u32>(parameters.size()), chunk, std::move(gen._localVars));
+        auto *funcMeta = _rt.createCompilationObject<FuncMeta>(static_cast<u32>(parameters.size()), chunk,
+                                                               std::move(gen._localVars));
         funcMeta->hasCollapse = hasCollapse;
         return funcMeta;
     }

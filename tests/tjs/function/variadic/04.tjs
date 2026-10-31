@@ -1,0 +1,17 @@
+// 省略透传 / collapse 参数 / 展开调用（源码路径，对齐 tjs.y func_decl_arg_collapse） / 前导属性解引用与裸展开区分
+Scripts.execStorage("../../assert.tjs");
+
+class Holder {
+    var value = 4;
+    property item { getter { return value; } }
+}
+var holder = new Holder();
+function sum(a, b) { return a * 10 + b; }
+function dereference() {
+    var ref = &holder.item;
+    return sum(*ref, sum(1, *ref));
+}
+var r = dereference();
+assertTrue(((int)(r)) == 54);
+
+finishTests();

@@ -1,0 +1,12 @@
+// 函数声明 - 函数体内容 / 带控制流的函数体
+Scripts.execStorage("../../assert.tjs");
+
+function control() {
+    if (true) return 1;
+    else return 0;
+}
+var rControl = control();
+assertTrue(((control instanceof "Function")));
+assertTrue(((int)(rControl)) == 1);
+
+finishTests();

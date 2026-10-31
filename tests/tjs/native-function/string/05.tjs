@@ -1,0 +1,8 @@
+// 本地函数声明 - 字符串成员方法定义 / Method - sprintf
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(("%d-%s".sprintf(10, "ok")) == "10-ok");
+assertTrue(("%s".sprintf("test")) == "test");
+assertTrue(("".sprintf()) == "");
+
+finishTests();

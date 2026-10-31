@@ -1,0 +1,8 @@
+// with 语句与裸词链 / with 单语句形式
+Scripts.execStorage("../assert.tjs");
+
+var o = %[x : 0];
+with(o) .x = 7;
+assertTrue(((int)(o.x)) == 7);
+
+finishTests();

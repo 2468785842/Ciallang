@@ -6,6 +6,7 @@
 
 - [ ] 修复 CHKINS 转译的 target/name 顺序及结果写回。最小函数 `x instanceof "Integer"` 的手工字节码以 21 调用仍返回 21，预期为 1（`src/tjsbc/TjsTranslator.cpp` decode / OP_CHKINS）。
 - [ ] 对齐 `(const)` 容器的编译期构造、元素限制及同一字面量跨调用共享；当前 Parser 忽略标记并在运行期新建，见 [语法说明](doc/syntax.md#8-内联字面量array--dictionary--常量折叠形)。
+- [ ] 逐项核对共用 TJS 脚本套件与参考引擎的差异。本机 Linux、GCC 14、TJSCompiler `d8044c3` 实跑 224 个文件中 191 通过、33 失败或崩溃；不能将此统计直接视为语言语义差异（其 RegExp 使用 UTF-16LE，但 Linux 的 `tjs_char` 为 32 位）。复测及 JSON 报告命令见[脚本测试指南](tests/tjs/README.md)。
 
 ## 性能与优化
 

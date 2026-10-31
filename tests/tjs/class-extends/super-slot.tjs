@@ -1,0 +1,19 @@
+// TJS2 - super slot 优先于 instance 字段
+Scripts.execStorage("../assert.tjs");
+
+class C { var x = 4; function C() {} }
+class A extends C {
+    function A() { C(); }
+    function getX() { return x; }
+    function finalize() { super.finalize(); }
+}
+class B extends A {
+    var x = 2;
+    function B() { A(); }
+    function finalize() { super.finalize(); }
+}
+var o = new B();
+var res = o.getX();
+assertTrue(((int)(res)) == 2);
+
+finishTests();

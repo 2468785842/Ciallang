@@ -1,0 +1,11 @@
+// 表达式 - Array/Dictionary 字面量与下标 / 下标写越界自动扩展
+Scripts.execStorage("../../assert.tjs");
+
+var a = [];
+a[2] = 9;
+var c = a.count;
+var v = a[2];
+assertTrue(((int)(c)) == 3);
+assertTrue(((int)(v)) == 9);
+
+finishTests();

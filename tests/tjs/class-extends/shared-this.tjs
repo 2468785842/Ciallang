@@ -1,0 +1,17 @@
+// OOP - 父子字段应共享同一 this
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x = 1;
+    function A() {}
+}
+class B extends A {
+    function B() { A(); }
+    function inc() { x++; }
+}
+var o = new B();
+o.inc();
+var res = o.x;
+assertTrue(((int)(res)) == 2);
+
+finishTests();

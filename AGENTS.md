@@ -33,7 +33,9 @@ ctest --preset "Linux Debug"
 ```
 
 基础依赖为 fmt、frozen、utf8proc；CLI、测试、JIT 的可选依赖和开关见[构建指南](doc/building.md)。
-C++ 测试显式登记在 `tests/CMakeLists.txt`；CLI、LSP 与字节码工具测试也通过 CTest 运行。
+C++ 测试显式登记在 `tests/CMakeLists.txt`；纯语言/标准库行为放入 `tests/tjs/`，按功能归类，
+用 TJS 断言并自动登记为 CTest；原生注册与内部状态检查保留 Catch2。见[脚本测试指南](tests/tjs/README.md)。
+CLI、LSP 与字节码工具测试也通过 CTest 运行。
 性能修改需做同机 Release 对照，并覆盖异常恢复、可观察结果与 GC 生命周期。
 
 ## 代码惯例
@@ -54,7 +56,7 @@ C++ 测试显式登记在 `tests/CMakeLists.txt`；CLI、LSP 与字节码工具�
 | 运算符 | `src/types/Value.cpp`、`src/gen/IRGenerator.cpp`、`src/gen/Instruction.cpp` |
 | 指令与字节码 | [内部指令](doc/bytecode/ciallang-bytecode.md)、`Bytecode.cpp`、`VMState.cpp`；保持编码、派发与异常表一致 |
 | TJS2 转译 | [转译设计](doc/bytecode/mapping.md)、`src/tjsbc/` 及 fixture；检查截断输入和索引边界 |
-| 类与属性 | `tests/class_extends_test.cpp`、`src/types/Class.cpp`、`Property.hpp` |
+| 类与属性 | `tests/tjs/class-extends/`、`tests/tjs/property/`、`src/types/Class.cpp`、`Property.hpp` |
 | GC 与持有关系 | `Runtime.hpp` 的 create/RootGuard、`gc.hpp` 的 marked/collect；新持有者必须接入标记，sweep 不执行脚本 |
 | 字符串借用 | `src/types/Value.hpp` 的 asString；返回指针不能超过所属 Value 的有效期 |
 | 调用与异常 | `src/vm/VMState.hpp` 的 DispatchRet/ScriptExceptionCarrier、`VM.hpp` 的 callValue；压帧后正确交还主循环 |

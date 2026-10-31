@@ -1,0 +1,18 @@
+// 表达式 - 加法的 void 幺元与字符串化
+Scripts.execStorage("../assert.tjs");
+
+var v;
+var sv = "a" + v;
+var vs = v + "b";
+var vi = v + 1;
+var iv = 1 + v;
+var vr = v + 1.5;
+var vv = v + v;
+assertTrue(((sv)) == "a");
+assertTrue(((vs)) == "b");
+assertTrue(((int)(vi)) == 1);
+assertTrue(((int)(iv)) == 1);
+assertTrue(near((((real)(vr))), 1.5));
+assertTrue((typeof (vv) == "Real"));
+
+finishTests();

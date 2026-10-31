@@ -1,0 +1,12 @@
+// OOP - isvalid 在 invalidate 前后行为
+Scripts.execStorage("../assert.tjs");
+
+class A { function A() {} }
+var o = new A();
+var before = isvalid o;
+invalidate o;
+var after = isvalid o;
+assertTrue(((int)(before)) == 1);
+assertTrue(((int)(after)) == 0);
+
+finishTests();

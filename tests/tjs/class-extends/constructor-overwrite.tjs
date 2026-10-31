@@ -1,0 +1,16 @@
+// TJS2 - 构造函数调用会覆盖子类字段
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x = 1;
+    function A() { x = 10; }
+}
+class B extends A {
+    var x = 2;
+    function B() { A(); }
+}
+var o = new B();
+var res = o.x;
+assertTrue(((int)(res)) == 10);
+
+finishTests();

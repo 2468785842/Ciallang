@@ -1,0 +1,14 @@
+// 集成 - with 语句写实例成员
+Scripts.execStorage("../assert.tjs");
+
+var obj = %["x" => 0, "y" => 0];
+with (obj) {
+    .x = 42;
+    .y = .x + 1;
+}
+var x = obj.x;
+var y = obj.y;
+assertTrue(((int)(x)) == 42);
+assertTrue(((int)(y)) == 43);
+
+finishTests();

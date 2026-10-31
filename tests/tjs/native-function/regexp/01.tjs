@@ -1,0 +1,11 @@
+// 本地函数声明 - RegExp 内建方法 / Method - test/match
+Scripts.execStorage("../../assert.tjs");
+
+assertTrue(((int)(/a.c/.test("abc"))) == 1);
+assertTrue(((int)(/a.c/.test("abd"))) == 0);
+assertTrue(((int)(/ABC/i.test("xabcx"))) == 1);
+assertTrue(((int)(/:(\d+):(\d+):/.match("time :12:34: ok").count)) == 3);
+assertTrue(((/:(\d+):(\d+):/.match("time :12:34: ok")[1])) == "12");
+assertTrue(((int)(/zzz/.match("abc").count)) == 0);
+
+finishTests();

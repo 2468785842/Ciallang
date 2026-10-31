@@ -1,0 +1,24 @@
+// 集成 - 函数与控制流组合
+Scripts.execStorage("../assert.tjs");
+
+function fib(n) {
+    if (n < 2) return n;
+    return fib(n - 1) + fib(n - 2);
+}
+function sum(a, b = 10) { return a + b; }
+var r1 = fib(10);
+var r2 = sum(5);
+var total = 0;
+for (var i = 1; i <= 10; i++) {
+    if (i % 2 == 0) continue;
+    total += i;
+}
+var w = 0;
+var k = 0;
+while (k < 3) { k++; w += k; }
+assertTrue(((int)(r1)) == 55);
+assertTrue(((int)(r2)) == 15);
+assertTrue(((int)(total)) == 25);
+assertTrue(((int)(w)) == 6);
+
+finishTests();

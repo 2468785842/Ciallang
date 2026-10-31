@@ -1,0 +1,15 @@
+// OOP - 父类构造函数初始化字段对子类可见
+Scripts.execStorage("../assert.tjs");
+
+class A {
+    var x;
+    function A() { x = 10; }
+}
+class B extends A {
+    function B() { A(); }
+}
+var o = new B();
+var res = o.x;
+assertTrue(((int)(res)) == 10);
+
+finishTests();

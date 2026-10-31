@@ -1,0 +1,20 @@
+// property - & 引用与 * 解引用（TJS2 &/* 语义） / 全局 property 引用读写
+Scripts.execStorage("../../assert.tjs");
+
+var propvalue;
+property property1 {
+    setter(v) { propvalue = v; }
+    getter { return propvalue; }
+}
+property1 = 5;
+function proptest() {
+    var p = &property1;   // 取本体，不触发 getter
+    *p = 30;              // 通过本体调 setter
+    return (*p);          // 通过本体调 getter
+}
+var r = proptest();
+assertTrue(((int)(r)) == 30);
+assertTrue(((int)(propvalue)) == 30);
+assertTrue(((int)(property1)) == 30);
+
+finishTests();
