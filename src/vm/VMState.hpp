@@ -29,7 +29,6 @@
 #include "gen/Register.hpp"
 
 namespace cial::vm {
-
     enum class PendingCF { None, Throw };
 
     enum class DispatchRet {
@@ -49,40 +48,44 @@ namespace cial::vm {
 
     class VMState {
     public:
-        Runtime &rt;
-        Context &context;
+        Runtime& rt;
+        Context& context;
 
-        explicit VMState(Context &context) : rt(context.rt()), context(context) {}
-        VMState(const VMState &) = delete;
-        VMState &operator=(const VMState &) = delete;
+        explicit VMState(Context& context) : rt(context.rt()), context(context) {
+        }
+
+        VMState(const VMState&) = delete;
+        VMState& operator=(const VMState&) = delete;
 
         void run();
         // 借用记录器；调用方保证它覆盖所有 run（含原生回调）的执行期。
-        void setExecutionTrace(ExecutionTrace *trace) noexcept { _executionTrace = trace; }
+        void setExecutionTrace(ExecutionTrace* trace) noexcept { _executionTrace = trace; }
         [[nodiscard]] u64 tailCallsEliminated() const noexcept { return _tailCallsEliminated; }
         void setTailRecursionEnabled(bool enabled) noexcept { _tailRecursionEnabled = enabled; }
+
         void setJitMode(JitMode mode, u32 threshold = 32) {
             _integerJit = mode == JitMode::Off ? nullptr : std::make_unique<IntegerJit>(mode, threshold);
         }
+
         [[nodiscard]] JitStats jitStats() const noexcept { return _integerJit ? _integerJit->stats() : JitStats{}; }
         void drainFinalizers();
 
-        [[nodiscard]] const Value &reg(u16 reg) const;
+        [[nodiscard]] const Value& reg(u16 reg) const;
 
-        [[nodiscard]] Value &regRef(u16 reg) const;
+        [[nodiscard]] Value& regRef(u16 reg) const;
 
         [[nodiscard]] bool globalHas(Atom atom) const;
-        [[nodiscard]] bool globalHas(const std::string &name) const;
+        [[nodiscard]] bool globalHas(const std::string& name) const;
         [[nodiscard]] Value global(Atom atom) const;
 
-        void global(Atom atom, const Value &value) const;
+        void global(Atom atom, const Value& value) const;
 
-        [[nodiscard]] Value global(const std::string &name) const;
+        [[nodiscard]] Value global(const std::string& name) const;
 
-        void global(const std::string &name, const Value &value) const;
+        void global(const std::string& name, const Value& value) const;
         [[nodiscard]] bool hasThis(Atom atom) const;
         [[nodiscard]] Value getThis(Atom atom) const;
-        void setThis(Atom atom, const Value &v) const;
+        void setThis(Atom atom, const Value& v) const;
         [[nodiscard]] Value getUpVal(Atom atom) const;
 
         void setZF(const bool zf) { _zf = zf; }
@@ -101,18 +104,18 @@ namespace cial::vm {
             }
         }
 
-        void push(const Value &v) const { *_pool.ptrAt(_pool.allocFrame(1)) = v; }
+        void push(const Value& v) const { *_pool.ptrAt(_pool.allocFrame(1)) = v; }
 
         // 批量压入 n 个空槽并返回首槽指针：一次扩容检查替代 N 次 push 的逐次
         // allocFrame；调用方必须立刻逐槽写满（池顶约定与 push 系一致）
-        Value *pushSlots(const size_t n) const { return _pool.ptrAt(_pool.allocFrame(n)); }
+        Value* pushSlots(const size_t n) const { return _pool.ptrAt(_pool.allocFrame(n)); }
 
         void pop(const size_t count) const { _pool.freeFrame(count); }
 
         void makeClosure() { _curFrame->closure = _stackTop > 1 ? prevFrame() : nullptr; }
 
         template <typename T>
-        void allocCallFrame(T *arg, const Opt<u16> ret = {}, const size_t extraSlots = 0,
+        void allocCallFrame(T* arg, const Opt<u16> ret = {}, const size_t extraSlots = 0,
                             const bool argWindowDirect = false) {
             if(_stackTop >= Context::maxCallDepth)
                 throw std::runtime_error("Call stack overflow");
@@ -145,15 +148,35 @@ namespace cial::vm {
         // 读池内任意槽（VM::callValue 取哨兵异常值等；槽须仍在已分配窗口内）
         [[nodiscard]] Value poolAt(const size_t globalIndex) const { return *_pool.ptrAt(globalIndex); }
 
-        [[nodiscard]] CallFrame *curFrame() noexcept { return _curFrame; }
-        [[nodiscard]] const CallFrame *curFrame() const noexcept { return _curFrame; }
+        [[nodiscard]] CallFrame* curFrame() noexcept { return _curFrame; }
+        [[nodiscard]] const CallFrame* curFrame() const noexcept { return _curFrame; }
 
-        [[nodiscard]] CallFrame *prevFrame() noexcept { return _curFrame - 1; }
-        [[nodiscard]] const CallFrame *prevFrame() const noexcept { return _curFrame - 1; }
+        [[nodiscard]] CallFrame* prevFrame() noexcept { return _curFrame - 1; }
+        [[nodiscard]] const CallFrame* prevFrame() const noexcept { return _curFrame - 1; }
 
         void unwind();
 
-        void throwException(const Value &v) {
+        // 运行期故障位置（诊断元数据，随异常源记录，不写入脚本可见 message）：
+        // source 为 Chunk 的源码身份（字节码转译产物为空），行列 0 基。
+        // 顶层展示层据此渲染 file:line:col；生命周期见 recordFault/resetFault
+        struct FaultInfo {
+            std::string source;
+            u32 line = 0;
+            u32 column = 0;
+            bool valid = false;
+        };
+
+        // 记录故障指令位置（派发前的指令起始 PC；Rlc 未记录时保持原值）。
+        // 已有有效位置时不覆盖：保留最早抛出点（重抛/原生边界穿越不重复定位）
+        void recordFault(const Chunk* chunk, const u64 instructionPc);
+
+        // 故障位置失效：脚本 handler 消费异常或新一轮执行开始时调用
+        void resetFault() { _fault = FaultInfo{}; }
+
+        // 最近一次抛出且未被脚本捕获路径消费的故障位置
+        [[nodiscard]] const FaultInfo& fault() const noexcept { return _fault; }
+
+        void throwException(const Value& v) {
             _pending = PendingCF::Throw;
             _exValue = v;
             if(_exValue.isObject()) {
@@ -178,14 +201,14 @@ namespace cial::vm {
         [[nodiscard]] std::string dumpCurLocalVars() const {
             std::stringstream ss{};
             for(size_t i = 0; i < _stackTop; i++) {
-                const auto &call = _callStack[i];
+                const auto& call = _callStack[i];
                 if(!call.funcMeta)
                     continue;
 
-                for(const auto &[identifier, reg, startPC, endPC] : call.funcMeta->localVars) {
+                for(const auto& [identifier, reg, startPC, endPC] : call.funcMeta->localVars) {
                     if(startPC.address() <= getPC() && getPC() < endPC.address())
                         continue;
-                    const auto *entry = rt.atomTable.get(identifier);
+                    const auto* entry = rt.atomTable.get(identifier);
                     auto varName = "?unknow_var_name?"_str;
                     if(entry)
                         varName = *entry->str;
@@ -206,49 +229,54 @@ namespace cial::vm {
     private:
         template <bool Record, bool Native, bool Tail>
         void runLoop();
-        DispatchRet dispatchTailCallV(CallFrame *cur, Value *regs, const u8 *ip, u64 &pc);
-        bool trySelfTailCall(CallFrame *cur, Value *regs, Object *callee, u16 dst, const u16 *argRegs, u32 argc,
+        DispatchRet dispatchTailCallV(CallFrame* cur, Value* regs, const u8* ip, u64& pc);
+        bool trySelfTailCall(CallFrame* cur, Value* regs, Object* callee, u16 dst, const u16* argRegs, u32 argc,
                              u64 pc);
-        FastRegisterPool &_pool{ context.regPool() };
-        CallFrame *_curFrame{ context.callStack() };
-        CallFrame *_callStack{ context.callStack() };
-        size_t &_stackTop{ context.stackTop() }; // callFrame count
-        CIAL_INLINE DispatchRet invokeCallV(CallFrame *cur, Value *regs, u16 dst, u16 func, const u16 *argRegs,
-                                            u64 argc, u64 pc, const Value *receiver = nullptr);
+        FastRegisterPool& _pool{ context.regPool() };
+        CallFrame* _curFrame{ context.callStack() };
+        CallFrame* _callStack{ context.callStack() };
+        size_t& _stackTop{ context.stackTop() }; // callFrame count
+        CIAL_INLINE DispatchRet invokeCallV(CallFrame* cur, Value* regs, u16 dst, u16 func, const u16* argRegs,
+                                            u64 argc, u64 pc, const Value* receiver = nullptr);
+
         struct NativeMemberCache {
             NativeTypeKey type{};
             Atom atom{};
             u64 revision{};
-            NativeFunction *method{};
+            NativeFunction* method{};
             NativePropGetter getter{};
             NativeAccessor accessor{};
         };
+
         NativeMemberCache _nativeCache[64]{};
-        const NativeMemberCache &nativeMember(NativeTypeKey type, Atom atom, u64 site);
+        const NativeMemberCache& nativeMember(NativeTypeKey type, Atom atom, u64 site);
+
         struct GlobalSlotCache {
             Atom atom{};
             u64 revision{};
-            const Value *slot{};
+            const Value* slot{};
         };
+
         mutable GlobalSlotCache _globalCache[64]{};
-        const Value *cachedGlobal(Atom atom) const;
-        CIAL_INLINE void loadGlobal(Atom atom, Value &dst);
+        const Value* cachedGlobal(Atom atom) const;
+        CIAL_INLINE void loadGlobal(Atom atom, Value& dst);
         bool _zf{ false };
         PendingCF _pending{};
         Value _exValue{};
+        FaultInfo _fault{};
         // with 语句上下文栈（裸词链 .member 的查找基座）；对象挂 Runtime handle 保 GC，
         // 帧释放时截断到 CallFrame::withDepth（unwind/正常返回共用 freeCallFrame）
-        Vec<Object *> withStack{};
+        Vec<Object*> withStack{};
 
         // 可选模式状态置于末尾，保持已有解释器热字段的布局。
-        ExecutionTrace *_executionTrace{};
+        ExecutionTrace* _executionTrace{};
         u64 _tailCallsEliminated{};
         bool _tailRecursionEnabled{};
         std::unique_ptr<IntegerJit> _integerJit;
 
 #define DISPATCH_OP_METHOD(op)                                                                                         \
     CIAL_INLINE DispatchRet dispatch##op(CallFrame *cur, const Constant *constants, Value *regs, const u8 *ip, u64 &pc);
-        CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_OP_METHOD)
+        CIAL_BYTECODE_OPCODE_ENUMS (DISPATCH_OP_METHOD)
 #undef DISPATCH_OP_METHOD
     };
 } // namespace cial::vm

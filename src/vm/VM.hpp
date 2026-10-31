@@ -26,57 +26,58 @@
 #include "types/Value.hpp"
 
 namespace cial {
-
     template <typename T>
     struct HandleConvert;
 
     struct DefaultHandleConvert {
-        static void handleValue(Runtime *, const Value &) noexcept {}
-        static void releaseValue(Runtime *, const Value &) noexcept {}
+        static void handleValue(Runtime*, const Value&) noexcept {
+        }
+
+        static void releaseValue(Runtime*, const Value&) noexcept {
+        }
     };
 
     template <>
     struct HandleConvert<Value> : DefaultHandleConvert {
-        static Value fromValue(const Value &v) { return v; }
+        static Value fromValue(const Value& v) { return v; }
     };
 
     template <>
     struct HandleConvert<bool> : DefaultHandleConvert {
-        static bool fromValue(const Value &v) { return v.asBool(); }
+        static bool fromValue(const Value& v) { return v.asBool(); }
     };
 
     template <>
     struct HandleConvert<Integer> : DefaultHandleConvert {
-        static Integer fromValue(const Value &v) { return v.asInteger().unwrap(); }
+        static Integer fromValue(const Value& v) { return v.asInteger().unwrap(); }
     };
 
     template <>
     struct HandleConvert<Real> : DefaultHandleConvert {
-        static Real fromValue(const Value &v) { return v.asReal().unwrap(); }
+        static Real fromValue(const Value& v) { return v.asReal().unwrap(); }
     };
 
     template <>
-    struct HandleConvert<String *> : DefaultHandleConvert {
-        static String *fromValue(const Value &v) { return v.asString().unwrap(); }
+    struct HandleConvert<String*> : DefaultHandleConvert {
+        static String* fromValue(const Value& v) { return v.asString().unwrap(); }
     };
 
     template <>
-    struct HandleConvert<Octet *> : DefaultHandleConvert {
-        static Octet *fromValue(const Value &v) { return v.asOctet().unwrap(); }
+    struct HandleConvert<Octet*> : DefaultHandleConvert {
+        static Octet* fromValue(const Value& v) { return v.asOctet().unwrap(); }
     };
 
     template <>
-    struct HandleConvert<Object *> {
+    struct HandleConvert<Object*> {
+        static Object* fromValue(const Value& v) { return v.asObject().unwrap(); }
 
-        static Object *fromValue(const Value &v) { return v.asObject().unwrap(); }
-
-        static void handleValue(Runtime *rt, const Value &v) noexcept {
+        static void handleValue(Runtime* rt, const Value& v) noexcept {
             if(v.isObject()) {
                 rt->addHandleVal(v.asObject().value());
             }
         }
 
-        static void releaseValue(Runtime *rt, const Value &v) noexcept {
+        static void releaseValue(Runtime* rt, const Value& v) noexcept {
             if(v.isObject()) {
                 rt->removeHandleVal(v.asObject().value());
             }
@@ -84,25 +85,27 @@ namespace cial {
     };
 
     template <typename T>
-    struct HandleConvert<T *> : HandleConvert<Object *> {
-        static T *fromValue(const Value &v) { return dynamic_cast<T *>(v.asObject().unwrap()); }
+    struct HandleConvert<T*> : HandleConvert<Object*> {
+        static T* fromValue(const Value& v) { return dynamic_cast<T*>(v.asObject().unwrap()); }
     };
 
     class VM {
     public:
         template <typename T>
         class Handle {
-            Runtime *_rt;
+            Runtime* _rt;
             Value _value;
 
         public:
-            Handle(Runtime *rt, Value value) : _rt(rt), _value(std::move(value)) { retain(); }
+            Handle(Runtime* rt, Value value) : _rt(rt), _value(std::move(value)) { retain(); }
 
-            Handle(const Handle &other) : Handle(other._rt, other._value) {}
+            Handle(const Handle& other) : Handle(other._rt, other._value) {
+            }
 
-            Handle(Handle &&other) noexcept : _rt(std::exchange(other._rt, nullptr)), _value(std::move(other._value)) {}
+            Handle(Handle&& other) noexcept : _rt(std::exchange(other._rt, nullptr)), _value(std::move(other._value)) {
+            }
 
-            Handle &operator=(const Handle &other) {
+            Handle& operator=(const Handle& other) {
                 if(this != &other) {
                     Handle copy{ other };
                     std::swap(_rt, copy._rt);
@@ -111,7 +114,7 @@ namespace cial {
                 return *this;
             }
 
-            Handle &operator=(Handle &&other) noexcept {
+            Handle& operator=(Handle&& other) noexcept {
                 if(this != &other) {
                     Handle moved{ std::move(other) };
                     std::swap(_rt, moved._rt);
@@ -149,14 +152,15 @@ namespace cial {
             }
         };
 
-        explicit VM(vm::VMState *vmState) : _vmState(vmState) {}
+        explicit VM(vm::VMState* vmState) : _vmState(vmState) {
+        }
 
-        [[nodiscard]] Context &context() const { return _vmState->context; }
+        [[nodiscard]] Context& context() const { return _vmState->context; }
 
-        [[nodiscard]] Runtime &rt() const { return _vmState->rt; }
+        [[nodiscard]] Runtime& rt() const { return _vmState->rt; }
 
         template <typename T, typename... Args>
-        T *create(Args &&...args) {
+        T* create(Args&&... args) {
             return _vmState->rt.create<T>(std::forward<Args>(args)...).get();
         }
 
@@ -168,8 +172,8 @@ namespace cial {
         // 帧的 pc、在本次 run 内执行其 catch 块，native 调用方控制流错乱）——
         // 异常值落入哨兵 exValueReg(reg0)，func/tmp 帧由 run 弹出（栈深比正常少 1，
         // 以此判定），此处经 throwException 重新进入脚本异常协议向上传播
-        Value callValue(const Value &callee, const size_t argCount, const Value *args,
-                        const Value &fallbackThis = Value{}) {
+        Value callValue(const Value& callee, const size_t argCount, const Value* args,
+                        const Value& fallbackThis = Value{}) {
             if(!callee.isObject())
                 throw std::runtime_error("value is not callable");
             // 回调可重入并触发 GC；宿主栈上的实参和接收者在压入脚本帧前也须保根。
@@ -179,24 +183,25 @@ namespace cial {
             argumentRoots.reserve(argCount);
             for(size_t i = 0; i < argCount; ++i)
                 argumentRoots.emplace_back(&rt(), args[i]);
-            auto *obj = callee.asObject().unwrap();
+            auto* obj = callee.asObject().unwrap();
             if(!obj)
                 throw std::runtime_error("value is not callable");
 
             // 原生函数：无帧直调（callProc 同步返回）
             if(obj->typeId() == TypeId::NativeFunction) {
-                auto *native = static_cast<NativeFunction *>(obj);
+                auto* native = static_cast<NativeFunction*>(obj);
                 const size_t arity = native->arity();
                 // 实参 placement new 到栈缓冲直传（与 invokeCallV 原生分支同款），
                 // 免每次回调的 Vec 堆分配；Value 非平凡构造/析构，只构造实际数量。
                 // 实参 GC 根由上方 argumentRoots 承接，栈副本无需注册。
                 if(argCount <= 64 && arity <= 64) {
                     alignas(Value) unsigned char argBuf[64 * sizeof(Value)];
-                    auto *const argv = reinterpret_cast<Value *>(argBuf);
+                    auto* const argv = reinterpret_cast<Value*>(argBuf);
                     size_t built = 0;
-                    DEFER {
+                    DEFER{
                         while(built > 0)
                             argv[--built].~Value();
+
                     };
                     for(; built < argCount; ++built)
                         new(argBuf + built * sizeof(Value)) Value(args[built]);
@@ -216,15 +221,15 @@ namespace cial {
                 return native->callProc(this, argCount, argv.data());
             }
 
-            auto *fn = obj->typeId() == TypeId::Function ? static_cast<Function *>(obj) : nullptr;
+            auto* fn = obj->typeId() == TypeId::Function ? static_cast<Function*>(obj) : nullptr;
             if(!fn)
                 throw std::runtime_error("value is not callable");
 
             constexpr u16 retReg = 0;
             constexpr u16 excReg = 1; // 异常值槽：须非 0——unwind 以 if(exValueReg) 判"有无槽位"
             vm::Chunk tmpChunk{};
-            tmpChunk.setRegCount(2); // reg0 = 返回值槽，reg1 = 哨兵异常值槽
-            tmpChunk.emit<inter::NOP>(); // 哨兵区间 [0,1) 覆盖的 1 字节指令
+            tmpChunk.setRegCount(2);                    // reg0 = 返回值槽，reg1 = 哨兵异常值槽
+            tmpChunk.emit<inter::NOP>();                // 哨兵区间 [0,1) 覆盖的 1 字节指令
             tmpChunk.addThrowHandler({ 0, 1, excReg }); // 全区哨兵：截住 unwind
             // 既有缺陷（2026-10-30 修复）：旧版 exValueReg=retReg=0 被 unwind 的
             // if(th->exValueReg) 判为"无槽位"，异常值从未写入，哨兵路径经
@@ -235,9 +240,9 @@ namespace cial {
             // allocFrame(regCount) - arity 回退对齐参数寄存器，前提是实参
             // 紧贴 func 帧窗口（先 push 实参会把 tmp 帧的槽夹进参数区，整体错位 1 槽）
             tmpChunk.toBytecode(); // 哨兵必须落进 bc 层 handlers 表：unwind 只查 bc 表，
-                                   // 而哨兵表惰性编译由 FETCH_NEW_FRAME 触发、tmp 帧永不
-                                   // 被派发执行——不显式编译哨兵形同虚设，异常会穿透直达
-                                   // 调用方帧的 handler（嵌套 run 内执行其 catch，控制流错乱）
+            // 而哨兵表惰性编译由 FETCH_NEW_FRAME 触发、tmp 帧永不
+            // 被派发执行——不显式编译哨兵形同虚设，异常会穿透直达
+            // 调用方帧的 handler（嵌套 run 内执行其 catch，控制流错乱）
             _vmState->allocCallFrame(&tmpChunk);
             _vmState->makeClosure();
             _vmState->curFrame()->setThisObj(*receiverRoot);
@@ -268,13 +273,13 @@ namespace cial {
         }
 
         template <typename T>
-        Handle<T> getGlobal(const String &name) const {
+        Handle<T> getGlobal(const String& name) const {
             return { &_vmState->rt, _vmState->global(name.getData()) };
         }
 
         template <typename T>
-        [[nodiscard]] Handle<T> eval(const String &str, bool filepath = false) const {
-            Runtime &rt = _vmState->rt;
+        [[nodiscard]] Handle<T> eval(const String& str, bool filepath = false) const {
+            Runtime& rt = _vmState->rt;
             if(str.isEmpty())
                 return Handle<T>{ &rt, Value{} };
 
@@ -284,6 +289,8 @@ namespace cial {
                 sourceFile = Common::SourceFile{ str.toStdStr() };
                 sourceFile.load(r);
             } else {
+                // eval 代码无文件身份：用逻辑名，诊断不暴露宿主路径
+                sourceFile.setSourceName("<eval>");
                 sourceFile.load(r, str.toStdStr());
             }
             if(r.isFailed()) {
@@ -293,7 +300,7 @@ namespace cial {
 
             syntax::Parser parser{ sourceFile, _vmState->context.pp() };
 
-            syntax::AstNode *node = parser.parse(r);
+            syntax::AstNode* node = parser.parse(r);
             if(r.isFailed()) {
                 reportEvalError(r);
                 return Handle<T>{ &rt, Value{} };
@@ -325,6 +332,7 @@ namespace cial {
             _vmState->allocCallFrame(evalChunk.get(), retReg);
             _vmState->makeClosure();
             u32 stackTop = _vmState->context.stackTop();
+            _vmState->resetFault(); // 每轮执行重置，避免上一轮故障位置污染本次输出
             try {
                 _vmState->run();
             } catch(...) {
@@ -346,14 +354,15 @@ namespace cial {
         }
 
         template <typename T>
-        [[nodiscard]] Handle<T> evalExpr(const String &expr) const {
-            Runtime &rt = _vmState->rt;
+        [[nodiscard]] Handle<T> evalExpr(const String& expr) const {
+            Runtime& rt = _vmState->rt;
             if(expr.isEmpty())
                 return Handle<T>{ &rt, Value{} };
 
             Common::SourceFile sourceFile{};
             Common::Result r{};
 
+            sourceFile.setSourceName("<eval>"); // 表达式求值无文件身份：用逻辑名
             sourceFile.load(r, expr.toStdStr());
             if(r.isFailed()) {
                 reportEvalError(r);
@@ -362,7 +371,7 @@ namespace cial {
 
             syntax::Parser parser{ sourceFile, _vmState->context.pp() };
 
-            syntax::ExprNode *node = parser.parseExpression(r, true);
+            syntax::ExprNode* node = parser.parseExpression(r, true);
             if(r.isFailed()) {
                 reportEvalError(r);
                 return Handle<T>{ &rt, Value{} };
@@ -384,6 +393,7 @@ namespace cial {
             auto evalChunk = std::move(*chunk).toHeap(rt);
             _vmState->allocCallFrame(evalChunk.get());
             _vmState->makeClosure();
+            _vmState->resetFault(); // 每轮执行重置，避免上一轮故障位置污染本次输出
             try {
                 _vmState->run();
             } catch(...) {
@@ -397,22 +407,27 @@ namespace cial {
             return Handle<T>{ &rt, ret };
         }
 
-        void eval(const String &str, const bool filepath = false) const { auto h = eval<Value>(str, filepath); }
-        void evalExpr(const String &expr) const { auto h = evalExpr<Value>(expr); }
+        void eval(const String& str, const bool filepath = false) const { auto h = eval<Value>(str, filepath); }
+        void evalExpr(const String& expr) const { auto h = evalExpr<Value>(expr); }
 
         [[nodiscard]] String dumpCurCallFrameInst() const { return _vmState->curFrame()->chunk->dumpInstructions(); }
 
     private:
-        vm::VMState *_vmState;
+        vm::VMState* _vmState;
 
-        static void reportEvalError(const Common::Result &r) {
-            for(const auto &m : r.messages()) {
-                if(m.isError())
-                    fmt::println(stderr, "cial: error: {} (line {})", m.message(), m.location().start().line);
+        static void reportEvalError(const Common::Result& r) {
+            // VM 只产出诊断数据；文件与位置（如有）在此渲染，未定位错误不伪造
+            for(const auto& m : r.messages()) {
+                if(!m.isError())
+                    continue;
+                if(m.hasLocation())
+                    fmt::println(stderr, "cial: error: {}:{}:{}: {}", m.source(), m.location().start().line + 1,
+                        m.location().start().column + 1, m.message());
+                else
+                    fmt::println(stderr, "cial: error: {}", m.message());
             }
         }
 
-        static void reportEvalError(const char *message) { fmt::println(stderr, "cial: error: {}", message); }
+        static void reportEvalError(const char* message) { fmt::println(stderr, "cial: error: {}", message); }
     };
-
 } // namespace cial

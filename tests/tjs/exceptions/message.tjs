@@ -1,0 +1,44 @@
+// 异常 message 纯净性：VM 只传播异常值，源码位置由顶层展示层附加，
+// 不写入脚本可见的 message（原行为附带 " (line N)" 后缀）
+Scripts.execStorage("../assert.tjs");
+
+// 原生错误包装的 Exception：message 为纯错误文本
+try {
+    var v = void;
+    v.nonexistent;
+}
+catch(e) {
+    assertTrue(e.message.indexOf("line") < 0, "native message must not embed line info");
+    assertTrue(e.message.length > 0, "native message should not be empty");
+}
+
+// 脚本显式抛出的值：字符串原样，不追加位置
+try {
+    throw "plain";
+}
+catch(e) {
+    assertTrue(e == "plain", "thrown value passes through unchanged");
+}
+
+// Exception 实例：message 保持构造时的原文
+try {
+    throw new Exception("instance message");
+}
+catch(e) {
+    assertTrue(e.message == "instance message", "Exception message unchanged");
+}
+
+// 重抛：异常值不变
+try {
+    try {
+        throw "re";
+    }
+    catch(e) {
+        throw e;
+    }
+}
+catch(e2) {
+    assertTrue(e2 == "re", "rethrown value unchanged");
+}
+
+finishTests();

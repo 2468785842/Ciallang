@@ -28,17 +28,24 @@
 #include "types/Dictionary.hpp"
 
 namespace cial::inter {
-
-    IRGenerator::IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile, ChunkOptimizer optimize) :
-        _rt(rt), _sourceFile(sourceFile), _r(r), _optimize(optimize) {}
+    IRGenerator::IRGenerator(Common::Result& r, Runtime& rt, Common::SourceFile& sourceFile, ChunkOptimizer optimize) :
+        _rt(rt), _sourceFile(sourceFile), _r(r), _optimize(optimize) {
+    }
 
     IRGenerator::~IRGenerator() = default;
 
-    Opt<vm::Chunk> IRGenerator::parseAst(const syntax::AstNode *node, OptReg &optReg) {
+    Opt<vm::Chunk> IRGenerator::parseAst(const syntax::AstNode* node, OptReg& optReg) {
         _rt.beginCompilation();
-        DEFER { _rt.endCompilation(); };
-        if(node)
+        DEFER{ _rt.endCompilation();  };
+        // 源码身份随 Chunk 携带（嵌套函数经各自的 parseAst 同样填充），
+        // 运行期诊断据此定位；字节码转译产物不经过此处，保持为空
+        _chunk->setSourceName(_sourceFile.sourceName());
+        if(node) {
+            // 根节点兜底行记录：表达式求值入口（REPL/evalExpr）没有语句节点，
+            // 若无此记录整个 chunk 将无行号可查；语句根因同位置去重不受影响
+            _chunk->addLine(node->location);
             node->generateBytecode(this, optReg);
+        }
         if(_r.isFailed())
             return {};
         _chunk->setRegCount(_regNextIndex);
@@ -51,7 +58,7 @@ namespace cial::inter {
         return vm::Chunk{ std::move(*chunk) };
     }
 
-    bool IRGenerator::expectValue(const syntax::ExprNode *node, Register &ret) {
+    bool IRGenerator::expectValue(const syntax::ExprNode* node, Register& ret) {
         // 哨兵寄存器（0xFFFF 不会被正常分配）：告知表达式生成器"调用方需要值"，
         // 后缀 ++/-- 据此决定是否发射旧值拷贝；语句链传入的空 OptReg 则不拷贝
         OptReg reg{ Register{ 0xFFFF } };
@@ -66,13 +73,13 @@ namespace cial::inter {
         return true;
     }
 
-    void IRGenerator::generate(const syntax::ExprStmtNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::ExprStmtNode* node, OptReg& optReg) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         return node->expression->generateBytecode(this, optReg);
     }
 
-    void IRGenerator::generate(const syntax::TryStmtNode *node, OptReg &optReg) {
-        _chunk->addLine(node->location); // Rlc 行号（语句粒度）
+    void IRGenerator::generate(const syntax::TryStmtNode* node, OptReg& optReg) {
+        _chunk->addLine(node->location);     // Rlc 行号（语句粒度）
         const auto tryStartIp = makeLabel(); // closed interval
         node->tryBlock->generateBytecode(this, optReg);
 
@@ -101,7 +108,7 @@ namespace cial::inter {
         optReg = {};
     }
 
-    void IRGenerator::generate(const syntax::ValueExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::ValueExprNode* node, OptReg& optReg) {
         if(node->token.type() == syntax::TokenType::Null) {
             error("null token current not support", node->location);
             return;
@@ -111,7 +118,7 @@ namespace cial::inter {
         optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::BinaryExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::BinaryExprNode* node, OptReg& optReg) {
         using enum syntax::TokenType;
 
         // tjs.y:661 `A in B`：原版保留字，tjsInterCodeGen 无 T_IN 分支，整个节点
@@ -128,7 +135,7 @@ namespace cial::inter {
 
             Register dst = allocateRegister();
 
-            if(auto *identifier = dynamic_cast<const syntax::IdentifierExprNode *>(node->rhs); identifier) {
+            if(auto* identifier = dynamic_cast<const syntax::IdentifierExprNode*>(node->rhs); identifier) {
                 // 成员名编译期 Atom 直引（跳过名字字符串寄存器与 dispatch 再 intern）
                 _chunk->emit<GPropC>(reg1, getAtomFromToken(identifier->token), dst);
             } else {
@@ -143,8 +150,8 @@ namespace cial::inter {
         }
 
         if(node->token.type() == Swap) {
-            const auto lVarExpr = dynamic_cast<const syntax::IdentifierExprNode *>(node->lhs);
-            const auto rVarExpr = dynamic_cast<const syntax::IdentifierExprNode *>(node->rhs);
+            const auto lVarExpr = dynamic_cast<const syntax::IdentifierExprNode*>(node->lhs);
+            const auto rVarExpr = dynamic_cast<const syntax::IdentifierExprNode*>(node->rhs);
             if(!rVarExpr || !lVarExpr) {
                 // TODO: 类的属性替换需要以后添加
                 error("isn't support operator", node->location);
@@ -152,8 +159,8 @@ namespace cial::inter {
             }
             const Atom lVarName = getAtomFromToken(lVarExpr->token);
             const Atom rVarName = getAtomFromToken(rVarExpr->token);
-            auto *lVar = resolveLocalVariable(lVarName);
-            auto *rVar = resolveLocalVariable(rVarName);
+            auto* lVar = resolveLocalVariable(lVarName);
+            auto* rVar = resolveLocalVariable(rVarName);
             auto dst = allocateRegister();
             OptReg lVarReg{};
             if(lVar) {
@@ -289,7 +296,7 @@ namespace cial::inter {
         optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::PrefixUnaryExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::PrefixUnaryExprNode* node, OptReg& optReg) {
         if(node->token.type() == syntax::TokenType::Throw) {
             Register reg{};
             if(!expectValue(node->rhs, reg)) {
@@ -397,13 +404,13 @@ namespace cial::inter {
             case syntax::TokenType::Increment:
             case syntax::TokenType::Decrement: {
                 // 前缀 ++/--：表达式值为自增/自减后的新值
-                const auto *identifier = dynamic_cast<const syntax::IdentifierExprNode *>(node->rhs);
+                const auto* identifier = dynamic_cast<const syntax::IdentifierExprNode*>(node->rhs);
                 if(!identifier) {
                     error("prefix ++/-- expects identifier operand", node->location);
                     return;
                 }
                 generateIncDec(getAtomFromToken(identifier->token), node->token.type() == syntax::TokenType::Increment,
-                               optReg);
+                    optReg);
                 break;
             }
             case syntax::TokenType::Sharp: {
@@ -430,7 +437,7 @@ namespace cial::inter {
             }
             case syntax::TokenType::Delete: {
                 // delete obj.member：仅支持成员访问形式（TJS2 delete 作用于对象成员）
-                const auto *member = dynamic_cast<const syntax::BinaryExprNode *>(node->rhs);
+                const auto* member = dynamic_cast<const syntax::BinaryExprNode*>(node->rhs);
                 if(!member || member->token.type() != syntax::TokenType::Dot) {
                     error("delete expects member access (obj.member)", node->location);
                     return;
@@ -439,7 +446,7 @@ namespace cial::inter {
                 if(!expectValue(member->lhs, objReg)) {
                     return;
                 }
-                const auto *identifierExpr = dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs);
+                const auto* identifierExpr = dynamic_cast<const syntax::IdentifierExprNode*>(member->rhs);
                 if(!identifierExpr) {
                     error("delete member must be identifier", node->location);
                     return;
@@ -453,9 +460,9 @@ namespace cial::inter {
                 // &obj.member / &identifier（旧版 T_IGNOREPROP/GPDS）：取成员本体，
                 // property 不触发 getter。
                 // identifier 形态：局部变量直接拷值；否则 GRefRaw 走 this/global 槽位
-                const syntax::Token *memberToken{};
-                const syntax::ExprNode *objExpr{};
-                if(const auto *identifier = dynamic_cast<const syntax::IdentifierExprNode *>(node->rhs)) {
+                const syntax::Token* memberToken{};
+                const syntax::ExprNode* objExpr{};
+                if(const auto* identifier = dynamic_cast<const syntax::IdentifierExprNode*>(node->rhs)) {
                     const Atom identifierAtom = getAtomFromToken(identifier->token);
                     if(const auto variable = resolveLocalVariable(identifierAtom)) {
                         // 局部变量无 property 包装，本体即值
@@ -468,10 +475,10 @@ namespace cial::inter {
                     optReg = dst;
                     break;
                 }
-                if(const auto *member = dynamic_cast<const syntax::BinaryExprNode *>(node->rhs);
-                   member && member->token.type() == syntax::TokenType::Dot) {
+                if(const auto* member = dynamic_cast<const syntax::BinaryExprNode*>(node->rhs);
+                    member && member->token.type() == syntax::TokenType::Dot) {
                     objExpr = member->lhs;
-                    if(const auto *identifierExpr = dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs)) {
+                    if(const auto* identifierExpr = dynamic_cast<const syntax::IdentifierExprNode*>(member->rhs)) {
                         memberToken = &identifierExpr->token;
                     } else {
                         error("'&' member must be identifier", node->location);
@@ -509,7 +516,7 @@ namespace cial::inter {
     }
 
 
-    void IRGenerator::generate(const syntax::SuffixUnaryExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::SuffixUnaryExprNode* node, OptReg& optReg) {
         using enum syntax::TokenType;
         switch(node->token.type()) {
             case Exclamation: {
@@ -538,16 +545,16 @@ namespace cial::inter {
             }
             case Increment:
             case Decrement: {
-                if(const auto *expr = dynamic_cast<const syntax::IdentifierExprNode *>(node->lhs)) {
+                if(const auto* expr = dynamic_cast<const syntax::IdentifierExprNode*>(node->lhs)) {
                     generateIncDec(getAtomFromToken(expr->token), node->token.type() == Increment, optReg,
-                                   /*postfix=*/true);
+                        /*postfix=*/true);
                     return;
                 }
-                if(const auto *member = dynamic_cast<const syntax::BinaryExprNode *>(node->lhs);
-                   member && member->token.type() == Dot) {
+                if(const auto* member = dynamic_cast<const syntax::BinaryExprNode*>(node->lhs);
+                    member && member->token.type() == Dot) {
                     // obj.member++/--（旧版 INCGETP/SUBGETP 语义）：getter 读旧值 →
                     // 加减 → setter 写新值；表达式值为旧值（仅调用方需要时拷贝）
-                    const auto *identifierExpr = dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs);
+                    const auto* identifierExpr = dynamic_cast<const syntax::IdentifierExprNode*>(member->rhs);
                     if(!identifierExpr) {
                         error("suffix ++/-- member must be identifier", node->location);
                         return;
@@ -591,7 +598,7 @@ namespace cial::inter {
         }
     }
 
-    void IRGenerator::generateIncDec(const Atom identifier, const bool isIncrement, OptReg &optReg,
+    void IRGenerator::generateIncDec(const Atom identifier, const bool isIncrement, OptReg& optReg,
                                      const bool postfix) {
         // 后缀旧值拷贝仅在调用方需要表达式值时发射（语句上下文 optReg 为空，
         // i++; 不付拷贝成本）
@@ -672,19 +679,19 @@ namespace cial::inter {
             optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::ProcCallExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::ProcCallExprNode* node, OptReg& optReg) {
         auto dst = allocateRegister();
 
         // `...`：省略透传（旧版 argc=-1）——转发本帧实际实参
-        const bool omitCall = std::any_of(node->arguments.begin(), node->arguments.end(), [](const auto *expr) {
-            return dynamic_cast<const syntax::OmitArgExprNode *>(expr) != nullptr;
+        const bool omitCall = std::any_of(node->arguments.begin(), node->arguments.end(), [](const auto* expr) {
+            return dynamic_cast<const syntax::OmitArgExprNode*>(expr) != nullptr;
         });
 
         // `expr*` / 裸 `*`：展开调用（旧版 argc=-2 条目表）
         bool expandCall = false;
         if(!omitCall) {
-            for(const auto *exprNode : node->arguments) {
-                if(exprNode && dynamic_cast<const syntax::ExpandArgExprNode *>(exprNode)) {
+            for(const auto* exprNode : node->arguments) {
+                if(exprNode && dynamic_cast<const syntax::ExpandArgExprNode*>(exprNode)) {
                     expandCall = true;
                     break;
                 }
@@ -700,7 +707,7 @@ namespace cial::inter {
         Opt<Register> receiver;
         if(!omitCall && !expandCall && !_chunk->getInstVec().empty() &&
            _chunk->getInstVec().back()->opcode() == TacOpCode::GPropC) {
-            const auto &get = *_chunk->getInstVec().back();
+            const auto& get = *_chunk->getInstVec().back();
             if(get.getOp3() == memberReg) {
                 const auto obj = get.getOp1().value<Register>();
                 const auto atom = get.getOp2().value<Atom>();
@@ -719,13 +726,13 @@ namespace cial::inter {
         if(expandCall) {
             using FatEntry = std::pair<u8, Register>;
             Vec<FatEntry> entries{};
-            for(const auto *exprNode : node->arguments) {
+            for(const auto* exprNode : node->arguments) {
                 if(!exprNode) {
                     // 缺位实参：void 常量寄存器（Normal）
                     entries.emplace_back(0, loadVoidReg());
                     continue;
                 }
-                if(const auto *expand = dynamic_cast<const syntax::ExpandArgExprNode *>(exprNode)) {
+                if(const auto* expand = dynamic_cast<const syntax::ExpandArgExprNode*>(exprNode)) {
                     if(expand->inner) {
                         Register reg{ 0 };
                         if(!expectValue(expand->inner, reg)) {
@@ -750,7 +757,7 @@ namespace cial::inter {
         }
 
         std::vector<Register> argRegs{};
-        for(const auto *exprNode : node->arguments) {
+        for(const auto* exprNode : node->arguments) {
             if(!exprNode) {
                 argRegs.push_back(loadVoidReg()); // 缺位实参：void 常量寄存器
             } else {
@@ -765,7 +772,7 @@ namespace cial::inter {
         // 变长实参单指令调用（消逐参 Push 派发；语义等价）
         if(receiver) {
             _chunk->emitRaw<CallMethodV>(dst, memberReg, static_cast<Integer>(node->arguments.size()),
-                                         std::move(argRegs), *receiver);
+                std::move(argRegs), *receiver);
             freeRegister(*receiver);
         } else {
             _chunk->emitRaw<CallV>(dst, memberReg, static_cast<Integer>(node->arguments.size()), std::move(argRegs));
@@ -775,16 +782,16 @@ namespace cial::inter {
 
     // `...` / `*` 只在调用实参表内合法（ProcCall 生成时已特判降为
     // CallOmit/CallExpand）；单独到达此处即语法位置错误
-    void IRGenerator::generate(const syntax::OmitArgExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::OmitArgExprNode* node, OptReg& optReg) {
         error("`...` is only allowed in a call argument list", node->location);
     }
 
-    void IRGenerator::generate(const syntax::ExpandArgExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::ExpandArgExprNode* node, OptReg& optReg) {
         error("`*` expand is only allowed in a call argument list", node->location);
     }
 
-    void IRGenerator::generate(const syntax::AssignExprNode *node, OptReg &optReg) {
-        if(const auto *expr = dynamic_cast<const syntax::IdentifierExprNode *>(node->lhs)) {
+    void IRGenerator::generate(const syntax::AssignExprNode* node, OptReg& optReg) {
+        if(const auto* expr = dynamic_cast<const syntax::IdentifierExprNode*>(node->lhs)) {
             const Atom identifier = getAtomFromToken(expr->token);
 
             Register src{ 0 };
@@ -811,19 +818,17 @@ namespace cial::inter {
             return;
         }
 
-        if(const auto *expr = dynamic_cast<const syntax::BinaryExprNode *>(node->lhs)) {
-
+        if(const auto* expr = dynamic_cast<const syntax::BinaryExprNode*>(node->lhs)) {
             Register src{ 0 };
             if(!expectValue(node->rhs, src))
                 return;
 
             if(expr->token.type() == syntax::TokenType::Dot) {
-
                 Register lhsR{ 0 };
                 if(!expectValue(expr->lhs, lhsR))
                     return;
 
-                if(const auto *identifierExpr = dynamic_cast<const syntax::IdentifierExprNode *>(expr->rhs)) {
+                if(const auto* identifierExpr = dynamic_cast<const syntax::IdentifierExprNode*>(expr->rhs)) {
                     // 成员名编译期 Atom 直引
                     _chunk->emit<DPropC>(lhsR, getAtomFromToken(identifierExpr->token), src);
 
@@ -833,8 +838,8 @@ namespace cial::inter {
             }
         }
 
-        if(const auto *expr = dynamic_cast<const syntax::PrefixUnaryExprNode *>(node->lhs);
-           expr && expr->token.type() == syntax::TokenType::Asterisk) {
+        if(const auto* expr = dynamic_cast<const syntax::PrefixUnaryExprNode*>(node->lhs);
+            expr && expr->token.type() == syntax::TokenType::Asterisk) {
             // *p = v（旧版 SETP）：通过 property 引用写，调 setter
             Register propReg{ 0 };
             if(!expectValue(expr->rhs, propReg))
@@ -851,12 +856,12 @@ namespace cial::inter {
             return;
         }
 
-        if(const auto *expr = dynamic_cast<const syntax::PrefixUnaryExprNode *>(node->lhs);
-           expr && expr->token.type() == syntax::TokenType::Ampersand) {
+        if(const auto* expr = dynamic_cast<const syntax::PrefixUnaryExprNode*>(node->lhs);
+            expr && expr->token.type() == syntax::TokenType::Ampersand) {
             // &obj.member = v（旧版 SPDS）：绕过 setter 直接写槽位（注册 property 引用）
-            const auto *member = dynamic_cast<const syntax::BinaryExprNode *>(expr->rhs);
+            const auto* member = dynamic_cast<const syntax::BinaryExprNode*>(expr->rhs);
             if(!member || member->token.type() != syntax::TokenType::Dot ||
-               !dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs)) {
+               !dynamic_cast<const syntax::IdentifierExprNode*>(member->rhs)) {
                 error("'&' assignment expects member access lhs", node->location);
                 return;
             }
@@ -867,14 +872,14 @@ namespace cial::inter {
             if(!expectValue(node->rhs, src))
                 return;
             _chunk->emit<DPropRawC>(
-                objReg, getAtomFromToken(dynamic_cast<const syntax::IdentifierExprNode *>(member->rhs)->token), src);
+                objReg, getAtomFromToken(dynamic_cast<const syntax::IdentifierExprNode*>(member->rhs)->token), src);
             freeRegister(objReg);
             freeRegister(src);
             optReg = src;
             return;
         }
 
-        if(const auto *expr = dynamic_cast<const syntax::IndexExprNode *>(node->lhs)) {
+        if(const auto* expr = dynamic_cast<const syntax::IndexExprNode*>(node->lhs)) {
             // a[i] = v：下标写（数组越界自动扩展/字典键写入，SetIndex 分派）
             Register objReg{ 0 };
             if(!expectValue(expr->lhs, objReg))
@@ -896,9 +901,9 @@ namespace cial::inter {
         error("isn't support assign operator", node->location);
     }
 
-    void IRGenerator::generate(const syntax::FunctionExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::FunctionExprNode* node, OptReg& optReg) {
         auto funReg = allocateRegister();
-        auto *funcMeta = generateFuncMeta(node->parameters, node->body);
+        auto* funcMeta = generateFuncMeta(node->parameters, node->body);
 
         if(!funcMeta) {
             error("generate chunk failed with function expr", node->location);
@@ -910,16 +915,16 @@ namespace cial::inter {
         optReg = funReg;
     }
 
-    void IRGenerator::generate(const syntax::PropertyDeclNode *node, OptReg &) {
-        FuncMeta *setFuncMeta{};
+    void IRGenerator::generate(const syntax::PropertyDeclNode* node, OptReg&) {
+        FuncMeta* setFuncMeta{};
         if(node->setter)
             setFuncMeta = generateFuncMeta(node->setter->parameters, node->setter->body);
 
-        FuncMeta *getFuncMeta{};
+        FuncMeta* getFuncMeta{};
         if(node->getter)
             getFuncMeta = generateFuncMeta(node->getter->parameters, node->getter->body);
 
-        auto *propMeta = _rt.createCompilationObject<PropMeta>(setFuncMeta, getFuncMeta);
+        auto* propMeta = _rt.createCompilationObject<PropMeta>(setFuncMeta, getFuncMeta);
 
         const auto identifier = getAtomFromToken(node->token);
 
@@ -939,14 +944,15 @@ namespace cial::inter {
         addLocalVar(LocalVariable{ identifier, propReg, makeLabel() });
     }
 
-    void IRGenerator::generate(const syntax::VarDeclNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::VarDeclNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         const auto identifier = getAtomFromToken(node->token);
 
-        DEFER {
+        DEFER{
             OptReg reg;
             if(node->next)
                 node->next->generateBytecode(this, reg);
+
         };
 
         // can init
@@ -969,7 +975,8 @@ namespace cial::inter {
             }
 
             // not found but can init
-            if(_empty && src == *_empty) {
+            if(_empty&& src == *_empty)
+            {
                 const auto local = allocateRegister();
                 _chunk->emit<DLocal>(src, local);
                 src = local;
@@ -997,10 +1004,10 @@ namespace cial::inter {
         addLocalVar(LocalVariable{ identifier, voidReg, makeLabel() });
     }
 
-    void IRGenerator::generate(const syntax::FunctionDeclNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::FunctionDeclNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         auto funReg = allocateRegister();
-        auto *funcMeta = generateFuncMeta(node->parameters, node->body);
+        auto* funcMeta = generateFuncMeta(node->parameters, node->body);
 
         if(!funcMeta) {
             error("generate chunk failed with function declaration", node->location);
@@ -1028,12 +1035,12 @@ namespace cial::inter {
     }
 
 
-    void IRGenerator::generate(const syntax::ClassDeclNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::ClassDeclNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         const auto identifier = getAtomFromToken(node->token);
 
         auto classReg = allocateRegister();
-        auto *classMeta = _rt.createCompilationObject<ClassMeta>(identifier, 0);
+        auto* classMeta = _rt.createCompilationObject<ClassMeta>(identifier, 0);
         _chunk->emit<Load>(classReg, _chunk->addConstant(classMeta));
 
         // class is always global in current design
@@ -1041,7 +1048,7 @@ namespace cial::inter {
 
         beginScope();
 
-        for(const auto *funcDeclNode : node->funcDeclVec) {
+        for(const auto* funcDeclNode : node->funcDeclVec) {
             const auto funName = getAtomFromToken(funcDeclNode->token);
             const auto funcMeta = generateFuncMeta(funcDeclNode->parameters, funcDeclNode->body);
 
@@ -1052,20 +1059,20 @@ namespace cial::inter {
             classMeta->setMember(MemberShapeMeta{ .name = funName, .isMethod = true }, ClassFieldMeta{ funcMeta });
         }
 
-        for(const auto *ext : node->extends) {
+        for(const auto* ext : node->extends) {
             classMeta->extends.push_back(getAtomFromToken(ext->token));
         }
 
-        for(const auto *propertyDeclNode : node->propertyDeclVec) {
-            FuncMeta *setFuncMeta{};
+        for(const auto* propertyDeclNode : node->propertyDeclVec) {
+            FuncMeta* setFuncMeta{};
             if(propertyDeclNode->setter)
                 setFuncMeta = generateFuncMeta(propertyDeclNode->setter->parameters, propertyDeclNode->setter->body);
 
-            FuncMeta *getFuncMeta{};
+            FuncMeta* getFuncMeta{};
             if(propertyDeclNode->getter)
                 getFuncMeta = generateFuncMeta(propertyDeclNode->getter->parameters, propertyDeclNode->getter->body);
 
-            auto *propMeta = _rt.createCompilationObject<PropMeta>(setFuncMeta, getFuncMeta);
+            auto* propMeta = _rt.createCompilationObject<PropMeta>(setFuncMeta, getFuncMeta);
 
             const auto varName = getAtomFromToken(propertyDeclNode->token);
 
@@ -1076,7 +1083,7 @@ namespace cial::inter {
             auto gen = IRGenerator{ _r, _rt, _sourceFile, _optimize };
             gen.makeVirtualGlobalScope();
 
-            for(const auto *varDeclNode : node->varDeclVec) {
+            for(const auto* varDeclNode : node->varDeclVec) {
                 const auto varName = getAtomFromToken(varDeclNode->token);
 
                 // can init
@@ -1096,8 +1103,8 @@ namespace cial::inter {
                 return; // parseAst(nullptr) 不应失败,防御性判空(空 Opt 解引用是 UB)
             }
 
-            auto *chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
-            auto *initFuncMeta = _rt.createCompilationObject<FuncMeta>(0, chunk, std::move(gen._localVars));
+            auto* chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
+            auto* initFuncMeta = _rt.createCompilationObject<FuncMeta>(0, chunk, std::move(gen._localVars));
             classMeta->initDefaultVal = initFuncMeta;
         }
 
@@ -1109,16 +1116,16 @@ namespace cial::inter {
             if(node->constructor) {
                 // 与 generateFuncMeta 相同：实参按位置落入帧寄存器，
                 // 默认参数守卫在全部参数分配后发射
-                Vec<std::pair<Register, const syntax::ExprNode *>> defaultParams{};
+                Vec<std::pair<Register, const syntax::ExprNode*>> defaultParams{};
                 bool hasCollapse = false;
                 u32 collapseBase = 0;
                 Register collapseReg{ 0 };
                 {
                     u32 paramIndex = 0;
-                    for(const auto &param : node->constructor->parameters) {
+                    for(const auto& param : node->constructor->parameters) {
                         const auto varName = param.name.type() == syntax::TokenType::None
-                            ? _rt.atomTable.intern(String{})
-                            : getAtomFromToken(param.name);
+                                             ? _rt.atomTable.intern(String{})
+                                             : getAtomFromToken(param.name);
                         const Register paramReg = gen.allocateRegister();
                         if(param.collapse) {
                             hasCollapse = true;
@@ -1132,14 +1139,14 @@ namespace cial::inter {
                     }
                 }
                 gen.unnamedArgBase =
-                    hasCollapse ? collapseBase : static_cast<u32>(node->constructor->parameters.size());
+                        hasCollapse ? collapseBase : static_cast<u32>(node->constructor->parameters.size());
 
                 // collapse 参数收拢（旧版 FuncDeclCollapseBase）：本帧实际实参 %base..
                 // 收拢成 Array 落收拢参数寄存器；须在默认参数守卫前发射
                 if(hasCollapse)
                     gen._chunk->emitRaw<CollapseArgs>(collapseReg, Integer{ collapseBase });
 
-                for(const auto &[paramReg, exprNode] : defaultParams) {
+                for(const auto& [paramReg, exprNode] : defaultParams) {
                     // 仅当实参为 void(未传)时才以默认值覆盖
                     const Register voidFlag = gen.allocateRegister();
                     gen._chunk->emit<TestVoid>(paramReg, voidFlag);
@@ -1166,15 +1173,15 @@ namespace cial::inter {
                 }
 
                 // the last patch one ret
-                if(auto &instVec = funChunk->getInstVec();
-                   instVec.empty() || instVec.back()->opcode() != TacOpCode::Ret) {
+                if(auto& instVec = funChunk->getInstVec();
+                    instVec.empty() || instVec.back()->opcode() != TacOpCode::Ret) {
                     gen.patchVoidRet(*funChunk);
                 }
 
-                auto *chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
+                auto* chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
                 const size_t paramCount = node->constructor->parameters.size();
-                auto *initFuncMeta = _rt.createCompilationObject<FuncMeta>(static_cast<u32>(paramCount), chunk,
-                                                                           std::move(gen._localVars));
+                auto* initFuncMeta = _rt.createCompilationObject<FuncMeta>(static_cast<u32>(paramCount), chunk,
+                    std::move(gen._localVars));
                 initFuncMeta->name = identifier;
                 classMeta->setConstructor(initFuncMeta);
             }
@@ -1188,7 +1195,7 @@ namespace cial::inter {
             auto voidReg = genFinalize.loadVoidReg();
             genFinalize._chunk->emit<Ret>(voidReg);
             auto funChunk = _rt.createCompilationObject<vm::Chunk>(*genFinalize.parseAst(nullptr, ignoreReg));
-            auto *finalize = _rt.createCompilationObject<FuncMeta>(0, funChunk, Vec<LocalVariable>{});
+            auto* finalize = _rt.createCompilationObject<FuncMeta>(0, funChunk, Vec<LocalVariable>{});
             finalize->syntheticFinalizer = true;
             classMeta->setMember(MemberShapeMeta{ .name = finalizeAtom, .isMethod = true }, ClassFieldMeta{ finalize });
         }
@@ -1196,7 +1203,7 @@ namespace cial::inter {
         freeRegister(classReg);
     }
 
-    void IRGenerator::generate(const syntax::IdentifierExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::IdentifierExprNode* node, OptReg& optReg) {
         auto dst = allocateRegister();
         const auto identifier = getAtomFromToken(node->token);
 
@@ -1219,7 +1226,7 @@ namespace cial::inter {
         optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::InternalIdentifierExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::InternalIdentifierExprNode* node, OptReg& optReg) {
         auto dst = allocateRegister();
 
         switch(node->token.type()) {
@@ -1240,22 +1247,22 @@ namespace cial::inter {
         optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::StmtDeclNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::StmtDeclNode* node, OptReg& optReg) {
         return node->statement->generateBytecode(this, optReg);
     }
 
-    void IRGenerator::emitFunctionHoisting(const syntax::BlockStmtNode *node) {
+    void IRGenerator::emitFunctionHoisting(const syntax::BlockStmtNode* node) {
         if(!node)
             return;
         OptReg ignore{};
         for(const auto children : node->childrens) {
-            if(const auto *fn = dynamic_cast<const syntax::FunctionDeclNode *>(children)) {
+            if(const auto* fn = dynamic_cast<const syntax::FunctionDeclNode*>(children)) {
                 fn->generateBytecode(this, ignore);
             }
         }
     }
 
-    void IRGenerator::generate(const syntax::BlockStmtNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::BlockStmtNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         // block statement never return value
         beginScope();
@@ -1264,14 +1271,14 @@ namespace cial::inter {
         // 允许先调用后声明的写法 (test_misc.tjs 第 1-2 行即此形态)
         emitFunctionHoisting(node);
         for(const auto children : node->childrens) {
-            if(dynamic_cast<const syntax::FunctionDeclNode *>(children))
+            if(dynamic_cast<const syntax::FunctionDeclNode*>(children))
                 continue; // 已提升, 避免重复注册
             children->generateBytecode(this, ignore);
         }
         endScope();
     }
 
-    void IRGenerator::generate(const syntax::IfStmtNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::IfStmtNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         OptReg ignore{};
         Register testReg{ 0 };
@@ -1301,13 +1308,13 @@ namespace cial::inter {
         freeRegister(testReg);
     }
 
-    void IRGenerator::generate(const syntax::SwitchStmtNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::SwitchStmtNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         using namespace vm;
 
         _breakStack.emplace_back();
 
-        DEFER { _breakStack.pop_back(); };
+        DEFER{ _breakStack.pop_back();  };
 
         OptReg ignore{ 0 };
 
@@ -1319,9 +1326,9 @@ namespace cial::inter {
         size_t prevCaseJmpIdx{};
         const size_t matchLen = node->matches.size();
         for(size_t i = 0; i < matchLen; ++i) {
-            auto &[matchExprVec, body] = node->matches[i];
+            auto& [matchExprVec, body] = node->matches[i];
             Vec<size_t> jmpEIdxVec{};
-            for(const auto *matchExpr : matchExprVec) {
+            for(const auto* matchExpr : matchExprVec) {
                 Register matchReg{ 0 };
 
                 if(!expectValue(matchExpr, matchReg))
@@ -1360,14 +1367,15 @@ namespace cial::inter {
         }
     }
 
-    void IRGenerator::generate(const syntax::DoWhileStmtNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::DoWhileStmtNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         _breakStack.emplace_back();
         _continueStack.emplace_back();
 
-        DEFER {
-            _breakStack.pop_back();
-            _continueStack.pop_back();
+        DEFER{
+                _breakStack.pop_back();
+                _continueStack.pop_back();
+
         };
 
         OptReg ignore{};
@@ -1399,16 +1407,17 @@ namespace cial::inter {
         freeRegister(testReg);
     }
 
-    void IRGenerator::generate(const syntax::ForStmtNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::ForStmtNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
-        beginScope(); // TJS2 的 for 初始化子句拥有独立块作用域。
+        beginScope();                    // TJS2 的 for 初始化子句拥有独立块作用域。
         _breakStack.emplace_back();
         _continueStack.emplace_back();
 
-        DEFER {
-            _breakStack.pop_back();
-            _continueStack.pop_back();
-            endScope();
+        DEFER{
+                _breakStack.pop_back();
+                _continueStack.pop_back();
+                endScope();
+
         };
         OptReg ignore{};
         if(node->init)
@@ -1454,14 +1463,15 @@ namespace cial::inter {
             freeRegister(testReg);
     }
 
-    void IRGenerator::generate(const syntax::WhileStmtNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::WhileStmtNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         _breakStack.emplace_back();
         _continueStack.emplace_back();
 
-        DEFER {
-            _breakStack.pop_back();
-            _continueStack.pop_back();
+        DEFER{
+                _breakStack.pop_back();
+                _continueStack.pop_back();
+
         };
 
         OptReg ignore{};
@@ -1494,7 +1504,7 @@ namespace cial::inter {
         freeRegister(testReg);
     }
 
-    void IRGenerator::generate(const syntax::BreakStmtNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::BreakStmtNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         if(_breakStack.empty()) {
             error("break keyword must in loop or switch scope", node->location);
@@ -1504,7 +1514,7 @@ namespace cial::inter {
         _breakStack.back().push_back(idx);
     }
 
-    void IRGenerator::generate(const syntax::ContinueStmtNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::ContinueStmtNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         if(_continueStack.empty()) {
             error("continue keyword must in loop or switch scope", node->location);
@@ -1518,7 +1528,7 @@ namespace cial::inter {
         }
     }
 
-    void IRGenerator::generate(const syntax::TernaryExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::TernaryExprNode* node, OptReg& optReg) {
         Register dst = allocateRegister();
         Register testReg{ 0 };
         if(!expectValue(node->test, testReg)) {
@@ -1550,7 +1560,7 @@ namespace cial::inter {
         optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::IndexExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::IndexExprNode* node, OptReg& optReg) {
         Register objReg{ 0 };
         if(!expectValue(node->lhs, objReg))
             return;
@@ -1564,16 +1574,16 @@ namespace cial::inter {
         optReg = dst;
     }
 
-    Value IRGenerator::buildConstantContainer(const syntax::ExprNode *node) {
-        if(const auto *array = dynamic_cast<const syntax::ArrayLiteralNode *>(node)) {
-            auto *object = _rt.createCompilationObject<Array>(&_rt);
-            for(const auto *element : array->elements)
+    Value IRGenerator::buildConstantContainer(const syntax::ExprNode* node) {
+        if(const auto* array = dynamic_cast<const syntax::ArrayLiteralNode*>(node)) {
+            auto* object = _rt.createCompilationObject<Array>(&_rt);
+            for(const auto* element : array->elements)
                 object->elements.push_back(buildConstantContainer(element));
-            return Value{ static_cast<Object *>(object) };
+            return Value{ static_cast<Object*>(object) };
         }
-        if(const auto *dict = dynamic_cast<const syntax::DictLiteralNode *>(node)) {
-            auto *object = _rt.createCompilationObject<Dictionary>();
-            for(const auto &[key, element] : dict->pairs) {
+        if(const auto* dict = dynamic_cast<const syntax::DictLiteralNode*>(node)) {
+            auto* object = _rt.createCompilationObject<Dictionary>();
+            for(const auto& [key, element] : dict->pairs) {
                 Value name = buildConstantContainer(key);
                 if(name.toString().isFailed()) {
                     error("invalid constant dictionary key", key->location);
@@ -1581,19 +1591,19 @@ namespace cial::inter {
                 }
                 object->members[_rt.atomTable.intern(*name.asString().unwrap())] = buildConstantContainer(element);
             }
-            return Value{ static_cast<Object *>(object) };
+            return Value{ static_cast<Object*>(object) };
         }
-        if(const auto *unary = dynamic_cast<const syntax::PrefixUnaryExprNode *>(node)) {
+        if(const auto* unary = dynamic_cast<const syntax::PrefixUnaryExprNode*>(node)) {
             Value value = buildConstantContainer(unary->rhs);
             const auto result =
-                unary->token.type() == syntax::TokenType::Minus ? value.toSignChange() : value.toNumber();
+                    unary->token.type() == syntax::TokenType::Minus ? value.toSignChange() : value.toNumber();
             if(result.isFailed())
                 error("invalid signed constant", node->location);
             return value;
         }
-        const auto &token = node->token;
+        const auto& token = node->token;
         if(token.type() == syntax::TokenType::Null)
-            return Value{ static_cast<Object *>(nullptr) };
+            return Value{ static_cast<Object*>(nullptr) };
         switch(token.valueType()) {
             case syntax::TokenValueType::Integer:
                 return Value{ token.getInteger() };
@@ -1609,7 +1619,7 @@ namespace cial::inter {
         return {};
     }
 
-    void IRGenerator::generate(const syntax::ArrayLiteralNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::ArrayLiteralNode* node, OptReg& optReg) {
         if(node->isConstant) {
             const Value value = buildConstantContainer(node);
             if(_r.isFailed())
@@ -1622,7 +1632,7 @@ namespace cial::inter {
         Register dst = allocateRegister();
         _chunk->emit<NewArray>(dst, static_cast<Integer>(node->elements.size()));
         for(size_t i = 0; i < node->elements.size(); ++i) {
-            auto *elm = node->elements[i];
+            auto* elm = node->elements[i];
             if(!elm)
                 continue; // 空元素保持 void
             Register valReg{ 0 };
@@ -1637,7 +1647,7 @@ namespace cial::inter {
         optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::DictLiteralNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::DictLiteralNode* node, OptReg& optReg) {
         if(node->isConstant) {
             const Value value = buildConstantContainer(node);
             if(_r.isFailed())
@@ -1649,7 +1659,7 @@ namespace cial::inter {
         }
         Register dst = allocateRegister();
         _chunk->emit<NewDict>(dst);
-        for(const auto &[keyExpr, valueExpr] : node->pairs) {
+        for(const auto& [keyExpr, valueExpr] : node->pairs) {
             Register keyReg{ 0 };
             if(!expectValue(keyExpr, keyReg))
                 return;
@@ -1663,20 +1673,20 @@ namespace cial::inter {
         optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::RegexLiteralExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::RegexLiteralExprNode* node, OptReg& optReg) {
         Register dst = allocateRegister();
         // 模式文本按字符串字面量同路径入常量池（Atom 形态）
         _chunk->emit<NewRegExp>(dst, _chunk->addConstant(getAtomFromToken(node->token)));
         optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::WithBaseExprNode *node, OptReg &optReg) {
+    void IRGenerator::generate(const syntax::WithBaseExprNode* node, OptReg& optReg) {
         Register dst = allocateRegister();
         _chunk->emit<GetWith>(dst);
         optReg = dst;
     }
 
-    void IRGenerator::generate(const syntax::WithStmtNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::WithStmtNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         // with(obj) stmt：obj 求值一次压入 with 上下文栈，块结束弹出；
         // 异常穿越时随帧截断（freeCallFrame）
@@ -1692,7 +1702,7 @@ namespace cial::inter {
         _chunk->emit<WithPop>();
     }
 
-    void IRGenerator::generate(const syntax::ReturnStmtNode *node, OptReg &) {
+    void IRGenerator::generate(const syntax::ReturnStmtNode* node, OptReg&) {
         _chunk->addLine(node->location); // Rlc 行号（语句粒度）
         if(node->expr) {
             Register reg{ 0 };
@@ -1705,11 +1715,11 @@ namespace cial::inter {
         _chunk->emit<Ret>(loadVoidReg());
     }
 
-    void IRGenerator::generate(const syntax::DebuggerStmtNode *, OptReg &) { _chunk->emit<Debugger>(); }
+    void IRGenerator::generate(const syntax::DebuggerStmtNode*, OptReg&) { _chunk->emit<Debugger>(); }
 
-    LocalVariable *IRGenerator::resolveLocalVariable(const Atom identifier) {
+    LocalVariable* IRGenerator::resolveLocalVariable(const Atom identifier) {
         for(const auto index : std::ranges::reverse_view(_activeLocals)) {
-            auto &var = _localVars[index];
+            auto& var = _localVars[index];
             if(var.identifier == identifier) {
                 return &var;
             }
@@ -1717,34 +1727,34 @@ namespace cial::inter {
         return nullptr;
     }
 
-    LocalVariable *IRGenerator::resolveCurrentLocalVariable(const Atom identifier) {
+    LocalVariable* IRGenerator::resolveCurrentLocalVariable(const Atom identifier) {
         for(size_t index = _activeLocals.size(); index > _scopeLocalStarts.back(); --index) {
-            auto &variable = _localVars[_activeLocals[index - 1]];
+            auto& variable = _localVars[_activeLocals[index - 1]];
             if(variable.identifier == identifier)
                 return &variable;
         }
         return nullptr;
     }
 
-    FuncMeta *IRGenerator::generateFuncMeta(const syntax::Parameters &parameters,
-                                            const syntax::BlockStmtNode *body) const {
-
+    FuncMeta* IRGenerator::generateFuncMeta(const syntax::Parameters& parameters,
+                                            const syntax::BlockStmtNode* body) const {
         auto gen = IRGenerator{ _r, _rt, _sourceFile, _optimize };
         gen.makeVirtualGlobalScope();
 
         // 调用约定：实参按位置落入帧寄存器 0..arity-1，参数寄存器必须连续分配，
         // 默认参数的守卫代码只能在全部参数分配完之后发射
-        Vec<std::pair<Register, const syntax::ExprNode *>> defaultParams{};
+        Vec<std::pair<Register, const syntax::ExprNode*>> defaultParams{};
         bool hasCollapse = false;
         u32 collapseBase = 0;
         Register collapseReg{ 0 };
         {
             u32 paramIndex = 0;
-            for(const auto &param : parameters) {
+            for(const auto& param : parameters) {
                 // 未命名 collapse（裸 `*`）名为空 Token：getString 解引用未初始化
                 // 载荷会段错误，落一个不会被引用的占位名
-                const auto varName = param.name.type() == syntax::TokenType::None ? _rt.atomTable.intern(String{})
-                                                                                  : getAtomFromToken(param.name);
+                const auto varName = param.name.type() == syntax::TokenType::None
+                                     ? _rt.atomTable.intern(String{})
+                                     : getAtomFromToken(param.name);
                 const Register paramReg = gen.allocateRegister();
                 if(param.collapse) {
                     // 收拢参数（`name*` / `*`，语法上必为最后一个）：
@@ -1767,7 +1777,7 @@ namespace cial::inter {
         if(hasCollapse)
             gen._chunk->emitRaw<CollapseArgs>(collapseReg, Integer{ collapseBase });
 
-        for(const auto &[paramReg, exprNode] : defaultParams) {
+        for(const auto& [paramReg, exprNode] : defaultParams) {
             // 默认参数语义（TJS2）：仅当对应实参为 void(未传)时才以默认值覆盖，
             // 否则实参已占据参数寄存器。降糖为 TestVoid + 条件跳过
             const Register voidFlag = gen.allocateRegister();
@@ -1795,13 +1805,13 @@ namespace cial::inter {
         }
 
         // the last instruction is not ret, patch one ret
-        if(auto &instVec = funChunk->getInstVec(); instVec.empty() || instVec.back()->opcode() != TacOpCode::Ret) {
+        if(auto& instVec = funChunk->getInstVec(); instVec.empty() || instVec.back()->opcode() != TacOpCode::Ret) {
             gen.patchVoidRet(*funChunk);
         }
 
-        auto *chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
-        auto *funcMeta = _rt.createCompilationObject<FuncMeta>(static_cast<u32>(parameters.size()), chunk,
-                                                               std::move(gen._localVars));
+        auto* chunk = _rt.createCompilationObject<vm::Chunk>(std::move(*funChunk));
+        auto* funcMeta = _rt.createCompilationObject<FuncMeta>(static_cast<u32>(parameters.size()), chunk,
+            std::move(gen._localVars));
         funcMeta->hasCollapse = hasCollapse;
         return funcMeta;
     }
@@ -1814,25 +1824,27 @@ namespace cial::inter {
         return _empty.value();
     }
 
-    void IRGenerator::patchVoidRet(vm::Chunk &funChunk) {
+    void IRGenerator::patchVoidRet(vm::Chunk& funChunk) {
         // 给 parseAst 返回的 chunk 补"返回 void"的 ret。不能复用 loadVoidReg()：
         // parseAst 返回后 _chunk 已替换为丢弃用暂存 chunk，其 Load 会发射错位，
         // Ret 读到寄存器池陈旧值（无 return 函数/构造器曾泄漏池内旧对象）。
         // 体生成期已装载的 _empty 寄存器可直接复用。
-        const Register voidReg = _empty.has_value() ? *_empty : [&] {
-            const Register reg = allocateRegister();
-            funChunk.emit<Load>(reg, ConstIdx{ 0 });
-            return reg;
-        }();
+        const Register voidReg = _empty.has_value()
+                                 ? *_empty
+                                 : [&] {
+                                     const Register reg = allocateRegister();
+                                     funChunk.emit<Load>(reg, ConstIdx{ 0 });
+                                     return reg;
+                                 }();
         funChunk.emit<Ret>(voidReg);
         funChunk.setRegCount(_regNextIndex);
     }
 
-    Atom IRGenerator::getAtomFromToken(const syntax::Token &token) const {
+    Atom IRGenerator::getAtomFromToken(const syntax::Token& token) const {
         return _rt.atomTable.intern(token.getString());
     }
 
-    void IRGenerator::genTokenValueLoadInst(Register reg, const syntax::Token &token) const {
+    void IRGenerator::genTokenValueLoadInst(Register reg, const syntax::Token& token) const {
         switch(token.valueType()) {
             case syntax::TokenValueType::Real:
                 _chunk->emit<Load>(reg, _chunk->addConstant(token.getReal()));
@@ -1842,7 +1854,7 @@ namespace cial::inter {
                 break;
             case syntax::TokenValueType::Octet: {
                 // octet 字面量走常量池(payload 所有权随 Constant)
-                auto *payload = SharedPayload<Octet>::makeSingle(Octet{ token.getOctet() });
+                auto* payload = SharedPayload<Octet>::makeSingle(Octet{ token.getOctet() });
                 _chunk->emit<Load>(reg, _chunk->addConstant(Constant{ payload }));
                 break;
             }
@@ -1857,5 +1869,4 @@ namespace cial::inter {
                 break;
         }
     }
-
 } // namespace cial::inter
