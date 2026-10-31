@@ -43,7 +43,7 @@ C++ 测试显式登记在 `tests/CMakeLists.txt`；CLI、LSP 与字节码工具�
 - 编译期错误使用 `Common::Result` / `Ret<T>`；运行期遵循现有 `Err` / 脚本异常传播协议。
 - 标准库注册使用一次 `context.nativeType<T>()`，后续 `.method()` / `.property()` 链式调用。
 - 新增指令同步修改 `Instruction.hpp` 与 `Bytecode.hpp` 的 X-macro、`DEF_INST` 声明、
-  `Instruction.cpp` execute/dump、`Bytecode.cpp` 编码和 `VMState.cpp` 派发。
+  `Instruction.cpp` dump、`Bytecode.cpp` 编码和 `VMState.cpp` 执行派发。
 - 修改前阅读相应接口注释；不要用编辑器风格建议替代对类型、GC 和异常协议的检查。
 
 ## 修改前先读

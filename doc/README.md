@@ -12,7 +12,7 @@
 | 参与开发 | [待办](../TODO.md) · [开发约定](../AGENTS.md) |
 
 官方语法参考：[TJS2 リファレンス](https://hydrozoa.felisworks.com/doc/tjs2doc/contents/index.html)。
-原版 bison 文法副本位于 [grammar/](grammar/)。
+TJSCompiler 的 Bison 文法见[文法快照与来源](grammar/README.md)。
 
 使用方法写入专题指南，局部实现约束写在代码旁，常见问题集中到 FAQ。
 待办只保留未完成项；历史测量注明环境与基线，修复过程可从 Git 历史查阅。

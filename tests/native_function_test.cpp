@@ -628,17 +628,15 @@ TEST_CASE("with 内 try/catch（对齐原版：catch 内 with 上下文丢失）
     REQUIRE((**vm.evalExpr<String *>("out"_str)) == "n=1|c|1"_str); // try 前裸词链 + 穿越后恢复
 }
 
-TEST_CASE("(const)[...] / (const)%[...] 常量内联形态（对齐原版：无只读/无共享）") {
+TEST_CASE("(const)[...] / (const)%[...] 常量内联形态（当前实现：可写的运行期容器）") {
     Runtime rt{};
     Context context{ rt };
     stdlib::registerStandardLibrary(context);
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
-    // tjs.y:795 产生式 = TJSCreateArrayObject 新建 + T_CONSTVAL 节点；代码生成
-    // 只是 VM_CONST 常量池装载——无只读保护、无跨求值共享（每次新建）。
-    // 原版 (const)%[...] 甚至解析报错（旧版缺陷），此处行为超出原版（可用），
-    // 其余逐项对齐。
+    // 参考 const_inline_array 在解析期建容器，再经 VM_CONST 复用常量对象。
+    // 当前 Parser 忽略 (const)，此处只覆盖可写性及嵌套语法，不证明跨调用共享已对齐。
     vm.eval(R"tjs(
         var a = (const)[1, 2, 3];
         var b = (const)[1, 2, 3];

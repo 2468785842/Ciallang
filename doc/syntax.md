@@ -2,7 +2,7 @@
 
 > 权威来源：**官方《TJS2 リファレンス》**
 > <https://hydrozoa.felisworks.com/doc/tjs2doc/contents/index.html>（语言规格/内建类/预处理器）
-> 与原版 bison 语法 `doc/grammar/tjs.y`（产生式逐字权威，本文行号即指此文件）。
+> 与 [TJSCompiler 文法快照](grammar/README.md)；文法描述可接受的形式，运行语义仍需核对代码生成与执行器。
 > 本文整理完整语法并标注 **Ciallang 当前实现状态**：✅ 已实现 / ◐ 部分 / ❌ 未实现（与 README/TODO 对齐）。
 
 ---
@@ -31,10 +31,10 @@
 @endif                   条件结束
 ```
 
-- 表达式可用 `== != < > <= >= && || ! + - * / \ % ( )` 与已定义变量；
+- 表达式可用 `, = == != < > <= >= && || | ^ & ! + - * / % ( )` 与已定义变量；
 - 主脚本运行前由宿主注入变量（如 kirikiriz）。
 - **Ciallang 状态**：✅ `@set` / `@if` / `@endif`（实现于 `src/parser/PreProcessor.cpp`；
-  表达式能力对齐程度见测试 `tests/preprocess_test.cpp`）。
+  表达式能力对齐程度见测试 `tests/preprocessor_test.cpp`）。
 
 ## 3. 类型与值
 
@@ -44,14 +44,14 @@
 | Integer | 8 字节整数 | ✅ |
 | Real | double | ✅ |
 | String | `"..."`（16 位字符语义） | ✅（内部 UTF-8） |
-| Object | `null`（空闭包）、对象/函数/类/数组/字典 | ✅（Array/Dictionary 类缺失，见标准库） |
+| Object | `null`（空闭包）、对象/函数/类/数组/字典 | ✅（Array/Dictionary 等通过标准库注册） |
 | Octet | `<% 00 01 ff %>` 十六进制字节流 | ✅ |
 | `true` / `false` | 布尔（编译为 Integer 1/0 语义） | ✅ |
 | `Infinity` / `-Infinity` | | ✅ |
 
 ## 4. 表达式与优先级（从低到高）
 
-依据 tjs.y:527-775 产生式阶梯（左结合除非注明）：
+依据 tjs.y 的表达式产生式阶梯（左结合除非注明）：
 
 | 级 | 运算符 | 状态 |
 |---|---|---|
@@ -69,32 +69,32 @@
 | 11 | 移位 `<< >> >>>`（`>>>` 无符号右移） | ✅ |
 | 12 | 加减 `+ -`（`+` 对字符串为连接） | ✅ |
 | 13 | 乘除类 `% / \ *`（`\` 整除；`*` 与前缀属性访问歧义经专门产生式 `mul_div_expr_and_asterisk` 消解） | ✅ |
-| 14 | **一元前缀** `! ~ ++ -- new invalidate isvalid delete typeof # $ + - & *` | ✅（`&` 取属性本体不触发 getter、`*` 解引用调 getter/setter，引用须存局部变量） |
+| 14 | **一元前缀** `! ~ ++ -- new invalidate isvalid delete typeof # $ + - & *` | ✅（`&` 取属性本体，`*` 调 getter/setter；全局和成员槽的普通读取会触发 getter） |
 | 14′ | **一元中缀式** `A instanceof B`（B 为类名）、`A in B` | instanceof ✅（基础类型按类型名匹配，Number 覆盖 Integer/Real；2026-10-30 补内置对象：Array/Dictionary/RegExp/函数对象对各自类名恒真——TJS2 TJSDefaultIsInstanceOf 沿原生类链按名匹配，`src/runtime/Runtime.hpp` 保留 Atom + 各类型 instanceOf 覆写，`tests/expression_test.cpp`）；`in` ✅（保留字行为对齐：原版 codegen 无 T_IN 分支，节点与操作数均不求值、结果为 void，2026-10-29 实测定论；勿实现成成员存在判断） |
 | 15 | `A isvalid`（**后缀**形态，与前缀并存）、`A incontextof B`（**右结合**，替换函数闭包的 this） | ✅：incontextof ✅；isvalid 前/后缀 ✅（2026-10-30 对齐原版 VM_CHKINV 语义：非对象值恒 true（tjsInterCodeExec.cpp:1177），对象按 IsValid 判定，invalidate 后 false；`src/vm/VMState.cpp` ChkInv、`tests/judgment_test.cpp`） |
 | 16 | **类型转换** `(int)A (real)A (string)A` 或裸 `int A real A string A` | ✅ |
 | 17 | **后缀**：调用 `f(args)`、成员 `.sym`（含 `.` 起始的裸词链）、下标 `a[i]`（通用路径：数组/字典/字符串；可写，越界扩展）、后缀 `++ --`（表达式值为旧值；成员形态走 getter/setter 链）、**即时求值 `A !`**（把 A 的字符串值作为 TJS 表达式编译执行） | 全部 ✅：`() . -- ++ []`；后缀 `!` 即时求值（A 字符串化为表达式编译执行，空串原值不变，2026-10-26） |
-| 18 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]`（键形式 `sym :` 与 `"k" >= v`，=> 词形即 >=）/ 正则 `/pattern/` / 常量式 `(const)[...]` `(const)%[...]` | ✅（`(const)` 无只读/无共享语义——tjs.y:795 产生式即新建对象，实测原版写入放行，行为已对齐） |
+| 18 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]`（键形式 `sym :` 与 `"k" >= v`，=> 词形即 >=）/ 正则 `/pattern/` / 常量式 `(const)[...]` `(const)%[...]` | ◐ 普通字面量已实现；`(const)` 的编译期容器、常量元素限制与重复求值共享尚未对齐（见 §8） |
 
 前缀一元语义速查（原版）：
 
 - `#s`：字符串取首字符的字符码（ASC，非字符串先字符串化；octet 报错）；`$n`：字符码 → 单字符字符串（CHR，对应新增字节码 Asc/Chr）
 - `&expr`：忽略属性访问（属性当普通值取）；`*expr`：强制属性访问（当 property 取）
-- `+expr`：数值规范化（字符串转数值、octet 报错，对应 NUM；降糖为 ToReal）
+- `+expr`：数值规范化（字符串转数值、octet 报错，对应 ToNumber）
 - `delete expr`：删除成员，返回 bool（仅删实例自有成员）
 - `typeof expr`：类型名字符串
 
 后缀条件 `expr if cond`（tjs.y `expr → comma_expr "if" expr`）：绑定比逗号更松，
 假条件时**整个赋值不发生**（`tmp = a if c` 的 lhs 是整个赋值表达式）——已实现 ✅。
-成员只读属性：`str.length`（字节长度）✅。
+成员只读属性：`str.length`（UTF-8 码点计数）✅。
 
-## 5. 语句（tjs.y:222-243）
+## 5. 语句
 
 | 语句 | 形式 | 状态 |
 |---|---|---|
 | 空语句 `;` | | ✅ |
 | 表达式语句 | | ✅ |
-| `var` 声明 | `var a, b = expr;`；可带类型注解 `var a:int`（注解仅文档性） | ✅ 块级遮蔽、同层重新声明（无初值重置 void）、for 初始化作用域（`src/gen/IRGenerator.*`、`tests/scope_test.cpp`）；const 与 var 等价，只读性不强制；类型注解 ✅（2026-10-29：var/函数参数/函数返回值/getter/setter 全位解析并丢弃，对齐 tjs.y:339 "Ignore types"） |
+| `var` 声明 | `var a, b = expr;`；可带类型注解 `var a:int`（注解仅文档性） | ✅ 块级遮蔽、同层重新声明（无初值重置 void）、for 初始化作用域（`src/gen/IRGenerator.*`、`tests/scope_test.cpp`）；const 与 var 等价，只读性不强制；类型注解 ✅（2026-10-29：var/函数参数/函数返回值/getter/setter 全位解析并丢弃，对齐 tjs.y "Ignore types"） |
 | `if (e) s [else s]` | | ✅ |
 | `while (e) s` | | ✅ |
 | `do s while (e);` | | ✅ |
@@ -118,7 +118,7 @@ function (参数表) [: 类型] { … }     // 函数表达式（值）
 参数:  名字 [: 类型] [= 默认值表达式]  // 默认值：实参为 void 时求值；类型注解文档性
        *                        // 匿名收拢：多余实参打包 Array
        名字*                     // 命名收拢
-调用:  f(a, b, ...)               // ... 省略：透传当前函数全部实参
+调用:  f(...)                     // ... 单独作为实参表，透传当前函数全部实参
        f(a, arr*)                 // arr* 展开：数组元素作为实参（后缀星号）
        f(a, *)                    // * 未命名透传：转发当前位置起的全部实参
 ```
@@ -133,30 +133,33 @@ function (参数表) [: 类型] { … }     // 函数表达式（值）
 ```
 class 类名 extends 父类1, 父类2 … {   // 多继承，后面的覆盖前面
     var 成员变量;                      // 实例字段
-    static var 静态字段;               // 静态成员（挂在类对象上）
     function 方法(…) { … }
-    static function 静态方法(…) { … }
     function 类名(…) { … }            // 与类同名的构造函数
     property 名 { getter() { … } setter(v) { … } }   // getter/setter 顺序任意，可只有其一
-    function finalize() { … }         // 析构（invalidate 后触发）
+    function finalize() { … }         // 无效化时的终结回调
 }
 ```
 
 - 语义要点（TJS2 特有，Ciallang 以 29 个类测试固化）：
   - 成员解析走 **slot 链**（实例字段 → 本类 → 父类链），`super` 显式跨层；
   - 方法访问按对象绑定 this（字节码侧经闭包 objthis，本项目经 `DataObject::getProp` 克隆绑定）；
-  - `invalidate obj` 置失效 + 引用计数归零时触发 `finalize`。
-- 状态：class/多继承/property/构造函数/super ✅；`finalize` 触发时机 ✅（GC 保活队列 + VM 安全点 drain，tests/interpreter_test.cpp）；`static` ✅ 定论——原版保留字但无文法规则（tjs.y:116-120 零产生式），类内 `static` 原版即语法错误，本项目同为编译错误（tests/compat_reserved_test.cpp）。
+  - 显式 `invalidate obj` 同步调用 `finalize`；不可达对象由 GC 排队，在 VM 安全点执行终结回调。
+- 状态：class/多继承/property/构造函数/super ✅；`finalize` 触发时机 ✅（GC 保活队列 + VM 安全点 drain，tests/interpreter_test.cpp）；`static` ✅ 定论——原版保留字但无文法规则（tjs.y 零产生式），类内 `static` 原版即语法错误，本项目同为编译错误（tests/compat_reserved_test.cpp）。
 
 ## 8. 内联字面量（Array / Dictionary / 常量折叠形）
 
 ```
 [ e1, e2, e3 ]                // Array
 %[ key: v, "key2": v2, … ]    // Dictionary（key 可为裸符号或字符串；尾逗号合法）
-(const)[ … ] / (const)%[ … ]  // 常量形：元素须为编译期常量，编译时构建真实 Array/Dictionary 常量
+(const)[ … ] / (const)%[ … ]  // 参考文法的常量容器形态；本项目支持范围见下
 ```
 
-状态：全部 ✅（Array/Dictionary 字面量 2026-10-24 批次接入，`(const)` 常量形同批）。
+状态：普通 Array/Dictionary 字面量 ✅；`(const)` ◐。参考文法的 `const_inline_array` /
+`const_inline_dic` 在解析期创建容器并放入 `T_CONSTVAL`，并限制元素为常量。
+Ciallang 目前忽略 `(const)` 标记，按普通表达式在运行期新建容器，未实现同一字面量跨调用的常量对象共享。
+可写与共享是两个独立问题；两个不同字面量互不影响也不能证明同一表达式没有共享。
+字典键值形式也应区分：参考 `const_dic_elm` 使用常量键、逗号、常量值，本项目接受普通字典写法。
+依据 `src/parser/Parser.cpp` 的 `GroupPrefixParser` 与固定快照 `tjs.y` 的上述产生式。
 
 ## 9. 标准库概览（详细对照见 compatibility.md）
 

@@ -52,8 +52,9 @@ Clang 19 Windows 运行库曾在 C++ 异常路径崩溃，纯标准库最小程�
 
 ## 对拍前怎样确认参考引擎可用
 
-`../TJSCompiler` 上游 `src/main.cpp` 使用固定脚本路径，不直接提供历史测量使用的脚本路径和
-`--dump` CLI。指定 `CIAL_TJS_EXE` 前，先确认适配后的程序确实执行输入脚本并支持所需导出接口。
+TJSCompiler 的旧入口曾使用固定脚本路径；`d8044c3` 已提交 `TJSCompiler <script>` 和
+`--dump <script> <output>` CLI（参考仓库 `src/main.cpp` / `CMakeLists.txt`）。不同版本的入口能力仍需实际确认。
+指定 `CIAL_TJS_EXE` 前，检查程序确实执行输入脚本并支持所需导出接口。
 `bench/bytecode_conformance.py --reference` 会探测参考 CLI；已有源码与字节码 fixture 可独立使用，
 无需参考程序。命令与报告语义见[构建指南](building.md#测试与基准)和[转译文档](bytecode/mapping.md#9-对拍与工具链)。
 

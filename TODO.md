@@ -2,6 +2,11 @@
 
 只记录尚未完成的工作；完成后删除条目。使用限制见 [FAQ](doc/faq.md)，历史测量见[性能记录](doc/performance.md)。
 
+## 字节码与语言兼容
+
+- [ ] 修复 CHKINS 转译的 target/name 顺序及结果写回。最小函数 `x instanceof "Integer"` 的手工字节码以 21 调用仍返回 21，预期为 1（`src/tjsbc/TjsTranslator.cpp` decode / OP_CHKINS）。
+- [ ] 对齐 `(const)` 容器的编译期构造、元素限制及同一字面量跨调用共享；当前 Parser 忽略标记并在运行期新建，见 [语法说明](doc/syntax.md#8-内联字面量array--dictionary--常量折叠形)。
+
 ## 性能与优化
 
 - [ ] 继续缩小与参考 TJS2 的原生调用性能差距，优先评估调用帧及实参窗口成本；使用同机 Release 交替对照记录收益与回退。

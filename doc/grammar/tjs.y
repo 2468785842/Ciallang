@@ -4,12 +4,12 @@
 %header "tjs.tab.hpp"
 %output "tjs.tab.cpp"
 %define api.namespace {TJS}
+%define parse.error verbose
 
 %code top
 {
-#include <cstdlib>
+#include <memory>
 
-#include "tjsTypes.h"
 #include "tjsError.h"
 #include "tjsArray.h"
 #include "tjsDictionary.h"
@@ -39,7 +39,6 @@ namespace TJS {
     class tTJSExprNode;
 }
 }
-
 
 %token
 	T_COMMA					","
@@ -404,8 +403,8 @@ func_decl_arg_collapse
 												lx->GetString($1)); }
 /*
 	These are currently not supported
-	| T_SYMBOL "*" "=" inline_array			{}
-	| T_SYMBOL "*=" inline_array			{}
+	| T_SYMBOL "*" "=" inline_array			{ ; }
+	| T_SYMBOL "*=" inline_array			{ ; }
 */
 ;
 

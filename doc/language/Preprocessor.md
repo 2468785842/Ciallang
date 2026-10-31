@@ -23,7 +23,8 @@ condition 中可用的运算符：
 +  -  %  *  /  !  +  -  ( )
 ```
 
-含义同普通表达式（见 [ExpressionAndOperator.md](ExpressionAndOperator.md)），但**只能处理整数**。
+运算含义可对照[普通表达式](ExpressionAndOperator.md)，但这里只处理 **32 位整数**。
+优先级以 `tjspp.y` 为准：赋值高于位运算；Bison 动作在两侧归约后计算逻辑结果，不能套用脚本表达式的短路规则。
 
 可使用任意变量与立即值，变量命名规则与 token 规则相同。预处理器变量与 TJS2 脚本变量**互不干扰**（命名空间独立）。
 

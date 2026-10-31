@@ -8,9 +8,8 @@
 %lex-param   { tTJSPPExprParser *ptr }
 
 %code top {
-#include <cstdlib>
+#include <memory>
 
-#include "tjsTypes.h"
 #include "tjs.h"
 #include "tjsCompileControl.h"
 
@@ -21,6 +20,7 @@
 }
 
 %code requires {
+#include "tjsTypes.h"
 
 namespace TJSPP {
     class tTJSPPExprParser;

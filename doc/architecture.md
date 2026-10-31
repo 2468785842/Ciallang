@@ -53,10 +53,10 @@
 
 - `PreProcessor`：`@set(变量=值)` / `@if(条件)` / `@endif` 条件编译（对标原版 `tjsCompileControl` + `tjspp.y`，指令同名）。
 - `Lexer`：手写词法器 + `OperatorTrie` 多字符运算符匹配 + 模板字符串状态机。
-- `Parser`：**Pratt 优先级解析器**（`Precedence` 枚举 29-56 行），四类子解析器注册表——
-  与 TJS 的 bison LALR 生成表完全不同的实现路线，但目标产生式一致（`doc/grammar/tjs.y`）。
+- `Parser`：**Pratt 优先级解析器**（`Parser.hpp` 的 `Precedence`），四类子解析器注册表——
+  与 TJSCompiler 的 Bison 生成表采用不同实现路线；对照文法的来源见 [grammar/README.md](grammar/README.md)。
 - `ast/`：`AstNode` 基类 + X-macro `CIAL_AST_NODE_ENUMS`；节点自带
-  `generateBytecode(IRGenerator*, OptReg&)` 虚方法（**AST 直接驱动 IR 生成**，`IRGenerator.hpp:59-61`）。
+  `generateBytecode(IRGenerator*, OptReg&)` 虚方法（**AST 直接驱动 IR 生成**，`IRGenerator.hpp`）。
 
 ### 2.3 `src/gen/` — 中端
 
@@ -96,14 +96,16 @@
   全部运算/比较/转换（宽松 `==` 与严格 `===` 分离：`equals`/`discernEquals`）。
 - `Object`：虚接口 `hasProp/getProp/setProp/call/instanceOf`——所有对象统一走属性协议。
 - `Class.hpp/cpp`：`ClassObject`（类对象，持有 ClassMeta）、`DataObject`（实例，slot 化成员，
-  **方法访问时克隆 Function 并绑定 this**，`Class.cpp:210-235`）、`GlobalObject`。
+  **方法访问时克隆 Function 并绑定 this**，见 `Class.cpp`）、`GlobalObject`。
 - `Function`：TJS 函数（FuncMeta + thisObj）；`NativeFunction`：原生函数（traits 支持成员函数/lambda）。
-- `Property`：getter/setter 属性对象（对 DLocal/GLocal/DGlobal/GGlobal 透明触发）。
+- `Property`：getter/setter 属性对象（对象/global/this 成员读写可触发处理器；GLocal/DLocal 仅复制引用）。
 
 ### 2.7 `src/stdlib/`
 
-`print/println`、String 方法（`StringLib`，replace/split 待 RegExp/Array）、
-按 `TypeId` 分派的原生方法注册（`NativeRegister`）。
+各 `*Lib.cpp` 实现和注册 String、Array、Dictionary、RegExp、Math、Date、Random、
+结构化存取及 Scripts；`StandardLibrary` 汇总安装，print/println 和 Exception 由宿主按需添加。
+`NativeRegister` 按开放的 `NativeTypeKey` 分派，`TypeId` 保留给 VM 内部判型。
+宿主普通 C++ 类型的绑定入口是 `Binding.hpp`，见 [embedding.md](embedding.md)。
 
 ## 3. 关键设计决策
 
@@ -115,24 +117,24 @@
 | 实参经寄存器池顶传递，被调帧 %0..arity-1 即实参 | 免独立实参栈；与 TJS "ra[-3] 向下"的对应关系在转译 prologue 解决 |
 | GC 标记清除 + RootGuard | 根由句柄和 MarkRootProvider 显式枚举；见 `Runtime.hpp` |
 | 常量池 index 0 恒 Void | 空/void 语义有免费表达；TJS 转译时 VOID/OBJECT(null) 直接映射 *0 |
-| 类成员 slot 化 + 按名继承 | 与 TJS2 动态类行为一致（运行期才能确定父类），15 个语义测试固化 |
+| 类成员 slot 化 + 按名继承 | 源码路径在运行期解析父类名；字节码路径的动态类体边界见 [转译说明](bytecode/mapping.md#7-类与属性元数据) |
 
 ## 4. 与 TJSCompiler（旧版）逐段对照
 
 | 阶段 | TJSCompiler（原版） | Ciallang |
 |---|---|---|
-| 预处理 | `#[...]`/`@set` 经 tjspp.y 表达式（`tjsCompileControl`） | `PreProcessor`（@set/@if，独立实现） |
+| 预处理 | `@set/@if/@endif` 经 tjspp.y 表达式（`tjsCompileControl`） | `PreProcessor`（@set/@if，独立实现） |
 | 词法 | `tTJSLexicalAnalyzer`（tjsLex.cpp） | `Lexer`（手写 DFA + Trie） |
 | 语法 | **bison LALR**（tjs.y → tjs.tab.cpp），动作直接驱动代码生成 | Pratt 递归下降 → AST → 再生成 |
 | 中间表示 | `tTJSInterCodeContext`：编译与执行同体，**CodeArea 即产物** | `IRGenerator` 产生 TAC 存 `Chunk`，编译/执行分离 |
-| 指令集 | 128 操作码 int32 码字（[bytecode/tjs2-bytecode.md](bytecode/tjs2-bytecode.md)） | 55 TAC + 17 扁平操作码（[bytecode/ciallang-bytecode.md](bytecode/ciallang-bytecode.md)） |
-| 值 | `tTJSVariant`（CopyRef 引用计数） | `Value`（String 三层间接引用计数 + GC 对象） |
+| 指令集 | 128 操作码 int32 码字（[bytecode/tjs2-bytecode.md](bytecode/tjs2-bytecode.md)） | 95 种 TAC 与对应扁平操作码（[bytecode/ciallang-bytecode.md](bytecode/ciallang-bytecode.md)） |
+| 值 | `tTJSVariant`（CopyRef 引用计数） | `Value`（短串内联、长串/Octet 共享负载、对象由 GC 管理） |
 | 对象 | `iTJSDispatch2` COM 风格接口 | `Object` 虚接口（hasProp/getProp/setProp/call） |
 | 函数 | context 本身是可调用对象（实现 iTJSDispatch2） | `Function`(FuncMeta 包装) / `NativeFunction` |
 | 异常 | ENTRY/EXTRY try 栈 + C++ 异常穿越 | `ThrowHandler` 区间表 + `unwind()` 逐帧退栈 |
-| 序列化 | `"TJS2" "100\0"` 字节码容器（tjsScriptBlock/tjsByteCodeLoader） | **无**（规划：TJS 字节码加载→转译，见 mapping.md） |
+| 序列化 | `"TJS2" "100\0"` 字节码容器（tjsScriptBlock/tjsByteCodeLoader） | 已实现 TJS2 文件读取与转译；内部 Chunk 无磁盘导出（见 mapping.md） |
 | GC | 无（纯引用计数） | 标记清除 + 根句柄 |
-| 标准库 | Array/Dictionary/Date/Math(+MT 随机)/Exception/RegExp(oniguruma)/String/Octet | print/println + String 部分 |
+| 标准库 | Array/Dictionary/Date/Math(+MT 随机)/Exception/RegExp(oniguruma)/String/Octet | 各库状态及偏差见 [compatibility.md](compatibility.md) |
 
 ## 5. 目录↔职责速查（改代码定位用）
 
@@ -151,7 +153,7 @@
 GC/内存              → src/gc/gc.cpp, src/runtime/Runtime.*
 ```
 
-## 5. GC 终结与访问缓存（2026-10-28）
+## 6. GC 终结与访问缓存
 
 `src/gc/gc.hpp` 的 collect 在标记根后先快照不可达且需要 finalize 的对象，再标记整个队列及其依赖，
 sweep 不运行脚本。`src/vm/VMState.cpp` 在指令安全点 drain 所属 VM 的队列并保存 `_zf`；

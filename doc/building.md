@@ -64,7 +64,7 @@ python bench/test_bytecode_conformance.py --cial build/Windows/Debug/cial.exe
 ```
 
 工具逐字节比较两条 Ciallang 路径的 stdout，失败、超时或输出差异返回 1；已有
-`test_misc` fixture 的诊断行号差异也会如实报告，不能把该命令默认等同于“全绿”。
+`test_misc` fixture 的诊断格式与行号差异也会如实报告，不能把该命令默认等同于“全绿”。
 `--case` 可筛选用例；fixture 必须有源码（s1–s5 无源码样本已清理，缺源码报
 `TOOL_ERROR`），`--reference` 可使用经随机脚本及导出执行探测的参考 CLI 从源码生成临时
 字节码，入库 fixture 不受影响。JSON 含退出码、无损输出与 SHA-256；详见

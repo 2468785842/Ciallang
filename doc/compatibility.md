@@ -1,8 +1,8 @@
-# 兼容性矩阵与路线图
+# 兼容性与已知差异
 
 > Ciallang 对原版 TJS2（TJSCompiler）的三维兼容状态总览。
 > 语法细节见 [syntax.md](syntax.md)；字节码规范与转译设计见 [bytecode/](bytecode/) 目录。
-> 状态：✅ 可用 / ◐ 部分 / ❌ 未实现 / 📐 设计定稿未实现。
+> 状态：✅ 已有实现及对应验证 / ◐ 部分 / ❌ 未实现；不代表所有输入都与参考引擎一致。
 
 ---
 
@@ -13,7 +13,7 @@
 | 预处理 | @set / @if / @endif | ✅ |
 | 语句 | var/if/while/do-while/for/switch/try-catch/return/break/continue/function/property/class/debugger | ✅ |
 | 语句 | with | ✅（withStack 上下文栈，异常随帧截断）|
-| 语句 | for(const …)、var 类型注解 | ✅ for(const)；const 声明（只读性不强制）；类型注解 `: symbol/void/int/real/string/octet`（var/函数参数/返回值/getter/setter 全位解析并丢弃——tjs.y:339 "Ignore types"，2026-10-29 对齐） |
+| 语句 | for(const …)、var 类型注解 | ✅ for(const)；const 声明（只读性不强制）；类型注解 `: symbol/void/int/real/string/octet`（var/函数参数/返回值/getter/setter 全位解析并丢弃——tjs.y "Ignore types"，2026-10-29 对齐） |
 | 表达式 | 赋值全家（含 `<->`、`\|\|=`、`&&=`、`>>>=`）、?:、逻辑/位/比较/严格相等/移位/乘除整除 | ✅ |
 | 一元前缀 | `!` `new` `invalidate` `-` `~` `++` `--` `delete` `typeof` `#` `$` `+` `&` `*`（及前后缀 `isvalid`） | ✅ |
 | 一元后缀 | `()` `.` `++` `--` | ✅ |
@@ -22,33 +22,32 @@
 | 容器成员 | Array/Dictionary 方法面（sort/split/save/load/pack 系含） | ✅（逐方法状态见 §3 标准库兼容） |
 | 中缀 | instanceof / incontextof / `in` | instanceof ✅（基础类型按类型名匹配）/ incontextof ✅；`in` ✅ 保留字行为对齐（原版 codegen 无 T_IN 分支——节点与操作数均不求值、结果 void；官方リファレンス亦无此运算符，2026-10-29 实测定论，见 `tests/compat_reserved_test.cpp`） |
 | 字面量 | 全部标量（含 i64 大整数字面量精确解析）+ 函数表达式 + @"…" 模板串 | ✅ |
-| 字面量 | `[...]` Array、`%[...]` Dictionary、`<%%>` Octet、`(const)` 常量形 | ✅（`(const)` 运行时新建，与原版一致——tjs.y:795 查证原版无只读共享语义，2026-10-25 对齐） |
+| 字面量 | `[...]` Array、`%[...]` Dictionary、`<%%>` Octet、`(const)` 常量形 | ◐ 普通字面量支持；`(const)` 当前按运行期字面量处理，未对齐参考文法的编译期常量容器、元素限制与重复求值共享，见 [语法 §8](syntax.md#8-内联字面量array--dictionary--常量折叠形) |
 | 后缀条件 | `expr if cond`（假条件整体不赋值，tjs.y expr 层级绑定） | ✅ |
 | 函数 | 默认参数（TestVoid 守卫，实参优先） | ✅ |
-| 函数 | 收拢 `*args`、省略调用 `...`、展开调用 `*expr` | ✅（2026-10-27 源码路径补齐，与字节码路径能力对齐） |
+| 函数 | 收拢 `args*`、省略调用 `...`、展开调用 `expr*` | ✅（2026-10-27 源码路径补齐，与字节码路径能力对齐） |
 | 类 | 多继承/slot 链/super/构造函数/property（29 个语义测试） | ✅ |
-| 类 | static / finalize 触发语义 | finalize ✅（GC 保活队列 + 所属 VM 安全点 drain，显式 invalidate 保持同步，`src/gc/gc.hpp`、`src/types/Class.cpp`、`src/vm/VMState.cpp`；Runtime 销毁不执行脚本）。static ✅ 定论（2026-10-30）：原版 tjs.y:116-120 保留 static/private/public/protected 但产生式零使用，类内 `static var` 在原版即语法错误；本项目同为编译错误（tjsLex.cpp:926 仅注册保留字），行为锁定 tests/compat_reserved_test.cpp |
+| 类 | static / finalize 触发语义 | finalize ✅（GC 保活队列 + 所属 VM 安全点 drain，显式 invalidate 保持同步，`src/gc/gc.hpp`、`src/types/Class.cpp`、`src/vm/VMState.cpp`；Runtime 销毁不执行脚本）。static ✅ 定论（2026-10-30）：原版 tjs.y 保留 static/private/public/protected 但产生式零使用，类内 `static var` 在原版即语法错误；本项目同为编译错误（tjsLex.cpp:926 仅注册保留字），行为锁定 tests/compat_reserved_test.cpp |
 | 成员 | `delete obj.member`（实例自有成员） | ✅ |
 | 成员 | `str.length` 只读属性 | ✅ |
 | 异常 | Exception 类（message 成员）+ 原生错误转脚本可捕获异常 | ✅ |
 
 ## 2. 字节码兼容（TJSCompiler 编译产物 `"TJS2" "100\0"` 文件）
 
-**路线已定**：加载 → **转译为 Ciallang TAC** → 现有 VM 执行。设计见
-[bytecode/mapping.md](bytecode/mapping.md)（2026-10-20 决策记录：否决"独立 TJS 解释器"方案）。
-**M1–M4 全部完成（2026-10-27）**：tjs2 语料 12 文件字节码路径全量通过，128 操作码转译覆盖闭环。
+执行路径：加载 → **转译为 Ciallang TAC** → 现有 VM 执行，见
+[bytecode/mapping.md](bytecode/mapping.md)。
+Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。已有解码分支不等于所有语义都已对齐，`CHKINS` 等已知问题见 [转译边界](bytecode/mapping.md#8-已知差异与待修复项)。
 
 | 项 | 状态 |
 |---|---|
-| 容器/常量池/context 解析（Reader） | ✅ M1 |
-| 顶层/函数 context 转译（算术/比较/跳转/调用/flag 物化） | ✅ M1（历史基准 s1–s5 对拍；该批无源码样本已于 2026-10-30 清理，见下方 fixture 说明） |
-| 属性访问全族（GPD/GPI/SPD/…/S 变体 + P 变体/GETP/SETP/DELD/TYPEOFD） | ✅ M2 |
-| 类（ctClass 加载期解释）/ NEW / try-catch / property / extends | ✅ M2（`test_class.tjs` 对拍一致） |
-| 新增 TAC（比较写 zf、Inc/Dec 单指令、BNOT/NUM/OCTET 等） | ✅ M3（2026-10-27，128 操作码转译覆盖闭环） |
-| collapse/展开/省略调用、EVAL/EEXP、CLT/CGT 序修正、`test_function.tjs` 全量 | ✅ M4（CallOmit/CallExpand/CollapseArgs 三条新 TAC + 超额实参保留区；test_misc/test_with 同步一致） |
-| test_variant（octet 语料） | ✅ 2026-10-27（Reader OCTET 段 pos 推进修复 + dst=0 丢弃语义修复后全量通过） |
-| test_string（原版 --dump 崩溃，无法产出字节码） | 📐 受上游阻塞 |
-| 对拍工具链：TJSCompiler `--dump` 导出选项 + `cial --tjsbc` + 语料入库 | ✅ `--dump` + 语料（tests/test_files/tjsbc/ s6_class/s7_ext/test_class/test_function/test_misc/test_variant/test_with，均有源码；s1–s5 无源码样本已于 2026-10-30 清理）+ 转译器 + `cial --tjsbc`（`CIAL_TJSBC_DUMP=1` 可打印顶层转译 TAC） |
+| 容器/常量池/context 解析（Reader） | ✅ 有截断、索引及布局回归；不代表所有元数据组合均已验证 |
+| 顶层/函数 context 转译（算术/比较/跳转/调用/flag 物化） | ◐ 已实现；`CHKINS` 有操作数及结果写回缺陷 |
+| 属性访问（GPD/GPI/SPD/…/S 变体 + P 变体/GETP/SETP/DELD/TYPEOFD） | ◐ 缺失成员的 typeof、proxy 回落、Operation 原子语义等尚有差异 |
+| 类 / NEW / try-catch / property / extends | ◐ fixture 覆盖常见模式；类体与父类表达式只支持加载期可识别模式 |
+| collapse/展开/省略调用、EVAL/EEXP、比较与转换 | ✅ 已有指令及 fixture；具体映射与边界见转译文档 |
+| test_variant（octet 语料） | ✅ 已有 fixture 和对应源码 |
+| test_string | ❌ 尚无入库字节码 fixture；旧记录中参考导出曾崩溃，未据此推定新版本仍不可用 |
+| 对拍工具链 | ✅ `bench/bytecode_conformance.py` + `cial --tjsbc`；参考 `d8044c3` 已提供 `--dump`。当前 7 个 fixture 均有源码，`test_misc` 异常消息格式与行号仍会产生 `OUTPUT_DIFF`，默认全量比较并非全绿 |
 
 ## 3. 标准库兼容
 
@@ -86,8 +85,7 @@
 3. `success: class ClassA::finalize` 双方均不打印（SubClass 实例未 invalidate，GC 时机
    不触发 finalize）——双方一致。
 
-TJSCompiler 侧实现在其仓库 `src/syntax/library/ScriptsInterface.{h,cpp}` +
-`src/main.cpp` REGISTER_OBJECT 注入（工作区本地适配，未提交）。
+参考引擎 `d8044c3` 已提交 `src/syntax/library/ScriptsInterface.{h,cpp}` 及 `src/main.cpp` 的 Scripts 注册；上面的测量是历史记录，不是本轮重新对拍。
 
 ## 4. 运行时行为差异（已知，须保持记录）
 
@@ -99,7 +97,7 @@ TJSCompiler 侧实现在其仓库 `src/syntax/library/ScriptsInterface.{h,cpp}` 
 | 调用栈深度 | 无同值上限 | 1024 | 记录差异 |
 | 局部变量名（字节码态） | 序列化不含 Namespace | 同样无 | 一致 |
 | 原生错误报告 | 未捕获异常打印 VM 转储（含 ip） | 顶层打印 Exception.message 文本 | 语料对拍报告的 DIFF 部分由此产生，语义等价 |
-| `const` 只读性 | 仅编译期要求初始化；赋值/自增/for 递增放行——tjs.y:320 原作者注释明确"current version does not actually disallow re-assigning"（非 UB，官方设计现状） | 一致（2026-10-25 对齐，tjs.y 佐证） | 无差异 |
+| `const` 只读性 | 仅编译期要求初始化；赋值/自增/for 递增放行——tjs.y 原作者注释明确"current version does not actually disallow re-assigning"（非 UB，官方设计现状） | 一致（2026-10-25 对齐，tjs.y 佐证） | 无差异 |
 | `#`/`$` 操作数 | 严格类型（字符串/整数） | `#` 对非字符串先字符串化（`#65 == 54`，对齐 kirikiri 语料期望） | 记录差异 |
 | 后缀 `i++` 表达式值 | 返回自增前旧值 | 同（旧值，2026-10-24 修正） | 一致 |
 | `isvalid` 非对象值 | 恒 true（VM_CHKINV：`Type() != tvtObject` 即 true，tjsInterCodeExec.cpp:1177） | 一致（2026-10-30 修正——曾对非对象抛"Invalid type get as Object"）；对象按 IsValid 判定，invalidate 后 false | 无差异 |
@@ -117,7 +115,7 @@ TJSCompiler 侧实现在其仓库 `src/syntax/library/ScriptsInterface.{h,cpp}` 
 已用两份不同最小脚本确认本地参考 CLI 适配二进制接收脚本路径，再以含自校验的
 全局/局部/对象成员脚本对拍，两引擎均成功。参考二进制报告 TJS2 2.4.28，SHA-256 为
 `D404F11D5E173194E02AD92F5F2C13A0161F5A99CC49F6B23838076D2D5D5BCA`；
-当前上游 `src/main.cpp` 的硬编码入口不具备此 CLI 能力（见 [building.md](building.md)）。
+参考引擎旧入口曾硬编码路径；`d8044c3` 已提供路径参数和导出 CLI，见 [FAQ](faq.md#对拍前怎样确认参考引擎可用)。
 
 ## 5. 后续工作
 

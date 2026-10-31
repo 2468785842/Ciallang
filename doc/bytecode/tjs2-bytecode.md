@@ -4,7 +4,7 @@
 > 与编译产物序列化格式。是本项目实现"字节码兼容（加载 → 转译执行）"的规格依据。
 > 转译设计见 [mapping.md](mapping.md)；本项目自身指令集见 [ciallang-bytecode.md](ciallang-bytecode.md)。
 >
-> 事实来源（行号以 TJSCompiler 当前源码为准）：
+> 事实来源（核对版本为 TJSCompiler `d8044c3`，源码路径相对该仓库；行号仅供定位）：
 > - 操作码枚举：`src/syntax/lexer/tjsInterCodeGen.h:45-76`
 > - 执行器（语义权威）：`src/syntax/tjsInterCodeExec.cpp`（`ExecuteCode` 主循环 938-1400）
 > - 指令长度表/地址换算：`src/syntax/tjsScriptBlock.cpp:575-894`（`TranslateCodeAddress`）
@@ -51,7 +51,7 @@ TJS2 VM 是**基于寄存器 + 常量池**的解释器，无操作数栈。每�
 ```
 
 - 实参传递：调用方把第 i 个实参放到被调帧 `ra[-3-(i-1)]`；不足 `FuncDeclArgCount` 的补 void；
-  `FuncDeclCollapseBase >= 0`（`function f(a, *rest)` 收拢参数）时，把多余实参打包成 Array 放到
+  `FuncDeclCollapseBase >= 0`（`function f(a, rest*)` 收拢参数）时，把多余实参打包成 Array 放到
   `ra[-3-FuncDeclCollapseBase]`（`tjsInterCodeExec.cpp:802-814`）。
 - `ra[-2]` 的 proxy 是 `tTJSObjectProxy`（this 命中失败时回落 global），与本项目 `GThis` 的
   动态链查找语义对应（见 mapping.md §4）。
@@ -120,7 +120,7 @@ gpi %3, %1.%bar   ; %3 = %1[bar]
 | 1 | CONST | 3 | `[dst, daIdx]` | `ra[c1] = DataArea[c2]`（CopyRef） |
 | 2 | CP | 3 | `[dst, src]` | `ra[c1] = ra[c2]` |
 | 3 | CL | 2 | `[r]` | `ra[c1]` 清空为 void |
-| 4 | CCL | 3 | `[startReg, count]` | **连续清空** `ra[c1] .. ra[c1]+c2`；⚠️ `code[2]` 是数量**不是寄存器**（`ContinuousClear`，`tjsInterCodeExec.cpp:1495`） |
+| 4 | CCL | 3 | `[startReg, count]` | **连续清空** `ra[c1] .. ra[c1]+c2-1`；⚠️ `code[2]` 是数量**不是寄存器**（`ContinuousClear`，`tjsInterCodeExec.cpp:1495`） |
 
 ### 3.2 标志寄存器与比较（2~3 字）
 
@@ -130,8 +130,8 @@ gpi %3, %1.%bar   ; %3 = %1[bar]
 | 6 | TF | 2 | `[r]` | `flag = !bool(ra[c1])` |
 | 7 | CEQ | 3 | `[r1, r2]` | `flag = (ra[c1] == ra[c2])`（宽松相等 NormalCompare） |
 | 8 | CDEQ | 3 | `[r1, r2]` | `flag = (ra[c1] === ra[c2])`（严格 DiscernCompare，对应 `===`/`!==`） |
-| 9 | CLT | 3 | `[r1, r2]` | `flag = ra[c1] > ra[c2]`（注意：CLT 实为 GreaterThan，编译器已换序） |
-| 10 | CGT | 3 | `[r1, r2]` | `flag = ra[c1] < ra[c2]`（同上，LittlerThan） |
+| 9 | CLT | 3 | `[r1, r2]` | `flag = ra[c1] < ra[c2]`（调用 GreaterThan，但该函数实现为自然序 `<`） |
+| 10 | CGT | 3 | `[r1, r2]` | `flag = ra[c1] > ra[c2]`（LittlerThan 实现为自然序 `>`） |
 | 11 | SETF | 2 | `[r]` | `ra[c1] = flag` |
 | 12 | SETNF | 2 | `[r]` | `ra[c1] = !flag` |
 | 13 | LNOT | 2 | `[r]` | `ra[c1] = !ra[c1]`（原地逻辑非） |
@@ -150,8 +150,8 @@ gpi %3, %1.%bar   ; %3 = %1[bar]
 | 值 | 助记 | 语义 | 值 | 助记 | 语义 |
 |---|---|---|---|---|---|
 | 82 | BNOT | 按位非 | 93 | INV | invalidate 对象（置失效） |
-| 89 | ASC | 首字符→字符码（`$"a"` → 97） | 94 | CHKINV | `ra[c1] = isvalid(ra[c1])`（原地写回 bool） |
-| 90 | CHR | 字符码→单字符字符串（`#97` → "a"） | 95 | INT | 原地转 int |
+| 89 | ASC | 首字符→字符码（`#"a"` → 97） | 94 | CHKINV | `ra[c1] = isvalid(ra[c1])`（原地写回 bool） |
+| 90 | CHR | 字符码→单字符字符串（`$97` → "a"） | 95 | INT | 原地转 int |
 | 91 | NUM | 数值规范化（int/real 归一） | 96 | REAL | 原地转 real |
 | 92 | CHS | 变号（一元负号） | 97 | STR | 原地转 string |
 | 83 | TYPEOF | 原地求 typeof 字符串 | 98 | OCTET | 原地转 octet |
@@ -166,7 +166,7 @@ gpi %3, %1.%bar   ; %3 = %1[bar]
 | 85 | TYPEOFI | 4 | `[dst, obj, memberReg]` | 同上，成员名取自寄存器 |
 | 116 | DELD | 4 | `[dst, obj, daIdx]` | `ra[c1] = delete ra[c2][DataArea[c3]]`（返回 bool） |
 | 117 | DELI | 4 | `[dst, obj, memberReg]` | 同上 |
-| 88 | CHKINS | 3 | `[name, obj]` | `flag = (ra[c2] instanceof ra[c1])`（`ra[c1]` 是类名字符串） |
+| 88 | CHKINS | 3 | `[target, name]` | `ra[c1] = (ra[c1] instanceof ra[c2])`，原地写回 target，不写 flag；见 ExecuteCode/InstanceOf |
 
 ### 3.6 属性读写（3~4 字）
 
@@ -269,7 +269,7 @@ CALLD/CALLI:  [op][res][func][name][argcount][args...]
 |---|---|---|
 | `>= 0` | 普通调用 | `argcount` 个寄存器字（每个是一个实参寄存器） |
 | `-1` | 省略调用 `f(...)` | 无实参字；透传**当前函数收到的实参**（`args/numargs`） |
-| `-2` | 展开调用 `f(a, *arr, *)` | `[written_count][(fatType, reg) 对 × written_count]`；`fatType`：0=fatNormal、1=fatExpand（`*arr` 数组展开）、2=fatUnnamedExpand（匿名 `*` 全展开） |
+| `-2` | 展开调用 `f(a, arr*, *)` | `[written_count][(fatType, reg) 对 × written_count]`；`fatType`：0=fatNormal、1=fatExpand（`arr*` 数组展开）、2=fatUnnamedExpand（匿名 `*` 全展开） |
 
 - `res == 0` 表示丢弃返回值（表达式语句）。
 - 指令总字数：CALL/NEW 为 `4 + argcount`（普通），CALLD/CALLI 为 `5 + argcount`；
@@ -318,9 +318,9 @@ CALLD/CALLI:  [op][res][func][name][argcount][args...]
 | 6 | STRING | 每条 `[len i32][UTF-16LE 码元 × len]`，len 为奇数时补 2B 零 |
 | 7 | OCTET | 每条 `[len i32][bytes × len]`，补零到 4 对齐 |
 
-- 各段内按值**去重**（std::map 哈希；octet 线性比较）。
+- 各段内按值**去重**（有序映射；octet 线性比较）。
 - **没有任何字符转义**——二义性完全由长度字段消除（`len` 是 UTF-16 **码元数**，不是字节数）。
-- 整数按值域自动分型：`|v|≤127`→BYTE、`≤32767`→SHORT、`≤2^31-1`→INTEGER、否则 LONG。
+- 整数按值域自动分型：`[-128,127]`→BYTE、`[-32768,32767]`→SHORT、`[-2^31,2^31-1]`→INTEGER、否则 LONG。
 
 ### 5.3 context 体
 

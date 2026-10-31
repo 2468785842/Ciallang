@@ -165,7 +165,7 @@ TAC 层**非破坏性**；扁平字节码层同样保持三寄存器非破坏性
 性能专项（2026-10-28）补齐 **direct 形态**：`GPropC/DPropC/GPropRawC/DPropRawC/DelPropC`
 （§3.10）成员名以 u32 Atom 内联进指令流，编译期直引、dispatch 免再 intern；
 寄存器形态保留给动态成员名与整数成员名（旧版 GPI/PropGetByNum，数组下标）。
-IGNOREPROP/MEMBERENSURE 标志位由独立的 *Raw 指令承担（见 mapping.md §6 缺口清单）。
+IGNOREPROP 由 *Raw 指令承担；MEMBERENSURE 依赖对象 setProp 的创建语义，HIDDENMEMBER 无独立编码，见 [转译边界](mapping.md#8-已知差异与待修复项)。
 
 **property 触发协议**：GProp/DProp/GThis/GGlobal/DThis/DGlobal 在槽位为 Property 时
 调 getter/setter；GLocal/DLocal（局部变量=寄存器拷贝，TJS2 VM_CP 语义）与
@@ -306,7 +306,8 @@ FETCH_NEW_FRAME:
 ```
 
 注意三个"压帧不执行"的点都返回 `DispatchRet::Call` 让主循环接管：
-`DLocal/DThis/DGlobal` 触发属性 setter、`Inv` 触发 finalize、`Call` 本身。
+成员写入指令（如 `DThis/DGlobal/DProp`）触发属性 setter、`Inv` 触发 finalize、`Call` 本身。
+`DLocal` 仅复制寄存器，不调用 setter。
 （`Property::invokeGet` 与 `Class.cpp` 的初始化/构造走**嵌套 run**，自释放帧。）
 
 ## 6. 异常模型

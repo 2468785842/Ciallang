@@ -42,7 +42,7 @@ static  setter  string  super  typeof  throw
 this  true  try  void  var  while  with
 ```
 
-各自有构成语法的特殊含义，其中一些用作运算符。**并非所有保留字在当前版本中都被实际使用**（如 `export`、`goto`、`synchronized`、`enum`、`import`、`debugger` 等为预留）。
+各自有构成语法的特殊含义，其中一些用作运算符。**并非所有保留字都被实际使用**，如 `export`、`goto`、`synchronized`、`enum`、`import`、`static`、`private`、`public`、`protected` 等没有对应产生式。`debugger` 已有语句规则，不属于这一类；执行效果取决于宿主的调试支持。
 
 ---
 
@@ -162,7 +162,7 @@ this  true  try  void  var  while  with
 
 * `g`：全局匹配（匹配所有；缺省只匹配第一个）
 * `i`：忽略英文字母大小写
-* `l`：使用本地化排序规则
+* `l`：历史上表示本地化排序规则；核对的 TJSCompiler `d8044c3` 实现直接忽略此标志（`tjsRegExp.cpp` 的 `TJSRegExpFlagToValue`）
 
 正则字面量作为 **RegExp 类的对象**处理。
 

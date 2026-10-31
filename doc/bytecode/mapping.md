@@ -1,397 +1,175 @@
-# TJS2 字节码 → Ciallang 内部指令 转译设计
+# TJS2 字节码到 Ciallang 的转译
 
-> **已选定的技术路线**（2026-10 决策）：Ciallang 加载 TJSCompiler 编译出的字节码文件
-> （`"TJS2" "100\0"` 格式，见 [tjs2-bytecode.md](tjs2-bytecode.md) §5），**转译（转义）为
-> Ciallang 的 TAC 指令**，进入现有 `Chunk`，由现有 VM（`run()`）执行。
-> 不采用"独立 TJS 解释器"方案（被否决原因：保留两条执行路径不如统一到现有 VM，
-> 且本项目 TAC 本就对标 TJS 指令集）。
->
-> 本文是**实现前的设计文档**。实施进度（2026-10-27）：阶段 0（--dump）与阶段 1（Reader）完成；
-> 阶段 2（TjsTranslator）**M1+M2 完成**：kirikiri `test_class.tjs` 编译产物对拍通过
-> （字节码路径与源码路径输出逐字节一致；s6/s7 + kirikiri test_* 语料全绿）。M2 落地：类 context 加载期解释
-> （var 成员 + initDefaultVal（无成员类也产出，initClassFields 契约）+ 构造器 setConstructor
-> （不入成员表，保 super.<Ctor>() 经类对象调用进 super 分支）+ 成员 property 注册 +
-> superClassGetter 加载期解释为 extends）、NEW→Call（ClassObject::call 构造）、
-> GETP/SETP→DerefGet/Set、P 变体（INCP/二目 P 读-算-写）、DELD/DELI→DelProp、
-> TYPEOFD/I→GProp+TypeOf、octet 常量、proxy(ra[-2]) 访存→GThis/DThis/GRefRaw
-> （TJS2 objthis-proxy 的 this→global 回落语义）。修复的 M1 遗留缺陷：JF/JNF 物化跳转
-> 方向颠倒、INCPD/ADDPD 等 +1/+2/+3 变体落 default 静默不发射、INCPD 自加（加载 1 的
-> 寄存器未参与运算）、INTER_OBJECT 占位常量被 addConstant 去重合并（回填互相覆盖）。
-> 配套 VM 语义修正：DProp/GProp 对全局 property 槽触发 getter/setter（TJS2 PropSet 语义），
-> ChgThis 接受 Property 闭包，Function::call 未绑定时继承调用者 this（TJS2 调用点绑定，
-> super.<方法>() 经类对象成员访问的关键路径），GPD/GPI/SPD/SPI/DPropRaw/GPropRaw 支持
-> 整数成员名（数组数值下标，旧版 PropGet/SetByNum——TJS `a[0]` 编译为 GPI+整数名）。
-> **M4 完成（2026-10-27）**：省略透传（argc=-1 → CallOmit）、展开调用（argc=-2 →
-> CallExpand，fatNormal/fatExpand/fatUnnamedExpand 条目表）、collapse 参数
-> （FuncDeclCollapseBase → CollapseArgs，超额实参由 Function::call 复制到窗口顶部
-> 保留区按调用序保全）、EVAL/EEXP→EvalStr；CLT/CGT 序修正。`test_function.tjs`
-> 与 `test_misc.tjs` 字节码路径全量通过（test_misc 与源码路径逐行一致；这两类语法
-> 源码路径不支持，对拍基准为原版引擎行为）。
-> **成员名 Atom 直引（2026-10-28）**：GPD/GPDS/SPD/SPDS/DELD/TYPEOFD/CALLD 及
-> INC·DEC·二目组的 PD 变体不再「Load 名字常量进寄存器 + 寄存器名属性指令」，
-> 改发 `GPropC/DPropC/GPropRawC/DPropRawC/DelPropC`（成员名 u32 Atom 内联，
-> dispatch 免再 intern）；PI/GPI 等整数名形态保留寄存器指令（见
-> ciallang-bytecode.md §3.10）。
-> **M3 完成（2026-10-27）**：CmpEQ/CmpDEQ/CmpLT/CmpGT 比较直写 _zf + 转译器前瞻融合
-> （比较/TT/TF 紧随 JF/JNF 时省 %F 物化与 Test，每分支省 1 条）、Inc/Dec 单指令
-> （int/real，TJS increment 语义——旧译法 LoadImm+Add 对字符串会误拼接）、
-> BNOT/NUM/OCTET 转换指令补全（Value 增 bitNot/toNumber；128 操作码转译覆盖闭环）。
-> **Reader 修复**：OCTET 段条目读取后未推进 pos（内容字节缺失导致多 octet 文件
-> 错位，仅靠段尾收口掩盖）——test_variant 因此解锁并全量通过（与源码路径一致）。
-> **dst=0 调用丢弃语义修复**：TJS `CALLD dst=0` 表示不写回（原版传 NULL 结果指针），
-> 旧译法写入 %K（void 槽）沿隐式 return 链污染上层 `SRV r0` 返回值——统一落到窗口
-> 顶部专用丢弃寄存器。仍缺口：test_string（TJSCompiler --dump 自身崩溃）。
-> 已知近似见 §8.1。
-> 前置阅读：
-> [tjs2-bytecode.md](tjs2-bytecode.md)（旧格式）、[ciallang-bytecode.md](ciallang-bytecode.md)（本项目指令集）。
+TJS2 文件经 Reader 解析为常量池和 context，再由 Translator 生成 Ciallang TAC，
+交给同一套 Chunk、Value、GC 与 VM 执行。本文描述当前实现和已知差异，不再保留实施前提案。
 
----
+依据：`src/tjsbc/TjsBytecodeReader.*`、`TjsTranslator.*`；格式见
+[tjs2-bytecode.md](tjs2-bytecode.md)，目标指令见 [ciallang-bytecode.md](ciallang-bytecode.md)。
 
 ## 1. 总体架构
 
-新增模块 `src/tjsbc/`（建议）：
-
-```
-"TJS2 100\0" 文件（TJSCompiler --dump 产物，见 §9）
-      │
-      ▼
-TjsBytecodeReader        ── 解析容器/常量池/context 骨架（对应 tjsByteCodeLoader 的读取部分）
-      │  产出内存模型：ConstPool(7 段) + Vec<TjsContext>（code 为 i16 码字、索引形态）
-      ▼
-TjsTranslator            ── 两遍转译
-      │  Pass 1: 按指令长度表线性步进，记录 TJS 码字偏移 → TAC 下标 映射
-      │  Pass 2: 逐条发射 TAC（Jmp 用 Pass 1 的映射做 Label）
-      │  每个 context 产出一个 Chunk；INTER_OBJECT 常量回填为 FuncMeta/ClassMeta
-      ▼
-vm::Chunk + FuncMeta     ── 进入现有执行体系（VM::eval / run()）
+```text
+TJS2 100\0 文件
+  → TjsBytecodeReader：常量池、context、索引形式的 i16 码字
+  → TjsTranslator：元数据骨架、解码与 TAC 发射、跳转和 context 引用回填
+  → Chunk::toHeap：保留常量图及元数据
+  → VMState::run：惰性编码后执行
 ```
 
-关键原则：
+同一 context 内解码与发射在一次扫描中完成，保留码字位置到 TAC 下标的映射，
+扫描结束后回填跳转。跨 context 引用则在全部 context 就绪后装配。
+不要将这两个阶段与“先计算每条指令会展开多少 TAC”的旧设计混淆。
 
-1. **加载器不做语义**——只按 §5 格式解析（对应 `tjsByteCodeLoader.cpp` 的行为）；
-2. **转译器不改 TJS 语义**——每条 TJS 指令的转译规则固定、可单测；
-3. **执行走现有 VM**——与源码路径共用同一套 Value/GC/类系统，收益共享。
+## 2. 寄存器空间映射
 
-## 2. 寄存器空间映射（核心方案）
+令 `K = max(maxVariableCount + variableReserveCount, funcDeclArgCount + 2)`，
+普通 TJS 寄存器 `r` 映射为 Ciallang `%r+K`。窗口还分配标志物化、临时值、
+实参备份和丢弃返回值的专用槽，具体布局以 Translator 的 prologue 为准。
 
-### 2.1 偏移恒等映射
-
-TJS 寄存器下标 `r ∈ [-(VC+RC), MaxFrameCount]`（VC=maxVariableCount，RC=variableReserveCount，
-见 [tjs2-bytecode.md](tjs2-bytecode.md) §1.1）。定义：
-
-```
-K = VC + RC                      （TJS 帧的 ra 基偏移）
-cialReg(r) = r + K               （恒等平移，全为非负）
-chunk->_registerCount = VC + RC + 1 + MaxFrameCount + 附加 scratch（§3.1）
-```
-
-TJS 帧的全部槽位与 Ciallang 寄存器一一对应，**TJS 代码的寄存器使用纪律
-（frame 临时区的分配/释放顺序）原样保留**，无需分析数据流。
-
-| TJS 槽 | Ciallang 寄存器 | 入口初值（prologue 发射） |
-|---|---|---|
-| `ra[-2]`（proxy/global） | `%K-2` | `Global %K-2`（近似：不建 proxy，GThis 的动态链查找已覆盖回落语义） |
-| `ra[-1]`（this） | `%K-1` | `This %K-1` |
-| `ra[0]`（void） | `%K` | `Load %K, *0`（常量池 0 号恒为 Void） |
-| `ra[1..]`（frame 临时） | `%K+1 ..` | —（TJS 字节码自会先写后读） |
-| `ra[-3-i]`（第 i+1 实参） | `%K-3-i` | prologue 搬运，见 §2.2 |
-
-### 2.2 实参搬运（prologue）
-
-Ciallang 调用约定：实参压池顶，被调帧 `%0..%arity-1` 与之重合（[ciallang-bytecode.md](ciallang-bytecode.md) §2）；
-TJS 约定：实参在 `ra[-3]` 向下。转译 prologue：
-
-```
-FuncMeta.arity = TJS FuncDeclArgCount           // Function::call 会自动补 void 到 arity
-for i in 0 .. FuncDeclArgCount-1:
-    DLocal %i → %K-3-i                          // 搬运实参到 TJS 位置
-（可优化：DLocal 纯 mov 语义，等价 GLocal；选不影响 prop 语义的 DLocal）
-```
-
-TJS 的默认参数值在函数体头部以普通字节码出现（判 void → 赋值），**无需转译器处理**（验证点，见 §10）。
-
-### 2.3 限制（首期明确不支持）
-
-- `FuncDeclCollapseBase >= 0`（`*args` 收拢）：Ciallang 无对应 → 加载时报"不支持"；
-- 省略调用（argcount=-1）与展开调用（-2）：见 §6 CALL；
-- 实参数 > arity 时 Ciallang 丢弃多余实参；TJS 在无 collapse 时同样丢弃——一致，无处理。
-
-## 3. 标志寄存器（flag）物化方案
-
-TJS 的 VM 级单 bool `flag`（CEQ/TT 写、JF/JNF 读、NF 取反、SETF/SETNF 与寄存器互传）
-在 Ciallang 对应 `_zf`，但 **TAC 的 3 op 比较直接产出 bool 值**。方案：**物化到专用 scratch 寄存器
-`%F`（编号 = 寄存器总数 +0，即 K+MaxFrameCount+1 起）**，统一规则：
-
-| TJS | 转译序列 |
+| TJS 槽位 | 初始化或用途 |
 |---|---|
-| CEQ/CDEQ/CLT/CGT r1,r2 | `EQ/AbsEQ/LT/GT r1, r2, %F`（⚠️ CLT/CGT 是自然序：tTJSVariant::GreaterThan 实现为 `this < val2`、LittlerThan 为 `this > val2`（tjsVariant.cpp:827/853），即 CLT= `<`、CGT= `>`。§8 旧表"编译器已换序"的说法有误——只对了名字没对实现） |
-| TT r / TF r | `GLocal r → %F` / `GLocal r → %F` + `LNot %F,%F` |
-| SETF r / SETNF r | `GLocal %F → r` / `GLocal %F → tmp` + `LNot tmp → r` |
-| NF | `LNot %F, %F` |
-| JF addr / JNF addr | `Test %F` + `JmpE @l` / `Test %F` + `JmpNE @l` |
-| JMP addr | `Jmp @l` |
+| `ra[-2]` | 装入 this；部分 direct 成员指令专门转为 this→global 查找，差异见 §8 |
+| `ra[-1]` | 装入 this |
+| `ra[0]` | 装入 void；不能用作调用结果的丢弃槽 |
+| `ra[-3-i]` | 第 i 个实参；先批量备份，再从 `%i` 搬入，避免槽位置换互相覆盖 |
+| 临时区 | 普通 TJS 正向寄存器及转译专用 scratch |
 
-优点：用现有 TAC 指令，语义逐条可对拍；缺点：每分支多一条 `Test`。
-M3 优化提案：新增 2 操作数"比较写 zf"指令族（`CmpEQ %r1,%r2` 直写 `_zf`），可省 `%F` 与 `Test`。
+`funcDeclCollapseBase >= 0` 时在 prologue 发射 `CollapseArgs`，把对应位置之后的
+实际实参收拢成 Array。超额实参另由调用帧保留，以供 `CallOmit` / `CallExpand` 使用。
+缺省形参补 void，默认参数的求值逻辑保留在原字节码中。
 
-## 4. 操作码转译总表
+## 3. 标志与控制流
 
-> 完整 TJS 语义见 [tjs2-bytecode.md](tjs2-bytecode.md) §3。`%x` = 映射后寄存器，`*c` = 转换后常量池下标。
+不相邻的 flag 生产者和消费者通过专用寄存器 `%F` 物化；相邻比较/TT/TF 与 JF/JNF
+则前瞻融合为直接写 `_zf` 的指令和跳转，减少中间值。
 
-### 4.1 基础/传送
+| TJS | 转译规则 |
+|---|---|
+| CEQ / CDEQ | `EQ` / `AbsEQ` 写 `%F`；融合路径用 `CmpEQ` / `CmpDEQ` |
+| CLT / CGT | 自然序 `<` / `>`；融合路径用 `CmpLT` / `CmpGT` |
+| TT / TF | 布尔化 / 取反写 `%F`；融合路径直接 `Test` 并按需反转跳转方向 |
+| SETF / SETNF / NF | 复制或逻辑取反物化值 |
+| JF / JNF | 真跳 / 假跳，对应 `Test %F` 后的 `JmpE` / `JmpNE` |
+| JMP | `Jmp` |
 
-| TJS | 转译 | 备注 |
-|---|---|---|
-| NOP | `NOP` | |
-| CONST r, da | `Load %r, *c` | 常量转换见 §5 |
-| CP d, s | `DLocal %s → %d` | |
-| CL r | `Load %r, *0`（Void 常量） | |
-| CCL r, n | `Load %r,*0; Load %r+1,*0; … ×n` 展开 | n 编译期已知 |
+参考实现的 `GreaterThan()` 实际返回 `<`，`LittlerThan()` 实际返回 `>`；
+必须结合 `tjsVariant.cpp` 的实现理解 CLT/CGT，不能只按函数名换序。
+跳转目标按“指令首码字偏移 + 相对码字偏移”计算，并检查范围与指令边界。
 
-### 4.2 双目运算（含四联变体）
+## 4. 主要操作码映射
 
-以 ADD 组为例（其余 15 组同构）：
+| TJS | Ciallang |
+|---|---|
+| CONST / CP / CL / CCL | `Load` 或 `LoadImm` / `DLocal` / 装入 void / 展开清空 |
+| 算术与位运算基型 | 对应三操作数指令，结果写回原目标寄存器 |
+| INC / DEC | `Inc` / `Dec`；成员变体使用读、加减、写模板 |
+| GPD / SPD | `GPropC` / `DPropC`，成员名 Atom 直引 |
+| GPI / SPI | `GProp` / `DProp`，成员名由寄存器提供 |
+| GPDS / SPDS / GPIS / SPIS | 对应 `GPropRawC` / `DPropRawC` / `GPropRaw` / `DPropRaw`，绕过属性处理器 |
+| GETP / SETP | `DerefGet` / `DerefSet` |
+| DELD / DELI | `DelPropC` / `DelProp` |
+| INT / REAL / STR / OCTET | `ToInt` / `ToReal` / `ToString` / `ToOctet` |
+| BNOT / NUM / CHS / LNOT | `BNot` / `ToNumber` / `ChgSign` / `LNot` |
+| ASC / CHR | `Asc`（`#`）/ `Chr`（`$`） |
+| TYPEOF | `TypeOf`；成员形态的缺失成员行为见 §8 |
+| INV / CHKINV | `Inv` / `ChkInv` |
+| CHKINS | 应按 `[target, className]` 原地改写 target；当前实现有缺陷，见 §8 |
+| EVAL / EEXP | `EvalStr`；非字符串或空字符串的现有处理由 VM 决定 |
+| CALL / CALLD / CALLI / NEW | 普通实参 Push 后 `Call`；成员调用先读函数，类值由 `ClassObject::call` 构造实例 |
+| argcount=-1 / -2 | `CallOmit` / `CallExpand`，展开项为普通值、Array 展开或匿名实参展开 |
+| SRV / RET | SRV 记录返回寄存器，RET 发射 `Ret`；没有返回值时使用 void 槽 |
+| ENTRY / EXTRY / THROW | 静态 try 表 / 无独立执行指令 / `Throw` |
+| CHGTHIS | `ChgThis %function, %thisValue`，操作数顺序与源指令一致 |
+| GLOBAL | `Global` |
+| ADDCI / REGMEMBER | 只在支持的类构造模式中加载期解释；普通函数 context 遇到时拒绝 |
+| NOP / DEBUGGER | 转译扫描中不发射执行指令 |
 
-| TJS | 转译 | 备注 |
-|---|---|---|
-| ADD r1,r2 | `Add %r1, %r2, %r1` | TJS 基型破坏性，3op TAC 传回原寄存器即等价 |
-| ADDPD d,o,m,p | `GPropD 读成员` + `Add` + `SPD 写回`，见 §6.1 | 近似：读-算-写**非原子**，property 并发语义差异可接受 |
-| ADDPI d,o,m,p | 同上（成员名在寄存器） | |
-| ADDP d,t,p | **缺口**：无成员闭包运算 | 近似：propObjectGet/Set（需新 TAC `GetP/SetP`，提案） |
-| INC r | `LoadImm %t,1` + `Add %r,%t,%r` | 提案：`Inc %r` 单条 |
-| INCPD/PI/P | 同属性变体展开 | |
+调用结果目标为 TJS 寄存器 0 时，转译到独立丢弃槽，避免污染 `ra[0]` 的 void 语义。
+包含解码分支不等于全部语义已经对齐，尤其不能据此宣称“128 条都完全兼容”。
 
-### 4.3 属性访问
+## 5. 常量池与 context 引用
 
-> 下表为设计期快照，实施状态以本文件头部进度注记与 `TjsTranslator.cpp` 为准；
-> direct 名（GPD/SPD/DELD/TYPEOFD/CALLD）现均发 *C 直引指令（不再 Load 名字常量）。
+| TJS 条目 | 目标表示 |
+|---|---|
+| VOID / null OBJECT | 常量 0 的 void；null 与 void 的区别未完整保留 |
+| BYTE / SHORT / INTEGER / LONG | 归一为 i64，在 CONST 发射点使用 `LoadImm` |
+| REAL | Real 常量，保留 double 位模式 |
+| STRING | UTF-16LE 转 UTF-8 后驻留为 Atom，处理代理对 |
+| OCTET | 共享 Octet 负载常量 |
+| INTER_OBJECT | 每处保留独立占位槽，全部 context 完成后回填 FuncMeta/ClassMeta/PropMeta |
 
-| TJS | 转译 | 备注 |
-|---|---|---|
-| GPD d,o,m | `GPropC %o,atom,%d` | 成员名 Atom 内联（设计期方案 Load+%n+GProp 已替换） |
-| GPI d,o,m | `GProp %o,%m,%d` | 成员名已在寄存器（整数名=数组下标） |
-| SPD o,m,s | `DPropC %o,atom,%s` | ⚠️ SPD 操作数顺序 `[obj,member,src]`，DProp 是 `[obj,name,src]` 一致 |
-| SPI o,m,s | `DProp %o,%m,%s` | |
-| GETP/SETP | `DerefGet/DerefSet` | M2 落地 |
-| DELD/DELI | `DelPropC`/`DelProp`（返回 bool 到 %d） | M2/M4 落地 |
-| GPDS/SPDS | `GPropRawC`/`DPropRawC`；GPIS/SPIS 走寄存器 Raw 指令 | M2/M4 落地 |
-| SPDE/SPIE/SPDEH（MEMBERENSURE） | Ciallang `setProp` 语义即"不存在则创建" | DataObject::setProp 直接 `_props[a]=v`，天然 ENSURE，行为兼容 |
+空占位槽不能经常量去重合并，否则回填会相互覆盖。移入 GC 堆时使用 `Chunk::toHeap()`
+保根；Translator 还持有转译产物的根，见 `TjsTranslator.hpp/.cpp`。
 
-字符串/字节串下标（`str[i]`）：TJS 在 GPD/GPI 内特判；Ciallang 走 stdlib 原生方法表
-（`GProp` 的非对象分支）——**需为 String/Octet 补数字下标成员访问**（验证点 §10）。
+## 6. 属性模板与异常表
 
-### 4.4 转换/一元
+以 direct 二目成员运算为例：
 
-| TJS | 转译 | 备注 |
-|---|---|---|
-| INT/REAL/STR | `ToInt/ToReal/ToString %r,%r` | 原地 |
-| CHS | `ChgSign %r,%r` | |
-| LNOT | `LNot %r,%r` | |
-| BNOT | **缺口**（按位非） | 提案 `BNot`（Value 已有位运算体系） |
-| NUM | 近似 `ToReal`+`ToInt`？ | **验证点**：tjsVariant::tonumber 语义（int/real 归一） |
-| ASC/CHR | **缺口** | 提案 `Asc/Chr`（`$`/`#` 前缀） |
-| TYPEOF/TYPEOFD/TYPEOFI | **缺口** | 提案 `Typeof`（返回类型名字符串） |
-| INV | `Inv %r` | |
-| CHKINV r | `ChkInv %r,%r` | TJS 原地写回 bool，Ciallang src,dst 同寄存器即可 |
-| CHKINS n,o | `DLocal %o→%F2` + `ChkIns %n,%F2` | 物化 flag：结果在 %F2，接 §3 规则 |
-| EVAL/EEXP | **缺口（远期）** | 运行期把字符串送 Parser→IRGenerator→执行；依赖源码前端完备 |
-
-### 4.5 调用
-
-| TJS | 转译 | 备注 |
-|---|---|---|
-| CALL d,f,n,[args] | `Push %a1 … Push %an` + `Call %d,%f,n` | this 绑定：Ciallang `Function::call` 用函数对象 thisObj；成员调用经 GProp 时 `DataObject::getProp` 已克隆并绑定 this（`Class.cpp:210-235`），语义对齐 |
-| CALLD d,f,m,[args] | `GPropC %f2,%o,atom` + Push… + `Call %d,%f2,n` | 方法名 Atom 直引（设计期方案 Load+%n+GProp 已替换）；obj=proxy 走 GThis |
-| CALLI d,f,m,[args] | `GProp %f,%m,%f2` + … | |
-| NEW d,c,[args] | **设计点** | TJS：调用类 context（其代码体做类构造，见 §7）。转译：对类值 Call；需要 Ciallang `ClassObject` 可调用 = 创建 DataObject + 跑构造；当前 ClassObject::call 语义需核对/补齐 |
-| argcount = -1/-2 | **缺口** | 省略透传/展开调用；提案 `ExpandCall`；首期加载报不支持 |
-
-### 4.6 返回/异常/其他
-
-| TJS | 转译 | 备注 |
-|---|---|---|
-| SRV r + RET | 合并为 `Ret %r` | 逐条扫描时记住最近 SRV 的寄存器；裸 RET → `Ret %voidReg` |
-| THROW r | `Throw %r` | |
-| ENTRY catch,ex / EXTRY | 转译器静态收集 `{tryStart, tryEnd=catchAddr, exValueReg}` 进 `Chunk::_throwHandlers`；指令处发 `NOP` | Ciallang unwind 命中后 `setPC(tryEnd)` 从 catch 块继续，与 TJS catch 语义对齐；**嵌套 try/重抛**为验证点 |
-| CHGTHIS f,t | `ChgThis %t → %f` | ⚠️ Ciallang ChgThis 操作数是 (src=this值, dst=函数)，TJS 是 (code1=函数, code2=this)，**顺序相反** |
-| GLOBAL r | `Global %r` | |
-| ADDCI / REGMEMBER | 不发射 TAC；类构造在加载期解释，见 §7 | |
-| DEBUGGER | `Debugger` | |
-
-## 5. 常量池转换
-
-| TJS DataArea 条目 | Ciallang 常量 | 备注 |
-|---|---|---|
-| VOID / OBJECT(null) | `*0`（Void） | |
-| BYTE/SHORT/INTEGER/LONG idx | 不进常量池：转译为 `LoadImm`（在 CONST 转译点内联） | 整数值域已归一为 i64 |
-| REAL idx | `Constant(Real)` | double 位模式原样 |
-| STRING idx | UTF-16LE → UTF-8 → `AtomTable::intern` → `Constant(Atom)` | **注意代理对**（tjs_char 16 位，UTF-16 → UTF-8 需正确处理代理项） |
-| OCTET idx | **缺口**：Constant 无 Octet 类型 | 提案 `ConstantType::Octet` + `Value::createValue` 分支；首期可报不支持 |
-| INTER_OBJECT ctxIdx | `FuncMeta*` / `ClassMeta*`（Pass 2 回填） | 见 §7 |
-
-两遍结构：Pass 1 为每个 context 建空 Chunk + 常量骨架；Pass 2 转译代码体并回填引用
-（对应 `tjsByteCodeLoader` 的两遍回填，[tjs2-bytecode.md](tjs2-bytecode.md) §5.6）。
-
-## 6. 关键机制细化
-
-### 6.1 属性变体的读-算-写展开模板
-
-`ADDPD %d, %o, %m, %p`（`d = o[m] + p`，成员为常量名）：
-
-```
-Load  %n, *m'          ; 成员名常量
-GProp %o, %n, %t       ; t = o[m]   （Property 触发 getter）
-Add   %t, %p, %t       ; t = t + p
-DProp %o, %n, %t       ; o[m] = t   （Property 触发 setter）
-（d≠0 时再 DLocal %t → %d）
+```text
+GPropC    %object, atom, %temp
+Add       %temp, %operand, %temp
+DPropC    %object, atom, %temp
+DLocal    %temp, %result          ; 只有源结果目标非 0 才写回
 ```
 
-与 TJS 原子 `Operation()` 派发的差异：getter/setter 间状态可变——**已知近似**，记录在案。
+间接成员名使用寄存器版本；闭包属性 P 变体使用 `DerefGet/DerefSet`。
+这与参考引擎一次 `Operation()` 分派不同，不能视为完整的原子属性操作。
+SPDE/SPIE 的创建成员语义依赖目标对象的 setProp，HIDDENMEMBER 等标志未有独立表示。
 
-### 6.2 跳转重定位（两遍法）
+ENTRY 登记异常接收寄存器、try 起点和 catch 目标；EXTRY 不生成独立执行指令。
+回填后的 TAC try 区间在 `Chunk::toBytecode()` 中转换为字节码偏移，unwind 使用该表。
 
-- Pass 1 按 [tjs2-bytecode.md](tjs2-bytecode.md) §3 长度表步进（含 CALL 变长解码），
-  记录 `tjsWordOffset → (Pass 2 将发射的) 首 TAC 下标`；
-- Pass 2 发射跳转：`Jmp Label(map[目标字偏移])`（TJS 跳转操作数是相对字节偏移 → 目标 = 指令首字偏移 + code[1]）；
-- 一条 TJS 指令展开多条 TAC（CCL/flag 物化/属性模板）时，映射只指向**首条** TAC——
-  TJS 跳转目标永远是指令边界，安全。
+## 7. 类与属性元数据
 
-## 7. context 类型 → Ciallang 元数据
+普通函数、表达式函数、getter 和 setter 生成函数元数据；ctProperty 汇总 getter/setter。
+ctClass 的受支持构造模式在加载期解释，填充成员、构造入口、默认字段初始化和父类名。
+`superClassGetter` 只支持可识别的父类引用模式，不支持任意动态父类表达式。
+无法识别的类构造模式报错，当前没有通用运行期 REGMEMBER/ADDCI 回退后端。
 
-| TJS contextType | Ciallang 映射 | 方案 |
-|---|---|---|
-| ctTopLevel | 顶层 Chunk | 直接执行入口 |
-| ctFunction / ctExprFunction | `FuncMeta(arity=FuncDeclArgCount, chunk)` | 直接 |
-| ctPropertySetter / ctPropertyGetter | `PropMeta(setFunc/getFunc)` | 父 ctProperty context 聚合二者 |
-| ctSuperClassGetter | **惰性求值**，Ciallang extends 是名字列表 | 首期：加载期执行 getter 代码体求出父类名列表（若代码体可静态解释），否则报不支持 |
-| ctClass | `ClassMeta` + 运行期构造 | **加载期解释**（见下） |
+## 8. 已知差异与待修复项
 
-**ctClass 的加载期解释**：类 context 的代码体是固定模式的构造序列
-（CONST 函数常量 → REGMEMBER 注册成员表 → ADDCI 标记 → 可能的 GPD 赋初值）。
-转译器遇到 ctClass context 时**不生成 TAC**，而是直接解释这几种模式，填充
-`ClassMeta.memberShapeMetas/memberMetas/constructor`；遇到无法识别的模式（类体内出现任意语句）
-则回退为"运行期方案"（提案：新增 `RegMember/AddCI` TAC，首期不做）。
-
-propcount 成员表（[tjs2-bytecode.md](tjs2-bytecode.md) §5.3）直接映射 `ClassMeta` 成员。
-
-## 8. 与源码路径的语义对账（转译特有风险）
-
-| 差异点 | 说明 | 对策 |
-|---|---|---|
-| `===` 语义 | TJS DiscernCompare vs Ciallang `discernEquals` | 用例对拍（int/real/string/void/null/object 全组合） |
-| 加法重载 | TJS ADD 对 string/int/real 混合的隐式转换规则 | Value::add 已按 TJS 实现（有 ieee 测试），对拍确认 |
-| CLT/CGT 序 | `CLT=自然 <`、`CGT=自然 >`（GreaterThan/LittlerThan 名实相反，见 §3） | CLT→LT、CGT→GT（2026-10-27 修正：曾按"换序"说法译反，s 语料无 `<` 比较未暴露，test_misc 暴露） |
-| 整数/实数除法 | DIV/IDIV vs div/idiv | 对拍 |
-| 布尔判定 | TJS `value != 0` 式宽松真 vs `Value::asBool` | 对拍（空串/void/null/NaN） |
-| flag 物化 | flag 跨指令存活的场景（CEQ …非 flag 指令… JF） | %F 物化天然正确；仅性能损耗 |
-| 字符串编码 | 文件 UTF-16LE ↔ 运行 UTF-8 | 转换器单测（ASCII/中文/emoji 代理对） |
-| 全局对象 | TJS global 可任意读写；Ciallang GlobalObject | 行为一致，对拍 |
-| 栈深限制 | Ciallang 1024 帧 vs TJS 无显式同值 | 记录差异 |
-
-### 8.1 M2 落地后的已知近似（逐条记录在案）
-
-| 差异点 | TJS2 行为 | 本项目行为 | 说明 |
-|---|---|---|---|
-| proxy(ra[-2]) 直访 | objthis-proxy：this 优先、global 回落 | prologue 以 `This` 填 %K-2；GPD/GPDS/SPD/SPDE/SPDEH/INCPD/二目 PD/CALLD 在 obj==-2 时译为 GThis/GRefRaw/DThis（atom 形态，自带回落）| GPI/GPIS/SPIS/CALLI（成员名在寄存器）经 proxy 无回落，直接对 this 值访问 |
-| SPDS obj==-2 | 原始写 proxy（this 空则 global） | `DPropRaw(%K-1)`（落 this 槽） | this 为空的帧不回落 global；语料未覆盖此形态 |
-| TYPEOFD/TYPEOFI | 成员不存在 → "undefined" 字符串 | GProp 直接抛错 | 成员存在路径一致 |
-| 顶层 property 写 | PropSet 触发 setter | DProp 已放开 Global 豁免，同触发 | 源码路径走 DGlobal，行为一致 |
-| 未绑定函数调用 | 调用点绑定 `clo.ObjThis ?: ra[-1]` | `Function::call` 未绑定时继承调用者 thisObj | super.<方法>() 经类对象取成员（未绑定）的关键路径；全局函数调用行为不变（调用者 this 即 global 或空） |
-| 读-算-写属性模板 | `Operation()` 原子派发 | GProp→算→DProp 三条指令 | getter/setter 间状态可变，已知近似 |
-| 类体 super 初始化三连（GPD+CHGTHIS+CALL） | 运行期重跑父类类体 | 加载期跳过，继承语义由 superClassGetter 解释的 `extends` 承担 | 与源码路径 extends 模型一致 |
-| int/real 等 binop PD 变体 dst==0 | 丢弃结果 | 不发射写回（%K void 槽不被污染） | 修复：曾无条件写回 %K，污染裸 RET 的 void 返回值 |
-| 省略透传（argc=-1） | 转发调用者实际实参（含超额） | `CallOmit`：实参由 Function::call 复制到窗口顶部保留区（regCount..，调用顺序），帧 %0..%arity-1 重写为前 arity 个 | 超额时物理池布局只会让末 arity 个落在 %0..，且 prologue 静态写位会覆盖之 |
-| 展开调用（argc=-2） | fatNormal/fatExpand(Array)/fatUnnamedExpand 条目表 | `CallExpand dst, func, unnamedBase, entries` 同构实现；fatExpand 仅支持 Array | UnnamedExpand 以调用方 FuncDeclUnnamedArgArrayBase 为界 |
-| collapse 参数（`function f(a, b*)`） | 入口把 args[base..] 收拢成 Array 落 ra[-3-base] | `CollapseArgs dst, base` 在 prologue 末尾发射（实参尚完整时） | 无超额实参也建空 Array（TJS2 无条件建） |
-| EVAL/EEXP | 字符串即时编译执行，this=ra[-1] | `EvalStr`（源码路径已有指令）；EEXP 编译期形态差异运行期无别 | — |
-| 整数成员名（`a[0]` → GPI+整数名） | PropGet/SetByNum | GPD/GPI/SPD/SPI/DPropRaw/GPropRaw 整数名分支 = 数组数值下标（负从尾、写越界扩展） | — |
-| 调用 dst=0 | 丢弃（结果指针 NULL，不写回） | 落窗口顶部专用丢弃寄存器（regCount-1） | 修复：曾写 %K（void 槽）污染 `SRV r0` 返回链 |
-| INC/DEC 基型 | increment（int/real，字符串报错） | `Inc`/`Dec` 单指令，同语义 | 旧译法 LoadImm+Add 对字符串会误拼接 |
-| BNOT/NUM/OCTET | bitnot / tonumber / ToOctet | `BNot`/`ToNumber`/`ToOctet`（Value 增 bitNot/toNumber） | OCTET：void→空 octet、octet 不变、其余报错 |
+| 项目 | 当前边界 |
+|---|---|
+| CHKINS | Decoder 把 target/name 注释及使用颠倒，结果落入 scratch 而非 target。手工函数 `x instanceof "Integer"` 的返回槽仍为输入 21，预期应为 1。源码路径不受该转译缺陷影响；修复见 [待办](../../TODO.md) |
+| proxy `ra[-2]` | 部分 direct 访问译为 GThis/GRefRaw/DThis；间接 GPI/CALLI 等只对映射的 this 值访问，没有完整的 this→global 回落 |
+| SPDS 写 proxy | 写 this 槽；this 为空时未完整回落 global |
+| TYPEOFD/TYPEOFI | 目前由属性读取后 TypeOf 实现；成员缺失会抛错，未返回参考实现的 `"undefined"` |
+| 属性读改写 | 多条 TAC 不提供一次 Operation 派发的完整语义 |
+| 动态类体与父类表达式 | 只接受加载期识别的模式；不是通用类体解释器 |
+| null / void | 常量池 null OBJECT 合并到 void，不能宣称完全等价 |
+| 输入校验 | 已检查截断指令、非法调用计数、类引用和跳转边界；不代表所有寄存器或元数据都已全面验证 |
 
 ## 9. 对拍与工具链
 
-### 已有 fixture 与严格源码/字节码对拍
-
-Reader 回归位于 `tests/tjsbc_reader_test.cpp`（畸形输入拒绝 + 手工构造最小文件），
-转译执行回归位于 `tests/tjsbc_translator_test.cpp`；入库的 `.tjsbc` 语料位于
-`tests/test_files/tjsbc/`（s6_class/s7_ext/test_class/test_function/test_misc/
-test_variant/test_with，**全部有对应源码**），CI 不需要参考引擎即可运行。
-`cial --tjsbc` 的 CLI 路径另由 `tests/cli_test.py` 覆盖。
-
-> 历史清理（2026-10-30）：早期入库的 s1–s5 `.tjsbc` 无对应 `.tjs` 源码（初始提交即只含
-> 二进制，Git 历史不可恢复源码），按"无源码 fixture 一并清理"的约定删除；仅针对它们的
-> Reader 断言（常量池/签名/context 结构 SECTION）与对比工具的降级覆盖路径同步移除。
-> 语料级结构覆盖由有源码的 s6/s7/test_* 承担，必要时可用
-> `TJSCompiler --dump <script.tjs> <out.tjsbc>` 从源码再生成。
-
-`bench/bytecode_conformance.py` 默认运行同一个 Ciallang 的源码路径和字节码路径，
-要求两边都以 0 退出，并按字节比较 stdout，不剥引号、时间戳、空行或诊断文本。
-源码先在 fixture 同目录寻找，再按同名文件在 `tests/test_files/tjs2/` 寻找；
-**找不到源码即报 `TOOL_ERROR` 并整体判失败**——工具不再提供任何"仅执行"性质的
-降级覆盖（原 `--mode execute` 与 `SKIPPED_NO_SOURCE` 分支随 s1–s5 清理一并移除）。
+入库 `.tjsbc` 位于 `tests/test_files/tjsbc/`，共 7 个，均有对应源码：s6_class、s7_ext、
+test_class、test_function、test_misc、test_variant、test_with。源码先在同目录寻找，
+再到 `tests/test_files/tjs2/` 找同名文件；CI 不需要参考引擎。
 
 ```sh
-python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe   --report bench/results/bytecode-conformance.json
-# 只复核指定用例（--case 可重复），目录和输出文件都可含空格
-python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe   --case s7_ext --case test_class
+python bench/bytecode_conformance.py --cial build/Linux/Debug/cial \
+  --report bench/results/bytecode-conformance.json
+python bench/bytecode_conformance.py --cial build/Linux/Debug/cial \
+  --case s7_ext --case test_class
 ```
 
-报告为 JSON，记录执行器、源码及字节码 SHA-256、退出码、超时、stdout 首个不同字节位置，
-并同时保留 stdout/stderr 的可读文本和无损 Base64。`MATCH` 以外的实际比较结果均返回 1，
-包括双方都执行失败；选中用例存在缺源码/工具错误也返回 1。参数错误返回 2。
-每个子进程默认 15 秒超时，可由 `--timeout` 设置（`bench/bytecode_conformance.py`）。
+工具要求源码路径和字节码路径都以 0 退出，并逐字节比较 stdout；不剥离引号、时间戳、空行或诊断。
+缺源码为 `TOOL_ERROR`；非 `MATCH` 返回 1，参数错误返回 2。每个子进程默认 15 秒超时，
+可由 `--timeout` 设置。JSON 保留输入/执行器 SHA-256、返回码、首个差异位置及无损输出。
+`test_misc` fixture 的异常消息格式与行号差异仍按 `OUTPUT_DIFF` 报告，不能把该命令默认当作全绿。
 
-严格报告会暴露 `test_misc` 的异常文本差异：源码路径携带源码行号，已有字节码 fixture
-缺少相同源码位置，输出中没有该行号。此项仍为 `OUTPUT_DIFF`，不通过归一化或删除源码
-诊断来强行判为匹配；这不等价于算术或异常捕获行为不兼容。
-
-### 可选参考导出与入口能力探测
-
-`--reference /path/to/TJSCompiler` 对**有源码的入库 fixture**（清理后即全部 fixture）有意义：
-工具在临时目录内生成两个随机标记的最小 `Debug.message` 脚本，先确认参考 CLI 确实执行
-不同的路径参数，再验证 `--dump <script.tjs> <out.tjsbc>` 生成 `TJS2 100 ` 头且能被
-Ciallang 执行并输出对应标记。任一探测失败即停止并返回失败，不能把忽略参数、固定执行
-脚本的旧入口当成有效对照。探测通过后才从源码临时导出选中语料并做上述源码/字节码对拍；
-不会覆盖入库 fixture。该模式验证"参考导出 → 转译执行"工具链端到端，不依赖入库副本
-的时效性。
+参考导出可选：
 
 ```sh
-python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe   --reference /path/to/verified/TJSCompiler --case s7_ext   --report bench/results/bytecode-fresh-export.json
+python bench/bytecode_conformance.py --cial build/Linux/Debug/cial \
+  --reference /path/to/TJSCompiler --case s7_ext \
+  --report bench/results/bytecode-fresh-export.json
 ```
 
-报告记录参考执行器 SHA-256 和两类探测结果。此模式验证**参考导出 → 转译执行**，
-不是参考引擎完整语料 stdout 与 Ciallang 的三方语义对拍；后者已由宿主 `Scripts` 类
-双侧实现后达成的 `test.tjs` 双引擎对拍覆盖（2026-10-30，见 doc/compatibility.md）。
-参考项目的 CLI 适配（`--dump` 与脚本路径参数）不作为本仓库能力或上游默认行为承诺。
-工具契约及真实 CLI/fixture 测试见 `bench/test_bytecode_conformance.py`
-（设置 `TJS_REFERENCE` 环境变量可启用参考导出的真实子进程测试，否则跳过）。
+该模式先用两个随机标记脚本检查路径参数，再验证 `--dump <script> <output>` 产生的
+`TJS2 100\0` 文件能被 Ciallang 执行。探测失败即停止；通过后只在临时目录导出，不覆盖 fixture。
+TJSCompiler `d8044c3` 的 CLI 已支持这些参数，不应继续将其描述为“尚未提交的本机适配”。
+这项检查验证参考导出到转译执行的链路，不替代三方语义或全部脚本覆盖。
 
-## 10. 里程碑
-
-| 里程碑 | 范围 | 出口判据 |
-|---|---|---|
-| **M1** ✅ | Reader（容器+常量池+context 骨架）；顶层/函数 context 转译（§4.1/4.2 基型/4.5 CALL/4.6）；flag 物化；prologue；`cial --tjsbc` | fib/循环/算术/字符串拼接/print 的 .bc 对拍全绿（s1–s5） |
-| **M2** ✅ | 属性全族（GPI/SPI/GPDS…模板）、ctClass 加载期解释、NEW、try/catch、property、P 变体、DELD/DELI、TYPEOFD/I、octet 常量、proxy 回落链 | kirikiri `test_class.tjs` 编译产物对拍全绿（2026-10-27，与源码路径逐字节一致）；`test_function.tjs` 前半通过，展开/收拢调用部分留 M4 |
-| **M3** ✅ | 比较写 zf 指令族（CmpEQ/DEQ/LT/GT + 前瞻融合）、Inc/Dec 单指令、BNot/ToNumber/ToOctet（Typeof/Asc/Chr/DelProp/GetP·SetP 已随 M1/M2 提前落地） | 指令转译覆盖 128/128（2026-10-27）；全部语料 run 路径全绿 |
-| **M4** ✅ | collapse 参数（CollapseArgs）、展开调用（CallExpand）、省略透传（CallOmit）、EVAL/EEXP→EvalStr、CLT/CGT 序修正、dst=0 丢弃语义 | `test_function.tjs` 全量通过（2026-10-27）；test_misc/test_with/test_variant 与源码路径一致；`test.tjs` 双引擎对拍通过（2026-10-30 宿主 Scripts 类双侧落地，见 doc/compatibility.md）。遗留：test_string 原版导出崩溃（`--dump` segfault，2026-10-30 复核仍现，不影响对拍主路径） |
-
-**新增 TAC 指令提案汇总**（M3 落地，命名沿用现有风格）：
-`CmpEQ/CmpDEQ/CmpLT/CmpGT`（写 zf）、`Inc/Dec`、`Typeof`、`Asc/Chr`、`BNot`、`Num`、
-`DelProp`、`GetP/SetP`、`GPropI 已有(=GProp)`、`CallMethod(direct)` 可选、`ExpandCall`（M4）。
-每条按 AGENTS.md"新增指令清单"四处同步（X-macro/execute/encode/dispatch）。
-
-### 2026-10-31 加载期边界与成员变体修复
-
-`src/tjsbc/TjsTranslator.cpp` 的 decode 对固定长度指令和 CALL 族的参数表检查剩余
-码字，负参数计数（省略/展开标志以外）及负展开条目数直接报错；不再多读四码字属性
-指令和 INC/DEC 成员变体之后的码字。MUL 的 PD/PI/P 解码范围统一包含在四连组内。
-类体加载检查 DataArea 引用、superClassGetter context 与入口指针；索引相加采用
-size_t 或经 i64 检查后转换，避免先做窄类型加法。普通跳转及 ENTRY 目标必须在代码范围
-内，回填仍要求目标对应指令边界；TAC 映射使用 size_t / optional，try 元数据写入 u32
-前检查范围。未改变指令编码或现有语义。
-
-新增回归在 `tests/tjsbc_translator_test.cpp`：截断与负计数、非法常量/类成员槽、
-越界跳转/异常目标与 superclass 引用、末尾合法四码字指令，以及 MULPD 的属性写回
-和返回值。macOS Debug/Release 各 242 项 CTest 全过（2026-10-31）。这不是对所有
-未可信字节码输入的完整安全性证明，寄存器和其他元数据仍需遵循格式约束。
+回归见 `tests/tjsbc_reader_test.cpp`、`tests/tjsbc_translator_test.cpp`、
+`tests/cli_test.py` 与 `bench/test_bytecode_conformance.py`。
+设置 `TJS_REFERENCE` 可启用工具测试的参考引擎真实子进程部分。

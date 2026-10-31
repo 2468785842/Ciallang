@@ -5,7 +5,7 @@
 * 源站（英文/日文混排镜像）：https://a-rabin.github.io/krkr2doc-en/tjs2doc/contents/index.html
 * 官方站（语法权威）：https://hydrozoa.felisworks.com/doc/tjs2doc/contents/index.html
 * 与本项目实现状态的关系：本目录描述**原版语义**（行为基准）；本项目“实现了多少、缺什么”见 [../syntax.md](../syntax.md) 状态矩阵与 [../compatibility.md](../compatibility.md)。
-* 产生式（语法权威）另见 [../grammar/tjs.y](../grammar/tjs.y)。
+* 产生式与快照来源见 [../grammar/README.md](../grammar/README.md)；词法、代码生成和运行语义不能仅从 `.y` 推断。
 
 ## 章节索引
 
