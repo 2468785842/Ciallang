@@ -17,6 +17,8 @@
 
 #include "Types.hpp"
 
+#include "config.h"
+
 #include "Octet.hpp"
 #include "Real.hpp"
 #include "String.hpp"
@@ -75,25 +77,116 @@ namespace cial {
     public:
         Value() noexcept = default;
 
-        explicit Value(Integer value);
+        // 构造/析构/拷贝移动在类内定义：整数与对象路径现场消解为几次访存，
+        // 跨 TU 外联调用曾在原生调用画像中占 Value 生命周期总样本的 ~40%
+        // （2026-10-31 native_stress 采样，见 doc/performance.md）
+        explicit Value(const Integer value) {
+            _data.integer = value;
+            type(ValueType::Integer);
+        }
 
-        explicit Value(Real value);
+        explicit Value(const Real value) {
+            new(&_data.real) Real(value);
+            type(ValueType::Real);
+        }
 
         explicit Value(String value);
 
         explicit Value(Octet value);
 
-        explicit Value(Object *value);
+        explicit Value(Object *value) {
+            _data.object = value;
+            type(ValueType::Object);
+        }
 
-        ~Value();
+        CIAL_INLINE ~Value() {
+            if(isInlineString())
+                _smallString.~String();
+            else if(isString())
+                SharedPayload<String>::release(_data.string);
+            else if(isOctet())
+                SharedPayload<Octet>::release(_data.octet);
+        }
 
-        Value(Value &&v) noexcept;
+        CIAL_INLINE Value(Value &&v) noexcept {
+            const auto kind = v.type();
+            if(v.isInlineString()) {
+                new(&_smallString) String(std::move(v._smallString));
+                v._smallString.~String();
+                tag() |= inlineStringTag << 5;
+            } else {
+                switch(kind) {
+                    case ValueType::Integer:
+                        _data.integer = v._data.integer;
+                        break;
+                    case ValueType::Real:
+                        new(&_data.real) Real(v._data.real);
+                        break;
+                    case ValueType::String:
+                        _data.string = v._data.string;
+                        break;
+                    case ValueType::Octet:
+                        _data.octet = v._data.octet;
+                        break;
+                    case ValueType::Object:
+                        _data.object = v._data.object;
+                        break;
+                    case ValueType::Void:
+                        _data.integer = 0;
+                        break;
+                }
+                type(kind);
+            }
+            v.type(ValueType::Void);
+        }
 
-        Value &operator=(Value &&v) noexcept;
+        CIAL_INLINE Value &operator=(Value &&v) noexcept {
+            if(this != &v) {
+                this->~Value();
+                new(this) Value(std::move(v));
+            }
+            return *this;
+        }
 
-        Value(const Value &v) noexcept;
+        CIAL_INLINE Value(const Value &v) noexcept {
+            const auto kind = v.type();
+            if(v.isInlineString()) {
+                new(&_smallString) String(v._smallString);
+                tag() |= inlineStringTag << 5;
+            } else {
+                switch(kind) {
+                    case ValueType::Integer:
+                        _data.integer = v._data.integer;
+                        break;
+                    case ValueType::Real:
+                        new(&_data.real) Real(v._data.real);
+                        break;
+                    case ValueType::String:
+                        _data.string = v._data.string;
+                        SharedPayload<String>::retain(_data.string);
+                        break;
+                    case ValueType::Octet:
+                        _data.octet = v._data.octet;
+                        SharedPayload<Octet>::retain(_data.octet);
+                        break;
+                    case ValueType::Object:
+                        _data.object = v._data.object;
+                        break;
+                    case ValueType::Void:
+                        _data.integer = 0;
+                        break;
+                }
+                type(kind);
+            }
+        }
 
-        Value &operator=(const Value &value) noexcept;
+        CIAL_INLINE Value &operator=(const Value &value) noexcept {
+            if(this != &value) {
+                this->~Value();
+                new(this) Value(value);
+            }
+            return *this;
+        }
 
         [[nodiscard]] ValueType type() const noexcept {
             const u8 raw = tag() >> 5;
@@ -138,7 +231,12 @@ namespace cial {
 
         [[nodiscard]] Ret<Octet *> asOctet() const noexcept;
 
-        [[nodiscard]] Ret<Object *> asObject() const noexcept;
+        [[nodiscard]] CIAL_INLINE Ret<Object *> asObject() const noexcept {
+            if(type() == ValueType::Object) {
+                return Ret<Object *>::ok(_data.object);
+            }
+            return Ret<Object *>::err(ErrCode::TypeError, "Invalid type get as Object"_str);
+        }
 
         [[nodiscard]] bool asBool() const noexcept;
 

@@ -433,3 +433,37 @@ string_concat 约 2.4%–3.4% 回退。本机 macOS arm64，Release `-O2 -DNDEBU
 热路径二进制证据：`runLoop<0,0,0>` 尺寸 ca4df1b 37236B、2a1d684 36024B、
 HEAD 36024B（`nm -n` 相邻符号差）。微基准对布局的 ±2%–7% 摆动以后按本节方法
 （锚点重建 + 提交级 A/B + 采样）归因，不与算法成本混记。
+
+## 2026-10-31 原生调用实参窗口评估与 Value 生命周期内联批次
+
+承接"原生调用帧及实参窗口成本"评估项。方法：macOS arm64 Release（Clang 20.1，无 LTO），
+native_stress 语料（`bench/native_methods.tjs` 的 3×10⁷ 迭代变体，约 4.5s）`sample` 采样；
+A/B 用交替配对中位数（预热 1 次 + 交替 9 对，两轮反转顺序），对照脚本与 2026-10-31
+定位轮一致。A/A 噪声底 ±1%。
+
+**画像**：Value 生命周期管理占进程样本 ~54%（`~Value` 25%、拷贝构造 17%、移动/拷贝
+赋值 ~10%、各 ctor 2%），派发循环 31%，而真正 stdlib 工作（`callDirect`→`asArray`）
+仅 ~3%。`~Value`/拷贝构造/移动/`asObject` 均为跨 TU 外联调用（`Value.hpp` 只声明，
+定义在 `Value.cpp`），整数/对象热路径每次实参落缓冲、接收者拷贝、返回值写回都要付
+真实调用开销。调用帧本身（免池同步快路径 + 直写窗口）与实参窗口机制无肥肉——
+与 2026-10-30 融合批"剩余开销在调用帧建立"的判断合并修正为：**在 Value 生命周期**。
+
+**两步改动**（`src/types/Value.hpp`、`Value.cpp`）：
+
+1. 构造/析构/拷贝/移动/`asObject` 移入类内定义（普通 inline）：
+   native_methods 94.5%/94.9%，loop_int 96.0%/96.5%，fib 96.3%/97.4%，
+   string_concat 97.8%/98.6%。`runLoop` 侧内联吸收（自采样 836→780，
+   函数 35780→35468B），残余外联调用在 stdlib 侧翻译单元。
+2. 上述函数加 `CIAL_INLINE`（always_inline，`config.h` 既有宏，MSVC/GNU 分支），
+   强制全部站点内联：**native_methods 78.2%/78.5%，fib 87.4%/89.7%，
+   loop_int 94.1%/95.0%，string_concat 94.1%/94.4%，class_instantiate 97.0%/97.2%**
+   （对照为步骤 1 之前的留档二进制，含 2026-10-31 定位轮的 cold 标注）。
+
+代价与验证：二进制 2.35MB→2.80MB（+19%，激进内联的预期代价）；编译时间略增；
+CTest MacOS Debug/Release 各 385/385 通过；`tools/check-format.sh` 通过。
+被否决的中间形态：`CIAL_INLINE [[nodiscard]] Ret<Object*>` 属性顺序非法
+（nodiscard 无法作用于类型），须写作 `[[nodiscard]] CIAL_INLINE`。
+
+后续候选（未展开）：`Value::asInteger` 仍外联（String 解析回执使函数偏大，
+可拆内联快路径 + 冷慢路径）；stdlib 内部临时 Value 的拷贝消除；
+fib 相对 TJS2 的剩余差距待 Windows 三方对照复核（本批 fib 已再快 ~11%）。

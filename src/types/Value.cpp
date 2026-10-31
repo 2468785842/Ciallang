@@ -20,14 +20,6 @@
 
 namespace cial {
 
-    Value::Value(const Integer value) {
-        _data.integer = value;
-        type(ValueType::Integer);
-    }
-    Value::Value(const Real value) {
-        new(&_data.real) Real(value);
-        type(ValueType::Real);
-    }
     Value::Value(String value) {
         if(value.length() <= String::SHORT_STR_LEN) {
             new(&_smallString) String(std::move(value));
@@ -41,96 +33,7 @@ namespace cial {
         _data.octet = SharedPayload<Octet>::makeSingle(std::move(value));
         type(ValueType::Octet);
     }
-    Value::Value(Object *value) {
-        _data.object = value;
-        type(ValueType::Object);
-    }
 
-    Value::~Value() {
-        if(isInlineString())
-            _smallString.~String();
-        else if(isString())
-            SharedPayload<String>::release(_data.string);
-        else if(isOctet())
-            SharedPayload<Octet>::release(_data.octet);
-    }
-
-    Value::Value(Value &&v) noexcept {
-        const auto kind = v.type();
-        if(v.isInlineString()) {
-            new(&_smallString) String(std::move(v._smallString));
-            v._smallString.~String();
-            tag() |= inlineStringTag << 5;
-        } else {
-            switch(kind) {
-                case ValueType::Integer:
-                    _data.integer = v._data.integer;
-                    break;
-                case ValueType::Real:
-                    new(&_data.real) Real(v._data.real);
-                    break;
-                case ValueType::String:
-                    _data.string = v._data.string;
-                    break;
-                case ValueType::Octet:
-                    _data.octet = v._data.octet;
-                    break;
-                case ValueType::Object:
-                    _data.object = v._data.object;
-                    break;
-                case ValueType::Void:
-                    _data.integer = 0;
-                    break;
-            }
-            type(kind);
-        }
-        v.type(ValueType::Void);
-    }
-    Value &Value::operator=(Value &&v) noexcept {
-        if(this != &v) {
-            this->~Value();
-            new(this) Value(std::move(v));
-        }
-        return *this;
-    }
-    Value::Value(const Value &v) noexcept {
-        const auto kind = v.type();
-        if(v.isInlineString()) {
-            new(&_smallString) String(v._smallString);
-            tag() |= inlineStringTag << 5;
-        } else {
-            switch(kind) {
-                case ValueType::Integer:
-                    _data.integer = v._data.integer;
-                    break;
-                case ValueType::Real:
-                    new(&_data.real) Real(v._data.real);
-                    break;
-                case ValueType::String:
-                    _data.string = v._data.string;
-                    SharedPayload<String>::retain(_data.string);
-                    break;
-                case ValueType::Octet:
-                    _data.octet = v._data.octet;
-                    SharedPayload<Octet>::retain(_data.octet);
-                    break;
-                case ValueType::Object:
-                    _data.object = v._data.object;
-                    break;
-                case ValueType::Void:
-                    _data.integer = 0;
-                    break;
-            }
-            type(kind);
-        }
-    }
-    Value &Value::operator=(const Value &v) noexcept {
-        if(this != &v) {
-            this->~Value();
-            new(this) Value(v);
-        }
-        return *this;
-    }
 
     Ret<Integer> Value::asInteger() const noexcept {
         switch(type()) {
@@ -185,12 +88,6 @@ namespace cial {
         return Ret<Octet *>::err(ErrCode::TypeError, "Invalid type get as Octet"_str);
     }
 
-    Ret<Object *> Value::asObject() const noexcept {
-        if(type() == ValueType::Object) {
-            return Ret<Object *>::ok(_data.object);
-        }
-        return Ret<Object *>::err(ErrCode::TypeError, "Invalid type get as Object"_str);
-    }
 
     bool Value::asBool() const noexcept {
         switch(this->type()) {
