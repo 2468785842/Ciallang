@@ -8,6 +8,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
+import cial_lsp
 from cial_lsp import source_position, line_prefix, utf16
 
 parser = argparse.ArgumentParser()
@@ -503,6 +504,58 @@ holder.member;
         self.assertEqual(self.receive()["params"]["diagnostics"], [])  # throw 不得被执行
         self.send("textDocument/didClose", {"textDocument": {"uri": uri}})
         self.assertEqual(self.receive()["params"]["diagnostics"], [])
+
+    def test_diagnostics_schema_v2_ranges_and_codes(self):
+        self.initialize()
+        uri = "file:///ranges.tjs"
+        self.send("textDocument/didOpen", {"textDocument": {
+            "uri": uri, "version": 1, "text": "var 中文 = ;"}})
+        diagnostic = self.receive()["params"]["diagnostics"][0]
+        self.assertEqual(diagnostic["code"], "parse.invalid-expression")  # 错误码透传
+        self.assertNotIn("(", diagnostic["message"])  # 纯文本，无 (file@l:c) 前缀
+        # 字节列 13 经完整字符边界换算为 UTF-16 character 9；半开范围宽 1
+        self.assertEqual(diagnostic["range"]["start"], {"line": 0, "character": 9})
+        self.assertEqual(diagnostic["range"]["end"], {"line": 0, "character": 10})
+        # EOF 零宽插入点保持零宽（无末尾换行：EOF 在行 0 列 8）
+        self.send("textDocument/didChange", {"textDocument": {"uri": uri, "version": 2},
+                                            "contentChanges": [{"text": "if(a>b){"}]})
+        diagnostic = self.receive()["params"]["diagnostics"][0]
+        self.assertEqual(diagnostic["code"], "parse.expected-token")
+        self.assertEqual(diagnostic["range"]["start"], {"line": 0, "character": 8})
+        self.assertEqual(diagnostic["range"]["end"], {"line": 0, "character": 8})
+
+    def test_diagnostics_coalesce_rapid_edits_to_latest_version(self):
+        self.initialize()
+        uri = "file:///coalesce.tjs"
+        self.send("textDocument/didOpen", {"textDocument": {"uri": uri, "version": 1, "text": "var ;"}})
+        for version, text in ((2, "var ; ;"), (3, "var x = 42;")):
+            self.send("textDocument/didChange", {"textDocument": {"uri": uri, "version": version},
+                                                 "contentChanges": [{"text": text}]})
+        report = self.receive()["params"]  # 防抖合并：仅最新版本发布一次
+        self.assertEqual(report["version"], 3)
+        self.assertEqual(report["diagnostics"], [])
+        self.send("textDocument/hover", {"textDocument": {"uri": uri},
+                                         "position": {"line": 0, "character": 1}}, 9)
+        response = self.receive()
+        self.assertIn("id", response)  # 下一条即请求响应：无过期发布滞留
+        self.send("textDocument/didClose", {"textDocument": {"uri": uri}})
+        self.assertEqual(self.receive()["params"]["diagnostics"], [])
+
+    def test_diagnostics_check_helper_conversions(self):
+        # 检查器不可用：与编译器诊断使用不同错误码
+        server = cial_lsp.Server(cial=str(pathlib.Path("definitely-missing-compiler").resolve()))
+        unavailable = server.check("var x = ;", "file:///x.tjs")
+        self.assertEqual(unavailable[0]["code"], "lsp.checker-unavailable")
+        self.assertIn("unavailable", unavailable[0]["message"])
+        # 旧版检查器输出（无 schema 字段）：包含式 endColumn +1、前缀剥离
+        legacy = cial_lsp.Server._convert_legacy(
+            "var b = ;",
+            {"diagnostics": [{"message": "(legacy.tjs@1:9) legacy prefix", "severity": 1,
+                              "line": 0, "column": 8, "endLine": 0, "endColumn": 8}]})
+        self.assertEqual(legacy[0]["range"]["start"], {"line": 0, "character": 8})
+        self.assertEqual(legacy[0]["range"]["end"], {"line": 0, "character": 9})
+        self.assertEqual(legacy[0]["message"], "legacy prefix")
+
 
     def test_completion_hover_symbols_and_lifecycle(self):
         self.initialize()

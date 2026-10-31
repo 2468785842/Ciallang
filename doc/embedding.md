@@ -55,7 +55,7 @@ context.registerGlobal("hostVersion"_str, Value{ Integer{1} });
 
 此例还需包含 `types/Array.hpp`。`registerClass<T>` 创建并立即把对象注册为全局构造入口，返回指针由全局对象保根；`T` 应为实现构造调用协议的 Object 子类。方法和只读属性按 NativeTypeKey 注册，因此同一 Context 中同一类型的实例共享注册项。声明式绑定的可写属性由 NativeAccessor 分派，其他属性由对象的 `setProp` 实现；脚本 class/property 语义不变（`src/runtime/Context.hpp`、`src/stdlib/NativeRegister.hpp`）。
 
-库不自动添加 CLI 的 print/println、Debug、Exception 自举；宿主按需注册（`src/stdlib/Print.hpp`、`ExceptionLib.hpp`）。`VM::eval` / `evalExpr` 的编译错误按既有 API 报到 stderr 并返回 void，运行期错误抛异常；需要结构化编译诊断的宿主应使用 Parser/IRGenerator 的 `Common::Result`（`src/vm/VM.hpp`）。
+库不自动添加 CLI 的 print/println、Debug、Exception 自举；宿主按需注册（`src/stdlib/Print.hpp`、`ExceptionLib.hpp`）。`VM::eval` / `evalExpr` 的编译错误按既有 API 报到 stderr 并返回 void，运行期错误抛异常；需要结构化编译诊断的宿主应使用 Parser/IRGenerator 的 `Common::Result`（`src/vm/VM.hpp`）。`ResultMessage` 携带纯文本 `message`、稳定错误码 `code`、源码身份 `source`、权威字节半开区间 `span()`（`hasSpan()` 为 false 表示无位置错误，不得以 (0,0) 代替）与终端摘录 `details`；REPL/eval 等虚拟源可用 `SourceFile::setSourceName` 设置逻辑名，`SourceFile::load` 对非法 UTF-8/NUL/体内 BOM 会以带位置的诊断使 Result 失败（`src/common/ResultMessage.hpp`、`SourceFile.hpp`）。范围与错误码约定见[诊断重构计划](diagnostics-plan.md)。
 
 ## 外部原生类型注册
 

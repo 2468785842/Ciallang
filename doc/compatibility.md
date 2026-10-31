@@ -80,8 +80,10 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 1. 参考引擎 Debug.message 带时间戳前缀、被捕获异常打印 VM 转储、退出前转储脚本块
    （其 main 的 Dump 流程）——输出协议差异，非行为差异（§4"原生错误报告"同类）。
 2. test_misc.tjs:149 octet 除法异常的 `e.message`：参考引擎为空串，本项目为
-   "unsupported operand types for \`/\` (line 149)"（原生错误包装 + 行号装饰）——
-   异常消息文案差异，控制流（catch 触发、后续消息序）一致。
+   "unsupported operand types for \`/\`"（原生错误包装）。历史上的 " (line N)" 行号
+   装饰已按 2026-10-31 分层约定移除：VM 只传播异常值，行号作为诊断元数据由顶层
+   展示层渲染（`src/vm/VMState.cpp` 的 FaultInfo）——剩余差异仅为消息文案本身，
+   控制流（catch 触发、后续消息序）一致。
 3. `success: class ClassA::finalize` 双方均不打印（SubClass 实例未 invalidate，GC 时机
    不触发 finalize）——双方一致。
 
@@ -96,7 +98,7 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 | 字符串内部编码 | UTF-16（tjs_char） | UTF-8 | 字节码转译处做转换（代理对）；str.length 为码点计数 |
 | 调用栈深度 | 无同值上限 | 1024 | 记录差异 |
 | 局部变量名（字节码态） | 序列化不含 Namespace | 同样无 | 一致 |
-| 原生错误报告 | 未捕获异常打印 VM 转储（含 ip） | 顶层打印 Exception.message 文本 | 语料对拍报告的 DIFF 部分由此产生，语义等价 |
+| 原生错误报告 | 未捕获异常打印 VM 转储（含 ip） | 顶层打印 `源:行:列: message` 并按文件身份重读渲染源码摘录（位置为诊断元数据；无源码身份的字节码产物与逻辑名输入只打印单行） | 语料对拍报告的 DIFF 部分由此产生，语义等价 |
 | `const` 只读性 | 仅编译期要求初始化；赋值/自增/for 递增放行——tjs.y 原作者注释明确"current version does not actually disallow re-assigning"（非 UB，官方设计现状） | 一致（2026-10-25 对齐，tjs.y 佐证） | 无差异 |
 | `#`/`$` 操作数 | 严格类型（字符串/整数） | `#` 对非字符串先字符串化（`#65 == 54`，对齐 kirikiri 语料期望） | 记录差异 |
 | 后缀 `i++` 表达式值 | 返回自增前旧值 | 同（旧值，2026-10-24 修正） | 一致 |

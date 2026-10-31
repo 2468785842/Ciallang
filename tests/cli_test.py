@@ -75,6 +75,33 @@ class CliTest(unittest.TestCase):
         self.assertFalse(diagnostic["ok"])
         self.assertTrue(diagnostic["diagnostics"])
         self.assertEqual(diagnostic["columnEncoding"], "utf-8")
+
+    def test_runtime_error_rendered_with_source_identity(self):
+        # VM 只传播异常值；文件与位置由顶层附加，message 内不再拼行号
+        self.script.write_text('function f(){ throw "inner"; }\nf();\n', encoding="utf-8")
+        process = self.run_cial(self.script)
+        self.assertEqual(process.returncode, 1)
+        self.assertEqual(process.stderr.splitlines()[0],
+                         'cial: error: %s:1:15: "inner"' % self.script)  # throw 语句位置
+        # 打印时按文件身份重读渲染摘录（linecache 式），指示符指向 throw
+        excerpt = process.stderr.splitlines()
+        self.assertTrue(any(line.rstrip().endswith('throw "inner"; }') for line in excerpt))
+        self.assertEqual(excerpt[2], " " * (7 + 14) + "^")
+        # 被捕获的异常 message 保持纯净（println 输出字符串带引号）
+        self.script.write_text('try { var v = void; v.x; } catch(e) { println(e.message); }\n',
+                               encoding="utf-8")
+        process = self.run_cial(self.script)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(process.stdout.splitlines()[0], '"cannot access member of void"')
+        self.assertNotIn("line", process.stdout)
+        # 连续执行不残留上一轮故障位置
+        self.script.write_text('try { throw 1; } catch(e) {}\nthrow "second";\n', encoding="utf-8")
+        process = self.run_cial(self.script)
+        self.assertEqual(process.stderr.splitlines()[0], 'cial: error: %s:2:1: "second"' % self.script)
+        # stdin 逻辑名读不回源码：退化为单行，不伪造摘录
+        process = self.run_cial("-", input='throw "s";\n')
+        self.assertEqual(process.returncode, 1)
+        self.assertEqual(process.stderr, 'cial: error: <stdin>:1:1: "s"\n')
         self.assertEqual(self.run_cial(self.root / "missing.tjs").returncode, 1)
         self.assertFalse(json.loads(self.run_cial("--check-json", self.root / "missing.tjs").stdout)["ok"])
 
@@ -187,6 +214,77 @@ selected
                 process = self.run_cial("--check-json", self.script)
                 self.assertEqual(process.returncode, 1)
                 self.assertFalse(json.loads(process.stdout)["ok"])
+
+    def test_json_schema_v2_structure(self):
+        self.script.write_text("var b = ;", encoding="utf-8")
+        report = json.loads(self.run_cial("--check-json", self.script).stdout)
+        self.assertEqual(report["schema"], 2)
+        self.assertEqual(report["columnEncoding"], "utf-8")
+        self.assertEqual(report["source"], str(self.script))
+        diagnostic = report["diagnostics"][0]
+        self.assertEqual(diagnostic["code"], "parse.invalid-expression")
+        self.assertEqual(diagnostic["line"], 0)
+        self.assertEqual(diagnostic["column"], 8)
+        self.assertEqual(diagnostic["endColumn"], 9)  # 半开：单字符 token 宽 1
+        self.assertEqual(diagnostic["range"], {"begin": 8, "end": 9})
+        self.assertNotIn("(", diagnostic["message"])  # 纯文本，无 (file@l:c) 前缀
+        self.assertNotIn(self.script.name, diagnostic["message"])
+
+    def test_json_schema_v1_is_derived_legacy_shape(self):
+        self.script.write_text("var b = ;", encoding="utf-8")
+        report = json.loads(self.run_cial("--check-json", "--json-schema", "1", self.script).stdout)
+        self.assertNotIn("schema", report)
+        diagnostic = report["diagnostics"][0]
+        self.assertEqual(diagnostic["endColumn"], 8)  # 旧包含式由 v2 派生
+        self.assertNotIn("code", diagnostic)
+
+    def test_json_schema_rejects_unknown_versions(self):
+        for version in ["0", "3", "x"]:
+            with self.subTest(version=version):
+                process = self.run_cial("--check-json", "--json-schema", version, self.script)
+                self.assertEqual(process.returncode, 2)
+                self.assertIn("json-schema", process.stderr)
+
+    def test_stdin_input_keeps_source_identity(self):
+        process = self.run_cial("--check-json", "--source-name", "untitled:tjs-1", "-",
+                                input='var 中文 = ;\n')
+        report = json.loads(process.stdout)
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["source"], "untitled:tjs-1")
+        diagnostic = report["diagnostics"][0]
+        self.assertEqual(diagnostic["source"], "untitled:tjs-1")
+        self.assertEqual(diagnostic["column"], 13)  # 字节列：var␣中文(6B)␣=␣;
+        self.assertEqual(diagnostic["range"], {"begin": 13, "end": 14})
+        # 未保存内容的合法输入同样可走 stdin
+        ok = json.loads(self.run_cial("--check-json", "-", input="println(42);").stdout)
+        self.assertTrue(ok["ok"])
+        self.assertEqual(ok["source"], "<stdin>")
+
+    def test_source_name_requires_stdin(self):
+        process = self.run_cial("--check-json", "--source-name", "x", self.script)
+        self.assertEqual(process.returncode, 2)
+        self.assertIn("--source-name", process.stderr)
+
+    def test_text_diagnostics_render_location_and_excerpt(self):
+        self.script.write_text('var a = "中文"; var b = ;\n', encoding="utf-8")
+        process = self.run_cial(self.script)
+        self.assertEqual(process.returncode, 1)
+        self.assertEqual(process.stderr.splitlines()[0],
+                         "cial: error[parse.invalid-expression]: %s:1:27: unable prefix parse for token ';'." % self.script)
+        excerpt = process.stderr.splitlines()
+        self.assertTrue(any(line.rstrip().endswith("var b = ;") for line in excerpt))
+        # 指示符按显示宽度对齐：栏 7 列 + 前缀 16 显示列（中文各 2 列）+ "var b = " 8 列
+        caret = excerpt[2]
+        self.assertEqual(caret.index("^"), 7 + 24)
+        self.assertTrue(caret.endswith("^"))
+        self.assertNotIn("\x1b[", process.stderr)  # 管道输出不带 ANSI
+
+    def test_no_color_flag(self):
+        self.script.write_text("var ;", encoding="utf-8")
+        process = self.run_cial("--no-color", self.script)
+        self.assertEqual(process.returncode, 1)
+        self.assertNotIn("\x1b[", process.stderr)
+
         self.script.write_text('/* **/ println(42);', encoding="utf-8")
         process = self.run_cial(self.script)
         self.assertEqual(process.returncode, 0, process.stderr)

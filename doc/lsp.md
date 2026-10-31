@@ -1,6 +1,6 @@
 # LSP 与编辑器接入
 
-`tools/lsp/cial_lsp.py` 使用 Python 3 标准库提供 stdio LSP：完整文本同步、实时语法/编译诊断、关键字与当前文档声明补全、基于保守类型推导的语义成员补全、`textDocument/definition` 跳转（本文件作用域解析 + 跨文件顶层声明）、`textDocument/rename` 绑定级重命名、内置关键字悬停说明、词法级文档符号列表，以及跨文件工作区符号搜索。诊断由 `cial --check-json file.tjs` 返回，检查过程不执行被检查脚本；位置从原生 UTF-8 字节列转换成 LSP UTF-16 列（`src/cli/Application.cpp`、`src/cli/Compilation.cpp`、`src/common/SourceFile.cpp`、`tools/lsp/cial_lsp.py`）。
+`tools/lsp/cial_lsp.py` 使用 Python 3 标准库提供 stdio LSP：完整文本同步、实时语法/编译诊断、关键字与当前文档声明补全、基于保守类型推导的语义成员补全、`textDocument/definition` 跳转（本文件作用域解析 + 跨文件顶层声明）、`textDocument/rename` 绑定级重命名、内置关键字悬停说明、词法级文档符号列表，以及跨文件工作区符号搜索。诊断由 `cial --check-json --source-name <文档URI> -` 经 stdin 返回（schema 2：半开范围、纯文本消息、稳定错误码透传为 `code`），不落临时文件、不暴露宿主路径；检查过程不执行被检查脚本，位置从原生 UTF-8 字节列按完整字符边界转换成 LSP UTF-16 列（`src/cli/Application.cpp`、`src/cli/Compilation.cpp`、`src/common/SourceFile.cpp`、`tools/lsp/cial_lsp.py`）。无 `schema` 字段的旧版检查器走兼容转换（包含式列 +1、剥离消息位置前缀）。
 
 启动命令（将路径替换为实际绝对路径）：
 
@@ -31,7 +31,9 @@ python tools/lsp/cial_lsp.py --cial build/Windows/Debug/cial.exe
 
 `workspace/symbol` 支持在工作区所有 `.tjs` 文件中按名称子串搜索函数、类、属性和变量声明，忽略大小写，结果包含文件 URI 与 UTF-16 名称范围。支持该请求的客户端可显示全局符号搜索入口，例如 VSCode 的“转到工作区中的符号”。初始化读取 `workspaceFolders`，兼容 `rootUri` / `rootPath`；`workspace/didChangeWorkspaceFolders` 可更新目录集合。没有工作区目录时只搜索已打开的文件，不自行扫描当前进程目录（`tools/lsp/cial_lsp.py` 的 `workspace_symbols`、`update_workspace_folders`）。
 
-未打开文件按磁盘内容索引，查询时检查文件时间与大小并缓存声明；未保存缓冲优先覆盖磁盘内容，关闭后恢复磁盘版本，删除文件会移出索引。扫描不跟随目录符号链接，并排除解析后位于工作区之外的文件链接；跳过 build、bin、ext、node_modules 以及常见编辑器/缓存目录。单文件上限 2 MB，每次查询最多检查 2000 个 `.tjs` 候选文件和 10000 个目录，源内容预算 20 MB，最多返回排序后的 200 个匹配；可收窄名称继续查找。无法读取、编码非法或超限的文件会跳过（`tools/lsp/cial_lsp.py` 的 `MAX_*`、`EXCLUDED_DIRECTORIES`、`workspace_symbols`）。每次完整文本更新触发独立的编译检查，单次超时 5 秒，诊断文档上限 2 MB；关闭文档清空诊断，过期版本不会覆盖新内容（`tools/lsp/cial_lsp.py` 的 `declarations`、`check`、`handle`）。
+未打开文件按磁盘内容索引，查询时检查文件时间与大小并缓存声明；未保存缓冲优先覆盖磁盘内容，关闭后恢复磁盘版本，删除文件会移出索引。扫描不跟随目录符号链接，并排除解析后位于工作区之外的文件链接；跳过 build、bin、ext、node_modules 以及常见编辑器/缓存目录。单文件上限 2 MB，每次查询最多检查 2000 个 `.tjs` 候选文件和 10000 个目录，源内容预算 20 MB，最多返回排序后的 200 个匹配；可收窄名称继续查找。无法读取、编码非法或超限的文件会跳过（`tools/lsp/cial_lsp.py` 的 `MAX_*`、`EXCLUDED_DIRECTORIES`、`workspace_symbols`）。
+
+诊断在独立后台线程执行（`CHECK_DEBOUNCE_SECONDS`=0.15s 防抖合并快速输入），编译检查不阻塞后续请求；发布前按文档版本丢弃过期结果，stdio 帧经互斥锁有序写出。每次完整文本更新触发一次编译检查，单次超时 `CHECK_TIMEOUT_SECONDS`=5 秒（超时杀掉子进程），诊断文档上限 2 MB；关闭文档清空诊断并丢弃待检请求，在途结果由版本检查拦下；检查器不可用发布带 `lsp.checker-unavailable` 错误码的诊断，与编译器诊断区分（`tools/lsp/cial_lsp.py` 的 `declarations`、`check`、`schedule_check`、`_check_loop`）。
 
 文件身份按解析后的真实路径匹配，确保路径别名指向的未保存缓冲覆盖同一磁盘文件。已打开文件在工作区符号、跳转定义和重命名编辑中保留客户端原始 URI；未打开文件使用真实路径生成的 URI，避免 macOS `/var` 与 `/private/var`、Windows 短路径与长路径混用时误判绑定或遗漏缓冲（`tools/lsp/cial_lsp.py` 的 `file_path`、`workspace_sources`）。协议测试对磁盘路径先执行 `resolve()`，并使用含 `..`、空格、百分号和中文的客户端 URI 验证别名覆盖、跨文件定义、双向重命名与关闭恢复（`tools/lsp/test_protocol.py`）。
 
@@ -51,7 +53,7 @@ python tools/lsp/cial_lsp.py --cial build/Windows/Debug/cial.exe
 
 ### 测试
 
-`tools/lsp/test_protocol.py` 通过真正的子进程 stdio 测试初始化、诊断与修复、关闭、补全、悬停、符号、未知请求、shutdown/exit，以及 Unicode 位置转换；另外覆盖未打开文件的工作区搜索、磁盘修改/删除、未保存缓冲更新与关闭恢复、工作区目录切换、结果数量限制、超限/编码非法文件跳过，以及带空格、百分号和中文的 URI。新增能力测试覆盖：内置类型推导成员补全（Array/String/Dictionary/RegExp、前缀过滤、Integer/unknown 回落词法）、工作区 class 成员与 extends 继承、函数返回值类型、跨文件唯一类与多义回落、`prepareRename` 接受/拒绝形态（关键字、内置类名、动态成员、字典键、自由标识符）、绑定级 rename 的作用域遮蔽精度与非法新名拒绝、跨文件唯一 rename 与多义 null、definition 多文件返回全部并按 URI 排序、唯一时单 Location 兼容。Python 可用时由 CTest 注册（`CiallangLspProtocol`）。VSCode 客户端已做依赖安装与 JavaScript 语法检查，2026-10-31 已在 Windows 的真实 VSCode Extension Development Host 中验证成员补全、定义跳转、重命名并应用编辑；JetBrains 客户端仍未验证（`tools/lsp/test_protocol.py`、`tests/CMakeLists.txt`）。
+`tools/lsp/test_protocol.py` 通过真正的子进程 stdio 测试初始化、诊断与修复、关闭、补全、悬停、符号、未知请求、shutdown/exit，以及 Unicode 位置转换；另外覆盖未打开文件的工作区搜索、磁盘修改/删除、未保存缓冲更新与关闭恢复、工作区目录切换、结果数量限制、超限/编码非法文件跳过，以及带空格、百分号和中文的 URI。新增能力测试覆盖：内置类型推导成员补全（Array/String/Dictionary/RegExp、前缀过滤、Integer/unknown 回落词法）、工作区 class 成员与 extends 继承、函数返回值类型、跨文件唯一类与多义回落、`prepareRename` 接受/拒绝形态（关键字、内置类名、动态成员、字典键、自由标识符）、绑定级 rename 的作用域遮蔽精度与非法新名拒绝、跨文件唯一 rename 与多义 null、definition 多文件返回全部并按 URI 排序、唯一时单 Location 兼容。诊断协议测试覆盖：schema 2 半开范围与错误码透传（含中文行 UTF-16 换算、EOF 零宽插入点）、快速连续编辑防抖合并到最新版本、检查器不可用与旧版检查器输出的区分转换（`tools/lsp/test_protocol.py`）。Python 可用时由 CTest 注册（`CiallangLspProtocol`）。VSCode 客户端已做依赖安装与 JavaScript 语法检查，2026-10-31 已在 Windows 的真实 VSCode Extension Development Host 中验证成员补全、定义跳转、重命名并应用编辑；JetBrains 客户端仍未验证（`tools/lsp/test_protocol.py`、`tests/CMakeLists.txt`）。
 
 协议参考：[LSP 3.17](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/)。
 
@@ -71,4 +73,3 @@ Windows 盘符 URI 可能为 `file:///d%3A/...`。服务端仅先还原盘符冒
 `url2pathname` 解码其余部分，避免相对路径误判与文件名二次解码；协议测试另覆盖
 带空格、字面 `%20` 和中文的路径（`tools/lsp/cial_lsp.py`、`test_protocol.py`）。
 此验收通过 VSCode 提供器命令执行，未覆盖全部快捷键、主题与弹窗布局。
-最终 Debug、Release 及 MSVC ASan 的 CTest 均为 230/230 通过，协议套件为 19 个用例。

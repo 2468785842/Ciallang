@@ -4,11 +4,13 @@ import argparse
 import json
 import os
 import pathlib
+import queue
 import re
 import shutil
 import subprocess
 import sys
-import tempfile
+import threading
+import time
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
@@ -55,6 +57,8 @@ MAX_INFER_DEPTH = 3          # 推导递归深度（函数返回值/变量拷贝
 MAX_INFER_STEPS = 20_000     # 单次请求推理总步数预算，超限一律回退 unknown
 MAX_CLASS_HIERARCHY = 8      # extends 链展开深度上限
 MAX_RENAME_EDITS = 5_000     # 单次 rename 产生的编辑总数上限
+CHECK_DEBOUNCE_SECONDS = 0.15  # didChange 防抖：合并快速连续输入
+CHECK_TIMEOUT_SECONDS = 5.0     # 单次检查子进程超时；超时即杀，避免悬挂后续请求
 
 # 内置类型成员名单：逐一核对自 src/stdlib 的注册代码（勿凭记忆增删）：
 #   Array      src/stdlib/ArrayLib.cpp:17-35 + src/stdlib/SerializeLib.cpp:28-33
@@ -698,8 +702,20 @@ class Server:
         self.symbol_cache = {}
         self.initialized = False
         self.shutdown = False
+        # 检查在后台线程执行：主循环不被编译阻塞，发布前按版本丢弃过期结果
+        self.lock = threading.Lock()      # documents/pending/queued + sink 写入的互斥
+        self.check_queue = queue.Queue()  # 待检 uri；哨兵 None 通知退出
+        self.pending_checks = {}          # uri -> (version, text)，仅保留最新
+        self.queued_uris = set()
+        self.checker = threading.Thread(target=self._check_loop, name="cial-check", daemon=True)
+        self.checker.start()
 
     def send(self, payload):
+        with self.lock:
+            self._send_locked(payload)
+
+    def _send_locked(self, payload):
+        """调用方必须已持有 self.lock；保证 stdio 帧不与后台发布交错。"""
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         self.sink.write(b"Content-Length: " + str(len(body)).encode("ascii") + b"\r\n\r\n" + body)
         self.sink.flush()
@@ -949,35 +965,96 @@ class Server:
             return None
         return {"changes": changes} if changes else None
 
-    def check(self, text):
-        with tempfile.TemporaryDirectory(prefix="cial-lsp-") as directory:
-            path = pathlib.Path(directory) / "document.tjs"
-            path.write_text(text, encoding="utf-8")
-            try:
-                run = subprocess.run([self.cial, "--check-json", str(path)], capture_output=True, timeout=5)
-                report = json.loads(run.stdout.decode("utf-8"))
-                if run.returncode not in (0, 1):
-                    raise ValueError("checker exited with status " + str(run.returncode))
-                diagnostics = []
-                for diagnostic in report["diagnostics"]:
-                    start = source_position(text, diagnostic["line"], diagnostic["column"])
-                    end = source_position(text, diagnostic["endLine"], diagnostic["endColumn"] + 1)
-                    if (end["line"], end["character"]) < (start["line"], start["character"]):
-                        end = start.copy()
-                    diagnostics.append({"range": {"start": start, "end": end},
-                                        "severity": diagnostic["severity"], "source": "ciallang",
-                                        "message": re.sub(r"^\([^@]*@\d+:\d+\)\s*", "", diagnostic["message"])})
-                return diagnostics
-            except (OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
-                return [{"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}},
-                         "severity": 1, "source": "ciallang", "message": "Syntax checker unavailable: " + str(error)}]
+    # ---- 编译检查：stdin 传输正文，--source-name 保留原文档身份 ----
 
-    def publish(self, uri, text, version):
-        diagnostics = self.check(text) if len(text.encode("utf-8")) <= 2_000_000 else [
-            {"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}},
-             "severity": 2, "source": "ciallang", "message": "Document exceeds the 2 MB diagnostics limit."}]
-        self.send({"jsonrpc": "2.0", "method": "textDocument/publishDiagnostics",
-                   "params": {"uri": uri, "version": version, "diagnostics": diagnostics}})
+    def check(self, text, uri=""):
+        """编译检查；不落临时文件，诊断身份用调用方的 uri。"""
+        try:
+            run = subprocess.run(
+                [self.cial, "--check-json", "--source-name", uri or "<buffer>", "-"],
+                input=text.encode("utf-8"), capture_output=True, timeout=CHECK_TIMEOUT_SECONDS)
+            report = json.loads(run.stdout.decode("utf-8"))
+            if run.returncode not in (0, 1):
+                raise ValueError("checker exited with status " + str(run.returncode))
+            if report.get("schema") == 2:
+                return self._convert_v2(text, report)
+            return self._convert_legacy(text, report)  # 旧版检查器：无 schema 字段
+        except (OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
+            return [{"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}},
+                     "severity": 1, "source": "ciallang", "code": "lsp.checker-unavailable",
+                     "message": "Syntax checker unavailable: " + str(error)}]
+
+    @staticmethod
+    def _convert_v2(text, report):
+        """schema 2：line/column 为 0 基、endColumn 半开（排他），message 为纯文本。"""
+        diagnostics = []
+        for diagnostic in report["diagnostics"]:
+            start = source_position(text, diagnostic["line"], diagnostic["column"])
+            end = source_position(text, diagnostic["endLine"], diagnostic["endColumn"])
+            if (end["line"], end["character"]) < (start["line"], start["character"]):
+                end = start.copy()
+            entry = {"range": {"start": start, "end": end}, "severity": diagnostic["severity"],
+                     "source": "ciallang", "message": diagnostic["message"]}
+            if diagnostic.get("code"):
+                entry["code"] = diagnostic["code"]
+            diagnostics.append(entry)
+        return diagnostics
+
+    @staticmethod
+    def _convert_legacy(text, report):
+        """旧版检查器：endColumn 为包含式（+1），message 可能带 (file@l:c) 前缀。"""
+        diagnostics = []
+        for diagnostic in report["diagnostics"]:
+            start = source_position(text, diagnostic["line"], diagnostic["column"])
+            end = source_position(text, diagnostic["endLine"], diagnostic["endColumn"] + 1)
+            if (end["line"], end["character"]) < (start["line"], start["character"]):
+                end = start.copy()
+            diagnostics.append({"range": {"start": start, "end": end},
+                                "severity": diagnostic["severity"], "source": "ciallang",
+                                "message": re.sub(r"^\([^@]*@\d+:\d+\)\s*", "", diagnostic["message"])})
+        return diagnostics
+
+    # ---- 后台检查：防抖合并、版本过期丢弃、stdio 帧有序 ----
+
+    def schedule_check(self, uri, version, text):
+        if len(text.encode("utf-8")) > 2_000_000:
+            with self.lock:
+                self.pending_checks.pop(uri, None)
+                self._send_locked(self._diagnostics_frame(uri, version, [
+                    {"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 0}},
+                     "severity": 2, "source": "ciallang",
+                     "message": "Document exceeds the 2 MB diagnostics limit."}]))
+            return
+        with self.lock:
+            self.pending_checks[uri] = (version, text)
+            first = uri not in self.queued_uris
+            if first:
+                self.queued_uris.add(uri)
+        if first:
+            self.check_queue.put(uri)
+
+    @staticmethod
+    def _diagnostics_frame(uri, version, diagnostics):
+        return {"jsonrpc": "2.0", "method": "textDocument/publishDiagnostics",
+                "params": {"uri": uri, "version": version, "diagnostics": diagnostics}}
+
+    def _check_loop(self):
+        while True:
+            uri = self.check_queue.get()
+            if uri is None:
+                return
+            time.sleep(CHECK_DEBOUNCE_SECONDS)  # 防抖：合并期间的更新由下一条队列项处理
+            with self.lock:
+                self.queued_uris.discard(uri)
+                request = self.pending_checks.pop(uri, None)
+                document = self.documents.get(uri)
+                if request is None or document is None or document["version"] != request[0]:
+                    continue  # 已有更新排队 / 文档已关闭：丢弃本次
+            diagnostics = self.check(request[1], uri)
+            with self.lock:
+                current = self.documents.get(uri)
+                if current is not None and current["version"] == request[0]:
+                    self._send_locked(self._diagnostics_frame(uri, request[0], diagnostics))
 
     def handle(self, request):
         if request.get("jsonrpc") != "2.0":
@@ -987,6 +1064,7 @@ class Server:
         params = request.get("params", {})
         identifier = request.get("id")
         if method == "exit":
+            self.check_queue.put(None)  # 终止后台检查线程；在途子进程由超时回收
             return 0 if self.shutdown else 1
         if method == "initialize":
             if self.initialized or self.shutdown:
@@ -1045,12 +1123,14 @@ class Server:
                     return None  # 仅声明完整文本同步，不接受错误的增量更新。
                 text = changes[-1]["text"]
             self.documents[uri] = {"text": text, "version": version}
-            self.publish(uri, text, version)
+            self.schedule_check(uri, version, text)
         elif method == "textDocument/didClose":
             uri = params["textDocument"]["uri"]
-            self.documents.pop(uri, None)
-            self.send({"jsonrpc": "2.0", "method": "textDocument/publishDiagnostics",
-                       "params": {"uri": uri, "diagnostics": []}})
+            with self.lock:
+                self.documents.pop(uri, None)
+                self.pending_checks.pop(uri, None)  # 丢弃待检请求；在途结果由版本检查拦下
+                self._send_locked({"jsonrpc": "2.0", "method": "textDocument/publishDiagnostics",
+                                   "params": {"uri": uri, "diagnostics": []}})
         elif method in ("textDocument/completion", "textDocument/hover", "textDocument/documentSymbol"):
             document = self.documents.get(params["textDocument"]["uri"], {"text": ""})
             text = document["text"]
