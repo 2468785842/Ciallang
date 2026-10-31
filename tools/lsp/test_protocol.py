@@ -149,7 +149,7 @@ class Example { function method(arg) { arg; shared; } }
 
     def test_definitions_only_use_unique_top_level_workspace_declarations(self):
         with tempfile.TemporaryDirectory(prefix="cial definition %20 中文 ") as directory:
-            root = pathlib.Path(directory)
+            root = pathlib.Path(directory).resolve()
             library = root / "library.tjs"
             library_text = '"😀"; function Shared() {}\nfunction Owner() { var Hidden; }\nvar First=1, Tail=2;'
             library.write_text(library_text, encoding="utf-8")
@@ -183,7 +183,7 @@ class Example { function method(arg) { arg; shared; } }
 
     def test_definition_returns_all_top_level_matches_sorted(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = pathlib.Path(directory)
+            root = pathlib.Path(directory).resolve()
             (root / "alpha.tjs").write_text("function Multi() {}", encoding="utf-8")
             (root / "beta.tjs").write_text("class Multi {}", encoding="utf-8")
             uri = (root / "main.tjs").as_uri()
@@ -275,7 +275,7 @@ d.extra;
 
     def test_completion_cross_file_class_and_ambiguity_fallback(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = pathlib.Path(directory)
+            root = pathlib.Path(directory).resolve()
             (root / "defs.tjs").write_text("class Shared { function ping() {} }", encoding="utf-8")
             uri = (root / "main.tjs").as_uri()
             text = "var s = new Shared();\ns.ping;"
@@ -312,7 +312,7 @@ stray;
 
     def test_rename_is_binding_precise_across_shadowing(self):
         with tempfile.TemporaryDirectory() as directory:
-            source = pathlib.Path(directory) / "rename.tjs"
+            source = pathlib.Path(directory).resolve() / "rename.tjs"
             uri = source.as_uri()
             text = '''var value = 1;
 function f(value) { value; }
@@ -344,7 +344,7 @@ holder.member;
 
     def test_rename_cross_file_unique_and_ambiguous(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = pathlib.Path(directory)
+            root = pathlib.Path(directory).resolve()
             library = root / "library.tjs"
             library.write_text("var Counter = 1;\nCounter++;", encoding="utf-8")
             uri = (root / "main.tjs").as_uri()
@@ -363,8 +363,8 @@ holder.member;
 
     def test_workspace_symbols_disk_buffers_and_folder_changes(self):
         with tempfile.TemporaryDirectory(prefix="cial workspace %20 空间 ") as directory:
-            workspace = pathlib.Path(directory) / "first"
-            second = pathlib.Path(directory) / "second"
+            workspace = pathlib.Path(directory).resolve() / "first"
+            second = pathlib.Path(directory).resolve() / "second"
             workspace.mkdir()
             second.mkdir()
             source = workspace / "declarations.tjs"
@@ -408,9 +408,47 @@ holder.member;
                 "removed": [{"uri": workspace.as_uri(), "name": "first"}]}})
             self.assertEqual([symbol["name"] for symbol in self.symbols("find")], ["FindSecond"])
 
+    def test_client_uri_alias_preserves_buffers_definitions_and_rename(self):
+        with tempfile.TemporaryDirectory(prefix="cial alias %20 中文 ") as directory:
+            root = pathlib.Path(directory).resolve()
+            (root / "alias").mkdir()
+            source = root / "main.tjs"
+            source.write_text("function OnDisk() {}", encoding="utf-8")
+            library = root / "library.tjs"
+            library_text = "Counter;"
+            library.write_text(library_text, encoding="utf-8")
+            # '..' produces a portable alias without requiring Windows symlink privileges.
+            alias_root = root / "alias" / ".."
+            uri = (alias_root / "main.tjs").as_uri()
+            self.assertNotEqual(uri, source.as_uri())
+            text = "var Counter = 1; Counter;"
+            self.initialize({"rootUri": alias_root.as_uri()})
+            self.open_document(uri, text)
+
+            symbols = self.symbols("Counter")
+            self.assertEqual(len(symbols), 1)  # The buffer replaces the same on-disk file.
+            self.assertEqual(symbols[0]["location"]["uri"], uri)
+            self.assertEqual(self.symbols("OnDisk"), [])
+            result = self.rename(uri, text, "Counter = 1", 0, "Total")
+            self.assertEqual(set(result["changes"]), {uri, library.as_uri()})
+            self.assertEqual(len(result["changes"][uri]), 2)
+            self.assertEqual(len(result["changes"][library.as_uri()]), 1)
+
+            self.open_document(library.as_uri(), library_text)
+            self.assert_definition(self.definition(library.as_uri(), library_text, "Counter;"),
+                                   uri, text, "Counter = 1", "Counter")
+            result = self.rename(library.as_uri(), library_text, "Counter;", 0, "Total")
+            self.assertEqual(set(result["changes"]), {uri, library.as_uri()})
+
+            self.send("textDocument/didClose", {"textDocument": {"uri": uri}})
+            self.receive()
+            self.assertEqual(self.symbols("Counter"), [])
+            self.assertEqual(self.symbols("OnDisk")[0]["location"]["uri"], source.as_uri())
+            self.assertIsNone(self.definition(library.as_uri(), library_text, "Counter;"))
+
     def test_workspace_symbols_root_uri_and_result_limit(self):
         with tempfile.TemporaryDirectory() as directory:
-            workspace = pathlib.Path(directory)
+            workspace = pathlib.Path(directory).resolve()
             (workspace / "many.tjs").write_text(
                 "\n".join("var Find%03d = 0;" % index for index in range(205)), encoding="utf-8")
             self.initialize({"rootUri": workspace.as_uri()})
@@ -422,7 +460,7 @@ holder.member;
 
     def test_workspace_symbols_without_roots_only_search_open_files(self):
         with tempfile.TemporaryDirectory() as directory:
-            source = pathlib.Path(directory) / "outside.tjs"
+            source = pathlib.Path(directory).resolve() / "outside.tjs"
             source.write_text("function FindDisk() {}", encoding="utf-8")
             self.initialize()
             self.assertEqual(self.symbols("find"), [])

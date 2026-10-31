@@ -720,19 +720,19 @@ class Server:
         def in_workspace(path):
             return not self.workspace_roots or any(path == root or root in path.parents for root in self.workspace_roots)
 
-        # Canonical paths make an unsaved buffer override its on-disk spelling/URI.
+        # Match files by canonical path, but retain the client's URI for open buffers.
         overlays = {}
         for uri, document in self.documents.items():
             path = file_path(uri)
             if path is not None and path.suffix.lower() == ".tjs" and in_workspace(path):
-                overlays[path] = document["text"]
+                overlays[path] = (uri, document["text"])
         sources, visited, total_bytes, file_count, directory_count = [], {}, 0, 0, 0
         # Reserve the budget for current buffers before looking at disk files.
-        for path, text in sorted(overlays.items()):
+        for path, (uri, text) in sorted(overlays.items()):
             size = len(text.encode("utf-8"))
             if size <= MAX_DOCUMENT_BYTES and total_bytes + size <= MAX_WORKSPACE_BYTES:
                 total_bytes += size
-                sources.append((path.as_uri(), declarations(text), text))
+                sources.append((uri, declarations(text), text))
         for root in sorted(self.workspace_roots):
             if file_count >= MAX_WORKSPACE_FILES or directory_count >= MAX_WORKSPACE_DIRECTORIES:
                 break
