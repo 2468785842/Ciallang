@@ -153,9 +153,12 @@ TEST_CASE("保留字 - static/private/public/protected 无文法规则") {
 }
 
 TEST_CASE("constant containers reject runtime expressions", "[parser]") {
+    // (const)%[1 => 2] 在参考文法下合法（tjsLex.cpp 将 => 词法为 T_COMMA，const_dic_elm
+    // 为 T_CONSTVAL "," T_CONSTVAL），现随 => 分隔符支持一并接受，不再作为拒绝样例；
+    // 拒绝范围仍是键与值位置上的运行时表达式
     for(const auto *source : { "var a = (const)[x];", "var a = (const)[1 + 2];", "var a = (const)[[]];",
                                "var a = (const)[,];", "var a = (const)[1,];", "var a = (const)%[key: 1];",
-                               "var a = (const)%[1 => 2];", "var a = (const)(1);", "var a = (const)[-(1)];", "var a = (const)%[,];" }) {
+                               "var a = (const)%[1 => x];", "var a = (const)(1);", "var a = (const)[-(1)];", "var a = (const)%[,];" }) {
         INFO(source);
         Common::SourceFile file;
         Common::Result diagnostics;

@@ -1451,7 +1451,13 @@ namespace cial::syntax {
                             return nullptr;
                         }
                         key = parseConstantElement(r, parser);
-                        if(!parser->expect(r, TokenType::Comma))
+                        // tjs.y:853 const_dic_elm 写作 T_CONSTVAL "," T_CONSTVAL，成立前提是
+                        // 旧 tjsLex.cpp 将 => 词法成 T_COMMA；本解析器把 => 映射为 GtOrEqual
+                        // （见 Lexer::matchOperator），键值分隔符须同时接受 => 与 ","，
+                        // 配对之间仍以 "," 分隔
+                        if(parser->peek(r, TokenType::GtOrEqual))
+                            parser->consume(r);
+                        else if(!parser->expect(r, TokenType::Comma))
                             return nullptr;
                     }
                     auto* value = parseConstantElement(r, parser);

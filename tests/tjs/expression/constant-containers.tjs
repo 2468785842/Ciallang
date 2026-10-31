@@ -21,4 +21,14 @@ assertTrue((const)%[, "leading", 7]["leading"] === 7);
 var nil = (const)[null, true, false];
 assertTrue(!nil[0] && nil[1] === 1 && nil[2] === 0);
 assertTrue((const)[].count === 0 && (const)%[].count === 0);
+// 常量字典键值分隔符接受 TJS2 语料的 => 写法（参考 tjsLex.cpp 将 => 词法为 T_COMMA）
+var arrow = (const)%["k" => 1, "j" => 2];
+assertTrue(arrow["k"] === 1 && arrow["j"] === 2 && arrow.count === 2);
+// 与 "," 分隔混用；值仍限于字面量与嵌套常量容器
+var mixed = (const)%["a" => 1, "b", 2, "c" => (const)[3]];
+assertTrue(mixed["a"] === 1 && mixed["b"] === 2 && mixed["c"][0] === 3);
+// TJS2 语料形态：十六进制浮点值（tjs2/test.tjs）；数字键亦合法（T_CONSTVAL 键）
+var hex = (const)%["quakeEndTick" => 0x1.07CC000000000p14];
+assertTrue(hex["quakeEndTick"] === 16883.0);
+assertTrue((const)%[1 => "one"][1] === "one");
 finishTests();
