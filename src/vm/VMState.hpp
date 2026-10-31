@@ -166,8 +166,11 @@ namespace cial::vm {
         };
 
         // 记录故障指令位置（派发前的指令起始 PC；Rlc 未记录时保持原值）。
-        // 已有有效位置时不覆盖：保留最早抛出点（重抛/原生边界穿越不重复定位）
-        void recordFault(const Chunk *chunk, const u64 instructionPc);
+        // 已有有效位置时不覆盖：保留最早抛出点（重抛/原生边界穿越不重复定位）。
+        // 冷路径显式标注：调用点位于派发循环异常臂，块布局对 runLoop 热区敏感，
+        // 不标注时宿主内联/布局决策可使 loop_int 类微基准摆动数个点
+        // （2026-10-31 实测见 doc/performance.md）
+        CIAL_COLD_NOINLINE void recordFault(const Chunk *chunk, const u64 instructionPc);
 
         // 故障位置失效：脚本 handler 消费异常或新一轮执行开始时调用
         void resetFault() { _fault = FaultInfo{}; }

@@ -400,3 +400,36 @@ Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT，JIT 关闭。
 包含 225 个脚本用例、C++、CLI、LSP 与字节码工具套件。MSVC 编译时将宿主绑定的
 内部 invoke 调用显式限定为 `cial::binding::invoke`，避免 ADL 引入 `std::invoke`；
 Tracer 增加空对象保护，并由 native_binding_test 的持有值/GC 用例验证。
+
+## 2026-10-31 macOS arm64 绑定层回退定位（布局效应，非算法成本）
+
+承接 2026-10-30 [原生绑定层重构对照](#2026-10-30-原生绑定层重构对照)记录的 loop_int /
+string_concat 约 2.4%–3.4% 回退。本机 macOS arm64，Release `-O2 -DNDEBUG`（Clang
+20.1，无 LTO），`bench/*.tjs` 每项预热 1 次、交替配对取进程 wall-time 中位数（测量
+脚本按同法置于会话内，未入库）；A/A 噪声底 loop_int 100.3%、string_concat 99.6%。
+
+1. **回退在 HEAD 复现**：历史基线 `/tmp/cial-before-native-binding`
+   （SHA-256 `86242ffa…8d37`）对照 HEAD `df3c56a`，loop_int 102.5%/102.9%、
+   string_concat 100.6%/101.5%，fib 与 native_methods 持平。
+2. **锚点可重建**：基线二进制与源码提交 `ad82ffb`（0757384^）的重建版逐项
+   99.9%–100.1%，基线锚定到精确提交，不再依赖 /tmp 遗留二进制。
+3. **绑定重构批次自身干净**：`ad82ffb` 对照 `0757384`，loop_int 99.4%/99.4%——
+   2026-10-30 的归因（绑定重构引入回退）不成立，回退系其后提交进入。
+4. **二分定位**：`02cea8e`（99.5%/99.6%）与 `ca4df1b`（99.6%/100.0%）均干净；
+   `2a1d684`（故障元数据批次）loop_int **106.8%/106.7%**、string_concat 102.9%，
+   回退精确进入于该提交。
+5. **机制隔离**：`2a1d684` 派发循环功能性 diff 为零（仅异常臂变化 + 全量重排），
+   采样热点构成不变而 `runLoop` 自采样 1327→1415；移除 `runLoop` 异常臂内三处
+   `recordFault` 调用点（loop_int 不抛异常，热路径零语义影响）即恢复至 101.2%。
+   结论：调用点存在本身改变块布局/寄存器分配，属代码布局效应，无算法成本。
+6. **修复与残差**：`recordFault` 标注 `CIAL_COLD_NOINLINE`（config.h 新增，
+   MSVC `__declspec(noinline)` / GNU `cold,noinline`）后 `2a1d684` 处完全恢复
+   （loop_int 100.3%）；HEAD 处该属性为中性（±0.6% 噪声内），残余约 3% 来自
+   后续不触碰 VM 代码的提交（9d82caf/580ed29/5f1ffe4）改变链接布局所致，
+   不再以掷骰方式追逐。最终 HEAD+cold 对照历史基线：loop_int 103.2%–103.4%、
+   string_concat 100.7%/101.8%、fib/native_methods/class_instantiate 持平。
+
+验证：CTest MacOS Debug/Release 各 385/385 通过；`tools/check-format.sh` 通过。
+热路径二进制证据：`runLoop<0,0,0>` 尺寸 ca4df1b 37236B、2a1d684 36024B、
+HEAD 36024B（`nm -n` 相邻符号差）。微基准对布局的 ±2%–7% 摆动以后按本节方法
+（锚点重建 + 提交级 A/B + 采样）归因，不与算法成本混记。
