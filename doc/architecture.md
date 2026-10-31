@@ -85,7 +85,7 @@
 ### 2.5 `src/runtime/` + `src/gc/` — 运行时
 
 - `Runtime`：运行时资源所有者——AtomTable、MarkSweep GC（固定 512B 节点 × 自由链表）、
-  GC 根句柄集合、`create<T>()`（返回 `RootGuard<T>`，析构摘根——**坑位见 AGENTS.md**）。
+  GC 根句柄集合、`create<T>()`（返回 `RootGuard<T>`，析构摘根；生命周期见 `Runtime.hpp` 注释）。
 - `Context`：执行上下文——调用栈（`_callStack`，深度上限 1024）、寄存器池、GlobalObject、
   原生方法注册表。
 - `AtomTable`：字符串驻留（u32 `Atom` 句柄），运算符/属性名/变量名全部走 Atom。
@@ -113,7 +113,7 @@
 | TAC（多态对象）+ 扁平字节码两级 IR | TAC 便于实现优化 Pass；扁平字节码是热路径；惰性编译使慢路径零开销 |
 | 寄存器机（非栈机） | 对标 TJS2 VM（[bytecode/tjs2-bytecode.md](bytecode/tjs2-bytecode.md)），也为字节码转译铺路（[bytecode/mapping.md](bytecode/mapping.md)） |
 | 实参经寄存器池顶传递，被调帧 %0..arity-1 即实参 | 免独立实参栈；与 TJS "ra[-3] 向下"的对应关系在转译 prologue 解决 |
-| GC 标记清除 + RootGuard | 简单可控；已知句柄生命周期坑位（TODO.md） |
+| GC 标记清除 + RootGuard | 根由句柄和 MarkRootProvider 显式枚举；见 `Runtime.hpp` |
 | 常量池 index 0 恒 Void | 空/void 语义有免费表达；TJS 转译时 VOID/OBJECT(null) 直接映射 *0 |
 | 类成员 slot 化 + 按名继承 | 与 TJS2 动态类行为一致（运行期才能确定父类），15 个语义测试固化 |
 

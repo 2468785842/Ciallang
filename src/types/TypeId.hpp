@@ -3,6 +3,7 @@
 // VM 内部类型标识；NativeRegister 使用独立 NativeTypeKey，内置类型复用此编号。
 // 值类型（Integer/Real/Octet/String）按 Value 自身 tag 判别；
 // 对象类型经 Object::typeId() 虚调用取得（替代热路径上的 dynamic_cast 链）。
+// 向下转换前必须有对应 TypeId/opcode 守卫；外部宿主类型身份使用 NativeTypeKey。
 // 独立成头以打破 Object.hpp ↔ NativeRegister.hpp 的循环依赖。
 #pragma once
 

@@ -93,8 +93,8 @@ TJSCompiler 侧实现在其仓库 `src/syntax/library/ScriptsInterface.{h,cpp}` 
 
 | 项 | TJSCompiler | Ciallang | 处理 |
 |---|---|---|---|
-| 内存管理 | 纯引用计数（tTJSVariant CopyRef） | 标记清除 GC + 引用计数混合 | 行为等价；GC 句柄坑位见 AGENTS.md |
-| 性能 | fib(25) 基准 | 2026-10-28 同机对照：fib 约 1.5×、原生方法约 1.9×；整数循环/字符串拼接已与旧版持平或反超（详见 doc/performance.md） | TODO.md 二节 |
+| 内存管理 | 纯引用计数（tTJSVariant CopyRef） | 标记清除 GC + 引用计数混合 | 对象存活依赖显式根；见 [FAQ](faq.md#宿主持有-value-或-shared_ptr-就能保住脚本对象吗) |
+| 性能 | fib(25) 基准 | 2026-10-28 同机对照：fib 约 1.5×、原生方法约 1.9×；整数循环/字符串拼接已与旧版持平或反超（详见 doc/performance.md） | [性能待办](../TODO.md#性能与优化) |
 | 字符串内部编码 | UTF-16（tjs_char） | UTF-8 | 字节码转译处做转换（代理对）；str.length 为码点计数 |
 | 调用栈深度 | 无同值上限 | 1024 | 记录差异 |
 | 局部变量名（字节码态） | 序列化不含 Namespace | 同样无 | 一致 |
@@ -119,11 +119,6 @@ TJSCompiler 侧实现在其仓库 `src/syntax/library/ScriptsInterface.{h,cpp}` 
 `D404F11D5E173194E02AD92F5F2C13A0161F5A99CC49F6B23838076D2D5D5BCA`；
 当前上游 `src/main.cpp` 的硬编码入口不具备此 CLI 能力（见 [building.md](building.md)）。
 
-## 5. 路线图
+## 5. 后续工作
 
-P0–P4 全部完成（2026-10-27 字节码兼容 M4 收官）：字节码执行、标准库全量、
-源码前端与字节码路径能力对齐。后续任务跟踪见 [TODO.md](../TODO.md)；
-性能对照见 doc/performance.md。
-
-- 2026-10-28：String.reverse 返回独立反转结果，接收者不变（UTF-8 按码点反转；TJS2 按 UTF-16 码元）。依据 `../TJSCompiler/src/syntax/tjsInterCodeExec.cpp` 的 reverse 分支及参考 CLI 对拍；实现见 `src/stdlib/StringLib.cpp`，回归见 `tests/native_function_test.cpp`。
-- 2026-10-29 查证定论批次：①`in` 为保留字——原版 tjsInterCodeGen 无 T_IN 分支，`A in B` 节点与操作数均不求值、结果 void（参考 CLI 实测 + 官方リファレンス无此运算符章节），本项目按同语义实现（`src/parser/Parser.hpp` infix 表 + `src/gen/IRGenerator.cpp` BinaryExprNode In 分支）；②类型注解（tjs.y:339 "Ignore types"）var/参数/返回值/getter/setter 全位解析并丢弃（`src/parser/Parser.cpp` parseTypeAnnotation）；③裸 `new A`（无括号）原版为语法错误（实测 "syntax error, unexpected ;"，tjs.y:659 `"new" func_call_expr`），本项目对齐为编译错误，`new A().m` 后缀豁免（`src/parser/Parser.cpp` isNewOperandCallable）；④模板串内嵌表达式仅 `&expr;` 与 `${expr}` 两形态，裸 `$` 为普通文本、`\&`/`\$` 转义不展开（tjsLex.cpp:309-325），与本项目实现逐项一致。行为锁定测试见 `tests/compat_reserved_test.cpp`。
+未完成事项集中记录在 [TODO.md](../TODO.md)，性能测量见 [performance.md](performance.md)。

@@ -161,6 +161,8 @@ namespace cial {
         }
 
     public:
+        // 返回句柄析构即摘根；不要从 create<T>().get() 借出裸指针后跨越下一次 GC 分配。
+        // 长期持有对象应保留 RootGuard/Handle，或交给 MarkRootProvider 可遍历的对象图。
         template <typename T, typename... Args>
             requires std::is_base_of_v<MarkSweepHeader, T>
         RootGuard<T> create(Args &&...args) {

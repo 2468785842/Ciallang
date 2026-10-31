@@ -41,9 +41,8 @@ namespace cial {
         }
 
     protected:
-        // 派生类 marked() 必须以 "if(alreadyMarked()) return;" 开头：
-        // 对象图存在环（FuncMeta↔Chunk、DataObject↔ClassObject 等），
-        // 不检查标志会在环上无限递归
+        // 派生类 marked() 先执行 if(_marked) return，再调用基类标记并遍历子对象。
+        // 对象图可能有环；漏掉守卫会无限递归，漏调基类会使对象在 sweep 中被回收。
         bool _marked{ false };
 
     private:

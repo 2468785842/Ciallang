@@ -161,6 +161,8 @@ namespace cial::vm {
             }
         }
 
+        // 幂等且通常由 run 取帧时惰性调用，同时生成 unwind 使用的字节码异常表。
+        // 不派发指令的宿主哨兵帧须显式调用；正常编译流程保持 TAC 直到发射结束。
         void toBytecode() {
             if(_isBytecode)
                 return;

@@ -53,7 +53,7 @@ cmake --build build/bench --target conformance-report
 
 参考引擎默认从 `../TJSCompiler` 探测，也可设置 `CIAL_TJS_ROOT` 环境变量或 `TJS_ROOT` 缓存项；报告放在 `bench/results/`。性能记录与统计口径见 [performance.md](performance.md)。
 
-当前 TJSCompiler 上游入口不接受脚本路径/`--dump` 参数；本地适配版（含 `--dump <script.tjs> <out.tjsbc>` 导出与宿主 `Scripts` 类）是工作区未提交改动，使用 `CIAL_TJS_EXE` 前确认该程序支持路径参数，避免将固定脚本的输出误当作对拍结果。入库字节码 fixture（均有源码）不依赖参考引擎即可对拍。
+参考程序必须支持脚本路径和所需导出协议，使用前按 [FAQ](faq.md#对拍前怎样确认参考引擎可用) 确认入口能力。入库字节码 fixture 不依赖参考引擎。
 
 严格源码/字节码对拍可独立运行，无需启用 bench 构建选项或安装参考引擎：
 
@@ -89,46 +89,11 @@ cmake --build build/Windows/ASanMsvc -j
 要点：运行库必须与 vcpkg 依赖一致（静态 MT + `_DISABLE_{STRING,VECTOR}_ANNOTATION=1`
 对齐未插桩依赖的容器注解）；部署需把
 `<VC>/Tools/MSVC/<ver>/bin/Hostx64/x64/clang_rt.asan_dynamic-x86_64.dll`
-复制到可执行文件旁。验证基线（2026-10-30）：Catch2 全量 + tjs2 语料零报告。
+复制到可执行文件旁。
 
-clang++ 前端的 `-fsanitize=address` 在 Windows 可构建并通过编译期测试组
-（optimizer/LEB128/IEEE），但执行 C++ 异常路径即崩：Clang 19 Windows 运行库对
-SEH 异常的工具链缺陷（30 行纯标准库程序可复现，静态/动态运行时与优化级别均同），
-与本项目代码无关；其配置需静态 CRT + 注解对齐旗标，历史脚本中的 `-shared-asan`
-为无效旗标。
+Windows Clang ASan 与 C++ 异常的已知工具链问题见 [FAQ](faq.md#windows-asan-与异常处理)。
 
-## ASan（macOS ARM64）
-
-**ARM 芯片并非不支持 ASan。** LLVM 系工具链支持 `aarch64-apple-darwin` 的
-AddressSanitizer；支持范围可对照 [Rust 官方 sanitizer 文档](https://doc.rust-lang.org/unstable-book/compiler-flags/sanitizer.html#addresssanitizer)
-与 [Clang ASan 文档](https://clang.llvm.org/docs/AddressSanitizer.html)。
-ASan 地址检查与 LeakSanitizer 泄漏检查是不同功能；本机运行库拒绝
-`detect_leaks=1`，不能由此推断 ASan 不支持 ARM64。
-
-2026-10-30 本机环境为 macOS 26.5.1（25F80）、arm64、Apple clang 17.0.0
-（clang-1700.3.19.1）。ASan 插桩程序在 main 前的运行库初始化中死锁；
-空 main 同样复现，关闭泄漏检查仍卡住。采样显示初始化 shadow memory 时，经
-`get_dyld_hdr` / `_Block_copy` 再次调用 malloc，重入 ASan 初始化锁。
-这与 [LLVM issue #200447](https://github.com/llvm/llvm-project/issues/200447)
-报告的 macOS 26 与特定 ASan 运行库组合故障吻合；本机归因属于根据最小复现及栈的
-判断，不能扩大为所有 macOS ARM64 工具链均不可用。
-
-排查时先用与项目相同的编译器/运行库验证空程序，再运行项目测试：
-
-```cpp
-// asan_smoke.cpp
-int main() { return 0; }
-```
-
-```bash
-clang++ -fsanitize=address -g asan_smoke.cpp -o asan_smoke
-ASAN_OPTIONS=detect_leaks=0 ./asan_smoke
-```
-
-如果空程序也挂起，应停止该次运行，使用修复后的工具链重新验证，或转到已验证的
-平台执行内存检查；不要将本轮测试记为通过。本项目最小复现和采样记录见
-[native-binding-refactor.md](native-binding-refactor.md#asan-验证限制)。未在本机验证任何
-替代工具链的修复效果。
+macOS ARM64 的 ASan 启动故障排查见 [FAQ](faq.md#asan-在-macos-arm64-上无法启动)。
 
 ## 有界 fuzz
 

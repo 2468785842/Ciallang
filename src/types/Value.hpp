@@ -133,6 +133,7 @@ namespace cial {
 
         [[nodiscard]] Ret<Real> asReal() const noexcept;
 
+        // 借用所属 Value 的字符串；短串直接内联，不能借用临时 Value 后跨全表达式使用。
         [[nodiscard]] Ret<String *> asString() const noexcept;
 
         [[nodiscard]] Ret<Octet *> asOctet() const noexcept;
@@ -202,7 +203,7 @@ namespace cial {
                 SharedPayload<Octet> *octet;
                 Object *object;
             };
-            u8 reserved[7];
+            u8 reserved[7]; // 仅供布局填充，不参与语义读取或整块比较；无须在热路径清零。
             u8 control;
             Data() noexcept : integer(0), control(0) {}
         };

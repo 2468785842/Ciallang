@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="94" height="20" role="img" aria-label="CMake: 3.25+">
+  <title>CMake: 3.25+</title>
+  <rect width="94" height="20" rx="3" fill="#064f8c"/>
+  <path d="M3 0h49v20H3a3 3 0 0 1-3-3V3a3 3 0 0 1 3-3z" fill="#555"/>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11">
+    <text x="26" y="14">CMake</text>
+    <text x="73" y="14">3.25+</text>
+  </g>
+</svg>

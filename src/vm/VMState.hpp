@@ -34,6 +34,7 @@ namespace cial::vm {
 
     enum class DispatchRet {
         Continue,
+        // setter、finalize、调用等若压入新帧，返回 Call 交由主循环切换；仅压帧不会执行。
         Call,
         Return,
     };

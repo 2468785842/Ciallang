@@ -7,6 +7,7 @@ set(TEST_FUZZ_REGRESS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/fuzz_regress)
 
 configure_file(test_config.h.in test_config.h)
 
+# 新增 C++ 测试文件须显式登记；未列入此目标的用例不会被 CTest 发现。
 set(SOURCES
         bytecode_test.cpp
         runtime_lifetime_test.cpp
