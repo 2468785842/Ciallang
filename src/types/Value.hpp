@@ -210,7 +210,22 @@ namespace cial {
 
         [[nodiscard]] const char *name() const;
 
-        [[nodiscard]] Ret<Integer> asInteger() const noexcept;
+        // 数值取整：Integer/Void/Real 快路径类内内联（派发循环 8 处调用点 +
+        // 算术族内部各两次），String 解析/Octet/Object 报错走冷慢路径；
+        // 拆分动机同上——外联调用曾在 loop_int 画像中占 ~4.4%
+        [[nodiscard]] Ret<Integer> asInteger() const noexcept {
+            switch(type()) {
+                case ValueType::Void:
+                    return Ret<Integer>::ok(0);
+                case ValueType::Integer:
+                    return Ret<Integer>::ok(_data.integer);
+                case ValueType::Real:
+                    return Ret<Integer>::ok(static_cast<Integer>(_data.real.value()));
+                default:
+                    return asIntegerSlow();
+            }
+        }
+        [[nodiscard]] Ret<Integer> asIntegerSlow() const noexcept;
 
         // 热路径直取:调用方保证 isInteger() 为真(如 dispatch 整数特化),
         // 绕过 Ret<T> optional 装配
@@ -268,7 +283,17 @@ namespace cial {
         [[nodiscard]] Ret<Value> mul(const Value &value) const noexcept;
         [[nodiscard]] Ret<Value> div(const Value &value) const noexcept;
         [[nodiscard]] Ret<Value> idiv(const Value &value) const noexcept;
-        [[nodiscard]] Ret<Value> mod(const Value &value) const noexcept;
+        // 取模：双 Integer 快路径类内内联（含除零守卫），其余类型组合走
+        // modSlow（asInteger 语义含 Real 截断与字符串解析，不能在快路径冒进）
+        [[nodiscard]] Ret<Value> mod(const Value &value) const noexcept {
+            if(isIntegerFast() && value.isIntegerFast()) {
+                if(value._data.integer == 0)
+                    return Ret<Value>::err(ErrCode::DivideByZero, "Divide by zero"_str);
+                return Ret<Value>::ok(Value{ _data.integer % value._data.integer });
+            }
+            return modSlow(value);
+        }
+        [[nodiscard]] Ret<Value> modSlow(const Value &value) const noexcept;
 
         [[nodiscard]] Ret<Value> bitwiseXor(const Value &value) const noexcept;
         [[nodiscard]] Ret<Value> bitwiseAnd(const Value &value) const noexcept;

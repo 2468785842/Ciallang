@@ -35,7 +35,7 @@ namespace cial {
     }
 
 
-    Ret<Integer> Value::asInteger() const noexcept {
+    CIAL_COLD_NOINLINE Ret<Integer> Value::asIntegerSlow() const noexcept {
         switch(type()) {
             case ValueType::Void:
                 return Ret<Integer>::ok(0);
@@ -391,7 +391,7 @@ namespace cial {
         return Ret<Value>::ok(Value{ lhs.value() / rhs.value() });
     }
 
-    Ret<Value> Value::mod(const Value &value) const noexcept {
+    Ret<Value> Value::modSlow(const Value &value) const noexcept {
         const auto lhs = this->asInteger();
         const auto rhs = value.asInteger();
         if(rhs.isFailed() || lhs.isFailed())

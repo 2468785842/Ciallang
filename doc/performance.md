@@ -467,3 +467,21 @@ CTest MacOS Debug/Release 各 385/385 通过；`tools/check-format.sh` 通过。
 后续候选（未展开）：`Value::asInteger` 仍外联（String 解析回执使函数偏大，
 可拆内联快路径 + 冷慢路径）；stdlib 内部临时 Value 的拷贝消除；
 fib 相对 TJS2 的剩余差距待 Windows 三方对照复核（本批 fib 已再快 ~11%）。
+
+### 同日追加：asInteger/mod 拆分内联
+
+同方法同机（对照为上节最终态留档二进制）。loop_int 画像中 `asInteger` 仍外联占
+~4.4%（派发循环 8 处调用点 + 算术族内部各两次），`Ret<Value>` optional 机制 ~7%。
+改动（`src/types/Value.hpp`/`Value.cpp`）：`asInteger` 拆类内内联快路径
+（Void/Integer/Real）+ `asIntegerSlow` 冷路径（`CIAL_COLD_NOINLINE`，String 解析与
+Octet/Object 报错）；`mod` 拆双 Integer 快路径（含除零守卫）+ `modSlow`。
+
+| 脚本 | 后/前 | 结论 |
+|---|---:|---|
+| loop_int | **93.8%/93.9%/94.1%** | 三轮一致，稳定 −6% |
+| fib | 101.0%→99.4% | 首轮 +1.5% 为布局摆动，加测回落持平 |
+| native_methods / string_concat / class | 98.9%–100.3% | 持平（不在其热路径） |
+
+CTest Release 385/385。仍未动的候选：算术族其余成员（add/sub/mul/div——add 含
+字符串拼接重路径，宜快慢拆分后单独批次）与派发层 `Ret<Value>::unwrap`/
+optional 协议成本（~7%，需调用协议改造，非内联可及）。
