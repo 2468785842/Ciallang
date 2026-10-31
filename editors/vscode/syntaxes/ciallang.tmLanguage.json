@@ -1,0 +1,484 @@
+{
+  "name": "Ciallang / TJS2",
+  "scopeName": "source.ciallang",
+  "patterns": [
+    {
+      "include": "#code"
+    }
+  ],
+  "repository": {
+    "code": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#octet"
+        },
+        {
+          "include": "#preprocessor"
+        },
+        {
+          "include": "#regexp"
+        },
+        {
+          "include": "#declarations"
+        },
+        {
+          "include": "#constants"
+        },
+        {
+          "include": "#numbers"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#calls"
+        },
+        {
+          "include": "#braces"
+        },
+        {
+          "include": "#parens"
+        },
+        {
+          "include": "#brackets"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "match": "[,;:.]",
+          "name": "punctuation.separator.ciallang"
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.ciallang",
+          "match": "//.*$"
+        },
+        {
+          "include": "#block-comment"
+        }
+      ]
+    },
+    "block-comment": {
+      "name": "comment.block.ciallang",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "patterns": [
+        {
+          "include": "#block-comment"
+        }
+      ]
+    },
+    "escape": {
+      "name": "constant.character.escape.ciallang",
+      "match": "\\\\(?:x[0-9a-fA-F]{1,4}|[0-7]{1,3}|.)"
+    },
+    "strings": {
+      "patterns": [
+        {
+          "include": "#template-double"
+        },
+        {
+          "include": "#template-single"
+        },
+        {
+          "include": "#string-double"
+        },
+        {
+          "include": "#string-single"
+        }
+      ]
+    },
+    "string-double": {
+      "name": "string.quoted.double.ciallang",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.ciallang"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.ciallang"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#escape"
+        }
+      ]
+    },
+    "template-double": {
+      "name": "string.quoted.double.template.ciallang",
+      "begin": "(@)(\")",
+      "end": "\"",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.template.ciallang"
+        },
+        "2": {
+          "name": "punctuation.definition.string.begin.ciallang"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.ciallang"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#escape"
+        },
+        {
+          "include": "#interpolation-braced"
+        },
+        {
+          "include": "#interpolation-ampersand"
+        }
+      ]
+    },
+    "string-single": {
+      "name": "string.quoted.single.ciallang",
+      "begin": "'",
+      "end": "'",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.ciallang"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.ciallang"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#escape"
+        }
+      ]
+    },
+    "template-single": {
+      "name": "string.quoted.single.template.ciallang",
+      "begin": "(@)(')",
+      "end": "'",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.template.ciallang"
+        },
+        "2": {
+          "name": "punctuation.definition.string.begin.ciallang"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.ciallang"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#escape"
+        },
+        {
+          "include": "#interpolation-braced"
+        },
+        {
+          "include": "#interpolation-ampersand"
+        }
+      ]
+    },
+    "interpolation-braced": {
+      "name": "meta.interpolation.ciallang",
+      "contentName": "meta.embedded.expression.ciallang",
+      "begin": "\\$\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.interpolation.begin.ciallang"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.interpolation.end.ciallang"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#code"
+        }
+      ]
+    },
+    "interpolation-ampersand": {
+      "name": "meta.interpolation.ciallang",
+      "contentName": "meta.embedded.expression.ciallang",
+      "begin": "&",
+      "end": ";",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.interpolation.begin.ciallang"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.interpolation.end.ciallang"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#code"
+        }
+      ]
+    },
+    "octet": {
+      "name": "string.other.octet.ciallang",
+      "begin": "<%",
+      "end": "%>",
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "match": "\\b[\\da-fA-F]{2}\\b",
+          "name": "constant.numeric.hex.octet.ciallang"
+        }
+      ]
+    },
+    "preprocessor": {
+      "patterns": [
+        {
+          "match": "(@)(endif)\\b",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.preprocessor.ciallang"
+            },
+            "2": {
+              "name": "keyword.control.preprocessor.ciallang"
+            }
+          }
+        },
+        {
+          "name": "meta.preprocessor.ciallang",
+          "begin": "(@)(if|set)\\b",
+          "end": "$",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.preprocessor.ciallang"
+            },
+            "2": {
+              "name": "keyword.control.preprocessor.ciallang"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#code"
+            }
+          ]
+        }
+      ]
+    },
+    "regexp": {
+      "name": "meta.literal.regexp.ciallang",
+      "contentName": "string.regexp.ciallang",
+      "begin": "(?x)(?:(?<=[=(:,\\[!&|?;*%~^<>])[ \\t]*|(?<=[+-])(?<!\\+\\+|--)[ \\t]*|^[ \\t]*|\\b(return|throw|case|delete|typeof|void|new|in|instanceof)[ \\t]+)(/)(?![/*=])",
+      "end": "(/)([a-z]*)|$",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.ciallang"
+        },
+        "2": {
+          "name": "punctuation.definition.string.begin.ciallang"
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.end.ciallang"
+        },
+        "2": {
+          "name": "keyword.other.regexp-flags.ciallang"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#escape"
+        },
+        {
+          "name": "constant.other.character-class.regexp.ciallang",
+          "begin": "\\[",
+          "end": "\\]",
+          "patterns": [
+            {
+              "include": "#escape"
+            }
+          ]
+        },
+        {
+          "name": "keyword.operator.regexp.ciallang",
+          "match": "[?+*|^$]|\\{\\d+(?:,\\d*)?\\}"
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "(?<![\\w$.])\\b(function)(\\s+)([\\p{L}\\p{Nl}_$][\\p{L}\\p{Nl}\\p{N}_$]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.function.ciallang"
+            },
+            "3": {
+              "name": "entity.name.function.ciallang"
+            }
+          }
+        },
+        {
+          "match": "(?<![\\w$.])\\b(class)(\\s+)([\\p{L}\\p{Nl}_$][\\p{L}\\p{Nl}\\p{N}_$]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.class.ciallang"
+            },
+            "3": {
+              "name": "entity.name.type.class.ciallang"
+            }
+          }
+        },
+        {
+          "match": "(?<![\\w$.])\\b(property)(\\s+)([\\p{L}\\p{Nl}_$][\\p{L}\\p{Nl}\\p{N}_$]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.property.ciallang"
+            },
+            "3": {
+              "name": "entity.name.function.property.ciallang"
+            }
+          }
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "match": "(?<![\\w$.])\\b(true|false|null|void|NaN|Infinity)\\b",
+          "name": "constant.language.ciallang"
+        },
+        {
+          "match": "(?<![\\w$.])\\b(this|super|global)\\b",
+          "name": "variable.language.ciallang"
+        },
+        {
+          "match": "(?<![\\w$.])\\b(Array|Dictionary|String|Math|Date|RegExp|Exception|Octet|Scripts|Debug)\\b",
+          "name": "support.class.ciallang"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.ciallang",
+          "match": "\\b0[xX][\\da-fA-F]+(?:\\.[\\da-fA-F]*)?(?:[pP][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.binary.ciallang",
+          "match": "\\b0[bB][01]+(?:\\.[01]*)?(?:[pP][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.ciallang",
+          "match": "(?<![\\w$])(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?(?![\\w$])"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "storage.type.ciallang",
+          "match": "(?<![\\w$.])\\b(var|const|function|class|property|int|real|string|octet|enum)\\b"
+        },
+        {
+          "name": "storage.modifier.ciallang",
+          "match": "(?<![\\w$.])\\b(private|public|protected|static)\\b"
+        },
+        {
+          "name": "keyword.operator.word.ciallang",
+          "match": "(?<![\\w$.])\\b(new|delete|typeof|invalidate|isvalid|instanceof|incontextof|in)\\b"
+        },
+        {
+          "name": "keyword.control.ciallang",
+          "match": "(?<![\\w$.])\\b(if|else|while|do|for|continue|break|switch|case|default|return|extends|getter|setter|try|catch|finally|throw|debugger|with|synchronized|goto|import|export)\\b"
+        }
+      ]
+    },
+    "calls": {
+      "match": "[\\p{L}\\p{Nl}_$][\\p{L}\\p{Nl}\\p{N}_$]*(?=[ \\t]*\\()",
+      "name": "entity.name.function.call.ciallang"
+    },
+    "braces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.braces.begin.ciallang"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.braces.end.ciallang"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#code"
+        }
+      ]
+    },
+    "parens": {
+      "begin": "\\(",
+      "end": "\\)",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.begin.ciallang"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.parens.end.ciallang"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#code"
+        }
+      ]
+    },
+    "brackets": {
+      "begin": "\\[",
+      "end": "\\]",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.section.brackets.begin.ciallang"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.brackets.end.ciallang"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#code"
+        }
+      ]
+    },
+    "operators": {
+      "match": "<->|===|!==|>>>?=?|<<=?|\\+\\+|--|&&=?|\\|\\|=?|[=+*/%&|^!~<>?\\\\#$-]=?",
+      "name": "keyword.operator.ciallang"
+    }
+  }
+}

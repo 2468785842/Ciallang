@@ -12,9 +12,16 @@ python tools/lsp/cial_lsp.py --cial build/Windows/Debug/cial.exe
 
 ## VSCode
 
-`editors/vscode/` 包含使用 `vscode-languageclient` 的客户端。进入该目录运行 `npm ci`、`npm run prepare`，用 VSCode 打开该目录后按 F5 启动 Extension Development Host，再打开 Ciallang 工作区中的 `.tjs` 文件。`prepare.js` 把服务器脚本复制进扩展目录，确保打包时不依赖仓库外的相对路径（`editors/vscode/package.json`、`extension.js`、`prepare.js`、`.vscode/launch.json`）。
+`editors/vscode/` 包含使用 `vscode-languageclient` 的客户端。进入该目录运行 `npm ci`，用 VSCode 打开该目录后按 F5；启动前自动执行 `npm run prepare`，Extension Development Host 会打开工程根目录，再打开 `.tjs` 文件。`prepare.js` 把服务器脚本复制进扩展目录，确保打包时不依赖仓库外的相对路径（`editors/vscode/package.json`、`extension.js`、`prepare.js`、`.vscode/launch.json`）。
 
-配置项 `ciallang.python` 指定 Python，`ciallang.executable` 指定已构建的 cial。未显式配置时，客户端根据平台尝试当前工作区 `build/<平台>/Debug/cial`。服务器或解释器缺失时会发布明确的检查器不可用诊断（`editors/vscode/extension.js`、`tools/lsp/cial_lsp.py`）。
+扩展通过 TextMate 文法提供关键字、字符串、嵌套注释、数值、Octet、正则与预处理高亮，
+并识别模板串中的 `${expr}` / `&expr;` 插值；颜色由当前主题决定，基础高亮不依赖语言服务。
+括号匹配、引号与括号自动闭合、注释快捷键由 `language-configuration.json` 注册。
+词法规则依据 `src/parser/Token.hpp`、`Lexer.cpp` 与 [语法说明](syntax.md)；
+实现见 `editors/vscode/syntaxes/ciallang.tmLanguage.json`，分词回归见 `test/grammar.test.js`。
+正则/除法按局部上下文识别，不等价于解析器的完整上下文判定。
+
+配置项 `ciallang.python` 指定 Python，`ciallang.executable` 指定已构建的 cial。未显式配置时，客户端根据活动文件和工作区向父目录查找 `build/<平台>/Debug/cial`，同级 Debug 不存在时尝试 Release，最后回落 PATH 的 `cial`。配置的相对路径按活动文件所属工作区解析；修改配置后重新加载 VSCode 窗口。服务端缺失或 Python 启动失败时弹出错误并提供设置入口；cial 不可用时发布检查器不可用诊断（`editors/vscode/extension.js`、`launch-options.js`、`tools/lsp/cial_lsp.py`）。源码调试及排错见[客户端说明](../editors/vscode/README.md)。
 
 ## IDEA / CLion 等客户端
 
@@ -51,9 +58,9 @@ python tools/lsp/cial_lsp.py --cial build/Windows/Debug/cial.exe
 ### VSCode 宿主验收
 
 `editors/vscode/test/smoke.js` 使用真实 VSCode API 打开编辑器，调用补全/跳转/重命名提供器，
-断言 Array.push、函数声明位置及两处重命名编辑并应用到文档。测试会覆盖工作区的
-`smoke.tjs`，请使用独立的临时工作区。该工作区 `.vscode/settings.json` 应为
-`ciallang.python`、`ciallang.executable` 配置绝对路径。先执行 `node editors/vscode/prepare.js`，
+断言 Array.push、函数声明位置及两处重命名编辑并应用到文档，再引入语法错误并修复，验证实际编译器诊断。测试会覆盖工作区的
+`smoke.tjs`，请使用独立的临时工作区。该工作区 `.vscode/settings.json` 可为
+`ciallang.python`、`ciallang.executable` 配置绝对路径；工作区位于工程子目录时可省略解释器配置以验收自动查找。先执行 `node editors/vscode/prepare.js`，
 再以 VSCode 可执行文件启动：
 
 ```text

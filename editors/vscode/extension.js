@@ -1,22 +1,42 @@
 const path = require('node:path');
 const vscode = require('vscode');
 const { LanguageClient } = require('vscode-languageclient/node');
+const { launchOptions } = require('./launch-options');
 let client;
 
 async function activate(context) {
-  const settings = vscode.workspace.getConfiguration('ciallang');
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const platform = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'MacOS' : 'Linux';
-  const binary = settings.get('executable') || (root
-    ? path.join(root, 'build', platform, 'Debug', process.platform === 'win32' ? 'cial.exe' : 'cial') : 'cial');
-  const python = settings.get('python') || (process.platform === 'win32' ? 'python' : 'python3');
-  client = new LanguageClient('ciallang', 'Ciallang', {
-    command: python,
-    args: [context.asAbsolutePath('server/cial_lsp.py'), '--cial', binary]
-  }, { documentSelector: [{ scheme: 'file', language: 'ciallang' }] });
-  context.subscriptions.push({ dispose: () => { if (client) void client.stop(); } });
-  await client.start();
+  const document = vscode.window.activeTextEditor?.document;
+  const resource = document?.uri.scheme === 'file' ? document.uri : undefined;
+  const settings = vscode.workspace.getConfiguration('ciallang', resource);
+  const folders = vscode.workspace.workspaceFolders || [];
+  const current = resource && vscode.workspace.getWorkspaceFolder(resource);
+  const roots = [...new Set([current, ...folders].filter(Boolean).map(folder => folder.uri.fsPath))];
+  try {
+    const server = launchOptions({
+      extensionPath: context.extensionPath,
+      workspaceRoots: roots,
+      documentDirectory: resource ? path.dirname(resource.fsPath) : undefined,
+      python: settings.get('python'),
+      executable: settings.get('executable')
+    });
+    client = new LanguageClient('ciallang', 'Ciallang', server, {
+      documentSelector: [{ scheme: 'file', language: 'ciallang' }]
+    });
+    await client.start();
+  } catch (error) {
+    await client?.dispose();
+    client = undefined;
+    void vscode.window.showErrorMessage(
+      `Ciallang 语言服务启动失败：${error.message}。请检查 Python 3 和 ciallang.executable 配置。`, '打开设置').then(action => {
+      if (action === '打开设置') return vscode.commands.executeCommand('workbench.action.openSettings', '@ext:ciallang.ciallang-language');
+    });
+    throw error;
+  }
 }
 
-function deactivate() { return client?.stop(); }
+async function deactivate() {
+  const running = client;
+  client = undefined;
+  await running?.dispose();
+}
 module.exports = { activate, deactivate };

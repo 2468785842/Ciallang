@@ -1,23 +1,65 @@
 {
   "name": "ciallang-language",
   "displayName": "Ciallang / TJS2",
-  "description": "Ciallang syntax diagnostics and basic language hints",
+  "description": "Ciallang / TJS2 syntax highlighting and language tools",
   "version": "0.1.0",
   "publisher": "ciallang",
   "license": "MIT",
-  "engines": {"vscode": "^1.82.0"},
+  "engines": {
+    "vscode": "^1.82.0"
+  },
   "main": "./extension.js",
-  "activationEvents": ["onLanguage:ciallang"],
+  "activationEvents": [
+    "onLanguage:ciallang"
+  ],
   "contributes": {
-    "languages": [{"id": "ciallang", "aliases": ["Ciallang", "TJS2"], "extensions": [".tjs"]}],
+    "languages": [
+      {
+        "id": "ciallang",
+        "aliases": [
+          "Ciallang",
+          "TJS2"
+        ],
+        "extensions": [
+          ".tjs"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
     "configuration": {
       "title": "Ciallang",
       "properties": {
-        "ciallang.python": {"type": "string", "default": "", "description": "Python interpreter (defaults to python on Windows, python3 elsewhere)"},
-        "ciallang.executable": {"type": "string", "default": "", "description": "Absolute path to cial; defaults to the workspace Debug build"}
+        "ciallang.python": {
+          "type": "string",
+          "default": "",
+          "description": "Python interpreter (defaults to python on Windows, python3 elsewhere)"
+        },
+        "ciallang.executable": {
+          "type": "string",
+          "default": "",
+          "description": "cial path or command; defaults to an ancestor build/<platform>/Debug or Release/cial, then PATH"
+        }
       }
-    }
+    },
+    "grammars": [
+      {
+        "language": "ciallang",
+        "scopeName": "source.ciallang",
+        "path": "./syntaxes/ciallang.tmLanguage.json"
+      }
+    ]
   },
-  "scripts": {"prepare": "node prepare.js", "vscode:prepublish": "node prepare.js", "check": "node --check extension.js"},
-  "dependencies": {"vscode-languageclient": "9.0.1"}
+  "scripts": {
+    "prepare": "node prepare.js",
+    "vscode:prepublish": "node prepare.js",
+    "check": "node --check extension.js && node --check launch-options.js && node --check prepare.js && node --check test/smoke.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "vscode-oniguruma": "2.0.1",
+    "vscode-textmate": "9.2.0"
+  }
 }
