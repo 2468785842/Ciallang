@@ -24,8 +24,9 @@ namespace cial::inter {
     namespace {
         const char *opcodeName(const TacOpCode opcode) {
             switch(opcode) {
-#define CASE_NAME(OP) \
-    case TacOpCode::OP: return #OP;
+#define CASE_NAME(OP)                                                                                                  \
+    case TacOpCode::OP:                                                                                                \
+        return #OP;
                 CIAL_TAC_OPCODE_ENUMS(CASE_NAME)
 #undef CASE_NAME
             }
@@ -38,9 +39,7 @@ namespace cial::inter {
             return operand.value<Register>();
         }
 
-        u64 refKey(const SsaRef &ref) {
-            return (u64(ref.kind) << 62) | (u64(ref.index) << 16) | ref.slot;
-        }
+        u64 refKey(const SsaRef &ref) { return (u64(ref.kind) << 62) | (u64(ref.index) << 16) | ref.slot; }
 
         std::string refText(const SsaRef &ref) {
             switch(ref.kind) {
@@ -48,7 +47,7 @@ namespace cial::inter {
                     return "None";
                 case SsaRef::Kind::Inst:
                     return ref.slot == 0 ? fmt::format("Inst:{}", ref.index)
-                        : fmt::format("Inst:{}#{}", ref.index, ref.slot);
+                                         : fmt::format("Inst:{}#{}", ref.index, ref.slot);
                 case SsaRef::Kind::Phi:
                     return fmt::format("Phi:{}", ref.index);
                 case SsaRef::Kind::Entry:
@@ -317,9 +316,8 @@ namespace cial::inter {
             case TacOpCode::CollapseArgs:
                 // 隐式读取帧实参（%0..%actualArgc-1 / unnamed 窗口），静态无法
                 // 给出精确使用集——明确拒绝而非给出貌似精确的 def-use（#25）
-                throw std::runtime_error(fmt::format(
-                    "SSA: opcode {} 隐式读取帧实参，受限 SSA 拒绝构造",
-                    opcodeName(inst.opcode())));
+                throw std::runtime_error(
+                    fmt::format("SSA: opcode {} 隐式读取帧实参，受限 SSA 拒绝构造", opcodeName(inst.opcode())));
             default:
                 throw std::runtime_error(
                     fmt::format("SSA: opcode {} 未登记 def/use，拒绝猜测", opcodeName(inst.opcode())));
@@ -329,9 +327,9 @@ namespace cial::inter {
         return access;
     }
 
-    SsaForm SsaBuilder::build(Vec<Vec<size_t>> successors, const size_t entryBlock,
-                              Vec<SsaBlockFacts> facts, const size_t variableCount,
-                              const Vec<bool> &preserveAllLiveOut, const Vec<bool> &exceptionEntries) {
+    SsaForm SsaBuilder::build(Vec<Vec<size_t>> successors, const size_t entryBlock, Vec<SsaBlockFacts> facts,
+                              const size_t variableCount, const Vec<bool> &preserveAllLiveOut,
+                              const Vec<bool> &exceptionEntries) {
         const size_t blockCount = successors.size();
         if(blockCount == 0)
             throw std::runtime_error("SSA: empty control-flow graph");
@@ -382,7 +380,7 @@ namespace cial::inter {
 
         // 入口可达性
         Vec<bool> reachable(blockCount, false);
-        Vec<size_t> reachStack{entryBlock};
+        Vec<size_t> reachStack{ entryBlock };
         reachable[entryBlock] = true;
         while(!reachStack.empty()) {
             const size_t current = reachStack.back();
@@ -400,7 +398,7 @@ namespace cial::inter {
         postorder.reserve(blockCount);
         Vec<std::pair<size_t, size_t>> dfs;
         Vec<u8> dfsState(blockCount, 0); // 0 未访问 1 栈内 2 完成
-        dfs.push_back({entryBlock, 0});
+        dfs.push_back({ entryBlock, 0 });
         dfsState[entryBlock] = 1;
         while(!dfs.empty()) {
             const size_t block = dfs.back().first;
@@ -408,7 +406,7 @@ namespace cial::inter {
                 const size_t successor = form._successors[block][dfs.back().second++];
                 if(dfsState[successor] == 0) {
                     dfsState[successor] = 1;
-                    dfs.push_back({successor, 0});
+                    dfs.push_back({ successor, 0 });
                 }
             } else {
                 dfsState[block] = 2;
@@ -443,8 +441,7 @@ namespace cial::inter {
                 for(const size_t predecessor : form._predecessors[block]) {
                     if(!reachable[predecessor] || form._idom[predecessor] == SsaForm::InvalidBlock)
                         continue;
-                    newIdom = newIdom == SsaForm::InvalidBlock ? predecessor
-                        : intersect(predecessor, newIdom);
+                    newIdom = newIdom == SsaForm::InvalidBlock ? predecessor : intersect(predecessor, newIdom);
                 }
                 if(newIdom != SsaForm::InvalidBlock && form._idom[block] != newIdom) {
                     form._idom[block] = newIdom;
@@ -480,7 +477,7 @@ namespace cial::inter {
         }
         // 入口自环：形式定义下 entry ∈ DF(entry)（上行法因 entry 自支配而跳过）
         if(std::ranges::find(form._successors[entryBlock], entryBlock) != form._successors[entryBlock].end() &&
-            std::ranges::find(form._domFrontiers[entryBlock], entryBlock) == form._domFrontiers[entryBlock].end())
+           std::ranges::find(form._domFrontiers[entryBlock], entryBlock) == form._domFrontiers[entryBlock].end())
             form._domFrontiers[entryBlock].push_back(entryBlock);
         for(auto &frontier : form._domFrontiers)
             std::ranges::sort(frontier);
@@ -495,7 +492,7 @@ namespace cial::inter {
             for(const auto &inst : facts[block].insts) {
                 form._insts[inst.pc].block = block;
                 for(const u16 var : inst.defs)
-                    form._insts[inst.pc].defs.push_back(Register{var});
+                    form._insts[inst.pc].defs.push_back(Register{ var });
             }
         }
 
@@ -505,9 +502,9 @@ namespace cial::inter {
         };
         const size_t wordCount = (variableCount + 63) / 64;
         using RegisterSet = Vec<u64>;
-        const auto setBit = [](RegisterSet &set, const u16 var) { set[var / 64] |= u64{1} << (var % 64); };
+        const auto setBit = [](RegisterSet &set, const u16 var) { set[var / 64] |= u64{ 1 } << (var % 64); };
         const auto testBit = [](const RegisterSet &set, const u16 var) {
-            return (set[var / 64] & (u64{1} << (var % 64))) != 0;
+            return (set[var / 64] & (u64{ 1 } << (var % 64))) != 0;
         };
         Vec<RegisterSet> useBits(blockCount, RegisterSet(wordCount, 0));
         Vec<RegisterSet> defBits(blockCount, RegisterSet(wordCount, 0));
@@ -532,9 +529,9 @@ namespace cial::inter {
                         out[word] |= liveIn[successor][word];
                 if(flagOf(block, preserveAllLiveOut)) {
                     for(size_t word = 0; word < wordCount; ++word)
-                        out[word] = ~u64{0};
+                        out[word] = ~u64{ 0 };
                     if(variableCount % 64 != 0 && wordCount > 0)
-                        out.back() = (u64{1} << (variableCount % 64)) - 1;
+                        out.back() = (u64{ 1 } << (variableCount % 64)) - 1;
                 }
                 RegisterSet in(wordCount, 0);
                 for(size_t word = 0; word < wordCount; ++word)
@@ -578,7 +575,7 @@ namespace cial::inter {
                         continue;
                     SsaPhi phi;
                     phi.block = join;
-                    phi.reg = Register{static_cast<u16>(var)};
+                    phi.reg = Register{ static_cast<u16>(var) };
                     phi.inputs.assign(form._predecessors[join].size(), SsaRef{});
                     form._phiIndices[join].push_back(static_cast<u32>(form._phis.size()));
                     form._phis.push_back(std::move(phi));
@@ -601,9 +598,9 @@ namespace cial::inter {
         struct RenameFrame {
             size_t block{};
             size_t childCursor{};
-            size_t catchBlock{SsaForm::InvalidBlock}; // 最近异常边界祖先
-            Vec<std::pair<u16, size_t>> savedTops;    // (变量, 进入时栈深)
-            bool hasSnapshot{};                       // 异常边界帧：整栈快照
+            size_t catchBlock{ SsaForm::InvalidBlock }; // 最近异常边界祖先
+            Vec<std::pair<u16, size_t>> savedTops; // (变量, 进入时栈深)
+            bool hasSnapshot{}; // 异常边界帧：整栈快照
             Vec<Vec<SsaRef>> snapshot;
         };
         Vec<RenameFrame> frames;
@@ -614,14 +611,13 @@ namespace cial::inter {
 
         // 未解析使用的身份：catch 语境为该着陆块的 Catch 未知值，否则入口参数
         const auto unresolvedRef = [&](const size_t catchBlock, const u16 var) {
-            return catchBlock == SsaForm::InvalidBlock
-                ? SsaRef{SsaRef::Kind::Entry, var}
-                : SsaRef{SsaRef::Kind::Catch, static_cast<u32>(catchBlock)};
+            return catchBlock == SsaForm::InvalidBlock ? SsaRef{ SsaRef::Kind::Entry, var }
+                                                       : SsaRef{ SsaRef::Kind::Catch, static_cast<u32>(catchBlock) };
         };
 
         // 进入块：phi 定义、使用点解析、后继 phi 输入回填
         const auto enterBlock = [&](const size_t block, const size_t parentCatchBlock) {
-            RenameFrame frame{block, 0, parentCatchBlock, {}, false, {}};
+            RenameFrame frame{ block, 0, parentCatchBlock, {}, false, {} };
             if(form._exceptionEntry[block]) {
                 // 异常着陆块是 SSA 边界：整栈快照后清空（可发生在块内任意点，
                 // 按长度恢复会丢失原到达定义——必须保存完整内容）
@@ -634,8 +630,8 @@ namespace cial::inter {
             // 块入口 phi 定义
             for(const u32 phiIndex : form._phiIndices[block]) {
                 const u16 var = form._phis[phiIndex].reg.index();
-                frame.savedTops.push_back({var, stacks[var].size()});
-                stacks[var].push_back(SsaRef{SsaRef::Kind::Phi, phiIndex});
+                frame.savedTops.push_back({ var, stacks[var].size() });
+                stacks[var].push_back(SsaRef{ SsaRef::Kind::Phi, phiIndex });
             }
             // 块内指令：先解析使用，再按槽位压定义
             for(const auto &inst : facts[block].insts) {
@@ -643,17 +639,14 @@ namespace cial::inter {
                 instSsa.operandDefs.reserve(inst.uses.size());
                 for(size_t j = 0; j < inst.uses.size(); ++j) {
                     const u16 var = inst.uses[j];
-                    const SsaRef def = stacks[var].empty()
-                        ? unresolvedRef(frame.catchBlock, var)
-                        : stacks[var].back();
+                    const SsaRef def = stacks[var].empty() ? unresolvedRef(frame.catchBlock, var) : stacks[var].back();
                     instSsa.operandDefs.push_back(def);
-                    recordUse(def, SsaUse{SsaUse::Kind::Operand, static_cast<u32>(inst.pc),
-                                          static_cast<u32>(j)});
+                    recordUse(def, SsaUse{ SsaUse::Kind::Operand, static_cast<u32>(inst.pc), static_cast<u32>(j) });
                 }
                 for(size_t slot = 0; slot < inst.defs.size(); ++slot) {
                     const u16 var = inst.defs[slot];
-                    frame.savedTops.push_back({var, stacks[var].size()});
-                    stacks[var].push_back(SsaRef{SsaRef::Kind::Inst, inst.pc, static_cast<u16>(slot)});
+                    frame.savedTops.push_back({ var, stacks[var].size() });
+                    stacks[var].push_back(SsaRef{ SsaRef::Kind::Inst, inst.pc, static_cast<u16>(slot) });
                 }
             }
             // 后继块入口 phi 的本边输入
@@ -661,24 +654,21 @@ namespace cial::inter {
                 if(form._phiIndices[successor].empty())
                     continue;
                 const auto &preds = form._predecessors[successor];
-                const size_t edgeIndex =
-                    static_cast<size_t>(std::ranges::find(preds, block) - preds.begin());
+                const size_t edgeIndex = static_cast<size_t>(std::ranges::find(preds, block) - preds.begin());
                 for(const u32 phiIndex : form._phiIndices[successor]) {
                     SsaPhi &phi = form._phis[phiIndex];
                     const u16 var = phi.reg.index();
                     if(stacks[var].empty()) {
                         // catch 语境下路径值是着陆块引入的未知值，可参与下游合流
-                        phi.inputs[edgeIndex] =
-                            frame.catchBlock == SsaForm::InvalidBlock
-                                ? SsaRef{}
-                                : SsaRef{SsaRef::Kind::Catch, static_cast<u32>(frame.catchBlock)};
+                        phi.inputs[edgeIndex] = frame.catchBlock == SsaForm::InvalidBlock
+                            ? SsaRef{}
+                            : SsaRef{ SsaRef::Kind::Catch, static_cast<u32>(frame.catchBlock) };
                     } else {
                         phi.inputs[edgeIndex] = stacks[var].back();
                     }
                     if(phi.inputs[edgeIndex].valid())
                         recordUse(phi.inputs[edgeIndex],
-                                  SsaUse{SsaUse::Kind::PhiInput, phiIndex,
-                                         static_cast<u32>(edgeIndex)});
+                                  SsaUse{ SsaUse::Kind::PhiInput, phiIndex, static_cast<u32>(edgeIndex) });
                 }
             }
             return frame;
@@ -797,8 +787,7 @@ namespace cial::inter {
         for(size_t i = 0; i < blocks.size(); ++i)
             successors[i] = blocks[i].successors;
 
-        return build(std::move(successors), 0, std::move(facts), variableCount, preserveAll,
-                     exceptionEntry);
+        return build(std::move(successors), 0, std::move(facts), variableCount, preserveAll, exceptionEntry);
     }
 
     std::string SsaBuilder::dumpSsaText(vm::Chunk &chunk, const SsaForm &form) {
@@ -815,16 +804,14 @@ namespace cial::inter {
             return text + "]";
         };
 
-        std::string out = fmt::format("== SSA blocks={} entry=B{} vars={}\n", form.blockCount(),
-                                      form.entryBlock(), form.variableCount());
+        std::string out = fmt::format("== SSA blocks={} entry=B{} vars={}\n", form.blockCount(), form.entryBlock(),
+                                      form.variableCount());
         const auto &code = chunk.getInstVec();
         for(size_t block = 0; block < form.blockCount(); ++block) {
             const size_t idom = form.idomOf(block);
             out += fmt::format("B{} idom={} preds={} succ={}{}\n", block,
-                               idom == SsaForm::InvalidBlock ? std::string("-")
-                                                             : fmt::format("B{}", idom),
-                               indexList(form.predecessorsOf(block)),
-                               indexList(form.successorsOf(block)),
+                               idom == SsaForm::InvalidBlock ? std::string("-") : fmt::format("B{}", idom),
+                               indexList(form.predecessorsOf(block)), indexList(form.successorsOf(block)),
                                form.isExceptionEntry(block) ? " exc-entry" : "");
             for(const u32 phiIndex : form.phiIndicesAt(block)) {
                 const SsaPhi &phi = form.phis()[phiIndex];
@@ -832,8 +819,7 @@ namespace cial::inter {
                 for(size_t i = 0; i < phi.inputs.size(); ++i) {
                     if(i > 0)
                         out += ", ";
-                    out += fmt::format("B{}={}", form.predecessorsOf(block)[i],
-                                       refText(phi.inputs[i]));
+                    out += fmt::format("B{}={}", form.predecessorsOf(block)[i], refText(phi.inputs[i]));
                 }
                 out += "]\n";
             }
@@ -843,13 +829,12 @@ namespace cial::inter {
                     continue;
                 out += fmt::format("  pc{} {}", pc, opcodeName(code[pc]->opcode()));
                 for(size_t slot = 0; slot < instSsa.defs.size(); ++slot)
-                    out += fmt::format(" def%{}<-{}", instSsa.defs[slot].index(),
-                                       refText(SsaRef{SsaRef::Kind::Inst,
-                                                      static_cast<u32>(pc), static_cast<u16>(slot)}));
+                    out += fmt::format(
+                        " def%{}<-{}", instSsa.defs[slot].index(),
+                        refText(SsaRef{ SsaRef::Kind::Inst, static_cast<u32>(pc), static_cast<u16>(slot) }));
                 const Access access = extractAccess(*code[pc]);
                 for(size_t j = 0; j < access.uses.size(); ++j) {
-                    const SsaRef &def =
-                        j < instSsa.operandDefs.size() ? instSsa.operandDefs[j] : SsaRef{};
+                    const SsaRef &def = j < instSsa.operandDefs.size() ? instSsa.operandDefs[j] : SsaRef{};
                     out += fmt::format(" use%{}<-{}", access.uses[j].index(), refText(def));
                 }
                 out += "\n";

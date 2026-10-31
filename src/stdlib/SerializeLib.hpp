@@ -46,6 +46,6 @@ namespace cial {
         // unpack：模板 → 数组（TJS2 Octet 仅有的方法）
         Value octetUnpack(VM *vm, const Value &thisObj, size_t argCount, Value *args);
 
-    } // namespace cial::stdlib
+    } // namespace stdlib
 
 } // namespace cial

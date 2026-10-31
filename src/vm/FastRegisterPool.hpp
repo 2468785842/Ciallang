@@ -95,8 +95,8 @@ namespace cial::vm {
 
         Vec<Block> _blocks;
         size_t _sp{ 0 }; // 全局栈指针（相对于首块）
-        size_t _shrinkMark{ 0 };      // 上次收缩时的水位
-        size_t _blocksAtMark{ 0 };    // 上次收缩时的块数
+        size_t _shrinkMark{ 0 }; // 上次收缩时的水位
+        size_t _blocksAtMark{ 0 }; // 上次收缩时的块数
 
         void allocateBlock() { _blocks.emplace_back(_blockSize); }
 

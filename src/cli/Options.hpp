@@ -21,5 +21,5 @@ namespace cial::cli {
         bool noColor{};
     };
 
-    Options parseOptions(int argc, char** argv);
+    Options parseOptions(int argc, char **argv);
 } // namespace cial::cli

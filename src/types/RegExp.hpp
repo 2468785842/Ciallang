@@ -65,8 +65,7 @@ namespace cial {
         explicit RegExp() = delete;
 
         // lexer 产物编码 "pattern\nflags"（见 Lexer::regexConstVal）；flags 缺省为空
-        explicit RegExp(Runtime *rt, const String &patternStr,
-                        const String &flagsStr = String{}) : _rt(rt) {
+        explicit RegExp(Runtime *rt, const String &patternStr, const String &flagsStr = String{}) : _rt(rt) {
             compilePattern(std::string(patternStr.getData(), patternStr.length()),
                            std::string(flagsStr.getData(), flagsStr.length()));
         }
@@ -85,8 +84,7 @@ namespace cial {
             pattern = pat.empty() ? "(?:)" : pat; // TJS2：空模式按空正则处理
             try {
                 re = std::regex(pattern,
-                                std::regex::ECMAScript |
-                                    (flagIgnoreCase ? std::regex::icase : std::regex::ECMAScript));
+                                std::regex::ECMAScript | (flagIgnoreCase ? std::regex::icase : std::regex::ECMAScript));
             } catch(const std::regex_error &e) {
                 throw std::runtime_error("invalid regex /" + pattern + "/: " + e.what());
             }
@@ -114,8 +112,8 @@ namespace cial {
                 lastIndex = start;
                 lastMatch = ""_str;
                 lastParen = ""_str;
-                leftContext = String(target.c_str(),
-                                     static_cast<u32>(regexp_cp::cpToByte(target, static_cast<size_t>(start))));
+                leftContext =
+                    String(target.c_str(), static_cast<u32>(regexp_cp::cpToByte(target, static_cast<size_t>(start))));
                 // TJS2 失败时 RightContext 不更新（保留上次值）
                 return false;
             }
@@ -149,8 +147,7 @@ namespace cial {
                 lastParen = ""_str;
             }
             leftContext = String(target.c_str(), static_cast<u32>(s + static_cast<size_t>(m.position(0))));
-            rightContext = String(target.c_str() + s + lastEnd,
-                                   static_cast<u32>(target.size() - (s + lastEnd)));
+            rightContext = String(target.c_str() + s + lastEnd, static_cast<u32>(target.size() - (s + lastEnd)));
             if(flagGlobal)
                 start = lastIndex; // g：下次搜索从本次匹配尾起（码点）
             return true;

@@ -22,7 +22,7 @@ namespace cial::cli {
 #endif
     }
 
-    bool needsMoreInput(const std::string& text) {
+    bool needsMoreInput(const std::string &text) {
         Common::SourceFile source;
         Common::Result diagnostics;
         source.load(diagnostics, text);
@@ -31,7 +31,7 @@ namespace cial::cli {
         PreProcessor preprocessor;
         syntax::Lexer lexer{ source, preprocessor };
         Vec<syntax::TokenType> brackets;
-        syntax::Token* token{};
+        syntax::Token *token{};
         do {
             const bool success = lexer.next(token, false);
             if(!token)
@@ -65,7 +65,7 @@ namespace cial::cli {
         return lexer.incomplete() || !brackets.empty();
     }
 
-    int runRepl(vm::VMState& state, std::istream& input, const bool interactive) {
+    int runRepl(vm::VMState &state, std::istream &input, const bool interactive) {
         if(interactive)
             fmt::println("Ciallang REPL. :help for commands, :quit to exit.");
         std::string buffer;
@@ -86,9 +86,9 @@ namespace cial::cli {
             }
             if(line == ":help") {
                 fmt::println(":help  show commands\n:abort discard pending input\n:quit  exit\n"
-                    "Expressions print their value; declarations share the session's globals.\n"
-                    "Open brackets, strings and block comments continue on the next line.\n"
-                    "End a line with \\ to continue an expression.");
+                             "Expressions print their value; declarations share the session's globals.\n"
+                             "Open brackets, strings and block comments continue on the next line.\n"
+                             "End a line with \\ to continue an expression.");
                 continue;
             }
             if(buffer.empty() && line.find_first_not_of(" \t\r") == std::string::npos)
@@ -122,7 +122,7 @@ namespace cial::cli {
                     else if(script.chunk)
                         execute(state, std::move(*script.chunk));
                 }
-            } catch(const std::exception& error) {
+            } catch(const std::exception &error) {
                 // VM 只传播异常值；文件与位置（如有）由共享渲染器附加
                 printRuntimeError(state, error.what());
                 failed = true;

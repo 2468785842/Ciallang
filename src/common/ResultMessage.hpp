@@ -31,29 +31,27 @@ namespace cial::Common {
         explicit ResultMessage(std::string message, const SourceLocation loc = {}, std::string details = {},
                                const Types type = info, std::string code = {}, std::string source = {},
                                const SourceSpan span = {}, const bool located = false) :
-            _type(type),
-            _message(std::move(message)), _details(std::move(details)), _location(loc), _code(std::move(code)),
-            _source(std::move(source)), _span(span), _located(located) {
-        }
+            _type(type), _message(std::move(message)), _details(std::move(details)), _location(loc),
+            _code(std::move(code)), _source(std::move(source)), _span(span), _located(located) {}
 
         [[nodiscard]] Types type() const noexcept { return _type; }
 
         [[nodiscard]] bool isError() const noexcept { return _type == error; }
 
-        [[nodiscard]] const std::string& details() const noexcept { return _details; }
+        [[nodiscard]] const std::string &details() const noexcept { return _details; }
 
-        [[nodiscard]] const std::string& message() const noexcept { return _message; }
+        [[nodiscard]] const std::string &message() const noexcept { return _message; }
 
-        [[nodiscard]] const SourceLocation& location() const noexcept { return _location; }
+        [[nodiscard]] const SourceLocation &location() const noexcept { return _location; }
 
         // 稳定错误码（如 "parse.expected-token"）；未迁移路径为空
-        [[nodiscard]] const std::string& code() const noexcept { return _code; }
+        [[nodiscard]] const std::string &code() const noexcept { return _code; }
 
         // 源码身份（路径或逻辑名）；无源码上下文为空
-        [[nodiscard]] const std::string& source() const noexcept { return _source; }
+        [[nodiscard]] const std::string &source() const noexcept { return _source; }
 
         // 权威字节范围（半开）；无位置错误（文件读取/宿主故障）无 span
-        [[nodiscard]] const SourceSpan& span() const noexcept { return _span; }
+        [[nodiscard]] const SourceSpan &span() const noexcept { return _span; }
 
         [[nodiscard]] bool hasSpan() const noexcept { return _span.valid(); }
 

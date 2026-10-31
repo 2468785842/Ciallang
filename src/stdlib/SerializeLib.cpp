@@ -43,7 +43,7 @@ namespace cial::stdlib {
 
     namespace {
 
-        constexpr u8 SER_HEADER[8] = {'K', 'B', 'A', 'D', '1', '0', '0', 0};
+        constexpr u8 SER_HEADER[8] = { 'K', 'B', 'A', 'D', '1', '0', '0', 0 };
 
         // 二进制类型码（tjsBinarySerializer.h 全量）
         enum : u8 {
@@ -136,7 +136,7 @@ namespace cial::stdlib {
             std::ifstream f(name.toStdStr(), std::ios::binary);
             if(!f)
                 serError("cannot open file");
-            std::string content{(std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>()};
+            std::string content{ (std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>() };
             return content;
         }
 
@@ -152,8 +152,8 @@ namespace cial::stdlib {
         // 文本读取：识别 UTF-8/UTF-16LE/BE BOM 并解码为 UTF-8；无 BOM 按原样
         std::string readTextDecoded(const String &name) {
             const std::string raw = readFileBytes(name);
-            if(raw.size() >= 3 && static_cast<u8>(raw[0]) == 0xEF && static_cast<u8>(raw[1]) == 0xBB
-               && static_cast<u8>(raw[2]) == 0xBF)
+            if(raw.size() >= 3 && static_cast<u8>(raw[0]) == 0xEF && static_cast<u8>(raw[1]) == 0xBB &&
+               static_cast<u8>(raw[2]) == 0xBF)
                 return raw.substr(3);
             if(raw.size() >= 2 && static_cast<u8>(raw[0]) == 0xFF && static_cast<u8>(raw[1]) == 0xFE)
                 return utf16LeToUtf8(reinterpret_cast<const u8 *>(raw.data() + 2), raw.size() - 2);
@@ -173,9 +173,7 @@ namespace cial::stdlib {
                 out.append(reinterpret_cast<const char *>(enc.data), static_cast<size_t>(enc.width));
         }
 
-        String makeString(const std::string &s) {
-            return String(s.c_str(), static_cast<u32>(s.size()));
-        }
+        String makeString(const std::string &s) { return String(s.c_str(), static_cast<u32>(s.size())); }
 
         std::string valueArgToString(const Value &v) {
             if(v.isString())
@@ -384,17 +382,48 @@ namespace cial::stdlib {
                 const char32_t c = static_cast<char32_t>(cp.value);
                 i += static_cast<size_t>(w);
                 switch(c) {
-                    case 0x07: out += "\\a"; hexflag = false; continue;
-                    case 0x08: out += "\\b"; hexflag = false; continue;
-                    case 0x0C: out += "\\f"; hexflag = false; continue;
-                    case 0x0A: out += "\\n"; hexflag = false; continue;
-                    case 0x0D: out += "\\r"; hexflag = false; continue;
-                    case 0x09: out += "\\t"; hexflag = false; continue;
-                    case 0x0B: out += "\\v"; hexflag = false; continue;
-                    case '\\': out += "\\\\"; hexflag = false; continue;
-                    case '\'': out += "\\'"; hexflag = false; continue;
-                    case '"': out += "\\\""; hexflag = false; continue;
-                    default: break;
+                    case 0x07:
+                        out += "\\a";
+                        hexflag = false;
+                        continue;
+                    case 0x08:
+                        out += "\\b";
+                        hexflag = false;
+                        continue;
+                    case 0x0C:
+                        out += "\\f";
+                        hexflag = false;
+                        continue;
+                    case 0x0A:
+                        out += "\\n";
+                        hexflag = false;
+                        continue;
+                    case 0x0D:
+                        out += "\\r";
+                        hexflag = false;
+                        continue;
+                    case 0x09:
+                        out += "\\t";
+                        hexflag = false;
+                        continue;
+                    case 0x0B:
+                        out += "\\v";
+                        hexflag = false;
+                        continue;
+                    case '\\':
+                        out += "\\\\";
+                        hexflag = false;
+                        continue;
+                    case '\'':
+                        out += "\\'";
+                        hexflag = false;
+                        continue;
+                    case '"':
+                        out += "\\\"";
+                        hexflag = false;
+                        continue;
+                    default:
+                        break;
                 }
                 char buf[8];
                 if(hexflag && isHexDigitChar(c)) {
@@ -785,8 +814,7 @@ namespace cial::stdlib {
 
         // 结构化二进制主体（saveStruct 的 'b' 形态 / loadStruct 的二进制形态）
         bool isBinaryHeader(const std::string &raw) {
-            return raw.size() >= sizeof(SER_HEADER)
-                && std::memcmp(raw.data(), SER_HEADER, sizeof(SER_HEADER)) == 0;
+            return raw.size() >= sizeof(SER_HEADER) && std::memcmp(raw.data(), SER_HEADER, sizeof(SER_HEADER)) == 0;
         }
 
         // ---------- 结构化文本读入（自包含递归下降，无 VM 重入）----------
@@ -846,19 +874,39 @@ namespace cial::stdlib {
                         fail();
                     const char e = s[i++];
                     switch(e) {
-                        case 'a': out += '\a'; break;
-                        case 'b': out += '\b'; break;
-                        case 'f': out += '\f'; break;
-                        case 'n': out += '\n'; break;
-                        case 'r': out += '\r'; break;
-                        case 't': out += '\t'; break;
-                        case 'v': out += '\v'; break;
-                        case '\\': out += '\\'; break;
-                        case '\'': out += '\''; break;
-                        case '"': out += '"'; break;
+                        case 'a':
+                            out += '\a';
+                            break;
+                        case 'b':
+                            out += '\b';
+                            break;
+                        case 'f':
+                            out += '\f';
+                            break;
+                        case 'n':
+                            out += '\n';
+                            break;
+                        case 'r':
+                            out += '\r';
+                            break;
+                        case 't':
+                            out += '\t';
+                            break;
+                        case 'v':
+                            out += '\v';
+                            break;
+                        case '\\':
+                            out += '\\';
+                            break;
+                        case '\'':
+                            out += '\'';
+                            break;
+                        case '"':
+                            out += '"';
+                            break;
                         case 'x': {
                             if(i + 1 < s.size() && isHexDigitChar(s[i])) {
-                                char buf[3] = {s[i], s[i + 1], 0};
+                                char buf[3] = { s[i], s[i + 1], 0 };
                                 i += 2;
                                 appendUtf8(out, static_cast<char32_t>(std::strtoul(buf, nullptr, 16)));
                             } else {
@@ -866,7 +914,8 @@ namespace cial::stdlib {
                             }
                             break;
                         }
-                        default: fail();
+                        default:
+                            fail();
                     }
                 }
                 return out;
@@ -923,10 +972,10 @@ namespace cial::stdlib {
 
             Value parseArray() {
                 auto *arr = vm.create<Array>(&vm.rt());
-                RootGuard<Array> guard{&vm.rt(), arr};
+                RootGuard<Array> guard{ &vm.rt(), arr };
                 ws();
                 if(lit("]"))
-                    return Value{arr};
+                    return Value{ arr };
                 while(true) {
                     Value v = parseValue();
                     arr->elements.push_back(v);
@@ -936,15 +985,15 @@ namespace cial::stdlib {
                         break;
                     fail();
                 }
-                return Value{arr};
+                return Value{ arr };
             }
 
             Value parseDictionary() {
                 auto *dic = vm.create<Dictionary>();
-                RootGuard<Dictionary> guard{&vm.rt(), dic};
+                RootGuard<Dictionary> guard{ &vm.rt(), dic };
                 ws();
                 if(lit("]"))
-                    return Value{dic};
+                    return Value{ dic };
                 while(true) {
                     const std::string key = parseString();
                     // "=>" 与 ">=" 同义（TJS2 词法怪癖：=> 词形化为 >=）
@@ -958,27 +1007,27 @@ namespace cial::stdlib {
                         break;
                     fail();
                 }
-                return Value{dic};
+                return Value{ dic };
             }
 
             Value parseNumber() {
                 ws();
                 size_t j = i;
-                while(j < s.size() && (std::isxdigit(static_cast<unsigned char>(s[j])) || s[j] == '.'
-                                       || s[j] == 'p' || s[j] == 'P' || s[j] == 'x' || s[j] == 'X'
-                                       || ((s[j] == '-' || s[j] == '+') && (j == i || s[j - 1] == 'p'
-                                                                            || s[j - 1] == 'P'))))
+                while(j < s.size() &&
+                      (std::isxdigit(static_cast<unsigned char>(s[j])) || s[j] == '.' || s[j] == 'p' || s[j] == 'P' ||
+                       s[j] == 'x' || s[j] == 'X' ||
+                       ((s[j] == '-' || s[j] == '+') && (j == i || s[j - 1] == 'p' || s[j - 1] == 'P'))))
                     ++j;
                 const std::string t = s.substr(i, j - i);
                 i = j;
-                if(t.find('.') != std::string::npos
-                   || ((t.find("0x") != std::string::npos || t.find("0X") != std::string::npos)
-                       && (t.find('p') != std::string::npos || t.find('P') != std::string::npos)))
+                if(t.find('.') != std::string::npos ||
+                   ((t.find("0x") != std::string::npos || t.find("0X") != std::string::npos) &&
+                    (t.find('p') != std::string::npos || t.find('P') != std::string::npos)))
                     return Value{ Real{ parseHexFloat(t) } };
                 if(t.compare(0, 2, "0x") == 0 || t.compare(0, 2, "0X") == 0)
                     return Value{ Integer{ static_cast<i64>(std::strtoll(t.c_str(), nullptr, 16)) } };
-                if(t.find('.') != std::string::npos || t.find('e') != std::string::npos
-                   || t.find('E') != std::string::npos)
+                if(t.find('.') != std::string::npos || t.find('e') != std::string::npos ||
+                   t.find('E') != std::string::npos)
                     return Value{ Real{ std::strtod(t.c_str(), nullptr) } };
                 return Value{ Integer{ static_cast<i64>(std::strtoll(t.c_str(), nullptr, 10)) } };
             }
@@ -1003,7 +1052,7 @@ namespace cial::stdlib {
                     while(i < s.size() && s[i] == ' ')
                         ++i;
                     if(i + 3 < s.size() && s[i] == '0' && s[i + 1] == 'x') {
-                        char buf[3] = {s[i + 2], s[i + 3], 0};
+                        char buf[3] = { s[i + 2], s[i + 3], 0 };
                         bytes.push_back(static_cast<u8>(std::strtoul(buf, nullptr, 16)));
                         i += 4;
                         ws();
@@ -1039,9 +1088,35 @@ namespace cial::stdlib {
         // ---------- pack / unpack（tjsOctPack 对齐）----------
 
         enum class OctPackType {
-            ascii, ASCII, bitstring, BITSTRING, charr, CHAR, dbl, flt, hex, HEX,
-            i32t, U32t, longt, LONGt, noshort, NOLONG, pointer, POINTER, shortt, SHORTt,
-            leshort, LELONG, uuencode, BRE, null, NULL_, fill, base64, EOT,
+            ascii,
+            ASCII,
+            bitstring,
+            BITSTRING,
+            charr,
+            CHAR,
+            dbl,
+            flt,
+            hex,
+            HEX,
+            i32t,
+            U32t,
+            longt,
+            LONGt,
+            noshort,
+            NOLONG,
+            pointer,
+            POINTER,
+            shortt,
+            SHORTt,
+            leshort,
+            LELONG,
+            uuencode,
+            BRE,
+            null,
+            NULL_,
+            fill,
+            base64,
+            EOT,
         };
 
         constexpr char OctPackChar[] = {
@@ -1068,7 +1143,7 @@ namespace cial::stdlib {
                 if(t == OctPackType::EOT)
                     serError("unknown pack/unpack template character");
                 ++i;
-                OctPackTemplate entry{t, 1};
+                OctPackTemplate entry{ t, 1 };
                 if(i < templ.size()) {
                     if(templ[i] == '*') {
                         entry.length = -1;
@@ -1148,7 +1223,7 @@ namespace cial::stdlib {
         }
 
         // h: 低位 nibble 在前；H: 高位在前。原版大写十六进制只收 'A'-'E'
-        //（'F' 被漏写，tjsOctPack.cpp HexToBin），按特性同步
+        // （'F' 被漏写，tjsOctPack.cpp HexToBin），按特性同步
         void hexToBin(std::vector<u8> &bin, const std::string &arg, const bool mtol, i32 len) {
             if(len < 0)
                 len = static_cast<i32>(arg.size());
@@ -1201,9 +1276,8 @@ namespace cial::stdlib {
             }
         }
 
-        template<typename TRet, typename TTmp, int NBYTE, typename TRetTmp>
-        void readNumberLE(std::vector<u8> &result, const Value *args, const size_t numargs, size_t &argindex,
-                          i32 len) {
+        template <typename TRet, typename TTmp, int NBYTE, typename TRetTmp>
+        void readNumberLE(std::vector<u8> &result, const Value *args, const size_t numargs, size_t &argindex, i32 len) {
             if(len < 0)
                 len = static_cast<i32>(numargs - argindex);
             if(static_cast<size_t>(len) + argindex > numargs)
@@ -1218,9 +1292,8 @@ namespace cial::stdlib {
             argindex += static_cast<size_t>(len - 1);
         }
 
-        template<typename TRet, typename TTmp, int NBYTE, typename TRetTmp>
-        void readNumberBE(std::vector<u8> &result, const Value *args, const size_t numargs, size_t &argindex,
-                          i32 len) {
+        template <typename TRet, typename TTmp, int NBYTE, typename TRetTmp>
+        void readNumberBE(std::vector<u8> &result, const Value *args, const size_t numargs, size_t &argindex, i32 len) {
             if(len < 0)
                 len = static_cast<i32>(numargs - argindex);
             if(static_cast<size_t>(len) + argindex > numargs)
@@ -1236,7 +1309,7 @@ namespace cial::stdlib {
         }
 
         // 浮点写出（double 实参；f 单精度由调用方截断）
-        template<typename TRet, int NBYTE, typename TBits>
+        template <typename TRet, int NBYTE, typename TBits>
         void readRealLE(std::vector<u8> &result, const Value *args, const size_t numargs, size_t &argindex,
                         const i32 len) {
             i32 l = len;
@@ -1438,7 +1511,7 @@ namespace cial::stdlib {
         }
 
         // unpack 各数值形态（LE/BE + 尾部截断 + 残组补推）
-        template<typename TRet, int NBYTE>
+        template <typename TRet, int NBYTE>
         void binToNumberLE(std::vector<TRet> &result, const u8 *&cur, const u8 *tail, i32 len) {
             if(len < 0)
                 len = static_cast<i32>((tail - cur + NBYTE - 1) / NBYTE);
@@ -1460,7 +1533,7 @@ namespace cial::stdlib {
                 result.push_back(val);
         }
 
-        template<typename TRet, int NBYTE>
+        template <typename TRet, int NBYTE>
         void binToNumberBE(std::vector<TRet> &result, const u8 *&cur, const u8 *tail, i32 len) {
             if(len < 0)
                 len = static_cast<i32>((tail - cur + NBYTE - 1) / NBYTE);
@@ -1482,7 +1555,7 @@ namespace cial::stdlib {
                 result.push_back(val);
         }
 
-        template<typename TRet, int NBYTE, typename TBits>
+        template <typename TRet, int NBYTE, typename TBits>
         void binToRealLE(std::vector<TRet> &result, const u8 *&cur, const u8 *tail, i32 len) {
             const size_t available = static_cast<size_t>(tail - cur);
             // 先限制字节数，再形成指针，截断输入也不会越过缓冲区末尾。
@@ -1750,8 +1823,7 @@ namespace cial::stdlib {
 
         // ---------- assignStruct（结构化深拷贝，环 → null）----------
 
-        void assignStructIntoDict(VM &vm, Dictionary *dst, const Dictionary *src,
-                                  std::vector<const Object *> &stack);
+        void assignStructIntoDict(VM &vm, Dictionary *dst, const Dictionary *src, std::vector<const Object *> &stack);
 
         void assignStructIntoArray(VM &vm, Array *dst, const Array *src, std::vector<const Object *> &stack) {
             stack.push_back(src);
@@ -1765,11 +1837,11 @@ namespace cial::stdlib {
                     }
                     if(auto *sarr = dynamic_cast<const Array *>(obj)) {
                         auto *narr = vm.create<Array>(&vm.rt());
-                        dst->elements.push_back(Value{narr});
+                        dst->elements.push_back(Value{ narr });
                         assignStructIntoArray(vm, narr, sarr, stack);
                     } else if(auto *sdic = dynamic_cast<const Dictionary *>(obj)) {
                         auto *ndic = vm.create<Dictionary>();
-                        dst->elements.push_back(Value{ndic});
+                        dst->elements.push_back(Value{ ndic });
                         assignStructIntoDict(vm, ndic, sdic, stack);
                     } else {
                         dst->elements.push_back(item); // 其他对象按引用复制（原版同）
@@ -1781,8 +1853,7 @@ namespace cial::stdlib {
             stack.pop_back();
         }
 
-        void assignStructIntoDict(VM &vm, Dictionary *dst, const Dictionary *src,
-                                  std::vector<const Object *> &stack) {
+        void assignStructIntoDict(VM &vm, Dictionary *dst, const Dictionary *src, std::vector<const Object *> &stack) {
             stack.push_back(src);
             dst->members.clear();
             for(const auto &[atom, value] : src->members) {
@@ -1794,11 +1865,11 @@ namespace cial::stdlib {
                     }
                     if(auto *sarr = dynamic_cast<const Array *>(obj)) {
                         auto *narr = vm.create<Array>(&vm.rt());
-                        dst->members[atom] = Value{narr};
+                        dst->members[atom] = Value{ narr };
                         assignStructIntoArray(vm, narr, sarr, stack);
                     } else if(auto *sdic = dynamic_cast<const Dictionary *>(obj)) {
                         auto *ndic = vm.create<Dictionary>();
-                        dst->members[atom] = Value{ndic};
+                        dst->members[atom] = Value{ ndic };
                         assignStructIntoDict(vm, ndic, sdic, stack);
                     } else {
                         dst->members[atom] = value;
@@ -1826,8 +1897,7 @@ namespace cial::stdlib {
         size_t p = 0;
         while(p < content.size()) {
             if(content[p] == '\r' || content[p] == '\n') {
-                arr->elements.push_back(
-                    Value{ String(content.c_str() + sp, static_cast<u32>(p - sp)) });
+                arr->elements.push_back(Value{ String(content.c_str() + sp, static_cast<u32>(p - sp)) });
                 const char c = content[p++];
                 if(c == '\r' && p < content.size() && content[p] == '\n')
                     ++p;
@@ -1862,8 +1932,8 @@ namespace cial::stdlib {
         const std::string raw = readFileBytes(makeString(argString(argCount, args, 0)));
         if(!isBinaryHeader(raw))
             serError("Array.loadStruct expects a binary struct file");
-        BinReader reader{*vm, reinterpret_cast<const u8 *>(raw.data()) + sizeof(SER_HEADER),
-                         raw.size() - sizeof(SER_HEADER)};
+        BinReader reader{ *vm, reinterpret_cast<const u8 *>(raw.data()) + sizeof(SER_HEADER),
+                          raw.size() - sizeof(SER_HEADER) };
         reader.readValue(arr, nullptr);
         return thisObj;
     }
@@ -1874,13 +1944,13 @@ namespace cial::stdlib {
             serError("Array.saveStruct expects an array");
         const String name = makeString(argString(argCount, args, 0));
         if(modeHasFlag(argCount, args, 1, 'b')) {
-            std::string out{reinterpret_cast<const char *>(SER_HEADER), sizeof(SER_HEADER)};
-            std::vector<const Object *> stack{arr};
+            std::string out{ reinterpret_cast<const char *>(SER_HEADER), sizeof(SER_HEADER) };
+            std::vector<const Object *> stack{ arr };
             saveStructBinaryArray(out, arr, stack, vm->rt().atomTable);
             writeFileBytes(name, out);
         } else {
             std::string out;
-            std::vector<const Object *> stack{arr};
+            std::vector<const Object *> stack{ arr };
             saveStructTextArray(out, arr, stack, {}, vm->rt().atomTable);
             writeFileBytes(name, out);
         }
@@ -1928,15 +1998,15 @@ namespace cial::stdlib {
         dic->members.clear(); // 原版在读文件前即清空自身
         const std::string raw = readFileBytes(makeString(argString(argCount, args, 0)));
         if(isBinaryHeader(raw)) {
-            BinReader reader{*vm, reinterpret_cast<const u8 *>(raw.data()) + sizeof(SER_HEADER),
-                             raw.size() - sizeof(SER_HEADER)};
+            BinReader reader{ *vm, reinterpret_cast<const u8 *>(raw.data()) + sizeof(SER_HEADER),
+                              raw.size() - sizeof(SER_HEADER) };
             reader.readValue(nullptr, dic);
             return thisObj;
         }
         // 非二进制回落文本结构化：解析结果作为返回值（不写入自身——原版同款怪癖）。
         // 专用解析器而非表达式求值：evalExpr 与外层脚本执行共用 VMState 不可重入
         const std::string text = readTextDecoded(makeString(argString(argCount, args, 0)));
-        TextParser parser{*vm, text};
+        TextParser parser{ *vm, text };
         return parser.parseValue();
     }
 
@@ -1946,13 +2016,13 @@ namespace cial::stdlib {
             serError("Dictionary.saveStruct expects a dictionary");
         const String name = makeString(argString(argCount, args, 0));
         if(modeHasFlag(argCount, args, 1, 'b')) {
-            std::string out{reinterpret_cast<const char *>(SER_HEADER), sizeof(SER_HEADER)};
-            std::vector<const Object *> stack{dic};
+            std::string out{ reinterpret_cast<const char *>(SER_HEADER), sizeof(SER_HEADER) };
+            std::vector<const Object *> stack{ dic };
             saveStructBinaryDictionary(out, dic, stack, vm->rt().atomTable);
             writeFileBytes(name, out);
         } else {
             std::string out;
-            std::vector<const Object *> stack{dic};
+            std::vector<const Object *> stack{ dic };
             saveStructTextDictionary(out, dic, stack, {}, vm->rt().atomTable);
             writeFileBytes(name, out);
         }

@@ -12,8 +12,8 @@
 
 #include "Class.hpp"
 
-#include <unordered_set>
 #include <fmt/format.h>
+#include <unordered_set>
 
 #include "Property.hpp"
 #include "vm/VM.hpp"

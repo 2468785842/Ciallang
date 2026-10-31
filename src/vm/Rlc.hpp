@@ -49,9 +49,7 @@ namespace cial::vm {
         [[nodiscard]] bool empty() const noexcept { return _bytecodeMapLine.empty(); }
 
         // 换算用：暴露条目（Chunk::toBytecode 把 TAC 下标替换为 bc 偏移）
-        [[nodiscard]] std::vector<std::pair<size_t, Common::SourceLocation>> &rawEntries() {
-            return _bytecodeMapLine;
-        }
+        [[nodiscard]] std::vector<std::pair<size_t, Common::SourceLocation>> &rawEntries() { return _bytecodeMapLine; }
         [[nodiscard]] const auto &rawEntries() const noexcept { return _bytecodeMapLine; }
 
     private:

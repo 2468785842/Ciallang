@@ -92,7 +92,7 @@ namespace cial::Common {
     }
 
 
-    int64_t utf8Strlen(const std::string& str) {
+    int64_t utf8Strlen(const std::string &str) {
         int64_t len = 0;
         for(auto p = str.data(); *p; len++) {
             const auto c = static_cast<u8>(*p);
@@ -114,7 +114,7 @@ namespace cial::Common {
         return len;
     }
 
-    size_t utf8DisplayWidth(const char* str, const size_t length) {
+    size_t utf8DisplayWidth(const char *str, const size_t length) {
         size_t width = 0;
         size_t i = 0;
         while(i < length) {
@@ -130,7 +130,7 @@ namespace cial::Common {
         return width;
     }
 
-    CodePointType utf8Decode(const char* str, size_t length) {
+    CodePointType utf8Decode(const char *str, size_t length) {
         CodePointType cp;
         if(length == 0)
             return cp;

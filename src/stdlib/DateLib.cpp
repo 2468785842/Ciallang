@@ -37,9 +37,7 @@ namespace cial::stdlib {
     }
 
     namespace {
-        DateNS *asDate(const Value &thisObj) {
-            return dynamic_cast<DateNS *>(thisObj.asObject().unwrap());
-        }
+        DateNS *asDate(const Value &thisObj) { return dynamic_cast<DateNS *>(thisObj.asObject().unwrap()); }
 
         Integer intArg(const Value &v, const Integer fallback) {
             return v.isVoid() ? fallback : v.asInteger().unwrap();

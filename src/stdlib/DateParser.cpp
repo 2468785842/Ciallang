@@ -33,7 +33,7 @@ namespace cial::stdlib {
         struct Token {
             TokKind kind;
             int val{}; // NUMBER / MONTH(0-based) / WDAY / TZ(hhmm)
-            int ch{};  // TK_CHAR 的字符码（已小写化）
+            int ch{}; // TK_CHAR 的字符码（已小写化）
         };
 
         // 词表（tjsDateWordMap.cpp 全量转写）。匹配语义 = 最长前缀命中且词后
@@ -47,71 +47,148 @@ namespace cial::stdlib {
 
         constexpr DateWord kWords[] = {
             // 月名（val = 0-based 月份）
-            {"january", TK_MONTH, 0},  {"jan", TK_MONTH, 0},  {"jan.", TK_MONTH, 0},
-            {"february", TK_MONTH, 1}, {"feb", TK_MONTH, 1},  {"feb.", TK_MONTH, 1},
-            {"march", TK_MONTH, 2},    {"mar", TK_MONTH, 2},  {"mar.", TK_MONTH, 2},
-            {"april", TK_MONTH, 3},    {"apr", TK_MONTH, 3},  {"apr.", TK_MONTH, 3},
-            {"may", TK_MONTH, 4},
-            {"june", TK_MONTH, 5},     {"jun", TK_MONTH, 5},  {"jun.", TK_MONTH, 5},
-            {"ju", TK_MONTH, 5}, // 原版词表怪癖："ju" 单独成词
-            {"july", TK_MONTH, 6},     {"jul", TK_MONTH, 6},  {"jul.", TK_MONTH, 6},
-            {"august", TK_MONTH, 7},   {"aug", TK_MONTH, 7},  {"aug.", TK_MONTH, 7},
-            {"september", TK_MONTH, 8}, {"sept", TK_MONTH, 8}, {"sept.", TK_MONTH, 8},
-            {"sep", TK_MONTH, 8},      {"sep.", TK_MONTH, 8},
-            {"october", TK_MONTH, 9},  {"oct", TK_MONTH, 9},  {"oct.", TK_MONTH, 9},
-            {"november", TK_MONTH, 10}, {"nov", TK_MONTH, 10}, {"nov.", TK_MONTH, 10},
-            {"december", TK_MONTH, 11}, {"dec", TK_MONTH, 11}, {"dec.", TK_MONTH, 11},
+            { "january", TK_MONTH, 0 },
+            { "jan", TK_MONTH, 0 },
+            { "jan.", TK_MONTH, 0 },
+            { "february", TK_MONTH, 1 },
+            { "feb", TK_MONTH, 1 },
+            { "feb.", TK_MONTH, 1 },
+            { "march", TK_MONTH, 2 },
+            { "mar", TK_MONTH, 2 },
+            { "mar.", TK_MONTH, 2 },
+            { "april", TK_MONTH, 3 },
+            { "apr", TK_MONTH, 3 },
+            { "apr.", TK_MONTH, 3 },
+            { "may", TK_MONTH, 4 },
+            { "june", TK_MONTH, 5 },
+            { "jun", TK_MONTH, 5 },
+            { "jun.", TK_MONTH, 5 },
+            { "ju", TK_MONTH, 5 }, // 原版词表怪癖："ju" 单独成词
+            { "july", TK_MONTH, 6 },
+            { "jul", TK_MONTH, 6 },
+            { "jul.", TK_MONTH, 6 },
+            { "august", TK_MONTH, 7 },
+            { "aug", TK_MONTH, 7 },
+            { "aug.", TK_MONTH, 7 },
+            { "september", TK_MONTH, 8 },
+            { "sept", TK_MONTH, 8 },
+            { "sept.", TK_MONTH, 8 },
+            { "sep", TK_MONTH, 8 },
+            { "sep.", TK_MONTH, 8 },
+            { "october", TK_MONTH, 9 },
+            { "oct", TK_MONTH, 9 },
+            { "oct.", TK_MONTH, 9 },
+            { "november", TK_MONTH, 10 },
+            { "nov", TK_MONTH, 10 },
+            { "nov.", TK_MONTH, 10 },
+            { "december", TK_MONTH, 11 },
+            { "dec", TK_MONTH, 11 },
+            { "dec.", TK_MONTH, 11 },
             // 星期（值不参与语义，仅被文法消费）
-            {"sunday", TK_WDAY, 0},    {"sun", TK_WDAY, 0},   {"sun.", TK_WDAY, 0},
-            {"monday", TK_WDAY, 1},    {"mon", TK_WDAY, 1},   {"mon.", TK_WDAY, 1},
-            {"tuesday", TK_WDAY, 2},   {"tues", TK_WDAY, 2},  {"tues.", TK_WDAY, 2},
-            {"tue", TK_WDAY, 2},       {"tue.", TK_WDAY, 2},
-            {"wednesday", TK_WDAY, 3}, {"wed", TK_WDAY, 3},   {"wed.", TK_WDAY, 3},
-            {"thursday", TK_WDAY, 4},  {"thurs", TK_WDAY, 4}, {"thurs.", TK_WDAY, 4},
-            {"thur", TK_WDAY, 4},      {"thu", TK_WDAY, 4},   {"thu.", TK_WDAY, 4},
-            {"friday", TK_WDAY, 5},    {"fri", TK_WDAY, 5},   {"fri.", TK_WDAY, 5},
-            {"saturday", TK_WDAY, 6},  {"sat", TK_WDAY, 6},   {"sat.", TK_WDAY, 6},
+            { "sunday", TK_WDAY, 0 },
+            { "sun", TK_WDAY, 0 },
+            { "sun.", TK_WDAY, 0 },
+            { "monday", TK_WDAY, 1 },
+            { "mon", TK_WDAY, 1 },
+            { "mon.", TK_WDAY, 1 },
+            { "tuesday", TK_WDAY, 2 },
+            { "tues", TK_WDAY, 2 },
+            { "tues.", TK_WDAY, 2 },
+            { "tue", TK_WDAY, 2 },
+            { "tue.", TK_WDAY, 2 },
+            { "wednesday", TK_WDAY, 3 },
+            { "wed", TK_WDAY, 3 },
+            { "wed.", TK_WDAY, 3 },
+            { "thursday", TK_WDAY, 4 },
+            { "thurs", TK_WDAY, 4 },
+            { "thurs.", TK_WDAY, 4 },
+            { "thur", TK_WDAY, 4 },
+            { "thu", TK_WDAY, 4 },
+            { "thu.", TK_WDAY, 4 },
+            { "friday", TK_WDAY, 5 },
+            { "fri", TK_WDAY, 5 },
+            { "fri.", TK_WDAY, 5 },
+            { "saturday", TK_WDAY, 6 },
+            { "sat", TK_WDAY, 6 },
+            { "sat.", TK_WDAY, 6 },
             // 上午/下午
-            {"am", TK_AM, 0},
-            {"pm", TK_PM, 0},
+            { "am", TK_AM, 0 },
+            { "pm", TK_PM, 0 },
             // 时区缩写（val = [+/-]hhmm）
-            {"acst", TK_TZ, 1030},  {"act", TK_TZ, 930},    {"adt", TK_TZ, -300},
-            {"aest", TK_TZ, 1100},  {"aet", TK_TZ, 1000},   {"ahst", TK_TZ, -1000},
-            {"ast", TK_TZ, -400},   {"awst", TK_TZ, 900},   {"awt", TK_TZ, 800},
-            {"a", TK_TZ, -100},
-            {"bst", TK_TZ, 100},    {"bt", TK_TZ, 300},
-            {"cadt", TK_TZ, 1030},  {"cast", TK_TZ, 930},   {"cat", TK_TZ, -1000},
-            {"cct", TK_TZ, 800},    {"cdt", TK_TZ, -500},   {"cedt", TK_TZ, 200},
-            {"cet", TK_TZ, 100},    {"cst", TK_TZ, -600},
-            {"dnt", TK_TZ, 100},
-            {"east", TK_TZ, 1000},  {"edt", TK_TZ, -400},   {"eetdst", TK_TZ, 300},
-            {"eet", TK_TZ, 200},    {"est", TK_TZ, -500},
-            {"fst", TK_TZ, 100},    {"fwt", TK_TZ, 200},
-            {"gmt", TK_TZ, 0},      {"gst", TK_TZ, 1000},
-            {"hdt", TK_TZ, -900},
-            {"idle", TK_TZ, 1200},  {"idlw", TK_TZ, -1200}, {"ist", TK_TZ, 200},
-            {"it", TK_TZ, 330},
-            {"jst", TK_TZ, 900},    {"jt", TK_TZ, 730},
-            {"kst", TK_TZ, 900},
-            {"ligt", TK_TZ, 1000},
-            {"mdt", TK_TZ, -600},   {"mest", TK_TZ, 200},   {"metdst", TK_TZ, 200},
-            {"met", TK_TZ, 100},    {"mewt", TK_TZ, 100},   {"mst", TK_TZ, -700},
-            {"mt", TK_TZ, 830},
-            {"m", TK_TZ, -1200},
-            {"ndt", TK_TZ, -230},   {"nft", TK_TZ, -330},   {"nor", TK_TZ, 100},
-            {"nst", TK_TZ, -330},   {"nt", TK_TZ, -1100},   {"nzdt", TK_TZ, 1300},
-            {"nzst", TK_TZ, 1200},  {"nzt", TK_TZ, 1200},
-            {"n", TK_TZ, 100},
-            {"pdt", TK_TZ, -700},   {"pst", TK_TZ, -800},
-            {"sadt", TK_TZ, 1030},  {"sast", TK_TZ, 930},   {"set", TK_TZ, 100},
-            {"sst", TK_TZ, 200},
-            {"utc", TK_TZ, 0},      {"ut", TK_TZ, 0},
-            {"wadt", TK_TZ, 800},   {"wast", TK_TZ, 700},   {"wat", TK_TZ, -100},
-            {"wdt", TK_TZ, 900},    {"wetdst", TK_TZ, 100}, {"wet", TK_TZ, 0},
-            {"wst", TK_TZ, 800},
-            {"ydt", TK_TZ, -800},
-            {"y", TK_TZ, 1200},
-            {"z", TK_TZ, 0},
+            { "acst", TK_TZ, 1030 },
+            { "act", TK_TZ, 930 },
+            { "adt", TK_TZ, -300 },
+            { "aest", TK_TZ, 1100 },
+            { "aet", TK_TZ, 1000 },
+            { "ahst", TK_TZ, -1000 },
+            { "ast", TK_TZ, -400 },
+            { "awst", TK_TZ, 900 },
+            { "awt", TK_TZ, 800 },
+            { "a", TK_TZ, -100 },
+            { "bst", TK_TZ, 100 },
+            { "bt", TK_TZ, 300 },
+            { "cadt", TK_TZ, 1030 },
+            { "cast", TK_TZ, 930 },
+            { "cat", TK_TZ, -1000 },
+            { "cct", TK_TZ, 800 },
+            { "cdt", TK_TZ, -500 },
+            { "cedt", TK_TZ, 200 },
+            { "cet", TK_TZ, 100 },
+            { "cst", TK_TZ, -600 },
+            { "dnt", TK_TZ, 100 },
+            { "east", TK_TZ, 1000 },
+            { "edt", TK_TZ, -400 },
+            { "eetdst", TK_TZ, 300 },
+            { "eet", TK_TZ, 200 },
+            { "est", TK_TZ, -500 },
+            { "fst", TK_TZ, 100 },
+            { "fwt", TK_TZ, 200 },
+            { "gmt", TK_TZ, 0 },
+            { "gst", TK_TZ, 1000 },
+            { "hdt", TK_TZ, -900 },
+            { "idle", TK_TZ, 1200 },
+            { "idlw", TK_TZ, -1200 },
+            { "ist", TK_TZ, 200 },
+            { "it", TK_TZ, 330 },
+            { "jst", TK_TZ, 900 },
+            { "jt", TK_TZ, 730 },
+            { "kst", TK_TZ, 900 },
+            { "ligt", TK_TZ, 1000 },
+            { "mdt", TK_TZ, -600 },
+            { "mest", TK_TZ, 200 },
+            { "metdst", TK_TZ, 200 },
+            { "met", TK_TZ, 100 },
+            { "mewt", TK_TZ, 100 },
+            { "mst", TK_TZ, -700 },
+            { "mt", TK_TZ, 830 },
+            { "m", TK_TZ, -1200 },
+            { "ndt", TK_TZ, -230 },
+            { "nft", TK_TZ, -330 },
+            { "nor", TK_TZ, 100 },
+            { "nst", TK_TZ, -330 },
+            { "nt", TK_TZ, -1100 },
+            { "nzdt", TK_TZ, 1300 },
+            { "nzst", TK_TZ, 1200 },
+            { "nzt", TK_TZ, 1200 },
+            { "n", TK_TZ, 100 },
+            { "pdt", TK_TZ, -700 },
+            { "pst", TK_TZ, -800 },
+            { "sadt", TK_TZ, 1030 },
+            { "sast", TK_TZ, 930 },
+            { "set", TK_TZ, 100 },
+            { "sst", TK_TZ, 200 },
+            { "utc", TK_TZ, 0 },
+            { "ut", TK_TZ, 0 },
+            { "wadt", TK_TZ, 800 },
+            { "wast", TK_TZ, 700 },
+            { "wat", TK_TZ, -100 },
+            { "wdt", TK_TZ, 900 },
+            { "wetdst", TK_TZ, 100 },
+            { "wet", TK_TZ, 0 },
+            { "wst", TK_TZ, 800 },
+            { "ydt", TK_TZ, -800 },
+            { "y", TK_TZ, 1200 },
+            { "z", TK_TZ, 0 },
         };
 
         class DateParser {
@@ -136,7 +213,7 @@ namespace cial::stdlib {
             const unsigned char *input;
             const unsigned char *cursor;
             bool hasPending = false; // 单枚回退 token（对齐 bison 的单 token 前瞻）
-            Token pending{TK_END};
+            Token pending{ TK_END };
             bool yearSet = false, monthSet = false, mdaySet = false;
             bool hourSet = false, minSet = false, secSet = false;
             bool ampmSet = false, ampm = false; // ampm: pm 为 true
@@ -146,17 +223,13 @@ namespace cial::stdlib {
 
             [[noreturn]] static void fail() { throw std::runtime_error("cannot parse date"); }
 
-            static bool isSpaceByte(const unsigned char c) {
-                return c < 0x80 && std::isspace(c) != 0;
-            }
+            static bool isSpaceByte(const unsigned char c) { return c < 0x80 && std::isspace(c) != 0; }
 
             static bool isDigitByte(const unsigned char c) { return c >= '0' && c <= '9'; }
 
             // 词边界：ASCII 字母或任意 >=0x80 字节视为字母（原 iswalpha 对宽字符
             // 一律返回字母；UTF-8 多字节序列逐字节等价阻断词命中）
-            static bool isAlphaByte(const unsigned char c) {
-                return c >= 0x80 || std::isalpha(c) != 0;
-            }
+            static bool isAlphaByte(const unsigned char c) { return c >= 0x80 || std::isalpha(c) != 0; }
 
             static unsigned char lowerByte(const unsigned char c) {
                 return c >= 'A' && c <= 'Z' ? static_cast<unsigned char>(c - 'A' + 'a') : c;
@@ -188,21 +261,21 @@ namespace cial::stdlib {
                 while(*cursor != 0 && isSpaceByte(*cursor))
                     cursor++;
                 if(*cursor == 0)
-                    return {TK_END};
+                    return { TK_END };
                 if(isDigitByte(*cursor)) {
                     int val = 0;
                     while(isDigitByte(*cursor))
                         val = val * 10 + (*cursor++ - '0');
-                    return {TK_NUMBER, val};
+                    return { TK_NUMBER, val };
                 }
                 if(const DateWord *w = matchWord(cursor)) {
                     cursor += std::strlen(w->word);
-                    return {w->kind, w->val};
+                    return { w->kind, w->val };
                 }
                 int ch = *cursor++;
                 if(ch >= 'A' && ch <= 'Z')
                     ch += 'a' - 'A';
-                return {TK_CHAR, 0, ch};
+                return { TK_CHAR, 0, ch };
             }
 
             void unlex(const Token t) {
@@ -571,7 +644,7 @@ namespace cial::stdlib {
     } // namespace
 
     time_t parseDateString(const std::string &s) {
-        DateParser parser{s};
+        DateParser parser{ s };
         return parser.parse();
     }
 

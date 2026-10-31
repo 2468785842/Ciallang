@@ -365,9 +365,11 @@ namespace cial {
             return Ret<Value>::ok(Value{ String::concat(*asString().value(), *value.asString().value()) });
 
         if(isString() && value.isIntegerFast())
-            return Ret<Value>::ok(Value{ String::concat(*asString().value(), TypeConverter::integerToString(value._data.integer)) });
+            return Ret<Value>::ok(
+                Value{ String::concat(*asString().value(), TypeConverter::integerToString(value._data.integer)) });
         if(isIntegerFast() && value.isString())
-            return Ret<Value>::ok(Value{ String::concat(TypeConverter::integerToString(_data.integer), *value.asString().value()) });
+            return Ret<Value>::ok(
+                Value{ String::concat(TypeConverter::integerToString(_data.integer), *value.asString().value()) });
 
         if(this->isString() || value.isString()) {
             Value lhs = *this;

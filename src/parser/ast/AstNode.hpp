@@ -52,8 +52,8 @@
     O(VarDeclNode)                                                                                                     \
     O(FunctionDeclNode)                                                                                                \
     O(ClassDeclNode)                                                                                                   \
-    O(OmitArgExprNode) \
-    O(ExpandArgExprNode) \
+    O(OmitArgExprNode)                                                                                                 \
+    O(ExpandArgExprNode)                                                                                               \
     O(StmtDeclNode)
 
 namespace cial::inter {
@@ -69,9 +69,9 @@ namespace cial::syntax {
 
     // 函数声明参数：`name` / `name = 默认值` / `name*`（末位收拢）/ `*`（未命名收拢）
     struct FuncParam {
-        Token name;          // 空名 = 未命名 collapse
+        Token name; // 空名 = 未命名 collapse
         ExprNode *defaultValue{};
-        bool collapse{};     // 收拢参数（必须是最后一个）
+        bool collapse{}; // 收拢参数（必须是最后一个）
     };
 
     using Parameters = std::vector<FuncParam>;

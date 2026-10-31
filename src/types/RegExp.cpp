@@ -110,8 +110,6 @@ namespace cial {
         throw std::runtime_error("RegExp member not found");
     }
 
-    bool RegExp::hasProp(const Atom a) const {
-        return regexpPropName(_rt->wkAtoms, a) != RegExpProp::None;
-    }
+    bool RegExp::hasProp(const Atom a) const { return regexpPropName(_rt->wkAtoms, a) != RegExpProp::None; }
 
 } // namespace cial

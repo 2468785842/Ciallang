@@ -162,11 +162,11 @@ namespace cial::syntax {
 
     static constexpr auto S_TypeToName = frozen::make_unordered_map<TokenType, frozen::string>({
 #define LIST_TO_NAME_PAIR(NAME, SYMBOL) { TokenType::NAME, SYMBOL },
-            SYMBOL_LIST(LIST_TO_NAME_PAIR) KEYWORD_LIST(LIST_TO_NAME_PAIR) TOKEN_SYMBOL_LIST(LIST_TO_NAME_PAIR)
+        SYMBOL_LIST(LIST_TO_NAME_PAIR) KEYWORD_LIST(LIST_TO_NAME_PAIR) TOKEN_SYMBOL_LIST(LIST_TO_NAME_PAIR)
 #undef LIST_TO_NAME_PAIR
     });
 
-    static constexpr const char* tokenTypeToStr(const TokenType type) {
+    static constexpr const char *tokenTypeToStr(const TokenType type) {
         if(const auto it = S_TypeToName.find(type); it != S_TypeToName.end()) {
             return it->second.data();
         }
@@ -184,16 +184,13 @@ namespace cial::syntax {
 
         constexpr explicit Token() = default;
 
-        constexpr explicit Token(const TokenType type) : _type(type) {
-        }
+        constexpr explicit Token(const TokenType type) : _type(type) {}
 
         explicit Token(const TokenType type, const Integer value) :
-            _type(type), _valueType(TokenValueType::Integer), _integer(value) {
-        }
+            _type(type), _valueType(TokenValueType::Integer), _integer(value) {}
 
         explicit Token(const TokenType type, const Real value) :
-            _type(type), _valueType(TokenValueType::Real), _real(value) {
-        }
+            _type(type), _valueType(TokenValueType::Real), _real(value) {}
 
         explicit Token(const TokenType type, String string) : _type(type), _valueType(TokenValueType::String) {
             _string = new String{ std::move(string) };
@@ -203,7 +200,7 @@ namespace cial::syntax {
             _octet = new Octet{ std::move(octet) };
         }
 
-        Token(Token&& token) noexcept {
+        Token(Token &&token) noexcept {
             _type = token._type;
             _valueType = token._valueType;
             location = token.location;
@@ -232,7 +229,7 @@ namespace cial::syntax {
             token._valueType = TokenValueType::None;
         }
 
-        Token& operator=(Token&& token) noexcept {
+        Token &operator=(Token &&token) noexcept {
             if(this != &token) {
                 this->~Token();
                 new(this) Token(std::move(token));
@@ -241,7 +238,7 @@ namespace cial::syntax {
         }
 
 
-        Token(const Token& token) {
+        Token(const Token &token) {
             _type = token._type;
             _valueType = token._valueType;
             location = token.location;
@@ -266,7 +263,7 @@ namespace cial::syntax {
             }
         }
 
-        Token& operator=(const Token& token) {
+        Token &operator=(const Token &token) {
             if(this != &token) {
                 this->~Token();
                 new(this) Token(token);
@@ -284,11 +281,11 @@ namespace cial::syntax {
 
         [[nodiscard]] constexpr Real getReal() const noexcept { return _real; }
 
-        [[nodiscard]] const String& getString() const noexcept { return *_string; }
+        [[nodiscard]] const String &getString() const noexcept { return *_string; }
 
-        [[nodiscard]] const Octet& getOctet() const noexcept { return *_octet; }
+        [[nodiscard]] const Octet &getOctet() const noexcept { return *_octet; }
 
-        [[nodiscard]] constexpr const char* name() const noexcept { return tokenTypeToStr(_type); }
+        [[nodiscard]] constexpr const char *name() const noexcept { return tokenTypeToStr(_type); }
 
         ~Token() noexcept {
             if(_valueType == TokenValueType::String) {
@@ -305,8 +302,8 @@ namespace cial::syntax {
         union {
             Integer _integer{};
             Real _real;
-            String* _string;
-            Octet* _octet;
+            String *_string;
+            Octet *_octet;
         };
     };
 
@@ -326,20 +323,20 @@ namespace cial::syntax {
 
     private:
         static constexpr auto _assignToNonAssign = frozen::make_unordered_map<TokenType, TokenType>({
-                { TokenType::PlusEqual, TokenType::Plus },               // +=
-                { TokenType::MinusEqual, TokenType::Minus },             // -=
-                { TokenType::SlashEqual, TokenType::Slash },             // /=
-                { TokenType::PercentEqual, TokenType::Percent },         // %=
-                { TokenType::AsteriskEqual, TokenType::Asterisk },       // *=
-                { TokenType::VertLineEqual, TokenType::VertLine },       // |=
-                { TokenType::AmpersandEqual, TokenType::Ampersand },     // &=
-                { TokenType::ChevronEqual, TokenType::Chevron },         // ^=
-                { TokenType::BackslashEqual, TokenType::Backslash },     // \=
-                { TokenType::LogicalOrEqual, TokenType::LogicalOr },     // ||=
-                { TokenType::LogicalAndEqual, TokenType::LogicalAnd },   // &&=
-                { TokenType::RBitShiftEqual, TokenType::RBitShift },     // >>>=
-                { TokenType::LArithShiftEqual, TokenType::LArithShift }, // <<=
-                { TokenType::RArithShiftEqual, TokenType::RArithShift }  // >>=
+            { TokenType::PlusEqual, TokenType::Plus }, // +=
+            { TokenType::MinusEqual, TokenType::Minus }, // -=
+            { TokenType::SlashEqual, TokenType::Slash }, // /=
+            { TokenType::PercentEqual, TokenType::Percent }, // %=
+            { TokenType::AsteriskEqual, TokenType::Asterisk }, // *=
+            { TokenType::VertLineEqual, TokenType::VertLine }, // |=
+            { TokenType::AmpersandEqual, TokenType::Ampersand }, // &=
+            { TokenType::ChevronEqual, TokenType::Chevron }, // ^=
+            { TokenType::BackslashEqual, TokenType::Backslash }, // \=
+            { TokenType::LogicalOrEqual, TokenType::LogicalOr }, // ||=
+            { TokenType::LogicalAndEqual, TokenType::LogicalAnd }, // &&=
+            { TokenType::RBitShiftEqual, TokenType::RBitShift }, // >>>=
+            { TokenType::LArithShiftEqual, TokenType::LArithShift }, // <<=
+            { TokenType::RArithShiftEqual, TokenType::RArithShift } // >>=
         });
     };
 } // namespace cial::syntax

@@ -14,10 +14,10 @@ namespace cial::tjsbc {
     namespace {
 
         // 文件魔数：'T','J','S','2','1','0','0',0（与 context 记录的 "TJS2" tag 同串前缀）
-        constexpr u8 FILE_TAG[8] = {'T', 'J', 'S', '2', '1', '0', '0', 0};
-        constexpr u8 DATA_TAG[4] = {'D', 'A', 'T', 'A'};
-        constexpr u8 OBJ_TAG[4] = {'O', 'B', 'J', 'S'};
-        constexpr u8 CODE_TAG[4] = {'T', 'J', 'S', '2'};
+        constexpr u8 FILE_TAG[8] = { 'T', 'J', 'S', '2', '1', '0', '0', 0 };
+        constexpr u8 DATA_TAG[4] = { 'D', 'A', 'T', 'A' };
+        constexpr u8 OBJ_TAG[4] = { 'O', 'B', 'J', 'S' };
+        constexpr u8 CODE_TAG[4] = { 'T', 'J', 'S', '2' };
 
         [[noreturn]] void bcError(const char *msg) { throw std::runtime_error(msg); }
 
@@ -116,8 +116,7 @@ namespace cial::tjsbc {
                 pool.bytes.resize(static_cast<size_t>(count));
                 for(i32 k = 0; k < count; ++k)
                     pool.bytes[static_cast<size_t>(k)] = static_cast<i8>(c.u8At());
-                c.skip(((static_cast<size_t>(count) + 3) & ~static_cast<size_t>(3))
-                       - static_cast<size_t>(count));
+                c.skip(((static_cast<size_t>(count) + 3) & ~static_cast<size_t>(3)) - static_cast<size_t>(count));
             }
             // 2. SHORT
             count = c.i32At();
@@ -162,8 +161,7 @@ namespace cial::tjsbc {
                     const size_t bytes = static_cast<size_t>(len) * 2;
                     c.need(bytes);
                     const std::string utf8 = utf16LeToUtf8(c.data + c.pos, bytes);
-                    pool.strings[static_cast<size_t>(k)] =
-                        String(utf8.c_str(), static_cast<u32>(utf8.size()));
+                    pool.strings[static_cast<size_t>(k)] = String(utf8.c_str(), static_cast<u32>(utf8.size()));
                     c.skip(bytes);
                     if(len & 1)
                         c.skip(2);
@@ -178,13 +176,11 @@ namespace cial::tjsbc {
                     if(len < 0)
                         bcError("tjs bytecode: negative octet length");
                     c.need(static_cast<size_t>(len));
-                    pool.octets[static_cast<size_t>(k)].assign(c.data + c.pos,
-                                                               c.data + c.pos + len);
+                    pool.octets[static_cast<size_t>(k)].assign(c.data + c.pos, c.data + c.pos + len);
                     // 内容 + 4 对齐填充一并跳过（缺内容推进会使后续条目错位，
                     // 仅靠段尾 c.pos=end 收口掩盖，test_variant 的多 octet 语料暴露）
-                    c.skip(static_cast<size_t>(len)
-                           + (((static_cast<size_t>(len) + 3) & ~static_cast<size_t>(3))
-                              - static_cast<size_t>(len)));
+                    c.skip(static_cast<size_t>(len) +
+                           (((static_cast<size_t>(len) + 3) & ~static_cast<size_t>(3)) - static_cast<size_t>(len)));
                 }
             }
 
@@ -235,7 +231,7 @@ namespace cial::tjsbc {
             for(i32 k = 0; k < dataCount; ++k) {
                 const i16 type = static_cast<i16>(c.u16At());
                 const i16 index = static_cast<i16>(c.u16At());
-                ctx.data[static_cast<size_t>(k)] = TjsDataSlot{type, index};
+                ctx.data[static_cast<size_t>(k)] = TjsDataSlot{ type, index };
             }
 
             const i32 scCount = c.i32At();
@@ -251,7 +247,7 @@ namespace cial::tjsbc {
                 for(i32 k = 0; k < propCount; ++k) {
                     const i32 name = c.i32At();
                     const i32 objIdx = c.i32At();
-                    ctx.propMembers[static_cast<size_t>(k)] = {name, objIdx};
+                    ctx.propMembers[static_cast<size_t>(k)] = { name, objIdx };
                 }
             }
             return ctx;
@@ -260,7 +256,7 @@ namespace cial::tjsbc {
     } // namespace
 
     TjsBytecodeFile readTjsBytecodeBytes(const Vec<u8> &bytes) {
-        ByteCursor c{bytes.data(), bytes.size(), 0};
+        ByteCursor c{ bytes.data(), bytes.size(), 0 };
         TjsBytecodeFile file{};
 
         c.expect(FILE_TAG, 8, "tjs bytecode: bad magic");
@@ -293,7 +289,7 @@ namespace cial::tjsbc {
         std::ifstream f(path, std::ios::binary);
         if(!f)
             throw std::runtime_error("tjs bytecode: cannot open " + path);
-        Vec<u8> bytes{(std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>()};
+        Vec<u8> bytes{ (std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>() };
         return readTjsBytecodeBytes(bytes);
     }
 

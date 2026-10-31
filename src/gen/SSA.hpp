@@ -29,7 +29,7 @@ namespace cial::inter {
     // Kind::None  — 无定义：不可达指令，或非 catch 语境下某前驱路径上无定义
     struct SsaRef {
         enum class Kind : u8 { None, Inst, Phi, Entry, Catch };
-        Kind kind{Kind::None};
+        Kind kind{ Kind::None };
         u32 index{};
         u16 slot{};
 
@@ -47,7 +47,7 @@ namespace cial::inter {
     // 一个定义点的全部使用位置（def-use 链）
     struct SsaUse {
         enum class Kind : u8 { Operand, PhiInput };
-        Kind kind{Kind::Operand};
+        Kind kind{ Kind::Operand };
         u32 a{}; // Operand: TAC pc;  PhiInput: phi 下标
         u32 b{}; // Operand: 该指令使用点序号;  PhiInput: inputs 下标
         bool operator==(const SsaUse &rhs) const noexcept = default;
@@ -55,20 +55,20 @@ namespace cial::inter {
 
     // 单条 TAC 指令的 SSA 信息（与 chunk.getInstVec() 平行；抽象构造时为空）
     struct InstSsa {
-        Vec<Register> defs;      // 有序定义槽位（空 = 无定义）
+        Vec<Register> defs; // 有序定义槽位（空 = 无定义）
         Vec<SsaRef> operandDefs; // 与使用点平行，按出现顺序；不可达指令为空
-        size_t block{std::numeric_limits<size_t>::max()}; // 所属块；不可达指令为 max
+        size_t block{ std::numeric_limits<size_t>::max() }; // 所属块；不可达指令为 max
     };
 
     // 抽象 CFG 的每块事实（变量为任意 u16 编号；chunk 便捷入口内部生成）
     struct SsaBlockFacts {
-        Vec<u16> defined;    // 块内被定义的变量（去重）
+        Vec<u16> defined; // 块内被定义的变量（去重）
         Vec<u16> upwardUses; // 块内任何定义之前被读取的变量（去重）
         // 块内指令级事实（按序；纯块级分析可留空）
         struct Inst {
-            u32 pc{};       // 全局指令编号（回填 InstSsa 时的下标）
-            Vec<u16> defs;  // 有序定义（空 = 无定义）
-            Vec<u16> uses;  // 有序使用（读-改-写的读取先于定义）
+            u32 pc{}; // 全局指令编号（回填 InstSsa 时的下标）
+            Vec<u16> defs; // 有序定义（空 = 无定义）
+            Vec<u16> uses; // 有序使用（读-改-写的读取先于定义）
         };
         Vec<Inst> insts;
     };
@@ -85,7 +85,9 @@ namespace cial::inter {
         static constexpr size_t InvalidBlock = std::numeric_limits<size_t>::max();
         [[nodiscard]] size_t idomOf(const size_t block) const { return _idom.at(block); }
         [[nodiscard]] const Vec<Vec<size_t>> &dominatorTree() const noexcept { return _domTree; }
-        [[nodiscard]] const Vec<size_t> &dominanceFrontierOf(const size_t block) const { return _domFrontiers.at(block); }
+        [[nodiscard]] const Vec<size_t> &dominanceFrontierOf(const size_t block) const {
+            return _domFrontiers.at(block);
+        }
 
         [[nodiscard]] const Vec<SsaPhi> &phis() const noexcept { return _phis; }
         [[nodiscard]] const Vec<u32> &phiIndicesAt(const size_t block) const { return _phiIndices.at(block); }
@@ -120,8 +122,8 @@ namespace cial::inter {
         // 顺序（读-改-写的读取在 defs 之前生效）。
         // 未登记 def/use 的 opcode、以及隐式读帧实参的三个调用指令抛错——不猜测。
         struct Access {
-            Opt<Register> def;      // 首个定义；无定义为空
-            Vec<Register> defs;     // 全部定义槽位（有序）
+            Opt<Register> def; // 首个定义；无定义为空
+            Vec<Register> defs; // 全部定义槽位（有序）
             Vec<Register> uses;
         };
         static Access extractAccess(const Instruction &instruction);
@@ -130,9 +132,8 @@ namespace cial::inter {
         // preserveAllLiveOut：对应块的出口视为所有变量活跃（try 保守）。
         // exceptionEntries：SSA 边界块（异常着陆点）——到达定义在此重置并引入
         // Catch 未知值，块内不放置 phi。不可达块不参与支配/phi，仅保留 defs 静态信息。
-        static SsaForm build(Vec<Vec<size_t>> successors, size_t entryBlock,
-                             Vec<SsaBlockFacts> facts, size_t variableCount,
-                             const Vec<bool> &preserveAllLiveOut = {},
+        static SsaForm build(Vec<Vec<size_t>> successors, size_t entryBlock, Vec<SsaBlockFacts> facts,
+                             size_t variableCount, const Vec<bool> &preserveAllLiveOut = {},
                              const Vec<bool> &exceptionEntries = {});
 
         // Chunk 便捷入口：精确 def/use 提取 + try 区间保守标记 + build()。

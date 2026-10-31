@@ -90,7 +90,9 @@ namespace cial {
         ~DataObject() noexcept override = default;
 
         [[nodiscard]] bool needsFinalization() const noexcept override;
-        [[nodiscard]] bool canFinalizeIn(const vm::VMState &state) const noexcept override { return _vmState == &state; }
+        [[nodiscard]] bool canFinalizeIn(const vm::VMState &state) const noexcept override {
+            return _vmState == &state;
+        }
         void finalizeDeferred(vm::VMState &vmState) override;
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;

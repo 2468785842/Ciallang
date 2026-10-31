@@ -267,7 +267,7 @@ namespace cial::inter {
 
         // dumpInstructions 每行形如 "@<idx>    : <text>"，按行前缀切出单条指令文本
         Vec<std::string> instText(code.size());
-        std::istringstream dumpStream{chunk.dumpInstructions().toStdStr()};
+        std::istringstream dumpStream{ chunk.dumpInstructions().toStdStr() };
         std::string line;
         while(std::getline(dumpStream, line)) {
             if(line.size() < 2 || line[0] != '@')
@@ -309,8 +309,7 @@ namespace cial::inter {
         // 边 u→v 是回边当且仅当 v 是某循环的 header 且 u 在该循环体内
         auto isBackEdge = [&](const size_t source, const size_t target) {
             return std::ranges::any_of(_loops, [&](const LoopInfo &loop) {
-                return loop.header == target &&
-                    std::ranges::find(loop.body, source) != loop.body.end();
+                return loop.header == target && std::ranges::find(loop.body, source) != loop.body.end();
             });
         };
 
@@ -339,7 +338,7 @@ namespace cial::inter {
                 continue;
             // 按终结指令给边标注类别；try handler 的额外后继排在尾部，标 exc
             const TacOpCode lastOp = code[block.end - 1]->opcode();
-            const char *kinds[2] = {"fall", "fall"};
+            const char *kinds[2] = { "fall", "fall" };
             size_t expected = 1;
             if(lastOp == TacOpCode::Jmp)
                 kinds[0] = "jmp";

@@ -25,7 +25,7 @@ namespace cial::stdlib {
             std::ifstream f(path, std::ios::binary);
             if(!f)
                 throw std::runtime_error("cannot open storage: " + path.string());
-            std::string content{(std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>()};
+            std::string content{ (std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>() };
             return content;
         }
 
@@ -51,8 +51,8 @@ namespace cial::stdlib {
 
         std::string readTextDecoded(const std::filesystem::path &path) {
             const std::string raw = readFileBytes(path);
-            if(raw.size() >= 3 && static_cast<u8>(raw[0]) == 0xEF && static_cast<u8>(raw[1]) == 0xBB
-               && static_cast<u8>(raw[2]) == 0xBF)
+            if(raw.size() >= 3 && static_cast<u8>(raw[0]) == 0xEF && static_cast<u8>(raw[1]) == 0xBB &&
+               static_cast<u8>(raw[2]) == 0xBF)
                 return raw.substr(3);
             if(raw.size() >= 2 && static_cast<u8>(raw[0]) == 0xFF && static_cast<u8>(raw[1]) == 0xFE)
                 return utf16LeToUtf8(reinterpret_cast<const u8 *>(raw.data()) + 2, raw.size() - 2);
@@ -72,19 +72,19 @@ namespace cial::stdlib {
         // 绑定方法；显式 incontextof 换接收者不支持——与 Math 静态方法同口径）
         ScriptsNS *scriptsNamespace(const Value &thisVal, const char *who) {
             if(!thisVal.isObject())
-                throw std::runtime_error(std::string{who} + " requires the Scripts namespace receiver");
+                throw std::runtime_error(std::string{ who } + " requires the Scripts namespace receiver");
             auto *obj = thisVal.asObject().unwrap();
             if(!obj || obj->typeId() != TypeId::Scripts)
-                throw std::runtime_error(std::string{who} + " requires the Scripts namespace receiver");
+                throw std::runtime_error(std::string{ who } + " requires the Scripts namespace receiver");
             return static_cast<ScriptsNS *>(obj); // final 类，typeId 判型后 static_cast 安全
         }
 
         std::filesystem::path requireStoragePath(const ScriptsNS *ns, const size_t argCount, Value *args,
                                                  const char *who) {
             if(argCount < 1)
-                throw std::runtime_error(std::string{who} + " expects a storage name");
+                throw std::runtime_error(std::string{ who } + " expects a storage name");
             if(!args[0].isString())
-                throw std::runtime_error(std::string{who} + " expects a string storage name");
+                throw std::runtime_error(std::string{ who } + " expects a string storage name");
             return ns->resolveStorage(args[0].asString().unwrap()->toStdStr());
         }
 
@@ -142,7 +142,7 @@ namespace cial::stdlib {
         // 顶层 var/函数经 DGlobal/GGlobal 落全局上下文，结果为 void
         Value execScriptStorage(vm::VMState &state, const std::filesystem::path &path) {
             Common::Result r{};
-            Common::SourceFile sourceFile{path.string()};
+            Common::SourceFile sourceFile{ path.string() };
             sourceFile.load(r);
             if(r.isFailed())
                 throw std::runtime_error("cannot open storage: " + path.string());
@@ -150,16 +150,14 @@ namespace cial::stdlib {
             syntax::Parser parser{ sourceFile, state.context.pp() };
             syntax::AstNode *node = parser.parse(r);
             if(r.isFailed() || !node)
-                throw std::runtime_error(fmt::format("cannot compile storage {}: {}",
-                                                     path.string(),
-                                                     compileErrorMessage(r)));
+                throw std::runtime_error(
+                    fmt::format("cannot compile storage {}: {}", path.string(), compileErrorMessage(r)));
 
             inter::IRGenerator codeGen{ r, state.rt, sourceFile };
             OptReg ignoreReg{};
             Opt<vm::Chunk> compiled = codeGen.parseAst(node, ignoreReg);
             if(r.isFailed() || !compiled)
-                throw std::runtime_error(fmt::format("cannot compile storage {}: {}",
-                                                     path.string(),
+                throw std::runtime_error(fmt::format("cannot compile storage {}: {}", path.string(),
                                                      r.isFailed() ? compileErrorMessage(r) : "compile failed"));
             if(compiled->getInstVec().empty())
                 return Value{}; // 空脚本（仅注释/空白）= 无操作（krkr2 ExecScript 语义）
@@ -177,20 +175,17 @@ namespace cial::stdlib {
             syntax::Parser parser{ sourceFile, state.context.pp() };
             syntax::ExprNode *node = parser.parseExpression(r, true);
             if(r.isFailed() || !node)
-                throw std::runtime_error(fmt::format("cannot evaluate storage {}: {}",
-                                                     path.string(),
-                                                     compileErrorMessage(r)));
+                throw std::runtime_error(
+                    fmt::format("cannot evaluate storage {}: {}", path.string(), compileErrorMessage(r)));
 
             inter::IRGenerator codeGen{ r, state.rt, sourceFile };
             // 哨兵寄存器（0xFFFF 不会被正常分配）：表达式结果寄存器
             OptReg retReg{ inter::Register{ 0xFFFF } };
             Opt<vm::Chunk> compiled = codeGen.parseAst(node, retReg);
-            if(r.isFailed() || !compiled || !retReg || compiled->getRegCount() == 0
-               || compiled->getInstVec().empty())
-                throw std::runtime_error(fmt::format("cannot evaluate storage {}: {}",
-                                                     path.string(),
-                                                     r.isFailed() ? compileErrorMessage(r)
-                                                                  : "expression produced no code"));
+            if(r.isFailed() || !compiled || !retReg || compiled->getRegCount() == 0 || compiled->getInstVec().empty())
+                throw std::runtime_error(
+                    fmt::format("cannot evaluate storage {}: {}", path.string(),
+                                r.isFailed() ? compileErrorMessage(r) : "expression produced no code"));
             // 表达式块以 Ret 收尾：返回值经 Ret 写回 tmp 帧槽位（dispatchEvalStr 同款）
             compiled->emit<inter::Ret>(*retReg);
 
@@ -203,7 +198,7 @@ namespace cial {
     // ---------- ScriptsNS ----------
 
     std::filesystem::path ScriptsNS::resolveStorage(const std::string &name) const {
-        const std::filesystem::path p{name};
+        const std::filesystem::path p{ name };
         if(p.is_absolute() || _baseDir.empty())
             return p;
         return _baseDir / p;

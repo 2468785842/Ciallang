@@ -230,8 +230,7 @@ namespace cial {
             return *this;
         }
 
-        Constant(Constant &&constant) noexcept :
-            _value(std::move(constant._value)), _strPayload(constant._strPayload) {
+        Constant(Constant &&constant) noexcept : _value(std::move(constant._value)), _strPayload(constant._strPayload) {
             constant._strPayload = nullptr;
             if(type() == ConstantType::Octet) {
                 // variant 已随移动接管所有权,防止源析构释放:

@@ -2,8 +2,8 @@
 // Created by LiDong on 2026/1/27.
 //
 
-#include <fmt/format.h>
 #include "Bytecode.hpp"
+#include <fmt/format.h>
 
 #include "VMState.hpp"
 #include "types/Property.hpp"
@@ -105,9 +105,7 @@ namespace cial::vm {
     }
 
     // ── 跳转（目标 u32 占位，编译结束后回填） ────────────────
-    void Bytecode::encode(Info &info, const inter::Jmp *tac) {
-        encodeJmp(info, VmOpCode::Jmp, tac->label().address());
-    }
+    void Bytecode::encode(Info &info, const inter::Jmp *tac) { encodeJmp(info, VmOpCode::Jmp, tac->label().address()); }
 
     void Bytecode::encode(Info &info, const inter::JmpE *tac) {
         encodeJmp(info, VmOpCode::JmpE, tac->label().address());
@@ -249,12 +247,12 @@ namespace cial::vm {
     }
 
     // ── 算术/位运算/比较：统一三寄存器原生编码 ────────────────
-#define ENCODE_RRR(op, getter1, getter2, getter3)                                                                       \
-    void Bytecode::encode(Info &info, const inter::op *tac) {                                                           \
-        info.code.push_back(static_cast<u8>(VmOpCode::op));                                                             \
-        write<u16>(info.code, tac->getter1().index());                                                                  \
-        write<u16>(info.code, tac->getter2().index());                                                                  \
-        write<u16>(info.code, tac->getter3().index());                                                                  \
+#define ENCODE_RRR(op, getter1, getter2, getter3)                                                                      \
+    void Bytecode::encode(Info &info, const inter::op *tac) {                                                          \
+        info.code.push_back(static_cast<u8>(VmOpCode::op));                                                            \
+        write<u16>(info.code, tac->getter1().index());                                                                 \
+        write<u16>(info.code, tac->getter2().index());                                                                 \
+        write<u16>(info.code, tac->getter3().index());                                                                 \
     }
 
     ENCODE_RRR(Add, src1, src2, dst)

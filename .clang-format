@@ -44,6 +44,9 @@ IndentWidth: 4
 MacroBlockBegin: ""
 MacroBlockEnd: ""
 MaxEmptyLinesToKeep: 2
+# 全库主流为 Fun &&f / const ScopeGuard & 形态；LLVM 基础风格默认即 Right，
+# 此处显式声明以防基础风格变更引起静默漂移（CI 校验依赖该行为稳定）
+PointerAlignment: Right
 NamespaceIndentation: All
 SpaceBeforeParens: Never
 SpaceInEmptyParentheses: false

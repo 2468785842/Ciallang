@@ -153,9 +153,7 @@ namespace cial::vm {
     // ZigZag 解码
     // 标准公式 (v >> 1) ^ -(v & 1)。旧实现 -(v >> 1) 对所有奇数编码值
     // (负数)差 1:zigzag(-1)=1 会被解成 0,LoadImm 负立即数全错
-    CIAL_INLINE i64 zigzagDecode(const u64 v) noexcept {
-        return static_cast<i64>(v >> 1) ^ -(static_cast<i64>(v & 1));
-    }
+    CIAL_INLINE i64 zigzagDecode(const u64 v) noexcept { return static_cast<i64>(v >> 1) ^ -(static_cast<i64>(v & 1)); }
 
     // 编码有符号数
     CIAL_INLINE size_t encodeSleb128(const i64 value, Vec<u8> &buffer) {

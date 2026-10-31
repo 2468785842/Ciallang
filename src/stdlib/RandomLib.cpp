@@ -24,9 +24,7 @@ namespace cial {
 
         constexpr u32 mixBits(const u32 u, const u32 v) { return (u & UMASK) | (v & LMASK); }
 
-        constexpr u32 twist(const u32 u, const u32 v) {
-            return (mixBits(u, v) >> 1) ^ (v & 1 ? MATRIX_A : 0);
-        }
+        constexpr u32 twist(const u32 u, const u32 v) { return (mixBits(u, v) >> 1) ^ (v & 1 ? MATRIX_A : 0); }
     } // namespace
 
     void RandomGen::initGenRand(const u32 s) {
@@ -45,8 +43,7 @@ namespace cial {
         int i = 1, j = 0;
         int k = MT_N > static_cast<int>(keyLen) ? MT_N : static_cast<int>(keyLen);
         for(; k; --k) {
-            state[i] = (state[i] ^ ((state[i - 1] ^ (state[i - 1] >> 30)) * 1664525u)) + key[j] +
-                static_cast<u32>(j);
+            state[i] = (state[i] ^ ((state[i - 1] ^ (state[i - 1] >> 30)) * 1664525u)) + key[j] + static_cast<u32>(j);
             ++i;
             ++j;
             if(i >= MT_N) {
@@ -57,8 +54,7 @@ namespace cial {
                 j = 0;
         }
         for(k = MT_N - 1; k; --k) {
-            state[i] = (state[i] ^ ((state[i - 1] ^ (state[i - 1] >> 30)) * 1566083941u)) -
-                static_cast<u32>(i);
+            state[i] = (state[i] ^ ((state[i - 1] ^ (state[i - 1] >> 30)) * 1566083941u)) - static_cast<u32>(i);
             ++i;
             if(i >= MT_N) {
                 state[0] = state[MT_N - 1];
@@ -108,9 +104,7 @@ namespace cial {
         return d - 1.0;
     }
 
-    u32 RandomGen::random32() {
-        return inited ? int32() : 0;
-    }
+    u32 RandomGen::random32() { return inited ? int32() : 0; }
 
     i64 RandomGen::random63() {
         if(!inited)

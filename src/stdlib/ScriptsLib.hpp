@@ -78,8 +78,7 @@ namespace cial {
         // 注册 Scripts 宿主类（重注册即替换全局 Scripts，用于 CLI/测试回填
         // VMState 与基目录）。state 为空时方法调用抛"未绑定"运行期异常；
         // baseDir 为空时相对路径相对进程 cwd。
-        void registerScriptsLib(Context &context, vm::VMState *state = nullptr,
-                                std::filesystem::path baseDir = {});
+        void registerScriptsLib(Context &context, vm::VMState *state = nullptr, std::filesystem::path baseDir = {});
 
         Value scriptsExecStorage(VM *vm, Value thisVal, size_t argCount, Value *args);
         Value scriptsEvalStorage(VM *vm, Value thisVal, size_t argCount, Value *args);

@@ -71,8 +71,7 @@ var Debug = new __DebugShim();
             vmState.allocCallFrame(chunk);
             vmState.makeClosure();
             // 顶层 this = 全局对象（TJS 顶层经 this/proxy 寄存器读写全局）
-            vmState.curFrame()->setThisObj(
-                Value{ static_cast<Object *>(vmState.context.global()) });
+            vmState.curFrame()->setThisObj(Value{ static_cast<Object *>(vmState.context.global()) });
             try {
                 vmState.run();
             } catch(...) {
@@ -95,8 +94,7 @@ TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
         TjsBytecodeFile file{};
         file.topLevel = -1; // 顶层注册模式（global proxy）M2 未支持,只测函数
         file.contexts.push_back(
-            makeFuncContext({2, 1, -3, 1, 2, 0, 78, 1, 2, 118, 1, 119},
-                            {TjsDataSlot{TJS_TYPE_BYTE, 0}}, 1));
+            makeFuncContext({ 2, 1, -3, 1, 2, 0, 78, 1, 2, 118, 1, 119 }, { TjsDataSlot{ TJS_TYPE_BYTE, 0 } }, 1));
         file.pool.bytes.push_back(2); // CONST 用的 2
 
         TjsTranslator translator{ rt, file };
@@ -105,7 +103,7 @@ TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
         REQUIRE(program.contexts[0].funcMeta != nullptr);
 
         // FuncMeta → Function 对象 → callValue(21) → 42
-        const Value func = Constant{program.contexts[0].funcMeta}.createValue(&rt);
+        const Value func = Constant{ program.contexts[0].funcMeta }.createValue(&rt);
         REQUIRE(func.isObject());
         Value arg{ Integer{ 21 } };
         const Value ret = vm.callValue(func, 1, &arg);
@@ -117,15 +115,14 @@ TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
         // CP %1,%-3; CP %2,%-4; CONST %3,(BYTE 10); MUL %2,%3; ADD %1,%2; SRV %1; RET
         TjsBytecodeFile file{};
         file.topLevel = -1;
-        file.contexts.push_back(
-            makeFuncContext({2, 1, -3, 2, 2, -4, 1, 3, 0, 78, 2, 3, 58, 1, 2, 118, 1, 119},
-                            {TjsDataSlot{TJS_TYPE_BYTE, 0}}, 2));
+        file.contexts.push_back(makeFuncContext({ 2, 1, -3, 2, 2, -4, 1, 3, 0, 78, 2, 3, 58, 1, 2, 118, 1, 119 },
+                                                { TjsDataSlot{ TJS_TYPE_BYTE, 0 } }, 2));
         file.pool.bytes.push_back(10);
 
         TjsTranslator translator{ rt, file };
         const auto program = translator.translate();
         fmt::println("=== g dump ===\n{}", program.contexts[0].chunk->dumpInstructions());
-        const Value func = Constant{program.contexts[0].funcMeta}.createValue(&rt);
+        const Value func = Constant{ program.contexts[0].funcMeta }.createValue(&rt);
         Value args[2]{ Value{ Integer{ 3 } }, Value{ Integer{ 4 } } };
         const Value ret = vm.callValue(func, 2, args);
         REQUIRE(ret.isInteger());
@@ -152,7 +149,7 @@ TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
     SECTION("未知操作码明确报错") {
         TjsBytecodeFile file2{};
         file2.topLevel = -1;
-        file2.contexts.push_back(makeFuncContext({200}, {}, 0));
+        file2.contexts.push_back(makeFuncContext({ 200 }, {}, 0));
         REQUIRE_THROWS(TjsTranslator{ rt, file2 }.translate());
     }
 }
@@ -198,9 +195,8 @@ TEST_CASE("TJS2 字节码转译——M2 语料端到端（类/NEW/property/继�
         // 源码路径不支持 `...`/`*` 语法，对拍基准为原版引擎行为（成功 = 无异常）
         CorpusRun run{ TEST_FILES_PATH R"(/tjsbc/test_function.tjsbc)" };
         // 抽查：argMul(*argsArray) 展开调用经 collapse 参数往返后全局写入的标记
-        //（脚本尾部 isFaild 应为 false）
-        const Value isFaild =
-            run.vmState.context.global()->getProp(run.rt.atomTable.intern("isFaild"_str));
+        // （脚本尾部 isFaild 应为 false）
+        const Value isFaild = run.vmState.context.global()->getProp(run.rt.atomTable.intern("isFaild"_str));
         REQUIRE(isFaild.isInteger());
         REQUIRE(isFaild.asInteger().unwrap() == 0);
     }
@@ -219,12 +215,11 @@ TEST_CASE("TJS2 字节码转译——TYPEOFD/DELD 直译") {
     file.pool.strings.push_back("x"_str);
     file.contexts.push_back(makeFuncContext(
         // TYPEOFD r1,-3,0 (丢结果) ; DELD r1,-3,0 ; SRV r1 ; RET
-        {84, 1, -3, 0, 116, 1, -3, 0, 118, 1, 119},
-        {TjsDataSlot{TJS_TYPE_STRING, 0}}, 1));
+        { 84, 1, -3, 0, 116, 1, -3, 0, 118, 1, 119 }, { TjsDataSlot{ TJS_TYPE_STRING, 0 } }, 1));
 
     TjsTranslator translator{ rt, file };
     const auto program = translator.translate();
-    const Value func = Constant{program.contexts[0].funcMeta}.createValue(&rt);
+    const Value func = Constant{ program.contexts[0].funcMeta }.createValue(&rt);
 
     Value dict = Value{ rt.create<Dictionary>().get() };
     dict.asObject().unwrap()->setProp(rt.atomTable.intern("x"_str), Value{ Integer{ 1 } });
@@ -249,11 +244,11 @@ TEST_CASE("TJS2 字节码转译——BNOT/NUM/OCTET 转换指令（M3）") {
         TjsBytecodeFile file{};
         file.topLevel = -1;
         file.pool.bytes.push_back(5);
-        file.contexts.push_back(makeFuncContext({1, 1, 0, 82, 1, 118, 1, 119},
-                                                {TjsDataSlot{TJS_TYPE_BYTE, 0}}, 1));
+        file.contexts.push_back(
+            makeFuncContext({ 1, 1, 0, 82, 1, 118, 1, 119 }, { TjsDataSlot{ TJS_TYPE_BYTE, 0 } }, 1));
         TjsTranslator translator{ rt, file }; // 具名持有：GC 根须存活至断言结束
         const auto program = translator.translate();
-        const Value func = Constant{program.contexts[0].funcMeta}.createValue(&rt);
+        const Value func = Constant{ program.contexts[0].funcMeta }.createValue(&rt);
         Value arg{ Integer{ 5 } };
         const Value ret = vm.callValue(func, 1, &arg);
         REQUIRE(ret.isInteger());
@@ -265,11 +260,11 @@ TEST_CASE("TJS2 字节码转译——BNOT/NUM/OCTET 转换指令（M3）") {
         TjsBytecodeFile file{};
         file.topLevel = -1;
         file.pool.strings.push_back("42"_str);
-        file.contexts.push_back(makeFuncContext({1, 1, 0, 91, 1, 118, 1, 119},
-                                                {TjsDataSlot{TJS_TYPE_STRING, 0}}, 1));
+        file.contexts.push_back(
+            makeFuncContext({ 1, 1, 0, 91, 1, 118, 1, 119 }, { TjsDataSlot{ TJS_TYPE_STRING, 0 } }, 1));
         TjsTranslator translator{ rt, file };
         const auto program = translator.translate();
-        const Value func = Constant{program.contexts[0].funcMeta}.createValue(&rt);
+        const Value func = Constant{ program.contexts[0].funcMeta }.createValue(&rt);
         Value arg = Value{ "42"_str };
         const Value ret = vm.callValue(func, 1, &arg);
         REQUIRE(ret.isInteger());
@@ -280,10 +275,10 @@ TEST_CASE("TJS2 字节码转译——BNOT/NUM/OCTET 转换指令（M3）") {
         // CL r1 ; OCTET r1,r1 ; SRV r1 ; RET
         TjsBytecodeFile file{};
         file.topLevel = -1;
-        file.contexts.push_back(makeFuncContext({3, 1, 98, 1, 118, 1, 119}, {}, 1));
+        file.contexts.push_back(makeFuncContext({ 3, 1, 98, 1, 118, 1, 119 }, {}, 1));
         TjsTranslator translator{ rt, file };
         const auto program = translator.translate();
-        const Value func = Constant{program.contexts[0].funcMeta}.createValue(&rt);
+        const Value func = Constant{ program.contexts[0].funcMeta }.createValue(&rt);
         Value arg{};
         const Value ret = vm.callValue(func, 1, &arg);
         REQUIRE(ret.isOctet());

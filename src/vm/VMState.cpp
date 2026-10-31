@@ -30,21 +30,21 @@
 namespace cial {
     void CallFrame::setThisObj(Value v) {
         thisObj = std::move(v);
-        thisData = thisObj.isObject() ? dynamic_cast<DataObject*>(thisObj.asObject().value()) : nullptr;
+        thisData = thisObj.isObject() ? dynamic_cast<DataObject *>(thisObj.asObject().value()) : nullptr;
     }
 } // namespace cial
 
 namespace cial::vm {
     [[nodiscard]] bool VMState::globalHas(const Atom atom) const { return context.global()->hasProp(atom); }
 
-    [[nodiscard]] bool VMState::globalHas(const std::string& name) const {
+    [[nodiscard]] bool VMState::globalHas(const std::string &name) const {
         const auto atom = rt.atomTable.intern(name.c_str(), name.length());
         return context.global()->hasProp(atom);
     }
 
-    const Value* VMState::cachedGlobal(const Atom atom) const {
-        auto* global = context.global();
-        auto& entry = _globalCache[atom.v % 64];
+    const Value *VMState::cachedGlobal(const Atom atom) const {
+        auto *global = context.global();
+        auto &entry = _globalCache[atom.v % 64];
         const u64 revision = global->slotRevision();
         if(entry.atom != atom || entry.revision != revision)
             entry = { atom, revision, global->findPropRef(atom) };
@@ -52,26 +52,26 @@ namespace cial::vm {
     }
 
     [[nodiscard]] Value VMState::global(const Atom atom) const {
-        if(const auto* slot = cachedGlobal(atom))
+        if(const auto *slot = cachedGlobal(atom))
             return *slot;
         throw std::runtime_error("in global object Not found property");
     }
 
-    void VMState::global(const Atom atom, const Value& value) const { context.global()->setProp(atom, value); }
+    void VMState::global(const Atom atom, const Value &value) const { context.global()->setProp(atom, value); }
 
-    [[nodiscard]] Value VMState::global(const std::string& name) const {
+    [[nodiscard]] Value VMState::global(const std::string &name) const {
         const auto atom = rt.atomTable.intern(name.c_str(), name.length());
         return context.global()->getProp(atom);
     }
 
-    void VMState::global(const std::string& name, const Value& value) const {
+    void VMState::global(const std::string &name, const Value &value) const {
         const auto atom = rt.atomTable.intern(name.c_str(), name.length());
         context.global()->setProp(atom, value);
     }
 
-    const Value& VMState::reg(const u16 reg) const { return _curFrame->getReg(reg); }
+    const Value &VMState::reg(const u16 reg) const { return _curFrame->getReg(reg); }
 
-    Value& VMState::regRef(const u16 reg) const { return _curFrame->getReg(reg); }
+    Value &VMState::regRef(const u16 reg) const { return _curFrame->getReg(reg); }
 
     bool VMState::hasThis(const Atom atom) const {
         // current thisObj（thisData 为帧创建时缓存的 DataObject*）
@@ -81,9 +81,9 @@ namespace cial::vm {
             }
         }
 
-        if(auto* callFrame = _curFrame->closure; callFrame) {
+        if(auto *callFrame = _curFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
-                for(const auto& localVar : callFrame->funcMeta->localVars) {
+                for(const auto &localVar : callFrame->funcMeta->localVars) {
                     if(localVar.endPC.address() > callFrame->pc)
                         continue;
                     if(localVar.identifier == atom)
@@ -104,9 +104,9 @@ namespace cial::vm {
             }
         }
 
-        if(auto* callFrame = _curFrame->closure; callFrame) {
+        if(auto *callFrame = _curFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
-                for(const auto& [identifier, reg, startPC, endPC] : callFrame->funcMeta->localVars) {
+                for(const auto &[identifier, reg, startPC, endPC] : callFrame->funcMeta->localVars) {
                     if(startPC.address() <= callFrame->pc && callFrame->pc < endPC.address())
                         continue;
                     if(identifier == atom)
@@ -119,7 +119,7 @@ namespace cial::vm {
         return global(atom);
     }
 
-    void VMState::setThis(const Atom atom, const Value& v) const {
+    void VMState::setThis(const Atom atom, const Value &v) const {
         // current thisObj（thisData 为帧创建时缓存的 DataObject*）
         if(_curFrame->thisData) {
             if(_curFrame->thisData->hasProp(atom)) {
@@ -128,9 +128,9 @@ namespace cial::vm {
             }
         }
 
-        if(auto* callFrame = _curFrame->closure; callFrame) {
+        if(auto *callFrame = _curFrame->closure; callFrame) {
             if(callFrame->funcMeta) {
-                for(const auto& localVar : callFrame->funcMeta->localVars) {
+                for(const auto &localVar : callFrame->funcMeta->localVars) {
                     if(localVar.endPC.address() > callFrame->pc)
                         continue;
                     if(localVar.identifier == atom)
@@ -150,10 +150,10 @@ namespace cial::vm {
         }
 
         for(u16 i = _stackTop - 1; i > 0; --i) {
-            const auto& callFrame = _callStack[i - 1];
+            const auto &callFrame = _callStack[i - 1];
             // prev local scope
             if(callFrame.funcMeta) {
-                for(const auto& localVar : callFrame.funcMeta->localVars) {
+                for(const auto &localVar : callFrame.funcMeta->localVars) {
                     if(localVar.endPC.address() > callFrame.pc)
                         continue;
                     if(localVar.identifier == atom)
@@ -163,7 +163,7 @@ namespace cial::vm {
 
             // prev context
             if(callFrame.thisObj.isObject()) {
-                if(auto* instanceObject = dynamic_cast<DataObject*>(_curFrame->thisObj.asObject().value())) {
+                if(auto *instanceObject = dynamic_cast<DataObject *>(_curFrame->thisObj.asObject().value())) {
                     return instanceObject->getProp(atom);
                 }
             }
@@ -173,7 +173,7 @@ namespace cial::vm {
         return global(atom);
     }
 
-    void VMState::recordFault(const Chunk* chunk, const u64 instructionPc) {
+    void VMState::recordFault(const Chunk *chunk, const u64 instructionPc) {
         if(_fault.valid || chunk == nullptr)
             return;
         if(const auto loc = chunk->lineAtBc(instructionPc)) {
@@ -182,10 +182,10 @@ namespace cial::vm {
     }
 
     void VMState::unwind() {
-        Chunk* lastChunk{}; // 弹空前最后的帧（终态兜底定位用）
+        Chunk *lastChunk{}; // 弹空前最后的帧（终态兜底定位用）
         u64 lastPc{};
         while(true) {
-            const CallFrame* cFrame = _curFrame;
+            const CallFrame *cFrame = _curFrame;
             // run 的 pc 是扁平字节码偏移，因此这里查询字节码空间的 try 区间表
             const Opt<ThrowHandler> th = cFrame->chunk->findBcThrowHandler(getPC());
             if(!th) {
@@ -201,7 +201,7 @@ namespace cial::vm {
                     // 未捕获异常：Exception 对象优先输出 message（与 TJS2 行为一致，
                     // 否则只显示 <object> 无法定位语料失败点）
                     if(_exValue.isObject()) {
-                        if(auto* obj = _exValue.asObject().unwrap(); dynamic_cast<DataObject*>(obj)) {
+                        if(auto *obj = _exValue.asObject().unwrap(); dynamic_cast<DataObject *>(obj)) {
                             const Atom msgAtom = rt.atomTable.intern("message"_str);
                             if(obj->hasProp(msgAtom)) {
                                 throw std::runtime_error(fmt::format("{}", obj->getProp(msgAtom)));
@@ -223,22 +223,22 @@ namespace cial::vm {
         }
     }
 
-    static bool propObjectSet(VMState& vmState, const Value& src, const Value& dst) {
+    static bool propObjectSet(VMState &vmState, const Value &src, const Value &dst) {
         if(dst.isObject()) {
             // typeId 直判替代 dynamic_cast（Property 为 final，二者等价）
-            if(const auto* obj = dst.asObject().value(); obj->typeId() == TypeId::Property) {
-                static_cast<const Property*>(obj)->invokeSet(vmState, src);
+            if(const auto *obj = dst.asObject().value(); obj->typeId() == TypeId::Property) {
+                static_cast<const Property *>(obj)->invokeSet(vmState, src);
                 return true;
             }
         }
         return false;
     }
 
-    static bool propObjectGet(VMState& vmState, const Value& src, Value& dst) {
+    static bool propObjectGet(VMState &vmState, const Value &src, Value &dst) {
         if(src.isObject()) {
             if(const auto object = src.asObject().unwrap()) {
                 if(object->typeId() == TypeId::Property) {
-                    dst = static_cast<const Property*>(object)->invokeGet(vmState);
+                    dst = static_cast<const Property *>(object)->invokeGet(vmState);
                     return true;
                 }
             }
@@ -251,15 +251,15 @@ namespace cial::vm {
 
     // obj.member 读：原生成员（方法/count 属性）→ Global/Class/普通对象分支 →
     // 非对象值的原生 property 表。getter 经 invokeGet 嵌套 run 同步完成，恒 Continue
-    static void propGetMember(VMState& vmState, CallFrame* cur, const Value& val, const Atom atom, Value& dst) {
+    static void propGetMember(VMState &vmState, CallFrame *cur, const Value &val, const Atom atom, Value &dst) {
         if(val.isObject()) {
-            auto* obj = val.asObject().value();
+            auto *obj = val.asObject().value();
 
             // 原生成员统一通过开放类型键查表；
             // 未命中落到对象自身 getProp。
             const TypeId tid = obj->typeId();
             const auto member = vmState.context.findNativeMember(obj->nativeTypeKey(), atom);
-            if(auto* getter = member.getter) {
+            if(auto *getter = member.getter) {
                 dst = getter(val);
                 return;
             }
@@ -269,7 +269,7 @@ namespace cial::vm {
                 dst = activeGetter->callDirect(vmState, val, 0, nullptr);
                 return;
             }
-            if(auto* nativeFn = member.method) {
+            if(auto *nativeFn = member.method) {
                 nativeFn = vmState.rt.create<NativeFunction>(*nativeFn).get();
                 nativeFn->setThisObj(val);
                 dst = Value{ nativeFn };
@@ -279,7 +279,7 @@ namespace cial::vm {
 
             if(tid == TypeId::Global) {
                 // for global, proxy object, maybe get extends object in dataObject?
-                auto* global = static_cast<GlobalObject*>(obj);
+                auto *global = static_cast<GlobalObject *>(obj);
                 if(global->proxy) {
                     throw std::runtime_error("Not implemented");
                 }
@@ -294,7 +294,7 @@ namespace cial::vm {
                 propObjectGet(vmState, tmp, tmp);
                 // 构造器名访问返回 ClassObject 本身（super.<Ctor>() 路径），非 Function
                 if(tmp.isObject()) {
-                    if(auto* fun = dynamic_cast<Function*>(tmp.asObject().value())) {
+                    if(auto *fun = dynamic_cast<Function *>(tmp.asObject().value())) {
                         fun->thisObj = cur->thisObj.asObject().value();
                     }
                 }
@@ -314,16 +314,16 @@ namespace cial::vm {
         if(val.isVoid())
             throw std::runtime_error("cannot access member of void");
         const NativeTypeKey tId = ValueToNativeTypeKey::getId(val);
-        if(auto* getter = vmState.context.findProperty(tId, atom)) {
+        if(auto *getter = vmState.context.findProperty(tId, atom)) {
             dst = getter(val);
             return;
         }
 
         // Native method
-        NativeFunction* nativeFn = vmState.context.findMethod(tId, atom);
+        NativeFunction *nativeFn = vmState.context.findMethod(tId, atom);
         if(!nativeFn) {
             // 成员不存在:脚本可捕获的运行期异常(与对象成员缺失同语义)
-            const auto* entry = vmState.rt.atomTable.get(atom);
+            const auto *entry = vmState.rt.atomTable.get(atom);
             const std::string nameStr = entry && entry->str ? entry->str->toStdStr() : "?atom?";
             throw std::runtime_error("in native object Not found property: " + nameStr);
         }
@@ -336,11 +336,11 @@ namespace cial::vm {
     // 帧不执行，与 DGlobal 同款检测栈变化交还主循环）；普通成员纯写。
     // Global 不豁免：字节码路径顶层 property 写入即 SPD this.x（this=全局），
     // TJS2 PropSet 对 property 槽同样触发 setter。返回 true 表示 setter 已压帧
-    static bool propSetMember(VMState& vmState, const Value& objVal, const Atom atom, const Value& src) {
+    static bool propSetMember(VMState &vmState, const Value &objVal, const Atom atom, const Value &src) {
         if(!objVal.isObject()) {
             throw std::runtime_error("dprop obj is not object");
         }
-        auto* obj = objVal.asObject().unwrap();
+        auto *obj = objVal.asObject().unwrap();
         const auto accessor = vmState.context.findAccessor(obj->nativeTypeKey(), atom);
         if(accessor.getter || accessor.setter) {
             if(!accessor.setter)
@@ -371,27 +371,25 @@ namespace cial::vm {
      * 交还给触发嵌套调用的 dispatch 继续。
      */
     void VMState::drainFinalizers() {
-        auto& gc = rt.markSweep;
+        auto &gc = rt.markSweep;
         if(gc.drainingFinalizers || gc.pendingFinalizers.empty())
             return;
         gc.drainingFinalizers = true;
         const bool savedZF = _zf;
-        DEFER{
-                gc.drainingFinalizers = false;
-                _zf = savedZF;
-
-
+        DEFER {
+            gc.drainingFinalizers = false;
+            _zf = savedZF;
         };
         // 新回调产生的垃圾留给下一安全点，避免一条指令无限延迟。
         size_t remaining = gc.pendingFinalizers.size();
         while(remaining-- && !gc.pendingFinalizers.empty()) {
-            auto* object = gc.pendingFinalizers.front();
+            auto *object = gc.pendingFinalizers.front();
             if(!object->canFinalizeIn(*this)) {
                 gc.pendingFinalizers.erase(gc.pendingFinalizers.begin());
                 gc.pendingFinalizers.push_back(object);
                 continue;
             }
-            DEFER{ gc.pendingFinalizers.erase(gc.pendingFinalizers.begin());   };
+            DEFER { gc.pendingFinalizers.erase(gc.pendingFinalizers.begin()); };
             object->finalizeDeferred(*this);
         }
     }
@@ -424,19 +422,19 @@ namespace cial::vm {
         ExecutionTrace::RunGuard traceRun{ Record ? _executionTrace : nullptr };
 
         for(;;) {
-FETCH_NEW_FRAME:
+        FETCH_NEW_FRAME:
             if constexpr(Native)
                 _integerJit->breakTrace();
-            CallFrame* cur = _curFrame;
+            CallFrame *cur = _curFrame;
             u64 pc = cur->pc;
-            Chunk* chunk = cur->chunk;
+            Chunk *chunk = cur->chunk;
             // 字节码按需编译（幂等）：进入字节码路径的 chunk 才编译
             chunk->toBytecode();
-            const Constant* constants = chunk->getConstants().data();
-            Value* regs = cur->regs();
+            const Constant *constants = chunk->getConstants().data();
+            Value *regs = cur->regs();
 
-            const Vec<u8>& codeVec = chunk->code();
-            const u8* ip = codeVec.data();
+            const Vec<u8> &codeVec = chunk->code();
+            const u8 *ip = codeVec.data();
             const size_t bcSize = codeVec.size();
 
             while(pc < bcSize) {
@@ -462,11 +460,11 @@ FETCH_NEW_FRAME:
         else                                                                                                           \
             r = dispatch##op(cur, constants, regs, ip, pc);                                                            \
         break;
-                            CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_CASE)
+                        CIAL_BYTECODE_OPCODE_ENUMS(DISPATCH_CASE)
 #undef DISPATCH_CASE
                     }
                     dispatched = true;
-                } catch(ScriptExceptionCarrier& carried) {
+                } catch(ScriptExceptionCarrier &carried) {
                     // 回调异常（VM::callValue 哨兵截获）：转入脚本异常协议，
                     // 由下方 unwind 恢复外层脚本 try/catch（栈空时 unwind 抛终态）
                     _pending = PendingCF::Throw;
@@ -477,7 +475,7 @@ FETCH_NEW_FRAME:
                     // 位置作为元数据记录；回调重入的调用点即本帧当前指令
                     recordFault(cur->chunk, instructionPc);
                     cur->pc = instructionPc; // 故障指令起始位置（pc 已越过操作数）
-                } catch(const std::exception& e) {
+                } catch(const std::exception &e) {
                     if(_pending != PendingCF::None) {
                         throw; // 脚本异常传播中,不吞噬
                     }
@@ -489,10 +487,10 @@ FETCH_NEW_FRAME:
                     _pending = PendingCF::Throw;
                     const Atom excAtom = rt.atomTable.intern("Exception"_str);
                     bool wrapped = false;
-                    if(const Value* klassVal = context.global()->findPropRef(excAtom);
-                        klassVal && klassVal->isObject()) {
-                        if(auto* klass = dynamic_cast<ClassObject*>(klassVal->asObject().unwrap())) {
-                            auto* obj = rt.create<DataObject>(this, klass).get();
+                    if(const Value *klassVal = context.global()->findPropRef(excAtom);
+                       klassVal && klassVal->isObject()) {
+                        if(auto *klass = dynamic_cast<ClassObject *>(klassVal->asObject().unwrap())) {
+                            auto *obj = rt.create<DataObject>(this, klass).get();
                             obj->setProp(rt.atomTable.intern("message"_str), Value{ String{ e.what() } });
                             _exValue = Value{ obj };
                             rt.addHandleVal(obj); // 根保护至 clearException
@@ -541,7 +539,7 @@ FETCH_NEW_FRAME:
                 freeCallFrame();
                 if(_stackTop < entryStackTop)
                     return; // 嵌套进入：目标帧已完成，交还原调用方
-                continue;   // 取父帧，从其保存的 pc 继续
+                continue; // 取父帧，从其保存的 pc 继续
             }
             break; // 最底层帧执行完毕
         }
@@ -595,7 +593,7 @@ FETCH_NEW_FRAME:
 
     DISPATCH_OP_METHOD(Super) {
         const u16 r1 = read<u16>(ip, pc);
-        auto* dataObj = dynamic_cast<DataObject*>(cur->thisObj.asObject().unwrap());
+        auto *dataObj = dynamic_cast<DataObject *>(cur->thisObj.asObject().unwrap());
         // 方法内：_lastSuperClass = 构造链中最后初始化的基类（"后继承优先"语义）
         if(dataObj->getSuperClass()) {
             regs[r1] = Value{ dataObj->getSuperClass() };
@@ -603,7 +601,7 @@ FETCH_NEW_FRAME:
         }
         // 构造器内 super.<baseCtor>()：setSuperClass 尚未发生（基类构造完成时才记录），
         // _lastSuperClass 为 null——按类定义的 extends 解析到最左（首个）基类
-        const auto& exts = dataObj->klass()->meta->extends;
+        const auto &exts = dataObj->klass()->meta->extends;
         for(const Atom extName : exts) {
             if(globalHas(extName)) {
                 regs[r1] = global(extName);
@@ -631,7 +629,7 @@ FETCH_NEW_FRAME:
         // invalidate 会把 finalize 帧压栈（如果类定义了 finalize）；
         // run 缓存了当前帧，必须跳到新帧执行完再回来
         const size_t top = _stackTop;
-        dynamic_cast<DataObject*>(regs[r1].asObject().unwrap())->invalidate();
+        dynamic_cast<DataObject *>(regs[r1].asObject().unwrap())->invalidate();
         if(_stackTop != top) {
             cur->pc = pc;
             return DispatchRet::Call;
@@ -649,8 +647,8 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc);
         // 顶层帧（无父帧/无返回寄存器）直接结束，不回写
         if(_stackTop > 1 && cur->ret) {
-            Value& value = regs[r1];
-            Value& dst = (cur - 1)->getReg(*cur->ret);
+            Value &value = regs[r1];
+            Value &dst = (cur - 1)->getReg(*cur->ret);
             if(value.isIntegerFast() && dst.isIntegerFast()) {
                 // 整数直写:跳过 Value 拷贝构造/析构(数值递归的返回主路径)
                 dst.asIntegerStore(value.asIntegerUnsafe());
@@ -685,7 +683,7 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(ToInt) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
-        Value& dst = regs[r2];
+        Value &dst = regs[r2];
         dst = regs[r1];
         if(const auto r = dst.toInteger(); r.isFailed()) {
             throw r.getErr();
@@ -696,7 +694,7 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(ToReal) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
-        Value& dst = regs[r2];
+        Value &dst = regs[r2];
         dst = regs[r1];
         if(const auto r = dst.toReal(); r.isFailed()) {
             throw r.getErr();
@@ -707,7 +705,7 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(ToString) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
-        Value& dst = regs[r2];
+        Value &dst = regs[r2];
         dst = regs[r1];
         if(const auto r = dst.toString(); r.isFailed()) {
             throw r.getErr();
@@ -729,11 +727,9 @@ FETCH_NEW_FRAME:
                 throw r.getErr();
             }
         }
-        const String* str = strVal.asString().unwrap();
+        const String *str = strVal.asString().unwrap();
         regs[r2] = Value{ Integer{
-                        str->isEmpty() ? 0 : static_cast<Integer>(static_cast<unsigned char>(str->getData()[0]))
-                }
-        };
+            str->isEmpty() ? 0 : static_cast<Integer>(static_cast<unsigned char>(str->getData()[0])) } };
         return DispatchRet::Continue;
     }
 
@@ -741,7 +737,7 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(Chr) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
-        const Value& src = regs[r1];
+        const Value &src = regs[r1];
         if(!src.isInteger() && !src.isReal()) {
             throw std::runtime_error("'$' operator expects an integer operand");
         }
@@ -755,7 +751,7 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
         // 与 TJS 一致的类型名:Integer/Real/String/Object/void/Octet
-        const Value& src = regs[r1];
+        const Value &src = regs[r1];
         switch(src.type()) {
             case ValueType::Integer:
                 regs[r2] = Value{ String{ "Integer" } };
@@ -774,7 +770,7 @@ FETCH_NEW_FRAME:
                 const auto objR = src.asObject();
                 if(objR.isOk() && objR.value()) {
                     const Atom name = objR.value()->getName();
-                    if(const auto* entry = rt.atomTable.get(name); entry && entry->str && entry->str->length() > 0) {
+                    if(const auto *entry = rt.atomTable.get(name); entry && entry->str && entry->str->length() > 0) {
                         regs[r2] = Value{ String{ entry->str->getData(), entry->str->length() } };
                     } else {
                         regs[r2] = Value{ String{ "Object" } };
@@ -794,7 +790,7 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(LNot) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
-        Value& dst = regs[r2];
+        Value &dst = regs[r2];
         dst = regs[r1];
         dst.toLogicalNot();
         return DispatchRet::Continue;
@@ -803,7 +799,7 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(ChgSign) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
-        Value& dst = regs[r2];
+        Value &dst = regs[r2];
         dst = regs[r1];
         if(const auto r = dst.toSignChange(); r.isFailed()) {
             throw r.getErr();
@@ -816,11 +812,11 @@ FETCH_NEW_FRAME:
         const u16 r2 = read<u16>(ip, pc); // 新 this
         // incontextof 的对象可为脚本函数、原生函数或 property 闭包
         // （TJS2 顶层 property 定义经 CHGTHIS 绑定 this=global）
-        if(auto* fn = dynamic_cast<Function*>(regs[r1].asObject().unwrap())) {
+        if(auto *fn = dynamic_cast<Function *>(regs[r1].asObject().unwrap())) {
             fn->thisObj = regs[r2].asObject().unwrap();
-        } else if(auto* nativeFn = dynamic_cast<NativeFunction*>(regs[r1].asObject().unwrap())) {
+        } else if(auto *nativeFn = dynamic_cast<NativeFunction *>(regs[r1].asObject().unwrap())) {
             nativeFn->setThisObj(regs[r2]);
-        } else if(auto* prop = dynamic_cast<Property*>(regs[r1].asObject().unwrap())) {
+        } else if(auto *prop = dynamic_cast<Property *>(regs[r1].asObject().unwrap())) {
             prop->thisObj = regs[r2].asObject().unwrap();
         } else {
             throw std::runtime_error("incontextof expects a function");
@@ -833,7 +829,7 @@ FETCH_NEW_FRAME:
         const u16 r2 = read<u16>(ip, pc);
         // 原版 VM_CHKINV（tjsInterCodeExec.cpp:1177）：非对象值恒有效（true）；
         // 对象按 IsValid 判定——本引擎仅 DataObject 跟踪失效状态，其余对象恒有效。
-        if(auto* data = regs[r1].isObject() ? dynamic_cast<DataObject*>(regs[r1].asObject().unwrap()) : nullptr) {
+        if(auto *data = regs[r1].isObject() ? dynamic_cast<DataObject *>(regs[r1].asObject().unwrap()) : nullptr) {
             regs[r2] = Value{ Integer{ data->isValid() } };
         } else {
             regs[r2] = Value{ Integer{ true } };
@@ -848,7 +844,7 @@ FETCH_NEW_FRAME:
         // 脚本帧存活时不能用单帧模式，否则嵌套 run 会继续执行外层帧
         const u16 src = read<u16>(ip, pc); // 与 encode 同序：先 src 后 dst
         const u16 dst = read<u16>(ip, pc);
-        const Value& val = regs[src];
+        const Value &val = regs[src];
         if(!val.isString() || val.asString().unwrap()->isEmpty()) {
             regs[dst] = val;
             return DispatchRet::Continue;
@@ -862,7 +858,7 @@ FETCH_NEW_FRAME:
         if(r.isFailed())
             throw std::runtime_error("cannot evaluate expression");
         syntax::Parser parser{ sourceFile, context.pp() };
-        syntax::ExprNode* node = parser.parseExpression(r, true);
+        syntax::ExprNode *node = parser.parseExpression(r, true);
         if(r.isFailed() || !node)
             throw std::runtime_error("cannot evaluate expression");
         inter::IRGenerator codeGen{ r, rt, sourceFile };
@@ -883,7 +879,7 @@ FETCH_NEW_FRAME:
         tmpChunk.setRegCount(2); // reg0 = 返回值槽，reg1 = 哨兵异常值槽
         tmpChunk.emit<inter::NOP>();
         tmpChunk.addThrowHandler({ 0, 1, excSlot }); // 全区哨兵：截住 unwind
-        tmpChunk.toBytecode();                       // 哨兵表必须显式落 bc 层（callValue 同款陷阱）
+        tmpChunk.toBytecode(); // 哨兵表必须显式落 bc 层（callValue 同款陷阱）
 
         const size_t tmpSp = getRegPoolTop(); // tmp 帧 reg0 的池内位置（异常值落点 = tmpSp + excSlot）
         allocCallFrame(&tmpChunk);
@@ -908,9 +904,9 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(ChkIns) {
         const u16 r1 = read<u16>(ip, pc); // 值(任意类型),同时是输出 bool 的槽位
         const u16 r2 = read<u16>(ip, pc); // 类名字符串
-        Value& dst = regs[r1];
-        if(const Value& src = regs[r2]; src.isString()) {
-            const String& name = *src.asString().unwrap();
+        Value &dst = regs[r1];
+        if(const Value &src = regs[r2]; src.isString()) {
+            const String &name = *src.asString().unwrap();
             // TJS2 语义:基础类型用类型名匹配(Integer/Real 同属 "Number"),
             // 其余走对象的类名 instanceOf
             bool result = false;
@@ -967,9 +963,9 @@ FETCH_NEW_FRAME:
         const u32 atom = read<u32>(ip, pc);
         const u16 r1 = read<u16>(ip, pc);
         const Atom a{ atom };
-        const Value& srcVal = regs[r1];
-        if(const Value* slot = cachedGlobal(a); slot && slot->isIntegerFast() && srcVal.isIntegerFast()) {
-            const_cast<Value*>(slot)->asIntegerStore(srcVal.asIntegerUnsafe());
+        const Value &srcVal = regs[r1];
+        if(const Value *slot = cachedGlobal(a); slot && slot->isIntegerFast() && srcVal.isIntegerFast()) {
+            const_cast<Value *>(slot)->asIntegerStore(srcVal.asIntegerUnsafe());
             return DispatchRet::Continue;
         }
         if(globalHas(a) && propObjectSet(*this, srcVal, global(a))) {
@@ -980,8 +976,8 @@ FETCH_NEW_FRAME:
         return DispatchRet::Continue;
     }
 
-    void VMState::loadGlobal(const Atom atom, Value& dst) {
-        if(const Value* g = cachedGlobal(atom)) {
+    void VMState::loadGlobal(const Atom atom, Value &dst) {
+        if(const Value *g = cachedGlobal(atom)) {
             // Property 触发 getter 的慢路径之外,直接从槽位零拷贝取值。
             // 注意寄存器写入可能触发 setter 语义无关,只读安全;
             // Property 调用可能修改 _props(重入),先拷出再降级慢路径。
@@ -1026,10 +1022,10 @@ FETCH_NEW_FRAME:
         const u32 atom = read<u32>(ip, pc);
         const u16 r1 = read<u16>(ip, pc);
         const Atom a{ atom };
-        const Value& srcVal = regs[r1];
+        const Value &srcVal = regs[r1];
         if(!cur->thisData && (!cur->closure || !cur->closure->funcMeta) && srcVal.isIntegerFast()) {
-            if(const Value* slot = cachedGlobal(a); slot && slot->isIntegerFast()) {
-                const_cast<Value*>(slot)->asIntegerStore(srcVal.asIntegerUnsafe());
+            if(const Value *slot = cachedGlobal(a); slot && slot->isIntegerFast()) {
+                const_cast<Value *>(slot)->asIntegerStore(srcVal.asIntegerUnsafe());
                 return DispatchRet::Continue;
             }
         }
@@ -1127,8 +1123,8 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
         const u16 r3 = read<u16>(ip, pc);
-        const Value& a = regs[r1];
-        const Value& b = regs[r2];
+        const Value &a = regs[r1];
+        const Value &b = regs[r2];
         if(a.isIntegerFast() && b.isIntegerFast()) {
             regs[r3] = Value{ Integer{ a.asIntegerUnsafe() < b.asIntegerUnsafe() } };
             return DispatchRet::Continue;
@@ -1247,7 +1243,7 @@ FETCH_NEW_FRAME:
     // （TJS increment 语义；字符串不拼接）
     DISPATCH_OP_METHOD(Inc) {
         const u16 r1 = read<u16>(ip, pc);
-        Value& v = regs[r1];
+        Value &v = regs[r1];
         if(v.isIntegerFast())
             v = Value{ Integer{ v.asIntegerUnsafe() + 1 } };
         else if(v.isReal())
@@ -1259,7 +1255,7 @@ FETCH_NEW_FRAME:
 
     DISPATCH_OP_METHOD(Dec) {
         const u16 r1 = read<u16>(ip, pc);
-        Value& v = regs[r1];
+        Value &v = regs[r1];
         if(v.isIntegerFast())
             v = Value{ Integer{ v.asIntegerUnsafe() - 1 } };
         else if(v.isReal())
@@ -1295,13 +1291,13 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(ToOctet) {
         const u16 r1 = read<u16>(ip, pc); // src
         const u16 r2 = read<u16>(ip, pc); // dst
-        const Value& v = regs[r1];
+        const Value &v = regs[r1];
         if(v.isOctet()) {
             regs[r2] = v;
             return DispatchRet::Continue;
         }
         if(v.isVoid()) {
-            auto* payload = SharedPayload<Octet>::makeSingle(Octet(nullptr, 0));
+            auto *payload = SharedPayload<Octet>::makeSingle(Octet(nullptr, 0));
             regs[r2] = Value{};
             regs[r2].type(ValueType::Octet);
             regs[r2].octetStore(payload);
@@ -1315,7 +1311,7 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
         const i64 imm = decodeSleb128(ip, pc, 10);
-        const auto& object = regs[r2].asObject().unwrap();
+        const auto &object = regs[r2].asObject().unwrap();
         cur->pc = pc;
         object->call(*this, r1, imm);
         return DispatchRet::Call;
@@ -1341,7 +1337,7 @@ FETCH_NEW_FRAME:
         return invokeCallV(cur, regs, dst, func, argRegs, argc, pc);
     }
 
-    DispatchRet VMState::dispatchTailCallV(CallFrame* cur, Value* regs, const u8* ip, u64& pc) {
+    DispatchRet VMState::dispatchTailCallV(CallFrame *cur, Value *regs, const u8 *ip, u64 &pc) {
         const u16 dst = read<u16>(ip, pc);
         const u16 func = read<u16>(ip, pc);
         const u64 argc = decodeUleb128(ip, pc, 10);
@@ -1351,9 +1347,9 @@ FETCH_NEW_FRAME:
         for(u64 i = 0; i < argc; ++i)
             args[i] = read<u16>(ip, pc);
         if(regs[func].isObject()) {
-            auto* callee = regs[func].asObject().unwrap();
+            auto *callee = regs[func].asObject().unwrap();
             if(callee->typeId() == TypeId::Function) {
-                auto* meta = static_cast<Function*>(callee)->meta;
+                auto *meta = static_cast<Function *>(callee)->meta;
                 if(meta == cur->funcMeta && meta->tailRecursionSafe != 0 &&
                    trySelfTailCall(cur, regs, callee, dst, args, static_cast<u32>(argc), pc))
                     return DispatchRet::Call;
@@ -1377,30 +1373,30 @@ FETCH_NEW_FRAME:
 
     namespace {
         // 无外部调用、动态状态访问或堆对象操作的函数，帧局部数值才可安全丢弃。
-        bool numericSelfRecursion(const FuncMeta& meta) {
+        bool numericSelfRecursion(const FuncMeta &meta) {
             using inter::TacOpCode;
-            const auto& chunk = *meta.chunk;
+            const auto &chunk = *meta.chunk;
             if(meta.hasCollapse || !chunk.getThrowHandlers().empty())
                 return false;
             bool hasTailReturn = false;
-            const auto& instructions = meta.chunk->getInstVec();
+            const auto &instructions = meta.chunk->getInstVec();
             for(size_t i = 0; i + 1 < instructions.size(); ++i) {
                 if(instructions[i]->opcode() == TacOpCode::CallV && instructions[i + 1]->opcode() == TacOpCode::Ret &&
-                   static_cast<const inter::CallV&>(*instructions[i]).dst ==
-                   instructions[i + 1]->getOp1().value<inter::Register>())
+                   static_cast<const inter::CallV &>(*instructions[i]).dst ==
+                       instructions[i + 1]->getOp1().value<inter::Register>())
                     hasTailReturn = true;
             }
             if(!hasTailReturn)
                 return false;
             Vec<bool> selfRegisters(chunk.getRegCount(), false);
-            for(const auto& instruction : meta.chunk->getInstVec()) {
+            for(const auto &instruction : meta.chunk->getInstVec()) {
                 if(instruction->opcode() == TacOpCode::GThis) {
                     if(instruction->getOp1().value<Atom>() != meta.name)
                         return false;
                     selfRegisters[instruction->getOp2().value<inter::Register>().index()] = true;
                 }
             }
-            for(const auto& instruction : meta.chunk->getInstVec()) {
+            for(const auto &instruction : meta.chunk->getInstVec()) {
                 Opt<inter::Register> destination;
                 switch(instruction->opcode()) {
                     case TacOpCode::NOP:
@@ -1446,7 +1442,7 @@ FETCH_NEW_FRAME:
                         destination = instruction->getOp3().value<inter::Register>();
                         break;
                     case TacOpCode::CallV: {
-                        const auto& call = static_cast<const inter::CallV&>(*instruction);
+                        const auto &call = static_cast<const inter::CallV &>(*instruction);
                         if(!selfRegisters[call.func.index()])
                             return false;
                         destination = call.dst;
@@ -1461,26 +1457,26 @@ FETCH_NEW_FRAME:
             return true;
         }
 
-        bool tailNumber(const Value& value) { return value.isIntegerFast() || value.isReal() || value.isVoid(); }
+        bool tailNumber(const Value &value) { return value.isIntegerFast() || value.isReal() || value.isVoid(); }
     } // namespace
 
-    bool VMState::trySelfTailCall(CallFrame* cur, Value* regs, Object* callee, const u16 dst, const u16* argRegs,
+    bool VMState::trySelfTailCall(CallFrame *cur, Value *regs, Object *callee, const u16 dst, const u16 *argRegs,
                                   const u32 argc, const u64 pc) {
-        auto* fn = static_cast<Function*>(callee);
-        auto* meta = fn->meta;
+        auto *fn = static_cast<Function *>(callee);
+        auto *meta = fn->meta;
         if(meta->tailRecursionSafe < 0)
             meta->tailRecursionSafe = numericSelfRecursion(*meta) ? 1 : 0;
         if(!meta->tailRecursionSafe || argc != meta->arity || cur->actualArgc != meta->arity || cur->closure ||
            !(cur->thisObj.isVoid() ||
              (cur->thisObj.isObject() && cur->thisObj.asObject().unwrap() == context.global())))
             return false;
-        const auto& code = cur->chunk->code();
+        const auto &code = cur->chunk->code();
         if(pc + 3 > code.size() || code[pc] != static_cast<u8>(VmOpCode::Ret))
             return false;
         u64 next = pc + 1;
         if(read<u16>(code.data(), next) != dst)
             return false;
-        const Value* globalSelf = context.global()->findPropRef(meta->name);
+        const Value *globalSelf = context.global()->findPropRef(meta->name);
         if(!globalSelf || !globalSelf->isObject() || globalSelf->asObject().unwrap() != callee ||
            (fn->thisObj && fn->thisObj != context.global()))
             return false;
@@ -1502,28 +1498,28 @@ FETCH_NEW_FRAME:
         return true;
     }
 
-    DispatchRet VMState::invokeCallV(CallFrame* cur, Value* regs, const u16 dst, const u16 func, const u16* argRegs,
-                                     const u64 argc, const u64 pc, const Value* receiver) {
-        const Value& funcVal = regs[func];
+    DispatchRet VMState::invokeCallV(CallFrame *cur, Value *regs, const u16 dst, const u16 func, const u16 *argRegs,
+                                     const u64 argc, const u64 pc, const Value *receiver) {
+        const Value &funcVal = regs[func];
         if(funcVal.isObject()) {
-            auto* callee = funcVal.asObject().unwrap();
+            auto *callee = funcVal.asObject().unwrap();
             // typeId 一次虚调用判型（替代 dynamic_cast）：Function 走直写压帧，
             // NativeFunction 走免池同步快路径，其余回落通用 call
             if(callee->typeId() == TypeId::Function) {
-                auto* fn = static_cast<Function*>(callee);
-                const FuncMeta* meta = fn->meta;
+                auto *fn = static_cast<Function *>(callee);
+                const FuncMeta *meta = fn->meta;
                 const u32 arity = meta->arity;
                 const u32 argc32 = static_cast<u32>(argc);
                 const bool needTail = argc32 > arity || meta->hasCollapse;
                 // 压帧前取：调用者 this（调用点绑定）与函数的绑定 this（incontextof）
                 const Value callerThis = cur->thisObj;
-                Object* boundThis = fn->thisObj;
+                Object *boundThis = fn->thisObj;
 
                 // 直写布局：%0 = 新分配基址，窗口整体在调用者上方（无槽位别名）
                 allocCallFrame(fn->meta, dst, needTail ? argc : 0, /*argWindowDirect=*/true);
-                CallFrame* nf = curFrame();
+                CallFrame *nf = curFrame();
                 nf->actualArgc = argc32;
-                Value* w = nf->regs();
+                Value *w = nf->regs();
                 const u32 head = argc32 < arity ? argc32 : arity;
                 for(u32 i = 0; i < head; ++i)
                     w[i] = regs[argRegs[i]];
@@ -1557,17 +1553,15 @@ FETCH_NEW_FRAME:
             // 无需注册；Value 具有非平凡构造/析构，禁止直接声明数组默认初始化
             // 全部 64 槽（每次调用 1KB 冗余流量），只构造实际数量并在回调后析构
             if(callee->typeId() == TypeId::NativeFunction) {
-                auto* nativeFn = static_cast<NativeFunction*>(callee);
+                auto *nativeFn = static_cast<NativeFunction *>(callee);
                 constexpr u64 maxDirectArgs = 64;
                 alignas(Value) unsigned char argBuf[maxDirectArgs * sizeof(Value)];
-                auto* const localArgs = reinterpret_cast<Value*>(argBuf);
+                auto *const localArgs = reinterpret_cast<Value *>(argBuf);
                 const u64 n = argc < maxDirectArgs ? argc : maxDirectArgs;
                 u64 built = 0;
-                DEFER{
+                DEFER {
                     while(built > 0)
                         localArgs[--built].~Value();
-
-
                 };
                 for(; built < n; ++built)
                     new(argBuf + built * sizeof(Value)) Value(regs[argRegs[built]]);
@@ -1575,7 +1569,7 @@ FETCH_NEW_FRAME:
                 // 回调对尾部 void 做 TestVoid 判缺省，与 callWithThis 池顶
                 // [args..., void...] 布局等价）
                 const u64 full =
-                        static_cast<u64>(nativeFn->arity()) > argc ? static_cast<u64>(nativeFn->arity()) : argc;
+                    static_cast<u64>(nativeFn->arity()) > argc ? static_cast<u64>(nativeFn->arity()) : argc;
                 for(; built < full && built < maxDirectArgs; ++built)
                     new(argBuf + built * sizeof(Value)) Value();
                 cur->pc = pc;
@@ -1609,7 +1603,7 @@ FETCH_NEW_FRAME:
     // 本帧实际实参读取：超额调用（argCount > arity）时全部实参由
     // Function::call 按调用顺序复制在窗口顶部保留区 regCount..；
     // 未超额时 %0..%actualArgc-1 即实参（与池顶重合）
-    static Value frameArg(const CallFrame* cur, const Value* regs, const u32 i) {
+    static Value frameArg(const CallFrame *cur, const Value *regs, const u32 i) {
         // collapse 声明的帧：Function::call 已把全部实参按调用序备份到尾区
         // （CollapseArgs 会覆盖参数槽，原始值只在尾区）
         if(cur->funcMeta && cur->funcMeta->hasCollapse)
@@ -1631,7 +1625,7 @@ FETCH_NEW_FRAME:
             args.push_back(frameArg(cur, regs, i));
         // 被调者与实参都在压池前取值：push 扩池会迁移寄存器窗口使 regs 悬空
         const Value callee = regs[r2];
-        for(const auto& v : args)
+        for(const auto &v : args)
             push(v);
         cur->pc = pc;
         callee.asObject().unwrap()->call(*this, r1, static_cast<size_t>(argc));
@@ -1655,11 +1649,11 @@ FETCH_NEW_FRAME:
                     break;
                 case 1: {
                     // fatExpand：展开 Array 元素
-                    const auto& obj = regs[reg];
-                    auto* arr = obj.isObject() ? dynamic_cast<Array*>(obj.asObject().unwrap()) : nullptr;
+                    const auto &obj = regs[reg];
+                    auto *arr = obj.isObject() ? dynamic_cast<Array *>(obj.asObject().unwrap()) : nullptr;
                     if(!arr)
                         throw std::runtime_error("expand call '*' expects an array");
-                    for(auto& el : arr->elements)
+                    for(auto &el : arr->elements)
                         args.push_back(el);
                     break;
                 }
@@ -1674,7 +1668,7 @@ FETCH_NEW_FRAME:
         }
         // 被调者在压池前取值（同 CallOmit）
         const Value callee = regs[r2];
-        for(const auto& v : args)
+        for(const auto &v : args)
             push(v);
         cur->pc = pc;
         callee.asObject().unwrap()->call(*this, r1, args.size());
@@ -1700,10 +1694,10 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc); // obj
         const u16 r2 = read<u16>(ip, pc); // member
         const u16 r3 = read<u16>(ip, pc); // dst
-        const auto& val = regs[r1];
+        const auto &val = regs[r1];
         // 整数成员名（旧版 PropGetByNum，TJS `a[0]` 编译为 GPI+整数名）：数组下标
         if(regs[r2].isInteger()) {
-            auto* arr = val.isObject() ? dynamic_cast<Array*>(val.asObject().unwrap()) : nullptr;
+            auto *arr = val.isObject() ? dynamic_cast<Array *>(val.asObject().unwrap()) : nullptr;
             if(!arr)
                 throw std::runtime_error("integer member access expects an array");
             const auto i = regs[r2].asInteger().unwrap();
@@ -1713,14 +1707,14 @@ FETCH_NEW_FRAME:
             regs[r3] = arr->elements[pos];
             return DispatchRet::Continue;
         }
-        const String& name = *regs[r2].asString().unwrap();
+        const String &name = *regs[r2].asString().unwrap();
         propGetMember(*this, cur, val, rt.atomTable.intern(name), regs[r3]);
         return DispatchRet::Continue;
     }
 
     // 成员名编译期 Atom 直引（同 GProp，跳过名字寄存器与 dispatch 再 intern）
-    const VMState::NativeMemberCache& VMState::nativeMember(NativeTypeKey type, Atom atom, u64 site) {
-        auto& entry = _nativeCache[(site ^ atom.v ^ type.hash()) % 64];
+    const VMState::NativeMemberCache &VMState::nativeMember(NativeTypeKey type, Atom atom, u64 site) {
+        auto &entry = _nativeCache[(site ^ atom.v ^ type.hash()) % 64];
         const u64 revision = context.nativeRevision();
         if(entry.type != type || entry.atom != atom || entry.revision != revision) {
             const auto member = context.findNativeMember(type, atom);
@@ -1735,9 +1729,9 @@ FETCH_NEW_FRAME:
         const u16 dst = read<u16>(ip, pc);
         const u16 receiver = read<u16>(ip, pc);
         // 只读引用替代栈拷贝：native 判定/propGetMember 均不修改源槽
-        const Value& value = regs[obj];
+        const Value &value = regs[obj];
         {
-            const auto& entry = nativeMember(ValueToNativeTypeKey::getId(value), atom, pc);
+            const auto &entry = nativeMember(ValueToNativeTypeKey::getId(value), atom, pc);
             if(entry.method && !entry.getter && !entry.accessor.getter) {
                 regs[receiver] = value;
                 regs[dst] = Value{ entry.method };
@@ -1750,9 +1744,9 @@ FETCH_NEW_FRAME:
     }
 
     DISPATCH_OP_METHOD(GPropC) {
-        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
-        const u16 r3 = read<u16>(ip, pc);    // dst
+        const u16 r3 = read<u16>(ip, pc); // dst
         propGetMember(*this, cur, regs[r1], Atom{ atomV }, regs[r3]);
         return DispatchRet::Continue;
     }
@@ -1761,12 +1755,12 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc); // obj
         const u16 r2 = read<u16>(ip, pc); // member
         const u16 r3 = read<u16>(ip, pc); // src
-        const auto& objVal = regs[r1];
+        const auto &objVal = regs[r1];
         // 整数成员名（旧版 PropSetByNum）：数组下标写，越界自动扩展补 void
         if(regs[r2].isInteger()) {
             if(!objVal.isObject())
                 throw std::runtime_error("dprop obj is not object");
-            auto* arr = dynamic_cast<Array*>(objVal.asObject().unwrap());
+            auto *arr = dynamic_cast<Array *>(objVal.asObject().unwrap());
             if(!arr)
                 throw std::runtime_error("integer member access expects an array");
             const auto i = regs[r2].asInteger().unwrap();
@@ -1783,7 +1777,7 @@ FETCH_NEW_FRAME:
             }
             return DispatchRet::Continue;
         }
-        const String& name = *regs[r2].asString().unwrap();
+        const String &name = *regs[r2].asString().unwrap();
         if(propSetMember(*this, objVal, rt.atomTable.intern(name), regs[r3])) {
             cur->pc = pc;
             return DispatchRet::Call;
@@ -1793,9 +1787,9 @@ FETCH_NEW_FRAME:
 
     // 成员名编译期 Atom 直引（同 DProp，跳过名字寄存器与 dispatch 再 intern）
     DISPATCH_OP_METHOD(DPropC) {
-        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
-        const u16 r3 = read<u16>(ip, pc);    // src
+        const u16 r3 = read<u16>(ip, pc); // src
         if(propSetMember(*this, regs[r1], Atom{ atomV }, regs[r3])) {
             cur->pc = pc;
             return DispatchRet::Call;
@@ -1809,13 +1803,13 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc); // obj
         const u16 r2 = read<u16>(ip, pc); // member
         const u16 r3 = read<u16>(ip, pc); // src
-        const auto& objVal = regs[r1];
+        const auto &objVal = regs[r1];
         if(!objVal.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
         }
         if(regs[r2].isInteger()) {
             // 整数成员名：数组下标写（越界扩展补 void）
-            auto* arr = dynamic_cast<Array*>(objVal.asObject().unwrap());
+            auto *arr = dynamic_cast<Array *>(objVal.asObject().unwrap());
             if(!arr)
                 throw std::runtime_error("integer member access expects an array");
             const auto i = regs[r2].asInteger().unwrap();
@@ -1832,16 +1826,16 @@ FETCH_NEW_FRAME:
             }
             return DispatchRet::Continue;
         }
-        const String& name = *regs[r2].asString().unwrap();
+        const String &name = *regs[r2].asString().unwrap();
         objVal.asObject().unwrap()->setProp(rt.atomTable.intern(name), regs[r3]);
         return DispatchRet::Continue;
     }
 
     DISPATCH_OP_METHOD(DPropRawC) {
-        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
-        const u16 r3 = read<u16>(ip, pc);    // src
-        const auto& objVal = regs[r1];
+        const u16 r3 = read<u16>(ip, pc); // src
+        const auto &objVal = regs[r1];
         if(!objVal.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
         }
@@ -1854,21 +1848,21 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc); // obj
         const u16 r2 = read<u16>(ip, pc); // member
         const u16 r3 = read<u16>(ip, pc); // dst
-        const auto& objVal = regs[r1];
+        const auto &objVal = regs[r1];
         if(!objVal.isObject()) {
             regs[r3] = Value{ Integer{ false } };
             return DispatchRet::Continue;
         }
-        const String& name = *regs[r2].asString().unwrap();
+        const String &name = *regs[r2].asString().unwrap();
         regs[r3] = Value{ Integer{ objVal.asObject().unwrap()->delProp(rt.atomTable.intern(name)) } };
         return DispatchRet::Continue;
     }
 
     DISPATCH_OP_METHOD(DelPropC) {
-        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
-        const u16 r3 = read<u16>(ip, pc);    // dst
-        const auto& objVal = regs[r1];
+        const u16 r3 = read<u16>(ip, pc); // dst
+        const auto &objVal = regs[r1];
         if(!objVal.isObject()) {
             regs[r3] = Value{ Integer{ false } };
             return DispatchRet::Continue;
@@ -1883,10 +1877,10 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc); // obj
         const u16 r2 = read<u16>(ip, pc); // member
         const u16 r3 = read<u16>(ip, pc); // dst
-        const auto& val = regs[r1];
+        const auto &val = regs[r1];
         if(regs[r2].isInteger()) {
             // 整数成员名：数组下标读
-            auto* arr = val.isObject() ? dynamic_cast<Array*>(val.asObject().unwrap()) : nullptr;
+            auto *arr = val.isObject() ? dynamic_cast<Array *>(val.asObject().unwrap()) : nullptr;
             if(!arr)
                 throw std::runtime_error("integer member access expects an array");
             const size_t pos = arrayIndex(regs[r2].asInteger().unwrap(), arr->elements.size());
@@ -1895,7 +1889,7 @@ FETCH_NEW_FRAME:
             regs[r3] = arr->elements[pos];
             return DispatchRet::Continue;
         }
-        const String& name = *regs[r2].asString().unwrap();
+        const String &name = *regs[r2].asString().unwrap();
         if(!val.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
         }
@@ -1904,10 +1898,10 @@ FETCH_NEW_FRAME:
     }
 
     DISPATCH_OP_METHOD(GPropRawC) {
-        const u16 r1 = read<u16>(ip, pc);    // obj
+        const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
-        const u16 r3 = read<u16>(ip, pc);    // dst
-        const auto& val = regs[r1];
+        const u16 r3 = read<u16>(ip, pc); // dst
+        const auto &val = regs[r1];
         if(!val.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
         }
@@ -1929,13 +1923,13 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(DerefGet) {
         const u16 r1 = read<u16>(ip, pc); // prop
         const u16 r2 = read<u16>(ip, pc); // dst
-        const auto& propVal = regs[r1];
+        const auto &propVal = regs[r1];
         if(!propVal.isObject()) {
             throw std::runtime_error("'*' operand is not a property");
         }
-        auto* prop = propVal.asObject().unwrap()->typeId() == TypeId::Property
-                     ? static_cast<Property*>(propVal.asObject().unwrap())
-                     : nullptr;
+        auto *prop = propVal.asObject().unwrap()->typeId() == TypeId::Property
+            ? static_cast<Property *>(propVal.asObject().unwrap())
+            : nullptr;
         if(!prop) {
             throw std::runtime_error("'*' operand is not a property");
         }
@@ -1948,13 +1942,13 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(DerefSet) {
         const u16 r1 = read<u16>(ip, pc); // prop
         const u16 r2 = read<u16>(ip, pc); // src
-        const auto& propVal = regs[r1];
+        const auto &propVal = regs[r1];
         if(!propVal.isObject()) {
             throw std::runtime_error("'*' operand is not a property");
         }
-        auto* prop = propVal.asObject().unwrap()->typeId() == TypeId::Property
-                     ? static_cast<Property*>(propVal.asObject().unwrap())
-                     : nullptr;
+        auto *prop = propVal.asObject().unwrap()->typeId() == TypeId::Property
+            ? static_cast<Property *>(propVal.asObject().unwrap())
+            : nullptr;
         if(!prop) {
             throw std::runtime_error("'*' operand is not a property");
         }
@@ -1987,10 +1981,10 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc); // obj
         const u16 r2 = read<u16>(ip, pc); // idx
         const u16 r3 = read<u16>(ip, pc); // dst
-        const Value& obj = regs[r1];
-        const Value& idx = regs[r2];
+        const Value &obj = regs[r1];
+        const Value &idx = regs[r2];
         if(obj.isObject()) {
-            if(auto* arr = dynamic_cast<Array*>(obj.asObject().unwrap())) {
+            if(auto *arr = dynamic_cast<Array *>(obj.asObject().unwrap())) {
                 const auto i = idx.isVoid() ? 0 : idx.asInteger().unwrap();
                 const size_t pos = arrayIndex(i, arr->elements.size());
                 if(pos == npos)
@@ -1998,7 +1992,7 @@ FETCH_NEW_FRAME:
                 regs[r3] = arr->elements[pos];
                 return DispatchRet::Continue;
             }
-            if(dynamic_cast<Dictionary*>(obj.asObject().unwrap()) != nullptr) {
+            if(dynamic_cast<Dictionary *>(obj.asObject().unwrap()) != nullptr) {
                 Value key = idx;
                 if(key.isVoid()) {
                     throw std::runtime_error("dictionary key is void");
@@ -2020,7 +2014,7 @@ FETCH_NEW_FRAME:
             return DispatchRet::Continue;
         }
         if(obj.isString()) {
-            const String* str = obj.asString().unwrap();
+            const String *str = obj.asString().unwrap();
             const auto i = idx.isVoid() ? 0 : idx.asInteger().unwrap();
             const auto n = static_cast<i64>(str->length());
             // TJS2 字符串下标语义（语料 test_string）：str[len] 得空串，str[>len] 报错，
@@ -2046,12 +2040,12 @@ FETCH_NEW_FRAME:
         const u16 r1 = read<u16>(ip, pc); // obj
         const u16 r2 = read<u16>(ip, pc); // idx
         const u16 r3 = read<u16>(ip, pc); // src
-        const Value& obj = regs[r1];
-        const Value& idx = regs[r2];
+        const Value &obj = regs[r1];
+        const Value &idx = regs[r2];
         if(!obj.isObject()) {
             throw std::runtime_error("value is not indexable");
         }
-        if(auto* arr = dynamic_cast<Array*>(obj.asObject().unwrap())) {
+        if(auto *arr = dynamic_cast<Array *>(obj.asObject().unwrap())) {
             const auto i = idx.isVoid() ? 0 : idx.asInteger().unwrap();
             if(i >= 0) {
                 const auto u = static_cast<u64>(i);
@@ -2085,7 +2079,7 @@ FETCH_NEW_FRAME:
         if(!regs[r1].isObject()) {
             throw std::runtime_error("with expects an object");
         }
-        auto* obj = regs[r1].asObject().unwrap();
+        auto *obj = regs[r1].asObject().unwrap();
         rt.addHandleVal(obj);
         withStack.push_back(obj);
         return DispatchRet::Continue;
@@ -2115,11 +2109,11 @@ FETCH_NEW_FRAME:
     DISPATCH_OP_METHOD(NewRegExp) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 cIdx = read<u16>(ip, pc);
-        const auto& constant = constants[cIdx];
+        const auto &constant = constants[cIdx];
         // 短串内联在 Value 内，不能借用 createValue 临时对象的字符串。
         const Value encodedValue = constant.createValue(&rt);
-        const String& encoded = *encodedValue.asString().unwrap();
-        const char* data = encoded.getData();
+        const String &encoded = *encodedValue.asString().unwrap();
+        const char *data = encoded.getData();
         const u32 len = encoded.length();
         u32 sep = 0;
         while(sep < len && data[sep] != '\n')

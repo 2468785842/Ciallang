@@ -20,17 +20,17 @@ using namespace cial::tjsbc;
 
 TEST_CASE("TJS2 字节码读取——畸形输入拒绝") {
     SECTION("魔数不符") {
-        Vec<u8> bytes{'X', 'Y', 'Z', 'Z', '1', '0', '0', 0};
+        Vec<u8> bytes{ 'X', 'Y', 'Z', 'Z', '1', '0', '0', 0 };
         REQUIRE_THROWS(readTjsBytecodeBytes(bytes));
     }
 
     SECTION("filesize 不一致") {
-        Vec<u8> bytes{'T', 'J', 'S', '2', '1', '0', '0', 0, 99, 0, 0, 0};
+        Vec<u8> bytes{ 'T', 'J', 'S', '2', '1', '0', '0', 0, 99, 0, 0, 0 };
         REQUIRE_THROWS(readTjsBytecodeBytes(bytes));
     }
 
     SECTION("截断（头后即止）") {
-        Vec<u8> bytes{'T', 'J', 'S', '2', '1', '0', '0', 0};
+        Vec<u8> bytes{ 'T', 'J', 'S', '2', '1', '0', '0', 0 };
         REQUIRE_THROWS(readTjsBytecodeBytes(bytes));
     }
 
@@ -41,10 +41,8 @@ TEST_CASE("TJS2 字节码读取——畸形输入拒绝") {
             for(int k = 0; k < 4; ++k)
                 bytes.push_back(static_cast<u8>(v >> (k * 8) & 0xFF));
         };
-        auto putTag = [&bytes](const char *t) {
-            bytes.insert(bytes.end(), t, t + 4);
-        };
-        const u8 header[8] = {'T', 'J', 'S', '2', '1', '0', '0', 0};
+        auto putTag = [&bytes](const char *t) { bytes.insert(bytes.end(), t, t + 4); };
+        const u8 header[8] = { 'T', 'J', 'S', '2', '1', '0', '0', 0 };
         bytes.insert(bytes.end(), header, header + 8);
         put32(0); // filesize 占位，末尾回填
         putTag("DATA");
@@ -55,7 +53,7 @@ TEST_CASE("TJS2 字节码读取——畸形输入拒绝") {
         putTag("OBJS");
         put32(12); // objsize = 8 + 4 + 4（toplevel + count）
         put32(-1); // toplevel：无
-        put32(0);  // context 数 0
+        put32(0); // context 数 0
         // 回填 filesize（覆盖偏移 8 的占位字段）
         const i32 fileSize = static_cast<i32>(bytes.size());
         for(int k = 0; k < 4; ++k)

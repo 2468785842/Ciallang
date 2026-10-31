@@ -26,9 +26,8 @@ namespace {
     public:
         TempDir() {
             const auto base = std::filesystem::temp_directory_path();
-            dir_ = base / ("cial_scripts_test_" + std::to_string(std::chrono::steady_clock::now()
-                                                                      .time_since_epoch()
-                                                                      .count()));
+            dir_ = base /
+                ("cial_scripts_test_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
             std::filesystem::create_directories(dir_);
         }
 
@@ -43,7 +42,7 @@ namespace {
         [[nodiscard]] const std::filesystem::path &path() const noexcept { return dir_; }
 
         void write(const char *name, const std::string &content) const {
-            std::ofstream f{dir_ / name, std::ios::binary | std::ios::trunc};
+            std::ofstream f{ dir_ / name, std::ios::binary | std::ios::trunc };
             f << content;
         }
 
@@ -53,9 +52,9 @@ namespace {
 
     struct Session {
         Runtime rt;
-        Context context{rt};
-        vm::VMState vmState{context};
-        VM vm{&vmState};
+        Context context{ rt };
+        vm::VMState vmState{ context };
+        VM vm{ &vmState };
 
         explicit Session(const std::filesystem::path &baseDir) {
             stdlib::registerStandardLibrary(context);
@@ -72,7 +71,7 @@ TEST_CASE("Scripts.execStorage 在全局上下文执行语句脚本", "[stdlib][
               "var g_from_storage = 41;\n"
               "function g_func() { return g_from_storage + 1; }\n");
 
-    Session session{dir.path()};
+    Session session{ dir.path() };
 
     // 嵌套执行：execStorage 在运行中的脚本回调内再入 VM
     session.vm.eval("Scripts.execStorage(\"sibling_exec.tjs\");"_str);
@@ -86,7 +85,7 @@ TEST_CASE("Scripts.evalStorage 返回表达式值", "[stdlib][scripts]") {
     const TempDir dir;
     dir.write("expr.tjs", "6 * 7");
 
-    Session session{dir.path()};
+    Session session{ dir.path() };
 
     session.vm.eval("var ev = Scripts.evalStorage(\"expr.tjs\");"_str);
     REQUIRE(*session.vm.evalExpr<Integer>("ev"_str) == 42);
@@ -98,19 +97,19 @@ TEST_CASE("Scripts 相对路径相对基目录解析", "[stdlib][scripts]") {
     // 进程 cwd 不在临时目录：能加载成功即证明按基目录（当前执行脚本所在目录）解析
     dir.write("sub/relative.tjs", "var rel = 9;\n");
 
-    Session session{dir.path()};
+    Session session{ dir.path() };
     session.vm.eval("Scripts.execStorage(\"sub/relative.tjs\");"_str);
     REQUIRE(*session.vm.evalExpr<Integer>("rel"_str) == 9);
 
     // 绝对路径直用（正斜杠形式：脚本字符串字面量里 `\` 是转义前缀）
     const auto abs = (dir.path() / "sub" / "relative.tjs").generic_string();
-    session.vm.eval(String{"Scripts.execStorage(\"" + abs + "\"); var rel2 = rel + 1;"});
+    session.vm.eval(String{ "Scripts.execStorage(\"" + abs + "\"); var rel2 = rel + 1;" });
     REQUIRE(*session.vm.evalExpr<Integer>("rel2"_str) == 10);
 }
 
 TEST_CASE("Scripts 缺失文件抛可捕获异常且消息含路径", "[stdlib][scripts]") {
     const TempDir dir;
-    Session session{dir.path()};
+    Session session{ dir.path() };
 
     session.vm.eval(R"(
 var hit = false;
@@ -132,7 +131,7 @@ TEST_CASE("Scripts.execStorage 内脚本抛出的异常向调用方传播", "[st
     const TempDir dir;
     dir.write("boom.tjs", "throw new Exception(\"boom-from-storage\");\n");
 
-    Session session{dir.path()};
+    Session session{ dir.path() };
     session.vm.eval(R"(
 var hit = false;
 var msg = "";
@@ -149,7 +148,7 @@ try {
 
 TEST_CASE("Scripts.evalStorage 缺失文件同样可捕获", "[stdlib][scripts]") {
     const TempDir dir;
-    Session session{dir.path()};
+    Session session{ dir.path() };
 
     session.vm.eval(R"(
 var hit = false;

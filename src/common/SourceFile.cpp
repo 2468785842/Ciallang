@@ -55,12 +55,12 @@ namespace cial::Common {
             throw std::out_of_range("source substring range");
         if(start == end)
             return {};
-        return { reinterpret_cast<const char*>(_buffer.data() + start), end - start };
+        return { reinterpret_cast<const char *>(_buffer.data() + start), end - start };
     }
 
     // 摘录渲染：行号栏 + 目标行 + 按显示宽度对齐的指示符。
     // 多行范围截断到首行并提示续行；零宽范围为插入点 '^'。
-    std::string SourceFile::renderExcerpt(const SourceSpan& span) const {
+    std::string SourceFile::renderExcerpt(const SourceSpan &span) const {
         if(!span.valid())
             return {};
 
@@ -77,7 +77,7 @@ namespace cial::Common {
         const auto targetLine = static_cast<i32>(location.start().line);
 
         for(i32 i = startLine; i < stopLine; i++) {
-            const auto* sourceLine = lineByNumber(static_cast<size_t>(i));
+            const auto *sourceLine = lineByNumber(static_cast<size_t>(i));
             if(sourceLine == nullptr)
                 break;
 
@@ -99,8 +99,7 @@ namespace cial::Common {
                 lineText = std::move(expanded);
             }
 
-            stream << Colorizer::colorize(
-                fmt::format("{:>{}} | ", i + 1, ExcerptGutterWidth), fmt::color::violet);
+            stream << Colorizer::colorize(fmt::format("{:>{}} | ", i + 1, ExcerptGutterWidth), fmt::color::violet);
 
             if(i != targetLine) {
                 stream << lineText << '\n';
@@ -126,10 +125,10 @@ namespace cial::Common {
                 marks = "^"; // 零宽：插入点
 
             stream << Colorizer::colorizeRange(lineText, beginByte, endByte, fmt::color::yellow, fmt::color::blue)
-                    << '\n'
-                    // 行号栏 "{:>4} | " 共 ExcerptGutterWidth+3 列，指示符按显示宽度对齐
-                    << std::string(ExcerptGutterWidth + 3, ' ') << std::string(beginWidth, ' ')
-                    << Colorizer::colorize(marks, fmt::color::red);
+                   << '\n'
+                   // 行号栏 "{:>4} | " 共 ExcerptGutterWidth+3 列，指示符按显示宽度对齐
+                   << std::string(ExcerptGutterWidth + 3, ' ') << std::string(beginWidth, ' ')
+                   << Colorizer::colorize(marks, fmt::color::red);
 
             if(location.end().line > location.start().line)
                 stream << fmt::format(" (continues to line {})", location.end().line + 1);
@@ -141,14 +140,14 @@ namespace cial::Common {
         return stream.str();
     }
 
-    void SourceFile::error(Result& r, const std::string& message, const SourceLocation& location,
-                           const std::string& code) const {
+    void SourceFile::error(Result &r, const std::string &message, const SourceLocation &location,
+                           const std::string &code) const {
         // 行列入口兼容旧调用（IRGenerator 等）；消息保持纯文本，前缀由展示层拼接
         r.error(message, location, {}, code, sourceName(), {}, true);
     }
 
-    void SourceFile::error(Result& r, const std::string& message, const SourceSpan& span,
-                           const std::string& code) const {
+    void SourceFile::error(Result &r, const std::string &message, const SourceSpan &span,
+                           const std::string &code) const {
         r.error(message, locationBySpan(span), renderExcerpt(span), code, sourceName(), span, true);
     }
 
@@ -161,10 +160,10 @@ namespace cial::Common {
         }
 
         const auto clamped = std::min(index, _buffer.size());
-        const auto* line = lineByIndex(clamped);
+        const auto *line = lineByIndex(clamped);
         if(line == nullptr) {
             // 行表未覆盖（不应发生）：收敛到末行
-            const auto* last = _linesByNumber.rbegin()->second;
+            const auto *last = _linesByNumber.rbegin()->second;
             location.start(last->line, static_cast<u32>(last->end - last->begin));
             location.end(last->line, static_cast<u32>(last->end - last->begin));
             return location;
@@ -176,7 +175,7 @@ namespace cial::Common {
         return location;
     }
 
-    SourceLocation SourceFile::locationBySpan(const SourceSpan& span) const {
+    SourceLocation SourceFile::locationBySpan(const SourceSpan &span) const {
         if(!span.valid())
             return {};
         const auto begin = locationByIndex(span.begin);
@@ -194,7 +193,7 @@ namespace cial::Common {
     }
 
     std::string SourceFile::renderExcerptAt(const u32 line, const u32 column) const {
-        const auto* lineEntry = lineByNumber(line);
+        const auto *lineEntry = lineByNumber(line);
         if(lineEntry == nullptr)
             return {};
         // 行列 -> 行内字节偏移（列越界收敛到行尾，零宽插入点）
@@ -230,9 +229,9 @@ namespace cial::Common {
         const size_t size = _buffer.size();
 
         auto addLine = [this](const size_t begin, const size_t end, const u32 number) {
-            const auto [fst, snd] = _linesByIndexRange.insert(std::make_pair(
-                std::make_pair(begin, end),
-                SourceFileLineType{ .end = end, .begin = begin, .line = number, .columns = 0 }));
+            const auto [fst, snd] = _linesByIndexRange.insert(
+                std::make_pair(std::make_pair(begin, end),
+                               SourceFileLineType{ .end = end, .begin = begin, .line = number, .columns = 0 }));
             _linesByNumber.insert(std::make_pair(number, &fst->second));
         };
 
@@ -256,7 +255,7 @@ namespace cial::Common {
 
     // 装载校验：非法 UTF-8、NUL 与文件体内 BOM 在此带字节位置上报；
     // 行表由纯字节扫描构建，校验失败也不影响后续按字节定位
-    void SourceFile::validateBytes(Result& r) const {
+    void SourceFile::validateBytes(Result &r) const {
         const size_t size = _buffer.size();
         size_t i = 0;
 
@@ -266,22 +265,22 @@ namespace cial::Common {
         while(i < size) {
             if(_buffer[i] == 0) {
                 r.error("illegal character NUL", locationByIndex(i), {}, "lex.invalid-byte", sourceName(),
-                    spanOf(i, i + 1), true);
+                        spanOf(i, i + 1), true);
                 return;
             }
             if(_buffer[i] < 0x80) {
                 ++i;
                 continue;
             }
-            const auto cp = utf8Decode(reinterpret_cast<const char*>(_buffer.data() + i), size - i);
+            const auto cp = utf8Decode(reinterpret_cast<const char *>(_buffer.data() + i), size - i);
             if(cp.value == runeInvalid || cp.width <= 0) {
                 r.error("illegal utf-8 encoding", locationByIndex(i), {}, "lex.invalid-byte", sourceName(),
-                    spanOf(i, i + 1), true);
+                        spanOf(i, i + 1), true);
                 return;
             }
             if(cp.value == runeBom) {
                 r.error("illegal byte order mark", locationByIndex(i), {}, "lex.invalid-byte", sourceName(),
-                    spanOf(i, i + cp.width), true);
+                        spanOf(i, i + cp.width), true);
                 return;
             }
             i += static_cast<size_t>(cp.width);
@@ -304,7 +303,7 @@ namespace cial::Common {
 
     void SourceFile::seek(const size_t index) { _index = index; }
 
-    bool SourceFile::load(Result& r, const std::string& buffer) {
+    bool SourceFile::load(Result &r, const std::string &buffer) {
         _index = 0;
         _lastWidth = 0;
         _markStack = {};
@@ -327,7 +326,7 @@ namespace cial::Common {
         }
     }
 
-    bool SourceFile::load(Result& r) {
+    bool SourceFile::load(Result &r) {
         _index = 0;
         _lastWidth = 0;
         _markStack = {};
@@ -353,7 +352,7 @@ namespace cial::Common {
 
     size_t SourceFile::numberOfLines() const { return _linesByNumber.size(); }
 
-    i32 SourceFile::next(Result& r) {
+    i32 SourceFile::next(Result &r) {
         size_t width = 1;
 
         DEFER {
@@ -376,7 +375,7 @@ namespace cial::Common {
         }
 
         if(ch >= 0x80) {
-            const auto cp = utf8Decode(reinterpret_cast<char*>(_buffer.data() + _index), _buffer.size() - _index);
+            const auto cp = utf8Decode(reinterpret_cast<char *>(_buffer.data() + _index), _buffer.size() - _index);
 
             width = cp.width;
             rune = cp.value;
@@ -403,16 +402,16 @@ namespace cial::Common {
 
     u8 SourceFile::operator[](const size_t index) const { return _buffer[index]; }
 
-    const std::filesystem::path& SourceFile::path() const { return _path; }
+    const std::filesystem::path &SourceFile::path() const { return _path; }
 
-    const SourceFileLineType* SourceFile::lineByNumber(const size_t line) const {
+    const SourceFileLineType *SourceFile::lineByNumber(const size_t line) const {
         const auto it = _linesByNumber.find(line);
         if(it == _linesByNumber.end())
             return nullptr;
         return it->second;
     }
 
-    const SourceFileLineType* SourceFile::lineByIndex(size_t index) const {
+    const SourceFileLineType *SourceFile::lineByIndex(size_t index) const {
         const auto it = _linesByIndexRange.find(std::make_pair(index, index));
         if(it == _linesByIndexRange.end())
             return nullptr;

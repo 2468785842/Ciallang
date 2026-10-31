@@ -11,14 +11,14 @@
 //
 #pragma once
 
-#include "types/String.hpp"
 #include "types/RegExp.hpp"
+#include "types/String.hpp"
 #include "types/Value.hpp"
 
 namespace cial {
     class Context;
     class VM;
-}
+} // namespace cial
 
 namespace cial::stdlib {
 
@@ -39,8 +39,7 @@ namespace cial::stdlib {
 
     // replace(regexp, replacement)：g 标志全局替换、否则仅第一处（TJS2 语义；
     // 实现委托 RegExpLib::regexpReplaceIn）；split 见 RegExpLib::stringSplitWith
-    String stringReplace(VM *, const Value &thisObj, size_t argCount, const Value &re,
-                         const Value &replacement);
+    String stringReplace(VM *, const Value &thisObj, size_t argCount, const Value &re, const Value &replacement);
 
     String stringEscape(VM *, const Value &thisObj, size_t argCount);
 

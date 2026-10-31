@@ -115,8 +115,8 @@ TEST_CASE("integer JIT preserves signed comparisons flags and aliased destinatio
         for(size_t kind = 0; kind < 8; ++kind) {
             vm::Chunk chunk;
             chunk.setRegCount(3);
-            chunk.getInstVec().push_back(std::make_unique<inter::CompareTest>(
-                comparisons[kind], Register{ 0 }, Register{ 1 }, Register{ 0 }));
+            chunk.getInstVec().push_back(
+                std::make_unique<inter::CompareTest>(comparisons[kind], Register{ 0 }, Register{ 1 }, Register{ 0 }));
             chunk.emit<inter::GLocal>(Register{ 0 }, Register{ 2 });
             chunk.emit<inter::Ret>(Register{ 2 });
             chunk.toBytecode();

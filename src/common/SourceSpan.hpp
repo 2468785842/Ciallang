@@ -30,8 +30,7 @@ namespace cial::Common {
 
         constexpr SourceSpan() = default;
 
-        constexpr SourceSpan(const size_t beginByte, const size_t endByte) : begin(beginByte), end(endByte) {
-        }
+        constexpr SourceSpan(const size_t beginByte, const size_t endByte) : begin(beginByte), end(endByte) {}
 
         [[nodiscard]] constexpr bool valid() const noexcept { return begin != npos && end != npos; }
 
@@ -39,7 +38,7 @@ namespace cial::Common {
 
         [[nodiscard]] constexpr size_t size() const noexcept { return valid() ? end - begin : 0; }
 
-        constexpr bool operator==(const SourceSpan& span) const noexcept {
+        constexpr bool operator==(const SourceSpan &span) const noexcept {
             if(!valid() || !span.valid())
                 return valid() == span.valid();
             return begin == span.begin && end == span.end;

@@ -17,7 +17,7 @@ namespace {
         bool lexerFailed = false;
     };
 
-    LexResult lexAll(const std::string& source) {
+    LexResult lexAll(const std::string &source) {
         Common::SourceFile file;
         Common::Result diagnostics;
         REQUIRE(file.load(diagnostics, source));
@@ -26,7 +26,7 @@ namespace {
         PreProcessor preProcessor;
         syntax::Lexer lexer{ file, preProcessor };
         LexResult result;
-        syntax::Token* token{};
+        syntax::Token *token{};
         while(true) {
             const bool ok = lexer.next(token, true);
             result.tokens.push_back(std::move(*token));
@@ -38,10 +38,10 @@ namespace {
         return result;
     }
 
-    const syntax::Token& tokenAt(const LexResult& result, const size_t index) { return result.tokens[index]; }
+    const syntax::Token &tokenAt(const LexResult &result, const size_t index) { return result.tokens[index]; }
 
     // 编译并返回首条诊断（若有）
-    Opt<Common::ResultMessage> firstDiagnostic(const std::string& source) {
+    Opt<Common::ResultMessage> firstDiagnostic(const std::string &source) {
         Common::SourceFile file;
         file.setSourceName("test.tjs");
         Common::Result diagnostics;
@@ -58,10 +58,7 @@ namespace {
     }
 } // namespace
 
-TEST_CASE (
-"source span semantics"
-)
- {
+TEST_CASE("source span semantics") {
     SECTION("unknown span is distinct from zero-width span at zero") {
         REQUIRE_FALSE(Common::SourceSpan{}.valid());
         const Common::SourceSpan zero{ 0, 0 };
@@ -75,16 +72,13 @@ TEST_CASE (
         Common::Result diagnostics;
         REQUIRE(file.load(diagnostics, "ab"));
         REQUIRE(file.spanOf(1, 2) == Common::SourceSpan{ 1, 2 });
-        REQUIRE_FALSE(file.spanOf(2, 1).valid());  // 反向区间无效
-        REQUIRE_FALSE(file.spanOf(0, 3).valid());  // 越界无效
+        REQUIRE_FALSE(file.spanOf(2, 1).valid()); // 反向区间无效
+        REQUIRE_FALSE(file.spanOf(0, 3).valid()); // 越界无效
         REQUIRE(file.eofSpan() == Common::SourceSpan{ 2, 2 });
     }
 }
 
-TEST_CASE (
-"line index handles line-ending and empty edge cases"
-)
- {
+TEST_CASE("line index handles line-ending and empty edge cases") {
     Common::SourceFile file;
     Common::Result diagnostics;
 
@@ -150,10 +144,7 @@ TEST_CASE (
     }
 }
 
-TEST_CASE (
-"lexer records byte half-open spans per token class"
-)
- {
+TEST_CASE("lexer records byte half-open spans per token class") {
     SECTION("ascii identifier and single-char operator are non-zero width") {
         const auto result = lexAll("var ab;");
         const auto &varToken = tokenAt(result, 0);
@@ -229,10 +220,7 @@ TEST_CASE (
     }
 }
 
-TEST_CASE (
-"lexer failure tokens carry code, span and eof relation"
-)
- {
+TEST_CASE("lexer failure tokens carry code, span and eof relation") {
     SECTION("unterminated string anchors at opening quote and EOF") {
         Common::SourceFile file;
         Common::Result diagnostics;
@@ -283,10 +271,7 @@ TEST_CASE (
     }
 }
 
-TEST_CASE (
-"parser reports first diagnostic with lexeme-accurate spans"
-)
- {
+TEST_CASE("parser reports first diagnostic with lexeme-accurate spans") {
     SECTION("missing expression points at the offending token") {
         const auto diagnostic = firstDiagnostic("var b = ;");
         REQUIRE(diagnostic.has_value());
@@ -348,7 +333,7 @@ TEST_CASE (
         const auto diagnostic = firstDiagnostic("var b = ;");
         REQUIRE((*diagnostic).source() == "test.tjs");
         REQUIRE((*diagnostic).message().find("@") == std::string::npos); // 无 (file@l:c) 前缀
-        REQUIRE_FALSE((*diagnostic).details().empty());                  // 摘录已生成
+        REQUIRE_FALSE((*diagnostic).details().empty()); // 摘录已生成
     }
 
     SECTION("cjk prefix keeps byte-accurate span on the same line") {

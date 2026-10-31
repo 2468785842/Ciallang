@@ -41,13 +41,13 @@ namespace cial::vm {
             _constants.emplace_back(); // Void
         }
 
-        void addThrowHandler(const ThrowHandler& tHandler) { _throwHandlers.push_back(tHandler); }
-        [[nodiscard]] Vec<ThrowHandler>& getThrowHandlers() noexcept { return _throwHandlers; }
-        [[nodiscard]] const Vec<ThrowHandler>& getThrowHandlers() const noexcept { return _throwHandlers; }
+        void addThrowHandler(const ThrowHandler &tHandler) { _throwHandlers.push_back(tHandler); }
+        [[nodiscard]] Vec<ThrowHandler> &getThrowHandlers() noexcept { return _throwHandlers; }
+        [[nodiscard]] const Vec<ThrowHandler> &getThrowHandlers() const noexcept { return _throwHandlers; }
 
         // TAC pc 空间的 try 区间表（供指令 dump 等使用）
         [[nodiscard]] Opt<ThrowHandler> findThrowHandler(const u64 pc) const {
-            for(const auto& h : _throwHandlers) {
+            for(const auto &h : _throwHandlers) {
                 if(h.tryStart <= pc && pc < h.tryEnd) {
                     return h;
                 }
@@ -57,7 +57,7 @@ namespace cial::vm {
 
         // 扁平字节码 pc 空间的 try 区间表（run 使用）
         [[nodiscard]] Opt<ThrowHandler> findBcThrowHandler(const u64 pc) const {
-            for(const auto& h : _bcThrowHandlers) {
+            for(const auto &h : _bcThrowHandlers) {
                 if(h.tryStart <= pc && pc < h.tryEnd) {
                     return h;
                 }
@@ -72,7 +72,7 @@ namespace cial::vm {
          */
         template <typename T, typename... Args>
             requires std::is_base_of_v<inter::Instruction, T>
-        size_t emit(Args&&... args) {
+        size_t emit(Args &&...args) {
             const size_t index = _instructions.size();
             _instructions.push_back(std::make_unique<T>(inter::Operand(std::forward<Args>(args))...));
             return index;
@@ -81,7 +81,7 @@ namespace cial::vm {
         // 非 Operand 操作数指令（如 CallV 的寄存器列表）的原生发射
         template <typename T, typename... Args>
             requires std::is_base_of_v<inter::Instruction, T>
-        size_t emitRaw(Args&&... args) {
+        size_t emitRaw(Args &&...args) {
             const size_t index = _instructions.size();
             _instructions.push_back(std::make_unique<T>(std::forward<Args>(args)...));
             return index;
@@ -89,31 +89,31 @@ namespace cial::vm {
 
         template <typename T, typename... Args>
             requires std::is_base_of_v<inter::Instruction, T>
-        void repl(const size_t index, Args&&... args) {
+        void repl(const size_t index, Args &&...args) {
             if(index > _instructions.size()) {
                 throw std::runtime_error("instruction index out of range");
             }
             _instructions[index] = std::make_unique<T>(inter::Operand(std::forward<Args>(args))...);
         }
 
-        [[nodiscard]] inter::Instruction* inst(const size_t index) const { return _instructions[index].get(); }
+        [[nodiscard]] inter::Instruction *inst(const size_t index) const { return _instructions[index].get(); }
 
-        Chunk(const Chunk&) = delete;
-        Chunk& operator=(const Chunk&) = delete;
+        Chunk(const Chunk &) = delete;
+        Chunk &operator=(const Chunk &) = delete;
 
-        Chunk(Chunk&& chunk) = default;
-        Chunk& operator=(Chunk&& chunk) = default;
+        Chunk(Chunk &&chunk) = default;
+        Chunk &operator=(Chunk &&chunk) = default;
 
         // Preserve constants while allocation may trigger a collection.
-        RootGuard<Chunk> toHeap(Runtime& runtime) &&;
+        RootGuard<Chunk> toHeap(Runtime &runtime) &&;
 
-        [[nodiscard]] auto& getInstVec() noexcept { return _instructions; }
+        [[nodiscard]] auto &getInstVec() noexcept { return _instructions; }
 
         void setRegCount(const u32 count) noexcept { _registerCount = count; }
         [[nodiscard]] u32 getRegCount() const noexcept { return _registerCount; }
 
         template <typename... Args>
-        ConstIdx addConstant(Args&&... args) {
+        ConstIdx addConstant(Args &&...args) {
             const Constant value{ std::forward<Args>(args)... };
             return addConstant(value);
         }
@@ -132,35 +132,35 @@ namespace cial::vm {
             return ConstIdx{ size };
         }
 
-        [[nodiscard]] const Constant& getConstant(const ConstIdx index) const {
+        [[nodiscard]] const Constant &getConstant(const ConstIdx index) const {
             CLL_ASSERT(index.index() < _constants.size() && "constant index out of range",
-                this->dumpInstructions().getData());
+                       this->dumpInstructions().getData());
             return _constants[index.index()];
         }
 
-        Vec<Constant>& getConstants() noexcept { return _constants; }
+        Vec<Constant> &getConstants() noexcept { return _constants; }
 
-        [[nodiscard]] String dumpConstant(const Runtime* rt, ConstIdx idx) const;
+        [[nodiscard]] String dumpConstant(const Runtime *rt, ConstIdx idx) const;
 
-        [[nodiscard]] String dumpConstants(const Runtime* rt) const;
+        [[nodiscard]] String dumpConstants(const Runtime *rt) const;
 
         [[nodiscard]] String dumpInstructions() const;
 
-        [[nodiscard]] String dumpInstructions(const VMState* vmState) const;
+        [[nodiscard]] String dumpInstructions(const VMState *vmState) const;
 
         void marked() noexcept override {
             if(_marked)
                 return;
             MarkSweepHeader::marked();
-            for(auto& inst : _constants) {
+            for(auto &inst : _constants) {
                 if(inst.type() == ConstantType::Object) {
-                    inst.value<Object*>()->marked();
+                    inst.value<Object *>()->marked();
                 } else if(inst.type() == ConstantType::FuncMeta) {
-                    inst.value<FuncMeta*>()->marked();
+                    inst.value<FuncMeta *>()->marked();
                 } else if(inst.type() == ConstantType::ClassMeta) {
-                    inst.value<ClassMeta*>()->marked();
+                    inst.value<ClassMeta *>()->marked();
                 } else if(inst.type() == ConstantType::PropMeta) {
-                    inst.value<PropMeta*>()->marked();
+                    inst.value<PropMeta *>()->marked();
                 }
             }
         }
@@ -175,15 +175,13 @@ namespace cial::vm {
             _code = std::move(result.code);
             _bcThrowHandlers = std::move(result.handlers);
             // 行号表换算：IRGen 记录的是 TAC 下标，run 的 pc 是 bc 偏移
-            for(auto& [idx, loc] : _rlc.rawEntries())
+            for(auto &[idx, loc] : _rlc.rawEntries())
                 idx = result.tacStartPos[idx];
             _isBytecode = true;
         }
 
         // 语句级行号记录（IRGen 各语句 generate 入口调用；Rlc 内部合并连续同位置）
-        void addLine(const Common::SourceLocation& loc) {
-            _rlc.addBytecodeLine(_instructions.size(), loc);
-        }
+        void addLine(const Common::SourceLocation &loc) { _rlc.addBytecodeLine(_instructions.size(), loc); }
 
         // bc 偏移 -> 源码位置（toBytecode 后有效；无记录返回空 Opt）
         [[nodiscard]] Opt<Common::SourceLocation> lineAtBc(const u64 bcPc) const {
@@ -192,7 +190,7 @@ namespace cial::vm {
             return _rlc.find(static_cast<size_t>(bcPc));
         }
 
-        [[nodiscard]] Rlc& rlc() noexcept { return _rlc; }
+        [[nodiscard]] Rlc &rlc() noexcept { return _rlc; }
 
         // 仅在启用执行记录时分配身份；记录器保存值快照，不持有 GC 对象指针。
         [[nodiscard]] u64 executionTraceId() {
@@ -202,7 +200,7 @@ namespace cial::vm {
             return _executionTraceId;
         }
 
-        [[nodiscard]] const Vec<u8>& code() const {
+        [[nodiscard]] const Vec<u8> &code() const {
             if(!_isBytecode) {
                 throw std::runtime_error("chunk is not compiled to bytecode");
             }
@@ -213,7 +211,7 @@ namespace cial::vm {
         // 仅用于诊断定位（Rlc 行列配套），不持有源码正文
         void setSourceName(std::string name) { _sourceName = std::move(name); }
 
-        [[nodiscard]] const std::string& sourceName() const noexcept { return _sourceName; }
+        [[nodiscard]] const std::string &sourceName() const noexcept { return _sourceName; }
 
     private:
         Vec<Box<inter::Instruction>> _instructions{};

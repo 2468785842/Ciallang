@@ -361,7 +361,7 @@ namespace cial::inter {
     // 成员名以 u32 Atom 内联进指令流（同 GGlobal），dispatch 免去
     // 「常量池 Atom → String Value → intern 回 Atom」的往返哈希。
     // 寄存器成员名形态（GProp/DProp/...）保留：动态成员名与整数成员名
-    //（旧版 GPI/PropGetByNum，数组下标）仍走寄存器
+    // （旧版 GPI/PropGetByNum，数组下标）仍走寄存器
     // obj.member 读（getter 语义与 GProp 一致）
     DEF_INST(GPropC, 3, OP_GET1(obj, Register) OP_GET2(atom, Atom) OP_GET3(dst, Register));
     // obj.member = v 写（DProp 语义：Property 槽位触发 setter，压帧 → Call）
@@ -446,7 +446,7 @@ namespace cial::inter {
     };
 
     // 省略透传调用（旧版 argc=-1，TJS `f(...)`）：把当前帧的实际实参
-    //（%0..%actualArgc-1）原样转发给 func。actualArgc 由 CallFrame 记录
+    // （%0..%actualArgc-1）原样转发给 func。actualArgc 由 CallFrame 记录
     class CallOmit : public Instruction {
     public:
         Register dst{};
@@ -472,8 +472,7 @@ namespace cial::inter {
         Integer unnamedBase{};
         Vec<std::pair<u8, Register>> entries{};
 
-        CallExpand(const Register d, const Register f, const Integer base,
-                   Vec<std::pair<u8, Register>> e) :
+        CallExpand(const Register d, const Register f, const Integer base, Vec<std::pair<u8, Register>> e) :
             dst(d), func(f), unnamedBase(base), entries(std::move(e)) {}
 
         ~CallExpand() override = default;
@@ -508,7 +507,7 @@ namespace cial::inter {
     DEF_INST(CmpGT, 2, OP_GET1(src1, Register) OP_GET2(src2, Register));
 
     // 自增/自减单指令（旧版 INC/DEC 基型）：int ±1 / real ±1.0，其余报错
-    //（旧译法 LoadImm+Add 对字符串会拼接，TJS increment 语义应报错）
+    // （旧译法 LoadImm+Add 对字符串会拼接，TJS increment 语义应报错）
     DEF_INST(Inc, 1, OP_GET1(src, Register));
     DEF_INST(Dec, 1, OP_GET1(src, Register));
 

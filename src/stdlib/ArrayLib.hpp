@@ -9,7 +9,7 @@
 namespace cial {
     class Context;
     class VM;
-}
+} // namespace cial
 
 namespace cial::stdlib {
 

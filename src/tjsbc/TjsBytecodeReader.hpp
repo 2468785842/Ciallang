@@ -17,7 +17,7 @@ namespace cial::tjsbc {
     // 常量槽类型 tag（tjsConstArrayData.h）
     enum TjsConstSlotType : i16 {
         TJS_TYPE_VOID = 0,
-        TJS_TYPE_OBJECT = 1,     // 仅允许 null 闭包
+        TJS_TYPE_OBJECT = 1, // 仅允许 null 闭包
         TJS_TYPE_INTER_OBJECT = 2, // idx → context 索引
         TJS_TYPE_STRING = 3,
         TJS_TYPE_OCTET = 4,
@@ -47,7 +47,7 @@ namespace cial::tjsbc {
         Vec<i32> ints{};
         Vec<i64> longs{};
         Vec<double> reals{};
-        Vec<String> strings{};                    // UTF-8（由 UTF-16LE 转换）
+        Vec<String> strings{}; // UTF-8（由 UTF-16LE 转换）
         Vec<Vec<u8>> octets{};
     };
 
@@ -59,24 +59,24 @@ namespace cial::tjsbc {
 
     // 单个 context（tjsInterCodeContext::ExportByteCode 的记录）
     struct TjsContext {
-        i32 parent = -1;                          // 父 context 索引（顶层 -1）
-        i32 name = -1;                            // 常量池 STRING 索引（-1 无名）
+        i32 parent = -1; // 父 context 索引（顶层 -1）
+        i32 name = -1; // 常量池 STRING 索引（-1 无名）
         TjsContextType type = TjsContextType::TopLevel;
-        i32 maxVariableCount = 0;                 // ┐
-        i32 variableReserveCount = 0;             // │帧尺寸（ra 基偏移 K = VC+RC）
-        i32 maxFrameCount = 0;                    // ┘
-        i32 funcDeclArgCount = 0;                 // ┐
-        i32 funcDeclUnnamedArgArrayBase = 0;      // │函数签名
-        i32 funcDeclCollapseBase = -1;            // -1 = 无 collapse             // ┘
-        i32 propSetter = -1;                      // context 索引（property setter）
+        i32 maxVariableCount = 0; // ┐
+        i32 variableReserveCount = 0; // │帧尺寸（ra 基偏移 K = VC+RC）
+        i32 maxFrameCount = 0; // ┘
+        i32 funcDeclArgCount = 0; // ┐
+        i32 funcDeclUnnamedArgArrayBase = 0; // │函数签名
+        i32 funcDeclCollapseBase = -1; // -1 = 无 collapse             // ┘
+        i32 propSetter = -1; // context 索引（property setter）
         i32 propGetter = -1;
         i32 superClassGetter = -1;
-        Vec<i32> codePos{};                       // 仅 outputdebug 产物非空
+        Vec<i32> codePos{}; // 仅 outputdebug 产物非空
         Vec<i32> sourcePos{};
-        Vec<i16> code{};                          // 文件态 i16 码字（未换算）
-        Vec<TjsDataSlot> data{};                  // 常量槽
-        Vec<i32> superClassGetterPointers{};      // scgetter 代码地址（已索引化）
-        Vec<std::pair<i32, i32>> propMembers{};   // 成员函数表 (name STRING idx, context idx)
+        Vec<i16> code{}; // 文件态 i16 码字（未换算）
+        Vec<TjsDataSlot> data{}; // 常量槽
+        Vec<i32> superClassGetterPointers{}; // scgetter 代码地址（已索引化）
+        Vec<std::pair<i32, i32>> propMembers{}; // 成员函数表 (name STRING idx, context idx)
     };
 
     // 整个字节码文件
@@ -84,7 +84,7 @@ namespace cial::tjsbc {
         i32 fileSize = 0;
         i32 dataSize = 0;
         i32 objsSize = 0;
-        i32 topLevel = -1;                        // 顶层 context 索引（无则 -1）
+        i32 topLevel = -1; // 顶层 context 索引（无则 -1）
         TjsConstPool pool{};
         Vec<TjsContext> contexts{};
     };

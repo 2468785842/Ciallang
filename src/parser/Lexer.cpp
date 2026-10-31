@@ -27,24 +27,23 @@
 #include "types/Real.hpp"
 
 namespace cial::syntax {
-    Lexer::Lexer(SourceFile& sourceFile, PreProcessor& preProcessor) :
-        _sourceFile(sourceFile), _preProcessor(preProcessor) {
-    }
+    Lexer::Lexer(SourceFile &sourceFile, PreProcessor &preProcessor) :
+        _sourceFile(sourceFile), _preProcessor(preProcessor) {}
 
-    Token* Lexer::makeErrorToken(Token*& token, const char* code, const String& message) {
+    Token *Lexer::makeErrorToken(Token *&token, const char *code, const String &message) {
         token = makeToken(TokenType::Error, message);
         token->code = code;
         return token;
     }
 
     // 统一按字节半开区间落位：span 为权威，location 由行索引换算
-    void Lexer::patchTokenLoc(Token& token, const size_t beginByte, const size_t endByte) const {
+    void Lexer::patchTokenLoc(Token &token, const size_t beginByte, const size_t endByte) const {
         token.span = _sourceFile.spanOf(beginByte, endByte);
         token.location = _sourceFile.locationBySpan(token.span);
     }
 
     // 合成 token（模板字符串拼装的括号/加号）：零宽插入点，不指向源码词素
-    void Lexer::patchSyntheticToken(Token& token) const {
+    void Lexer::patchSyntheticToken(Token &token) const {
         const size_t pos = _sourceFile.pos();
         patchTokenLoc(token, pos, pos);
     }
@@ -102,15 +101,14 @@ namespace cial::syntax {
      * @return 是否匹配成功? succeed -> true
      *                     failed  -> false
      */
-    bool Lexer::next(Token*& token, const bool enablePreProcessor) {
-        DEFER{
-                _hasNext = !_sourceFile.eof();
-                // 记录最近产出 token（注释不计），供 isRegexStart 判定除法 vs 正则
+    bool Lexer::next(Token *&token, const bool enablePreProcessor) {
+        DEFER {
+            _hasNext = !_sourceFile.eof();
+            // 记录最近产出 token（注释不计），供 isRegexStart 判定除法 vs 正则
             if(token != nullptr && token->type() != TokenType::LineComment &&
                token->type() != TokenType::BlockComment) {
-                        _lastTokenType = token->type();
-
-                }
+                _lastTokenType = token->type();
+            }
         };
 
         i32 rune = read(!tmplStrCtx.active);
@@ -150,7 +148,7 @@ namespace cial::syntax {
                     }
                     break;
                 }
-            } catch(const std::runtime_error& error) {
+            } catch(const std::runtime_error &error) {
                 makeErrorToken(token, "lex.preprocessor", String{ error.what() });
                 patchTokenLoc(*token, start, _sourceFile.pos());
                 return false;
@@ -296,7 +294,7 @@ namespace cial::syntax {
                 default: {
                     read();
                     makeErrorToken(token, "lex.invalid-character",
-                        String{ fmt::format("unexpected character '{}'", static_cast<char>(rune)) });
+                                   String{ fmt::format("unexpected character '{}'", static_cast<char>(rune)) });
                     patchTokenLoc(*token, start, _sourceFile.pos());
                     return false;
                 }
@@ -310,7 +308,7 @@ namespace cial::syntax {
         return false;
     }
 
-    bool Lexer::readPreProcessorExpr(std::string& out) {
+    bool Lexer::readPreProcessorExpr(std::string &out) {
         int depth = 1;
 
         while(!_sourceFile.eof()) {
@@ -376,7 +374,7 @@ namespace cial::syntax {
     }
 
     void Lexer::skipComment() {
-        Token* token{};
+        Token *token{};
 
         while(hasNext()) {
             if(!next(token)) {
@@ -393,10 +391,10 @@ namespace cial::syntax {
         }
     }
 
-    bool Lexer::takeOverToken(Token& token) {
+    bool Lexer::takeOverToken(Token &token) {
         assert(!_tokens.empty());
 
-        Token* tmp = _tokens.front();
+        Token *tmp = _tokens.front();
         token = std::move(*tmp);
         _tokens.pop_front();
         delete tmp;
@@ -432,9 +430,9 @@ namespace cial::syntax {
      * @return 是否匹配成功? succeed -> true
      *                     failed  -> false
      */
-    bool Lexer::match(const String& literal) {
+    bool Lexer::match(const String &literal) {
         _sourceFile.pushMark();
-        DEFER{ _sourceFile.popMark();  };
+        DEFER { _sourceFile.popMark(); };
 
         return std::ranges::all_of(literal, [&](const char targetCh) {
             if(targetCh != read(false)) {
@@ -445,10 +443,10 @@ namespace cial::syntax {
         });
     }
 
-    bool Lexer::matchOperator(Token*& token) {
+    bool Lexer::matchOperator(Token *&token) {
         static OperatorTrie OpTrie{
 #define LIST_TO_TOKEN_TYPE_PAIR(SYMBOL, NAME) { NAME##_str, TokenType::SYMBOL },
-                SYMBOL_LIST(LIST_TO_TOKEN_TYPE_PAIR)
+            SYMBOL_LIST(LIST_TO_TOKEN_TYPE_PAIR)
 #undef LIST_TO_TOKEN_TYPE_PAIR
         };
         // 字典分隔符 => 在本解析器中借用 GtOrEqual；参考 tjsLex.cpp 将其映射为
@@ -491,7 +489,7 @@ namespace cial::syntax {
         return false;
     }
 
-    bool Lexer::lineComment(Token*& token) {
+    bool Lexer::lineComment(Token *&token) {
         if(match("//"_str)) {
             token = makeToken(TokenType::LineComment);
             i32 ch;
@@ -512,7 +510,7 @@ namespace cial::syntax {
      * @param token 返回的token
      * @return 是否成功
      */
-    bool Lexer::blockComment(Token*& token) {
+    bool Lexer::blockComment(Token *&token) {
         if(match("/*"_str)) {
             auto blockCount = 1;
 
@@ -569,7 +567,7 @@ namespace cial::syntax {
     // /pattern/flags 正则字面量：'/' 已读，读到未转义的 '/'，再读 [a-z]* flags。
     // token 文本编码为 "pattern\nflags"（'\n' 作分隔符；模式内裸换行视为未终结，
     // 保证编码无歧义），NewRegExp 处解码。TJS2 flags：g=全局、i=忽略大小写、l=忽略
-    bool Lexer::regexConstVal(Token*& token) {
+    bool Lexer::regexConstVal(Token *&token) {
         std::string pattern;
         bool closed = false;
         // case '/' 的 peek+双 rewind 把 '/' 退了回来：这里先消费它
@@ -600,7 +598,7 @@ namespace cial::syntax {
                     pattern.push_back(static_cast<char>(esc));
                 } else {
                     const auto encoded = utf8Encode(esc);
-                    pattern.append(reinterpret_cast<const char*>(encoded.data), encoded.width);
+                    pattern.append(reinterpret_cast<const char *>(encoded.data), encoded.width);
                 }
                 continue;
             }
@@ -608,7 +606,7 @@ namespace cial::syntax {
                 pattern.push_back(static_cast<char>(rune));
             } else {
                 const auto encoded = utf8Encode(rune);
-                pattern.append(reinterpret_cast<const char*>(encoded.data), encoded.width);
+                pattern.append(reinterpret_cast<const char *>(encoded.data), encoded.width);
             }
         }
 
@@ -634,7 +632,7 @@ namespace cial::syntax {
         return true;
     }
 
-    bool Lexer::numberConstVal(Token*& token) {
+    bool Lexer::numberConstVal(Token *&token) {
         std::stringstream stream{ "" };
         auto ch = read();
         constexpr std::string_view valid = ".0123456789Ee";
@@ -663,7 +661,7 @@ namespace cial::syntax {
 
                 if(tCh == 'e' || tCh == 'E') {
                     const auto runeType = utf8Encode(ch);
-                    stream.write(reinterpret_cast<const char*>(runeType.data), runeType.width);
+                    stream.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
                     hasActualDigits = true;
                     ch = tCh;
                     continue;
@@ -708,7 +706,7 @@ namespace cial::syntax {
             }
 
             const auto runeType = utf8Encode(ch);
-            stream.write(reinterpret_cast<const char*>(runeType.data), runeType.width);
+            stream.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
             if(isdigit(ch)) {
                 hasActualDigits = true;
             }
@@ -722,7 +720,7 @@ namespace cial::syntax {
             return false;
         }
 
-        const auto fixValue = [&](const double& val) {
+        const auto fixValue = [&](const double &val) {
             double ret = val;
             if(shifting > 0)
                 ret *= pow(10, shifting);
@@ -754,13 +752,13 @@ namespace cial::syntax {
     }
 
     // regex expr : 0x\\d*\.?\\d+[pP]\\d*
-    bool Lexer::parseNonDecimalNumber(Token * &token, std::stringstream & ss, i8(*validDigits)(char), const i8 base) {
+    bool Lexer::parseNonDecimalNumber(Token *&token, std::stringstream &ss, i8 (*validDigits)(char), const i8 base) {
         bool isReal = false;
         _sourceFile.pushMark();
-        DEFER{ _sourceFile.popMark();  };
+        DEFER { _sourceFile.popMark(); };
         extractNumber(validDigits, "Pp", ss, isReal);
 
-        const auto& str = ss.str();
+        const auto &str = ss.str();
         if(str.empty()) {
             _sourceFile.restoreTopMark();
             makeErrorToken(token, "lex.malformed-number", "unexcepted exponent"_str);
@@ -774,7 +772,7 @@ namespace cial::syntax {
         return parseNonDecimalInteger(token, str, validDigits, base);
     }
 
-    void Lexer::parseNonDecimalReal(Token*& token, const std::string& decimalStr, i8 (*validDigits)(char),
+    void Lexer::parseNonDecimalReal(Token *&token, const std::string &decimalStr, i8 (*validDigits)(char),
                                     const i8 baseBits) {
         // 朴素求值：mantissa × base^(−小数位数) × 2^p指数（base = 2^baseBits）。
         // 旧实现直接组装 IEEE double 位域，前导零/负指数偏置等边界多处算错
@@ -812,7 +810,7 @@ namespace cial::syntax {
         token = makeToken(TokenType::ConstVal, Real(value));
     }
 
-    bool Lexer::parseNonDecimalInteger(Token*& token, const std::string& decimalStr, i8 (*validDigits)(char),
+    bool Lexer::parseNonDecimalInteger(Token *&token, const std::string &decimalStr, i8 (*validDigits)(char),
                                        const i8 baseBits) {
         UInteger v = 0;
         for(const auto decimal : decimalStr) {
@@ -824,7 +822,7 @@ namespace cial::syntax {
     }
 
     // 如果是 . | p | P 那么isReal = true
-    void Lexer::extractNumber(i8(*validDigits)(char), const std::string & expMark, std::stringstream & ss,
+    void Lexer::extractNumber(i8 (*validDigits)(char), const std::string &expMark, std::stringstream &ss,
                               bool &isReal) {
         // 小数点
         bool pointFound = false;
@@ -882,7 +880,7 @@ namespace cial::syntax {
         isReal = pointFound || expFound;
     }
 
-    void Lexer::identifier(Token*& token) {
+    void Lexer::identifier(Token *&token) {
         const String name = readIdentifier();
 
         // if(name.isEmpty())
@@ -890,7 +888,7 @@ namespace cial::syntax {
 
         static std::unordered_map<String, Token> Keywords{
 #define LIST_TO_TOKEN_PAIR(SYMBOL, NAME, VALUE) { NAME##_str, Token{ TokenType::SYMBOL, VALUE } },
-                CONSTANT_VAL_LIST(LIST_TO_TOKEN_PAIR)
+            CONSTANT_VAL_LIST(LIST_TO_TOKEN_PAIR)
 #undef LIST_TO_TOKEN_PAIR
 #define LIST_TO_TOKEN_PAIR(SYMBOL, NAME) { NAME##_str, Token{ TokenType::SYMBOL } },
                 KEYWORD_LIST(LIST_TO_TOKEN_PAIR)
@@ -914,13 +912,13 @@ namespace cial::syntax {
         std::stringstream stream{ "" };
 
         auto runeType = utf8Encode(ch);
-        stream.write(reinterpret_cast<const char*>(runeType.data), runeType.width);
+        stream.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
 
         while(true) {
             ch = read(false);
             if(isRuneLetter(ch) || isRuneDigit(ch)) {
                 runeType = utf8Encode(ch);
-                stream.write(reinterpret_cast<const char*>(runeType.data), runeType.width);
+                stream.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
                 continue;
             }
             rewindOneChar();
@@ -928,7 +926,7 @@ namespace cial::syntax {
         }
     }
 
-    bool Lexer::stringConstVal(Token*& token) {
+    bool Lexer::stringConstVal(Token *&token) {
         const i32 delimiter = read(false);
         // if(delimiter != '"' && delimiter != '\'') {
         //     rewindOneChar();
@@ -944,14 +942,14 @@ namespace cial::syntax {
      * 各阶段自行落位：文本段覆盖整段词素（含引号/触发符），合成 token 为
      * 零宽插入点，Expression 阶段由递归 next() 精确定位（此处不得覆盖）。
      */
-    bool Lexer::templateStringConstVal(Token*& token) {
+    bool Lexer::templateStringConstVal(Token *&token) {
         // 本阶段起点：'@'（首次进入）或上一阶段结束处
         const size_t entryPos = _sourceFile.pos();
 
         // 第一次进入时初始化
         if(!tmplStrCtx.active) {
             /*i32 at =*/
-            read();                   // read '@'
+            read(); // read '@'
             const i32 delim = read(); // read '"' or '\''
             if(delim != '"' && delim != '\'') {
                 makeErrorToken(token, "lex.template-start", "template string expected '@\"' start"_str);
@@ -1054,7 +1052,7 @@ namespace cial::syntax {
         return false;
     }
 
-    TemplateStringContext::State Lexer::parseStringConstVal(Token*& token, const char delimiter) {
+    TemplateStringContext::State Lexer::parseStringConstVal(Token *&token, const char delimiter) {
         std::stringstream str{ "" };
         auto strPsState = TemplateStringContext::State::None;
         for(;;) {
@@ -1101,7 +1099,7 @@ namespace cial::syntax {
 
                     // 将Unicode转为utf-8, 存储到窄字符序列
                     const auto enRuneType = utf8Encode(code);
-                    str.write(reinterpret_cast<const char*>(enRuneType.data), enRuneType.width);
+                    str.write(reinterpret_cast<const char *>(enRuneType.data), enRuneType.width);
 
                     continue;
                 }
@@ -1130,7 +1128,7 @@ namespace cial::syntax {
                         runeType = utf8Encode(code);
                     else
                         runeType = utf8Encode(ch);
-                    str.write(reinterpret_cast<const char*>(runeType.data), runeType.width);
+                    str.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
                     continue;
                 }
                 str << TemplateStringContext::unescapeBackSlash(static_cast<char>(ch));
@@ -1158,7 +1156,7 @@ namespace cial::syntax {
             }
 
             const auto runeType = utf8Encode(ch);
-            str.write(reinterpret_cast<const char*>(runeType.data), runeType.width);
+            str.write(reinterpret_cast<const char *>(runeType.data), runeType.width);
         }
 
         if(strPsState == TemplateStringContext::State::None) {
@@ -1176,7 +1174,7 @@ namespace cial::syntax {
     /**
      * 十六进制,字符序列
      */
-    bool Lexer::octetLiteral(Token*& token) {
+    bool Lexer::octetLiteral(Token *&token) {
         std::stringstream stream{ "" };
         std::vector<u8> buf{};
         // parse an octet literal;

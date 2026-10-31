@@ -21,11 +21,11 @@
 // 128 操作码转译覆盖闭环。仍缺口：无（test_string 受上游 --dump 崩溃阻塞）。
 #pragma once
 
+#include <memory>
 #include "runtime/AtomTable.hpp"
 #include "tjsbc/TjsBytecodeReader.hpp"
 #include "vm/Chunk.hpp"
 #include "vm/Constant.hpp"
-#include <memory>
 
 namespace cial {
 
@@ -35,13 +35,13 @@ namespace cial {
     namespace tjsbc {
 
         // 转译产物：每个 context 一个 Chunk；函数 context 另有 FuncMeta
-        //（INTER_OBJECT 常量经 Constant(FuncMeta*) 回填，createValue 建可调用对象）
+        // （INTER_OBJECT 常量经 Constant(FuncMeta*) 回填，createValue 建可调用对象）
         struct TjsTranslatedContext {
             i32 parent = -1;
             TjsContextType type = TjsContextType::TopLevel;
             i32 arity = 0;
             bool isFunctionLike = false; // Function/ExprFunction
-            vm::Chunk *chunk = nullptr;  // GC 持有（翻译器根保护）
+            vm::Chunk *chunk = nullptr; // GC 持有（翻译器根保护）
             FuncMeta *funcMeta = nullptr; // 仅 isFunctionLike
             // ctClass：加载期解释产物（body 不生成 TAC）
             bool isClass = false;
