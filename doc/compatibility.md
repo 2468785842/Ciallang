@@ -108,6 +108,9 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 | 回调异常值传播 | 宿主回调（sort 比较器/replace 回调/即时求值）抛出的脚本异常，外层 catch(e) 收到抛出值本身（try handler 的 exValueReg 回写） | 一致（2026-10-30 修正——ThrowHandler 以 0 表示"无槽位"与寄存器 0 冲突，异常值曾丢失、catch 读到池内陈旧值；现以 0xFFFF 为无槽位哨兵，寄存器 0 合法；`src/vm/VMState.cpp` unwind、`src/vm/Bytecode.hpp`、回归 tests/try_catch_test.cpp） | 无差异 |
 | `+` 的 void 幺元 / `(string)void` | `operator+=`：任一侧为 String 时两侧 `AsString()`（void→NULL 即空串，tjsVariant.cpp:1095-1128、683-686）；void±Integer/Real 恒等；void+void → AsReal 兜底得 Real 0；octet+String 抛错。`ToString()` 对 void 给空串（:411-415）、octet 抛错（:443-445） | 一致（2026-10-30 修正——`(string)void` 与 `"a"+void` 曾报 "Invalid type cast / unsupported operand"；`src/types/Value.cpp` toString Void 分支） | 无差异 |
 | `&` 引用作用域 | 全局/局部/对象成员均可存属性引用；普通全局/成员读取触发 getter，局部读取仅复制引用 | 一致；`&name` / `&obj.member` 取引用本体，`*(&name)` 可显式解引用全局槽 | 无差异；回归见 `tests/tjs/property/` |
+| RegExp `index` 属性单位 | 字节偏移：`tjsRegExp.cpp:669` `Index = Start + region->beg[0]` 漏除 `sizeof(tjs_char)`，同函数 `lastIndex`（:676）与 :677/:680/:682 均有除——同一对象两属性单位不自洽；字符位 1 的匹配实测 Windows 返回 2、macOS arm64 返回 4（= 字符位 × sizeof(tjs_char)） | 字符位（TJS2 语义），与 `lastIndex` 一致 | 参考侧缺陷，记录不追仿（2026-10-31 macOS 稳定构建裁决，数据见 [报告 §6](reports/2026-10-31-semantic-diff-tasks.md)） |
+| 后缀 `!` 编译失败可捕获性 | 不可捕获：`try { "1 +"!; } catch` 得 caught=0（macOS 稳定复现）；`VM_EVAL`→`Eval` 的编译错误以原生异常逃逸（tjsInterCodeExec.cpp:1222、:2713 `catch(...) { throw; }`） | 可捕获（caught=1），与 kirkr2 一致 | 记录差异，保持我方；参考侧疑似未实现可捕获 |
+| 字典字面量 count / 下标赋值 | 最小复现（混合键字面量、字面量后下标赋值）SIGSEGV，两平台一致；套件形态不崩时亦稳定 assertion 1/4 failed（count 不符） | `count=2`/`count=3` 正确，符合 TJS2 字面量语义 | 参考侧缺陷，记录不追仿 |
 
 属性引用作用域已于 2026-10-30 复核：原版 `TJSDefaultPropGet` 在未设 `TJS_IGNOREPROP`
 时调用属性默认 getter，`VM_GPDS` / `VM_GPIS` 则以该标志取本体；局部变量走 `VM_CP`

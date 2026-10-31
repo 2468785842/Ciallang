@@ -1,6 +1,7 @@
 # 2026-10-31 TJS2 语义差异归因任务清单
 
-状态：待处理。本文供在其他设备/会话继续修复使用，自包含全部复现材料。
+状态：已裁决（§5 全部步骤于同日 §6 macOS 稳定参考构建轮完成；三项候选均为参考侧
+缺陷或保持我方，无需修改本项目行为）。§1–§5 保留为 Windows 轮历史记录。
 前置阅读：[2026-10-31 参考侧复核](2026-10-31-reference-audit.md)、[tests/tjs/README.md](../../tests/tjs/README.md)。
 
 ## 1. 环境与工具（本节数据的测量条件）
@@ -152,3 +153,55 @@ for i in 1 2 3; do $R tests/tjs/scope/block/04.tjs >/dev/null 2>&1; printf "rc=%
    更新 [TODO](../../TODO.md) 与 [2026-10-31 审计报告](2026-10-31-reference-audit.md)。
 5. 验收：`python tests/run_tjs_tests.py --engine <新参考> --report ...` 全量对拍，
    差异逐项归因到本清单编号或新条目；CTest 全绿。
+
+## 6. macOS 稳定参考构建轮（2026-10-31 当日，裁决执行）
+
+### 6.1 环境与稳定性前置（对应 §5.1）
+
+- 本机：macOS arm64；Ciallang 提交 `05fae9d`，Debug 构建
+  `build/MacOS/Debug/cial`，`tests/tjs` 226 文件全数通过（572 断言）。
+- 参考仓库 `../TJSCompiler` 提交 `d8044c3`（含 macOS 构建适配与脚本路径 CLI），
+  二进制 `bin/darwin/TJSCompiler`（2026-10-30 与提交同刻构建），
+  SHA-256 `35169f56a7475b790239d9070fab768be59502a9dc7712982126459cb8b05537`。
+- 全量对拍（`tests/run_tjs_tests.py --engine bin/darwin/TJSCompiler`）：
+  参考 **199/226 通过（454 断言）**，27 失败；失败夹具 3×复跑全部 0/3，**零漂移**。
+  Windows 轮的随机崩溃问题在本构建上不存在，§5.1 前置达成；差异逐项归因见 §6.3。
+- 27 个稳定失败中 6 个即本清单候选夹具，其余 21 个亦为稳定复现的参考侧问题
+  （RegExp 01/04–07、regexp-state/01、string/03/05、string-length、numeric-literals/03、
+  void-addition、exceptions/message、super-slot、oop/member-lookup/01–03、scope/class-context、
+  math/02、native-function/containers/02–03；其中 containers/02 为 `a.erase()` 触发
+  原生异常并带 VM 转储）。按既定口径只记录不追仿。
+
+### 6.2 最小复现双引擎结果（`/tmp/diff/t1–t6`，脚本原文见 §3）
+
+| 例 | 参考（macOS d8044c3） | 参考（Windows 40a736c，§3 数据） | 我方 |
+|---|---|---|---|
+| t1 字典混合键 count | SIGSEGV（rc=139） | 崩溃/偶发 count 错 | `count=2 k=1 num=2` |
+| t2 字面量后下标赋值 | SIGSEGV（rc=139） | 崩溃/偶发 count 错 | `count=3 c=3` |
+| t3 后缀 `!` 可捕获性 | `caught=0`（稳定） | `caught=0` | `caught=1` |
+| t4 RegExp index | SIGSEGV（rc=139） | `index=4` | `index=2 lastIndex=6` |
+| t5 RegExp index（无分组） | `index=4`（稳定） | `index=2` | `index=1` |
+| t6 CJK 码点 exec | 未匹配，`i1=0 li1=0`（稳定） | `index=4 li=6` | `i1=2 li1=6` |
+
+t5 的跨平台差值（2 → 4）恰等于 `字符位 × sizeof(tjs_char)`（Windows wchar_t 2 字节、
+macOS arm64 4 字节），与 §6.3 源码证据互为印证；t6 的参考侧未匹配则与其
+UTF-16LE 固定编码对 32 位 `tjs_char` 平台的错配一致（tests/tjs/README 已记录）。
+套件形态（非最小化）下 §3.1/§3.2/§3.3 的 6 个夹具在 macOS 参考上均稳定执行到
+断言失败并输出 `00:00:00 assertion N failed:`，可作为非崩溃样本。
+
+### 6.3 裁决结论（对应 §5.2–§5.4）
+
+1. **§3.1 RegExp `index` 单位：参考侧缺陷，实锤。** `tjsRegExp.cpp:669`
+   `_this->Index = _this->Start + region->beg[0];` 漏除 `sizeof(tjs_char)`——
+   同函数 `lastIndex`（:676）与 :677/:680/:682 的 `beg[]` 使用均做了除。
+   `region->beg[]` 为字节偏移，故 index 按字节、lastIndex 按字符位。
+   我方按字符位保持不变；差异已记入 [compatibility.md §4](../compatibility.md)。
+2. **§3.2 后缀 `!` 编译失败可捕获性：记录差异，保持我方。** 参考 `VM_EVAL`
+   （tjsInterCodeExec.cpp:1222）→ `Eval`（:2713）将编译错误以原生异常重抛
+   （`catch(...) { throw; }`），脚本层 catch 不可捕获（t3 caught=0 稳定）。
+   我方与 kirkr2 一致可捕获；リファレンス eval 异常章节未及核对，条目按
+   "参考侧疑似未实现可捕获"记录。
+3. **§3.3 字典字面量 count / 下标赋值：参考侧缺陷。** 最小复现两平台均 SIGSEGV，
+   套件形态稳定断言失败（不崩时 count 亦不符）；我方与 TJS2 リファレンス字面量
+   语义一致，行为不变。
+4. 六个候选均无需修改本项目行为，无"我方修复"独立提交；TODO 首项按完成删除。
