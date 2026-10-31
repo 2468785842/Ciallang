@@ -53,7 +53,7 @@ namespace cial::inter {
     };
 
     // 有符号整数常量传播：块内折叠溢出安全的 Add/Sub/Mul；
-    // 块间状态分析——唯一前驱的块继承前驱出口常量状态（回边与多前驱保守放弃）。
+    // 块间状态分析——全部前向前驱的相同常量取交集（回边与异常前驱保守放弃）。
     // 不改变可能抛错的动态运算。
     class IntegerConstantPropagationOptimizer final : public Optimizer {
     public:

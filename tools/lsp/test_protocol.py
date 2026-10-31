@@ -472,6 +472,24 @@ holder.member;
             self.receive()
             self.assertEqual(self.symbols("find"), [])
 
+    @unittest.skipUnless(sys.platform == "win32", "Windows drive URI")
+    def test_vscode_encoded_drive_rename(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory).resolve()
+            path = root / "smoke %20 中文.tjs"
+            text = 'function greet() {}\ngreet();'
+            path.write_text(text, encoding="utf-8")
+            def encoded(uri):
+                return uri[:8] + uri[8:].replace(":", "%3A", 1)
+            uri = encoded(path.as_uri())
+            self.initialize({"workspaceFolders": [{"uri": encoded(root.as_uri()), "name": "smoke"}]})
+            self.send("textDocument/didOpen", {"textDocument": {"uri": uri, "version": 1, "text": text}})
+            self.assertEqual(self.receive()["params"]["diagnostics"], [])
+            self.send("textDocument/rename", {"textDocument": {"uri": uri},
+                      "position": {"line": 1, "character": 2}, "newName": "welcome"}, 2)
+            result = self.receive()["result"]
+            self.assertEqual(len(result["changes"][uri]), 2)
+
     def test_diagnostics_fix_and_close(self):
         self.initialize()
         uri = "file:///protocol-test.tjs"

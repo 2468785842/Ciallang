@@ -347,3 +347,56 @@ GMethodC/CallMethodV 的接收者分离；访问器缓存增加 getter/setter �
 同时去除临时 Value 与重复函数适配代码（`src/types/RegExp.hpp`、
 `src/stdlib/RegExpLib.cpp`、`src/Binding.hpp`）。本轮比值范围为 97.5%–101.3%；单轮
 短脚本结果不用于声称稳定提速，也不撤销上一节尚待定位的回退记录。
+
+## 2026-10-31 调用参数索引清零候选（未采纳）
+
+Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT，JIT 关闭。
+基线为本批 CHKINS、常量容器及汇合传播实现后的 Release CLI
+（`bench/results/cial-todo-semantic.exe`）；候选仅取消 CallV/CallMethodV/TailCallV
+参数索引数组的全槽清零，实际 argc 个索引仍逐个解码赋值。Value 参数副本及回调协议不变。
+
+每项预热 1 次，11 轮交替、反转顺序，统计含启动 wall-time 中位数。
+第二轮数据（候选/基线，小于 100% 更快）：
+
+| 脚本 | 基线 ms | 候选 ms | 后/前 |
+|---|---:|---:|---:|
+| class_instantiate | 17.081 | 16.946 | 99.2% |
+| fib | 43.208 | 43.539 | 100.8% |
+| loop_int | 330.772 | 335.473 | 101.4% |
+| native_methods | 21.488 | 21.582 | 100.4% |
+| string_concat | 15.856 | 15.806 | 99.7% |
+| native_todo_stress | 301.949 | 316.802 | 104.9% |
+
+压力语料是 native_methods 的百万迭代变体，校验和 499999500000；所有脚本自校验通过。
+首轮与参考侧复测重叠，仅作探索，不用作收益证据。第二轮没有稳定收益信号，候选已撤回，
+生产 VMState.cpp 未保留此次改动。原始第二轮样本及双方 SHA-256 位于
+`bench/results/20261031-todo-native.json`。这些数据不是本批最终实现相对原始 HEAD 的加速比，
+也不是与 TJS2 的对照，不能据此宣布原生调用性能任务完成。
+
+历史绑定层 2.4%–3.4% 回退发生于 macOS arm64，且文档基线为本机 `/tmp` 二进制；
+本 Windows 工作区没有该二进制、原始采样或对应 macOS 执行环境。现有证据不足以将其归因于
+布局或派发；任务继续保留，须取得原基线或可重建的精确提交，做同平台 A/A、A/B 与采样。
+
+### 本批最终 Release 快照复核
+
+全部构建及测试停止后，最终 Release 与任务开始前保留的现有 Release CLI 交替比较，
+预热 1 次、11 轮反转顺序，含启动 wall-time 中位数；同上 Windows/Clang 19.1.5 配置。
+基线是既有二进制快照，不宣称能从某个精确 Git 提交重建；双方 SHA-256 和原始样本见
+`bench/results/20261031-todo-final.json`。压力语料同上，全部自校验通过。
+
+| 脚本 | 前 ms | 后 ms | 后/前 |
+|---|---:|---:|---:|
+| class_instantiate | 11.328 | 11.309 | 99.8% |
+| fib | 44.582 | 45.767 | 102.7% |
+| loop_int | 346.859 | 340.180 | 98.1% |
+| native_methods | 25.024 | 24.042 | 96.1% |
+| string_concat | 16.608 | 16.428 | 98.9% |
+| native_todo_stress | 313.618 | 315.017 | 100.4% |
+
+此单批快照的比值范围约 96.1%–102.7%，没有做本轮独立 A/A 校准，不据此宣称稳定提速
+或完全无回退。它也不能定位历史 macOS 绑定层回退。最终未保留调用索引清零候选。
+
+最终验证：Windows Clang Debug/Release 与 MSVC ASan 的 CTest 均 230/230 通过，
+包含 225 个脚本用例、C++、CLI、LSP 与字节码工具套件。MSVC 编译时将宿主绑定的
+内部 invoke 调用显式限定为 `cial::binding::invoke`，避免 ADL 引入 `std::invoke`；
+Tracer 增加空对象保护，并由 native_binding_test 的持有值/GC 用例验证。

@@ -275,7 +275,7 @@ TEST_CASE("原生回调脚本函数（VM::callValue 底座）") {
     }
 }
 
-TEST_CASE("(const)[...] / (const)%[...] 常量内联形态（当前实现：可写的运行期容器）") {
+TEST_CASE("(const)[...] / (const)%[...] 常量内联形态（编译期共享容器）") {
     Runtime rt{};
     Context context{ rt };
     stdlib::registerStandardLibrary(context);
@@ -283,16 +283,16 @@ TEST_CASE("(const)[...] / (const)%[...] 常量内联形态（当前实现：可�
     VM vm{ &vmState };
 
     // 参考 const_inline_array 在解析期建容器，再经 VM_CONST 复用常量对象。
-    // 当前 Parser 忽略 (const)，此处只覆盖可写性及嵌套语法，不证明跨调用共享已对齐。
+    // 常量容器仍可写；同一字面量的共享另由脚本测试和 GC 测试覆盖。
     vm.eval(R"tjs(
         var a = (const)[1, 2, 3];
         var b = (const)[1, 2, 3];
         var eq = a[1] === b[1];
         a[1] = 99;
         var w = a[1];
-        var nested = (const)[1, (const)%[k: 7]];
+        var nested = (const)[1, (const)%["k", 7]];
         var nk = nested[1]["k"];
-        var d = (const)%[x: 1, y: 2];
+        var d = (const)%["x", 1, "y", 2];
         d["x"] = 5;
         var dx = d["x"];
     )tjs"_str);

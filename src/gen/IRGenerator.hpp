@@ -134,6 +134,8 @@ namespace cial::inter {
         // (Load + DGlobal)前置到块代码之前,调用先于声明文本位置也能命中
         void emitFunctionHoisting(const syntax::BlockStmtNode *node);
 
+        Value buildConstantContainer(const syntax::ExprNode *node);
+
         Register loadVoidReg();
 
         // 补"返回 void"的 ret 到 parseAst 产出的 chunk（void Load 必须写入该 chunk 本体）

@@ -193,7 +193,9 @@ def file_path(uri):
     parsed = urlsplit(uri)
     if parsed.scheme != "file" or parsed.query or parsed.fragment:
         return None
-    value = parsed.path
+    # VSCode 把 Windows 盘符冒号编码为 %3A；url2pathname 在解码前
+    # 识别盘符，直接传入会得到非绝对路径。只还原盘符，避免文件名二次解码。
+    value = re.sub(r"^/([A-Za-z])%3[aA](?=/)", r"/\1:", parsed.path)
     if parsed.netloc and parsed.netloc != "localhost":
         value = "//" + parsed.netloc + value
     path = pathlib.Path(url2pathname(value))

@@ -418,3 +418,37 @@ TEST_CASE("optimizer - compare-test fusion preserves values and control-flow ent
     REQUIRE(target.inst(0)->opcode() == TacOpCode::LT);
     REQUIRE(target.inst(1)->opcode() == TacOpCode::Test);
 }
+
+TEST_CASE("optimizer - joins equal constants on both branch arms") {
+    vm::Chunk chunk;
+    chunk.emit<LoadImm>(Register{ 1 }, 20);
+    chunk.emit<JmpE>(Label{ 4 });
+    chunk.emit<LoadImm>(Register{ 1 }, 7);
+    chunk.emit<Jmp>(Label{ 5 });
+    chunk.emit<LoadImm>(Register{ 1 }, 7);
+    chunk.emit<Add>(Register{ 1 }, Register{ 1 }, Register{ 2 });
+    chunk.emit<inter::Ret>(Register{ 2 });
+    chunk.setRegCount(3);
+    ControlFlowGraph cfg;
+    const auto blocks = cfg.buildCFG(chunk);
+    IntegerConstantPropagationOptimizer optimizer;
+    REQUIRE(optimizer.optimize(chunk, blocks) == 1);
+    REQUIRE(chunk.inst(5)->opcode() == TacOpCode::LoadImm);
+    REQUIRE(chunk.inst(5)->getOp2().value<Integer>() == 14);
+}
+
+TEST_CASE("optimizer - handler never inherits normal exit constants") {
+    vm::Chunk chunk;
+    chunk.emit<LoadImm>(Register{ 1 }, 3);
+    chunk.emit<Throw>(Register{ 0 });
+    chunk.emit<LoadImm>(Register{ 1 }, 7);
+    chunk.emit<Add>(Register{ 1 }, Register{ 1 }, Register{ 2 });
+    chunk.emit<inter::Ret>(Register{ 2 });
+    chunk.setRegCount(3);
+    chunk.addThrowHandler({ 0, 3, 0 });
+    ControlFlowGraph cfg;
+    const auto blocks = cfg.buildCFG(chunk);
+    IntegerConstantPropagationOptimizer optimizer;
+    optimizer.optimize(chunk, blocks);
+    REQUIRE(chunk.inst(3)->opcode() == TacOpCode::Add);
+}

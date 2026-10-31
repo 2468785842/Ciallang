@@ -1356,15 +1356,79 @@ namespace cial::syntax {
         return parser->astBuilder()->makeNode<InternalIdentifierExprNode>(*token);
     }
 
+    // 常量容器使用独立文法：元素仅为字面量、带符号字面量或嵌套常量容器。
+    static ExprNode *parseConstantElement(Result &r, Parser *parser) {
+        Token token;
+        parser->consume(r, token);
+        if(token.type() == TokenType::ConstVal || token.type() == TokenType::Void || token.type() == TokenType::Null)
+            return parser->astBuilder()->makeNode<ValueExprNode>(token);
+        if(token.type() == TokenType::Plus || token.type() == TokenType::Minus) {
+            Token value;
+            if(!parser->peek(r, TokenType::ConstVal) && !parser->peek(r, TokenType::Null)) {
+                parser->error(r, "constant sign expects a literal", token.location);
+                return nullptr;
+            }
+            parser->consume(r, value);
+            return parser->astBuilder()->makeNode<PrefixUnaryExprNode>(
+                token, parser->astBuilder()->makeNode<ValueExprNode>(value));
+        }
+        if(token.type() == TokenType::LParenthesis && parser->peek(r, TokenType::Const))
+            return S_ParenthesizedPrefixParser.parse(r, parser, &token);
+        parser->error(r, "constant container expects a literal", token.location);
+        return nullptr;
+    }
+
     ExprNode *ParenthesizedPrefixParser::parse(Result &r, Parser *parser, Token *token) const {
-        // (const)[...] / (const)%[...] —— 常量形字面量（tjs.y const_inline_array/dic）。
-        // const 性暂不强制（每次求值新建实例，语义差异已记录 TODO），此处吞掉前缀后
-        // 交回常规表达式解析，后续 [ / %[ 自然命中字面量解析器
         if(parser->peek(r, TokenType::Const)) {
             parser->consume(r);
             if(!parser->expect(r, TokenType::RParenthesis))
                 return nullptr;
-            return parser->parseExpression(r, true, Precedence::prefix);
+            const bool dictionary = parser->peek(r, TokenType::Percent);
+            if(dictionary)
+                parser->consume(r);
+            if(!parser->expect(r, TokenType::LBracket))
+                return nullptr;
+            auto *array = dictionary ? nullptr : parser->astBuilder()->makeNode<ArrayLiteralNode>();
+            auto *dict = dictionary ? parser->astBuilder()->makeNode<DictLiteralNode>() : nullptr;
+            if(array) {
+                array->isConstant = true;
+                array->location = token->location;
+            }
+            if(dict) {
+                dict->isConstant = true;
+                dict->location = token->location;
+            }
+            // const_dic_elm_list 的空产生式允许首对之前有一个逗号。
+            const bool leadingPair = dictionary && parser->peek(r, TokenType::Comma);
+            if(leadingPair)
+                parser->consume(r);
+            if(leadingPair || !parser->peek(r, TokenType::RBracket)) {
+                do {
+                    ExprNode *key{};
+                    if(dictionary) {
+                        if(!parser->peek(r, TokenType::ConstVal) && !parser->peek(r, TokenType::Null)) {
+                            parser->error(r, "constant dictionary expects a literal key", token->location);
+                            return nullptr;
+                        }
+                        key = parseConstantElement(r, parser);
+                        if(!parser->expect(r, TokenType::Comma))
+                            return nullptr;
+                    }
+                    auto *value = parseConstantElement(r, parser);
+                    if(!value)
+                        return nullptr;
+                    if(dict)
+                        dict->pairs.emplace_back(key, value);
+                    else
+                        array->elements.push_back(value);
+                    if(!parser->peek(r, TokenType::Comma))
+                        break;
+                    parser->consume(r);
+                } while(true);
+            }
+            if(!parser->expect(r, TokenType::RBracket))
+                return nullptr;
+            return dict ? static_cast<ExprNode *>(dict) : static_cast<ExprNode *>(array);
         }
         // (int)x / (real)x / (string)x —— TJS 的括号内类型转换写法;
         // 语料中亦有 (int x) 无括号变体(test_variant.tjs),两种都接受

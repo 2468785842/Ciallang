@@ -241,8 +241,8 @@ namespace cial::tjsbc {
                     d.imm = reg(1);
                     return d;
                 case OP_CHKINS:
-                    d.r1 = reg(1); // 类名 reg
-                    d.r2 = reg(2); // 对象 reg
+                    d.r1 = reg(1); // 被测值与结果槽
+                    d.r2 = reg(2); // 类名
                     return d;
                 case OP_SETP: // [target, src]：*target = src
                     d.r1 = reg(1);
@@ -802,8 +802,7 @@ namespace cial::tjsbc {
                         break;
                     }
                     case OP_CHKINS:
-                        chunk.emit<inter::DLocal>(r2, regT);
-                        chunk.emit<inter::ChkIns>(regT, r1);
+                        chunk.emit<inter::ChkIns>(r1, r2);
                         break;
                     case OP_INC: case OP_INC + 1: case OP_INC + 2: case OP_INC + 3:
                     case OP_DEC: case OP_DEC + 1: case OP_DEC + 2: case OP_DEC + 3: {

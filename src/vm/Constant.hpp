@@ -196,9 +196,11 @@ namespace cial {
         ClassMeta,
         PropMeta,
         Octet,
+        Object, // 编译期常量容器，由 Chunk 标记持有
     };
 
-    using ConstantValue = std::variant<std::monostate, Real, Atom, FuncMeta *, ClassMeta *, PropMeta *, SharedPayload<Octet> *>;
+    using ConstantValue =
+        std::variant<std::monostate, Real, Atom, FuncMeta *, ClassMeta *, PropMeta *, SharedPayload<Octet> *, Object *>;
 
     struct Constant {
 

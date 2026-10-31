@@ -1,0 +1,24 @@
+// 常量容器：对象共享、独立字面量、嵌套及带符号元素
+Scripts.execStorage("../assert.tjs");
+function array() { return (const)[1, -2, +"3", void, (const)%["key", (const)[7]]]; }
+function dict() { return (const)%["x", 1, "x", 2, 3, "number key"]; }
+var a = array();
+assertTrue(a === array());
+a[0] = 42;
+assertTrue(array()[0] === 42);
+assertTrue(a[1] === -2 && a[2] === 3 && a[3] === void);
+assertTrue(a[4]["key"][0] === 7);
+a[4]["key"][0] = 8;
+assertTrue(array()[4]["key"][0] === 8);
+assertTrue(dict() === dict());
+assertTrue(dict()["x"] === 2 && dict()["3"] === "number key");
+var b = (const)[1];
+var c = (const)[1];
+assertTrue(b !== c);
+function fresh() { return [1]; }
+assertTrue(fresh() !== fresh());
+assertTrue((const)%[, "leading", 7]["leading"] === 7);
+var nil = (const)[null, true, false];
+assertTrue(!nil[0] && nil[1] === 1 && nil[2] === 0);
+assertTrue((const)[].count === 0 && (const)%[].count === 0);
+finishTests();

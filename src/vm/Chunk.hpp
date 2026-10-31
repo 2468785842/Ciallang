@@ -19,8 +19,9 @@
 
 #include <fmt/format.h>
 #include "Bytecode.hpp"
-#include "Rlc.hpp"
 #include "Constant.hpp"
+#include "Rlc.hpp"
+#include "types/Object.hpp"
 
 #include "gen/Instruction.hpp"
 #include "logging/Logger.hpp"
@@ -151,7 +152,9 @@ namespace cial::vm {
                 return;
             MarkSweepHeader::marked();
             for(auto &inst : _constants) {
-                if(inst.type() == ConstantType::FuncMeta) {
+                if(inst.type() == ConstantType::Object) {
+                    inst.value<Object *>()->marked();
+                } else if(inst.type() == ConstantType::FuncMeta) {
                     inst.value<FuncMeta *>()->marked();
                 } else if(inst.type() == ConstantType::ClassMeta) {
                     inst.value<ClassMeta *>()->marked();

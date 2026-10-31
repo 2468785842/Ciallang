@@ -151,3 +151,19 @@ TEST_CASE("保留字 - static/private/public/protected 无文法规则") {
         REQUIRE(r.isFailed());
     }
 }
+
+TEST_CASE("constant containers reject runtime expressions", "[parser]") {
+    for(const auto *source : { "var a = (const)[x];", "var a = (const)[1 + 2];", "var a = (const)[[]];",
+                               "var a = (const)[,];", "var a = (const)[1,];", "var a = (const)%[key: 1];",
+                               "var a = (const)%[1 => 2];", "var a = (const)(1);", "var a = (const)[-(1)];", "var a = (const)%[,];" }) {
+        INFO(source);
+        Common::SourceFile file;
+        Common::Result diagnostics;
+        file.load(diagnostics, source);
+        Runtime rt;
+        Context context{ rt };
+        syntax::Parser parser{ file, context.pp() };
+        parser.parse(diagnostics);
+        REQUIRE(diagnostics.isFailed());
+    }
+}

@@ -520,19 +520,13 @@ namespace cial::inter {
 
         const size_t registerCount = chunk.getRegCount();
 
-        // 前驱统计：块间状态分析只沿唯一前驱的前向边继承（回边前驱晚于自身
-        // 出现，自然落在 pred >= self 分支被跳过；try handler 汇聚多前驱同样放弃）。
-        Vec<u32> predecessorCount(blocks.size(), 0);
-        Vec<size_t> predecessorIndex(blocks.size(), 0);
-        for(size_t i = 0; i < blocks.size(); ++i) {
-            for(const size_t successor : blocks[i].successors) {
-                if(predecessorCount[successor] == 0)
-                    predecessorIndex[successor] = i;
-                ++predecessorCount[successor];
-            }
-        }
+        // 仅合并已遍历的全部前驱；值相同才保留。回边尚无出口状态，整体放弃，
+        // 避免把入口常量误用于后续迭代。异常前驱的中间状态不能用正常出口代替。
+        Vec<Vec<size_t>> predecessors(blocks.size());
+        for(size_t i = 0; i < blocks.size(); ++i)
+            for(const size_t successor : blocks[i].successors)
+                predecessors[successor].push_back(i);
 
-        // 出口状态按需记录：仅唯一前驱的后继块会读取前驱状态。
         size_t foldedCount = 0;
         Vec<Vec<Integer>> blockOutConstants(blocks.size());
         Vec<Vec<u8>> blockOutKnown(blocks.size());
@@ -541,11 +535,20 @@ namespace cial::inter {
         for(size_t blockIndex = 0; blockIndex < blocks.size(); ++blockIndex) {
             const auto &block = blocks[blockIndex];
             std::fill(known.begin(), known.end(), 0);
-            if(predecessorCount[blockIndex] == 1) {
-                const size_t predecessor = predecessorIndex[blockIndex];
-                if(predecessor < blockIndex && !blockOutKnown[predecessor].empty()) {
+            bool first = true;
+            for(const size_t predecessor : predecessors[blockIndex]) {
+                if(predecessor >= blockIndex || protectedByTry(chunk, blocks[predecessor])) {
+                    std::fill(known.begin(), known.end(), 0);
+                    break;
+                }
+                if(first) {
                     known = blockOutKnown[predecessor];
                     constants = blockOutConstants[predecessor];
+                    first = false;
+                } else {
+                    for(size_t reg = 0; reg < registerCount; ++reg)
+                        known[reg] = known[reg] && blockOutKnown[predecessor][reg] &&
+                            constants[reg] == blockOutConstants[predecessor][reg];
                 }
             }
             for(size_t pc = block.start; pc < block.end; ++pc) {

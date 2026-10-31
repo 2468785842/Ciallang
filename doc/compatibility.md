@@ -22,7 +22,7 @@
 | 容器成员 | Array/Dictionary 方法面（sort/split/save/load/pack 系含） | ✅（逐方法状态见 §3 标准库兼容） |
 | 中缀 | instanceof / incontextof / `in` | instanceof ✅（基础类型按类型名匹配）/ incontextof ✅；`in` ✅ 保留字行为对齐（原版 codegen 无 T_IN 分支——节点与操作数均不求值、结果 void；官方リファレンス亦无此运算符，2026-10-29 实测定论，见 `tests/compat_reserved_test.cpp`） |
 | 字面量 | 全部标量（含 i64 大整数字面量精确解析）+ 函数表达式 + @"…" 模板串 | ✅ |
-| 字面量 | `[...]` Array、`%[...]` Dictionary、`<%%>` Octet、`(const)` 常量形 | ◐ 普通字面量支持；`(const)` 当前按运行期字面量处理，未对齐参考文法的编译期常量容器、元素限制与重复求值共享，见 [语法 §8](syntax.md#8-内联字面量array--dictionary--常量折叠形) |
+| 字面量 | `[...]` Array、`%[...]` Dictionary、`<%%>` Octet、`(const)` 常量形 | ✅ 普通字面量与 `(const)` 编译期容器、常量元素限制及跨调用共享，见 [语法 §8](syntax.md#8-内联字面量array--dictionary--常量折叠形) |
 | 后缀条件 | `expr if cond`（假条件整体不赋值，tjs.y expr 层级绑定） | ✅ |
 | 函数 | 默认参数（TestVoid 守卫，实参优先） | ✅ |
 | 函数 | 收拢 `args*`、省略调用 `...`、展开调用 `expr*` | ✅（2026-10-27 源码路径补齐，与字节码路径能力对齐） |
@@ -36,12 +36,12 @@
 
 执行路径：加载 → **转译为 Ciallang TAC** → 现有 VM 执行，见
 [bytecode/mapping.md](bytecode/mapping.md)。
-Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。已有解码分支不等于所有语义都已对齐，`CHKINS` 等已知问题见 [转译边界](bytecode/mapping.md#8-已知差异与待修复项)。
+Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。已有解码分支不等于所有语义都已对齐，已知问题见 [转译边界](bytecode/mapping.md#8-已知差异与待修复项)。
 
 | 项 | 状态 |
 |---|---|
 | 容器/常量池/context 解析（Reader） | ✅ 有截断、索引及布局回归；不代表所有元数据组合均已验证 |
-| 顶层/函数 context 转译（算术/比较/跳转/调用/flag 物化） | ◐ 已实现；`CHKINS` 有操作数及结果写回缺陷 |
+| 顶层/函数 context 转译（算术/比较/跳转/调用/flag 物化） | ◐ 已实现；`CHKINS` 按 target/name 原地写回，其他边界见转译文档 |
 | 属性访问（GPD/GPI/SPD/…/S 变体 + P 变体/GETP/SETP/DELD/TYPEOFD） | ◐ 缺失成员的 typeof、proxy 回落、Operation 原子语义等尚有差异 |
 | 类 / NEW / try-catch / property / extends | ◐ fixture 覆盖常见模式；类体与父类表达式只支持加载期可识别模式 |
 | collapse/展开/省略调用、EVAL/EEXP、比较与转换 | ✅ 已有指令及 fixture；具体映射与边界见转译文档 |

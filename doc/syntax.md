@@ -74,7 +74,7 @@
 | 15 | `A isvalid`（**后缀**形态，与前缀并存）、`A incontextof B`（**右结合**，替换函数闭包的 this） | ✅：incontextof ✅；isvalid 前/后缀 ✅（2026-10-30 对齐原版 VM_CHKINV 语义：非对象值恒 true（tjsInterCodeExec.cpp:1177），对象按 IsValid 判定，invalidate 后 false；`src/vm/VMState.cpp` ChkInv、`tests/tjs/judgment/`） |
 | 16 | **类型转换** `(int)A (real)A (string)A` 或裸 `int A real A string A` | ✅ |
 | 17 | **后缀**：调用 `f(args)`、成员 `.sym`（含 `.` 起始的裸词链）、下标 `a[i]`（通用路径：数组/字典/字符串；可写，越界扩展）、后缀 `++ --`（表达式值为旧值；成员形态走 getter/setter 链）、**即时求值 `A !`**（把 A 的字符串值作为 TJS 表达式编译执行） | 全部 ✅：`() . -- ++ []`；后缀 `!` 即时求值（A 字符串化为表达式编译执行，空串原值不变，2026-10-26） |
-| 18 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]`（键形式 `sym :` 与 `"k" => v`）/ 正则 `/pattern/` / 常量式 `(const)[...]` `(const)%[...]` | ◐ 普通字面量已实现；`(const)` 的编译期容器、常量元素限制与重复求值共享尚未对齐（见 §8） |
+| 18 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]`（键形式 `sym :` 与 `"k" => v`）/ 正则 `/pattern/` / 常量式 `(const)[...]` `(const)%[...]` | ✅ 普通字面量与 `(const)` 常量容器（见 §8） |
 
 前缀一元语义速查（原版）：
 
@@ -154,12 +154,18 @@ class 类名 extends 父类1, 父类2 … {   // 多继承，后面的覆盖前�
 (const)[ … ] / (const)%[ … ]  // 参考文法的常量容器形态；本项目支持范围见下
 ```
 
-状态：普通 Array/Dictionary 字面量 ✅；`(const)` ◐。参考文法的 `const_inline_array` /
-`const_inline_dic` 在解析期创建容器并放入 `T_CONSTVAL`，并限制元素为常量。
-Ciallang 目前忽略 `(const)` 标记，按普通表达式在运行期新建容器，未实现同一字面量跨调用的常量对象共享。
-可写与共享是两个独立问题；两个不同字面量互不影响也不能证明同一表达式没有共享。
-字典键值形式也应区分：参考 `const_dic_elm` 使用常量键、逗号、常量值，本项目接受普通字典写法。
-依据 `src/parser/Parser.cpp` 的 `GroupPrefixParser` 与固定快照 `tjs.y` 的上述产生式。
+状态：普通 Array/Dictionary 字面量与 `(const)` 常量容器均支持。
+`(const)` 的元素仅接受字面量、`void`、带单个正负号的字面量和嵌套 `(const)` 容器；
+不接受变量、函数调用、算术表达式、空元素或尾逗号。常量字典使用
+`(const)%["key", value, "other", value]`，不接受普通字典的 `:` / `=>` 语法；参考文法允许首对前有一个逗号。
+
+容器在 IR 生成期构造并存入 Chunk 常量池。同一字面量跨函数调用共享对象，内容仍可修改；
+两个不同字面量各自持有对象。普通字面量每次求值新建，不受此规则影响。
+嵌套容器由外层对象标记，Chunk 的标记与转堆保护覆盖常量对象图。
+容器内部的 `null` 元素保留空对象值；这不扩展其他位置原有的 null 支持范围。
+依据 `src/parser/Parser.cpp` 的 `ParenthesizedPrefixParser`、`src/gen/IRGenerator.cpp`、
+`src/vm/Constant.*` 与 `Chunk.*`；行为和 GC 回归见
+`tests/tjs/expression/constant-containers.tjs`、`tests/runtime_lifetime_test.cpp`。
 
 ## 9. 标准库概览（详细对照见 compatibility.md）
 

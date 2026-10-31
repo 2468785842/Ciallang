@@ -12,6 +12,9 @@ namespace cial::vm {
         Vec<RootGuard<MarkSweepHeader>> roots;
         for(const auto &constant : _constants) {
             switch(constant.type()) {
+                case ConstantType::Object:
+                    roots.emplace_back(&runtime, constant.value<Object *>());
+                    break;
                 case ConstantType::FuncMeta:
                     roots.emplace_back(&runtime, constant.value<FuncMeta *>());
                     break;
@@ -31,6 +34,9 @@ namespace cial::vm {
     [[nodiscard]] String Chunk::dumpConstant(const Runtime *rt, const ConstIdx idx) const {
         std::stringstream ss{ "" };
         switch(const auto &constant = _constants[idx.index()]; constant.type()) {
+            case ConstantType::Object:
+                ss << "<constant container>";
+                break;
             case ConstantType::None:
                 ss << "Void";
                 break;

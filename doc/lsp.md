@@ -44,6 +44,24 @@ python tools/lsp/cial_lsp.py --cial build/Windows/Debug/cial.exe
 
 ### 测试
 
-`tools/lsp/test_protocol.py` 通过真正的子进程 stdio 测试初始化、诊断与修复、关闭、补全、悬停、符号、未知请求、shutdown/exit，以及 Unicode 位置转换；另外覆盖未打开文件的工作区搜索、磁盘修改/删除、未保存缓冲更新与关闭恢复、工作区目录切换、结果数量限制、超限/编码非法文件跳过，以及带空格、百分号和中文的 URI。新增能力测试覆盖：内置类型推导成员补全（Array/String/Dictionary/RegExp、前缀过滤、Integer/unknown 回落词法）、工作区 class 成员与 extends 继承、函数返回值类型、跨文件唯一类与多义回落、`prepareRename` 接受/拒绝形态（关键字、内置类名、动态成员、字典键、自由标识符）、绑定级 rename 的作用域遮蔽精度与非法新名拒绝、跨文件唯一 rename 与多义 null、definition 多文件返回全部并按 URI 排序、唯一时单 Location 兼容。Python 可用时由 CTest 注册（`CiallangLspProtocol`）。VSCode 客户端已做依赖安装与 JavaScript 语法检查，图形编辑器中的交互仍需在目标 IDE 实测（`tools/lsp/test_protocol.py`、`tests/CMakeLists.txt`）。
+`tools/lsp/test_protocol.py` 通过真正的子进程 stdio 测试初始化、诊断与修复、关闭、补全、悬停、符号、未知请求、shutdown/exit，以及 Unicode 位置转换；另外覆盖未打开文件的工作区搜索、磁盘修改/删除、未保存缓冲更新与关闭恢复、工作区目录切换、结果数量限制、超限/编码非法文件跳过，以及带空格、百分号和中文的 URI。新增能力测试覆盖：内置类型推导成员补全（Array/String/Dictionary/RegExp、前缀过滤、Integer/unknown 回落词法）、工作区 class 成员与 extends 继承、函数返回值类型、跨文件唯一类与多义回落、`prepareRename` 接受/拒绝形态（关键字、内置类名、动态成员、字典键、自由标识符）、绑定级 rename 的作用域遮蔽精度与非法新名拒绝、跨文件唯一 rename 与多义 null、definition 多文件返回全部并按 URI 排序、唯一时单 Location 兼容。Python 可用时由 CTest 注册（`CiallangLspProtocol`）。VSCode 客户端已做依赖安装与 JavaScript 语法检查，2026-10-31 已在 Windows 的真实 VSCode Extension Development Host 中验证成员补全、定义跳转、重命名并应用编辑；JetBrains 客户端仍未验证（`tools/lsp/test_protocol.py`、`tests/CMakeLists.txt`）。
 
 协议参考：[LSP 3.17](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/)。
+
+### VSCode 宿主验收
+
+`editors/vscode/test/smoke.js` 使用真实 VSCode API 打开编辑器，调用补全/跳转/重命名提供器，
+断言 Array.push、函数声明位置及两处重命名编辑并应用到文档。测试会覆盖工作区的
+`smoke.tjs`，请使用独立的临时工作区。该工作区 `.vscode/settings.json` 应为
+`ciallang.python`、`ciallang.executable` 配置绝对路径。先执行 `node editors/vscode/prepare.js`，
+再以 VSCode 可执行文件启动：
+
+```text
+Code --extensionDevelopmentPath=<仓库>/editors/vscode --extensionTestsPath=<仓库>/editors/vscode/test/smoke.js --user-data-dir=<临时用户目录> <临时工作区>
+```
+
+Windows 盘符 URI 可能为 `file:///d%3A/...`。服务端仅先还原盘符冒号，再由
+`url2pathname` 解码其余部分，避免相对路径误判与文件名二次解码；协议测试另覆盖
+带空格、字面 `%20` 和中文的路径（`tools/lsp/cial_lsp.py`、`test_protocol.py`）。
+此验收通过 VSCode 提供器命令执行，未覆盖全部快捷键、主题与弹窗布局。
+最终 Debug、Release 及 MSVC ASan 的 CTest 均为 230/230 通过，协议套件为 19 个用例。

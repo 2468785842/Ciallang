@@ -16,7 +16,8 @@ namespace cial::binding {
     struct Tracer {
         void operator()(const Value &value) const noexcept {
             if(value.isObject())
-                value.asObject().unwrap()->marked();
+                if(auto *object = value.asObject().unwrap())
+                    object->marked();
         }
     };
 
@@ -121,8 +122,8 @@ namespace cial::binding {
         using Traits = native::NativeFunTraits<F>;
         return makeFunction(ctx, [fn](const VM *vm, const Value &, const size_t argc, Value *args) {
             checkArity(argc, Traits::arity);
-            return invoke<const F &, typename Traits::ArgsTuple>(vm->context(), fn, args,
-                                                                 std::make_index_sequence<Traits::arity>{});
+            return cial::binding::invoke<const F &, typename Traits::ArgsTuple>(
+                vm->context(), fn, args, std::make_index_sequence<Traits::arity>{});
         });
     }
 
@@ -187,7 +188,7 @@ namespace cial::binding {
                     checkArity(argc, Traits::arity);
                     auto &object = thisAs<T>(self);
                     auto bound = [&](auto &&...values) -> decltype(auto) { return std::invoke(fn, object, values...); };
-                    return invoke<decltype(bound) &, typename Traits::ArgsTuple>(
+                    return cial::binding::invoke<decltype(bound) &, typename Traits::ArgsTuple>(
                         vm->context(), bound, args, std::make_index_sequence<Traits::arity>{});
                 });
             return *this;

@@ -35,4 +35,6 @@ TJSCompiler `d8044c3`。runner 如实报告两个引擎的差异，不自动跳�
 
 AST 结构、编译诊断、Value 的 C++ API、GC/调用帧/优化器内部状态、原生注册及宿主回调
 继续使用 `tests/*_test.cpp` 的 Catch2 测试。跨多次 `VM::eval` 的宿主接口测试也保留。
-尚未对齐的 `(const)` 容器等 Ciallang 专用回归不混入两引擎共用的语义用例。
+`expression/constant-containers.tjs` 覆盖常量容器的跨调用共享、可写性、嵌套和独立字面量；
+非法常量元素的诊断及 GC 生命周期仍由 C++ 回归覆盖。
+参考侧 Windows 复核及逐项结果见 [2026-10-31 报告](../../doc/reports/2026-10-31-reference-audit.md)。

@@ -266,3 +266,18 @@ TEST_CASE("Native exceptions release constructed argument copies and preserve su
     REQUIRE(*vm.evalExpr<Integer>("caught"_str) == 10);
     REQUIRE(context.stackTop() == 0);
 }
+
+TEST_CASE("constant container graphs survive compilation and collection", "[runtime][gc]") {
+    Runtime runtime{ 8 };
+    Context context{ runtime };
+    vm::VMState state{ context };
+    VM vm{ &state };
+    vm.eval(R"(
+        function shared() { return (const)[(const)%["nested", (const)[11]]]; }
+        var value = shared();
+        value[0]["nested"][0] = 42;
+    )"_str);
+    runtime.markSweep.collect([&] { runtime.collectAllMark(); });
+    REQUIRE(*vm.evalExpr<Integer>(R"(shared()[0]["nested"][0])"_str) == 42);
+    REQUIRE(runtime.handles.empty());
+}

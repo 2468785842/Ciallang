@@ -24,6 +24,8 @@
 #include "parser/ast/StmtNode.hpp"
 
 #include "Instruction.hpp"
+#include "types/Array.hpp"
+#include "types/Dictionary.hpp"
 
 namespace cial::inter {
 
@@ -1562,7 +1564,61 @@ namespace cial::inter {
         optReg = dst;
     }
 
+    Value IRGenerator::buildConstantContainer(const syntax::ExprNode *node) {
+        if(const auto *array = dynamic_cast<const syntax::ArrayLiteralNode *>(node)) {
+            auto *object = _rt.createCompilationObject<Array>(&_rt);
+            for(const auto *element : array->elements)
+                object->elements.push_back(buildConstantContainer(element));
+            return Value{ static_cast<Object *>(object) };
+        }
+        if(const auto *dict = dynamic_cast<const syntax::DictLiteralNode *>(node)) {
+            auto *object = _rt.createCompilationObject<Dictionary>();
+            for(const auto &[key, element] : dict->pairs) {
+                Value name = buildConstantContainer(key);
+                if(name.toString().isFailed()) {
+                    error("invalid constant dictionary key", key->location);
+                    return {};
+                }
+                object->members[_rt.atomTable.intern(*name.asString().unwrap())] = buildConstantContainer(element);
+            }
+            return Value{ static_cast<Object *>(object) };
+        }
+        if(const auto *unary = dynamic_cast<const syntax::PrefixUnaryExprNode *>(node)) {
+            Value value = buildConstantContainer(unary->rhs);
+            const auto result =
+                unary->token.type() == syntax::TokenType::Minus ? value.toSignChange() : value.toNumber();
+            if(result.isFailed())
+                error("invalid signed constant", node->location);
+            return value;
+        }
+        const auto &token = node->token;
+        if(token.type() == syntax::TokenType::Null)
+            return Value{ static_cast<Object *>(nullptr) };
+        switch(token.valueType()) {
+            case syntax::TokenValueType::Integer:
+                return Value{ token.getInteger() };
+            case syntax::TokenValueType::Real:
+                return Value{ token.getReal() };
+            case syntax::TokenValueType::String:
+                return Value{ token.getString() };
+            case syntax::TokenValueType::Octet:
+                return Value{ token.getOctet() };
+            case syntax::TokenValueType::None:
+                return {};
+        }
+        return {};
+    }
+
     void IRGenerator::generate(const syntax::ArrayLiteralNode *node, OptReg &optReg) {
+        if(node->isConstant) {
+            const Value value = buildConstantContainer(node);
+            if(_r.isFailed())
+                return;
+            const Register dst = allocateRegister();
+            _chunk->emit<Load>(dst, _chunk->addConstant(Constant{ value.asObject().unwrap() }));
+            optReg = dst;
+            return;
+        }
         Register dst = allocateRegister();
         _chunk->emit<NewArray>(dst, static_cast<Integer>(node->elements.size()));
         for(size_t i = 0; i < node->elements.size(); ++i) {
@@ -1582,6 +1638,15 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::DictLiteralNode *node, OptReg &optReg) {
+        if(node->isConstant) {
+            const Value value = buildConstantContainer(node);
+            if(_r.isFailed())
+                return;
+            const Register dst = allocateRegister();
+            _chunk->emit<Load>(dst, _chunk->addConstant(Constant{ value.asObject().unwrap() }));
+            optReg = dst;
+            return;
+        }
         Register dst = allocateRegister();
         _chunk->emit<NewDict>(dst);
         for(const auto &[keyExpr, valueExpr] : node->pairs) {

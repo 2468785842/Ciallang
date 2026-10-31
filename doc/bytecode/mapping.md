@@ -73,7 +73,7 @@ TJS2 100\0 文件
 | ASC / CHR | `Asc`（`#`）/ `Chr`（`$`） |
 | TYPEOF | `TypeOf`；成员形态的缺失成员行为见 §8 |
 | INV / CHKINV | `Inv` / `ChkInv` |
-| CHKINS | 应按 `[target, className]` 原地改写 target；当前实现有缺陷，见 §8 |
+| CHKINS | `ChkIns target, className`，结果原地写回 target |
 | EVAL / EEXP | `EvalStr`；非字符串或空字符串的现有处理由 VM 决定 |
 | CALL / CALLD / CALLI / NEW | 普通实参 Push 后 `Call`；成员调用先读函数，类值由 `ClassObject::call` 构造实例 |
 | argcount=-1 / -2 | `CallOmit` / `CallExpand`，展开项为普通值、Array 展开或匿名实参展开 |
@@ -130,7 +130,6 @@ ctClass 的受支持构造模式在加载期解释，填充成员、构造入口
 
 | 项目 | 当前边界 |
 |---|---|
-| CHKINS | Decoder 把 target/name 注释及使用颠倒，结果落入 scratch 而非 target。手工函数 `x instanceof "Integer"` 的返回槽仍为输入 21，预期应为 1。源码路径不受该转译缺陷影响；修复见 [待办](../../TODO.md) |
 | proxy `ra[-2]` | 部分 direct 访问译为 GThis/GRefRaw/DThis；间接 GPI/CALLI 等只对映射的 this 值访问，没有完整的 this→global 回落 |
 | SPDS 写 proxy | 写 this 槽；this 为空时未完整回落 global |
 | TYPEOFD/TYPEOFI | 目前由属性读取后 TypeOf 实现；成员缺失会抛错，未返回参考实现的 `"undefined"` |

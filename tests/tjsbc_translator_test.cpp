@@ -15,10 +15,10 @@
 #include "stdlib/ExceptionLib.hpp"
 #include "stdlib/Print.hpp"
 #include "test_config.h"
-#include "types/Class.hpp"
-#include "types/Dictionary.hpp"
 #include "tjsbc/TjsBytecodeReader.hpp"
 #include "tjsbc/TjsTranslator.hpp"
+#include "types/Class.hpp"
+#include "types/Dictionary.hpp"
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
@@ -130,6 +130,23 @@ TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
         const Value ret = vm.callValue(func, 2, args);
         REQUIRE(ret.isInteger());
         REQUIRE(ret.asInteger().unwrap() == 43); // 3 + 4*10
+    }
+
+    SECTION("CHKINS overwrites target and preserves class name") {
+        TjsBytecodeFile file{};
+        file.topLevel = -1;
+        file.pool.strings.push_back("Integer"_str);
+        // CP r1,arg0; CONST r2,"Integer"; CHKINS r1,r2; SRV r1; RET
+        file.contexts.push_back(
+            makeFuncContext({ 2, 1, -3, 1, 2, 0, 88, 1, 2, 118, 1, 119 }, { TjsDataSlot{ TJS_TYPE_STRING, 0 } }, 1));
+        TjsTranslator translator{ rt, file };
+        const auto program = translator.translate();
+        const Value func = Constant{ program.contexts[0].funcMeta }.createValue(&rt);
+        for(const auto &arg : { Value{ Integer{ 21 } }, Value{ "text"_str } }) {
+            const Value ret = vm.callValue(func, 1, &arg);
+            REQUIRE(ret.isInteger());
+            REQUIRE(ret.asInteger().unwrap() == (arg.isInteger() ? 1 : 0));
+        }
     }
 
     SECTION("未知操作码明确报错") {

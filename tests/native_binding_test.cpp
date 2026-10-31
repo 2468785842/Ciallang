@@ -63,6 +63,9 @@ TEST_CASE("Declarative native bindings construct ordinary C++ classes", "[native
     vm.eval("counter.keep(new Graphics.Counter(17));"_str);
     rt.markSweep.collect([&] { rt.collectAllMark(); });
     REQUIRE(*vm.evalExpr<Integer>("counter.held.value"_str) == 17);
+    vm.eval("counter.keep((const)[null][0]);"_str);
+    rt.markSweep.collect([&] { rt.collectAllMark(); });
+    REQUIRE(*vm.evalExpr<Integer>("!counter.held"_str) == 1);
     auto shared = std::make_shared<Counter>(99);
     ctx.registerGlobal("shared"_str, binding::wrap(ctx, shared));
     REQUIRE(*vm.eval<Integer>("shared.value = 100; return shared.value;"_str) == 100);

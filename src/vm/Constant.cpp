@@ -33,6 +33,8 @@ namespace cial {
 
     Value Constant::createValue(Runtime *rt) const noexcept {
         switch(type()) {
+            case ConstantType::Object:
+                return Value{ value<Object *>() };
             case ConstantType::None:
                 break;
             case ConstantType::Real:

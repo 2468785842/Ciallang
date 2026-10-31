@@ -246,6 +246,7 @@ namespace cial::syntax {
     // [e1, e2, ...] 数组字面量（每次求值新建 Array）
     class ArrayLiteralNode final : public ExprNode {
     public:
+        bool isConstant{}; // 编译期构造，同一字面量共享对象
         Vec<ExprNode *> elements{};
 
         explicit ArrayLiteralNode() : ExprNode("array_literal") {}
@@ -260,6 +261,7 @@ namespace cial::syntax {
     // %["k" => v, sym : v2, ...] 字典字面量（每次求值新建 Dictionary）
     class DictLiteralNode final : public ExprNode {
     public:
+        bool isConstant{};
         Vec<std::pair<ExprNode *, ExprNode *>> pairs{};
 
         explicit DictLiteralNode() : ExprNode("dict_literal") {}

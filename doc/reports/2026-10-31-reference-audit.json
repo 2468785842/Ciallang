@@ -1,0 +1,1295 @@
+{
+  "date": "2026-10-31",
+  "platform": "Windows x64",
+  "reference_commit": "40a736c48f40dff7c737e9c5dc9c0e46f145e9e5",
+  "reference_sha256": "8f370f2bb7460c8b7b8090a8bc71b7d0fb94a25e98ee2ff20d01bf3df358c60b",
+  "first_passed": 156,
+  "total": 224,
+  "retry_passed": 24,
+  "failures": [
+    {
+      "script": "class-extends/bound-slot.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "class-extends/combined.tjs",
+      "category": "输出通过标记后异常退出",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [
+          "12"
+        ],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226356,
+        "error": null,
+        "pass_markers": [
+          "12"
+        ],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "class-extends/default-constructor.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "exceptions/control-flow/04.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1327ms\r\n"
+      }
+    },
+    {
+      "script": "expression/assignment/08.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1286ms\r\n"
+      }
+    },
+    {
+      "script": "expression/binary/04.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting )"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "3"
+        ],
+        "stderr": "Time taken by function: 1248ms\r\n"
+      }
+    },
+    {
+      "script": "expression/containers/02.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "expression/containers/05.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "expression/conversion/01.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "expression/conversion/03.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1188ms\r\n"
+      }
+    },
+    {
+      "script": "expression/function-expression/01.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "expression/function-expression/04.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1367ms\r\n"
+      }
+    },
+    {
+      "script": "expression/function-expression/06.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "expression/function-expression/07.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1609ms\r\n"
+      }
+    },
+    {
+      "script": "expression/instanceof-primitive.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting ;"
+      }
+    },
+    {
+      "script": "expression/interpolation/01.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1588ms\r\n"
+      }
+    },
+    {
+      "script": "expression/interpolation/04.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting ;"
+      }
+    },
+    {
+      "script": "expression/interpolation/05.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "expression/literals/03.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      }
+    },
+    {
+      "script": "expression/prefix-delete/02.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "expression/prefix-delete/03.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1282ms\r\n"
+      }
+    },
+    {
+      "script": "expression/template-string/01.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting )"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1463ms\r\n"
+      }
+    },
+    {
+      "script": "expression/unary/02.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      }
+    },
+    {
+      "script": "expression/void-addition.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "function/body/01.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "function/variadic/02.tjs",
+      "category": "输出通过标记后异常退出",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226356,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226356,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "integration/containers.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "judgment/switch/03.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "2"
+        ],
+        "stderr": "Time taken by function: 1324ms\r\n"
+      }
+    },
+    {
+      "script": "judgment/switch/07.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "judgment/switch/08.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting )"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "loop/const/01.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1842ms\r\n"
+      }
+    },
+    {
+      "script": "loop/iteration/04.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 2149ms\r\n"
+      }
+    },
+    {
+      "script": "loop/iteration/05.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "2"
+        ],
+        "stderr": "Time taken by function: 2021ms\r\n"
+      }
+    },
+    {
+      "script": "loop/iteration/07.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1949ms\r\n"
+      }
+    },
+    {
+      "script": "native-function/containers/02.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/containers/03.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/date/02.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "2"
+        ],
+        "stderr": "Time taken by function: 1423ms\r\n"
+      }
+    },
+    {
+      "script": "native-function/eval/04.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/math/01.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "11"
+        ],
+        "stderr": "Time taken by function: 1386ms\r\n"
+      }
+    },
+    {
+      "script": "native-function/math/02.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/math/03.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "4"
+        ],
+        "stderr": "Time taken by function: 1756ms\r\n"
+      }
+    },
+    {
+      "script": "native-function/numeric-literals/01.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting ;"
+      }
+    },
+    {
+      "script": "native-function/numeric-literals/02.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "7"
+        ],
+        "stderr": "Time taken by function: 1241ms\r\n"
+      }
+    },
+    {
+      "script": "native-function/numeric-literals/03.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/regexp/01.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/regexp/02.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/regexp/03.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/regexp/05.tjs",
+      "category": "输出通过标记后异常退出",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226356,
+        "error": null,
+        "pass_markers": [
+          "2"
+        ],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/regexp/07.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/regexp-state/01.tjs",
+      "category": "输出通过标记后异常退出",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [
+          "6"
+        ],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/regexp-state/03.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/string/01.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "6"
+        ],
+        "stderr": "Time taken by function: 1278ms\r\n"
+      }
+    },
+    {
+      "script": "native-function/string/03.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "native-function/string/05.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      }
+    },
+    {
+      "script": "native-function/string/09.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected end of file, expecting ;"
+      }
+    },
+    {
+      "script": "native-function/string-length.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "oop/member-lookup/01.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected ;"
+      }
+    },
+    {
+      "script": "oop/member-lookup/02.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "oop/member-lookup/03.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "preprocessor/disabled.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1835ms\r\n"
+      }
+    },
+    {
+      "script": "preprocessor/literals.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 1992ms\r\n"
+      }
+    },
+    {
+      "script": "property/getter.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 2352ms\r\n"
+      }
+    },
+    {
+      "script": "property/handler-exceptions.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "ERROR",
+        "returncode": null,
+        "error": "Command '['D:\\\\Users\\\\LiDon\\\\CLionProjects\\\\TJSCompiler\\\\bin\\\\Windows\\\\TJSCompiler.exe', 'D:\\\\Users\\\\LiDon\\\\CLionProjects\\\\Ciallang\\\\tests\\\\tjs\\\\property\\\\handler-exceptions.tjs']' timed out after 3 seconds",
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "scope/block/01.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 2074ms\r\n"
+      }
+    },
+    {
+      "script": "scope/block/07.tjs",
+      "category": "复测通过，参考侧不稳定",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "PASS",
+        "returncode": 0,
+        "error": null,
+        "pass_markers": [
+          "1"
+        ],
+        "stderr": "Time taken by function: 2012ms\r\n"
+      }
+    },
+    {
+      "script": "scope/block/08.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "scope/class-context.tjs",
+      "category": "参考侧运行错误或崩溃，需稳定环境归因",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221225477,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": ""
+      }
+    },
+    {
+      "script": "with/04.tjs",
+      "category": "参考侧报告语法错误",
+      "first": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      },
+      "retry": {
+        "status": "FAIL",
+        "returncode": 3221226505,
+        "error": null,
+        "pass_markers": [],
+        "stderr": "syntax error, unexpected :, expecting ;"
+      }
+    }
+  ]
+}
