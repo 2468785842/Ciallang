@@ -485,3 +485,25 @@ Octet/Object 报错）；`mod` 拆双 Integer 快路径（含除零守卫）+ `m
 CTest Release 385/385。仍未动的候选：算术族其余成员（add/sub/mul/div——add 含
 字符串拼接重路径，宜快慢拆分后单独批次）与派发层 `Ret<Value>::unwrap`/
 optional 协议成本（~7%，需调用协议改造，非内联可及）。
+
+### 2026-11-01 macOS 双引擎对照（TJS2 d8044c3 vs HEAD，含 fib 差距画像）
+
+macOS arm64；参考 `bin/darwin/TJSCompiler`（d8044c3，SHA `35169f56…537`，bench 语料
+零输出，wall-time 纯执行）；本项目 HEAD（含 2026-10-31 全部内联批次）。交替配对
+中位数 9 对 ×2 轮。与 2026-10-30 Windows 三方数字不可直接对齐（平台与参考构建不同）。
+
+| 语料 | 参考 ms | 本项目 ms | 本项目/参考 | 备注 |
+|---|---:|---:|---:|---|
+| loop_int | 255.0–256.9 | 160.2–161.3 | **62.8%**（两轮一致） | |
+| string_concat | 8.08–8.17 | 7.62–7.87 | 94.2%/96.4% | |
+| native_methods | 8.53–9.92 | 8.25–9.81 | 96.7%/98.9% | 内联批次后基本追平（Windows 场为 90.0%） |
+| class_instantiate | 3.64–3.80 | 3.54–3.57 | 93.9%/97.3% | 启动敏感，噪声带内 |
+| fib | 18.91–18.92 | 23.19–23.39 | **122.7%/123.6%** | 唯一落后项 |
+
+**fib 差距画像**（fib(35) 变体 `sample`）：libc++abi RTTI 链合计 ~32% 样本
+（`type_info::operator==`、`__si_class_type_info::search_*`、`dyn_cast_*`、
+`strcmp`）——派发循环内存在被内联的 `dynamic_cast` 调用点，fib 的纯整数递归
+每层都触达；`CallFrame` 生命周期 ~9%（`setThisObj(Value)` 按值传递 55 样本、
+构造/析构/释放 83）；`Ret` 返回整数直写已在位。RTTI 具体源点需 `-g` 采样定位
+（候选：ChkInv/ChgThis 的 `dynamic_cast<DataObject*>` 或调用链其他点）；
+下一批次方向：调用路径 RTTI 消除（TypeId 直判化剩余点）+ `setThisObj` 引用化。
