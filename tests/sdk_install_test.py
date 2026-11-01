@@ -24,7 +24,8 @@ def main():
     def run(*command):
         subprocess.run(command, check=True)
 
-    with tempfile.TemporaryDirectory(prefix="cial sdk 空格 ") as directory:
+    # Windows 编译器的后台进程可能暂时持有构建目录；清理错误不覆盖实际验收结果。
+    with tempfile.TemporaryDirectory(prefix="cial sdk 空格 ", ignore_cleanup_errors=True) as directory:
         root = Path(directory)
         prefix = root / "original"
         run(args.cmake, "--install", str(build), "--config", config,
