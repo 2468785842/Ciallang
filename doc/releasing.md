@@ -17,10 +17,11 @@ CMake 在 `project()` 前调用生成器；manifest 或生成器变化会触发�
 
 CLI 压缩包只包含 Runtime 组件，SDK 可从源码另行安装，见[宿主集成](embedding.md)；
 不承诺稳定 C++ ABI。SDK、`.d.tjs`、模块和 DAP 的后续工作见[路线图](roadmap.md)。
-本机 Windows x64 与 Linux x64 包已通过验收；三平台 `package-and-release` 工作流
-仍待实际运行，本次未创建远端标签或 Release。Linux 本轮验证提交为 `8c9e343`，
-包内记录干净工作树、编译器和系统运行库信息；解压后在独立工作目录、精简 PATH 下验证
-版本、示例与 JSON 检查器。普通构建 CI 与三平台发布工作流的验收分别记录。
+首个预览版为 [v0.1.0-preview.1](https://github.com/2468785842/Ciallang/releases/tag/v0.1.0-preview.1)，
+提供 Windows x64、Linux x64 与 macOS ARM64 的 CLI 包。附件包含校验和、许可与构建信息；
+每个平台均在独立工作目录、精简 PATH 下验证版本、示例与 JSON 检查器。
+三平台打包验收记录见 [package-and-release](https://github.com/2468785842/Ciallang/actions/workflows/release.yml)，
+普通构建 CI 与发布流程分别验收。未列出的系统版本或架构不在首版二进制验收范围内。
 
 ## 本地打包
 

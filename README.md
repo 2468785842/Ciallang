@@ -1,6 +1,7 @@
 # Ciallang
 
 [![CI](https://github.com/2468785842/Ciallang/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/2468785842/Ciallang/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/2468785842/Ciallang?include_prereleases)](https://github.com/2468785842/Ciallang/releases)
 [![C++20](doc/assets/cpp20.svg)](https://en.cppreference.com/w/cpp/20)
 [![CMake](doc/assets/cmake.svg)](doc/building.md)
 [![MIT](doc/assets/license.svg)](LICENSE)
@@ -19,6 +20,12 @@
 整数 JIT、Trace JIT 与尾递归优化需显式启用，适用范围见 [JIT](doc/jit.md) 和[尾递归](doc/tail-recursion.md)。
 
 ## 快速开始
+
+直接运行可下载[首个预览版](https://github.com/2468785842/Ciallang/releases/tag/v0.1.0-preview.1)，
+校验 SHA-256 后解压，执行 `bin/cial examples/hello.tjs`（Windows 使用 `bin/cial.exe`）。
+系统要求与已知限制见发布说明；C++ SDK 需从源码安装。
+
+从源码构建：
 
 准备 CMake 3.25+、Python 3.10+、C++20 编译器、Ninja 和 [vcpkg](https://github.com/microsoft/vcpkg)，
 并设置 `VCPKG_ROOT`。Linux 预设使用 Clang。

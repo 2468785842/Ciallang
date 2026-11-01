@@ -13,8 +13,8 @@
 - Engine 提供逻辑源码身份、结构化编译诊断和带根结果；嵌套调用隔离异常。
   Scripts 第三参 context 接收顶层声明并保留声明函数的接收者。
 - TextStorageReader 将存储名、mode、调用源身份交还宿主，已有虚拟存储测试。
-- SDK 有 install/export、版本头与移动前缀后的独立宿主验收。CI 已登记三平台 Release
-  安装验收，远端是否通过以实际运行结果为准。
+- SDK 有 install/export、版本头与移动前缀后的独立宿主验收。三平台 Release 安装消费
+  测试已通过[远端 CI](https://github.com/2468785842/Ciallang/actions/runs/41273522747)。
 
 这些是接入基础；双向 TJS2 对象桥和真实 KAG/游戏启动验收尚未完成。
 
