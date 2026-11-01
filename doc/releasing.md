@@ -70,7 +70,7 @@ ciallang-<version>-<system>-<arch>/
 
 首版要求核心及 fmt/utf8proc 等链接库为静态目标，Windows 使用静态 CRT。
 不自动捆绑未知动态依赖；不满足要求时配置失败。系统基础运行库仍由操作系统提供，
-不宣称跨任意 Linux 发行版或 macOS 版本通用。Release CI 固定使用 `ubuntu-22.04`、
+不宣称跨任意 Linux 发行版或 macOS 版本通用。Release CI 固定使用 `ubuntu-24.04`、
 `windows-2022`、`macos-15`，macOS 部署下限继承预设；架构从实际 CMake 配置生成，
 不能根据 runner 名称猜测或承诺 universal。
 
