@@ -1,0 +1,16 @@
+// 表达式 - Array/Dictionary 字面量与下标 / 尾逗号与空元素占 void
+Scripts.execStorage("../../assert.tjs");
+
+var trailing = [1,];
+var leading = [,];
+var holes = [1,,3];
+
+assertTrue(((int)(trailing.count)) == 2);
+assertTrue(((int)(leading.count)) == 2);
+assertTrue(((int)(holes.count)) == 3);
+assertTrue((typeof (trailing[1]) == "void"));
+assertTrue((typeof (holes[1]) == "void"));
+assertTrue(((int)(holes[0])) == 1);
+assertTrue(((int)(holes[2])) == 3);
+
+finishTests();

@@ -1624,7 +1624,9 @@ namespace cial::syntax {
                 arrayNode->elements.push_back(nullptr);
                 parser->consume(r);
             } else if(parser->peek(r, TokenType::RBracket)) {
+                // 尾逗号后的空元素占 void，元素表到此终止，由外层 consume ']'
                 arrayNode->elements.push_back(nullptr);
+                break;
             } else {
                 auto *elm = parser->parseExpression(r, false);
                 if(!elm) {
