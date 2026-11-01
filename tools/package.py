@@ -41,6 +41,12 @@ def clean_revision(source, tag):
     return head
 
 
+def write_checksum(archive):
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    # GNU sha256sum treats a Windows CR as part of the filename; always emit LF.
+    archive.with_name(archive.name + '.sha256').write_bytes(f'{digest}  {archive.name}\n'.encode('ascii'))
+
+
 def member_path(destination, name):
     # Reject both POSIX and Windows escapes, regardless of the extraction host.
     posix = PurePosixPath(name)
@@ -177,8 +183,7 @@ def main(argv=None):
         verify_archive(archive, version)
         final = output / archive.name
         shutil.copy2(archive, final)
-        digest = hashlib.sha256(final.read_bytes()).hexdigest()
-        final.with_name(final.name + '.sha256').write_text(f'{digest}  {final.name}\n', encoding='ascii')
+        write_checksum(final)
         print('Package ready:', final, flush=True)
 
 

@@ -23,6 +23,11 @@ CLI 压缩包只包含 Runtime 组件，SDK 可从源码另行安装，见[宿�
 三平台打包验收记录见 [package-and-release](https://github.com/2468785842/Ciallang/actions/workflows/release.yml)，
 普通构建 CI 与发布流程分别验收。未列出的系统版本或架构不在首版二进制验收范围内。
 
+首版[标签流程](https://github.com/2468785842/Ciallang/actions/runs/41275291370)的三平台原生
+构建、测试和解压验收均通过；草稿汇总时因 Windows 校验文本的 CRLF 换行失败。
+发布时保留该标签及原始压缩包，将校验文本统一为 LF，再逐项核验并上传。
+后续打包器直接按 LF 写入，跨平台回归位于 `tests/test_packaging.py`。
+
 ## 本地打包
 
 需要 Python 3.10+、CMake 3.25+、CPack 和[构建依赖](building.md)。设置 `VCPKG_ROOT` 后，

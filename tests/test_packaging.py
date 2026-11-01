@@ -39,6 +39,13 @@ class PackagingTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             package.validate_tag('v99.0.0', version)
 
+    def test_checksum_uses_lf_on_every_platform(self):
+        archive = self.root / 'cial preview.zip'
+        archive.write_bytes(b'abc')
+        package.write_checksum(archive)
+        self.assertEqual(archive.with_name(archive.name + '.sha256').read_bytes(),
+                         b'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  cial preview.zip\n')
+
     def test_manifest_is_the_only_version_source(self):
         manifest = self.root / 'vcpkg.json'
         for version in ('0.1.0-preview.1', '2.3.4', '1.0.0-rc.2'):
