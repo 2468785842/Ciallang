@@ -1,16 +1,6 @@
 include(CMakePackageConfigHelpers)
 
-# 依赖由使用者的包管理器提供；记录实际解析的包名以兼容 vcpkg 与上游安装。
-if(CIAL_UTF8PROC_TARGET STREQUAL "unofficial::utf8proc::utf8proc")
-    set(CIAL_UTF8PROC_PACKAGE unofficial-utf8proc)
-else()
-    set(CIAL_UTF8PROC_PACKAGE utf8proc)
-endif()
-if(CIAL_ONIG_TARGET STREQUAL "unofficial::oniguruma::onig")
-    set(CIAL_ONIG_PACKAGE unofficial-oniguruma)
-else()
-    set(CIAL_ONIG_PACKAGE oniguruma)
-endif()
+# 包名由依赖发现过程记录；导出的目标名不能唯一确定 Config 包名。
 configure_package_config_file("${CMAKE_CURRENT_LIST_DIR}/CiallangConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/CiallangConfig.cmake"
     INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Ciallang")
