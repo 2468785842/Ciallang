@@ -1,492 +1,52 @@
-# 2026-10-28 TODO 批次性能与验证
-
-测试环境：macOS arm64、AppleClang 17，两个引擎均为 `-O3 -DNDEBUG` Release。
-对照基线为本轮 TODO 改动前的本机 Ciallang（已修复 macOS 编译入口），参考实现为兄弟目录
-TJSCompiler，新 CLI 使用命令行脚本路径，不再依赖写死的本机路径。
-
-每个脚本预热 1 轮，再交替执行三个引擎 7 轮，逐轮反转执行顺序，统计包含进程启动的 wall-time
-中位数。所有基准脚本自校验，非零退出码即失败。本表反映整批改动，不能单独归因于某一优化。
-
-| 脚本 | 改动前 ms | 改动后 ms | TJS2 ms | 后/前 | 后/TJS2 |
-|---|---:|---:|---:|---:|---:|
-| class_instantiate | 4.166 | 4.184 | 4.024 | 100.4% | 104.0% |
-| fib | 29.565 | 27.711 | 18.761 | 93.7% | 147.7% |
-| loop_int | 340.645 | 173.580 | 252.214 | 51.0% | 68.8% |
-| native_methods | 21.845 | 15.890 | 8.564 | 72.7% | 185.5% |
-| string_concat | 11.307 | 7.972 | 8.139 | 70.5% | 98.0% |
-
-类实例化在进程启动噪声内持平，fib 和原生方法与参考实现仍有差距。采样曾发现合成空 finalize
-导致大量无意义回调，现由 `FuncMeta::syntheticFinalizer` 排除；短串内联最终没有扩大 Value 的 16B 布局。
-
-基准语料见 `bench/*.tjs`，原生调用密集语料为 `bench/native_methods.tjs`。
-当前引擎与 TJS2 可用 `cmake --build build/MacOS/Release --target bench` 复测；该目标使用
-`cmake/Bench.cmake` 的 min/mean 口径，与本表中位数口径不同。
-
-## 2026-10-29 Windows 首次实测
-
-环境：Windows x64、MSVC 14.44 `-O3 -DNDEBUG`，对照同机 TJSCompiler `windows-release`
-构建（2026-10-26）。`cmake/Bench.cmake` 编排：预热 1 轮 + 交替 7 轮取 **min**（含进程启动
-wall-time），与本文件上表中位数口径不同，两引擎口径一致。提交 7fe3f84。
-
-| 脚本 | TJS2 min | Ciallang min | Ciallang/TJS2 |
-|---|---:|---:|---:|
-| class_instantiate | 13.771 | 13.629 | 98% |
-| fib | 70.129 | 80.441 | 114% |
-| loop_int | 853.943 | 401.106 | 46% |
-| native_methods | 21.108 | 30.169 | 142% |
-| string_concat | 17.665 | 15.250 | 85% |
-
-同机对照下 5 项中 3 项反超 TJS2（整数循环 2.2×、字符串拼接、类实例化），fib 与原生方法
-仍落后（1.14× / 1.42×）。不同机器、编译器与口径的历史比例不可直接比较；上表 macOS 数据
-为 wall-time 中位数。另：TJS2 CLI 的内部计时标签 "Time taken by function: Nms" 实为
-微秒（fib(25) 标 31586"ms"，外部实测 52ms 含转储输出），对照时勿按标签字面取值。
-
-### 2026-10-29 常量传播扩展后的复核
-
-整数常量 pass 升级为块间状态分析（唯一前驱块继承出口状态）后同机复测三轮，比值
-class 99~108% / fib 122~132% / loop 50~53% / native 148~164% / string 80~88%，均在
-本机噪声带内：未改动的 TJS2 二进制 fib min 跨批次在 35.8~70.1ms 间摆动（2 倍），
-绝对值与单轮比值不可比。`CIAL_OPTIMIZER_STATS=1` 证实 pass 对 fib 块 transforms=0
-（代码路径未变），基准差异均为机器负载噪声。注意：当前 IR 形态下局部变量每次使用
-经 GLocal 重载（VM_CP 语义），常量极少以寄存器形态跨块存活——跨块继承对现有脚本
-收益有限，为后续槽位提升类优化打底（单元测试已锁定传播/多前驱/回边语义）。
-
-### 2026-10-29 拷贝传播批次
-
-新增 CopyPropagationOptimizer（GLocal/DLocal 纯拷贝在使用点改写为源寄存器 +
-DEL 扩展死拷贝清除，管线首位）后同机三轮：**fib 从 122~132% 降至 108~120%**
-（fib 函数块 14→10 条指令，每次调用省 3 条变量读拷贝，`--dump-cfg` 可复核）；
-其余四项均在既有噪声带内（class 96~102% / loop 47~49% / native 148~149% /
-string 84~85%），无回退。至此 fib 与 TJS2 同机比值首次进入 1.1× 以内，
-剩余差距在调用帧建立与参数窗口路径（CallV 实参直写已做，下一步可评估
-调用点参数寄存器直映）。
-
-## 2026-10-29 保留字语法批次后的 macOS 复核
-
-语言批次（`in`/类型注解/`new` 检查均为解析期改动，执行路径不变）后同机复测：
-fib 126~132% / native_methods 174~183% / loop_int 68% / string_concat ~100% /
-class_instantiate ~98%（预热 1 轮 + 交替 5~11 轮取 min，含进程启动），与
-2026-10-28 批次一致，无回退。native_methods 仍为最大缺口；采样（`sample`，5M
-迭代变体，861 样本）显示：解释器 dispatch 约 66%、`NativeFunction::callWithThis`
-调用链约 21%、Value 拷贝/析构约 12%；`asArray` 的 `dynamic_cast`（libc++abi
-RTTI 遍历）约 2%。据此把 Array/Dictionary/RegExp 三处接收者辅助改为 `typeId()`
-直判 + `static_cast`（final 类，二者等价，`src/stdlib/ArrayLib.cpp` 等）——
-严格更优但端到端在噪声带内（177% vs 182%），证实剩余差距在调用帧建立与
-实参窗口路径而非类型判断，与下文"下一步可评估调用点参数寄存器直映"结论一致。
-
-### 2026-10-29 调用路径批次：fib 首次追平
-
-采样定位（`sample`，native_methods 5M 迭代变体）出三大开销并逐项削减：
-
-1. **原生同步调用的主循环重取**：`DispatchRet::Call` 一律 `goto FETCH_NEW_FRAME`
-   重算 chunk/regs/ip/toBytecode 检查，但 NativeFunction 回调在 dispatch 内同步
-   完成、帧未变——新增免池同步快路径返回 `Continue` 直接续内层取指
-   （`src/vm/VMState.cpp` invokeCallV）。
-2. **热路径 RTTI 遍历**：`loadGlobal` 对每个对象型全局读、`propObjectGet/Set` 对
-   每次成员访问都做 `dynamic_cast<Property*>`（libc++abi 遍历）。TypeId 增加
-   `NativeFunction`/`Property` 专有值（`src/types/TypeId.hpp`），六处 dynamic_cast
-   换一次虚调用 typeId 直判（final 类等价）。
-3. **实参池中转**：原生调用实参 N×push 压池 → getArgs 读回；改为 placement new
-   到调用点栈缓冲直传回调（`NativeFunction::callDirect`，`src/types/Function.*`），
-   缺省参数补 void 布局与池顶约定等价。注意 Value 具有非平凡构造/析构，栈数组
-   必须只构造实际数量（初版 `Value localArgs[64]` 默认初始化全槽曾致回退 256%）。
-   实参对象的 GC 根仍在调用者寄存器槽（回调期间不被覆盖），栈副本无需注册根。
-
-同机对照（预热 1 轮 + 交替 5 轮取 min，含进程启动）：
-
-| 脚本 | 改前 | 改后 | TJS2 | 后/TJS2 |
-|---|---:|---:|---:|---:|
-| fib | 126~132% | — | — | **94~97%（首次 ≤100%）** |
-| native_methods | 174~183% | — | — | **135~140%** |
-| loop_int | 68% | 68% | — | 无回退 |
-| string_concat | ~100% | ~100% | — | 无回退 |
-| class_instantiate | ~98% | ~96% | — | 噪声带内 |
-
-fib 收益主要来自 loadGlobal 的 RTTI 消除（每次递归读全局 fib 名字）；native_methods
-剩余缺口的大头在 NativeFn 回调协议（std::function 间接调用 + Value 拷贝语义），
-结构性改造（函数指针化/寄存器直读协议）记入 TODO.md 待后续。
-
-实现与回归来源：`src/gen/Optimizer.cpp`（比较融合）、`src/vm/VMState.cpp`（缓存和整型槽读写）、
-`src/types/Value.cpp` / `String.hpp`（紧凑短串）、`src/types/Function.cpp`（objthis 分离）、
-`tests/optimizer_test.cpp` / `native_function_test.cpp` / `value_storage_test.cpp`。
-
-验证：macOS Debug、Release、UBSan 的 CTest 各 120/120 通过（2026-10-28 批次时点）；
-Windows Debug CTest 143/143 通过（2026-10-29，4 个历史测试文件回归主线后）；12 个字节码样本全部成功；从其他工作目录配置的 TJSCompiler 相对路径检查通过；Release 空优化标志配置被拒绝。
-ASan 在测试进程进入 main 前卡于系统运行库初始化，采样链为 AsanInitInternal →
-InitializeShadowMemory → malloc → AsanInitFromRtl 自旋，因此未获得 ASan 测试结果。
-Windows 静态 triplet 与 Linux/Windows CI 尚未在本机执行，工作流配置见 `.github/workflows/ci.yml`。
-
-
-## 2026-10-29 README 开发批次的默认路径复核
-
-Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT；可选 JIT、尾递归与执行记录均关闭。
-对照是本次开发中加入尾递归/JIT 之前保存的 Release 二进制（已经包含执行记录功能），
-不是本轮全部改动前的 Git 提交。每项预热一次，随后交替运行前/后两个二进制五轮，
-每轮反转先后顺序，统计含进程启动的 wall-time 中位数。脚本 `bench/*.tjs` 均通过自校验。
-测量前确认本机没有正在构建的编译器进程，clangd 连续三秒无 CPU 活动；后台繁忙期间的样本不用于下表。
-
-| 脚本 | 对照 ms | 当前 ms | 当前/对照 |
-|---|---:|---:|---:|
-| class_instantiate | 12.003 | 12.297 | 102.4% |
-| fib | 48.079 | 45.414 | 94.5% |
-| loop_int | 387.752 | 381.368 | 98.4% |
-| native_methods | 31.434 | 33.552 | 106.7% |
-| string_concat | 17.791 | 18.594 | 104.5% |
-
-结果仍不能支持“默认执行全面无回退”或“已追平 TJS2”的结论；原生调用项慢约 6.7%，
-字符串项慢约 4.5%，需后续定位和复测；fib 与整数循环本轮较快。完整样本保留于本机
-`bench/results/20261029-readme-default.json`，二进制 SHA-256 记录于同名 `.metadata.json`
-（该目录按既有约定不入库）。本表只比较默认执行，不代表可选 JIT 或尾递归的加速比。
-为了避免每条指令和每次普通调用承担开关判断，`VMState::run()` 在进入时选择模板化
-解释循环；尾递归仅显式启用，可选模式状态放在类末尾以保留已有热字段布局。
-实现见 `src/vm/VMState.cpp`、`VMState.hpp`；可选后端范围见 `doc/jit.md`、`doc/tail-recursion.md`。
-
-
-## 2026-10-30 原生接收者拷贝候选验证（未采用）
-
-基线为 `7ad212a`，Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT；
-JIT、尾递归与执行记录关闭。候选只把 `src/types/NativeFunDetail.hpp` 的
-`invokeCallable` / `invokeCallableImpl` 接收者改为 `const Value &`，消除转换层的
-两次中间拷贝；`src/types/Function.hpp` 的 `NativeFn` 按值协议与入口快照保持不变。
-
-停止构建后，每项预热一次，交替运行前/后 Release 二进制九轮，逐轮反转先后顺序，
-记录含进程启动的 wall-time 中位数；第二批反转起始顺序。所有脚本均通过自校验。
-`native_stress` 为 `bench/native_methods.tjs` 的一百万次迭代变体，校验和改为
-499999500000；其余脚本直接使用 `bench/*.tjs`。
-
-| 脚本 | 第一批前 ms | 第一批后 ms | 后/前 | 第二批前 ms | 第二批后 ms | 后/前 |
-|---|---:|---:|---:|---:|---:|---:|
-| class_instantiate | 10.541 | 10.681 | 101.3% | 10.704 | 10.210 | 95.4% |
-| fib | 43.597 | 46.467 | 106.6% | 45.709 | 46.038 | 100.7% |
-| loop_int | 358.858 | 377.552 | 105.2% | 351.054 | 369.020 | 105.1% |
-| native_methods | 23.857 | 26.426 | 110.8% | 23.553 | 22.814 | 96.9% |
-| string_concat | 16.102 | 15.851 | 98.4% | 16.265 | 16.070 | 98.8% |
-| native_stress | 384.356 | 348.367 | 90.6% | 361.627 | 334.843 | 92.6% |
-
-百万次原生调用耗时下降 7.4%～9.4%，五万次原生调用则跨批波动，无法给出稳定收益。
-整数循环在两批中均慢约 5.1%～5.2%，因此本轮候选未采用，生产代码恢复基线；
-表中是被撤回候选的数据，不代表当前提交的性能。没有进行新的 TJS2 对照，整体
-“原版性能追平”任务保持未完成。下一步优先评估保持回调协议的函数指针快路径，
-并继续覆盖这五项基准，不能仅凭原生调用单项收益接受默认执行回退。
-
-新增 `tests/native_function_test.cpp` 接收者快照测试：长串 this 在重新绑定及嵌套
-`callProc` 后保持原值，按值宿主回调修改自身副本不改变绑定；测试在原有实现上通过。
-候选阶段 Windows Debug、Release 的完整 CTest 均通过，C++ 套件为 214 个用例、
-1550 条断言；撤回后 Debug、Release 完整 CTest（C++、CLI、LSP）再次全部通过。
-
-完整样本及二进制 SHA-256 位于本机忽略目录 `bench/results/` 下的
-`20261030-native-receiver-final1.json`、`20261030-native-receiver.json`。
-
-## 2026-10-30 NativeFn 函数指针化批次
-
-环境：Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT；JIT、尾递归与执行记录关闭。
-基线为批次前 Release 二进制（改动前 `git` 工作树构建，留档 `bench/results/cial-baseline.exe`）。
-方法：每项预热 1 轮后交替运行前/后二进制 7 轮、逐轮反转先后顺序，统计含进程启动的
-wall-time 中位数；比值 = 改动前中位数 / 改动后中位数（>100% 即改动后更快）。样本落盘
-`bench/results/20261030-*.json`。
-
-改动（语义零变化，全部注册面不受影响）：
-
-1. **无捕获回调函数指针化**（`src/types/Function.hpp`、`src/types/NativeFunDetail.hpp`、
-   `src/types/Function.cpp`）：NativeFunction 增加 small-closure 快路径
-   `{NativeThinFn _thin, void *_thunkCtx}`——构造点按 callable 具体类型静态实例化
-   `native::nativeThinTrampoline<F>`，stdlib 注册面（`&stdlib::fn` 函数指针与无捕获
-   lambda，覆盖 Array/String/Math/Date/RegExp/Serialize/Random 全部方法）构造时不再
-   包装 std::function；调用经两指针直派发，接收者以 `const Value &` 跨 ABI 直传
-   （零拷贝）。有捕获回调保持 `NativeFn`（std::function 按值协议）不变；`invokeCallable`
-   共用，实参提取/void 返回适配/按值接收者副本语义一致。
-2. **`VM::callValue` 原生分支栈缓冲**（`src/vm/VM.hpp`）：宿主回调实参从每次
-   `Vec<Value>` 堆分配改为 placement new 栈直传（≤64 实参，缺省补 void，超宽回落堆
-   缓冲）；GC 根仍由 `argumentRoots` 承接。基准语料不覆盖此路径（受益者为
-   Array.sort 比较器、RegExp.replace 回调等宿主回调）。
-
-同机对照（预热 1 轮 + 交替 7 轮取中位数比值；轮 1–3 为批次中间态=仅改动 1，
-轮 4 为最终态=改动 1+2，五项基准在两态下的基准路径相同）：
-
-| 脚本 | 轮1 | 轮2 | 轮3 | 轮4（最终态） | 结论 |
-|---|---:|---:|---:|---:|---|
-| native_methods | 108.7% | 110.0% | 108.8% | 111.3% | 稳定 +9~11%，远超噪声 |
-| class_instantiate | 102.6% | 100.2% | 101.8% | 97.0% | 噪声带内 |
-| fib | 104.8% | 101.8% | 103.7% | 101.7% | 噪声带内（基准不含原生调用） |
-| loop_int | 100.2% | 95.2% | 98.8% | 102.7% | 噪声带内（见下 A/A 校准） |
-| string_concat | 97.3% | 102.0% | 102.1% | 102.5% | 噪声带内 |
-
-噪声校准：同二进制 A/A 对照两轮为 class 98.9%/100.1%、fib 99.0%/98.1%、
-loop_int 99.0%/**93.8%**、native_methods 98.3%/97.9%、string 100.6%/100.0%——本机
-单批中位数噪声可达 ±6%（loop_int），故轮 2 的 95.2% 不足以判回退；native_methods
-的 +9~11% 在全部轮次（含后台繁忙批次的 106.5%/108.6%）一致复现，接受改动。
-绝对值口径：改动前基线（安静批次）native_methods 25.136/24.936 ms → 最终态 23.074 ms
-（由轮 4 比值折算）；跨批次绝对值受负载漂移影响，以上述交替比值为准。
-
-**被否决的中间方案**：`invokeCallV` 原生分支接收者改引用绑定（`const Value &recv`
-三元左值，消一次 16B 拷贝）。与改动 1 叠加后直接对拍（两改动态互为 A/B，7 轮）：
-native_methods 100.9%（拷贝版反而略快，噪声带内），未复现收益——与上一节被否决的
-转换层借用快照同因：接收者拷贝本身廉价（对象值 16B 指针拷贝），引用化引入的间接
-加载抵消收益。已回退为按值拷贝原形。
-
-**GMethodC+CallMethodV 合并单指令（未实施）**：核结是发射形态不支持无条件融合——
-`IRGenerator.cpp` 的方法调用先改写 GPropC→GMethodC（方法加载），随后**逐个实参
-表达式求值**，最后才发射 CallMethodV（`src/gen/IRGenerator.cpp:699-770`），二者之间
-存在任意脚本代码（副作用/异常/方法表替换），融合需跨任意语句的副作用分析或仅限
-零实参调用点的专用指令（预计收益 ~5%，成本为指令集四处同步+异常点重验证）。
-自然后续是把零实参情形折入现有 GPropC→GMethodC 就地改写模式，另批验证。
-
-验证：Windows Debug/Release 全量构建通过；完整 CTest 4 套件全绿
-（C++ 224 用例/2168 断言，与批次前一致）。样本与工具位于本机忽略目录
-`bench/results/`（`bench_median.py` 为本轮使用的 A/B 中位数编排脚本）。
-
-## 2026-10-30 GMethodC+CallMethodV 零实参融合批次（未采纳，已回退）
-
-环境与上批一致：Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT；JIT、尾递归与
-执行记录关闭。基线为 `86a5b11`（HEAD）Release 构建（留档
-`bench/results/cial-fusion-before.exe`，SHA-256 e3d6d896…）。
-
-实现形态（已整体回退，此处留档供后续批参考）：新指令 `CallMethod0`（TAC/扁平字节码
-第 96 条，`op + u16 obj + u32 atom + u16 func + u16 receiver + u16 dst`），发射期在
-ProcCallExprNode 实参循环结束后若 `argRegs` 为空且尾指令仍是 GMethodC 则就地改写——
-零实参调用点两条指令之间无任何用户代码。语义逐项核对：方法缺失报错文本/行号、异常
-传播、GC 保根（方法值与接收者先落寄存器槽再进 invokeCallV，与两指令序列同协议）、
-Rlc 语句级行号（改写不位移指令下标）、Optimizer forEachRegisterOf/拷贝传播 def 杀灭、
-SSA def-use 登记全部同步；tjsbc 转译面不发射该指令（grep 证实），字节码样本回归不受
-影响。测试/语料在融合状态下亦全绿。
-
-同机 A/A 校准（同二进制自对照）：两批 94.7%~117.5%（string_concat 单批 117.5% 为
-当机漂移），安静时段补测 100.2%。本机单批噪声 ±6% 起，跨批 ±10%；同日无方法调用
-的 fib/loop_int 在 A/B 批次中摆动 92.5%~112.2%，即漂移界。
-
-五项基准 A/B 三批（前/后交替 7 轮取中位）：native_methods 101.7%/98.9%/96.8%、
-fib 104.6%/100.4%/112.2%、loop_int 105.6%/102.5%/98.7%、class 99.5%/98.3%/111.3%、
-string 101.2%/114.3%/99.0%——全部在噪声带内且与对照脚本同摆，无可归因信号。
-
-受控归因（放大语料 `bench/results/native_stress.tjs`，1e6 次 push/pop，pop 为零实参
-融合路径；script_method_stress 为 2e6 次零实参脚本方法）：
-
-1. 同源对照 C（融合指令保留、仅发射面禁用就地改写）vs 融合 B：13 轮 B/C=105.7%——
-   初版 dispatch（布尔标志合并两个 invokeCallV 调用点）存在真实代码生成病理。
-2. dispatch 改写为 GMethodC 同款早返回双调用点形态后 B2/C=98.7%（13 轮 10 胜），
-   病理消除。
-3. A/B2/C 三方同场：**C/A=102.4%——仅向 VMState.cpp 新增 dispatch 函数（不执行）
-   就使主循环热路径布局损失 ~2.4%**；单次调用省下的一个主循环迭代（估 5~8ns，
-   <170ns/次调用的 5%）不足以覆盖。
-4. 安静时段决胜（中位 + 逐轮胜率）：native_methods B2/A=102.7%（B2 胜 6/15）、
-   native_stress 101.0%（7/13），min 口径三方持平（±0.3%）；script_method_stress
-   B/A=99.3%（回落路径融合亦无可测收益）。
-
-结论：**零实参融合在五项基准无可测收益，放大语料相对基线慢 1~3%，按预登记规则
-整体回退**（指令、编码、dispatch、发射改写与 Opt/SSA 同步全部撤销），工作树回到
-`86a5b11`。被否决的中间方案：①布尔标志合并形态的 dispatch（+5.7% 病理，早返回
-形态修复 7 个百分点，说明融合指令的分支形态本身比指令数更关键）；②"复用现有指令+
-调整 invokeCallV 快路径"路线未展开——invokeCallV 的 Function 直写/Native 免池快路径
-上批已就位，剩余开销在调用帧建立而非指令派发。经验：评估新增指令必须做"保留代码、
-禁用发射"的同源对照，dispatch 主循环所在翻译单元对代码布局极敏感。
-
-### 同场 TJS2 三方对照（独立交付物）
-
-TJS2 为当日 `windows-release` 重建（工作树含本地适配，clang++ -O3，非 2026-10-26 旧
-二进制）。口径：预热 1 轮 + 三引擎交替 7 轮取中位，含进程启动与 TJS2 每脚本固定的
-上下文转储输出（其 stderr "Time taken by function" 标签实为微秒，不采用）。
-
-| 脚本 | HEAD 中位 ms | 融合构建中位 ms | TJS2 中位 ms | HEAD/TJS2 中位 | HEAD/TJS2 min 口径 |
-|---|---:|---:|---:|---:|---:|
-| class_instantiate | 14.95 | 14.64 | 16.81 | 88.9% | 81.4% |
-| fib | 56.34 | 52.13 | 50.21 | 112.2% | 113.8% |
-| loop_int | 423.70 | 385.16 | 771.92 | 54.9% | 51.6% |
-| native_methods | 24.79 | 28.05 | 27.54 | 90.0% | 92.0% |
-| string_concat | 19.52 | 20.59 | 26.15 | 74.6% | 74.4% |
-
-融合/HEAD 列受同场漂移影响（无方法调用的 fib/loop_int 摆动 90.9%~112.2%，即单场
-漂移界；融合批已被否决，该列仅留档）。HEAD/TJS2：class/loop/string/native 反超，
-fib 仍落后 ~13%；与 2026-10-29 批次（native 142%）相比 native_methods 大幅收窄——
-归因于 Ciallang NativeFn 批次收益与本场换用当日重建的 TJS2 二进制（其 native 耗时
-较 10-26 版升高），两个变量同向，比值不可与历史批次直接对齐。
-
-验证：回退后 Release/Debug 重建，CTest 4 套件全绿（230 用例/2159 断言与基线一致）；
-tjs2 语料 7 脚本 + tjsbc 字节码样本（仓库现存 7 个）rc=0；ASan 全量（MSVC
-/fsanitize=address，回退后 HEAD 状态重建）230/2159 全绿、语料零报告。样本 JSON：
-`bench/results/20261030-*.json`（aa-fusion×2、ab-fusion×3、threeway-fusion-rejected）。
-
-## 2026-10-30 原生绑定层重构对照
-
-本轮基线为同机已构建的“开放 NativeTypeKey 分派第一阶段”Release CLI（保存在
-`/tmp/cial-before-native-binding`），候选为新增声明式绑定、NativeAccessor、标准库统一
-注册后的 Release CLI。不是相对于原始 HEAD 或 TJSCompiler 的比较。
-macOS arm64，同一套 `bench/*.tjs`，每项预热 1 次、7 次交替执行取进程 wall-time
-中位数，独立重复两轮；脚本自身校验均通过。比值为候选/基线，低于 100% 更快。
-
-| 语料 | 第一轮 | 第二轮 |
-|---|---:|---:|
-| class_instantiate | 99.6% | 102.0% |
-| loop_int | 103.4% | 102.6% |
-| fib | 98.9% | 101.0% |
-| native_methods | 101.0% | 99.1% |
-| string_concat | 102.4% | 103.0% |
-
-原生方法在两轮中近似持平；整数循环和字符串存在约 2.4%–3.4% 的耗时回退，尚未定位
-原因，不作“性能无回退”结论。新增功能保留无捕获 NativeFunction 快路径和
-GMethodC/CallMethodV 的接收者分离；访问器缓存增加 getter/setter 信息，实际影响需
-后续 profile 区分布局变化与派发成本（`src/vm/VMState.hpp/.cpp`、
-`src/stdlib/NativeRegister.hpp`、`src/types/Function.hpp`）。
-
-### 同日 CLion 检查后的整理与查询合并
-
-对照基线为完整绑定重构、CLion 整理之前的 Release CLI
-（`/tmp/cial-before-ide`），候选为整理后的同机 Release。各项预热 1 次、交替执行
-7 次取进程 wall-time 中位数；与上表的基线不同，不能直接拼接成累计收益。
-
-| 语料 | 整理前 ms | 整理后 ms | 后/前 |
-|---|---:|---:|---:|
-| class_instantiate | 3.985 | 4.038 | 101.3% |
-| loop_int | 179.146 | 174.699 | 97.5% |
-| fib | 26.012 | 26.008 | 100.0% |
-| native_methods | 10.868 | 10.784 | 99.2% |
-| string_concat | 8.290 | 8.081 | 97.5% |
-
-`NativeRegister::findMember` 将原生方法、只读 getter、访问器的三次类型表定位合并为
-一次，供普通对象成员读取与 VM 调用点缓存填充使用；成员优先级与注册版本失效不变
-（`src/stdlib/NativeRegister.hpp`、`src/runtime/Context.hpp`、`src/vm/VMState.cpp`）。
-同时去除临时 Value 与重复函数适配代码（`src/types/RegExp.hpp`、
-`src/stdlib/RegExpLib.cpp`、`src/Binding.hpp`）。本轮比值范围为 97.5%–101.3%；单轮
-短脚本结果不用于声称稳定提速，也不撤销上一节尚待定位的回退记录。
-
-## 2026-10-31 调用参数索引清零候选（未采纳）
-
-Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT，JIT 关闭。
-基线为本批 CHKINS、常量容器及汇合传播实现后的 Release CLI
-（`bench/results/cial-todo-semantic.exe`）；候选仅取消 CallV/CallMethodV/TailCallV
-参数索引数组的全槽清零，实际 argc 个索引仍逐个解码赋值。Value 参数副本及回调协议不变。
-
-每项预热 1 次，11 轮交替、反转顺序，统计含启动 wall-time 中位数。
-第二轮数据（候选/基线，小于 100% 更快）：
-
-| 脚本 | 基线 ms | 候选 ms | 后/前 |
-|---|---:|---:|---:|
-| class_instantiate | 17.081 | 16.946 | 99.2% |
-| fib | 43.208 | 43.539 | 100.8% |
-| loop_int | 330.772 | 335.473 | 101.4% |
-| native_methods | 21.488 | 21.582 | 100.4% |
-| string_concat | 15.856 | 15.806 | 99.7% |
-| native_todo_stress | 301.949 | 316.802 | 104.9% |
-
-压力语料是 native_methods 的百万迭代变体，校验和 499999500000；所有脚本自校验通过。
-首轮与参考侧复测重叠，仅作探索，不用作收益证据。第二轮没有稳定收益信号，候选已撤回，
-生产 VMState.cpp 未保留此次改动。原始第二轮样本及双方 SHA-256 位于
-`bench/results/20261031-todo-native.json`。这些数据不是本批最终实现相对原始 HEAD 的加速比，
-也不是与 TJS2 的对照，不能据此宣布原生调用性能任务完成。
-
-历史绑定层 2.4%–3.4% 回退发生于 macOS arm64，且文档基线为本机 `/tmp` 二进制；
-本 Windows 工作区没有该二进制、原始采样或对应 macOS 执行环境。现有证据不足以将其归因于
-布局或派发；任务继续保留，须取得原基线或可重建的精确提交，做同平台 A/A、A/B 与采样。
-
-### 本批最终 Release 快照复核
-
-全部构建及测试停止后，最终 Release 与任务开始前保留的现有 Release CLI 交替比较，
-预热 1 次、11 轮反转顺序，含启动 wall-time 中位数；同上 Windows/Clang 19.1.5 配置。
-基线是既有二进制快照，不宣称能从某个精确 Git 提交重建；双方 SHA-256 和原始样本见
-`bench/results/20261031-todo-final.json`。压力语料同上，全部自校验通过。
-
-| 脚本 | 前 ms | 后 ms | 后/前 |
-|---|---:|---:|---:|
-| class_instantiate | 11.328 | 11.309 | 99.8% |
-| fib | 44.582 | 45.767 | 102.7% |
-| loop_int | 346.859 | 340.180 | 98.1% |
-| native_methods | 25.024 | 24.042 | 96.1% |
-| string_concat | 16.608 | 16.428 | 98.9% |
-| native_todo_stress | 313.618 | 315.017 | 100.4% |
-
-此单批快照的比值范围约 96.1%–102.7%，没有做本轮独立 A/A 校准，不据此宣称稳定提速
-或完全无回退。它也不能定位历史 macOS 绑定层回退。最终未保留调用索引清零候选。
-
-最终验证：Windows Clang Debug/Release 与 MSVC ASan 的 CTest 均 230/230 通过，
-包含 225 个脚本用例、C++、CLI、LSP 与字节码工具套件。MSVC 编译时将宿主绑定的
-内部 invoke 调用显式限定为 `cial::binding::invoke`，避免 ADL 引入 `std::invoke`；
-Tracer 增加空对象保护，并由 native_binding_test 的持有值/GC 用例验证。
-
-## 2026-10-31 macOS arm64 绑定层回退定位（布局效应，非算法成本）
-
-承接 2026-10-30 [原生绑定层重构对照](#2026-10-30-原生绑定层重构对照)记录的 loop_int /
-string_concat 约 2.4%–3.4% 回退。本机 macOS arm64，Release `-O2 -DNDEBUG`（Clang
-20.1，无 LTO），`bench/*.tjs` 每项预热 1 次、交替配对取进程 wall-time 中位数（测量
-脚本按同法置于会话内，未入库）；A/A 噪声底 loop_int 100.3%、string_concat 99.6%。
-
-1. **回退在 HEAD 复现**：历史基线 `/tmp/cial-before-native-binding`
-   （SHA-256 `86242ffa…8d37`）对照 HEAD `df3c56a`，loop_int 102.5%/102.9%、
-   string_concat 100.6%/101.5%，fib 与 native_methods 持平。
-2. **锚点可重建**：基线二进制与源码提交 `ad82ffb`（0757384^）的重建版逐项
-   99.9%–100.1%，基线锚定到精确提交，不再依赖 /tmp 遗留二进制。
-3. **绑定重构批次自身干净**：`ad82ffb` 对照 `0757384`，loop_int 99.4%/99.4%——
-   2026-10-30 的归因（绑定重构引入回退）不成立，回退系其后提交进入。
-4. **二分定位**：`02cea8e`（99.5%/99.6%）与 `ca4df1b`（99.6%/100.0%）均干净；
-   `2a1d684`（故障元数据批次）loop_int **106.8%/106.7%**、string_concat 102.9%，
-   回退精确进入于该提交。
-5. **机制隔离**：`2a1d684` 派发循环功能性 diff 为零（仅异常臂变化 + 全量重排），
-   采样热点构成不变而 `runLoop` 自采样 1327→1415；移除 `runLoop` 异常臂内三处
-   `recordFault` 调用点（loop_int 不抛异常，热路径零语义影响）即恢复至 101.2%。
-   结论：调用点存在本身改变块布局/寄存器分配，属代码布局效应，无算法成本。
-6. **修复与残差**：`recordFault` 标注 `CIAL_COLD_NOINLINE`（config.h 新增，
-   MSVC `__declspec(noinline)` / GNU `cold,noinline`）后 `2a1d684` 处完全恢复
-   （loop_int 100.3%）；HEAD 处该属性为中性（±0.6% 噪声内），残余约 3% 来自
-   后续不触碰 VM 代码的提交（9d82caf/580ed29/5f1ffe4）改变链接布局所致，
-   不再以掷骰方式追逐。最终 HEAD+cold 对照历史基线：loop_int 103.2%–103.4%、
-   string_concat 100.7%/101.8%、fib/native_methods/class_instantiate 持平。
-
-验证：CTest MacOS Debug/Release 各 385/385 通过；`tools/check-format.sh` 通过。
-热路径二进制证据：`runLoop<0,0,0>` 尺寸 ca4df1b 37236B、2a1d684 36024B、
-HEAD 36024B（`nm -n` 相邻符号差）。微基准对布局的 ±2%–7% 摆动以后按本节方法
-（锚点重建 + 提交级 A/B + 采样）归因，不与算法成本混记。
-
-## 2026-10-31 原生调用实参窗口评估与 Value 生命周期内联批次
-
-承接"原生调用帧及实参窗口成本"评估项。方法：macOS arm64 Release（Clang 20.1，无 LTO），
-native_stress 语料（`bench/native_methods.tjs` 的 3×10⁷ 迭代变体，约 4.5s）`sample` 采样；
-A/B 用交替配对中位数（预热 1 次 + 交替 9 对，两轮反转顺序），对照脚本与 2026-10-31
-定位轮一致。A/A 噪声底 ±1%。
-
-**画像**：Value 生命周期管理占进程样本 ~54%（`~Value` 25%、拷贝构造 17%、移动/拷贝
-赋值 ~10%、各 ctor 2%），派发循环 31%，而真正 stdlib 工作（`callDirect`→`asArray`）
-仅 ~3%。`~Value`/拷贝构造/移动/`asObject` 均为跨 TU 外联调用（`Value.hpp` 只声明，
-定义在 `Value.cpp`），整数/对象热路径每次实参落缓冲、接收者拷贝、返回值写回都要付
-真实调用开销。调用帧本身（免池同步快路径 + 直写窗口）与实参窗口机制无肥肉——
-与 2026-10-30 融合批"剩余开销在调用帧建立"的判断合并修正为：**在 Value 生命周期**。
-
-**两步改动**（`src/types/Value.hpp`、`Value.cpp`）：
-
-1. 构造/析构/拷贝/移动/`asObject` 移入类内定义（普通 inline）：
-   native_methods 94.5%/94.9%，loop_int 96.0%/96.5%，fib 96.3%/97.4%，
-   string_concat 97.8%/98.6%。`runLoop` 侧内联吸收（自采样 836→780，
-   函数 35780→35468B），残余外联调用在 stdlib 侧翻译单元。
-2. 上述函数加 `CIAL_INLINE`（always_inline，`config.h` 既有宏，MSVC/GNU 分支），
-   强制全部站点内联：**native_methods 78.2%/78.5%，fib 87.4%/89.7%，
-   loop_int 94.1%/95.0%，string_concat 94.1%/94.4%，class_instantiate 97.0%/97.2%**
-   （对照为步骤 1 之前的留档二进制，含 2026-10-31 定位轮的 cold 标注）。
-
-代价与验证：二进制 2.35MB→2.80MB（+19%，激进内联的预期代价）；编译时间略增；
-CTest MacOS Debug/Release 各 385/385 通过；`tools/check-format.sh` 通过。
-被否决的中间形态：`CIAL_INLINE [[nodiscard]] Ret<Object*>` 属性顺序非法
-（nodiscard 无法作用于类型），须写作 `[[nodiscard]] CIAL_INLINE`。
-
-后续候选（未展开）：`Value::asInteger` 仍外联（String 解析回执使函数偏大，
-可拆内联快路径 + 冷慢路径）；stdlib 内部临时 Value 的拷贝消除；
-fib 相对 TJS2 的剩余差距待 Windows 三方对照复核（本批 fib 已再快 ~11%）。
-
-### 同日追加：asInteger/mod 拆分内联
-
-同方法同机（对照为上节最终态留档二进制）。loop_int 画像中 `asInteger` 仍外联占
-~4.4%（派发循环 8 处调用点 + 算术族内部各两次），`Ret<Value>` optional 机制 ~7%。
-改动（`src/types/Value.hpp`/`Value.cpp`）：`asInteger` 拆类内内联快路径
-（Void/Integer/Real）+ `asIntegerSlow` 冷路径（`CIAL_COLD_NOINLINE`，String 解析与
-Octet/Object 报错）；`mod` 拆双 Integer 快路径（含除零守卫）+ `modSlow`。
-
-| 脚本 | 后/前 | 结论 |
-|---|---:|---|
-| loop_int | **93.8%/93.9%/94.1%** | 三轮一致，稳定 −6% |
-| fib | 101.0%→99.4% | 首轮 +1.5% 为布局摆动，加测回落持平 |
-| native_methods / string_concat / class | 98.9%–100.3% | 持平（不在其热路径） |
-
-CTest Release 385/385。仍未动的候选：算术族其余成员（add/sub/mul/div——add 含
-字符串拼接重路径，宜快慢拆分后单独批次）与派发层 `Ret<Value>::unwrap`/
-optional 协议成本（~7%，需调用协议改造，非内联可及）。
-
-### 2026-11-01 macOS 双引擎对照（TJS2 d8044c3 vs HEAD，含 fib 差距画像）
+# 性能记录
+
+按批次保留测量环境、基线与结论；逐轮样本与详细过程见 git 历史与本机忽略目录
+`bench/results/`。基准语料为 `bench/*.tjs`（自校验，非零退出码即失败），复测可用
+`cmake --build build/MacOS/Release --target bench`（`cmake/Bench.cmake` 的 min/mean
+口径）。各批次计时口径（中位数/min、轮数）以当节记录为准；不同机器、编译器与口径
+的历史比例不可直接比较。
+
+## 历史批次摘要（2026-10-28 ~ 2026-10-31）
+
+- 2026-10-28 TODO 批次（macOS arm64、AppleClang 17、`-O3 -DNDEBUG`、中位数）：对
+  TJS2 为 loop_int 68.8%、string_concat 98.0%、class 104.0%、fib 147.7%、
+  native 185.5%；排除合成空 finalize（`FuncMeta::syntheticFinalizer`），短串内联
+  因 Value 16B 布局未采纳。
+- 2026-10-29 Windows 首次实测（MSVC 14.44、min 口径、提交 `7fe3f84`）：3/5 反超
+  TJS2（loop 46%、string 85%、class 98%），fib 114%、native 142%。TJS2 CLI 的
+  "Time taken by function: Nms" 标签实为微秒，对照勿按字面取值。
+- 2026-10-29 调用路径批次：采样定位三项开销并削减——原生同步调用免 FETCH 重取
+  （invokeCallV 的 Continue 快路径）、六处热路径 dynamic_cast 改 typeId 直判
+  （`TypeId.hpp` 专有值）、实参栈缓冲直传（`callDirect`）；fib 首次 ≤100%
+  （94~97%）、native 135~140%。注意 Value 栈数组只可构造实际数量（全槽默认
+  初始化曾致 256% 回退）。
+- 2026-10-29 常量传播跨块扩展与拷贝传播批次：跨块常量继承在现有 IR 下收益有限
+  （局部变量每次使用经 GLocal 重载）；拷贝传播（纯拷贝改写 + DEL 清除）使 fib
+  122~132%→108~120%，首次进入 1.1× 内。
+- 2026-10-29 README 默认路径复核（Clang 19.1.5、Windows）：native +6.7%、
+  string +4.5% 待定位，其余持平（后续批次逐步收窄）。
+- 2026-10-30 原生接收者引用化候选：未采用——16B 接收者拷贝本身廉价，引用化的
+  间接加载抵消收益（百万次原生调用 −7~9% 但 loop_int +5%）。
+- 2026-10-30 NativeFn 函数指针化：small-closure `{_thin,_thunkCtx}` 两指针直派发 +
+  `VM::callValue` 实参栈缓冲，native_methods 稳定 −9~11%，其余噪声带内，接受。
+- 2026-10-30 GMethodC+CallMethodV 零实参融合（新指令 CallMethod0）：整体回退，
+  五项基准无信号、放大语料慢 1~3%。教训：仅向 VMState.cpp 新增不执行的 dispatch
+  函数即损失 ~2.4%（布局效应）；评估新指令必须做"保留代码、禁用发射"的同源对照，
+  dispatch 所在翻译单元对代码布局极敏感。
+- 2026-10-30 同场 TJS2 三方对照（当日重建参考二进制）：class/loop/string 反超
+  （88.9%/54.9%/74.6%），native 90.0%，fib 落后 ~13%。
+- 2026-10-30 原生绑定层重构对照：loop/string −2.4~3.4% 回退记录（次日定位轮归因
+  布局效应）；同日整理将 `findMember` 三次类型表定位合并为一次（97.5~101.3%）。
+- 2026-10-31 调用参数索引清零候选：未采纳，两轮均无稳定收益信号。
+- 2026-10-31 绑定层回退定位（macOS）：二分至 `2a1d684`——recordFault 调用点改变
+  runLoop 块布局（非算法成本），`CIAL_COLD_NOINLINE` 修复；残余 ~3% 为后续提交
+  的链接布局漂移，不再追逐。方法：基线锚点重建到精确提交 + 提交级 A/B + 采样。
+- 2026-10-31 Value 生命周期内联（macOS）：画像示 Value 生命周期 ~54% 样本、
+  stdlib 实际工作仅 ~3%；生命周期成员类内定义 + `CIAL_INLINE` 后 native 78.2%、
+  fib 87.4%、loop 94.1%，代价二进制 +19%。追加 asInteger/mod 快慢拆分，loop_int
+  再 −6%；属性须写作 `[[nodiscard]] CIAL_INLINE`（顺序颠倒非法）。剩余候选见 TODO。
+
+## 2026-11-01 macOS 双引擎对照（TJS2 d8044c3 vs HEAD，含 fib 差距画像）
 
 macOS arm64；参考 `bin/darwin/TJSCompiler`（d8044c3，SHA `35169f56…537`，bench 语料
 零输出，wall-time 纯执行）；本项目 HEAD（含 2026-10-31 全部内联批次）。交替配对
@@ -510,12 +70,10 @@ macOS arm64；参考 `bin/darwin/TJSCompiler`（d8044c3，SHA `35169f56…537`�
 （源点已采样定位并落地修复，见下文[thisData 缓存继承补丁](#2026-11-01-thisdata-缓存继承补丁macos-复测并落地)：
 必败转换在绑定 this 分支，非 ChkInv/ChgThis。）
 
-
 ## 2026-11-01 语义对齐与 SDK 基础批次
 
-同机 Linux x64、GCC 14.2，基线为 `04dbd2e`，两侧均为 Release `-O3 -DNDEBUG`，
-JIT/尾递归关闭，核心不强制 PIC。每个自校验脚本预热一次，再逐轮反转顺序交替执行
-11 轮，比较 stdout，取含进程启动的 wall-time 中位数。测量时没有并行构建。
+同机 Linux x64、GCC 14.2，基线 `04dbd2e`，两侧 Release `-O3 -DNDEBUG`（JIT/尾递归
+关闭，核心不强制 PIC），预热后交替 11 轮取含启动 wall-time 中位数。
 
 | 用例 | 基线 ms | 本批 ms | 变化 |
 |---|---:|---:|---:|
@@ -525,138 +83,51 @@ JIT/尾递归关闭，核心不强制 PIC。每个自校验脚本预热一次，
 | string_concat | 9.041 | 9.404 | +4.0% |
 | class_instantiate | 2.991 | 3.093 | +3.4% |
 
-本批以 null、UTF-16/Oniguruma 与宿主接口正确性为目标，不代表性能优化完成。
-全局整数循环仍有约 10% 回退，应在正式发布前继续定位；不能归因于某一语义检查。
-该脚本的生成 TAC 与基线相同；缓存读取函数反汇编也一致，但主循环布局发生变化。
-去掉强制 PIC 后回退仍存在，因此不能把 PIC 当作唯一原因。对 Unicode 操作做整体
-冷路径外提的实验未显示稳定收益，已撤回；保留非空对象读取内联、错误路径外联，
-以及全局整数读取提前返回。SDK 需要链接进共享库时由宿主显式启用 PIC。
-
-原始样本、环境和二进制 SHA-256 见[测量数据](reports/2026-11-01-sdk-alignment-benchmark.json)。
-不同编译器、机器与既往 macOS 数据不能直接比较，本表也不是与原版 TJS2 的性能对拍。
-
+本批以 null、UTF-16/Oniguruma 与宿主接口正确性为目标。loop_int +10% 未归因：
+生成 TAC 与缓存读取函数反汇编一致，仅主循环布局变化；去掉强制 PIC 后回退仍存在，
+Unicode 冷路径外提实验无稳定收益已撤回，保留非空对象读取内联、错误路径外联与
+全局整数读取提前返回；SDK 链接进共享库时由宿主显式启用 PIC。原始样本、环境和
+二进制 SHA-256 见[测量数据](reports/2026-11-01-sdk-alignment-benchmark.json)。
 
 ## 2026-11-01 运行期诊断源码快照
 
-Windows x64、Clang 19.1.5，干净 `3f4c913` 工作树为基线，同机 Release
-`-O3 -DNDEBUG`、静态 CRT、JIT 关闭，两侧使用同一份已安装依赖。
-每项预热后交替顺序运行 11 轮，校验 stdout，取含进程启动的 wall-time 中位数；
-计时期间没有并行构建或测试。原有本机 Release 文件早于 SDK 批次，已排除出本次对照。
-
-| 用例 | 基线 ms | 快照 ms | 变化 |
-|---|---:|---:|---:|
-| class_instantiate | 11.362 | 11.356 | -0.1% |
-| fib | 39.585 | 39.672 | +0.2% |
-| loop_int | 347.597 | 321.340 | -7.6% |
-| native_methods | 18.444 | 19.240 | +4.3% |
-| string_concat | 17.277 | 17.618 | +2.0% |
-| snapshot-string-stress | 215.350 | 215.634 | +0.1% |
-| snapshot-native-stress | 249.933 | 253.630 | +1.5% |
-
-压力用例分别把字符串与原生方法循环增至百万次并同步调整结果断言。
-字符串压力变化 +0.1%，原生方法压力 +1.5%；短脚本受启动和布局影响，
-整数循环的下降不作为普遍加速结论。以上是本机有限语料复核，不替代 GCC 回退定位。
-
-正文保留成本：2099200 字节、2048 行注释源码，两侧各运行 5 次，
-使用 Windows GetProcessMemoryInfo 的 PeakWorkingSetSize 取中位数：
-基线 6852608 字节，快照 9347072 字节，增加约 2.38 MiB。
-CLI 在编译/执行期间同时持有原缓冲与快照，增量包含正文和独立行索引；
-嵌套 Chunk 共享快照，不按函数重复复制正文。此样本不是每种源码的固定内存开销。
-Catch2 验证重新装载、延迟函数、GC 回收、故障重置与关闭保留；CLI 覆盖文件自覆盖、
-虚拟源、REPL 历史与后缀求值。Windows Debug、Release、Release + JIT 各 235 项
-CTest 通过，JIT 的 Eager/Trace 均验证执行后抛出的定位和快照。
-
-原始样本、方法及二进制 SHA-256 见[测量数据](reports/2026-11-01-source-snapshot-benchmark.json)。
-
+Windows x64、Clang 19.1.5、Release `-O3 -DNDEBUG` 静态 CRT，基线为上一批最终
+可执行文件；预热后交替 11 轮取含启动 wall-time 中位数。七项基准 −7.6%~+4.3%
+（class −0.1%、fib +0.2%、loop_int −7.6%、native +4.3%、string +2.0%、字符串/
+原生压力 +0.1%/+1.5%），短用例波动不外推。正文快照保留成本：2099200 字节源码
+（2048 行注释）峰值工作集 +2.38 MiB；CLI 编译/执行期间同时持有原缓冲与快照，
+嵌套 Chunk 共享快照不按函数复制。Catch2 验证重装载、延迟函数、GC 回收、故障
+重置与关闭保留；Windows Debug/Release/Release+JIT 各 235 项 CTest 通过。原始
+样本见[测量数据](reports/2026-11-01-source-snapshot-benchmark.json)。
 
 ## 2026-11-01 结构化异常栈与 getter 异常隔离
 
-Windows x64、Clang 19.1.5，Release `-O3 -DNDEBUG`、静态 CRT、JIT 关闭。
-基线为上一节源码快照批次的最终可执行文件（SHA-256 与该节记录一致），候选增加结构化
-异常栈和 getter 哨兵隔离；依赖与编译选项相同。每项预热后交替顺序运行 11 轮，
-比较 stdout 并运行脚本结果断言，取含启动的 wall-time 中位数；计时期间不并行构建/测试。
-
-| 用例 | 基线 ms | 本批 ms | 变化 |
-|---|---:|---:|---:|
-| class_instantiate | 10.252 | 10.182 | -0.7% |
-| fib | 39.516 | 38.616 | -2.3% |
-| loop_int | 354.588 | 340.688 | -3.9% |
-| native_methods | 21.723 | 23.240 | +7.0% |
-| string_concat | 19.873 | 19.303 | -2.9% |
-| snapshot-string-stress | 250.213 | 243.520 | -2.7% |
-| stack-native-stress | 252.362 | 254.292 | +0.8% |
-| stack-getter-stress | 7.128 | 7.051 | -1.1% |
-| stack-fib-stress | 382.091 | 397.725 | +4.1% |
-| stack-class-stress | 41.105 | 44.839 | +9.1% |
-
-压力脚本：字符串/原生方法百万次，fib(30)，类实例化 2 万次，独立 getter 千次；
-结果断言同步调整。疑似回退再单独交替复测 11 轮：
-
-| 用例 | 基线 ms | 本批 ms | 变化 |
-|---|---:|---:|---:|
-| stack-fib-stress | 478.001 | 461.289 | -3.5% |
-| stack-class-stress | 48.232 | 51.891 | +7.6% |
-
-类压力两次均观察到约 8% 回退，尚未归因，保留 TODO 复核；不能把本批描述为性能无回退。
-fib 的两次结果方向不同，暂不作稳定回退或加速结论。字符串/原生方法长负载约 -2.7%/+0.8%，
-短用例波动不能外推。上述结果不替代前述 GCC 整数循环回退定位。
-
-getter 哨兵在每个 VM 中惰性创建并缓存已编码的空 Chunk，嵌套访问只创建独立调用帧，
-不逐次重复编码；仅含 void 常量，不持有脚本对象。旧 getter 向调用者遗留返回槽，
-初始 10 万次基线尝试持续增长后终止，未纳入有限耗时对照；本批相同规模的结果断言连续
-5 次通过。Catch2 另验证千次 getter 调用后池顶增量为 0，以及异常 catch 后后续语句只执行一次。
-指令边界表新增每 Chunk 一个 Vec 和每条 TAC 约 4 字节，异常栈仅在错误路径分配，最多 64 帧。
-
-Windows Debug、Release、Release + JIT 均完成 235 项 CTest 验收；Release 的 LSP 协议
-测试曾在并行编译期间超时，空闲后单独重跑通过。JIT 构建的专项集合 223 条断言通过，其中 Eager/Trace 验证循环后抛出点及调用点；
-重抛、原生回调、GC/快照寿命与栈降级另由默认解释路径用例覆盖。相关实现见 `src/vm/VMState.*`、
-`Chunk.hpp`、`CallFrame.hpp`、`src/types/Property.hpp`，回归见 `tests/diagnostics_test.cpp`、`tests/cli_test.py`。
-
-原始样本、工作负载与 SHA-256 见[测量数据](reports/2026-11-01-runtime-stack-benchmark.json)。
+环境同上节，基线为源码快照批次最终可执行文件。九项基准：class −0.7%、fib −2.3%、
+loop_int −3.9%、native +7.0%、string −2.9%、字符串/原生/getter 压力 −2.7%/+0.8%/−1.1%；
+疑似回退单独交替复测 11 轮：stack-fib-stress −3.5%（两轮方向相反，不作结论）、
+**stack-class-stress +7.6%（两次均约 +8%，尚未归因，TODO 保留复核）**。getter
+哨兵每 VM 惰性创建并缓存已编码空 Chunk，嵌套访问只创建独立调用帧；指令边界表
+每 Chunk 一个 Vec、每条 TAC 约 4 字节，异常栈仅错误路径分配（≤64 帧）。Windows
+Debug/Release/Release+JIT 各 235 项 CTest 通过；实现见 `src/vm/VMState.*`、
+`Chunk.hpp`、`CallFrame.hpp`、`src/types/Property.hpp`，原始样本见
+[测量数据](reports/2026-11-01-runtime-stack-benchmark.json)。
 
 ## 2026-11-01 fib 调用路径批次（A 帧级字节码缓存 / D 立即数融合 / B 释放帧免重建）
 
-Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT，JIT 关闭。基线为干净 HEAD `2fe2d59`
-worktree 构建；候选在同一 worktree 逐项叠加，每项相对上一已接受状态单变量对照。本机测量期间
-前台应用稳定占用约 1.5 核（无法清空），因此主口径改为预热后交替 15~21 轮取 **min**（对负载
-尖峰鲁棒，`cmake/Bench.cmake` 同款），同场附 median 与同二进制 A/A 校准；A/A 噪声底：
-fib（40ms 级短脚本）单批可达 ±10%，fib(30) 压力变体 ±2%，loop_int ±1.5%。调用机械微基准
-`bench/results/20261101-fib-call-path/probe-call-in-fn.tjs`（寄存器局部循环内 5M 次空函数调用）与纯循环差分得：调用机械
-**Ciallang 133.7ns/次 vs TJS2 93.6ns/次**，纯派发 7.4 vs 3.6 ns/条——fib 差距全在此，不在函数体。
+Windows x64、Clang 19.1.5、`-O3 -DNDEBUG` 静态 CRT，基线为干净 HEAD `2fe2d59`，
+单变量逐项叠加；负载期口径为预热后交替 15~21 轮取 min，A/A 噪声底：fib ±10%、
+fib(30) ±2%、loop_int ±1.5%。调用微基准差分：调用机械 133.7 vs TJS2 93.6 ns/次、
+纯派发 7.4 vs 3.6 ns/条，fib 差距全在调用机械而非函数体。
 
-**A. CallFrame 帧级字节码缓存**（`CallFrame::bcBase/bcSize/bcConstants/bcRegs`，
-FETCH_NEW_FRAME 冷填热读；`src/vm/CallFrame.hpp`、`VMState.cpp`）。三种形态：
+- A 帧级字节码缓存（`CallFrame::bcBase/bcSize/bcConstants/bcRegs`）：A1 内联分支
+  （loop_int +19% 派发环布局病理）与 A2 建帧即编码（破坏惰性编码不变量）否决，
+  A3 惰性填充 + 冷路径 `CIAL_COLD_NOINLINE` 外提接受。
+- D 立即数融合（`BinaryImm`/`CompareTestImm`，活跃性共用 `computeBlockLiveness`）：
+  fib 两批一致向好，接受；新指令 95/96 同步 X-macro/encode/dispatch/dump/SSA/JIT
+  与字节码文档；JIT 拒编门槛改按等效解释步数计（融合指令计 2）。
+- B 释放槽只析构不重建（`freeCallFrame`）：严格更少工作且各批无回退，接受。
 
-| 形态 | 结果 | 结论 |
-|---|---|---|
-| A1 FETCH 内联分支填充 | 调用微基准 −5.2%，**loop_int +19%（min）** | 派发环寄存器分配/布局病理，否决 |
-| A2 建帧即编码并填充（FETCH 无分支直读） | `diagnostics_test.cpp:145` 失败：recordFault 不得触发编码 | 破坏惰性编码不变量，否决 |
-| A3 惰性填充，冷路径 `CIAL_COLD_NOINLINE` 外提 | loop_int +1.35%（噪声），调用微基准 −3.3%/−3.7%（两批），fib ±噪声 | 严格不劣 + 调用机械收益复现，**接受** |
-
-**D. 立即数融合**（`BinaryImm`/`CompareTestImm`，`ImmediateOperandFusionOptimizer`）：
-`LoadImm K imm; {Add,Sub,Mul,CompareTest} src K dst` 在 K 此后不活跃时改写为单指令，活跃性
-与 DeadLoadElimination 共享 `computeBlockLiveness`（跨块 liveOut 数据流，try 保护区跳过，只
-处理相邻对）。fib 函数体 14→11 条 TAC；语义 = 原指令以 `Value{imm}` 作右操作数。相对 A3：
-
-| 脚本 | 批 1（负载期）| 批 2 min | 批 2 median |
-|---|---:|---:|---:|
-| fib(30) | −9.0% | −2.6% | −5.5% |
-| fib | +5.7% | −9.9% | −4.6% |
-| loop_int | −4.6% | +1.3% | +2.5% |
-| 调用微基准 | −4.5% | +0.7% | +2.6% |
-| native_methods / string_concat | +0.4% / −1.7% | — | — |
-
-fib 方向在两批一致（fib(30) 高分辨率项稳定向好），其余在噪声带内无回退，**接受**。
-新指令同步：TAC/字节码 X-macro（编号 95/96）、encode/dispatch、dump、SSA def-use、尾递归
-白名单、IntegerJit 解码与发射（右操作数取立即数）、`doc/bytecode/ciallang-bytecode.md`。
-
-**B. `freeCallFrame` 释放槽只析构不重建**（`src/vm/VMState.hpp`）：GC 标记、recordFault、
-转储遍历均以 `_stackTop` 为界，释放槽在下次 `allocCallFrame` placement-new 时全量覆写（含
-A 的缓存字段清零）。相对 A3+D（min / median）：调用微基准 −5.4% / −7.6%，fib(30) −2.5% / −2.6%，
-fib −1.2% / +0.3%；loop_int −4.6% / −8.2% 与 native_methods −8.7% / −7.0% 不在其机制路径上
-（无帧弹出），属同场布局漂移。严格更少工作且各批无回退，**接受**。
-
-**整栈 A3+D+B 相对 HEAD**（min-of-21，同场 A/A：fib +10.8%、fib(30) −2.1%）：
+整栈 A3+D+B 相对 HEAD（min-of-21）：
 
 | 脚本 | HEAD min ms | 整栈 min ms | 变化 |
 |---|---:|---:|---:|
@@ -668,30 +139,13 @@ fib −1.2% / +0.3%；loop_int −4.6% / −8.2% 与 native_methods −8.7% / �
 | string_concat | 17.23 | 16.66 | −3.3% |
 | class_instantiate | 10.57 | 10.28 | −2.8% |
 
-验证：Windows Release CTest 236/236（含新增 `tests/optimizer_test.cpp` 融合判定四用例与
-`tests/tjs/expression/binary/immediate-fusion.tjs`，后者在 TJSCompiler 参考上亦 28/28 通过）；
-Release + JIT CTest 236/236——融合把 `x + 2` 一类函数体缩成单步轨迹，曾触发 IntegerJit
-`steps.size() < 2` 门槛拒编（`jit_test.cpp:102` 失败、寄存器循环 compiled 4→2）；门槛改按
-等效解释步数计（融合指令计 2）后 JIT 覆盖面与 HEAD 完全一致（compiled=4 / executions=10,000,002）。
-修改文件 clang-format 校验通过。原始样本、A/B 脚本、各形态补丁与二进制 SHA-256 位于本机忽略目录
-`bench/results/20261101-fib-call-path/`。同日另有 `thisData` 缓存继承补丁（`setThisObj` 每次全局函数
-调用对 GlobalObject 做必败 `dynamic_cast<DataObject*>`，fib(25) 实测 242,787 次/命中 1 次）：
-Windows 上中性（MSVC ABI 失败转换廉价），对应 macOS 画像 ~32% RTTI 采样，未纳入本栈；
-已于 macOS 复测后落地，见下节。
-
-**被否决的后续候选 F——终结检查外提**（同机、同口径，对照 A3+D+B 整栈）：把每条指令前的
-`pendingFinalizers.empty()` 检查改为帧入口一次（局部 bool 门控）+ 回边（Jmp/JmpE/JmpNE 向后跳）
-安全点借 `DispatchRet::Call` 回帧入口 drain。语义探针（5 万次无调用分配循环）确认延迟终结仍在
-循环内推进，CTest 236/236；但两批 A/B 一致回退：loop_int +7.3% / +3.8%，寄存器局部纯循环
-+8.9% / +7.8%，fib(30) −1.1%~−2.9%（噪声级）。归因：原检查是 L1 热、恒预测不跳转的
-load+cmp+jcc，实际代价很小；替代形态的帧入口 bool 在 try/catch 与全内联巨型循环体下被溢出到
-栈（仍是每指令 load+test），回边 handler 又多了比较与 Call 返回边（循环中 1/7~1/10 的指令）。
-**结论：每指令骨架开销（终结检查、`_pending` 检查、instructionPc/r/dispatched 记账、循环
-条件）是多个分散小项，没有单一热点；搬运其中一项不划算**。若要收此块，应整体改骨架——例如
-GC sweep 排队终结对象时直接置 `_pending`（一个 "需走慢路径" 标志替代两次检查，零新增每指令
-开销）。顺带核实：Release 下 96 个 dispatch handler 全部内联进 `runLoop<>`（仅
-`dispatchTailCallV` 作为独立符号存活），"每指令一次函数调用"的假设不成立；派发差距（7.4 vs
-3.6 ns/条）来自骨架记账与指令语义本身。diff 留档本机 `bench/results/20261101-fib-call-path/stack-plus-F-rejected.patch`。
+验证：Windows Release 与 Release+JIT CTest 各 236/236（含融合判定用例与
+`tests/tjs/expression/binary/immediate-fusion.tjs`）。被否决的后续候选 F（终结检查
+外提）两批一致回退后归因：每指令骨架开销（终结检查、`_pending`、记账、循环条件）
+是多个分散小项，搬运单项不划算，收此块应整体改骨架；顺带核实 Release 下 96 个
+dispatch handler 全部内联进 runLoop（仅 dispatchTailCallV 存活为独立符号）。
+同日 `thisData` 缓存继承补丁未纳入本栈，已于 macOS 复测后落地（见下节）；原始
+样本、A/B 脚本与各形态补丁留档本机忽略目录 `bench/results/20261101-fib-call-path/`。
 
 ## 2026-11-01 thisData 缓存继承补丁（macOS 复测并落地）
 
