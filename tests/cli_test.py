@@ -267,6 +267,21 @@ x
         self.assertEqual(process.returncode, 1)
         self.assertEqual(process.stdout.splitlines(), ["0", "1", "1"])
 
+    def test_repl_declaration_without_semicolon(self):
+        process = self.run_cial("--repl", input='''var x = 40
+x + 2
+const c = 7
+c
+var flagged = 1 // trailing comment
+flagged
+do { x = x + 1; } while(x < 44)
+x
+:quit
+''')
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(process.stdout.splitlines(), ["42", "7", "1", "44"])
+        self.assertEqual(process.stderr, "")
+
     def test_repl_multiline_string_and_preprocessor_state(self):
         process = self.run_cial("--repl", input='''var text = "a
 b";
@@ -449,6 +464,48 @@ selected
         garbage.write_bytes(b"\x01\x02\x03\x04 not a script or bytecode")
         process = self.run_cial("--decompile", garbage)
         self.assertNotEqual(process.returncode, 0)
+
+    def test_decompile_outputdebug_source_lines(self):
+        # 真实 outputdebug 产物（manifest 固定参考二进制/导出选项/样本哈希）经
+        # --source 做偏移→行号换算的端到端；合成用例在 decompile_test.cpp
+        corpus = pathlib.Path(__file__).resolve().parent / "test_files" / "tjsbc" / "debug"
+        manifest = json.loads((corpus / "manifest.json").read_text(encoding="utf-8"))
+        import hashlib
+
+        for sample in manifest["samples"]:
+            source = corpus / f"{sample['name']}.tjs"
+            bytecode = corpus / f"{sample['name']}.tjsbc"
+            map_path = self.root / f"{sample['name']}_map.json"
+            with self.subTest(sample=sample["name"]):
+                for name, field in [("source", source), ("bytecode", bytecode)]:
+                    digest = hashlib.sha256(field.read_bytes()).hexdigest()
+                    self.assertEqual(digest, sample[f"{name}Sha256"], name)
+                process = self.run_cial("--decompile", "--view", "--source", source,
+                                        "--map", map_path, bytecode)
+                self.assertEqual(process.returncode, 0, process.stderr)
+                payload = json.loads(map_path.read_text(encoding="utf-8"))
+                self.assertEqual(payload["status"], "unsupported")
+                # 行号落在源文件行数内（0 基；末条目可指向末尾之后，由换算收敛）
+                line_count = source.read_text(encoding="utf-8").count("\n") + 1
+                units = {unit["name"]: [row.get("srcLine") for row in unit["lines"]]
+                         for unit in payload["units"]}
+                for name, lines in units.items():
+                    for line in lines:
+                        if line is not None:
+                            self.assertGreaterEqual(line, 0, name)
+                            self.assertLess(line, line_count, f"{sample['name']}/{name}")
+                for name, expected in sample["expectedLines"].items():
+                    self.assertIn(name, units, f"{sample['name']}/{name}")
+                    for line in expected:
+                        self.assertIn(line, units[name], f"{sample['name']}/{name}")
+        # 无 outputdebug 表的既有语料不携带 srcLine
+        plain_map = self.root / "plain_map.json"
+        process = self.run_cial("--decompile", "--view", "--source", corpus.parent / "s6_class.tjs",
+                                "--map", plain_map, corpus.parent / "s6_class.tjsbc")
+        self.assertEqual(process.returncode, 0, process.stderr)
+        payload = json.loads(plain_map.read_text(encoding="utf-8"))
+        self.assertFalse(any(row.get("srcLine") is not None
+                             for unit in payload["units"] for row in unit["lines"]))
 
 
 if __name__ == "__main__":

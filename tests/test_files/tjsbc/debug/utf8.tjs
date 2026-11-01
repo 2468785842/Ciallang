@@ -1,0 +1,6 @@
+// 中文注释：验证 UTF-16 偏移换算
+function f(v) {
+	return v * 2; // 中文行注释
+}
+var r = f(21);
+println("结果=" + r);

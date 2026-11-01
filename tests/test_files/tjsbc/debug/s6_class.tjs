@@ -1,0 +1,24 @@
+// M2 语料：类定义 + NEW + 成员 property + &/* 属性闭包（节点经局部变量）
+class Animal {
+	var legs;
+	function Animal(n) { legs = n; }
+	function describe() { return "legs=" + legs; }
+	property legCount {
+		getter { return legs; }
+		setter(v) { legs = v; }
+	}
+}
+var a = new Animal(4);
+println(a.describe());
+a.legCount = 6;
+println(a.legCount);
+function testDeref() {
+	var f = &a.legCount;
+	*f = 8;
+	println(*f);
+	a.legCount++;
+	println(a.legCount);
+	*f += 2;
+	println(*f);
+}
+testDeref();

@@ -1,0 +1,9 @@
+function f(x) {
+	return x * 2;
+}
+function g(a, b) {
+	var t = a + b;
+	return t * f(t);
+}
+var r = g(1, 2);
+println(r);

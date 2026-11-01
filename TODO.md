@@ -14,17 +14,17 @@
 
 设计与批次见[反编译器方案](doc/bytecode/decompiler-plan.md)（2026-11-01 采纳 TAC 层直译路径）。
 
-- [ ] M1 残项：现有 tjsbc 语料均为无 debug 产物，需生成/收集 outputdebug 样本验证
-  `--source` 行号换算的端到端（合成用例已在 `tests/decompile_test.cpp` 覆盖）；固定参考
-  二进制/版本/样本清单（哈希与导出选项）。
-
 - [ ] M2–M5：后优化形态表达式恢复（含 BinaryImm/CompareTestImm 逆映射）、语句结构化与短路/三元跨块折叠、壳组装与 `+=` 逆融合双守卫（模板命中 + `computeBlockLiveness` 无其他读者）、任意 CFG/switch 链/try 嵌套兜底；按方案 §7 四环验证逐批验收。
 
 M0 已完成（2026-11-01）：`src/decompile/` 的 `{文本, 行表}` 管道、CLI `--decompile`（严格模式
 默认 / `--view` 反汇编视图 / `--map` 行表 JSON / `--source` 偏移换算）、TJS2 路径来源表
 （`TacOrigin`，码字坐标 + 可选源偏移）随转译器透传；两条入口反汇编级端到端，CTest 237 全绿。
 
-- [ ] M2–M5：后优化形态表达式恢复（含 BinaryImm/CompareTestImm 逆映射）、语句结构化与短路/三元跨块折叠、壳组装与 `+=` 逆融合双守卫（模板命中 + `computeBlockLiveness` 无其他读者）、任意 CFG/switch 链/try 嵌套兜底；按方案 §7 四环验证逐批验收。
+M1 已完成（2026-11-01）：参考编译器新增 `--dump-debug` 导出 outputdebug 源位置表；
+`--source` 行号换算以真实产物端到端验证（多行函数/类/继承/UTF-8 中文注释四类样本，
+覆盖 TJS2 仅在控制流点登记位置、条目间继承行号的粒度），语料与固定清单（参考二进制
+与样本哈希、导出选项）见 `tests/test_files/tjsbc/debug/manifest.json`，断言入
+`tests/cli_test.py`；全量 CTest 通过。
 
 ## SDK 与开发工具路线图
 
