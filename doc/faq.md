@@ -51,6 +51,17 @@ Clang 19 Windows 运行库曾在 C++ 异常路径崩溃，纯标准库最小程�
 项目已验证过 MSVC `/fsanitize=address` 组合；静态 CRT、容器注解设置及 ASan 运行库部署
 见[构建指南](building.md#asanwindows-msvc)。
 
+### Windows 上为什么跑不了 libFuzzer 有界 fuzz
+
+除上述 ASan 异常问题外，Windows Clang 还有一处独立故障：只要链接任一 `clang_rt`
+运行库（含纯覆盖率的 `clang_rt.fuzzer*`），`catch(const std::runtime_error &)` 这类
+对 std 类型的具名捕获在 RTTI 匹配阶段会跳入类型描述符数据段直接崩溃；`catch(...)`
+与项目自定义类型不受影响，Linux 下同一构建完全正常。已验证该现象与 Clang 18/19、
+MSVC CRT 14.29/14.44、lld-link/link.exe 及静态/动态运行库组合均无关。
+`src/parser/Lexer.cpp` 需捕获预处理抛出的 `std::runtime_error`，且 `fuzz/tjs.dict`
+含 `"@set("`，语料回归数秒内必然触发，因此 fuzz 构建只在 Linux（含 WSL）运行，
+流程见[构建指南](building.md#有界-fuzz)。
+
 ## 对拍前怎样确认参考引擎可用
 
 TJSCompiler 的旧入口曾使用固定脚本路径；`d8044c3` 已提交 `TJSCompiler <script>` 和
