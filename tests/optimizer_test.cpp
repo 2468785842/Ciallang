@@ -451,3 +451,99 @@ TEST_CASE("optimizer - handler never inherits normal exit constants") {
     optimizer.optimize(chunk, blocks);
     REQUIRE(chunk.inst(3)->opcode() == TacOpCode::Add);
 }
+
+TEST_CASE("optimizer - fuses dead immediate operands into BinaryImm and CompareTestImm") {
+    vm::Chunk chunk;
+    chunk.emit<LoadImm>(Register{ 1 }, 2);
+    chunk.emit<Sub>(Register{ 0 }, Register{ 1 }, Register{ 2 }); // %1 此后不活跃 → 融合
+    chunk.emit<LoadImm>(Register{ 3 }, 7);
+    chunk.emit<LT>(Register{ 2 }, Register{ 3 }, Register{ 4 });
+    chunk.emit<Test>(Register{ 4 }); // 先由 CompareTestFusion 合并，再融合立即数
+    chunk.emit<JmpNE>(Label{ 7 });
+    chunk.emit<inter::Ret>(Register{ 2 });
+    chunk.emit<inter::Ret>(Register{ 4 });
+    chunk.setRegCount(5);
+
+    OptimizerManager optimizer{ chunk };
+    optimizer.addOptimizer(std::make_unique<CompareTestFusionOptimizer>());
+    optimizer.addOptimizer(std::make_unique<ImmediateOperandFusionOptimizer>());
+    (void)optimizer.applyOptimizations();
+
+    const auto &instructions = chunk.getInstVec();
+    REQUIRE(instructions.size() == 5);
+    REQUIRE(instructions[0]->opcode() == TacOpCode::BinaryImm);
+    REQUIRE(static_cast<const BinaryImm &>(*instructions[0]).arithmetic == TacOpCode::Sub);
+    REQUIRE(instructions[0]->getOp1().value<Register>() == Register{ 0 });
+    REQUIRE(instructions[0]->getOp2().value<Integer>() == 2);
+    REQUIRE(instructions[0]->getOp3().value<Register>() == Register{ 2 });
+    REQUIRE(instructions[1]->opcode() == TacOpCode::CompareTestImm);
+    REQUIRE(static_cast<const CompareTestImm &>(*instructions[1]).comparison == TacOpCode::LT);
+    REQUIRE(instructions[1]->getOp2().value<Integer>() == 7);
+    REQUIRE(instructions[1]->getOp3().value<Register>() == Register{ 4 });
+    // 压缩后跳转目标重映射：原 @7 → 现 @4
+    REQUIRE(instructions[2]->opcode() == TacOpCode::JmpNE);
+    REQUIRE(instructions[2]->getOp1().value<Label>().address() == 4);
+}
+
+TEST_CASE("optimizer - keeps immediate loads whose register stays live or aliases the lhs") {
+    SECTION("register read again after the consumer") {
+        vm::Chunk chunk;
+        chunk.emit<LoadImm>(Register{ 1 }, 2);
+        chunk.emit<Add>(Register{ 0 }, Register{ 1 }, Register{ 2 });
+        chunk.emit<Add>(Register{ 2 }, Register{ 1 }, Register{ 3 }); // %1 仍被读
+        chunk.emit<inter::Ret>(Register{ 3 });
+        chunk.setRegCount(4);
+        OptimizerManager optimizer{ chunk };
+        optimizer.addOptimizer(std::make_unique<ImmediateOperandFusionOptimizer>());
+        (void)optimizer.applyOptimizations();
+        REQUIRE(chunk.getInstVec().size() == 4);
+        REQUIRE(chunk.inst(0)->opcode() == TacOpCode::LoadImm);
+        REQUIRE(chunk.inst(1)->opcode() == TacOpCode::Add);
+        REQUIRE(chunk.inst(2)->opcode() == TacOpCode::Add);
+    }
+    SECTION("immediate register is also the lhs") {
+        vm::Chunk chunk;
+        chunk.emit<LoadImm>(Register{ 1 }, 2);
+        chunk.emit<Mul>(Register{ 1 }, Register{ 1 }, Register{ 2 }); // 双立即数形态不支持
+        chunk.emit<inter::Ret>(Register{ 2 });
+        chunk.setRegCount(3);
+        OptimizerManager optimizer{ chunk };
+        optimizer.addOptimizer(std::make_unique<ImmediateOperandFusionOptimizer>());
+        (void)optimizer.applyOptimizations();
+        REQUIRE(chunk.getInstVec().size() == 3);
+        REQUIRE(chunk.inst(0)->opcode() == TacOpCode::LoadImm);
+        REQUIRE(chunk.inst(1)->opcode() == TacOpCode::Mul);
+    }
+    SECTION("register is live across the back edge of a loop") {
+        vm::Chunk chunk;
+        chunk.emit<LoadImm>(Register{ 1 }, 1);
+        chunk.emit<Add>(Register{ 0 }, Register{ 1 }, Register{ 0 }); // 循环头：%1 从回边仍活跃
+        chunk.emit<LoadImm>(Register{ 2 }, 5);
+        chunk.emit<LT>(Register{ 0 }, Register{ 2 }, Register{ 3 });
+        chunk.emit<Test>(Register{ 3 });
+        chunk.emit<JmpE>(Label{ 1 }); // 回边跳到 Add，而非 LoadImm：%1 必须保留
+        chunk.emit<inter::Ret>(Register{ 0 });
+        chunk.setRegCount(4);
+        OptimizerManager optimizer{ chunk };
+        optimizer.addOptimizer(std::make_unique<CompareTestFusionOptimizer>());
+        optimizer.addOptimizer(std::make_unique<ImmediateOperandFusionOptimizer>());
+        (void)optimizer.applyOptimizations();
+        REQUIRE(chunk.inst(0)->opcode() == TacOpCode::LoadImm);
+        REQUIRE(chunk.inst(1)->opcode() == TacOpCode::Add);
+        // 块内死掉的 %2 照常融合
+        REQUIRE(chunk.inst(2)->opcode() == TacOpCode::CompareTestImm);
+    }
+    SECTION("blocks protected by try are left untouched") {
+        vm::Chunk chunk;
+        chunk.emit<LoadImm>(Register{ 1 }, 2);
+        chunk.emit<Sub>(Register{ 0 }, Register{ 1 }, Register{ 2 });
+        chunk.emit<inter::Ret>(Register{ 2 });
+        chunk.setRegCount(3);
+        chunk.addThrowHandler({ 0, 3, 0 });
+        OptimizerManager optimizer{ chunk };
+        optimizer.addOptimizer(std::make_unique<ImmediateOperandFusionOptimizer>());
+        (void)optimizer.applyOptimizations();
+        REQUIRE(chunk.getInstVec().size() == 3);
+        REQUIRE(chunk.inst(1)->opcode() == TacOpCode::Sub);
+    }
+}

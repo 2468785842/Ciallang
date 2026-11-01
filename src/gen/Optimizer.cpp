@@ -20,6 +20,7 @@ namespace cial::inter {
         optimizerManager.addOptimizer(std::make_unique<IntegerConstantPropagationOptimizer>());
         optimizerManager.addOptimizer(std::make_unique<DeadLoadEliminationOptimizer>(optReg));
         optimizerManager.addOptimizer(std::make_unique<CompareTestFusionOptimizer>());
+        optimizerManager.addOptimizer(std::make_unique<ImmediateOperandFusionOptimizer>(optReg));
         const OptimizerStats optimizerStats = optimizerManager.applyOptimizations();
         if(OptimizerManager::profilingEnabled()) {
             fmt::print(stderr,
@@ -216,6 +217,92 @@ namespace cial::inter {
             return std::ranges::any_of(chunk.getThrowHandlers(), [&](const ThrowHandler &handler) {
                 return block.start < handler.tryEnd && handler.tryStart < block.end;
             });
+        }
+
+        // 块级活跃性（liveOut 数据流 + try 保护区标记）：DeadLoadElimination 与
+        // ImmediateOperandFusion 共用。use/defs 为内部工作集，调用方只需 liveOut。
+        struct BlockLiveness {
+            Vec<RegisterSet> liveOut;
+            Vec<bool> preserveAll;
+        };
+
+        BlockLiveness computeBlockLiveness(const Chunk &chunk, const Vec<BasicBlock> &blocks,
+                                           const OptReg externallyObserved) {
+            const size_t blockCount = blocks.size();
+            const size_t registerCount = chunk.getRegCount();
+            const size_t wordCount = (registerCount + 63) / 64;
+            Vec<RegisterSet> blockUse(blockCount);
+            Vec<RegisterSet> blockDefs(blockCount);
+            Vec<RegisterSet> liveIn(blockCount);
+            Vec<RegisterSet> liveOut(blockCount);
+            Vec<RegisterSet> nextIn(blockCount);
+            Vec<RegisterSet> nextOut(blockCount);
+            Vec<bool> preserveAll(blockCount, false);
+
+            for(size_t i = 0; i < blockCount; ++i) {
+                const auto &block = blocks[i];
+                blockUse[i].resize(wordCount);
+                blockDefs[i].resize(wordCount);
+                liveIn[i].resize(wordCount);
+                liveOut[i].resize(wordCount);
+                nextIn[i].resize(wordCount);
+                nextOut[i].resize(wordCount);
+                preserveAll[i] = protectedByTry(chunk, block);
+                for(size_t pc = block.start; pc < block.end; ++pc) {
+                    const Instruction &instruction = *chunk.inst(pc);
+                    Register destination{};
+                    if(tryGetImmediateLoadDestination(instruction, destination)) {
+                        setRegister(blockDefs[i], destination.index());
+                        continue;
+                    }
+                    Register copyDst{}, copySrc{};
+                    if(pureCopyDestination(instruction, copyDst, copySrc)) {
+                        // 拷贝的 src 仍计入 use：活跃性不得欠记，否则跨块前驱的
+                        // 定义会被误删（死拷贝自身的清除在反向遍历中处理）
+                        setRegister(blockDefs[i], copyDst.index());
+                    }
+                    forEachRegisterOf(instruction, [&](const Register reg) {
+                        if(!isSet(blockDefs[i], reg.index()))
+                            setRegister(blockUse[i], reg.index());
+                    });
+                }
+            }
+
+            bool anyChanged;
+            do {
+                anyChanged = false;
+                for(size_t reverse = blockCount; reverse > 0; --reverse) {
+                    const size_t i = reverse - 1;
+                    auto &out = nextOut[i];
+                    std::fill(out.begin(), out.end(), 0);
+                    for(const size_t successor : blocks[i].successors)
+                        mergeRegisters(out, liveIn[successor]);
+                    // parseAst may return a value in a register without emitting a Ret
+                    // (for example VM::evalExpr). That value is observable after any
+                    // normal exit from the chunk and must be a liveness root.
+                    if(externallyObserved && blocks[i].successors.empty())
+                        setRegister(out, externallyObserved->index());
+                    if(preserveAll[i]) {
+                        std::fill(out.begin(), out.end(), ~u64{ 0 });
+                        if(registerCount % 64 != 0 && !out.empty())
+                            out.back() = (u64{ 1 } << (registerCount % 64)) - 1;
+                    }
+
+                    auto &in = nextIn[i];
+                    bool blockChanged = false;
+                    for(size_t word = 0; word < wordCount; ++word) {
+                        in[word] = blockUse[i][word] | (out[word] & ~blockDefs[i][word]);
+                        blockChanged |= in[word] != liveIn[i][word] || out[word] != liveOut[i][word];
+                    }
+                    if(blockChanged) {
+                        liveIn[i] = in;
+                        liveOut[i] = out;
+                        anyChanged = true;
+                    }
+                }
+            } while(anyChanged);
+
+            return { std::move(liveOut), std::move(preserveAll) };
         }
     } // namespace
 
@@ -604,85 +691,13 @@ namespace cial::inter {
         if(!hasImmediate)
             return 0;
 
-        const size_t blockCount = blocks.size();
-        const size_t registerCount = chunk.getRegCount();
-        const size_t wordCount = (registerCount + 63) / 64;
-        Vec<RegisterSet> blockUse(blockCount);
-        Vec<RegisterSet> blockDefs(blockCount);
-        Vec<RegisterSet> liveIn(blockCount);
-        Vec<RegisterSet> liveOut(blockCount);
-        Vec<RegisterSet> nextIn(blockCount);
-        Vec<RegisterSet> nextOut(blockCount);
-        Vec<bool> preserveAll(blockCount, false);
+        const auto liveness = computeBlockLiveness(chunk, blocks, externallyObserved);
 
         size_t removedCount = 0;
-        for(size_t i = 0; i < blockCount; ++i) {
-            const auto &block = blocks[i];
-            blockUse[i].resize(wordCount);
-            blockDefs[i].resize(wordCount);
-            liveIn[i].resize(wordCount);
-            liveOut[i].resize(wordCount);
-            nextIn[i].resize(wordCount);
-            nextOut[i].resize(wordCount);
-            preserveAll[i] = protectedByTry(chunk, block);
-            for(size_t pc = block.start; pc < block.end; ++pc) {
-                const Instruction &instruction = *chunk.inst(pc);
-                Register destination{};
-                if(tryGetImmediateLoadDestination(instruction, destination)) {
-                    setRegister(blockDefs[i], destination.index());
-                    continue;
-                }
-                Register copyDst{}, copySrc{};
-                if(pureCopyDestination(instruction, copyDst, copySrc)) {
-                    // 拷贝的 src 仍计入 use：活跃性不得欠记，否则跨块前驱的
-                    // 定义会被误删（死拷贝自身的清除在反向遍历中处理）
-                    setRegister(blockDefs[i], copyDst.index());
-                }
-                forEachRegisterOf(instruction, [&](const Register reg) {
-                    if(!isSet(blockDefs[i], reg.index()))
-                        setRegister(blockUse[i], reg.index());
-                });
-            }
-        }
-
-        bool anyChanged;
-        do {
-            anyChanged = false;
-            for(size_t reverse = blockCount; reverse > 0; --reverse) {
-                const size_t i = reverse - 1;
-                auto &out = nextOut[i];
-                std::fill(out.begin(), out.end(), 0);
-                for(const size_t successor : blocks[i].successors)
-                    mergeRegisters(out, liveIn[successor]);
-                // parseAst may return a value in a register without emitting a Ret
-                // (for example VM::evalExpr). That value is observable after any
-                // normal exit from the chunk and must be a liveness root.
-                if(externallyObserved && blocks[i].successors.empty())
-                    setRegister(out, externallyObserved->index());
-                if(preserveAll[i]) {
-                    std::fill(out.begin(), out.end(), ~u64{ 0 });
-                    if(registerCount % 64 != 0 && !out.empty())
-                        out.back() = (u64{ 1 } << (registerCount % 64)) - 1;
-                }
-
-                auto &in = nextIn[i];
-                bool blockChanged = false;
-                for(size_t word = 0; word < wordCount; ++word) {
-                    in[word] = blockUse[i][word] | (out[word] & ~blockDefs[i][word]);
-                    blockChanged |= in[word] != liveIn[i][word] || out[word] != liveOut[i][word];
-                }
-                if(blockChanged) {
-                    liveOut[i] = out;
-                    liveIn[i] = in;
-                    anyChanged = true;
-                }
-            }
-        } while(anyChanged);
-
-        for(size_t i = 0; i < blockCount; ++i) {
-            if(preserveAll[i])
+        for(size_t i = 0; i < blocks.size(); ++i) {
+            if(liveness.preserveAll[i])
                 continue;
-            RegisterSet live = liveOut[i];
+            RegisterSet live = liveness.liveOut[i];
             const auto &block = blocks[i];
             for(size_t reverse = block.end; reverse > block.start; --reverse) {
                 const size_t pc = reverse - 1;
@@ -714,6 +729,72 @@ namespace cial::inter {
             }
         }
         return removedCount;
+    }
+
+    size_t ImmediateOperandFusionOptimizer::optimize(Chunk &chunk, const Vec<BasicBlock> &blocks) {
+        // 粗筛：没有立即数加载就不值得做活跃性分析
+        if(std::ranges::none_of(chunk.getInstVec(),
+                                [](const auto &instruction) { return instruction->opcode() == TacOpCode::LoadImm; }))
+            return 0;
+
+        const auto fusableArith = [](const TacOpCode op) {
+            return op == TacOpCode::Add || op == TacOpCode::Sub || op == TacOpCode::Mul;
+        };
+        const auto liveness = computeBlockLiveness(chunk, blocks, externallyObserved);
+
+        size_t fusedCount = 0;
+        for(size_t i = 0; i < blocks.size(); ++i) {
+            // try 保护区：寄存器可能被 handler 观察，保守不改写（同 DLE）
+            if(liveness.preserveAll[i])
+                continue;
+            RegisterSet live = liveness.liveOut[i];
+            const auto &block = blocks[i];
+            for(size_t reverse = block.end; reverse > block.start; --reverse) {
+                const size_t pc = reverse - 1;
+                const Instruction &instruction = *chunk.inst(pc);
+                const TacOpCode op = instruction.opcode();
+                if((fusableArith(op) || op == TacOpCode::CompareTest) && pc > block.start) {
+                    const auto src1 = instruction.getOp1().value<Register>();
+                    const auto rhs = instruction.getOp2().value<Register>();
+                    // 反向扫描到此时 live 是消费点之后的（过近似）活跃集：右操作数
+                    // 此后不再活跃、不与左操作数同槽（双立即数不支持），且紧邻的
+                    // 前一条正是它的 LoadImm 定义——即 IRGen 的 `load_imm; op` 形态
+                    if(src1.index() != rhs.index() && !isSet(live, rhs.index())) {
+                        const Instruction &def = *chunk.inst(pc - 1);
+                        if(def.opcode() == TacOpCode::LoadImm &&
+                           def.getOp1().value<Register>().index() == rhs.index()) {
+                            const auto imm = def.getOp2().value<Integer>();
+                            const auto dst = instruction.getOp3().value<Register>();
+                            if(op == TacOpCode::CompareTest)
+                                chunk.getInstVec()[pc] = std::make_unique<CompareTestImm>(
+                                    static_cast<const CompareTest &>(instruction).comparison, src1, imm, dst);
+                            else
+                                chunk.getInstVec()[pc] = std::make_unique<BinaryImm>(op, src1, imm, dst);
+                            chunk.repl<NOP>(pc - 1);
+                            ++fusedCount;
+                            // 以融合后的指令更新活跃集（op2 为 Integer，只触及 src/dst）
+                            forEachRegisterOf(*chunk.inst(pc),
+                                              [&](const Register reg) { setRegister(live, reg.index()); });
+                            continue;
+                        }
+                    }
+                }
+                // 活跃集更新与 DLE 反向遍历一致；本 pass 只融合不删除
+                Register destination{};
+                if(tryGetImmediateLoadDestination(instruction, destination)) {
+                    clearRegister(live, destination.index());
+                    continue;
+                }
+                Register copyDst{}, copySrc{};
+                if(pureCopyDestination(instruction, copyDst, copySrc)) {
+                    clearRegister(live, copyDst.index());
+                    setRegister(live, copySrc.index());
+                    continue;
+                }
+                forEachRegisterOf(instruction, [&](const Register reg) { setRegister(live, reg.index()); });
+            }
+        }
+        return fusedCount;
     }
 
 } // namespace cial::inter

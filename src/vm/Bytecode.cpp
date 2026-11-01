@@ -460,6 +460,63 @@ namespace cial::vm {
         write<u16>(info.code, tac->getOp3Val<inter::Register>().index());
         write<u16>(info.code, tac->receiver.index());
     }
+
+    namespace {
+        // CompareTest 与 CompareTestImm 共用的比较子码映射（稳定值，不写 TAC 枚举）
+        u8 comparisonKind(const inter::TacOpCode op) {
+            switch(op) {
+                case inter::TacOpCode::EQ:
+                    return 0;
+                case inter::TacOpCode::NEQ:
+                    return 1;
+                case inter::TacOpCode::AbsEQ:
+                    return 2;
+                case inter::TacOpCode::AbsNEQ:
+                    return 3;
+                case inter::TacOpCode::LT:
+                    return 4;
+                case inter::TacOpCode::LE:
+                    return 5;
+                case inter::TacOpCode::GT:
+                    return 6;
+                case inter::TacOpCode::GE:
+                    return 7;
+                default:
+                    throw std::runtime_error("invalid fused comparison");
+            }
+        }
+    } // namespace
+
+    void Bytecode::encode(Info &info, const inter::BinaryImm *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::BinaryImm));
+        u8 kind{};
+        switch(tac->arithmetic) {
+            case inter::TacOpCode::Add:
+                kind = 0;
+                break;
+            case inter::TacOpCode::Sub:
+                kind = 1;
+                break;
+            case inter::TacOpCode::Mul:
+                kind = 2;
+                break;
+            default:
+                throw std::runtime_error("invalid fused arithmetic");
+        }
+        info.code.push_back(kind);
+        write<u16>(info.code, tac->getOp1Val<inter::Register>().index());
+        encodeSleb128(tac->getOp2Val<Integer>(), info.code);
+        write<u16>(info.code, tac->getOp3Val<inter::Register>().index());
+    }
+
+    void Bytecode::encode(Info &info, const inter::CompareTestImm *tac) {
+        info.code.push_back(static_cast<u8>(VmOpCode::CompareTestImm));
+        info.code.push_back(comparisonKind(tac->comparison));
+        write<u16>(info.code, tac->getOp1Val<inter::Register>().index());
+        encodeSleb128(tac->getOp2Val<Integer>(), info.code);
+        write<u16>(info.code, tac->getOp3Val<inter::Register>().index());
+    }
+
     void Bytecode::encode(Info &info, const inter::CallMethodV *tac) {
         info.code.push_back(static_cast<u8>(VmOpCode::CallMethodV));
         write<u16>(info.code, tac->receiver.index());

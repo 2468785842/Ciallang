@@ -138,8 +138,10 @@ namespace cial::vm {
             // 先出栈再取新栈顶；栈清空时 _curFrame 置空，
             // 不能写 &_callStack[-1]（会越界踩坏相邻成员）
             _curFrame = _stackTop > 0 ? &_callStack[_stackTop - 1] : nullptr;
+            // 只析构不重建：GC 标记/recordFault/转储遍历均以 _stackTop 为界，
+            // 释放槽在下一次 allocCallFrame placement-new 时全量覆写（含字节码
+            // 缓存字段清零）；原 new CallFrame{} 每次返回要清写全部字段
             _callStack[_stackTop].~CallFrame();
-            new(&_callStack[_stackTop]) CallFrame{};
         }
 
         [[nodiscard]] size_t getRegPoolTop() const { return _pool.used(); }

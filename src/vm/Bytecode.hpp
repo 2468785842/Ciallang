@@ -111,7 +111,9 @@
     O(DelPropC) \
     O(CompareTest) \
     O(GMethodC) \
-    O(CallMethodV)
+    O(CallMethodV) \
+    O(BinaryImm) \
+    O(CompareTestImm)
 // clang-format on
 
 namespace cial::vm {

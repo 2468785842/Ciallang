@@ -1,0 +1,61 @@
+// 表达式 - 二元运算表达式 / 立即数融合（BinaryImm / CompareTestImm）
+// 右操作数为字面量、左操作数经函数参数传入（防常量折叠），覆盖整数快路径、
+// 实数/字符串慢路径、负数与多字节立即数，以及比较直写 _zf 驱动分支
+Scripts.execStorage("../../assert.tjs");
+
+function id(v) { return v; }
+
+// 整数快路径
+assertTrue(id(5) - 2 == 3, "sub imm");
+assertTrue(id(5) + 2 == 7, "add imm");
+assertTrue(id(5) * 2 == 10, "mul imm");
+assertTrue(id(5) - -3 == 8, "sub negative imm");
+assertTrue(id(5) + -1 == 4, "add negative imm");
+assertTrue(id(5) + 1000000 == 1000005, "add multi-byte imm");
+assertTrue(id(-7) * 3 == -21, "mul negative lhs");
+
+// 慢路径：左操作数非整数时右立即数按 Value 语义参与运算
+assertTrue(id(3.5) - 2 == 1.5, "real sub imm");
+assertTrue(id(1.25) * 2 == 2.5, "real mul imm");
+assertTrue(id("ab") + 1 == "ab1", "string add imm concatenates");
+assertTrue(id("7") - 2 == 5, "numeric string sub imm");
+assertTrue(id("4") * 2 == 8, "numeric string mul imm");
+
+// 比较直写 _zf：驱动 if/循环分支
+function sign(n) {
+    if(n < 0) return -1;
+    if(n == 0) return 0;
+    return 1;
+}
+assertTrue(sign(id(-5)) == -1, "lt imm branch");
+assertTrue(sign(id(0)) == 0, "eq imm branch");
+assertTrue(sign(id(9)) == 1, "fallthrough branch");
+
+var n = id(2);
+assertTrue(!(n < 2), "lt false");
+assertTrue(n <= 2, "le true");
+assertTrue(!(n > 2), "gt false");
+assertTrue(n >= 2, "ge true");
+assertTrue(n == 2, "eq true");
+assertTrue(!(n != 2), "ne false");
+assertTrue(id(1.5) < 2, "real lt imm");
+assertTrue(id(2.0) == 2, "real eq imm");
+assertTrue(!(id(2.0) === 2), "real strict-ne imm (type differs)");
+assertTrue(id(3) !== 2, "int strict-ne imm");
+
+// 比较结果同时保留为值
+var flag = id(7) > 2;
+assertTrue(flag == 1, "comparison result materialized");
+
+// 融合后的计数循环与递归（fib 形态）
+var count = 0;
+for(var i = 0; i < 10; i++) count += 1;
+assertTrue(count == 10, "loop with fused compare/add");
+
+function fib(k) {
+    if(k < 2) return k;
+    return fib(k - 2) + fib(k - 1);
+}
+assertTrue(fib(id(15)) == 610, "recursive fib with fused sub/compare");
+
+finishTests();

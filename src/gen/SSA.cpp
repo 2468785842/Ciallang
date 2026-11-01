@@ -286,6 +286,13 @@ namespace cial::inter {
                 if(auto reg = asRegister(inst.getOp3()))
                     access.defs.push_back(*reg);
                 break;
+            // 立即数融合族：op2 为 Integer，仅左操作数为使用
+            case TacOpCode::BinaryImm:
+            case TacOpCode::CompareTestImm:
+                use1();
+                if(auto reg = asRegister(inst.getOp3()))
+                    access.defs.push_back(*reg);
+                break;
             case TacOpCode::CallV: {
                 const auto &call = static_cast<const CallV &>(inst);
                 access.defs.push_back(call.dst);

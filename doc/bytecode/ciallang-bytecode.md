@@ -203,6 +203,8 @@ IGNOREPROP 由 *Raw 指令承担；MEMBERENSURE 依赖对象 setProp 的创建�
 | 92 | CompareTest | `kind, %lhs, %rhs, %dst` | 融合比较与紧随的 Test，保留 `%dst` 布尔值并同步 `_zf`；不跨 CFG 基本块边界（`src/gen/Optimizer.cpp`） |
 | 93 | GMethodC | `%obj, atom, %func, %receiver` | 调用前读取成员：原生方法不分配绑定对象，函数和接收者分开存入寄存器；其他成员走原有属性读取协议，receiver 为 void |
 | 94 | CallMethodV | `%receiver, %dst, %func, argc, %args...` | receiver 非 void 时按原生调用约定传递 objthis；否则复用 CallV 的脚本函数直写或通用调用。成员读取先于实参求值，提取为一等值的方法仍用 GPropC 绑定（`src/gen/IRGenerator.cpp`、`src/types/Function.cpp`） |
+| 95 | BinaryImm | `kind, %src, imm, %dst` | 立即数融合算术：`LoadImm K imm; {Add,Sub,Mul} src K dst` 在 K 此后不活跃时由 ImmediateOperandFusion 改写为单指令；kind 0/1/2 依次 Add/Sub/Mul，语义 = 原三寄存器指令以 `Value{imm}` 作右操作数（整数快路径条件退化为仅判左操作数；`src/gen/Optimizer.cpp`） |
+| 96 | CompareTestImm | `kind, %lhs, imm, %dst` | CompareTest 的右操作数立即数形态：`LoadImm K imm; CompareTest kind lhs K dst` 融合而来；kind 与 CompareTest 同一映射，写 `%dst` 并同步 `_zf` |
 
 ## 4. Chunk 结构（`src/vm/Chunk.hpp`）
 
@@ -263,6 +265,8 @@ IGNOREPROP 由 *Raw 指令承担；MEMBERENSURE 依赖对象 setProp 的创建�
 | 名字访问 | DGlobal/GGlobal/GThis/DThis/GRefRaw | `op + u32 atom + u16 reg` |
 | 成员名直引 | GPropC/DPropC/GPropRawC/DPropRawC/DelPropC（`obj, atom, dst/src`） | `op + u16 obj + u32 atom + u16 dst/src` |
 | 比较测试融合 | CompareTest | `op + u8 kind + u16 lhs + u16 rhs + u16 dst`；kind 0..7 依次 EQ/NEQ/AbsEQ/AbsNEQ/LT/LE/GT/GE |
+| 立即数融合算术 | BinaryImm | `op + u8 kind + u16 src + sLEB128 imm + u16 dst`；kind 0/1/2 依次 Add/Sub/Mul |
+| 立即数比较测试 | CompareTestImm | `op + u8 kind + u16 lhs + sLEB128 imm + u16 dst`；kind 同 CompareTest |
 | 原生方法读取 | GMethodC | `op + u16 obj + u32 atom + u16 func + u16 receiver` |
 | 接收者分离调用 | CallMethodV | `op + u16 receiver + u16 dst + u16 func + uleb(argc) + u16×n` |
 | 算术/位/比较 | Add..LOr 全部 22 条（§3.8） | `op + u16 src1 + u16 src2 + u16 dst`（**三寄存器非破坏性**） |

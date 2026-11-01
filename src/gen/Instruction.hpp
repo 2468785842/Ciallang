@@ -114,7 +114,9 @@
     O(DelPropC) \
     O(CompareTest) \
     O(GMethodC) \
-    O(CallMethodV)
+    O(CallMethodV) \
+    O(BinaryImm) \
+    O(CompareTestImm)
 // clang-format on
 
 namespace cial::vm {
@@ -419,6 +421,36 @@ namespace cial::inter {
             _ops[2] = Operand{ dst };
         }
         TacOpCode opcode() const override { return TacOpCode::CompareTest; }
+        std::string dump(const vm::VMState *) override;
+    };
+
+    // ── 立即数融合族（ImmediateOperandFusionOptimizer 生成，IRGen 不直接发射）──
+    // `LoadImm K imm; Op src K dst` 在 K 此后不活跃时改写为单指令，省一次派发
+    // 与一个寄存器槽写入；语义 = 原指令以 `Value{imm}` 作右操作数（整数快路径
+    // 条件退化为仅判左操作数）。op2 为 Integer 操作数，forEachRegisterOf 自然跳过
+    // 右操作数：Add/Sub/Mul（有整数快路径的三元算术）
+    class BinaryImm : public Instruction {
+    public:
+        TacOpCode arithmetic;
+        BinaryImm(TacOpCode op, Register src, Integer imm, Register dst) : arithmetic(op) {
+            _ops[0] = Operand{ src };
+            _ops[1] = Operand{ imm };
+            _ops[2] = Operand{ dst };
+        }
+        TacOpCode opcode() const override { return TacOpCode::BinaryImm; }
+        std::string dump(const vm::VMState *) override;
+    };
+
+    // CompareTest 的右操作数立即数形态（kind 与 CompareTest 同一映射，同步 _zf）
+    class CompareTestImm : public Instruction {
+    public:
+        TacOpCode comparison;
+        CompareTestImm(TacOpCode op, Register lhs, Integer imm, Register dst) : comparison(op) {
+            _ops[0] = Operand{ lhs };
+            _ops[1] = Operand{ imm };
+            _ops[2] = Operand{ dst };
+        }
+        TacOpCode opcode() const override { return TacOpCode::CompareTestImm; }
         std::string dump(const vm::VMState *) override;
     };
 

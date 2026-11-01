@@ -611,3 +611,82 @@ Windows Debug、Release、Release + JIT 均完成 235 项 CTest 验收；Release
 `Chunk.hpp`、`CallFrame.hpp`、`src/types/Property.hpp`，回归见 `tests/diagnostics_test.cpp`、`tests/cli_test.py`。
 
 原始样本、工作负载与 SHA-256 见[测量数据](reports/2026-11-01-runtime-stack-benchmark.json)。
+
+## 2026-11-01 fib 调用路径批次（A 帧级字节码缓存 / D 立即数融合 / B 释放帧免重建）
+
+Windows x64、Clang 19.1.5、`-O3 -DNDEBUG`、静态 CRT，JIT 关闭。基线为干净 HEAD `2fe2d59`
+worktree 构建；候选在同一 worktree 逐项叠加，每项相对上一已接受状态单变量对照。本机测量期间
+前台应用稳定占用约 1.5 核（无法清空），因此主口径改为预热后交替 15~21 轮取 **min**（对负载
+尖峰鲁棒，`cmake/Bench.cmake` 同款），同场附 median 与同二进制 A/A 校准；A/A 噪声底：
+fib（40ms 级短脚本）单批可达 ±10%，fib(30) 压力变体 ±2%，loop_int ±1.5%。调用机械微基准
+`bench/results/20261101-fib-call-path/probe-call-in-fn.tjs`（寄存器局部循环内 5M 次空函数调用）与纯循环差分得：调用机械
+**Ciallang 133.7ns/次 vs TJS2 93.6ns/次**，纯派发 7.4 vs 3.6 ns/条——fib 差距全在此，不在函数体。
+
+**A. CallFrame 帧级字节码缓存**（`CallFrame::bcBase/bcSize/bcConstants/bcRegs`，
+FETCH_NEW_FRAME 冷填热读；`src/vm/CallFrame.hpp`、`VMState.cpp`）。三种形态：
+
+| 形态 | 结果 | 结论 |
+|---|---|---|
+| A1 FETCH 内联分支填充 | 调用微基准 −5.2%，**loop_int +19%（min）** | 派发环寄存器分配/布局病理，否决 |
+| A2 建帧即编码并填充（FETCH 无分支直读） | `diagnostics_test.cpp:145` 失败：recordFault 不得触发编码 | 破坏惰性编码不变量，否决 |
+| A3 惰性填充，冷路径 `CIAL_COLD_NOINLINE` 外提 | loop_int +1.35%（噪声），调用微基准 −3.3%/−3.7%（两批），fib ±噪声 | 严格不劣 + 调用机械收益复现，**接受** |
+
+**D. 立即数融合**（`BinaryImm`/`CompareTestImm`，`ImmediateOperandFusionOptimizer`）：
+`LoadImm K imm; {Add,Sub,Mul,CompareTest} src K dst` 在 K 此后不活跃时改写为单指令，活跃性
+与 DeadLoadElimination 共享 `computeBlockLiveness`（跨块 liveOut 数据流，try 保护区跳过，只
+处理相邻对）。fib 函数体 14→11 条 TAC；语义 = 原指令以 `Value{imm}` 作右操作数。相对 A3：
+
+| 脚本 | 批 1（负载期）| 批 2 min | 批 2 median |
+|---|---:|---:|---:|
+| fib(30) | −9.0% | −2.6% | −5.5% |
+| fib | +5.7% | −9.9% | −4.6% |
+| loop_int | −4.6% | +1.3% | +2.5% |
+| 调用微基准 | −4.5% | +0.7% | +2.6% |
+| native_methods / string_concat | +0.4% / −1.7% | — | — |
+
+fib 方向在两批一致（fib(30) 高分辨率项稳定向好），其余在噪声带内无回退，**接受**。
+新指令同步：TAC/字节码 X-macro（编号 95/96）、encode/dispatch、dump、SSA def-use、尾递归
+白名单、IntegerJit 解码与发射（右操作数取立即数）、`doc/bytecode/ciallang-bytecode.md`。
+
+**B. `freeCallFrame` 释放槽只析构不重建**（`src/vm/VMState.hpp`）：GC 标记、recordFault、
+转储遍历均以 `_stackTop` 为界，释放槽在下次 `allocCallFrame` placement-new 时全量覆写（含
+A 的缓存字段清零）。相对 A3+D（min / median）：调用微基准 −5.4% / −7.6%，fib(30) −2.5% / −2.6%，
+fib −1.2% / +0.3%；loop_int −4.6% / −8.2% 与 native_methods −8.7% / −7.0% 不在其机制路径上
+（无帧弹出），属同场布局漂移。严格更少工作且各批无回退，**接受**。
+
+**整栈 A3+D+B 相对 HEAD**（min-of-21，同场 A/A：fib +10.8%、fib(30) −2.1%）：
+
+| 脚本 | HEAD min ms | 整栈 min ms | 变化 |
+|---|---:|---:|---:|
+| fib(30) 压力 | 412.11 | 384.10 | **−6.8%** |
+| fib | 41.29 | 38.81 | −6.0% |
+| loop_int | 348.80 | 309.07 | **−11.4%** |
+| 调用微基准 | 888.19 | 811.03 | **−8.7%** |
+| native_methods | 19.38 | 18.78 | −3.1% |
+| string_concat | 17.23 | 16.66 | −3.3% |
+| class_instantiate | 10.57 | 10.28 | −2.8% |
+
+验证：Windows Release CTest 236/236（含新增 `tests/optimizer_test.cpp` 融合判定四用例与
+`tests/tjs/expression/binary/immediate-fusion.tjs`，后者在 TJSCompiler 参考上亦 28/28 通过）；
+Release + JIT CTest 236/236——融合把 `x + 2` 一类函数体缩成单步轨迹，曾触发 IntegerJit
+`steps.size() < 2` 门槛拒编（`jit_test.cpp:102` 失败、寄存器循环 compiled 4→2）；门槛改按
+等效解释步数计（融合指令计 2）后 JIT 覆盖面与 HEAD 完全一致（compiled=4 / executions=10,000,002）。
+修改文件 clang-format 校验通过。原始样本、A/B 脚本、各形态补丁与二进制 SHA-256 位于本机忽略目录
+`bench/results/20261101-fib-call-path/`。同日另有 `thisData` 缓存继承补丁（`setThisObj` 每次全局函数
+调用对 GlobalObject 做必败 `dynamic_cast<DataObject*>`，fib(25) 实测 242,787 次/命中 1 次）：
+Windows 上中性（MSVC ABI 失败转换廉价），对应 macOS 画像 ~32% RTTI 采样，未纳入本栈，待
+macOS 复测后单独落地。
+
+**被否决的后续候选 F——终结检查外提**（同机、同口径，对照 A3+D+B 整栈）：把每条指令前的
+`pendingFinalizers.empty()` 检查改为帧入口一次（局部 bool 门控）+ 回边（Jmp/JmpE/JmpNE 向后跳）
+安全点借 `DispatchRet::Call` 回帧入口 drain。语义探针（5 万次无调用分配循环）确认延迟终结仍在
+循环内推进，CTest 236/236；但两批 A/B 一致回退：loop_int +7.3% / +3.8%，寄存器局部纯循环
++8.9% / +7.8%，fib(30) −1.1%~−2.9%（噪声级）。归因：原检查是 L1 热、恒预测不跳转的
+load+cmp+jcc，实际代价很小；替代形态的帧入口 bool 在 try/catch 与全内联巨型循环体下被溢出到
+栈（仍是每指令 load+test），回边 handler 又多了比较与 Call 返回边（循环中 1/7~1/10 的指令）。
+**结论：每指令骨架开销（终结检查、`_pending` 检查、instructionPc/r/dispatched 记账、循环
+条件）是多个分散小项，没有单一热点；搬运其中一项不划算**。若要收此块，应整体改骨架——例如
+GC sweep 排队终结对象时直接置 `_pending`（一个 "需走慢路径" 标志替代两次检查，零新增每指令
+开销）。顺带核实：Release 下 96 个 dispatch handler 全部内联进 `runLoop<>`（仅
+`dispatchTailCallV` 作为独立符号存活），"每指令一次函数调用"的假设不成立；派发差距（7.4 vs
+3.6 ns/条）来自骨架记账与指令语义本身。diff 留档本机 `bench/results/20261101-fib-call-path/stack-plus-F-rejected.patch`。

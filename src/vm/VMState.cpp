@@ -482,6 +482,20 @@ namespace cial::vm {
         }
     }
 
+    namespace {
+        // FETCH_NEW_FRAME 冷路径：帧首次进入派发环时编码（幂等）并填充帧级
+        // 字节码缓存。惰性编码不变量保持——仅进入派发环的 chunk 才编码；
+        // 外提 noinline 防止冷块内联膨胀改变派发环的寄存器分配/布局
+        CIAL_COLD_NOINLINE void fillFrameBytecodeCache(CallFrame *cur, Chunk *chunk) {
+            chunk->toBytecode();
+            cur->bcConstants = chunk->getConstants().data();
+            cur->bcRegs = cur->regs();
+            const Vec<u8> &codeVec = chunk->code();
+            cur->bcBase = codeVec.data();
+            cur->bcSize = codeVec.size();
+        }
+    } // namespace
+
     template <bool Record, bool Native, bool Tail>
     void VMState::runLoop() {
         const size_t entryStackTop = _stackTop;
@@ -497,14 +511,16 @@ namespace cial::vm {
             CallFrame *cur = _curFrame;
             u64 pc = cur->pc;
             Chunk *chunk = cur->chunk;
-            // 字节码按需编译（幂等）：进入字节码路径的 chunk 才编译
-            chunk->toBytecode();
-            const Constant *constants = chunk->getConstants().data();
-            Value *regs = cur->regs();
-
-            const Vec<u8> &codeVec = chunk->code();
-            const u8 *ip = codeVec.data();
-            const size_t bcSize = codeVec.size();
+            // 帧级字节码缓存（CallFrame::bcBase）：chunk 一次 toBytecode 后
+            // code/constants 布局不可变，寄存器池只增块不迁移已分配块——首次
+            // 取帧冷路径填充（外提防内联膨胀改变派发环寄存器分配），调用/返回
+            // 重取帧时直接复用，免 toBytecode 检查与 Vec/池取址的依赖加载链
+            if(!cur->bcBase)
+                fillFrameBytecodeCache(cur, chunk);
+            const Constant *constants = cur->bcConstants;
+            Value *regs = cur->bcRegs;
+            const u8 *ip = cur->bcBase;
+            const size_t bcSize = cur->bcSize;
 
             while(pc < bcSize) {
                 DispatchRet r{};
@@ -1297,6 +1313,126 @@ namespace cial::vm {
         return DispatchRet::Continue;
     }
 
+    // ── 立即数融合族（ImmediateOperandFusionOptimizer 生成）────────────
+    // 语义 = 对应三寄存器指令以 Value{imm} 作右操作数：右操作数恒为整数，
+    // 整数快路径条件退化为仅判左操作数；慢路径构造临时 Value 走同一 Value 方法
+    DISPATCH_OP_METHOD(BinaryImm) {
+        const u8 kind = ip[pc++];
+        const u16 r1 = read<u16>(ip, pc);
+        const Integer imm = decodeSleb128(ip, pc, 10);
+        const u16 r3 = read<u16>(ip, pc);
+        Value &a = regs[r1];
+        if(a.isIntegerFast()) {
+            const Integer x = a.asIntegerUnsafe();
+            Integer result{};
+            switch(kind) {
+                case 0:
+                    result = x + imm;
+                    break;
+                case 1:
+                    result = x - imm;
+                    break;
+                case 2:
+                    result = x * imm;
+                    break;
+                default:
+                    throw std::runtime_error("invalid fused arithmetic");
+            }
+            if(regs[r3].isIntegerFast())
+                regs[r3].asIntegerStore(result);
+            else
+                regs[r3] = Value{ result };
+            return DispatchRet::Continue;
+        }
+        const Value b{ imm };
+        switch(kind) {
+            case 0:
+                regs[r3] = a.add(b).unwrap();
+                break;
+            case 1:
+                regs[r3] = a.sub(b).unwrap();
+                break;
+            case 2:
+                regs[r3] = a.mul(b).unwrap();
+                break;
+            default:
+                throw std::runtime_error("invalid fused arithmetic");
+        }
+        return DispatchRet::Continue;
+    }
+
+    DISPATCH_OP_METHOD(CompareTestImm) {
+        const u8 kind = ip[pc++];
+        const u16 lhs = read<u16>(ip, pc);
+        const Integer imm = decodeSleb128(ip, pc, 10);
+        const u16 dst = read<u16>(ip, pc);
+        const Value &a = regs[lhs];
+        bool result{};
+        if(a.isIntegerFast()) {
+            const Integer x = a.asIntegerUnsafe();
+            switch(kind) {
+                case 0:
+                case 2:
+                    result = x == imm;
+                    break;
+                case 1:
+                case 3:
+                    result = x != imm;
+                    break;
+                case 4:
+                    result = x < imm;
+                    break;
+                case 5:
+                    result = x <= imm;
+                    break;
+                case 6:
+                    result = x > imm;
+                    break;
+                case 7:
+                    result = x >= imm;
+                    break;
+                default:
+                    throw std::runtime_error("invalid fused comparison");
+            }
+        } else {
+            const Value b{ imm };
+            switch(kind) {
+                case 0:
+                    result = a.equals(b);
+                    break;
+                case 1:
+                    result = !a.equals(b);
+                    break;
+                case 2:
+                    result = a.discernEquals(b);
+                    break;
+                case 3:
+                    result = !a.discernEquals(b);
+                    break;
+                case 4:
+                    result = a.littlerThan(b).unwrap();
+                    break;
+                case 5:
+                    result = !a.greaterThan(b).unwrap();
+                    break;
+                case 6:
+                    result = a.greaterThan(b).unwrap();
+                    break;
+                case 7:
+                    result = !a.littlerThan(b).unwrap();
+                    break;
+                default:
+                    throw std::runtime_error("invalid fused comparison");
+            }
+        }
+        if(regs[dst].isIntegerFast())
+            regs[dst].asIntegerStore(Integer{ result });
+        else
+            regs[dst] = Value{ Integer{ result } };
+        _zf = result;
+        return DispatchRet::Continue;
+    }
+
     DISPATCH_OP_METHOD(CmpEQ) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
@@ -1525,6 +1661,9 @@ namespace cial::vm {
                     case TacOpCode::GT:
                     case TacOpCode::GE:
                     case TacOpCode::CompareTest:
+                    // 立即数融合族：语义与上方三寄存器形态一致（右操作数为整数）
+                    case TacOpCode::BinaryImm:
+                    case TacOpCode::CompareTestImm:
                         destination = instruction->getOp3().value<inter::Register>();
                         break;
                     case TacOpCode::CallV: {

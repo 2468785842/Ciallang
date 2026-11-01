@@ -44,6 +44,15 @@ namespace cial {
         // 帧释放时 withStack 截断到此深度（unwind/正常返回共用 freeCallFrame）
         size_t withDepth{};
 
+        // 帧级字节码缓存（runLoop 首次取帧时填充）：chunk 一旦 toBytecode 后
+        // code/constants 布局不可变，寄存器池只增块不迁移已分配块——
+        // 调用/返回重取帧时直接复用，免 toBytecode 幂等检查与 Vec/池取址的
+        // 依赖加载链（调用密集路径每次调用走两遍 FETCH_NEW_FRAME）
+        const u8 *bcBase{};
+        size_t bcSize{};
+        const Constant *bcConstants{};
+        Value *bcRegs{};
+
         // thisObj 的赋值入口：同步刷新 thisData 缓存（定义在 VMState.cpp，需要完整 DataObject 类型）。
         // 不要绕过它直接写 thisObj，否则缓存失效。
         void setThisObj(Value v);

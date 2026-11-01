@@ -79,6 +79,21 @@ namespace cial::inter {
         size_t optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) override;
     };
 
+    // 立即数融合：`LoadImm K imm; {Add,Sub,Mul,CompareTest} src K dst` 且 K 在
+    // 消费点之后不再活跃（含跨块 liveOut 数据流）时改写为 BinaryImm/CompareTestImm
+    // 单指令。只处理相邻对（IRGen 的发射形态）；try 保护区保守跳过。活跃性计算
+    // 与 DeadLoadElimination 共享（computeBlockLiveness）。
+    class ImmediateOperandFusionOptimizer final : public Optimizer {
+    public:
+        explicit ImmediateOperandFusionOptimizer(OptReg externallyObserved = {}) :
+            externallyObserved(externallyObserved) {}
+        [[nodiscard]] std::string_view name() const noexcept override { return "immediate-operand-fusion"; }
+        size_t optimize(vm::Chunk &chunk, const Vec<BasicBlock> &blocks) override;
+
+    private:
+        OptReg externallyObserved;
+    };
+
     void optimizeDefaultChunk(vm::Chunk &chunk, OptReg externallyObserved = {});
 
     class OptimizerManager {

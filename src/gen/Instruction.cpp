@@ -189,6 +189,15 @@ namespace cial::inter {
         return fmt::format("compare_test {} %{} %{} %{}", static_cast<int>(comparison), getOp1Val<Register>().index(),
                            getOp2Val<Register>().index(), getOp3Val<Register>().index());
     }
+    std::string BinaryImm::dump(const VMState *) {
+        return fmt::format("binary_imm {} %{} #{} %{}", static_cast<int>(arithmetic), getOp1Val<Register>().index(),
+                           static_cast<i64>(getOp2Val<Integer>()), getOp3Val<Register>().index());
+    }
+    std::string CompareTestImm::dump(const VMState *) {
+        return fmt::format("compare_test_imm {} %{} #{} %{}", static_cast<int>(comparison),
+                           getOp1Val<Register>().index(), static_cast<i64>(getOp2Val<Integer>()),
+                           getOp3Val<Register>().index());
+    }
     std::string GMethodC::dump(const VMState *) {
         return fmt::format("g_method_c %{} atom_{} %{} %{}", getOp1Val<Register>().index(), getOp2Val<Atom>().v,
                            getOp3Val<Register>().index(), receiver.index());

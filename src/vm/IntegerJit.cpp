@@ -18,6 +18,9 @@ namespace cial::vm {
             u16 dst{}, lhs{}, rhs{};
             u8 comparison{};
             i64 immediate{};
+            // 立即数融合族（BinaryImm/CompareTestImm）：右操作数取 immediate，
+            // rhs 槽位不用（保持 0 以通过寄存器数上界检查）
+            bool rhsIsImmediate{};
             u64 pc{}, end{}, next{}, target{};
         };
         bool decode(const Chunk &chunk, const u64 start, Step &s, const bool branches) {
@@ -69,6 +72,29 @@ namespace cial::vm {
                     s.lhs = read<u16>(ip, pc);
                     s.rhs = read<u16>(ip, pc);
                     s.dst = read<u16>(ip, pc);
+                    break;
+                // 立即数融合族：kind + u16 + sleb128(≤10) + u16
+                case VmOpCode::BinaryImm:
+                    if(!need(6))
+                        return false;
+                    s.comparison = ip[pc++];
+                    if(s.comparison > 2)
+                        return false;
+                    s.lhs = read<u16>(ip, pc);
+                    s.immediate = decodeSleb128(ip, pc, std::min<size_t>(10, code.size() - pc));
+                    s.dst = read<u16>(ip, pc);
+                    s.rhsIsImmediate = true;
+                    break;
+                case VmOpCode::CompareTestImm:
+                    if(!need(6))
+                        return false;
+                    s.comparison = ip[pc++];
+                    if(s.comparison > 7)
+                        return false;
+                    s.lhs = read<u16>(ip, pc);
+                    s.immediate = decodeSleb128(ip, pc, std::min<size_t>(10, code.size() - pc));
+                    s.dst = read<u16>(ip, pc);
+                    s.rhsIsImmediate = true;
                     break;
                 case VmOpCode::Test:
                     if(!need(2))
@@ -132,7 +158,13 @@ namespace cial::vm {
             if(cache.size() >= 128 || cache.contains(key))
                 return;
             auto &entry = cache[key];
-            if(steps.size() < 2)
+            // 最短轨迹门槛按等效解释步数计：立即数融合指令（BinaryImm/
+            // CompareTestImm）等价于原 LoadImm + 运算两步，单条融合指令的轨迹
+            // 与融合前同样可编译，JIT 覆盖面不因融合而缩减
+            size_t effectiveSteps = 0;
+            for(const auto &s : steps)
+                effectiveSteps += s.rhsIsImmediate ? 2 : 1;
+            if(effectiveSteps < 2)
                 return;
             EmitErrors errors;
             asmjit::CodeHolder code;
@@ -195,11 +227,22 @@ namespace cial::vm {
                     }
                 } else {
                     auto lhs = load(s.lhs);
-                    const auto rhs = load(s.rhs);
-                    if(s.op == VmOpCode::Add || s.op == VmOpCode::Sub || s.op == VmOpCode::Mul) {
-                        if(s.op == VmOpCode::Add)
+                    // 立即数融合族：右操作数来自 immediate 而非寄存器槽
+                    const auto rhs = [&] {
+                        if(s.rhsIsImmediate) {
+                            auto value = cc.newInt64();
+                            cc.mov(value, asmjit::imm(s.immediate));
+                            return value;
+                        }
+                        return load(s.rhs);
+                    }();
+                    const bool isAdd = s.op == VmOpCode::Add || (s.op == VmOpCode::BinaryImm && s.comparison == 0);
+                    const bool isSub = s.op == VmOpCode::Sub || (s.op == VmOpCode::BinaryImm && s.comparison == 1);
+                    const bool isMul = s.op == VmOpCode::Mul || (s.op == VmOpCode::BinaryImm && s.comparison == 2);
+                    if(isAdd || isSub || isMul) {
+                        if(isAdd)
                             cc.add(lhs, rhs);
-                        else if(s.op == VmOpCode::Sub)
+                        else if(isSub)
                             cc.sub(lhs, rhs);
                         else
                             cc.imul(lhs, rhs);
@@ -260,7 +303,7 @@ namespace cial::vm {
                                 break;
                         }
                         lhs = flag;
-                        if(s.op == VmOpCode::CompareTest)
+                        if(s.op == VmOpCode::CompareTest || s.op == VmOpCode::CompareTestImm)
                             cc.mov(mem(regCount), flag);
                     }
                     cc.mov(mem(s.dst), lhs);
