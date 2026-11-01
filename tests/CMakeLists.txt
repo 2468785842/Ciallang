@@ -30,6 +30,7 @@ set(SOURCES
         jit_test.cpp
         tjsbc_reader_test.cpp
         tjsbc_translator_test.cpp
+        decompile_test.cpp
         scripts_test.cpp
         sdk_test.cpp
         statement_test.cpp

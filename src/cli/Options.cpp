@@ -13,6 +13,8 @@ namespace cial::cli {
                                          { "--check-json", "compile only; emit JSON diagnostics" },
                                          { "--dump-cfg", "compile only; emit control-flow graphs" },
                                          { "--dump-ssa", "compile only; emit SSA analysis" },
+                                         { "--decompile", "decompile TJS2 bytecode or source to TJS2 source (strict)" },
+                                         { "--view", "with --decompile: emit the disassembly-level diagnostic view" },
                                          { "--repl", "start an interactive session" },
                                          { "--jit", "enable the optional x64 integer JIT" },
                                          { "--trace-jit", "enable the optional trace JIT" },
@@ -27,6 +29,9 @@ namespace cial::cli {
             .default_value(std::string{ "2" });
         parser.add_argument("--source-name")
             .help("logical source name reported in diagnostics (default: input path or <stdin>)");
+        parser.add_argument("--map").help("with --decompile: write the line table as JSON to this file");
+        parser.add_argument("--source")
+            .help("with --decompile on TJS2 bytecode: original source for offset-to-line mapping");
         parser.add_argument("input")
             .nargs(argparse::nargs_pattern::any)
             .help("script ('-' reads stdin); trace mode also takes output.dot");
@@ -38,6 +43,7 @@ namespace cial::cli {
                                          { "--check-json", Mode::CheckJson },
                                          { "--dump-cfg", Mode::DumpCfg },
                                          { "--dump-ssa", Mode::DumpSsa },
+                                         { "--decompile", Mode::Decompile },
                                          { "--repl", Mode::Repl } }) {
             if(parser.get<bool>(flag)) {
                 options.mode = mode;
@@ -45,7 +51,16 @@ namespace cial::cli {
             }
         }
         if(modes > 1)
-            throw std::runtime_error("choose only one of --tjsbc, --check-json, --dump-cfg, --dump-ssa, --repl");
+            throw std::runtime_error(
+                "choose only one of --tjsbc, --check-json, --dump-cfg, --dump-ssa, --decompile, --repl");
+        options.decompileView = parser.get<bool>("--view");
+        if(parser.is_used("--map"))
+            options.decompileMap = parser.get<std::string>("--map");
+        if(parser.is_used("--source"))
+            options.decompileSource = parser.get<std::string>("--source");
+        if(options.mode != Mode::Decompile &&
+           (options.decompileView || !options.decompileMap.empty() || !options.decompileSource.empty()))
+            throw std::runtime_error("--view, --map and --source require --decompile");
         if(parser.get<bool>("--jit") && parser.get<bool>("--trace-jit"))
             throw std::runtime_error("--jit and --trace-jit are mutually exclusive");
         options.jit = parser.get<bool>("--jit") ? vm::JitMode::Eager
@@ -85,8 +100,8 @@ namespace cial::cli {
             options.input = inputs[0];
         if(trace && inputs.size() == 2)
             options.traceOutput = inputs[1];
-        const bool compileOnly =
-            options.mode == Mode::CheckJson || options.mode == Mode::DumpCfg || options.mode == Mode::DumpSsa;
+        const bool compileOnly = options.mode == Mode::CheckJson || options.mode == Mode::DumpCfg ||
+            options.mode == Mode::DumpSsa || options.mode == Mode::Decompile;
         if(compileOnly &&
            (trace || options.jit != vm::JitMode::Off || options.tailRecursion || options.timing || options.dumpTac))
             throw std::runtime_error("compile-only modes do not accept execution options");

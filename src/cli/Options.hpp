@@ -5,7 +5,7 @@
 #include "vm/IntegerJit.hpp"
 
 namespace cial::cli {
-    enum class Mode { Script, Bytecode, CheckJson, DumpCfg, DumpSsa, Repl };
+    enum class Mode { Script, Bytecode, CheckJson, DumpCfg, DumpSsa, Decompile, Repl };
 
     struct Options {
         Mode mode{ Mode::Script };
@@ -19,6 +19,11 @@ namespace cial::cli {
         bool timing{};
         bool dumpTac{};
         bool noColor{};
+        // --decompile（doc/bytecode/decompiler-plan.md §8）：严格模式默认；--view 输出
+        // 反汇编级诊断视图；--map 写行表 JSON；--source 提供原源码做偏移→行号换算
+        bool decompileView{};
+        std::string decompileMap;
+        std::string decompileSource;
     };
 
     Options parseOptions(int argc, char **argv);

@@ -16,7 +16,15 @@
 
 设计与批次见[反编译器方案](doc/bytecode/decompiler-plan.md)（2026-11-01 采纳 TAC 层直译路径）。
 
-- [ ] M0/M1：`DecompiledOutput{文本,行表}` 类型、CLI `--decompile` 骨架与反汇编级 Printer；转译器为每个转译 Chunk 发 Rlc（Pass 1 接线，行表在 `toBytecode` 前快照 TAC 坐标）；固定参考二进制/版本/样本清单。完成条件：两条入口反汇编级端到端，行表含 TAC 与码字区间。
+- [ ] M1 残项：现有 tjsbc 语料均为无 debug 产物，需生成/收集 outputdebug 样本验证
+  `--source` 行号换算的端到端（合成用例已在 `tests/decompile_test.cpp` 覆盖）；固定参考
+  二进制/版本/样本清单（哈希与导出选项）。
+
+- [ ] M2–M5：后优化形态表达式恢复（含 BinaryImm/CompareTestImm 逆映射）、语句结构化与短路/三元跨块折叠、壳组装与 `+=` 逆融合双守卫（模板命中 + `computeBlockLiveness` 无其他读者）、任意 CFG/switch 链/try 嵌套兜底；按方案 §7 四环验证逐批验收。
+
+M0 已完成（2026-11-01）：`src/decompile/` 的 `{文本, 行表}` 管道、CLI `--decompile`（严格模式
+默认 / `--view` 反汇编视图 / `--map` 行表 JSON / `--source` 偏移换算）、TJS2 路径来源表
+（`TacOrigin`，码字坐标 + 可选源偏移）随转译器透传；两条入口反汇编级端到端，CTest 237 全绿。
 
 - [ ] M2–M5：后优化形态表达式恢复（含 BinaryImm/CompareTestImm 逆映射）、语句结构化与短路/三元跨块折叠、壳组装与 `+=` 逆融合双守卫（模板命中 + `computeBlockLiveness` 无其他读者）、任意 CFG/switch 链/try 嵌套兜底；按方案 §7 四环验证逐批验收。
 

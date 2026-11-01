@@ -3,8 +3,11 @@
 
 #include "TjsTranslator.hpp"
 
+#include <algorithm>
+#include <iterator>
 #include <limits>
 #include <map>
+#include <ranges>
 
 
 #include "gen/Label.hpp"
@@ -1402,6 +1405,27 @@ namespace cial::tjsbc {
             out.isFunctionLike = ctx.type == TjsContextType::Function || ctx.type == TjsContextType::ExprFunction ||
                 ctx.type == TjsContextType::PropertySetter || ctx.type == TjsContextType::PropertyGetter;
             out.chunk = chunkPtr;
+            // 体来源表（M1）：解码即发射时记录的 offsetMap（TJS2 码字 → TAC 下标）
+            // 透传给反编译行表；outputdebug 产物附带源偏移（codePos 平行数组按
+            // 升序快照后二分——导出顺序不保证有序）
+            out.origin.reserve(offsetMap.size());
+            Vec<std::pair<i32, i32>> sortedSrcPos;
+            if(!ctx.codePos.empty()) {
+                sortedSrcPos.reserve(ctx.codePos.size());
+                for(size_t k = 0; k < ctx.codePos.size(); ++k)
+                    sortedSrcPos.emplace_back(ctx.codePos[k], ctx.sourcePos[k]);
+                std::ranges::sort(sortedSrcPos, {}, &std::pair<i32, i32>::first);
+            }
+            for(const auto &[word, tac] : offsetMap) {
+                Opt<i32> src{};
+                if(!sortedSrcPos.empty()) {
+                    const auto it = std::ranges::upper_bound(sortedSrcPos, static_cast<i32>(word), {}, // NOLINT
+                                                             &std::pair<i32, i32>::first);
+                    if(it != sortedSrcPos.begin())
+                        src = std::prev(it)->second;
+                }
+                out.origin.push_back(TacOrigin{ static_cast<u32>(tac), static_cast<u32>(word), src });
+            }
         }
 
         // Phase B：为函数 context 建 FuncMeta，回填 INTER_OBJECT 占位常量

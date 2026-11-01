@@ -34,6 +34,17 @@ namespace cial {
 
     namespace tjsbc {
 
+        // 每条 TAC 的来源（M1，反编译行表的码字坐标，doc/bytecode/decompiler-plan.md §4）：
+        // tacIdx 单调递增；一条 TJS2 指令可展开为多条 TAC（展开区间 = [tacIdx, 下一项的
+        // tacIdx)），前瞻融合对（比较+跳转）的跳转项与前项共享 TAC 起点。sourceOffset 仅
+        // outputdebug 产物非空（codePos/sourcePos 平行数组中 ≤tjsWord 的最后一项，TJS2 源
+        // 字符偏移、UTF-16 码元口径）——无源码文本时不换算行号，不伪造
+        struct TacOrigin {
+            u32 tacIdx{};
+            u32 tjsWord{};
+            Opt<i32> sourceOffset{};
+        };
+
         // 转译产物：每个 context 一个 Chunk；函数 context 另有 FuncMeta
         // （INTER_OBJECT 常量经 Constant(FuncMeta*) 回填，createValue 建可调用对象）
         struct TjsTranslatedContext {
@@ -50,6 +61,8 @@ namespace cial {
             bool isProperty = false;
             PropMeta *propMeta = nullptr;
             Atom nameAtom{}; // ctx 名（STRING 池下标 intern）
+            // 体来源表（M1）：tacIdx ↔ TJS2 码字 ↔ 可选源偏移，见 TacOrigin
+            Vec<TacOrigin> origin{};
         };
 
         struct TjsTranslatedProgram {

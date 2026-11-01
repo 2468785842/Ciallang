@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -14,6 +15,7 @@
 #include "Repl.hpp"
 #include "common/Colorizer.hpp"
 #include "common/Defer.hpp"
+#include "decompile/Decompiler.hpp"
 #include "stdlib/ExceptionLib.hpp"
 #include "stdlib/Print.hpp"
 #include "stdlib/ScriptsLib.hpp"
@@ -114,6 +116,69 @@ var Debug = new __DebugShim();
             }
             return 0;
         }
+        // --decompile：输入按文件头探测（"TJS2 100\0" → 字节码路径，否则源码路径），
+        // 严格模式默认（M0 全部 Unsupported：逐单元诊断、退出码 2、不产出文本）；
+        // --view 输出反汇编级诊断视图，--map 写行表 JSON，--source 做偏移→行号换算
+        int runDecompile(const Options &options, vm::VMState &state) {
+            std::ifstream input{ options.input, std::ios::binary };
+            if(!input)
+                throw std::runtime_error("cannot open input: " + options.input);
+            char magic[8]{};
+            input.read(magic, sizeof(magic));
+            // 与 Reader::FILE_TAG 同串：'T','J','S','2','1','0','0',0（第 5 字节 '1'，无空格）
+            constexpr char tjs2Magic[8] = { 'T', 'J', 'S', '2', '1', '0', '0', '\0' };
+            const bool isBytecode = input.gcount() == 8 && std::memcmp(magic, tjs2Magic, 8) == 0;
+            input.close();
+
+            Common::SourceFile originalSource;
+            const bool hasSource = !options.decompileSource.empty();
+            if(hasSource) {
+                Common::Result result;
+                originalSource = Common::SourceFile{ std::filesystem::path{ options.decompileSource } };
+                originalSource.load(result);
+                if(result.isFailed())
+                    throw std::runtime_error("cannot load --source: " + options.decompileSource);
+            }
+            decompile::Options decompileOptions{ .diagnosticView = options.decompileView,
+                                                 .originalSource = hasSource ? &originalSource : nullptr };
+
+            decompile::DecompileResult decompiled;
+            if(isBytecode) {
+                const auto file = tjsbc::readTjsBytecodeFile(options.input);
+                tjsbc::TjsTranslator translator{ state.rt, file };
+                decompiled = decompile::decompileProgram(state.rt, translator.translate(), decompileOptions);
+            } else {
+                Common::Result diagnostics;
+                Common::SourceFile source{ std::filesystem::path{ options.input } };
+                source.load(diagnostics);
+                if(diagnostics.isFailed()) {
+                    printDiagnostics(diagnostics);
+                    return 1;
+                }
+                const Compilation compilation = compile(diagnostics, state.context, source);
+                printDiagnostics(diagnostics);
+                if(diagnostics.isFailed() || !compilation.chunk)
+                    return 1;
+                decompiled = decompile::decompileChunk(state.rt, *compilation.chunk, decompileOptions);
+            }
+
+            if(!options.decompileMap.empty()) {
+                std::ofstream map{ options.decompileMap, std::ios::binary };
+                if(!map)
+                    throw std::runtime_error("cannot write --map output: " + options.decompileMap);
+                map << decompiled.mapJson();
+            }
+            if(decompiled.status != decompile::Status::Success && !options.decompileView) {
+                for(const auto &diagnostic : decompiled.diagnostics)
+                    fmt::println(stderr, "cial: decompile unsupported: {}", diagnostic);
+                fmt::println(stderr,
+                             "cial: decompile not supported for this input yet (use --view for the "
+                             "disassembly-level diagnostic view)");
+                return 2;
+            }
+            fmt::print("{}", decompiled.text());
+            return 0;
+        }
     } // namespace
 
     int runApplication(const Options &options) {
@@ -124,8 +189,8 @@ var Debug = new __DebugShim();
         Context context{ runtime };
         vm::VMState state{ context };
         VM vm{ &state };
-        const bool compileOnly =
-            options.mode == Mode::CheckJson || options.mode == Mode::DumpCfg || options.mode == Mode::DumpSsa;
+        const bool compileOnly = options.mode == Mode::CheckJson || options.mode == Mode::DumpCfg ||
+            options.mode == Mode::DumpSsa || options.mode == Mode::Decompile;
         if(!compileOnly)
             initializeSession(context, vm, state, options);
         state.setJitMode(options.jit);
@@ -148,6 +213,8 @@ var Debug = new __DebugShim();
                 status = runRepl(state, std::cin, isInteractiveInput());
             else if(options.mode == Mode::Bytecode)
                 status = runBytecode(options, state);
+            else if(options.mode == Mode::Decompile)
+                status = runDecompile(options, state);
             else
                 status = runSource(options, state);
         } catch(const std::exception &error) {

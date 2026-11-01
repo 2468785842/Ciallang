@@ -105,6 +105,10 @@ namespace cial::Common {
 
         [[nodiscard]] size_t length() const;
 
+        // 已加载正文的 UTF-8 字节（诊断/反编译等离线路径只读访问；
+        // 词法状态不受影响）
+        [[nodiscard]] const std::vector<u8> &buffer() const noexcept { return _buffer; }
+
         size_t currentMark();
 
         void seek(size_t index);

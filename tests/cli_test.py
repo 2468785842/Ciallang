@@ -409,6 +409,47 @@ selected
             self.assertEqual(process.returncode, 1)
             self.assertIn("JIT backend not enabled", process.stderr)
 
+    def test_decompile_options_and_strict_mode(self):
+        # 互斥与从属校验
+        for flags in [("--decompile", "--tjsbc", self.script),
+                      ("--decompile", "--time", self.script),
+                      ("--view", self.script), ("--map", "m.json", self.script),
+                      ("--source", "orig.tjs", self.script)]:
+            with self.subTest(flags=flags):
+                process = self.run_cial(*flags)
+                self.assertEqual(process.returncode, 2, process.stderr)
+                self.assertEqual(process.stdout, "")
+        # 自产路径：严格模式 M0 = Unsupported，退出码 2、不产出文本、逐单元诊断
+        process = self.run_cial("--decompile", self.script)
+        self.assertEqual(process.returncode, 2, process.stderr)
+        self.assertEqual(process.stdout, "")
+        self.assertIn("decompile unsupported", process.stderr)
+        # 诊断视图：输出含行号与 TAC 反汇编，头部标注不可重编译
+        process = self.run_cial("--decompile", "--view", self.script)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("not recompilable", process.stdout)
+        self.assertIn("@0", process.stdout)
+        # 行表 JSON：状态与行坐标
+        mapPath = self.root / "map.json"
+        process = self.run_cial("--decompile", "--view", "--map", mapPath, self.script)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        payload = json.loads(mapPath.read_text(encoding="utf-8"))
+        self.assertEqual(payload["status"], "unsupported")
+        self.assertTrue(payload["units"])
+        # TJS2 路径：语料反汇编视图 + --source 行号换算；非法输入拒绝
+        corpus = pathlib.Path(__file__).resolve().parent / "test_files" / "tjsbc"
+        sample = corpus / "s6_class.tjsbc"
+        process = self.run_cial("--decompile", "--view", sample)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("context", process.stdout)
+        source = corpus / "s6_class.tjs"
+        process = self.run_cial("--decompile", "--view", "--source", source, sample)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        garbage = self.root / "garbage.bin"
+        garbage.write_bytes(b"\x01\x02\x03\x04 not a script or bytecode")
+        process = self.run_cial("--decompile", garbage)
+        self.assertNotEqual(process.returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main(argv=[__file__, *rest])
