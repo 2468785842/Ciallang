@@ -124,8 +124,12 @@ namespace cial::Common {
             // 目标行内的行相对字节范围（多行范围截断到本行末尾）
             const size_t beginRel = std::clamp(span.begin, sourceLine->begin, sourceLine->end) - sourceLine->begin;
             const size_t endRel = std::clamp(span.end, span.begin, sourceLine->end) - sourceLine->begin;
-            const auto toExpanded = [&byteMap](const size_t byteOffset) {
-                return byteMap.empty() ? byteOffset : byteMap[std::min(byteOffset, byteMap.size() - 1)];
+            // 无 byteMap(无制表符)时行同样可能被截断，偏移必须一并钳制到展示文本内，
+            // 否则长行尾部的 span 会让 utf8DisplayWidth/colorizeRange 读越界
+            const auto toExpanded = [&byteMap, &lineText](const size_t byteOffset) {
+                if(byteMap.empty())
+                    return std::min(byteOffset, lineText.size());
+                return byteMap[std::min(byteOffset, byteMap.size() - 1)];
             };
             const size_t beginByte = toExpanded(beginRel);
             const size_t endByte = std::max(toExpanded(endRel), beginByte);
