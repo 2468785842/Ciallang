@@ -17,8 +17,10 @@ CMake 在 `project()` 前调用生成器；manifest 或生成器变化会触发�
 
 CLI 压缩包只包含 Runtime 组件，SDK 可从源码另行安装，见[宿主集成](embedding.md)；
 不承诺稳定 C++ ABI。SDK、`.d.tjs`、模块和 DAP 的后续工作见[路线图](roadmap.md)。
-本机已验证 Windows x64 包；Linux/macOS 流程
-尚需实际运行 GitHub Actions 验收，本次未创建远端标签或 Release。
+本机 Windows x64 与 Linux x64 包已通过验收；三平台 `package-and-release` 工作流
+仍待实际运行，本次未创建远端标签或 Release。Linux 本轮验证提交为 `8c9e343`，
+包内记录干净工作树、编译器和系统运行库信息；解压后在独立工作目录、精简 PATH 下验证
+版本、示例与 JSON 检查器。普通构建 CI 与三平台发布工作流的验收分别记录。
 
 ## 本地打包
 

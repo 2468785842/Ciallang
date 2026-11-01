@@ -21,7 +21,7 @@
 
 ## 首次 CLI 预览版
 
-- [ ] 提交发布基础后，手动运行三平台 package-and-release 工作流并检查附件、许可及构建信息；全部验收通过后，在确认提交上推送版本标签，核对并公开 Release 草稿。当前只完成本机 Windows 包验收，见[发布指南](doc/releasing.md)。
+- [ ] 提交发布基础后，手动运行三平台 package-and-release 工作流并检查附件、许可及构建信息；全部验收通过后，在确认提交上推送版本标签，核对并公开 Release 草稿。本机 Windows 与 Linux 包验收已完成，三平台发布工作流仍待运行，见[发布指南](doc/releasing.md)。
 
 ## krkr2 接入
 
