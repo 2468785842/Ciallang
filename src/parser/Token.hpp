@@ -182,7 +182,7 @@ namespace cial::syntax {
         // 错误 token 的稳定诊断码（如 "lex.unterminated-string"）；正常 token 为空
         std::string code{};
 
-        constexpr explicit Token() = default;
+        constexpr explicit Token() : _integer{} {}
 
         constexpr explicit Token(const TokenType type) : _type(type) {}
 

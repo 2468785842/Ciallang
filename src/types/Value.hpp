@@ -75,7 +75,7 @@ namespace cial {
     class Value {
 
     public:
-        Value() noexcept = default;
+        Value() noexcept : _data{} {}
 
         // 构造/析构/拷贝移动在类内定义：整数与对象路径现场消解为几次访存，
         // 跨 TU 外联调用曾在原生调用画像中占 Value 生命周期总样本的 ~40%
