@@ -36,6 +36,10 @@ namespace cial {
         // 由各调用入口（Function::call / ClassObject::call 构造路径）在压帧后填写；
         // 非函数帧（eval/顶层/字段初始化）保持 0
         u32 actualArgc{};
+        // 宿主哨兵只中转异常；脚本 handler 才消费诊断。其余标志用于明确栈降级。
+        bool exceptionBoundary{};
+        bool pcIsInstruction{}; // finalizer 重入时 pc 是当前指令，而非返回位置
+        bool tailElided{};
         // 进入帧时的 with 上下文栈深（VMState::allocCallFrame 填写）：
         // 帧释放时 withStack 截断到此深度（unwind/正常返回共用 freeCallFrame）
         size_t withDepth{};
@@ -73,8 +77,9 @@ namespace cial {
         CallFrame(CallFrame &&callFrame) noexcept :
             closure(callFrame.closure), chunk(callFrame.chunk), funcMeta(callFrame.funcMeta),
             thisObj(std::move(callFrame.thisObj)), thisData(callFrame.thisData), ret(callFrame.ret), pc(callFrame.pc),
-            actualArgc(callFrame.actualArgc), withDepth(callFrame.withDepth),
-            _pool(std::exchange(callFrame._pool, nullptr)), _sp(callFrame._sp) {}
+            actualArgc(callFrame.actualArgc), exceptionBoundary(callFrame.exceptionBoundary),
+            pcIsInstruction(callFrame.pcIsInstruction), tailElided(callFrame.tailElided),
+            withDepth(callFrame.withDepth), _pool(std::exchange(callFrame._pool, nullptr)), _sp(callFrame._sp) {}
 
         CallFrame &operator=(CallFrame &&callFrame) noexcept {
             if(this != &callFrame) {

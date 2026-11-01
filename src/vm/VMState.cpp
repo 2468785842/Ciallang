@@ -177,12 +177,69 @@ namespace cial::vm {
         return global(atom);
     }
 
+    void VMState::initializeGetterBoundary() {
+        auto chunk = std::make_unique<Chunk>();
+        chunk->setRegCount(2);
+        chunk->emit<inter::NOP>();
+        chunk->addThrowHandler({ 0, 1, 1 });
+        chunk->toBytecode();
+        _getterBoundary = std::move(chunk);
+    }
+
     void VMState::recordFault(const Chunk *chunk, const u64 instructionPc) {
-        if(_fault.valid || chunk == nullptr)
+        if(!_fault.frames.empty() || chunk == nullptr)
             return;
-        if(const auto loc = chunk->lineAtBc(instructionPc)) {
-            _fault = FaultInfo{ chunk->sourceName(), loc->start().line, loc->start().column, true };
+        const auto append = [&](const CallFrame &frame, const Chunk *code, const Opt<u64> pc) {
+            if(_fault.frames.size() == maxFaultFrames) {
+                _fault.truncated = true;
+                return;
+            }
+            StackFrame item;
+            if(frame.exceptionBoundary) {
+                item.kind = StackFrameKind::NativeBoundary;
+                item.function = "<native boundary>";
+            } else {
+                item.function = frame.funcMeta ? "<anonymous>" : "<script>";
+                if(frame.funcMeta) {
+                    if(const auto *entry = rt.atomTable.get(frame.funcMeta->name); entry && entry->str)
+                        item.function = entry->str->toStdStr();
+                    if(item.function.empty())
+                        item.function = "<anonymous>";
+                }
+                if(code) {
+                    item.source = code->sourceName();
+                    item.snapshot = code->sourceSnapshot();
+                    if(const auto loc = pc ? code->lineAtBc(*pc) : Opt<Common::SourceLocation>{}) {
+                        item.hasLocation = true;
+                        item.line = loc->start().line;
+                        item.column = loc->start().column;
+                    }
+                }
+            }
+            _fault.tailFramesOmitted |= frame.tailElided;
+            _fault.frames.push_back(std::move(item));
+        };
+        if(_stackTop) {
+            append(*_curFrame, chunk, instructionPc);
+            for(size_t i = _stackTop - 1; i > 0; --i) {
+                const auto &caller = _callStack[i - 1];
+                // 最底部仅接收返回值的宿主帧不制造额外调用者。
+                if(caller.exceptionBoundary && i == 1)
+                    continue;
+                const auto pc =
+                    caller.pcIsInstruction ? Opt<u64>{ caller.pc } : caller.chunk->instructionBefore(caller.pc);
+                append(caller, caller.chunk, pc);
+            }
+        } else {
+            CallFrame fallback;
+            append(fallback, chunk, instructionPc);
         }
+        const auto &origin = _fault.frames.front();
+        _fault.source = origin.source;
+        _fault.line = origin.line;
+        _fault.column = origin.column;
+        _fault.valid = origin.hasLocation;
+        _fault.snapshot = origin.snapshot;
     }
 
     void VMState::unwind() {
@@ -222,7 +279,8 @@ namespace cial::vm {
 
             setPC(th->tryEnd);
             clearException();
-            resetFault(); // 异常被脚本 handler 消费：位置随之失效
+            if(!cFrame->exceptionBoundary)
+                resetFault(); // 只有脚本 handler 消费诊断；宿主哨兵保留首次抛出点
             return;
         }
     }
@@ -238,10 +296,11 @@ namespace cial::vm {
         return false;
     }
 
-    static bool propObjectGet(VMState &vmState, const Value &src, Value &dst) {
+    static bool propObjectGet(VMState &vmState, const Value &src, Value &dst, const u64 resumePc) {
         if(src.isObject()) {
             if(const auto object = src.asObject().unwrap()) {
                 if(object->typeId() == TypeId::Property) {
+                    vmState.curFrame()->pc = resumePc;
                     dst = static_cast<const Property *>(object)->invokeGet(vmState);
                     return true;
                 }
@@ -255,7 +314,8 @@ namespace cial::vm {
 
     // obj.member 读：原生成员（方法/count 属性）→ Global/Class/普通对象分支 →
     // 非对象值的原生 property 表。getter 经 invokeGet 嵌套 run 同步完成，恒 Continue
-    static void propGetMember(VMState &vmState, CallFrame *cur, const Value &val, const Atom atom, Value &dst) {
+    static void propGetMember(VMState &vmState, CallFrame *cur, const Value &val, const Atom atom, Value &dst,
+                              const u64 resumePc) {
         if(val.isObject()) {
             auto *obj = val.requireObject();
 
@@ -264,12 +324,14 @@ namespace cial::vm {
             const TypeId tid = obj->typeId();
             const auto member = vmState.context.findNativeMember(obj->nativeTypeKey(), atom);
             if(auto *getter = member.getter) {
+                cur->pc = resumePc;
                 dst = getter(val);
                 return;
             }
             const auto accessor = member.accessor;
             if(accessor.getter) {
                 const RootGuard<NativeFunction> activeGetter{ &vmState.rt, accessor.getter };
+                cur->pc = resumePc;
                 dst = activeGetter->callDirect(vmState, val, 0, nullptr);
                 return;
             }
@@ -288,14 +350,14 @@ namespace cial::vm {
                     throw std::runtime_error("Not implemented");
                 }
                 auto tmp = global->getProp(atom);
-                propObjectGet(vmState, tmp, tmp); // 顶层 property 读（字节码 SPD/GPD 经 this=全局）
+                propObjectGet(vmState, tmp, tmp, resumePc); // 顶层 property 读（字节码 SPD/GPD 经 this=全局）
                 dst = tmp;
                 return;
             }
 
             if(tid == TypeId::Class) {
                 auto tmp = obj->getProp(atom);
-                propObjectGet(vmState, tmp, tmp);
+                propObjectGet(vmState, tmp, tmp, resumePc);
                 // 构造器名访问返回 ClassObject 本身（super.<Ctor>() 路径），非 Function
                 if(tmp.isObject()) {
                     if(auto *fun = dynamic_cast<Function *>(tmp.asObject().value())) {
@@ -307,7 +369,7 @@ namespace cial::vm {
             }
 
             auto tmp = obj->getProp(atom);
-            propObjectGet(vmState, tmp, tmp);
+            propObjectGet(vmState, tmp, tmp, resumePc);
             dst = tmp;
             return;
         }
@@ -319,6 +381,7 @@ namespace cial::vm {
             throw std::runtime_error("cannot access member of void");
         const NativeTypeKey tId = ValueToNativeTypeKey::getId(val);
         if(auto *getter = vmState.context.findProperty(tId, atom)) {
+            cur->pc = resumePc;
             dst = getter(val);
             return;
         }
@@ -340,7 +403,8 @@ namespace cial::vm {
     // 帧不执行，与 DGlobal 同款检测栈变化交还主循环）；普通成员纯写。
     // Global 不豁免：字节码路径顶层 property 写入即 SPD this.x（this=全局），
     // TJS2 PropSet 对 property 槽同样触发 setter。返回 true 表示 setter 已压帧
-    static bool propSetMember(VMState &vmState, const Value &objVal, const Atom atom, const Value &src) {
+    static bool propSetMember(VMState &vmState, const Value &objVal, const Atom atom, const Value &src,
+                              const u64 resumePc) {
         if(!objVal.isObject()) {
             throw std::runtime_error("dprop obj is not object");
         }
@@ -351,6 +415,7 @@ namespace cial::vm {
                 throw std::runtime_error("native property is read-only");
             Value argument = src;
             const RootGuard<NativeFunction> activeSetter{ &vmState.rt, accessor.setter };
+            vmState.curFrame()->pc = resumePc;
             activeSetter->callDirect(vmState, objVal, 1, &argument);
             return false;
         }
@@ -448,6 +513,8 @@ namespace cial::vm {
                 try {
                     if(!rt.markSweep.pendingFinalizers.empty() && !rt.markSweep.drainingFinalizers) {
                         cur->pc = pc;
+                        cur->pcIsInstruction = true;
+                        DEFER { cur->pcIsInstruction = false; };
                         drainFinalizers();
                     }
                     if constexpr(Record)
@@ -867,6 +934,7 @@ namespace cial::vm {
 
         // 表达式编译（失败抛脚本异常，与原版 EvalExpression 一致）
         Common::SourceFile sourceFile{};
+        sourceFile.setSourceName("<eval>");
         Common::Result r{};
         sourceFile.load(r, expr.toStdStr());
         if(r.isFailed())
@@ -895,8 +963,10 @@ namespace cial::vm {
         tmpChunk.addThrowHandler({ 0, 1, excSlot }); // 全区哨兵：截住 unwind
         tmpChunk.toBytecode(); // 哨兵表必须显式落 bc 层（callValue 同款陷阱）
 
+        cur->pc = pc;
         const size_t tmpSp = getRegPoolTop(); // tmp 帧 reg0 的池内位置（异常值落点 = tmpSp + excSlot）
         allocCallFrame(&tmpChunk);
+        curFrame()->exceptionBoundary = true;
         makeClosure();
         allocCallFrame(evalChunk.get(), retSlot);
         makeClosure();
@@ -988,7 +1058,7 @@ namespace cial::vm {
         return DispatchRet::Continue;
     }
 
-    void VMState::loadGlobal(const Atom atom, Value &dst) {
+    void VMState::loadGlobal(const Atom atom, Value &dst, const u64 resumePc) {
         if(const Value *g = cachedGlobal(atom)) {
             // 数值循环先走纯整数拷贝，避免进入对象/属性分派的判型链。
             if(g->isIntegerFast() && dst.isIntegerFast()) {
@@ -1002,7 +1072,7 @@ namespace cial::vm {
             // 循环体内的对象型全局读（如 arr.push 的 arr）每次省一次 RTTI 遍历
             if(g->isObject() && !g->isNull() && g->asObject().unwrap()->typeId() == TypeId::Property) {
                 Value srcVal = *g;
-                propObjectGet(*this, srcVal, srcVal);
+                propObjectGet(*this, srcVal, srcVal, resumePc);
                 dst = srcVal;
                 return;
             }
@@ -1015,7 +1085,7 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(GGlobal) {
         const Atom atom{ read<u32>(ip, pc) };
         const u16 dst = read<u16>(ip, pc);
-        loadGlobal(atom, regs[dst]);
+        loadGlobal(atom, regs[dst], pc);
         return DispatchRet::Continue;
     }
 
@@ -1024,11 +1094,11 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc);
         if(!cur->thisData && (!cur->closure || !cur->closure->funcMeta) &&
            (!cur->thisObj.isObject() || cur->thisObj.isNull() || cur->thisObj.asObject().value() == context.global())) {
-            loadGlobal(Atom{ atom }, regs[r1]);
+            loadGlobal(Atom{ atom }, regs[r1], pc);
             return DispatchRet::Continue;
         }
         Value srcVal = getThis({ atom });
-        propObjectGet(*this, srcVal, srcVal);
+        propObjectGet(*this, srcVal, srcVal, pc);
         regs[r1] = srcVal;
         return DispatchRet::Continue;
     }
@@ -1510,6 +1580,7 @@ namespace cial::vm {
         for(u32 i = 0; i < argc; ++i)
             regs[i] = arguments[i];
         cur->pc = 0;
+        cur->tailElided = true;
         ++_tailCallsEliminated;
         return true;
     }
@@ -1724,7 +1795,7 @@ namespace cial::vm {
             return DispatchRet::Continue;
         }
         const String &name = *regs[r2].asString().unwrap();
-        propGetMember(*this, cur, val, rt.atomTable.intern(name), regs[r3]);
+        propGetMember(*this, cur, val, rt.atomTable.intern(name), regs[r3], pc);
         return DispatchRet::Continue;
     }
 
@@ -1755,7 +1826,7 @@ namespace cial::vm {
             }
         }
         regs[receiver] = Value{};
-        propGetMember(*this, cur, value, atom, regs[dst]);
+        propGetMember(*this, cur, value, atom, regs[dst], pc);
         return DispatchRet::Continue;
     }
 
@@ -1763,7 +1834,7 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
         const u16 r3 = read<u16>(ip, pc); // dst
-        propGetMember(*this, cur, regs[r1], Atom{ atomV }, regs[r3]);
+        propGetMember(*this, cur, regs[r1], Atom{ atomV }, regs[r3], pc);
         return DispatchRet::Continue;
     }
 
@@ -1794,7 +1865,7 @@ namespace cial::vm {
             return DispatchRet::Continue;
         }
         const String &name = *regs[r2].asString().unwrap();
-        if(propSetMember(*this, objVal, rt.atomTable.intern(name), regs[r3])) {
+        if(propSetMember(*this, objVal, rt.atomTable.intern(name), regs[r3], pc)) {
             cur->pc = pc;
             return DispatchRet::Call;
         }
@@ -1806,7 +1877,7 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc); // obj
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
         const u16 r3 = read<u16>(ip, pc); // src
-        if(propSetMember(*this, regs[r1], Atom{ atomV }, regs[r3])) {
+        if(propSetMember(*this, regs[r1], Atom{ atomV }, regs[r3], pc)) {
             cur->pc = pc;
             return DispatchRet::Call;
         }
@@ -1949,6 +2020,7 @@ namespace cial::vm {
         if(!prop) {
             throw std::runtime_error("'*' operand is not a property");
         }
+        cur->pc = pc;
         regs[r2] = prop->invokeGet(*this);
         return DispatchRet::Continue;
     }

@@ -16,6 +16,7 @@
 
 #include <filesystem>
 #include <map>
+#include <memory>
 #include <stack>
 #include <vector>
 #include "Result.hpp"
@@ -57,7 +58,21 @@ namespace cial::Common {
         // 源码身份：默认为路径字符串；REPL/eval/宿主可设置逻辑名
         [[nodiscard]] std::string sourceName() const;
 
-        void setSourceName(std::string name) { _sourceName = std::move(name); }
+        void setSourceName(std::string name) {
+            _sourceName = std::move(name);
+            _snapshot.reset();
+        }
+
+        // 每个装载版本惰性创建一份独立、只读的正文与行索引，供所有嵌套 Chunk 共享。
+        // 不借用扫描器或 GC 对象；reload/改名不会改变已发出的快照。
+        [[nodiscard]] std::shared_ptr<const SourceFile> snapshot() const;
+
+        // 只影响后续编译；关闭时仅保留 Chunk 的源码身份/位置，不从磁盘补读正文。
+        void setRetainSource(bool retain) {
+            _retainSource = retain;
+            if(!retain)
+                _snapshot.reset();
+        }
 
         // 字节偏移 -> 行列（0 基，列为字节列）；越界/空文件安全（收敛到首末行）
         [[nodiscard]] SourceLocation locationByIndex(size_t index) const;
@@ -133,6 +148,8 @@ namespace cial::Common {
         size_t _lastWidth = 0;
         std::filesystem::path _path;
         std::string _sourceName{};
+        bool _retainSource{ true };
+        mutable std::shared_ptr<const SourceFile> _snapshot;
         std::vector<u8> _buffer;
         std::stack<size_t> _markStack{};
         std::map<size_t, SourceFileLineType *> _linesByNumber{};

@@ -47,6 +47,7 @@ namespace cial {
         if(entryDepth == 0)
             state.resetFault();
         state.allocCallFrame(&sentinel);
+        state.curFrame()->exceptionBoundary = true;
         state.makeClosure();
         state.allocCallFrame(chunk.get(), retSlot);
         state.makeClosure();

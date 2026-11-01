@@ -1,8 +1,5 @@
 #include "Diagnostics.hpp"
 
-#include <fstream>
-#include <iterator>
-
 #include <fmt/format.h>
 
 #include "common/SourceFile.hpp"
@@ -67,21 +64,29 @@ namespace cial::cli {
         const auto &fault = state.fault();
         if(fault.valid && !fault.source.empty()) {
             fmt::println(stderr, "cial: error: {}:{}:{}: {}", fault.source, fault.line + 1, fault.column + 1, message);
-            // 摘录按文件身份在打印时重读（Python linecache 式）：Chunk 不保留正文，
-            // stdin/REPL/<eval> 等逻辑名或文件已变动时读不到即跳过，不伪造内容
-            if(std::ifstream in{ fault.source, std::ios::in | std::ios::binary }; in.is_open()) {
-                const std::string content{ std::istreambuf_iterator<char>{ in }, std::istreambuf_iterator<char>{} };
-                Common::SourceFile file;
-                Common::Result loadResult;
-                if(file.load(loadResult, content)) {
-                    if(const auto excerpt = file.renderExcerptAt(fault.line, fault.column); !excerpt.empty())
-                        fmt::println(stderr, "{}", excerpt);
-                }
+            if(fault.snapshot) {
+                if(const auto excerpt = fault.snapshot->renderExcerptAt(fault.line, fault.column); !excerpt.empty())
+                    fmt::println(stderr, "{}", excerpt);
             }
         } else if(fault.valid) // 有行列但无源码身份：不伪造文件名
             fmt::println(stderr, "cial: error: (line {}): {}", fault.line + 1, message);
         else
             fmt::println(stderr, "cial: error: {}", message);
+
+        for(const auto &frame : fault.frames) {
+            if(frame.kind == vm::VMState::StackFrameKind::NativeBoundary) {
+                fmt::println(stderr, "  at <native boundary> (C++ frames unavailable)");
+            } else if(frame.hasLocation && !frame.source.empty()) {
+                fmt::println(stderr, "  at {} ({}:{}:{})", frame.function, frame.source, frame.line + 1,
+                             frame.column + 1);
+            } else {
+                fmt::println(stderr, "  at {} (source location unavailable)", frame.function);
+            }
+        }
+        if(fault.truncated)
+            fmt::println(stderr, "  ... stack truncated after {} frames", vm::VMState::maxFaultFrames);
+        if(fault.tailFramesOmitted)
+            fmt::println(stderr, "  ... tail-call frames omitted");
     }
 
     void printJsonDiagnostics(const Common::Result &diagnostics, const int schemaVersion,

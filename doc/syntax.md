@@ -144,6 +144,7 @@ class 类名 extends 父类1, 父类2 … {   // 多继承，后面的覆盖前�
   - 成员解析走 **slot 链**（实例字段 → 本类 → 父类链），`super` 显式跨层；
   - 方法访问按对象绑定 this（字节码侧经闭包 objthis，本项目经 `DataObject::getProp` 克隆绑定）；
   - 显式 `invalidate obj` 同步调用 `finalize`；不可达对象由 GC 排队，在 VM 安全点执行终结回调。
+- getter 抛出的任意异常值按普通调用传播到外层 `try/catch`，捕获后后续语句仅执行一次；诊断栈不写入异常值或 `e.message`（`src/types/Property.hpp`、`src/vm/VMState.cpp`）。
 - 状态：class/多继承/property/构造函数/super ✅；`finalize` 触发时机 ✅（GC 保活队列 + VM 安全点 drain，tests/interpreter_test.cpp）；`static` ✅ 定论——原版保留字但无文法规则（tjs.y 零产生式），类内 `static` 原版即语法错误，本项目同为编译错误（tests/compat_reserved_test.cpp）。
 
 ## 8. 内联字面量（Array / Dictionary / 常量折叠形）

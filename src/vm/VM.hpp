@@ -174,6 +174,8 @@ namespace cial {
         // 以此判定），此处经 throwException 重新进入脚本异常协议向上传播
         Value callValue(const Value &callee, const size_t argCount, const Value *args,
                         const Value &fallbackThis = Value{}) {
+            if(context().stackTop() == 0)
+                _vmState->resetFault();
             if(!callee.isObject())
                 throw std::runtime_error("value is not callable");
             // 回调可重入并触发 GC；宿主栈上的实参和接收者在压入脚本帧前也须保根。
@@ -243,6 +245,7 @@ namespace cial {
             // 被派发执行——不显式编译哨兵形同虚设，异常会穿透直达
             // 调用方帧的 handler（嵌套 run 内执行其 catch，控制流错乱）
             _vmState->allocCallFrame(&tmpChunk);
+            _vmState->curFrame()->exceptionBoundary = true;
             _vmState->makeClosure();
             _vmState->curFrame()->setThisObj(*receiverRoot);
             // tmp 帧窗口基（reg0 槽）：压实参前捕获——压实参后池顶已越过窗口，
@@ -327,11 +330,13 @@ namespace cial {
             tmpChunk.setRegCount(1); // accept ret val
 
             _vmState->allocCallFrame(&tmpChunk);
+            _vmState->curFrame()->exceptionBoundary = true;
             _vmState->makeClosure();
             _vmState->allocCallFrame(evalChunk.get(), retReg);
             _vmState->makeClosure();
             u32 stackTop = _vmState->context.stackTop();
-            _vmState->resetFault(); // 每轮执行重置，避免上一轮故障位置污染本次输出
+            if(stackTop == 2)
+                _vmState->resetFault(); // 只在最外宿主入口清理诊断
             try {
                 _vmState->run();
             } catch(...) {
@@ -392,7 +397,8 @@ namespace cial {
             auto evalChunk = std::move(*chunk).toHeap(rt);
             _vmState->allocCallFrame(evalChunk.get());
             _vmState->makeClosure();
-            _vmState->resetFault(); // 每轮执行重置，避免上一轮故障位置污染本次输出
+            if(_vmState->context.stackTop() == 1)
+                _vmState->resetFault(); // 嵌套执行保留首次故障诊断
             try {
                 _vmState->run();
             } catch(...) {

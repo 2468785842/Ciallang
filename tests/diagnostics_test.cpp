@@ -7,8 +7,292 @@
 
 #include "parser/Lexer.hpp"
 #include "parser/Parser.hpp"
+#include "vm/VM.hpp"
 
 using namespace cial;
+
+namespace {
+    // 直接驱动顶层帧，与 CLI 相同。
+    void executeSource(vm::VMState &state, Common::SourceFile &source, Common::Result &result) {
+        syntax::Parser parser{ source, state.context.pp() };
+        auto *node = parser.parse(result);
+        REQUIRE_FALSE(result.isFailed());
+        inter::IRGenerator generator{ result, state.rt, source };
+        OptReg output;
+        auto compiled = generator.parseAst(node, output);
+        REQUIRE(compiled.has_value());
+        auto chunk = std::move(*compiled).toHeap(state.rt);
+        state.resetFault();
+        state.allocCallFrame(chunk.get());
+        state.makeClosure();
+        DEFER {
+            while(state.context.stackTop())
+                state.freeCallFrame();
+        };
+        try {
+            state.run();
+        } catch(...) {
+            state.clearException();
+            throw;
+        }
+    }
+} // namespace
+
+TEST_CASE("fault stacks preserve fault and caller instructions across SDK boundaries", "[diagnostics][stack]") {
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    VM vm{ &state };
+    Common::SourceFile source;
+    Common::Result result;
+    source.setSourceName("virtual://stack");
+    REQUIRE(source.load(
+        result, "function leaf() {\nthrow 17;\n}\nfunction middle() {\nleaf();\n}\nmiddle();\nvar later = 42;"));
+    REQUIRE_THROWS_AS(vm.execute(source, result), vm::ScriptExceptionCarrier);
+    auto fault = state.fault();
+    REQUIRE(fault.frames.size() == 3);
+    REQUIRE(fault.frames[0].function == "leaf");
+    REQUIRE(fault.frames[0].line == 1);
+    REQUIRE(fault.frames[1].function == "middle");
+    REQUIRE(fault.frames[1].line == 4);
+    REQUIRE(fault.frames[2].function == "<script>");
+    REQUIRE(fault.frames[2].line == 6);
+    for(const auto &frame : fault.frames) {
+        REQUIRE(frame.hasLocation);
+        REQUIRE(frame.source == "virtual://stack");
+        REQUIRE(frame.snapshot == fault.snapshot);
+    }
+    REQUIRE(source.load(result, "leaf = void; middle = void;"));
+    auto ignored = vm.execute(source, result);
+    runtime.markSweep.collect([&] { runtime.collectAllMark(); });
+    REQUIRE_FALSE(state.fault().valid);
+    REQUIRE(fault.frames[1].snapshot->renderExcerptAt(4, 0).find("leaf();") != std::string::npos);
+}
+
+TEST_CASE("native callback sentinels preserve the original exception stack", "[diagnostics][stack]") {
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    VM vm{ &state };
+    auto bridge = runtime.create<NativeFunction>([](VM *vm, const Value &, size_t count, Value *args) {
+        REQUIRE(count == 1);
+        return vm->callValue(args[0], 0, nullptr);
+    });
+    context.registerGlobal("bridge"_str, Value{ bridge.get() });
+    Common::SourceFile source;
+    Common::Result result;
+    source.setSourceName("virtual://callback");
+    REQUIRE(source.load(result, "function leaf() { throw 73; }\nbridge(leaf);"));
+    try {
+        auto ignored = vm.execute(source, result);
+        FAIL("expected callback exception");
+    } catch(const vm::ScriptExceptionCarrier &exception) {
+        REQUIRE(exception.value.asInteger().unwrap() == 73);
+    }
+    REQUIRE(state.fault().frames.size() == 3);
+    REQUIRE(state.fault().frames[0].function == "leaf");
+    REQUIRE(state.fault().frames[0].line == 0);
+    REQUIRE(state.fault().frames[1].kind == vm::VMState::StackFrameKind::NativeBoundary);
+    REQUIRE_FALSE(state.fault().frames[1].hasLocation);
+    REQUIRE(state.fault().frames[2].line == 1);
+    REQUIRE(source.load(result, "var seen = 0; try { bridge(leaf); } catch(e) { seen = e; }"));
+    auto ignored = vm.execute(source, result);
+    REQUIRE(vm.getGlobal<Integer>("seen"_str).get() == 73);
+    REQUIRE(state.fault().frames.empty());
+}
+
+TEST_CASE("rethrow starts a new stack after a script catch consumes the original", "[diagnostics][stack]") {
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    VM vm{ &state };
+    Common::SourceFile source;
+    Common::Result result;
+    REQUIRE(source.load(
+        result,
+        "function leaf() { throw 31; }\nfunction wrapper() {\ntry { leaf(); } catch(e) {\nthrow e;\n}\n}\nwrapper();"));
+    REQUIRE_THROWS_AS(vm.execute(source, result), vm::ScriptExceptionCarrier);
+    REQUIRE(state.fault().frames.size() == 2);
+    REQUIRE(state.fault().frames[0].function == "wrapper");
+    REQUIRE(state.fault().frames[0].line == 3);
+    REQUIRE(state.fault().frames[1].line == 6);
+}
+
+TEST_CASE("fault stacks have bounded size and explicit missing-source fallback", "[diagnostics][stack]") {
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    VM vm{ &state };
+    SECTION("recursive stacks are bounded") {
+        Common::SourceFile source;
+        Common::Result result;
+        REQUIRE(source.load(result, "function descend(n) { if(n == 0) throw 1; descend(n - 1); } descend(100);"));
+        REQUIRE_THROWS_AS(vm.execute(source, result), vm::ScriptExceptionCarrier);
+        REQUIRE(state.fault().frames.size() == vm::VMState::maxFaultFrames);
+        REQUIRE(state.fault().truncated);
+    }
+    SECTION("chunks without line information remain unknown") {
+        vm::Chunk chunk;
+        chunk.emit<inter::NOP>();
+        REQUIRE_FALSE(chunk.instructionBefore(1));
+        state.allocCallFrame(&chunk);
+        state.recordFault(&chunk, 0);
+        state.freeCallFrame();
+        REQUIRE_FALSE(state.fault().valid);
+        REQUIRE(state.fault().frames.size() == 1);
+        REQUIRE_FALSE(state.fault().frames.front().hasLocation);
+        REQUIRE(state.fault().frames.front().source.empty());
+        REQUIRE_THROWS(chunk.code()); // 捕获栈没有触发提前编码。
+    }
+}
+
+TEST_CASE("tail-call stack omissions are recorded on the active frame", "[diagnostics][stack][tail]") {
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    state.setTailRecursionEnabled(true);
+    Common::SourceFile source;
+    Common::Result result;
+    REQUIRE(
+        source.load(result, "function recurse(n) { if(n == 0) return 1 / n; return recurse(n - 1); } recurse(100);"));
+    REQUIRE_THROWS(executeSource(state, source, result));
+    REQUIRE(state.tailCallsEliminated() == 100);
+    REQUIRE(state.fault().tailFramesOmitted);
+    REQUIRE(state.fault().frames.size() == 2);
+}
+
+TEST_CASE("repeated getters leave no return slots in the caller register pool", "[diagnostics][stack][gc]") {
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    VM vm{ &state };
+    auto poolTop = runtime.create<NativeFunction>([&](VM *, const Value &, size_t, Value *) {
+        return Value{ Integer{ static_cast<i64>(state.getRegPoolTop()) } };
+    });
+    context.registerGlobal("poolTop"_str, Value{ poolTop.get() });
+    Common::SourceFile source;
+    Common::Result result;
+    REQUIRE(source.load(result,
+                        "property p { getter { return 1; } } var initial = poolTop(); "
+                        "var sum = 0; for(var i = 0; i < 1000; i++) sum += p; "
+                        "var growth = poolTop() - initial;"));
+    executeSource(state, source, result);
+    REQUIRE(vm.getGlobal<Integer>("sum"_str).get() == 1000);
+    REQUIRE(vm.getGlobal<Integer>("growth"_str).get() == 0);
+}
+
+TEST_CASE("source snapshots outlive reload and scanner destruction", "[diagnostics][snapshot]") {
+    std::shared_ptr<const Common::SourceFile> old;
+    {
+        Common::SourceFile source;
+        Common::Result result;
+        source.setSourceName("virtual://old");
+        REQUIRE(source.load(result, "// 中文\r\nthrow 17;\n"));
+        old = source.snapshot();
+        REQUIRE(old == source.snapshot());
+        REQUIRE(source.load(result, "throw 29;"));
+        source.setSourceName("virtual://new");
+        REQUIRE(source.snapshot() != old);
+        REQUIRE(old->sourceName() == "virtual://old");
+        REQUIRE(old->renderExcerptAt(1, 0).find("throw 17;") != std::string::npos);
+        source.setRetainSource(false);
+        REQUIRE_FALSE(source.snapshot());
+    }
+    REQUIRE(old->substring(0, old->length()) == "// 中文\r\nthrow 17;\n");
+}
+
+TEST_CASE("delayed functions share source snapshots through GC and exception recovery", "[diagnostics][snapshot][gc]") {
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    std::weak_ptr<const Common::SourceFile> lifetime;
+    {
+        Common::SourceFile source;
+        Common::Result result;
+        source.setSourceName("virtual://history");
+        REQUIRE(source.load(result, "function saved() { throw 17; }\nfunction other() { throw 29; }"));
+        executeSource(state, source, result);
+        REQUIRE_FALSE(result.isFailed());
+        lifetime = source.snapshot();
+    }
+    runtime.markSweep.collect([&] { runtime.collectAllMark(); });
+    REQUIRE_FALSE(lifetime.expired());
+    Common::Result result;
+    Common::SourceFile call;
+    REQUIRE(call.load(result, "saved();"));
+    REQUIRE_THROWS_AS(executeSource(state, call, result), std::runtime_error);
+    REQUIRE(state.fault().source == "virtual://history");
+    REQUIRE(state.fault().snapshot == lifetime.lock());
+    REQUIRE(state.fault().snapshot->renderExcerptAt(state.fault().line, state.fault().column).find("throw 17;") !=
+            std::string::npos);
+    auto first = state.fault().snapshot;
+    REQUIRE(call.load(result, "other();"));
+    REQUIRE_THROWS_AS(executeSource(state, call, result), std::runtime_error);
+    REQUIRE(state.fault().snapshot == first);
+    REQUIRE(call.load(result, "try { saved(); } catch(e) {} saved = void; other = void;"));
+    executeSource(state, call, result);
+    REQUIRE_FALSE(state.fault().valid);
+    REQUIRE_FALSE(state.fault().snapshot);
+    first.reset();
+    runtime.markSweep.collect([&] { runtime.collectAllMark(); });
+    REQUIRE(lifetime.expired());
+}
+
+TEST_CASE("fault snapshots survive chunk collection until reset", "[diagnostics][snapshot][gc]") {
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    std::weak_ptr<const Common::SourceFile> lifetime;
+    {
+        Common::SourceFile source;
+        Common::Result result;
+        REQUIRE(source.load(result, "throw 41;"));
+        lifetime = source.snapshot();
+        REQUIRE_THROWS_AS(executeSource(state, source, result), std::runtime_error);
+    }
+    runtime.markSweep.collect([&] { runtime.collectAllMark(); });
+    REQUIRE_FALSE(lifetime.expired());
+    REQUIRE(state.fault().snapshot->renderExcerptAt(0, 0).find("throw 41;") != std::string::npos);
+    state.resetFault();
+    REQUIRE(lifetime.expired());
+}
+
+TEST_CASE("JIT fault excerpts retain the compiled source", "[diagnostics][snapshot][jit]") {
+    if(!vm::IntegerJit::available())
+        return;
+    const auto mode = GENERATE(vm::JitMode::Eager, vm::JitMode::Trace);
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    state.setJitMode(mode, 2);
+    Common::SourceFile source;
+    Common::Result result;
+    source.setSourceName("virtual://jit");
+    REQUIRE(source.load(result, "function fail() {\nvar i = 0;\nwhile(i < 200) i++;\nthrow i;\n}\nfail();"));
+    REQUIRE_THROWS_AS(executeSource(state, source, result), std::runtime_error);
+    REQUIRE(state.jitStats().executions > 0);
+    REQUIRE(state.fault().source == "virtual://jit");
+    REQUIRE(state.fault().line == 3);
+    REQUIRE(state.fault().frames.size() == 2);
+    REQUIRE(state.fault().frames[1].line == 5);
+    REQUIRE(state.fault().snapshot->renderExcerptAt(3, 0).find("throw i;") != std::string::npos);
+}
+
+TEST_CASE("source retention can be disabled without losing fault positions", "[diagnostics][snapshot]") {
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    Common::SourceFile source;
+    Common::Result result;
+    source.setSourceName("virtual://stripped");
+    source.setRetainSource(false);
+    REQUIRE(source.load(result, "throw 31;"));
+    REQUIRE_THROWS_AS(executeSource(state, source, result), std::runtime_error);
+    REQUIRE(state.fault().valid);
+    REQUIRE(state.fault().source == "virtual://stripped");
+    REQUIRE(state.fault().line == 0);
+    REQUIRE_FALSE(state.fault().snapshot);
+}
 
 namespace {
     // 收集全部 token（忽略注释不适用此处：需逐类断言范围）

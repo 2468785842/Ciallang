@@ -29,7 +29,7 @@ cial --help
 
 ## 诊断
 
-文本诊断格式为 `cial: error[code]: 源:行:列: 消息`，随后附源码摘录与按显示宽度对齐的指示符（`src/common/SourceFile.cpp`）；位置 1 基展示，内部按字节半开区间记录。运行期错误同样由顶层渲染——VM 只传播异常值，位置作为元数据记录（`src/vm/VMState.cpp` 的 FaultInfo），脚本捕获的 `e.message` 因此不含行号；摘录在打印时按源码身份重读文件渲染（Python linecache 式），stdin/REPL/`<eval>` 等逻辑名或文件已变动时读不到即退化为单行，不伪造内容；执行字节码产物（`--tjsbc`）无源码身份，只打印纯消息。颜色默认按 stderr 是否为终端自动启用，`NO_COLOR` 环境变量与 `--no-color` 可关闭。
+文本诊断格式为 `cial: error[code]: 源:行:列: 消息`，随后附源码摘录与按显示宽度对齐的指示符（`src/common/SourceFile.cpp`）；位置 1 基展示，内部按字节半开区间记录。运行期错误同样由顶层渲染——VM 只传播异常值，位置作为元数据记录（`src/vm/VMState.cpp` 的 FaultInfo），脚本捕获的 `e.message` 因此不含行号；摘录使用编译时共享的不可变正文快照，文件随后修改或删除不影响正文，stdin/REPL/`<eval>` 等虚拟源也可显示摘录；关闭正文保留时只显示源码身份与位置，不回读磁盘；执行字节码产物（`--tjsbc`）无源码身份，只打印纯消息。异常摘录后按抛出点到外层调用者顺序输出 `at 函数 (源:行:列)`，调用点由实际指令边界还原；最多 64 帧，超出时标明截断。C++ 调用链只显示 `<native boundary>`，缺少源码时标明位置不可用，尾调用优化省略的帧另行提示。脚本 catch 消费异常时不打印栈，显式重抛从新的 throw 位置开始。颜色默认按 stderr 是否为终端自动启用，`NO_COLOR` 环境变量与 `--no-color` 可关闭。
 
 `--check-json` 默认输出 schema 2：`schema`、`ok`、`columnEncoding`、`source`（源码身份）与 `diagnostics[]`；每条含 `code`、`severity`、纯文本 `message`、半开的 `line/column/endLine/endColumn`（0 基字节列，`end` 为排他）及可选 `range`（字节偏移）。`--json-schema 1` 派生输出旧字段形状（无 `schema` 标记、`endColumn` 为包含式），供未迁移消费者过渡；其他版本号报参数错误。stdin 输入（`-`）配合 `--source-name` 为未保存内容保留逻辑源码名，宿主不得把临时路径暴露给编辑器。
 

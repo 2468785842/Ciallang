@@ -235,3 +235,9 @@ context.module("Host"_str).class_<HostState>("State"_str)
 回归测试见 `tests/native_binding_test.cpp` 和 `tests/native_registration_test.cpp`，覆盖
 普通 C++ 类构造、属性写入、只读错误、静态函数、转换错误、类型隔离、共享对象、
 payload trace、接收者保活和活动 getter 自替换回收。
+
+源码编译默认保留诊断正文：`SourceFile::snapshot()` 按装载版本惰性创建只读正文与行索引，嵌套函数的 Chunk 共享同一份，故障元数据在异常展开后继续持有；不借用原 SourceFile，也不持有脚本对象或增加 GC 根。重新装载或改名不改变已编译代码的快照。正文及行索引成本随不同源码版本累积，最后一个 Chunk、故障元数据及 SourceFile 缓存释放后回收；编译期间原缓冲与快照各有一份正文和行表。宿主可在传给 `VM::execute`/IRGenerator 的 SourceFile 上调用 `setRetainSource(false)`，只对该源码的后续编译关闭保留（不改变独立 eval/嵌套存储读取的策略）；身份和行列仍保留，渲染器不会重新读取磁盘（`src/common/SourceFile.*`、`src/vm/Chunk.hpp`、`src/vm/VMState.hpp`）。
+
+运行期栈由 `VMState::fault().frames` 提供（`src/vm/VMState.hpp`）：按故障帧到外层调用者排列，包含函数名、源码身份、0 基行列、`hasLocation`、`kind` 和只读正文快照。字段是独立值，不借用 Chunk/FuncMeta/Atom；可在异常展开和 GC 后复制/保留。`valid` 仅表示首帧有位置，`frames` 非空但 `valid == false` 表示仍可查看无源码的栈。最多 `maxFaultFrames`（64）帧，`truncated`/`tailFramesOmitted` 表示降级，`NativeBoundary` 表示未捕获 C++ 调用链。宿主哨兵转交 `ScriptExceptionCarrier` 时保留首次故障，脚本 catch 和新一轮顶层执行清理元数据；脚本重新 throw 时建立新栈。捕获只读取帧、原始 Atom 名与行映射，不访问异常对象成员或执行脚本。
+
+getter 的同步哨兵按 VMState 惰性缓存，嵌套访问复用同一份已编码的空 Chunk，各帧拥有独立寄存器窗口；仅含 void 常量，不持有脚本对象。getter 返回或抛错后窗口均回收，不向调用者遗留返回槽（`src/types/Property.hpp`、`src/vm/VMState.cpp`，`tests/diagnostics_test.cpp` 的池顶回归）。

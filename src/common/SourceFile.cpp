@@ -50,6 +50,21 @@ namespace cial::Common {
         return "<input>";
     }
 
+    std::shared_ptr<const SourceFile> SourceFile::snapshot() const {
+        if(!_retainSource)
+            return {};
+        if(!_snapshot) {
+            auto copy = std::make_shared<SourceFile>();
+            copy->_sourceName = sourceName();
+            copy->_buffer = _buffer;
+            // 行表含内部指针，必须重建，不能拷贝 SourceFile 的行表。
+            copy->buildLines();
+            copy->_retainSource = false;
+            _snapshot = std::move(copy);
+        }
+        return _snapshot;
+    }
+
     std::string SourceFile::substring(const size_t start, const size_t end) const {
         if(start > end || end > _buffer.size())
             throw std::out_of_range("source substring range");
@@ -304,6 +319,7 @@ namespace cial::Common {
     void SourceFile::seek(const size_t index) { _index = index; }
 
     bool SourceFile::load(Result &r, const std::string &buffer) {
+        _snapshot.reset();
         _index = 0;
         _lastWidth = 0;
         _markStack = {};
@@ -327,6 +343,7 @@ namespace cial::Common {
     }
 
     bool SourceFile::load(Result &r) {
+        _snapshot.reset();
         _index = 0;
         _lastWidth = 0;
         _markStack = {};

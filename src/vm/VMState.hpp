@@ -155,18 +155,43 @@ namespace cial::vm {
 
         void unwind();
 
+        // getter 的同步异常边界复用一份已编码的空 Chunk；可用于嵌套 getter。
+        // 仅含 void 常量，不引用脚本对象，所有权独立于 GC。
+        Chunk &getterBoundary() {
+            if(!_getterBoundary)
+                initializeGetterBoundary();
+            return *_getterBoundary;
+        }
+
         // 运行期故障位置（诊断元数据，随异常源记录，不写入脚本可见 message）：
         // source 为 Chunk 的源码身份（字节码转译产物为空），行列 0 基。
         // 顶层展示层据此渲染 file:line:col；生命周期见 recordFault/resetFault
+        enum class StackFrameKind { Script, NativeBoundary };
+        struct StackFrame {
+            std::string function;
+            std::string source;
+            u32 line{};
+            u32 column{};
+            bool hasLocation{};
+            StackFrameKind kind{ StackFrameKind::Script };
+            std::shared_ptr<const Common::SourceFile> snapshot;
+        };
+        static constexpr size_t maxFaultFrames = 64;
         struct FaultInfo {
             std::string source;
             u32 line = 0;
             u32 column = 0;
             bool valid = false;
+            // 展开后 Chunk 可被回收，故障本身仍持有当时正文；resetFault 释放。
+            std::shared_ptr<const Common::SourceFile> snapshot;
+            // 从故障帧到最外调用者的值快照，不借用 FuncMeta/Chunk/Atom，也不执行脚本。
+            Vec<StackFrame> frames;
+            bool truncated{};
+            bool tailFramesOmitted{};
         };
 
-        // 记录故障指令位置（派发前的指令起始 PC；Rlc 未记录时保持原值）。
-        // 已有有效位置时不覆盖：保留最早抛出点（重抛/原生边界穿越不重复定位）。
+        // 展开前记录故障指令位置和调用栈；无 Rlc 的帧明确保留未知位置。
+        // 已有栈时不覆盖，跨宿主边界保留首次抛出；脚本 catch 后重抛会重新记录。
         // 冷路径显式标注：调用点位于派发循环异常臂，块布局对 runLoop 热区敏感，
         // 不标注时宿主内联/布局决策可使 loop_int 类微基准摆动数个点
         // （2026-10-31 实测见 doc/performance.md）
@@ -261,7 +286,7 @@ namespace cial::vm {
 
         mutable GlobalSlotCache _globalCache[64]{};
         const Value *cachedGlobal(Atom atom) const;
-        CIAL_INLINE void loadGlobal(Atom atom, Value &dst);
+        CIAL_INLINE void loadGlobal(Atom atom, Value &dst, u64 resumePc);
         bool _zf{ false };
         PendingCF _pending{};
         Value _exValue{};
@@ -275,6 +300,8 @@ namespace cial::vm {
         u64 _tailCallsEliminated{};
         bool _tailRecursionEnabled{};
         std::unique_ptr<IntegerJit> _integerJit;
+        std::unique_ptr<Chunk> _getterBoundary;
+        CIAL_COLD_NOINLINE void initializeGetterBoundary();
 
 #define DISPATCH_OP_METHOD(op)                                                                                         \
     CIAL_INLINE DispatchRet dispatch##op(CallFrame *cur, const Constant *constants, Value *regs, const u8 *ip, u64 &pc);

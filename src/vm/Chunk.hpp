@@ -13,6 +13,7 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <atomic>
 #include <limits>
 #include <ranges>
@@ -22,6 +23,7 @@
 #include "Bytecode.hpp"
 #include "Constant.hpp"
 #include "Rlc.hpp"
+#include "common/SourceFile.hpp"
 #include "types/Object.hpp"
 
 #include "gen/Instruction.hpp"
@@ -178,6 +180,7 @@ namespace cial::vm {
             // 行号表换算：IRGen 记录的是 TAC 下标，run 的 pc 是 bc 偏移
             for(auto &[idx, loc] : _rlc.rawEntries())
                 idx = result.tacStartPos[idx];
+            _instructionStarts = std::move(result.tacStartPos);
             _isBytecode = true;
         }
 
@@ -192,6 +195,15 @@ namespace cial::vm {
         }
 
         [[nodiscard]] Rlc &rlc() noexcept { return _rlc; }
+
+        // 调用者保存的是操作数读取完毕后的返回 PC。精确匹配编码边界，
+        // 再取前一条指令；不使用 pc-1，不触发未执行 Chunk 的提前编码。
+        [[nodiscard]] Opt<u64> instructionBefore(const u64 resumePc) const {
+            const auto it = std::lower_bound(_instructionStarts.begin(), _instructionStarts.end(), resumePc);
+            if(it == _instructionStarts.end() || it == _instructionStarts.begin() || *it != resumePc)
+                return {};
+            return *std::prev(it);
+        }
 
         // 仅在启用执行记录时分配身份；记录器保存值快照，不持有 GC 对象指针。
         [[nodiscard]] u64 executionTraceId() {
@@ -209,10 +221,17 @@ namespace cial::vm {
         }
 
         // 源码身份：源码编译产物为文件名/逻辑名；字节码转译产物为空（无源码上下文）。
-        // 仅用于诊断定位（Rlc 行列配套），不持有源码正文
+        // 与 Rlc 行列配套；正文通过独立 C++ 所有权共享，不参与脚本 GC。
         void setSourceName(std::string name) { _sourceName = std::move(name); }
 
         [[nodiscard]] const std::string &sourceName() const noexcept { return _sourceName; }
+
+        void setSourceSnapshot(std::shared_ptr<const Common::SourceFile> source) {
+            _sourceSnapshot = std::move(source);
+        }
+        [[nodiscard]] const std::shared_ptr<const Common::SourceFile> &sourceSnapshot() const noexcept {
+            return _sourceSnapshot;
+        }
 
     private:
         Vec<Box<inter::Instruction>> _instructions{};
@@ -225,5 +244,8 @@ namespace cial::vm {
         u32 _registerCount{};
         bool _isBytecode{ false };
         u64 _executionTraceId{};
+        // 诊断资料放在末尾，保留执行路径使用的字段偏移。
+        std::shared_ptr<const Common::SourceFile> _sourceSnapshot;
+        Vec<u32> _instructionStarts;
     };
 } // namespace cial::vm

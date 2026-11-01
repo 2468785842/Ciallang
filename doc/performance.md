@@ -532,3 +532,82 @@ JIT/尾递归关闭，核心不强制 PIC。每个自校验脚本预热一次，
 
 原始样本、环境和二进制 SHA-256 见[测量数据](reports/2026-11-01-sdk-alignment-benchmark.json)。
 不同编译器、机器与既往 macOS 数据不能直接比较，本表也不是与原版 TJS2 的性能对拍。
+
+
+## 2026-11-01 运行期诊断源码快照
+
+Windows x64、Clang 19.1.5，干净 `3f4c913` 工作树为基线，同机 Release
+`-O3 -DNDEBUG`、静态 CRT、JIT 关闭，两侧使用同一份已安装依赖。
+每项预热后交替顺序运行 11 轮，校验 stdout，取含进程启动的 wall-time 中位数；
+计时期间没有并行构建或测试。原有本机 Release 文件早于 SDK 批次，已排除出本次对照。
+
+| 用例 | 基线 ms | 快照 ms | 变化 |
+|---|---:|---:|---:|
+| class_instantiate | 11.362 | 11.356 | -0.1% |
+| fib | 39.585 | 39.672 | +0.2% |
+| loop_int | 347.597 | 321.340 | -7.6% |
+| native_methods | 18.444 | 19.240 | +4.3% |
+| string_concat | 17.277 | 17.618 | +2.0% |
+| snapshot-string-stress | 215.350 | 215.634 | +0.1% |
+| snapshot-native-stress | 249.933 | 253.630 | +1.5% |
+
+压力用例分别把字符串与原生方法循环增至百万次并同步调整结果断言。
+字符串压力变化 +0.1%，原生方法压力 +1.5%；短脚本受启动和布局影响，
+整数循环的下降不作为普遍加速结论。以上是本机有限语料复核，不替代 GCC 回退定位。
+
+正文保留成本：2099200 字节、2048 行注释源码，两侧各运行 5 次，
+使用 Windows GetProcessMemoryInfo 的 PeakWorkingSetSize 取中位数：
+基线 6852608 字节，快照 9347072 字节，增加约 2.38 MiB。
+CLI 在编译/执行期间同时持有原缓冲与快照，增量包含正文和独立行索引；
+嵌套 Chunk 共享快照，不按函数重复复制正文。此样本不是每种源码的固定内存开销。
+Catch2 验证重新装载、延迟函数、GC 回收、故障重置与关闭保留；CLI 覆盖文件自覆盖、
+虚拟源、REPL 历史与后缀求值。Windows Debug、Release、Release + JIT 各 235 项
+CTest 通过，JIT 的 Eager/Trace 均验证执行后抛出的定位和快照。
+
+原始样本、方法及二进制 SHA-256 见[测量数据](reports/2026-11-01-source-snapshot-benchmark.json)。
+
+
+## 2026-11-01 结构化异常栈与 getter 异常隔离
+
+Windows x64、Clang 19.1.5，Release `-O3 -DNDEBUG`、静态 CRT、JIT 关闭。
+基线为上一节源码快照批次的最终可执行文件（SHA-256 与该节记录一致），候选增加结构化
+异常栈和 getter 哨兵隔离；依赖与编译选项相同。每项预热后交替顺序运行 11 轮，
+比较 stdout 并运行脚本结果断言，取含启动的 wall-time 中位数；计时期间不并行构建/测试。
+
+| 用例 | 基线 ms | 本批 ms | 变化 |
+|---|---:|---:|---:|
+| class_instantiate | 10.252 | 10.182 | -0.7% |
+| fib | 39.516 | 38.616 | -2.3% |
+| loop_int | 354.588 | 340.688 | -3.9% |
+| native_methods | 21.723 | 23.240 | +7.0% |
+| string_concat | 19.873 | 19.303 | -2.9% |
+| snapshot-string-stress | 250.213 | 243.520 | -2.7% |
+| stack-native-stress | 252.362 | 254.292 | +0.8% |
+| stack-getter-stress | 7.128 | 7.051 | -1.1% |
+| stack-fib-stress | 382.091 | 397.725 | +4.1% |
+| stack-class-stress | 41.105 | 44.839 | +9.1% |
+
+压力脚本：字符串/原生方法百万次，fib(30)，类实例化 2 万次，独立 getter 千次；
+结果断言同步调整。疑似回退再单独交替复测 11 轮：
+
+| 用例 | 基线 ms | 本批 ms | 变化 |
+|---|---:|---:|---:|
+| stack-fib-stress | 478.001 | 461.289 | -3.5% |
+| stack-class-stress | 48.232 | 51.891 | +7.6% |
+
+类压力两次均观察到约 8% 回退，尚未归因，保留 TODO 复核；不能把本批描述为性能无回退。
+fib 的两次结果方向不同，暂不作稳定回退或加速结论。字符串/原生方法长负载约 -2.7%/+0.8%，
+短用例波动不能外推。上述结果不替代前述 GCC 整数循环回退定位。
+
+getter 哨兵在每个 VM 中惰性创建并缓存已编码的空 Chunk，嵌套访问只创建独立调用帧，
+不逐次重复编码；仅含 void 常量，不持有脚本对象。旧 getter 向调用者遗留返回槽，
+初始 10 万次基线尝试持续增长后终止，未纳入有限耗时对照；本批相同规模的结果断言连续
+5 次通过。Catch2 另验证千次 getter 调用后池顶增量为 0，以及异常 catch 后后续语句只执行一次。
+指令边界表新增每 Chunk 一个 Vec 和每条 TAC 约 4 字节，异常栈仅在错误路径分配，最多 64 帧。
+
+Windows Debug、Release、Release + JIT 均完成 235 项 CTest 验收；Release 的 LSP 协议
+测试曾在并行编译期间超时，空闲后单独重跑通过。JIT 构建的专项集合 223 条断言通过，其中 Eager/Trace 验证循环后抛出点及调用点；
+重抛、原生回调、GC/快照寿命与栈降级另由默认解释路径用例覆盖。相关实现见 `src/vm/VMState.*`、
+`Chunk.hpp`、`CallFrame.hpp`、`src/types/Property.hpp`，回归见 `tests/diagnostics_test.cpp`、`tests/cli_test.py`。
+
+原始样本、工作负载与 SHA-256 见[测量数据](reports/2026-11-01-runtime-stack-benchmark.json)。

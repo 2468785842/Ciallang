@@ -83,7 +83,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(process.returncode, 1)
         self.assertEqual(process.stderr.splitlines()[0],
                          'cial: error: %s:1:15: "inner"' % self.script)  # throw 语句位置
-        # 打印时按文件身份重读渲染摘录（linecache 式），指示符指向 throw
+        # 摘录使用编译时快照，指示符指向 throw
         excerpt = process.stderr.splitlines()
         self.assertTrue(any(line.rstrip().endswith('throw "inner"; }') for line in excerpt))
         self.assertEqual(excerpt[2], " " * (7 + 14) + "^")
@@ -98,12 +98,104 @@ class CliTest(unittest.TestCase):
         self.script.write_text('try { throw 1; } catch(e) {}\nthrow "second";\n', encoding="utf-8")
         process = self.run_cial(self.script)
         self.assertEqual(process.stderr.splitlines()[0], 'cial: error: %s:2:1: "second"' % self.script)
-        # stdin 逻辑名读不回源码：退化为单行，不伪造摘录
+        # 虚拟输入也保留正文
         process = self.run_cial("-", input='throw "s";\n')
         self.assertEqual(process.returncode, 1)
-        self.assertEqual(process.stderr, 'cial: error: <stdin>:1:1: "s"\n')
+        self.assertEqual(process.stderr.splitlines()[0], 'cial: error: <stdin>:1:1: "s"')
+        self.assertIn('throw "s";', process.stderr)
         self.assertEqual(self.run_cial(self.root / "missing.tjs").returncode, 1)
         self.assertFalse(json.loads(self.run_cial("--check-json", self.root / "missing.tjs").stdout)["ok"])
+
+    def test_runtime_excerpt_uses_compiled_content_for_named_stdin(self):
+        self.script.write_text('// unrelated disk contents', encoding="utf-8")
+        process = self.run_cial("--source-name", self.script, "-", input='throw "snapshot";\n')
+        self.assertEqual(process.returncode, 1)
+        self.assertIn('throw "snapshot";', process.stderr)
+        self.assertNotIn('unrelated disk contents', process.stderr)
+
+    def test_runtime_excerpt_survives_script_overwriting_its_file(self):
+        path = json.dumps(self.script.as_posix())
+        self.script.write_text('["// replaced on disk"].save(%s);\nthrow "original";\n' % path,
+                               encoding="utf-8")
+        process = self.run_cial(self.script)
+        self.assertEqual(process.returncode, 1)
+        self.assertIn('replaced on disk', self.script.read_text(encoding="utf-8-sig"))
+        self.assertIn('throw "original";', process.stderr)
+        self.assertIn('%s:2:1:' % self.script, process.stderr)
+
+    def test_repl_history_keeps_original_function_body(self):
+        process = self.run_cial("--repl", input='function saved() { throw "history"; }\n'
+                               'var later = 42;\nsaved();\nprintln(42);\n')
+        self.assertEqual(process.returncode, 1)
+        self.assertIn('function saved() { throw "history"; }', process.stderr)
+        self.assertNotIn('var later = 42;', process.stderr)
+        self.assertIn('42', process.stdout)
+
+    def test_eval_function_keeps_source_after_eval_returns(self):
+        self.script.write_text('var delayed = \'function() { throw "eval-body"; }\'!;\ndelayed();\n',
+                               encoding="utf-8")
+        process = self.run_cial(self.script)
+        self.assertEqual(process.returncode, 1)
+        self.assertIn('<eval>:1:', process.stderr)
+        self.assertIn('function() { throw "eval-body"; }', process.stderr)
+        self.assertNotIn("var delayed =", process.stderr)
+
+    def test_runtime_stack_lists_fault_and_caller_positions(self):
+        self.script.write_text('function leaf() {\nthrow "inner";\n}\n'
+                               'function middle() {\nleaf();\n}\nmiddle();\nvar later = 42;\n', encoding="utf-8")
+        process = self.run_cial(self.script)
+        self.assertEqual(process.returncode, 1)
+        frames = [line for line in process.stderr.splitlines() if line.startswith("  at ")]
+        self.assertEqual(frames, ['  at leaf (%s:2:1)' % self.script,
+                                  '  at middle (%s:5:1)' % self.script,
+                                  '  at <script> (%s:7:1)' % self.script])
+
+    def test_runtime_stack_preserves_nested_storage_origin(self):
+        child = self.root / "child.tjs"
+        child.write_text('function leaf() { throw "storage"; }\nleaf();\n', encoding="utf-8")
+        self.script.write_text('function wrapper() {\nScripts.execStorage("child.tjs");\n}\nwrapper();\n',
+                               encoding="utf-8")
+        process = self.run_cial(self.script)
+        self.assertEqual(process.returncode, 1)
+        self.assertIn('throw "storage";', process.stderr)
+        frames = [line for line in process.stderr.splitlines() if line.startswith("  at ")]
+        self.assertEqual(len(frames), 5)
+        self.assertIn('at leaf (', frames[0])
+        self.assertIn('child.tjs:1:', frames[0])
+        self.assertIn('child.tjs:2:1)', frames[1])
+        self.assertIn('<native boundary>', frames[2])
+        self.assertEqual(frames[3], '  at wrapper (%s:2:1)' % self.script)
+        self.assertEqual(frames[4], '  at <script> (%s:4:1)' % self.script)
+
+    def test_runtime_stack_tracks_property_constructor_and_eval_call_sites(self):
+        for source, caller_column in [
+                ('property p { getter { throw "getter"; } }\nvar v = p;\n', 5),
+                ('property p { setter(v) { throw "setter"; } }\np = 1;\n', 1),
+                ('class C { function C() { throw "constructor"; } }\nnew C();\n', 1),
+                ('var expression = "1 / 0";\nexpression!;\n', 11)]:
+            with self.subTest(source=source):
+                self.script.write_text(source, encoding="utf-8")
+                process = self.run_cial(self.script)
+                self.assertEqual(process.returncode, 1)
+                self.assertIn('  at <script> (%s:2:%s)' % (self.script, caller_column), process.stderr)
+                self.assertGreaterEqual(process.stderr.count("  at "), 2)
+        self.assertIn('<eval>:1:', process.stderr)
+
+    def test_caught_callback_exception_does_not_print_a_stack(self):
+        self.script.write_text('function compare(a, b) { throw 37; }\n'
+                               'try { [2, 1].sort(compare); } catch(e) { println(e); }\n', encoding="utf-8")
+        process = self.run_cial(self.script)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(process.stderr, "")
+        self.assertEqual(process.stdout, "37\n")
+
+    def test_caught_getter_exception_resumes_caller_once(self):
+        self.script.write_text('property p { getter { throw 73; } }\n'
+                               'try { var v = p; } catch(e) { println(e); }\nprintln(42);\n', encoding="utf-8")
+        process = self.run_cial(self.script)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(process.stderr, "")
+        self.assertEqual(process.stdout, "73\n42\n")
 
     def test_empty_script_and_graph_modes(self):
         self.script.write_text("// empty\n", encoding="utf-8")

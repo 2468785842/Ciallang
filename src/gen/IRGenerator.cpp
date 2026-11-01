@@ -68,6 +68,7 @@ namespace cial::inter {
         // 源码身份随 Chunk 携带（嵌套函数经各自的 parseAst 同样填充），
         // 运行期诊断据此定位；字节码转译产物不经过此处，保持为空
         _chunk->setSourceName(_sourceFile.sourceName());
+        _chunk->setSourceSnapshot(_sourceFile.snapshot());
         if(node) {
             // 根节点兜底行记录：表达式求值入口（REPL/evalExpr）没有语句节点，
             // 若无此记录整个 chunk 将无行号可查；语句根因同位置去重不受影响

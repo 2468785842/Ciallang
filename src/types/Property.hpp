@@ -15,6 +15,7 @@
 #include "../gen/Register.hpp"
 #include "Object.hpp"
 #include "Value.hpp"
+#include "common/Defer.hpp"
 #include "vm/Constant.hpp"
 #include "vm/VMState.hpp"
 
@@ -62,17 +63,24 @@ namespace cial {
             if(!propMeta->getFunc)
                 throw std::runtime_error("property no have getter");
 
-            const size_t absSP{ vmState.getRegPoolTop() - vmState.curFrame()->getSP() };
-
-            const u32 ret{ static_cast<u32>(absSP) };
-            vmState.pushVoid(1);
-
+            // getter 同步重入时，哨兵先截住异常，再由调用方派发循环恢复 catch。
+            // 否则嵌套 run 会执行父帧的 catch/后续语句，返回后外层循环再次执行。
+            const size_t depth = vmState.context.stackTop();
+            auto &boundary = vmState.getterBoundary();
+            vmState.allocCallFrame(&boundary);
+            vmState.curFrame()->exceptionBoundary = true;
+            const size_t base = vmState.curFrame()->getSP();
+            DEFER {
+                while(vmState.context.stackTop() > depth)
+                    vmState.freeCallFrame();
+            };
             Function getFunc{ propMeta->getFunc };
             getFunc.thisObj = thisObj;
-            getFunc.call(vmState, ret, 0);
-            // 嵌套执行 getter 帧直至其返回（栈回落到入口之下即返回）
+            getFunc.call(vmState, 0, 0);
             vmState.run();
-            return vmState.reg(ret);
+            if(vmState.context.stackTop() == depth)
+                throw vm::ScriptExceptionCarrier{ vmState.poolAt(base + 1) };
+            return vmState.reg(0);
         }
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override {
