@@ -507,6 +507,8 @@ macOS arm64；参考 `bin/darwin/TJSCompiler`（d8044c3，SHA `35169f56…537`�
 构造/析构/释放 83）；`Ret` 返回整数直写已在位。RTTI 具体源点需 `-g` 采样定位
 （候选：ChkInv/ChgThis 的 `dynamic_cast<DataObject*>` 或调用链其他点）；
 下一批次方向：调用路径 RTTI 消除（TypeId 直判化剩余点）+ `setThisObj` 引用化。
+（源点已采样定位并落地修复，见下文[thisData 缓存继承补丁](#2026-11-01-thisdata-缓存继承补丁macos-复测并落地)：
+必败转换在绑定 this 分支，非 ChkInv/ChgThis。）
 
 
 ## 2026-11-01 语义对齐与 SDK 基础批次
@@ -674,8 +676,8 @@ Release + JIT CTest 236/236——融合把 `x + 2` 一类函数体缩成单步�
 修改文件 clang-format 校验通过。原始样本、A/B 脚本、各形态补丁与二进制 SHA-256 位于本机忽略目录
 `bench/results/20261101-fib-call-path/`。同日另有 `thisData` 缓存继承补丁（`setThisObj` 每次全局函数
 调用对 GlobalObject 做必败 `dynamic_cast<DataObject*>`，fib(25) 实测 242,787 次/命中 1 次）：
-Windows 上中性（MSVC ABI 失败转换廉价），对应 macOS 画像 ~32% RTTI 采样，未纳入本栈，待
-macOS 复测后单独落地。
+Windows 上中性（MSVC ABI 失败转换廉价），对应 macOS 画像 ~32% RTTI 采样，未纳入本栈；
+已于 macOS 复测后落地，见下节。
 
 **被否决的后续候选 F——终结检查外提**（同机、同口径，对照 A3+D+B 整栈）：把每条指令前的
 `pendingFinalizers.empty()` 检查改为帧入口一次（局部 bool 门控）+ 回边（Jmp/JmpE/JmpNE 向后跳）
@@ -690,3 +692,40 @@ GC sweep 排队终结对象时直接置 `_pending`（一个 "需走慢路径" �
 开销）。顺带核实：Release 下 96 个 dispatch handler 全部内联进 `runLoop<>`（仅
 `dispatchTailCallV` 作为独立符号存活），"每指令一次函数调用"的假设不成立；派发差距（7.4 vs
 3.6 ns/条）来自骨架记账与指令语义本身。diff 留档本机 `bench/results/20261101-fib-call-path/stack-plus-F-rejected.patch`。
+
+## 2026-11-01 thisData 缓存继承补丁（macOS 复测并落地）
+
+macOS arm64、Release `-O3 -DNDEBUG`（无 LTO），基线 `b26a547`；基线/补丁二进制
+交替批次（各 3 批 × 预热 + 11 轮取 min）。fib 的逐调用开销来自绑定 this 分支的
+`setThisObj(Value{GlobalObject})`：顶层 `chg_this` 把全局函数 `Function::thisObj`
+永久绑为 GlobalObject，此后每次 `call_v` 都做一次必败 `dynamic_cast<DataObject*>`
+（fib(35) 采样 ~20% 样本）。
+
+补丁为 `CallFrame::inheritThisObj`（`src/vm/CallFrame.hpp`）：绑定 this 与调用者
+thisObj 同对象时沿用调用者帧的 thisData 缓存（thisData 是 thisObj 的纯函数缓存，
+同一对象必得同值，严格等价）；`invokeCallV`（`VMState.cpp`）与 `Function::call` 的
+绑定 this、调用者 this 两分支改走继承，跨对象 incontextof 等其余形态保持
+`setThisObj` 原语义。补丁后采样 `setThisObj`/`dyn_cast_*` 归零。
+
+| 脚本 | 基线 min | 补丁 min | 变化 |
+|---|---:|---:|---:|
+| fib | 20.94 | 12.97 | **−38.1%** |
+| fib(30) 压力 | 202.41 | 123.23 | **−39.1%** |
+| fib(35) 采样变体 | 2289.43 | 1342.00 | **−41.4%** |
+| probe-call-in-fn（5M 空调用） | 407.58 | 262.42 | **−35.6%** |
+| loop_int / native_methods / string_concat / class_instantiate | — | — | A/A 同幅噪声带 |
+
+调用微基准 81.5 → 52.5 ns/次。同窗口双引擎对照（参考 TJS2 `d8044c3`，交替 11 轮取
+min）：fib 12.44 vs 17.80 ms = **69%**（同表补丁前口径 122.7%）、fib(30) 69%、
+fib(35) 66%、probe 91%；与调用路径无关的用例比值不变。Windows 上该补丁为中性
+（MSVC ABI 失败转换廉价），是否回植本机由 Windows 侧按同口径另行复核。
+
+验证：CTest MacOS Release/Debug 各 412/412；修改文件 clang-format 20.1.0 通过；
+this 绑定语义（incontextof / super / 方法调用）由既有 tests/tjs 套件覆盖。原始批次
+报告、采样与二进制 SHA-256 位于本机忽略目录 `bench/results/20261101-thisdata-macos/`。
+
+## 过程问题记录
+
+- thisData 补丁初版按 Windows 轮记录的猜测改在调用者 this 继承分支，复测无收益，采样定位后确认必败 `dynamic_cast` 在绑定 this 分支——热路径源点必须实测，不能沿用上一平台的画像推断。
+- 本机测量期间前台进程稳定占核，同二进制 A/A 批间漂移可达 ~4% 且波及无函数调用的 loop_int，先后批次不可直接对比，须基线/补丁二进制交替批次对消时间窗。
+- Bench.cmake 的 `BENCH_DIR` 传相对路径时 glob 不到基准脚本，须用绝对路径。

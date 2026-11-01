@@ -10,8 +10,6 @@
 
 - [ ] 评估 stdlib 内部临时值拷贝消除；继续采用同机 Release 对照及异常/GC 验证。已有调用布局、Value 生命周期与 asInteger 快路径结论见[性能记录](doc/performance.md)。
 
-- [ ] macOS 复测并落地 `thisData` 缓存继承补丁（全局函数调用经 `setThisObj` 对 GlobalObject 做必败 `dynamic_cast`，每次调用一次；Windows 插桩证实 fib(25) 242,787 次/命中 1，消除后严格等价且中性——MSVC ABI 失败转换廉价；macOS 画像 RTTI 链 ~32% 采样，预期为该平台 fib 主收益）。补丁与样本见本机 `bench/results/20261101-fib-call-path/`，测量见[性能记录](doc/performance.md)。
-
 ## 字节码反编译器
 
 设计与批次见[反编译器方案](doc/bytecode/decompiler-plan.md)（2026-11-01 采纳 TAC 层直译路径）。

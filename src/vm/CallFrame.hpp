@@ -63,6 +63,14 @@ namespace cial {
             thisData = nullptr;
         }
 
+        // 调用点绑定继承（thisObj 取调用者的 thisObj）：thisData 是 thisObj 的
+        // 纯函数缓存，同一对象直接沿用调用者已算好的缓存即可，免重复
+        // dynamic_cast——全局函数递归每次调用对 GlobalObject 做的正是必败转换
+        void inheritThisObj(const Value &v, DataObject *cached) {
+            thisObj = v;
+            thisData = cached;
+        }
+
         explicit CallFrame() = default;
 
         explicit CallFrame(vm::Chunk *chunk, const Opt<u16> ret, vm::FastRegisterPool &pool,

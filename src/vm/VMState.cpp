@@ -1759,10 +1759,19 @@ namespace cial::vm {
                         w[tail + j] = regs[argRegs[j]];
                 }
                 if(boundThis) {
-                    nf->setThisObj(Value{ boundThis });
+                    if(callerThis.isObject() && boundThis == callerThis.asObject().unwrap()) {
+                        // 顶层 chg_this 把全局函数绑定 this=GlobalObject：与调用者
+                        // thisObj 同对象（全局函数调用的常态），thisData 直接沿用
+                        // 调用者缓存，免每次调用对 GlobalObject 的必败 dynamic_cast
+                        nf->inheritThisObj(callerThis, cur->thisData);
+                    } else {
+                        nf->setThisObj(Value{ boundThis });
+                    }
                 } else if(callerThis.isObject()) {
-                    // TJS2 调用点绑定语义：clo.ObjThis 为空时 this 取调用者的 this
-                    nf->setThisObj(callerThis);
+                    // TJS2 调用点绑定语义：clo.ObjThis 为空时 this 取调用者的 this；
+                    // thisData 沿用调用者缓存（thisObj 同一对象的纯函数），免对
+                    // GlobalObject 的必败 dynamic_cast（全局函数递归每次调用一次）
+                    nf->inheritThisObj(callerThis, cur->thisData);
                 } else {
                     nf->setThisObjNull();
                 }
