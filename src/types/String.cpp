@@ -7,8 +7,15 @@
 #include "String.hpp"
 
 #include "Value.hpp"
+#include "common/UTF16.hpp"
 
 namespace cial {
+
+    String String::joinSurrogates(const String &a, const String &b) {
+        auto units = Common::toUtf16({ a.getData(), a.length() });
+        units += Common::toUtf16({ b.getData(), b.length() });
+        return String{ Common::fromUtf16(units) };
+    }
 
     String::String(const char *str, const u32 len) : _shortStr{} {
         if(len <= SHORT_STR_LEN) {

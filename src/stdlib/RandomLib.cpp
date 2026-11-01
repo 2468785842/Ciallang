@@ -222,7 +222,7 @@ namespace cial::stdlib {
 
 
     Value rgRandomize(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
-        auto *rg = dynamic_cast<RandomGen *>(thisObj.asObject().unwrap());
+        auto *rg = &dynamic_cast<RandomGen &>(*thisObj.requireObject());
         if(argCount == 0) {
             rg->randomizeNoArg();
         } else if(args[0].isObject()) {
@@ -236,23 +236,23 @@ namespace cial::stdlib {
     }
 
     Value rgRandom(VM *, const Value &thisObj, size_t, Value *) {
-        return Value{ Real{ dynamic_cast<RandomGen &>(*thisObj.asObject().unwrap()).random() } };
+        return Value{ Real{ dynamic_cast<RandomGen &>(*thisObj.requireObject()).random() } };
     }
 
     Value rgRandom32(VM *, const Value &thisObj, size_t, Value *) {
-        return Value{ Integer{ static_cast<i64>(dynamic_cast<RandomGen &>(*thisObj.asObject().unwrap()).random32()) } };
+        return Value{ Integer{ static_cast<i64>(dynamic_cast<RandomGen &>(*thisObj.requireObject()).random32()) } };
     }
 
     Value rgRandom63(VM *, const Value &thisObj, size_t, Value *) {
-        return Value{ Integer{ dynamic_cast<RandomGen &>(*thisObj.asObject().unwrap()).random63() } };
+        return Value{ Integer{ dynamic_cast<RandomGen &>(*thisObj.requireObject()).random63() } };
     }
 
     Value rgRandom64(VM *, const Value &thisObj, size_t, Value *) {
-        return Value{ Integer{ dynamic_cast<RandomGen &>(*thisObj.asObject().unwrap()).random64() } };
+        return Value{ Integer{ dynamic_cast<RandomGen &>(*thisObj.requireObject()).random64() } };
     }
 
     Value rgSerialize(VM *vm, const Value &thisObj, size_t, Value *) {
-        return dynamic_cast<RandomGen &>(*thisObj.asObject().unwrap()).serialize(vm);
+        return dynamic_cast<RandomGen &>(*thisObj.requireObject()).serialize(vm);
     }
 
 } // namespace cial::stdlib

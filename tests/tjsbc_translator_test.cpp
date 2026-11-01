@@ -90,6 +90,18 @@ TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
     vm::VMState vmState{ context };
     VM vm{ &vmState };
 
+    SECTION("null object constants remain distinct from void") {
+        TjsBytecodeFile file{};
+        file.topLevel = -1;
+        file.contexts.push_back(makeFuncContext({ 1, 1, 0, 118, 1, 119 }, { { TJS_TYPE_OBJECT, 0 } }, 0));
+        TjsTranslator translator{ rt, file };
+        const auto program = translator.translate();
+        const Value function = Constant{ program.contexts[0].funcMeta }.createValue(&rt);
+        const Value result = vm.callValue(function, 0, nullptr);
+        REQUIRE(result.isNull());
+        REQUIRE_FALSE(result.isVoid());
+    }
+
     SECTION("f(x) = x * 2") {
         TjsBytecodeFile file{};
         file.topLevel = -1; // 顶层注册模式（global proxy）M2 未支持,只测函数
@@ -132,8 +144,8 @@ TEST_CASE("TJS2 字节码转译——函数 context 直调（恒等映射）") {
     SECTION("CHKINS overwrites target and preserves class name") {
         TjsBytecodeFile file{};
         file.topLevel = -1;
-        file.pool.strings.push_back("Integer"_str);
-        // CP r1,arg0; CONST r2,"Integer"; CHKINS r1,r2; SRV r1; RET
+        file.pool.strings.push_back("Number"_str);
+        // CP r1,arg0; CONST r2,"Number"; CHKINS r1,r2; SRV r1; RET
         file.contexts.push_back(
             makeFuncContext({ 2, 1, -3, 1, 2, 0, 88, 1, 2, 118, 1, 119 }, { TjsDataSlot{ TJS_TYPE_STRING, 0 } }, 1));
         TjsTranslator translator{ rt, file };

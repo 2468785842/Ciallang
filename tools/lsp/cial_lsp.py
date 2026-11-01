@@ -107,7 +107,7 @@ BUILTIN_MEMBERS = {
         "trim": (MEMBER_METHOD, "trim(): String — 去除首尾空白"),
         "reverse": (MEMBER_METHOD, "reverse(): String — 反转字符串"),
         "repeat": (MEMBER_METHOD, "repeat(count): String — 重复 count 次"),
-        "length": (MEMBER_PROPERTY, "length: Integer — 字符长度（只读）"),
+        "length": (MEMBER_PROPERTY, "length: Integer — UTF-16 码元数（只读）"),
     },
     "Dictionary": {
         "assign": (MEMBER_METHOD, "assign(source) — 复制源字典的全部成员"),
@@ -149,8 +149,8 @@ BUILTIN_MEMBERS = {
         "SQRT2": (MEMBER_PROPERTY, "SQRT2: Real — √2"),
     },
     "Scripts": {
-        "execStorage": (MEMBER_METHOD, "execStorage(name): 执行存储中的脚本文件（相对当前脚本目录，全局上下文）"),
-        "evalStorage": (MEMBER_METHOD, "evalStorage(name): 值 — 求值存储中的表达式并返回结果"),
+        "execStorage": (MEMBER_METHOD, "execStorage(name, mode = void, context = void): 执行存储脚本；可由宿主读取器加载"),
+        "evalStorage": (MEMBER_METHOD, "evalStorage(name, mode = void, context = void): 值 — 在指定上下文求值存储表达式"),
     },
     "Date": {
         "getYear": (MEMBER_METHOD, "getYear(): Integer — 年"),

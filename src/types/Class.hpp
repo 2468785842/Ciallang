@@ -38,7 +38,7 @@ namespace cial {
             if(meta)
                 meta->marked();
             for(auto &v : _props | std::views::values) {
-                if(v.isObject()) {
+                if(v.isObject() && !v.isNull()) {
                     v.asObject().value()->marked();
                 }
             }
@@ -107,7 +107,7 @@ namespace cial {
                 _class->marked();
 
             for(auto &v : _props | std::views::values) {
-                if(v.isObject()) {
+                if(v.isObject() && !v.isNull()) {
                     v.asObject().value()->marked();
                 }
             }

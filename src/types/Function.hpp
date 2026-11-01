@@ -123,7 +123,7 @@ namespace cial {
             if(_marked)
                 return;
             Object::marked();
-            if(_thisObj.isObject())
+            if(_thisObj.isObject() && !_thisObj.isNull())
                 _thisObj.asObject().value()->marked();
         }
 

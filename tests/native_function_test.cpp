@@ -643,18 +643,26 @@ TEST_CASE("Array/Dictionary 结构化存取 + Octet pack 系（tjsBinarySerializ
             var c2 = [];
             c2.loadStruct(__tmpDir + "/t_c.bin", "b");
             var innerV = c2[1]["v"];
-            var backIsNull = c2[1]["back"] === void ? 1 : 0;
+            var backIsNull = c2[1]["back"] === null ? 1 : 0;
             var od = %[o: [0xde, 0xad].pack("C2")];
             od.saveStruct(__tmpDir + "/t_o.bin", "b");
             var od2 = %[];
             od2.loadStruct(__tmpDir + "/t_o.bin", "b");
             var oh = od2["o"].unpack("H*")[0];
+            var nullable = [null, void, $0xd83d, "中😀"];
+            nullable.saveStruct(__tmpDir + "/nullable.bin", "b");
+            var restored = [];
+            restored.loadStruct(__tmpDir + "/nullable.bin", "b");
+            var typesPreserved = restored[0] === null && restored[1] === void;
+            var unitsPreserved = #restored[2] == 0xd83d && restored[3] === "中😀";
         )tjs"_str);
         REQUIRE(*vm.evalExpr<Integer>("txtErr"_str) == 1);
         REQUIRE(*vm.evalExpr<Integer>("a3c"_str) == 4);
         REQUIRE(*vm.evalExpr<Integer>("e3"_str) == 7);
         REQUIRE(*vm.evalExpr<Integer>("y"_str) == 8);
         REQUIRE(*vm.evalExpr<Integer>("innerV"_str) == 1);
+        REQUIRE(*vm.evalExpr<bool>("typesPreserved"_str));
+        REQUIRE(*vm.evalExpr<bool>("unitsPreserved"_str));
         REQUIRE(*vm.evalExpr<Integer>("backIsNull"_str) == 1); // 环检测 → null
         REQUIRE((**vm.evalExpr<String *>("oh"_str)) == "DEAD"_str);
     }

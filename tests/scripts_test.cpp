@@ -160,3 +160,46 @@ try {
 )"_str);
     REQUIRE(*session.vm.evalExpr<bool>("hit"_str));
 }
+
+TEST_CASE("Scripts host storage forwards virtual names mode and source identity", "[stdlib][scripts][sdk]") {
+    struct Storage final : TextStorageReader {
+        std::string name, mode, from;
+        TextStorage read(std::string_view requested, std::string_view options, std::string_view caller) override {
+            name = requested;
+            mode = options;
+            from = caller;
+            if(name == "data.xp3>expr.tjs")
+                return { "xp3://data/expr.tjs", "40 + 2" };
+            if(name == "data.xp3>init.tjs")
+                return { "xp3://data/init.tjs", "var answer = 41; function read() { return answer + 1; }" };
+            throw std::runtime_error("storage unavailable: " + name);
+        }
+    };
+    const TempDir dir;
+    Session session{ dir.path() };
+    auto reader = std::make_shared<Storage>();
+    stdlib::registerScriptsLib(session.context, &session.vmState, {}, reader);
+    REQUIRE(*session.vm.evalExpr<Integer>("Scripts.evalStorage(\"data.xp3>expr.tjs\", \"o123\")"_str) == 42);
+    REQUIRE(reader->name == "data.xp3>expr.tjs");
+    REQUIRE(reader->mode == "o123");
+    REQUIRE(reader->from == "<eval>");
+    session.vm.eval("var isolated = %[]; Scripts.execStorage(\"data.xp3>init.tjs\", void, isolated);"_str);
+    REQUIRE_FALSE(session.vmState.globalHas("answer"));
+    REQUIRE(*session.vm.evalExpr<Integer>("isolated.read()"_str) == 42);
+    session.vm.eval("var caught = false; try { Scripts.execStorage(\"missing\"); } catch(e) { caught = true; }"_str);
+    REQUIRE(*session.vm.evalExpr<bool>("caught"_str));
+    REQUIRE(*session.vm.evalExpr<Integer>("Scripts.evalStorage(\"data.xp3>expr.tjs\")"_str) == 42);
+}
+
+TEST_CASE("Scripts execStorage decodes UTF16 BOM like evalStorage", "[stdlib][scripts]") {
+    const TempDir dir;
+    std::string bytes{ "\xff\xfe", 2 };
+    for(const auto unit : std::u16string{ u"var unicode = \"中😀\";" }) {
+        bytes.push_back(static_cast<char>(unit & 0xff));
+        bytes.push_back(static_cast<char>(unit >> 8));
+    }
+    dir.write("utf16.tjs", bytes);
+    Session session{ dir.path() };
+    session.vm.eval("Scripts.execStorage(\"utf16.tjs\");"_str);
+    REQUIRE(*session.vm.evalExpr<Integer>("unicode.length"_str) == 3);
+}

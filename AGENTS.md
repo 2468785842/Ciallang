@@ -32,7 +32,7 @@ cmake --build --preset "Linux Debug"
 ctest --preset "Linux Debug"
 ```
 
-基础依赖为 fmt、frozen、utf8proc；CLI、测试、JIT 的可选依赖和开关见[构建指南](doc/building.md)。
+基础依赖为 fmt、frozen、utf8proc、Oniguruma；CLI、测试、JIT 的可选依赖和开关见[构建指南](doc/building.md)。
 C++ 测试显式登记在 `tests/CMakeLists.txt`；纯语言/标准库行为放入 `tests/tjs/`，按功能归类，
 用 TJS 断言并自动登记为 CTest；原生注册与内部状态检查保留 Catch2。见[脚本测试指南](tests/tjs/README.md)。
 CLI、LSP 与字节码工具测试也通过 CTest 运行。

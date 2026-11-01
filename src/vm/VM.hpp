@@ -154,6 +154,11 @@ namespace cial {
 
         [[nodiscard]] Runtime &rt() const { return _vmState->rt; }
 
+        // SDK 执行入口：编译失败只写 Result，不打印；成功返回带根句柄（含合法 void）。
+        // 运行期异常遵循 ScriptExceptionCarrier 协议，嵌套调用不会越过宿主哨兵帧。
+        [[nodiscard]] Handle<Value> execute(Common::SourceFile &source, Common::Result &result, bool expression = false,
+                                            const Value &executionContext = {}) const;
+
         template <typename T, typename... Args>
         T *create(Args &&...args) {
             return _vmState->rt.create<T>(std::forward<Args>(args)...).get();

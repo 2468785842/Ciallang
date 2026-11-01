@@ -17,6 +17,7 @@
 #include "../gen/Instruction.hpp"
 #include "VMDebug.hpp"
 #include "common/Defer.hpp"
+#include "common/UTF16.hpp"
 #include "parser/Parser.hpp"
 #include "parser/ast/ExprNode.hpp"
 #include "stdlib/NativeRegister.hpp"
@@ -75,8 +76,9 @@ namespace cial::vm {
 
     bool VMState::hasThis(const Atom atom) const {
         // current thisObj（thisData 为帧创建时缓存的 DataObject*）
-        if(_curFrame->thisData) {
-            if(_curFrame->thisData->hasProp(atom)) {
+        if(_curFrame->thisObj.isObject() && !_curFrame->thisObj.isNull()) {
+            auto *receiver = _curFrame->thisObj.asObject().unwrap();
+            if(receiver->hasProp(atom)) {
                 return true;
             }
         }
@@ -98,9 +100,10 @@ namespace cial::vm {
 
     Value VMState::getThis(const Atom atom) const {
         // current thisObj（thisData 为帧创建时缓存的 DataObject*）
-        if(_curFrame->thisData) {
-            if(_curFrame->thisData->hasProp(atom)) {
-                return _curFrame->thisData->getProp(atom);
+        if(_curFrame->thisObj.isObject() && !_curFrame->thisObj.isNull()) {
+            auto *receiver = _curFrame->thisObj.asObject().unwrap();
+            if(receiver->hasProp(atom)) {
+                return receiver->getProp(atom);
             }
         }
 
@@ -121,9 +124,10 @@ namespace cial::vm {
 
     void VMState::setThis(const Atom atom, const Value &v) const {
         // current thisObj（thisData 为帧创建时缓存的 DataObject*）
-        if(_curFrame->thisData) {
-            if(_curFrame->thisData->hasProp(atom)) {
-                _curFrame->thisData->setProp(atom, v);
+        if(_curFrame->thisObj.isObject() && !_curFrame->thisObj.isNull()) {
+            auto *receiver = _curFrame->thisObj.asObject().unwrap();
+            if(receiver->hasProp(atom)) {
+                receiver->setProp(atom, v);
                 return;
             }
         }
@@ -226,7 +230,7 @@ namespace cial::vm {
     static bool propObjectSet(VMState &vmState, const Value &src, const Value &dst) {
         if(dst.isObject()) {
             // typeId 直判替代 dynamic_cast（Property 为 final，二者等价）
-            if(const auto *obj = dst.asObject().value(); obj->typeId() == TypeId::Property) {
+            if(const auto *obj = dst.asObject().value(); obj && obj->typeId() == TypeId::Property) {
                 static_cast<const Property *>(obj)->invokeSet(vmState, src);
                 return true;
             }
@@ -253,7 +257,7 @@ namespace cial::vm {
     // 非对象值的原生 property 表。getter 经 invokeGet 嵌套 run 同步完成，恒 Continue
     static void propGetMember(VMState &vmState, CallFrame *cur, const Value &val, const Atom atom, Value &dst) {
         if(val.isObject()) {
-            auto *obj = val.asObject().value();
+            auto *obj = val.requireObject();
 
             // 原生成员统一通过开放类型键查表；
             // 未命中落到对象自身 getProp。
@@ -340,7 +344,7 @@ namespace cial::vm {
         if(!objVal.isObject()) {
             throw std::runtime_error("dprop obj is not object");
         }
-        auto *obj = objVal.asObject().unwrap();
+        auto *obj = objVal.requireObject();
         const auto accessor = vmState.context.findAccessor(obj->nativeTypeKey(), atom);
         if(accessor.getter || accessor.setter) {
             if(!accessor.setter)
@@ -626,10 +630,17 @@ namespace cial::vm {
 
     DISPATCH_OP_METHOD(Inv) {
         const u16 r1 = read<u16>(ip, pc);
+        if(regs[r1].isNull())
+            throw std::runtime_error("null object access");
         // invalidate 会把 finalize 帧压栈（如果类定义了 finalize）；
         // run 缓存了当前帧，必须跳到新帧执行完再回来
         const size_t top = _stackTop;
-        dynamic_cast<DataObject *>(regs[r1].asObject().unwrap())->invalidate();
+        auto *object = regs[r1].isObject() ? dynamic_cast<DataObject *>(regs[r1].asObject().unwrap()) : nullptr;
+        const bool invalidated = object && object->isValid();
+        if(invalidated)
+            object->invalidate();
+        // finalize 可重入并扩容寄存器池，写回须重新取得所属帧的窗口。
+        cur->regs()[r1] = Value{ Integer{ invalidated } };
         if(_stackTop != top) {
             cur->pc = pc;
             return DispatchRet::Call;
@@ -728,12 +739,12 @@ namespace cial::vm {
             }
         }
         const String *str = strVal.asString().unwrap();
-        regs[r2] = Value{ Integer{
-            str->isEmpty() ? 0 : static_cast<Integer>(static_cast<unsigned char>(str->getData()[0])) } };
+        const auto units = Common::toUtf16({ str->getData(), str->length() });
+        regs[r2] = Value{ Integer{ units.empty() ? 0 : units.front() } };
         return DispatchRet::Continue;
     }
 
-    // $n：字符码转 1 字符字符串（与 charAt 一致的字节语义）
+    // $n：转换为一个 UTF-16 码元（与 charAt 使用相同单位）
     DISPATCH_OP_METHOD(Chr) {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
@@ -741,9 +752,9 @@ namespace cial::vm {
         if(!src.isInteger() && !src.isReal()) {
             throw std::runtime_error("'$' operator expects an integer operand");
         }
-        const auto code = static_cast<unsigned char>(
+        const char16_t code = static_cast<char16_t>(
             src.isInteger() ? src.asIntegerUnsafe() : static_cast<Integer>(src.asReal().unwrap().value()));
-        regs[r2] = Value{ String{ static_cast<char>(code) } };
+        regs[r2] = Value{ String{ Common::fromUtf16({ &code, 1 }) } };
         return DispatchRet::Continue;
     }
 
@@ -829,7 +840,10 @@ namespace cial::vm {
         const u16 r2 = read<u16>(ip, pc);
         // 原版 VM_CHKINV（tjsInterCodeExec.cpp:1177）：非对象值恒有效（true）；
         // 对象按 IsValid 判定——本引擎仅 DataObject 跟踪失效状态，其余对象恒有效。
-        if(auto *data = regs[r1].isObject() ? dynamic_cast<DataObject *>(regs[r1].asObject().unwrap()) : nullptr) {
+        if(regs[r1].isNull()) {
+            throw std::runtime_error("null object access");
+        } else if(auto *data =
+                      regs[r1].isObject() ? dynamic_cast<DataObject *>(regs[r1].asObject().unwrap()) : nullptr) {
             regs[r2] = Value{ Integer{ data->isValid() } };
         } else {
             regs[r2] = Value{ Integer{ true } };
@@ -910,19 +924,17 @@ namespace cial::vm {
             // TJS2 语义:基础类型用类型名匹配(Integer/Real 同属 "Number"),
             // 其余走对象的类名 instanceOf
             bool result = false;
-            if(name == "Number") {
-                result = dst.isInteger() || dst.isReal();
-            } else if(name == "Integer") {
-                result = dst.isInteger();
-            } else if(name == "Real") {
-                result = dst.isReal();
-            } else if(name == "String") {
-                result = dst.isString();
-            } else if(name == "Octet") {
-                result = dst.isOctet();
-            } else if(dst.isObject()) {
+            if(name == "Object") {
+                result = !dst.isVoid();
+            } else if(dst.isInteger() || dst.isReal()) {
+                result = name == "Number";
+            } else if(dst.isString()) {
+                result = name == "String";
+            } else if(dst.isOctet()) {
+                result = name == "Octet";
+            } else if(dst.isObject() && !dst.isNull()) {
                 const Atom atom = rt.atomTable.intern(name);
-                result = dst.asObject().unwrap()->instanceOf(atom);
+                result = dst.requireObject()->instanceOf(atom);
             }
             dst = Value{ Integer{ result } };
             return DispatchRet::Continue;
@@ -978,21 +990,23 @@ namespace cial::vm {
 
     void VMState::loadGlobal(const Atom atom, Value &dst) {
         if(const Value *g = cachedGlobal(atom)) {
+            // 数值循环先走纯整数拷贝，避免进入对象/属性分派的判型链。
+            if(g->isIntegerFast() && dst.isIntegerFast()) {
+                dst.asIntegerStore(g->asIntegerUnsafe());
+                return;
+            }
             // Property 触发 getter 的慢路径之外,直接从槽位零拷贝取值。
             // 注意寄存器写入可能触发 setter 语义无关,只读安全;
             // Property 调用可能修改 _props(重入),先拷出再降级慢路径。
             // typeId 直判替代 dynamic_cast（Property 为 final，二者等价）：
             // 循环体内的对象型全局读（如 arr.push 的 arr）每次省一次 RTTI 遍历
-            if(g->isObject() && g->asObject().unwrap()->typeId() == TypeId::Property) {
+            if(g->isObject() && !g->isNull() && g->asObject().unwrap()->typeId() == TypeId::Property) {
                 Value srcVal = *g;
                 propObjectGet(*this, srcVal, srcVal);
                 dst = srcVal;
                 return;
             }
-            if(g->isIntegerFast() && dst.isIntegerFast())
-                dst.asIntegerStore(g->asIntegerUnsafe());
-            else
-                dst = *g;
+            dst = *g;
             return;
         }
         throw std::runtime_error("in global object Not found property");
@@ -1008,7 +1022,8 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(GThis) {
         const u32 atom = read<u32>(ip, pc);
         const u16 r1 = read<u16>(ip, pc);
-        if(!cur->thisData && (!cur->closure || !cur->closure->funcMeta)) {
+        if(!cur->thisData && (!cur->closure || !cur->closure->funcMeta) &&
+           (!cur->thisObj.isObject() || cur->thisObj.isNull() || cur->thisObj.asObject().value() == context.global())) {
             loadGlobal(Atom{ atom }, regs[r1]);
             return DispatchRet::Continue;
         }
@@ -1023,7 +1038,8 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc);
         const Atom a{ atom };
         const Value &srcVal = regs[r1];
-        if(!cur->thisData && (!cur->closure || !cur->closure->funcMeta) && srcVal.isIntegerFast()) {
+        if(!cur->thisData && (!cur->closure || !cur->closure->funcMeta) && srcVal.isIntegerFast() &&
+           (!cur->thisObj.isObject() || cur->thisObj.isNull() || cur->thisObj.asObject().value() == context.global())) {
             if(const Value *slot = cachedGlobal(a); slot && slot->isIntegerFast()) {
                 const_cast<Value *>(slot)->asIntegerStore(srcVal.asIntegerUnsafe());
                 return DispatchRet::Continue;
@@ -1311,7 +1327,7 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc);
         const u16 r2 = read<u16>(ip, pc);
         const i64 imm = decodeSleb128(ip, pc, 10);
-        const auto &object = regs[r2].asObject().unwrap();
+        auto *object = regs[r2].requireObject();
         cur->pc = pc;
         object->call(*this, r1, imm);
         return DispatchRet::Call;
@@ -1347,8 +1363,8 @@ namespace cial::vm {
         for(u64 i = 0; i < argc; ++i)
             args[i] = read<u16>(ip, pc);
         if(regs[func].isObject()) {
-            auto *callee = regs[func].asObject().unwrap();
-            if(callee->typeId() == TypeId::Function) {
+            auto *callee = regs[func].requireObject();
+            if(callee && callee->typeId() == TypeId::Function) {
                 auto *meta = static_cast<Function *>(callee)->meta;
                 if(meta == cur->funcMeta && meta->tailRecursionSafe != 0 &&
                    trySelfTailCall(cur, regs, callee, dst, args, static_cast<u32>(argc), pc))
@@ -1502,10 +1518,10 @@ namespace cial::vm {
                                      const u64 argc, const u64 pc, const Value *receiver) {
         const Value &funcVal = regs[func];
         if(funcVal.isObject()) {
-            auto *callee = funcVal.asObject().unwrap();
+            auto *callee = funcVal.requireObject();
             // typeId 一次虚调用判型（替代 dynamic_cast）：Function 走直写压帧，
             // NativeFunction 走免池同步快路径，其余回落通用 call
-            if(callee->typeId() == TypeId::Function) {
+            if(callee && callee->typeId() == TypeId::Function) {
                 auto *fn = static_cast<Function *>(callee);
                 const FuncMeta *meta = fn->meta;
                 const u32 arity = meta->arity;
@@ -1584,7 +1600,7 @@ namespace cial::vm {
         for(u64 i = 0; i < argc; ++i)
             push(regs[argRegs[i]]);
         cur->pc = pc;
-        regs[func].asObject().unwrap()->call(*this, dst, argc);
+        regs[func].requireObject()->call(*this, dst, argc);
         return DispatchRet::Call;
     }
 
@@ -1628,7 +1644,7 @@ namespace cial::vm {
         for(const auto &v : args)
             push(v);
         cur->pc = pc;
-        callee.asObject().unwrap()->call(*this, r1, static_cast<size_t>(argc));
+        callee.requireObject()->call(*this, r1, static_cast<size_t>(argc));
         return DispatchRet::Call;
     }
 
@@ -1671,7 +1687,7 @@ namespace cial::vm {
         for(const auto &v : args)
             push(v);
         cur->pc = pc;
-        callee.asObject().unwrap()->call(*this, r1, args.size());
+        callee.requireObject()->call(*this, r1, args.size());
         return DispatchRet::Call;
     }
 
@@ -1827,7 +1843,7 @@ namespace cial::vm {
             return DispatchRet::Continue;
         }
         const String &name = *regs[r2].asString().unwrap();
-        objVal.asObject().unwrap()->setProp(rt.atomTable.intern(name), regs[r3]);
+        objVal.requireObject()->setProp(rt.atomTable.intern(name), regs[r3]);
         return DispatchRet::Continue;
     }
 
@@ -1839,7 +1855,7 @@ namespace cial::vm {
         if(!objVal.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
         }
-        objVal.asObject().unwrap()->setProp(Atom{ atomV }, regs[r3]);
+        objVal.requireObject()->setProp(Atom{ atomV }, regs[r3]);
         return DispatchRet::Continue;
     }
 
@@ -1854,7 +1870,7 @@ namespace cial::vm {
             return DispatchRet::Continue;
         }
         const String &name = *regs[r2].asString().unwrap();
-        regs[r3] = Value{ Integer{ objVal.asObject().unwrap()->delProp(rt.atomTable.intern(name)) } };
+        regs[r3] = Value{ Integer{ objVal.requireObject()->delProp(rt.atomTable.intern(name)) } };
         return DispatchRet::Continue;
     }
 
@@ -1867,7 +1883,7 @@ namespace cial::vm {
             regs[r3] = Value{ Integer{ false } };
             return DispatchRet::Continue;
         }
-        regs[r3] = Value{ Integer{ objVal.asObject().unwrap()->delProp(Atom{ atomV }) } };
+        regs[r3] = Value{ Integer{ objVal.requireObject()->delProp(Atom{ atomV }) } };
         return DispatchRet::Continue;
     }
 
@@ -1893,7 +1909,7 @@ namespace cial::vm {
         if(!val.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
         }
-        regs[r3] = val.asObject().unwrap()->getProp(rt.atomTable.intern(name));
+        regs[r3] = val.requireObject()->getProp(rt.atomTable.intern(name));
         return DispatchRet::Continue;
     }
 
@@ -1905,7 +1921,7 @@ namespace cial::vm {
         if(!val.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
         }
-        regs[r3] = val.asObject().unwrap()->getProp(Atom{ atomV });
+        regs[r3] = val.requireObject()->getProp(Atom{ atomV });
         return DispatchRet::Continue;
     }
 
@@ -1924,10 +1940,10 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc); // prop
         const u16 r2 = read<u16>(ip, pc); // dst
         const auto &propVal = regs[r1];
-        if(!propVal.isObject()) {
+        if(!propVal.isObject() || propVal.isNull()) {
             throw std::runtime_error("'*' operand is not a property");
         }
-        auto *prop = propVal.asObject().unwrap()->typeId() == TypeId::Property
+        auto *prop = propVal.requireObject()->typeId() == TypeId::Property
             ? static_cast<Property *>(propVal.asObject().unwrap())
             : nullptr;
         if(!prop) {
@@ -1943,10 +1959,10 @@ namespace cial::vm {
         const u16 r1 = read<u16>(ip, pc); // prop
         const u16 r2 = read<u16>(ip, pc); // src
         const auto &propVal = regs[r1];
-        if(!propVal.isObject()) {
+        if(!propVal.isObject() || propVal.isNull()) {
             throw std::runtime_error("'*' operand is not a property");
         }
-        auto *prop = propVal.asObject().unwrap()->typeId() == TypeId::Property
+        auto *prop = propVal.requireObject()->typeId() == TypeId::Property
             ? static_cast<Property *>(propVal.asObject().unwrap())
             : nullptr;
         if(!prop) {
@@ -1976,7 +1992,7 @@ namespace cial::vm {
     }
 
     // a[i] 读：数组整数下标（负=从尾，越界报脚本异常）、字典键（字符串化）、
-    // 字符串字符（保持旧 charAt 字节语义：越界得空串）、其余对象按成员名访问
+    // 字符串按 UTF-16 码元下标访问（负数/大于长度抛错，等于长度为空串）；其余对象按成员名访问
     DISPATCH_OP_METHOD(GetIndex) {
         const u16 r1 = read<u16>(ip, pc); // obj
         const u16 r2 = read<u16>(ip, pc); // idx
@@ -2001,7 +2017,7 @@ namespace cial::vm {
                     throw std::runtime_error("dictionary key must be convertible to string");
                 }
                 const Atom atom = rt.atomTable.intern(*key.asString().unwrap());
-                regs[r3] = obj.asObject().unwrap()->getProp(atom);
+                regs[r3] = obj.requireObject()->getProp(atom);
                 return DispatchRet::Continue;
             }
             // 其余对象：成员名访问
@@ -2010,25 +2026,18 @@ namespace cial::vm {
                 throw std::runtime_error("index must be convertible to string");
             }
             const Atom atom = rt.atomTable.intern(*key.asString().unwrap());
-            regs[r3] = obj.asObject().unwrap()->getProp(atom);
+            regs[r3] = obj.requireObject()->getProp(atom);
             return DispatchRet::Continue;
         }
         if(obj.isString()) {
             const String *str = obj.asString().unwrap();
             const auto i = idx.isVoid() ? 0 : idx.asInteger().unwrap();
-            const auto n = static_cast<i64>(str->length());
-            // TJS2 字符串下标语义（语料 test_string）：str[len] 得空串，str[>len] 报错，
-            // 负数从尾数（-1 = 末字符）
-            if(i >= 0) {
-                if(i > n)
-                    throw std::runtime_error("string index out of range");
-                regs[r3] = i == n ? Value{ String(""_str) } : Value{ String(str->getData()[static_cast<size_t>(i)]) };
-                return DispatchRet::Continue;
-            }
-            const auto u = -i;
-            if(u > n)
+            const auto units = Common::toUtf16({ str->getData(), str->length() });
+            const auto n = static_cast<i64>(units.size());
+            if(i < 0 || i > n)
                 throw std::runtime_error("string index out of range");
-            regs[r3] = u == n ? Value{ String(""_str) } : Value{ String(str->getData()[static_cast<size_t>(n - u)]) };
+            regs[r3] =
+                Value{ String{ Common::fromUtf16(std::u16string_view(units).substr(static_cast<size_t>(i), 1)) } };
             return DispatchRet::Continue;
         }
         throw std::runtime_error("value is not indexable");
@@ -2068,7 +2077,7 @@ namespace cial::vm {
             throw std::runtime_error("index must be convertible to string");
         }
         const Atom atom = rt.atomTable.intern(*key.asString().unwrap());
-        obj.asObject().unwrap()->setProp(atom, regs[r3]);
+        obj.requireObject()->setProp(atom, regs[r3]);
         return DispatchRet::Continue;
     }
 
@@ -2079,7 +2088,7 @@ namespace cial::vm {
         if(!regs[r1].isObject()) {
             throw std::runtime_error("with expects an object");
         }
-        auto *obj = regs[r1].asObject().unwrap();
+        auto *obj = regs[r1].requireObject();
         rt.addHandleVal(obj);
         withStack.push_back(obj);
         return DispatchRet::Continue;

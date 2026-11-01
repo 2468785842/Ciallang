@@ -806,8 +806,11 @@ namespace cial::tjsbc {
                         const auto &slot = ctx.data[static_cast<size_t>(d.dataIdx)];
                         switch(slot.type) {
                             case TJS_TYPE_VOID:
-                            case TJS_TYPE_OBJECT:
                                 chunk.emit<inter::Load>(r1, ConstIdx{ 0 });
+                                break;
+                            case TJS_TYPE_OBJECT:
+                                chunk.emit<inter::Load>(r1,
+                                                        chunk.addConstant(Constant{ static_cast<Object *>(nullptr) }));
                                 break;
                             case TJS_TYPE_BYTE:
                                 chunk.emit<inter::LoadImm>(r1, static_cast<Integer>(poolByte(file, slot.index)));

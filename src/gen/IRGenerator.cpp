@@ -31,6 +31,35 @@ namespace cial::inter {
     IRGenerator::IRGenerator(Common::Result &r, Runtime &rt, Common::SourceFile &sourceFile, ChunkOptimizer optimize) :
         _rt(rt), _sourceFile(sourceFile), _r(r), _optimize(optimize) {}
 
+    void IRGenerator::storeGlobal(const Atom name, const Register value) {
+        if(!_scriptContext) {
+            _chunk->emit<DGlobal>(name, value);
+            return;
+        }
+        const auto candidate = allocateRegister();
+        // 声明路径可能刚把 value 放回空闲表，但该值仍是本条写入的输入。
+        const auto receiver = candidate == value ? allocateRegister() : candidate;
+        _chunk->emit<This>(receiver);
+        _chunk->emit<DPropC>(receiver, name, value);
+        freeRegister(receiver);
+        if(candidate == value)
+            freeRegister(candidate);
+    }
+
+    void IRGenerator::loadGlobal(const Atom name, const Register value) {
+        if(_scriptContext)
+            _chunk->emit<GThis>(name, value);
+        else
+            _chunk->emit<GGlobal>(name, value);
+    }
+
+    void IRGenerator::loadDeclarationContext(const Register value) {
+        if(_scriptContext)
+            _chunk->emit<This>(value);
+        else
+            _chunk->emit<Global>(value);
+    }
+
     IRGenerator::~IRGenerator() = default;
 
     Opt<vm::Chunk> IRGenerator::parseAst(const syntax::AstNode *node, OptReg &optReg) {
@@ -108,10 +137,6 @@ namespace cial::inter {
     }
 
     void IRGenerator::generate(const syntax::ValueExprNode *node, OptReg &optReg) {
-        if(node->token.type() == syntax::TokenType::Null) {
-            error("null token current not support", node->location);
-            return;
-        }
         auto dst = allocateRegister();
         genTokenValueLoadInst(dst, node->token);
         optReg = dst;
@@ -166,7 +191,7 @@ namespace cial::inter {
                 lVarReg = lVar->reg;
             } else {
                 lVarReg = allocateRegister();
-                _chunk->emit<GGlobal>(lVarName, *lVarReg);
+                loadGlobal(lVarName, *lVarReg);
             }
             _chunk->emit<DLocal>(*lVarReg, dst);
             OptReg rVarReg{};
@@ -175,19 +200,19 @@ namespace cial::inter {
                 rVarReg = rVar->reg;
             } else {
                 rVarReg = allocateRegister();
-                _chunk->emit<GGlobal>(rVarName, *rVarReg);
+                loadGlobal(rVarName, *rVarReg);
             }
 
             if(lVar) {
                 _chunk->emit<DLocal>(*rVarReg, *lVarReg);
             } else {
-                _chunk->emit<DGlobal>(lVarName, *rVarReg);
+                storeGlobal(lVarName, *rVarReg);
             }
 
             if(rVar) {
                 _chunk->emit<DLocal>(dst, rVar->reg);
             } else {
-                _chunk->emit<DGlobal>(rVarName, dst);
+                storeGlobal(rVarName, dst);
             }
             // optReg = rVarReg;
             return;
@@ -213,8 +238,10 @@ namespace cial::inter {
         }
 
         if(node->token.type() == Instanceof) {
-            _chunk->emit<ChkIns>(src1, src2);
-            optReg = src1;
+            const auto dst = allocateRegister();
+            _chunk->emit<DLocal>(src1, dst);
+            _chunk->emit<ChkIns>(dst, src2);
+            optReg = dst;
             return;
         }
 
@@ -326,7 +353,9 @@ namespace cial::inter {
                 break;
             case syntax::TokenType::Invalidate:
                 node->rhs->generateBytecode(this, optReg);
-                _chunk->emit<Inv>(*optReg);
+                _chunk->emit<DLocal>(*optReg, dst);
+                _chunk->emit<Inv>(dst);
+                optReg = dst;
                 break;
             case syntax::TokenType::Isvalid: {
                 Register reg{};
@@ -340,12 +369,12 @@ namespace cial::inter {
             case syntax::TokenType::Plus: {
                 // 前缀 +:TJS 语义为"确保数值"——字符串转数值(+str5 == 5),
                 // octet 无法转数值则报错(语料 test_variant 期望 +oct5 被 catch)。
-                // 降糖为 ToReal(宽松比较下整数/实数等价)
+                // ToNumber 保留整数/实数类型，严格相等与 typeof 可观察此区别
                 Register reg{};
                 if(!expectValue(node->rhs, reg)) {
                     return;
                 }
-                _chunk->emit<ToReal>(reg, dst);
+                _chunk->emit<ToNumber>(reg, dst);
                 freeRegister(reg);
                 optReg = dst;
                 break;
@@ -643,7 +672,7 @@ namespace cial::inter {
         _chunk->emit<LoadImm>(src2, 1);
         if(isTopScope()) {
             // global maybe
-            _chunk->emit<GGlobal>(identifier, src1);
+            loadGlobal(identifier, src1);
             if(needOld) {
                 _chunk->emit<DLocal>(src1, oldReg);
             }
@@ -653,7 +682,7 @@ namespace cial::inter {
                 // 注意操作数顺序：变量 - 1，而非 1 - 变量
                 _chunk->emit<Sub>(src1, src2, dst);
             }
-            _chunk->emit<DGlobal>(identifier, dst);
+            storeGlobal(identifier, dst);
         } else {
             // find on context
             _chunk->emit<GThis>(identifier, src1);
@@ -807,7 +836,7 @@ namespace cial::inter {
 
             if(isTopScope()) {
                 // global maybe
-                _chunk->emit<DGlobal>(identifier, src);
+                storeGlobal(identifier, src);
             } else {
                 // find on context
                 _chunk->emit<DThis>(identifier, src);
@@ -933,7 +962,8 @@ namespace cial::inter {
         if(isTopScope()) {
             // 声明注册替换属性对象本体；普通 DGlobal 会误调用旧属性的 setter。
             const auto globalReg = allocateRegister();
-            _chunk->emit<Global>(globalReg);
+            loadDeclarationContext(globalReg);
+            _chunk->emit<ChgThis>(propReg, globalReg);
             _chunk->emit<DPropRawC>(globalReg, identifier, propReg);
             freeRegister(globalReg);
             freeRegister(propReg);
@@ -961,7 +991,7 @@ namespace cial::inter {
 
             if(isTopScope()) {
                 freeRegister(src);
-                _chunk->emit<DGlobal>(identifier, src);
+                storeGlobal(identifier, src);
                 return;
             }
 
@@ -984,7 +1014,7 @@ namespace cial::inter {
 
         // global
         if(isTopScope()) {
-            _chunk->emit<DGlobal>(identifier, loadVoidReg());
+            storeGlobal(identifier, loadVoidReg());
             return;
         }
 
@@ -1020,11 +1050,11 @@ namespace cial::inter {
             // tjsInterCodeExec.cpp:3023 同语义）：回调经 VM::callValue 调用时
             // Function::call 的显式绑定优先于 fallbackThis/callerThis 继承。
             const Register globalReg = allocateRegister();
-            _chunk->emit<Global>(globalReg);
+            loadDeclarationContext(globalReg);
             _chunk->emit<ChgThis>(funReg, globalReg);
             freeRegister(globalReg);
             freeRegister(funReg);
-            _chunk->emit<DGlobal>(identifier, funReg);
+            storeGlobal(identifier, funReg);
             return;
         }
 
@@ -1041,7 +1071,7 @@ namespace cial::inter {
         _chunk->emit<Load>(classReg, _chunk->addConstant(classMeta));
 
         // class is always global in current design
-        _chunk->emit<DGlobal>(identifier, classReg);
+        storeGlobal(identifier, classReg);
 
         beginScope();
 
@@ -1211,7 +1241,7 @@ namespace cial::inter {
         }
 
         if(isTopScope()) {
-            _chunk->emit<GGlobal>(identifier, dst);
+            loadGlobal(identifier, dst);
         } else {
             // dynamic get
             // but tjs2 doesn't support get up function scope local var
@@ -1836,6 +1866,10 @@ namespace cial::inter {
     }
 
     void IRGenerator::genTokenValueLoadInst(Register reg, const syntax::Token &token) const {
+        if(token.type() == syntax::TokenType::Null) {
+            _chunk->emit<Load>(reg, _chunk->addConstant(Constant{ static_cast<Object *>(nullptr) }));
+            return;
+        }
         switch(token.valueType()) {
             case syntax::TokenValueType::Real:
                 _chunk->emit<Load>(reg, _chunk->addConstant(token.getReal()));

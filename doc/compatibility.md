@@ -15,7 +15,7 @@
 | 语句 | with | ✅（withStack 上下文栈，异常随帧截断）|
 | 语句 | for(const …)、var 类型注解 | ✅ for(const)；const 声明（只读性不强制）；类型注解 `: symbol/void/int/real/string/octet`（var/函数参数/返回值/getter/setter 全位解析并丢弃——tjs.y "Ignore types"，2026-10-29 对齐） |
 | 表达式 | 赋值全家（含 `<->`、`\|\|=`、`&&=`、`>>>=`）、?:、逻辑/位/比较/严格相等/移位/乘除整除 | ✅ |
-| 一元前缀 | `!` `new` `invalidate` `-` `~` `++` `--` `delete` `typeof` `#` `$` `+` `&` `*`（及前后缀 `isvalid`） | ✅ |
+| 一元前缀 | `!` `new` `invalidate` `-` `~` `++` `--` `delete` `typeof` `#` `$` `+` `&` `*`（及前后缀 `isvalid`） | ◐ 基本值操作已实现；typeof 对缺失成员返回 undefined 尚待补齐 |
 | 一元后缀 | `()` `.` `++` `--` | ✅ |
 | 一元后缀 | `[]`（下标读写：数组/字典/字符串） | ✅ |
 | 一元后缀 | `!`（eval 即时求值，EvalStr 指令；嵌套 eval 可用） | ✅ |
@@ -47,26 +47,26 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 | collapse/展开/省略调用、EVAL/EEXP、比较与转换 | ✅ 已有指令及 fixture；具体映射与边界见转译文档 |
 | test_variant（octet 语料） | ✅ 已有 fixture 和对应源码 |
 | test_string | ❌ 尚无入库字节码 fixture；旧记录中参考导出曾崩溃，未据此推定新版本仍不可用 |
-| 对拍工具链 | ✅ `bench/bytecode_conformance.py` + `cial --tjsbc`；参考 `d8044c3` 已提供 `--dump`。当前 7 个 fixture 均有源码，`test_misc` 异常消息格式与行号仍会产生 `OUTPUT_DIFF`，默认全量比较并非全绿 |
+| 对拍工具链 | ✅ `bench/bytecode_conformance.py` + `cial --tjsbc`；参考 `d8044c3` 已提供 `--dump`。当前 7 个 fixture 均有源码，源码/字节码 stdout 严格比较已全部匹配（2026-10-31）；仍不覆盖全部语义边界 |
 
 ## 3. 标准库兼容
 
 | 库 | 原版能力（概要） | 状态 |
 |---|---|---|
 | （宿主）print | 控制台输出 | ✅ print/println |
-| String 内建成员 | length/charAt/indexOf/toUpperCase/…/sprintf/replace/split/escape/trim | ✅；replace 委托 regexpReplaceIn（g 全局替换、非 g 仅首处，2026-10-30 实测复核）；length 为码点计数（其余方法字节语义） |
+| String 内建成员 | length/charAt/indexOf/toUpperCase/…/sprintf/replace/split/escape/trim | ✅；replace 委托 regexpReplaceIn（g 全局替换、非 g 仅首处，2026-10-30 实测复核）；length/charAt/下标/indexOf/substring/substr/reverse/字符码与比较按 UTF-16 码元；sprintf 等其他 Unicode 边界仍待复核 |
 | Array | 数字下标数组；load/save(BinarySerializer)/sort/join/split/pack… | ✅ 字面量/下标/push/pop/unshift/shift/insert/remove/erase/reverse/join/split/sort/count/assign ✅；save（文本行）/load（文本行）/saveStruct（文本+二进制）/loadStruct（仅二进制，原版同）/pack/assignStruct ✅（2026-10-26）；文件文本 UTF-8 写出、读取自动识别 UTF-8/UTF-16LE/BE BOM |
 | Dictionary | 哈希字典；load/save/assign/clear | ✅ 字面量/下标/assign/clear/erase/count/assignStruct/saveStruct（文本+二进制）/loadStruct（二进制入自身；非二进制回落文本解析且解析值作返回值不写入自身——原版同款怪癖）✅（2026-10-26）；load/save 原版即 TODO 空实现，按特性同步 |
 | Exception | 异常类（message 成员），脚本异常载体 | ✅（TJS 源自举，main.cpp 注入；原生错误自动包装为 Exception 实例） |
 | Math / Math.RandomGenerator | abs/floor/…；Xorshift / MT19937 | ✅ 18 方法与原版逐一对应（abs/acos/asin/atan/atan2/ceil/exp/floor/log/pow/max/min/random/round/sin/cos/sqrt/tan，tjsMath.cpp:116-407 核对，2026-10-30）+ 常量 + RandomGenerator（MT19937 序列与原版逐位一致、serialize 格式互认） |
 | Date | get/set 系列 + 字符串 parse（tjsdate.y 文法） | ✅ 全部方法+构造+parse 完整文法（tjsdate.y 全 11 形态/月名/星期/AMPM/时区名与 ±hhmm/括号忽略段/两位年/小数秒，2026-10-26 对拍逐位一致）；注意：进程首个字符串构造因 CRT `_timezone` 惰性初始化偏移 +2×\|tz\|（原版同款怪癖，已同步保留，见 DateParser.cpp build() 注释） |
-| RegExp | compile/test/match/exec/replace/split（oniguruma）；属性 matches/start/index/lastIndex/input/lastMatch/lastParen/leftContext/rightContext | ✅ /pattern/flags 字面量（g/i）+ 全部方法 + 全部实例属性 + 静态属性 `RegExp.last`（仅 test/exec 更新且失败也更新）；`new RegExp(pattern, flags?)` ✅；replace 回调保留已有 this 绑定（含全局函数声明）；未绑定函数表达式/原生回调以 regexp 作 objthis（原版 `replace_regex` 同语义；实现 `src/stdlib/RegExpLib.cpp`、`src/vm/VM.hpp`，回归 `tests/native_function_test.cpp`）。位置语义：UTF-8 码点（TJS2 为 UTF-16 码元，BMP 内一致；2026-10-26 从字节偏移改定）。已知偏差：`index` 属性成功匹配的非 ASCII 值——原版 tjsRegExp.cpp:669 少除 sizeof(tjs_char)（UTF-16 单位+字节混加，start>0 时可与 lastIndex 相等），本项目为纯码点 |
+| RegExp | compile/test/match/exec/replace/split（oniguruma）；属性 matches/start/index/lastIndex/input/lastMatch/lastParen/leftContext/rightContext | ✅ /pattern/flags 字面量（g/i）+ 全部方法 + 全部实例属性 + 静态属性 `RegExp.last`（仅 test/exec 更新且失败也更新）；`new RegExp(pattern, flags?)` ✅；replace 回调保留已有 this 绑定（含全局函数声明）；未绑定函数表达式/原生回调以 regexp 作 objthis（原版 `replace_regex` 同语义；实现 `src/stdlib/RegExpLib.cpp`、`src/vm/VM.hpp`，回归 `tests/native_function_test.cpp`）。位置按 UTF-16 码元计数，使用 Oniguruma Perl 方言与 UTF-16 编码；保留孤立代理码元。`index` 与 `lastIndex` 单位一致，不追仿参考实现 index 的字节混算缺陷（见 §4） |
 | Octet | 字节流 + pack 系 | ◐ 类型+字面量+unpack ✅（2026-10-26，tjsOctPack 全类型；Octet 仅有的方法即 unpack）；偏差：原版 BinToHex 负 len 钳位 bug 使 unpack h\*/H\* 恒返回空串，本项目返回正确 hex（同 tjsOctPack.cpp HexToBin 大写仅收 A-E 的漏写按特性同步） |
-| Scripts | execStorage/evalStorage/compileStorage/exec/eval/dump/getTraceString/setCallMissing/getClassNames/textEncoding（tTJSNC_Scripts，ScriptMgnIntf.cpp:1295-1570） | ◐ execStorage ✅（语句脚本执行，全局上下文，嵌套双帧哨兵协议，`src/stdlib/ScriptsLib.cpp`）；evalStorage ✅（表达式求值返回值）；**compileStorage ❌ 不实现**——Ciallang 无库内字节码导出能力（`--tjsbc` 是 CLI 加载方向，非导出），按偏差记录；exec/eval/dump 等其余成员未实现。路径解析：绝对路径直用，相对路径相对当前执行脚本所在目录（krkr2 TVPSearchPlacedPath 的 CLI 简化，无 xp3 归档）；缺失文件抛可捕获 Exception（消息含路径）。回归 `tests/scripts_test.cpp` |
+| Scripts | execStorage/evalStorage/compileStorage/exec/eval/dump/getTraceString 等宿主接口 | ◐ execStorage/evalStorage 支持语句/表达式、第三参 context、逻辑源码身份与嵌套异常隔离；宿主 `TextStorageReader` 接收存储名/mode/from，可接 XP3/TVP 文本流。默认文件回落支持 UTF-8/UTF-16 BOM，相对基目录解析；非空 mode 要求宿主读取器。compileStorage、其他成员及二进制流未实现，见 `src/stdlib/ScriptsLib.*`、`tests/scripts_test.cpp` |
 
 ### 标准库边界处理（2026-10-31）
 
-- `String.indexOf` 对负数起点返回 `-1`；`substring/substr` 的超大正长度裁剪到剩余串长，避免有符号加法溢出。参考实现 `tjsInterCodeExec.cpp` 的 `indexOf` 分支未检查负数起点，本项目显式拒绝此越界输入（`src/stdlib/StringLib.cpp`）。
+- 字符串下标拒绝负数，与目标 krkr2 的 GetStringProperty 一致；`String.indexOf` 对负数起点返回 `-1`；`substring/substr` 的超大正长度裁剪到剩余串长，避免有符号加法溢出。参考实现 `tjsInterCodeExec.cpp` 的 `indexOf` 分支未检查负数起点，本项目显式拒绝此越界输入（`src/stdlib/StringLib.cpp`）。
 - `Math.RandomGenerator` 恢复只接受初始化状态 `{left=1,next=0}`，或 `1 <= next <= 624` 且 `left + next = 625` 的取数状态；拒绝整数窄化、非法游标及损坏的状态串，失败时保留原有序列。正常 `serialize()` 检查点及跨块序列不变（`src/stdlib/RandomLib.cpp`）。
 - 浮点 `unpack` 的 `d/f` 字段仅按实际读取字节推进一次游标；显式长度超过输入时按既有规则补零形成最后一个字段，后续字段不越界读取（`src/stdlib/SerializeLib.cpp`）。
 - 上述行为回归见 `tests/native_function_test.cpp` 的 `[stdlib][regression]` 用例。
@@ -95,7 +95,7 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 |---|---|---|---|
 | 内存管理 | 纯引用计数（tTJSVariant CopyRef） | 标记清除 GC + 引用计数混合 | 对象存活依赖显式根；见 [FAQ](faq.md#宿主持有-value-或-shared_ptr-就能保住脚本对象吗) |
 | 性能 | fib(25) 基准 | 2026-10-28 同机对照：fib 约 1.5×、原生方法约 1.9×；整数循环/字符串拼接已与旧版持平或反超（详见 doc/performance.md） | [性能待办](../TODO.md#性能与优化) |
-| 字符串内部编码 | UTF-16（tjs_char） | UTF-8 | 字节码转译处做转换（代理对）；str.length 为码点计数 |
+| 字符串内部编码 | UTF-16（目标 krkr2 为 char16_t） | UTF-8/WTF-8 | 基础脚本操作与正则位置按 UTF-16 码元，内部允许保存孤立代理码元；源码仍严格校验 UTF-8 |
 | 调用栈深度 | 无同值上限 | 1024 | 记录差异 |
 | 局部变量名（字节码态） | 序列化不含 Namespace | 同样无 | 一致 |
 | 原生错误报告 | 未捕获异常打印 VM 转储（含 ip） | 顶层打印 `源:行:列: message` 并按文件身份重读渲染源码摘录（位置为诊断元数据；无源码身份的字节码产物与逻辑名输入只打印单行） | 语料对拍报告的 DIFF 部分由此产生，语义等价 |
@@ -103,7 +103,8 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 | `#`/`$` 操作数 | 严格类型（字符串/整数） | `#` 对非字符串先字符串化（`#65 == 54`，对齐 kirikiri 语料期望） | 记录差异 |
 | 后缀 `i++` 表达式值 | 返回自增前旧值 | 同（旧值，2026-10-24 修正） | 一致 |
 | `isvalid` 非对象值 | 恒 true（VM_CHKINV：`Type() != tvtObject` 即 true，tjsInterCodeExec.cpp:1177） | 一致（2026-10-30 修正——曾对非对象抛"Invalid type get as Object"）；对象按 IsValid 判定，invalidate 后 false | 无差异 |
-| `instanceof` 内置对象 | `TJSDefaultIsInstanceOf` 沿原生类链按名匹配：Array/Dictionary/RegExp 实例与函数对象对各自类名恒真 | 一致（2026-10-30 修正——基类 instanceOf 曾恒 false）；保留 Atom + 各类型覆写（`src/runtime/Runtime.hpp`、`src/types/*.hpp`） | 无差异 |
+| 无效化对象的覆盖 | 通过 iTJSDispatch2 的 Invalidate/IsValid 及原生实例协议处理 | 当前主要跟踪 DataObject 的失效状态；Array/Dictionary 等其他内建对象与宿主对象未有统一协议 | null 访问已抛异常；完整对象生命周期仍属于接入待办 |
+| `instanceof` 内置对象 | `TJSDefaultIsInstanceOf` 沿原生类链按名匹配：Array/Dictionary/RegExp 实例与函数对象对各自类名恒真 | Object 对除 void 外的值均为真（包括 null）；数值匹配 Number，Integer/Real 不是数值类名；其他对象保留 Atom + 各类型覆写（`src/runtime/Runtime.hpp`、`src/types/*.hpp`） | 无差异 |
 | 无 return 函数返回值 | void（编译器补 ret 读 void 常量） | 一致（2026-10-30 修正潜伏缺陷——补丁 ret 的 void Load 曾发射到 parseAst 后的暂存 chunk，返回寄存器池陈旧值；`src/gen/IRGenerator.cpp` patchVoidRet） | 无差异 |
 | 回调异常值传播 | 宿主回调（sort 比较器/replace 回调/即时求值）抛出的脚本异常，外层 catch(e) 收到抛出值本身（try handler 的 exValueReg 回写） | 一致（2026-10-30 修正——ThrowHandler 以 0 表示"无槽位"与寄存器 0 冲突，异常值曾丢失、catch 读到池内陈旧值；现以 0xFFFF 为无槽位哨兵，寄存器 0 合法；`src/vm/VMState.cpp` unwind、`src/vm/Bytecode.hpp`、回归 tests/try_catch_test.cpp） | 无差异 |
 | `+` 的 void 幺元 / `(string)void` | `operator+=`：任一侧为 String 时两侧 `AsString()`（void→NULL 即空串，tjsVariant.cpp:1095-1128、683-686）；void±Integer/Real 恒等；void+void → AsReal 兜底得 Real 0；octet+String 抛错。`ToString()` 对 void 给空串（:411-415）、octet 抛错（:443-445） | 一致（2026-10-30 修正——`(string)void` 与 `"a"+void` 曾报 "Invalid type cast / unsupported operand"；`src/types/Value.cpp` toString Void 分支） | 无差异 |
@@ -125,3 +126,5 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 ## 5. 后续工作
 
 未完成事项集中记录在 [TODO.md](../TODO.md)，性能测量见 [performance.md](performance.md)。
+
+krkr2 替换验收以指定仓库为准，当前完成嵌入基础，不代表可直接替换其 TJS2 核心。见[接入说明](krkr2-integration.md)。

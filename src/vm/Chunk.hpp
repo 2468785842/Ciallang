@@ -154,7 +154,8 @@ namespace cial::vm {
             MarkSweepHeader::marked();
             for(auto &inst : _constants) {
                 if(inst.type() == ConstantType::Object) {
-                    inst.value<Object *>()->marked();
+                    if(auto *object = inst.value<Object *>())
+                        object->marked();
                 } else if(inst.type() == ConstantType::FuncMeta) {
                     inst.value<FuncMeta *>()->marked();
                 } else if(inst.type() == ConstantType::ClassMeta) {

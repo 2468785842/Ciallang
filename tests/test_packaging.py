@@ -122,7 +122,7 @@ class PackagingTest(unittest.TestCase):
                 'package_name': 'ciallang-test', 'system': 'Windows' if os.name == 'nt' else 'Linux'}
         files = {'build-info.json': json.dumps(info), 'LICENSE': 'license', 'README.md': 'readme',
                  'examples/hello.tjs': 'println(42);', 'bin/cial.exe' if os.name == 'nt' else 'bin/cial': 'binary'}
-        files.update({f'licenses/{port}/copyright': 'license' for port in ('fmt', 'frozen', 'utf8proc', 'argparse')})
+        files.update({f'licenses/{port}/copyright': 'license' for port in ('fmt', 'frozen', 'utf8proc', 'argparse', 'oniguruma')})
         return {'ciallang-test/' + name: data for name, data in files.items()}
 
     def test_missing_license_and_wrong_version_fail_before_execution(self):

@@ -94,7 +94,7 @@ namespace cial {
                 callFrame.funcMeta->marked();
             else
                 callFrame.chunk->marked();
-            if(callFrame.thisObj.isObject())
+            if(callFrame.thisObj.isObject() && !callFrame.thisObj.isNull())
                 callFrame.thisObj.asObject().value()->marked();
         }
     }

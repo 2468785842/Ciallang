@@ -44,7 +44,7 @@ namespace cial {
                 return TypeTraits<Octet>::id;
             if(v.isString())
                 return TypeTraits<String>::id;
-            if(v.isObject())
+            if(v.isObject() && !v.isNull())
                 // 对象提供开放的原生类型身份；VM 内部判型仍使用 TypeId。
                 return v.asObject().unwrap()->nativeTypeKey();
             return TypeId::None;

@@ -36,6 +36,8 @@ namespace cial::inter {
         IRGenerator(const IRGenerator &) = delete;
         IRGenerator &operator=(const IRGenerator &) = delete;
 
+        void useScriptContext() noexcept { _scriptContext = true; }
+
         Opt<vm::Chunk> parseAst(const syntax::AstNode *node, OptReg &optReg);
 
         void addLocalVar(LocalVariable variable) {
@@ -87,6 +89,11 @@ namespace cial::inter {
         Common::SourceFile &_sourceFile;
         Common::Result &_r;
         ChunkOptimizer _optimize;
+        // 只作用于本次顶层块；函数拥有声明时绑定的 this，不继承生成器开关。
+        bool _scriptContext{};
+        void storeGlobal(Atom name, Register value);
+        void loadGlobal(Atom name, Register value);
+        void loadDeclarationContext(Register value);
 
         OptReg _empty{};
 

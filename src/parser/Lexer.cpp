@@ -17,6 +17,7 @@
 #include <bit>
 #include <fmt/format.h>
 #include <stdexcept>
+#include "common/UTF16.hpp"
 
 #include "OperatorTrie.hpp"
 
@@ -1083,7 +1084,7 @@ namespace cial::syntax {
 
                     i32 code = 0, count = 0;
                     auto hex = getHexNum(static_cast<char>(ch));
-                    while(hex != -1 && count < sizeof(i32) * 2) {
+                    while(hex != -1 && count < 4) {
                         // code * 16
                         code <<= 4;
                         code += hex;
@@ -1098,8 +1099,8 @@ namespace cial::syntax {
                         continue;
 
                     // 将Unicode转为utf-8, 存储到窄字符序列
-                    const auto enRuneType = utf8Encode(code);
-                    str.write(reinterpret_cast<const char *>(enRuneType.data), enRuneType.width);
+                    const char16_t unit = static_cast<char16_t>(code);
+                    str << Common::fromUtf16({ &unit, 1 });
 
                     continue;
                 }
@@ -1165,7 +1166,7 @@ namespace cial::syntax {
             token = makeToken(TokenType::Error, "string value need close"_str);
             token->code = "lex.unterminated-string";
         } else {
-            token = makeToken(TokenType::ConstVal, String{ str.str() });
+            token = makeToken(TokenType::ConstVal, String{ Common::fromUtf16(Common::toUtf16(str.str())) });
         }
 
         return strPsState;

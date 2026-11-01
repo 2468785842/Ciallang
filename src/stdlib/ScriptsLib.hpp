@@ -1,15 +1,15 @@
 // Copyright (c) 2026/10/30
 //
-// Scripts 宿主类（krkr2 tTJSNC_Scripts 对应物，ScriptMgnIntf.cpp:1295-1570）：
-// execStorage/evalStorage 读兄弟/指定存储脚本并执行（TVPExecuteStorage 的
-// CLI 简化版——无 xp3 归档与字节码直载，modestr/context 实参按 TJS2 形参
-// 个数接受但本实现仅取第 1 参）。execStorage 按语句脚本执行（嵌套双帧，
-// 全局上下文，顶层 var/函数声明经 DGlobal 落全局），evalStorage 按
-// 表达式求值返回。compileStorage 依赖字节码导出，本引擎暂无库内等价能力，
-// 不实现（见 doc/compatibility.md 偏差记录）。
+// Scripts 宿主入口：文件模式读取 UTF-8/UTF-16 BOM，或交给宿主 TextStorageReader。
+// execStorage 编译语句，evalStorage 编译表达式；第三参 context 接收顶层声明，
+// 函数保留声明时接收者。嵌套执行通过 VM::execute 哨兵隔离异常。
+// 非空 mode 交由宿主读取器解释；本地文件回落不支持 mode。compileStorage 尚未实现。
 #pragma once
 
 #include <filesystem>
+#include <memory>
+
+#include "cial/Storage.hpp"
 
 #include "types/Function.hpp"
 #include "types/Object.hpp"
@@ -45,6 +45,9 @@ namespace cial {
 
         [[nodiscard]] const std::filesystem::path &baseDir() const noexcept { return _baseDir; }
 
+        void setStorageReader(std::shared_ptr<TextStorageReader> reader) { _reader = std::move(reader); }
+        [[nodiscard]] TextStorageReader *storageReader() const noexcept { return _reader.get(); }
+
         void setExecMethod(const Atom name, NativeFunction *fn) {
             execAtom = name;
             execFn = fn;
@@ -67,6 +70,7 @@ namespace cial {
 
     private:
         std::filesystem::path _baseDir;
+        std::shared_ptr<TextStorageReader> _reader;
         Atom execAtom = ATOM_INVALID;
         Atom evalAtom = ATOM_INVALID;
         NativeFunction *execFn{};
@@ -78,7 +82,8 @@ namespace cial {
         // 注册 Scripts 宿主类（重注册即替换全局 Scripts，用于 CLI/测试回填
         // VMState 与基目录）。state 为空时方法调用抛"未绑定"运行期异常；
         // baseDir 为空时相对路径相对进程 cwd。
-        void registerScriptsLib(Context &context, vm::VMState *state = nullptr, std::filesystem::path baseDir = {});
+        void registerScriptsLib(Context &context, vm::VMState *state = nullptr, std::filesystem::path baseDir = {},
+                                std::shared_ptr<TextStorageReader> reader = {});
 
         Value scriptsExecStorage(VM *vm, Value thisVal, size_t argCount, Value *args);
         Value scriptsEvalStorage(VM *vm, Value thisVal, size_t argCount, Value *args);

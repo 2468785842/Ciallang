@@ -27,6 +27,7 @@
   },
   "dependencies": [
     "fmt",
+    "oniguruma",
     "utf8proc",
     "frozen"
   ]

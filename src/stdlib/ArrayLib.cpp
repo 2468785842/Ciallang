@@ -16,7 +16,7 @@ namespace cial::stdlib {
         // count/length 属性（get；写走 Array::setProp）
         const auto arrayCount = [](const Value &thisObj) {
             return Value{ Integer{
-                static_cast<Integer>(dynamic_cast<Array &>(*thisObj.asObject().unwrap()).elements.size()) } };
+                static_cast<Integer>(dynamic_cast<Array &>(*thisObj.requireObject()).elements.size()) } };
         };
         context.nativeType<Array>()
             .method("push"_str, &stdlib::arrayPush)
@@ -39,8 +39,10 @@ namespace cial::stdlib {
         Array *asArray(const Value &thisObj) {
             // typeId 直判替代 dynamic_cast（Array 为 final，二者等价）：
             // 原生方法热路径每次调用省一次 libc++abi RTTI 遍历
-            auto *obj = thisObj.asObject().unwrap();
-            return obj->typeId() == TypeId::Array ? static_cast<Array *>(obj) : nullptr;
+            auto *obj = thisObj.requireObject();
+            if(obj->typeId() != TypeId::Array)
+                throw std::runtime_error("Array receiver required");
+            return static_cast<Array *>(obj);
         }
 
         // 数组元素 → 字符串（join 用）；TJS2 的字符串化语义

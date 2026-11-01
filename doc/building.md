@@ -27,10 +27,11 @@ ctest --test-dir build/local --output-on-failure
 | `CIAL_ENABLE_JIT` | OFF | OFF | `jit` / asmjit，仅 x64 |
 | `CIAL_BUILD_FUZZ` | OFF | OFF | 无；需 Clang/libFuzzer |
 | `CIAL_BUILD_BENCH` | OFF | OFF | 无；要求 CLI 开启 |
+| `CIAL_INSTALL_SDK` | ON | OFF | 安装 C++ 库、传递头与 CMake package，见[宿主集成](embedding.md) |
 | `CIAL_ENABLE_PACKAGING` | OFF | OFF | CLI 压缩包，要求独立工程、静态依赖与许可，见[发布指南](releasing.md) |
 | `CIAL_WARNINGS_AS_ERRORS` | ON | OFF | 无；只影响本项目目标 |
 
-基础依赖为 fmt、frozen、utf8proc。开关在 `project()` 之前映射到 `VCPKG_MANIFEST_FEATURES`，避免库模式安装 CLI/测试/JIT 依赖；spdlog 未被代码使用，已移除。独立构建时，原 `BUILD_EXECUTABLE`、`ENABLE_TESTS`、`ENABLE_FUZZ` 在新开关未设置时作为初始兼容值读取；两者都设置时以 `CIAL_*` 为准；子项目不读取父项目的这些通用旧开关（`CMakeLists.txt`、`vcpkg.json`）。
+基础依赖为 fmt、frozen、utf8proc、Oniguruma。开关在 `project()` 之前映射到 `VCPKG_MANIFEST_FEATURES`，避免库模式安装 CLI/测试/JIT 依赖；spdlog 未被代码使用，已移除。独立构建时，原 `BUILD_EXECUTABLE`、`ENABLE_TESTS`、`ENABLE_FUZZ` 在新开关未设置时作为初始兼容值读取；两者都设置时以 `CIAL_*` 为准；子项目不读取父项目的这些通用旧开关（`CMakeLists.txt`、`vcpkg.json`）。
 
 ```sh
 # 只构建库
@@ -69,8 +70,7 @@ python bench/bytecode_conformance.py --cial build/Windows/Debug/cial.exe \
 python bench/test_bytecode_conformance.py --cial build/Windows/Debug/cial.exe
 ```
 
-工具逐字节比较两条 Ciallang 路径的 stdout，失败、超时或输出差异返回 1；已有
-`test_misc` fixture 的诊断格式与行号差异也会如实报告，不能把该命令默认等同于“全绿”。
+工具逐字节比较两条 Ciallang 路径的 stdout，失败、超时或输出差异返回 1；当前入库 7 个 fixture 已严格匹配（2026-10-31）；新差异仍会如实使命令失败。
 `--case` 可筛选用例；fixture 必须有源码（s1–s5 无源码样本已清理，缺源码报
 `TOOL_ERROR`），`--reference` 可使用经随机脚本及导出执行探测的参考 CLI 从源码生成临时
 字节码，入库 fixture 不受影响。JSON 含退出码、无损输出与 SHA-256；详见

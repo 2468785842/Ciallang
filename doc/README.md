@@ -18,3 +18,5 @@ TJSCompiler 的 Bison 文法见[文法快照与来源](grammar/README.md)。
 
 使用方法写入专题指南，局部实现约束写在代码旁，常见问题集中到 FAQ。
 待办只保留未完成项；历史测量注明环境与基线，修复过程可从 Git 历史查阅。
+
+指定宿主的接入边界与替换验收见 [krkr2 接入](krkr2-integration.md)。

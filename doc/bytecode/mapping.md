@@ -91,10 +91,10 @@ TJS2 100\0 文件
 
 | TJS 条目 | 目标表示 |
 |---|---|
-| VOID / null OBJECT | 常量 0 的 void；null 与 void 的区别未完整保留 |
+| VOID / null OBJECT | 分别保留 void 与空对象指针；不合并两种值 |
 | BYTE / SHORT / INTEGER / LONG | 归一为 i64，在 CONST 发射点使用 `LoadImm` |
 | REAL | Real 常量，保留 double 位模式 |
-| STRING | UTF-16LE 转 UTF-8 后驻留为 Atom，处理代理对 |
+| STRING | UTF-16LE 转 UTF-8/WTF-8 后驻留为 Atom，保留代理对与孤立代理码元 |
 | OCTET | 共享 Octet 负载常量 |
 | INTER_OBJECT | 每处保留独立占位槽，全部 context 完成后回填 FuncMeta/ClassMeta/PropMeta |
 
@@ -135,7 +135,6 @@ ctClass 的受支持构造模式在加载期解释，填充成员、构造入口
 | TYPEOFD/TYPEOFI | 目前由属性读取后 TypeOf 实现；成员缺失会抛错，未返回参考实现的 `"undefined"` |
 | 属性读改写 | 多条 TAC 不提供一次 Operation 派发的完整语义 |
 | 动态类体与父类表达式 | 只接受加载期识别的模式；不是通用类体解释器 |
-| null / void | 常量池 null OBJECT 合并到 void，不能宣称完全等价 |
 | 输入校验 | 已检查截断指令、非法调用计数、类引用和跳转边界；不代表所有寄存器或元数据都已全面验证 |
 
 ## 9. 对拍与工具链
@@ -154,7 +153,8 @@ python bench/bytecode_conformance.py --cial build/Linux/Debug/cial \
 工具要求源码路径和字节码路径都以 0 退出，并逐字节比较 stdout；不剥离引号、时间戳、空行或诊断。
 缺源码为 `TOOL_ERROR`；非 `MATCH` 返回 1，参数错误返回 2。每个子进程默认 15 秒超时，
 可由 `--timeout` 设置。JSON 保留输入/执行器 SHA-256、返回码、首个差异位置及无损输出。
-`test_misc` fixture 的异常消息格式与行号差异仍按 `OUTPUT_DIFF` 报告，不能把该命令默认当作全绿。
+当前入库 7 个 fixture 的源码/字节码 stdout 严格比较已全部匹配（2026-10-31）；
+这只证明已归档样本一致，未消除上表的 proxy、typeof 和 Operation 等语义缺口。
 
 参考导出可选：
 

@@ -1,0 +1,32 @@
+// Windows TJS2 使用 UTF-16 码元：长度、下标、切片、字符码与比较共享单位。
+Scripts.execStorage("../assert.tjs");
+
+var text = "中😀文";
+assertTrue(text.length == 4);
+assertTrue(text.indexOf("文") == 3);
+assertTrue(text.indexOf("😀") == 1);
+assertTrue(text.indexOf("😀", 2) == -1);
+assertTrue(text.charAt(0) == "中");
+assertTrue(#text.charAt(1) == 0xd83d);
+assertTrue(#text.charAt(2) == 0xde00);
+assertTrue(text.charAt(3) == "文");
+assertTrue(text.charAt(1) + text.charAt(2) == "😀");
+assertTrue(text.substring(1, 2) == "😀");
+assertTrue(text.substr(2, 1) === text.charAt(2));
+assertTrue(text[1] + text[2] == "😀");
+var negativeIndex = false;
+try { text[-1]; } catch(e) { negativeIndex = true; }
+assertTrue(negativeIndex);
+assertTrue(text[4] == "");
+assertTrue(text.charAt(9223372036854775807) == "");
+assertTrue(text.substring(9223372036854775807, 1) == "");
+assertTrue(text.substring(1, 9223372036854775807) == "😀文");
+assertTrue($0xd83d + $0xde00 == "😀");
+assertTrue("\xD83D\xDE00" == "😀");
+assertTrue(text.reverse().reverse() == text);
+assertTrue("\xE000" > "😀");
+assertTrue("😀" < "\xE000");
+assertTrue(typeof(+1) == "Integer");
+assertTrue(typeof(+"1.5") == "Real");
+
+finishTests();

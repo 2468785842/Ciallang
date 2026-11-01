@@ -44,6 +44,10 @@ jobs:
             build/${{ matrix.platform }}/${{ matrix.configuration }}/cial
             build/${{ matrix.platform }}/${{ matrix.configuration }}/cial.exe
           if-no-files-found: ignore
+      - name: Test relocated installed SDK
+        if: matrix.configuration == 'Release'
+        shell: bash
+        run: python tests/sdk_install_test.py --build "build/${{ matrix.platform }}/${{ matrix.configuration }}"
       - name: Configure library consumer
         if: matrix.os == 'ubuntu-latest' && matrix.configuration == 'Release'
         shell: bash

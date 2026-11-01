@@ -35,7 +35,7 @@ namespace cial::vm {
         std::stringstream ss{ "" };
         switch(const auto &constant = _constants[idx.index()]; constant.type()) {
             case ConstantType::Object:
-                ss << "<constant container>";
+                ss << (constant.value<Object *>() ? "<constant container>" : "null");
                 break;
             case ConstantType::None:
                 ss << "Void";

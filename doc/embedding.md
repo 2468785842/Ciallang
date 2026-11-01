@@ -1,5 +1,61 @@
 # 作为库使用
 
+## 安装后的 SDK
+
+先配置并构建库，再安装 SDK 组件（CLI 压缩包仍只包含 Runtime）：
+
+```sh
+cmake -S . -B build/sdk -DCMAKE_BUILD_TYPE=Release -DCIAL_BUILD_TESTS=OFF -DCIAL_BUILD_CLI=OFF
+cmake --build build/sdk --parallel 4
+cmake --install build/sdk --component SDK --prefix /path/to/ciallang
+```
+
+外部宿主准备相同工具链/运行库的 fmt、frozen、utf8proc、Oniguruma 后：
+
+```cmake
+find_package(Ciallang 0.1.0 EXACT CONFIG REQUIRED)
+target_link_libraries(host PRIVATE Ciallang::Ciallang)
+```
+
+配置时通过 `CMAKE_PREFIX_PATH` 指向安装前缀与依赖。consumer 不依赖 Python、argparse 或 Catch2。
+静态库若要链接进共享库，构建 SDK 时加 `-DCMAKE_POSITION_INDEPENDENT_CODE=ON`；
+源码子项目继承父工程的 PIC 设置。CLI 构建不额外强制 PIC。
+示例位于 `share/ciallang/examples/host`；`python tests/sdk_install_test.py --build build/sdk`
+会安装、移动前缀并独立构建运行示例。
+
+公共入口为 `cial/Engine.hpp`、`Binding.hpp` 和 `cial/Storage.hpp`；`cial/Version.hpp`
+从 manifest 生成，`SDK_API_VERSION` 为预览源码接口版本。附带的 VM/IR 头是传递依赖，
+不承诺内部接口稳定，也不承诺跨编译器、CRT 或动态库 ABI。
+
+```cpp
+#include "cial/Engine.hpp"
+
+int main() {
+    cial::Engine engine;
+    cial::Common::Result diagnostics;
+    auto value = engine.execute("40 + 2", diagnostics, "host://startup", true);
+    if(diagnostics.isFailed()) return 1;
+    return value->asInteger().unwrap() == 42 ? 0 : 2;
+}
+```
+
+Engine 拥有 Runtime/Context/VM，Handle 必须先于 Engine 销毁。运行期脚本异常以
+`vm::ScriptExceptionCarrier` 传播，value 保留原抛出值；宿主若保存或跨分配使用该值，
+应立即构造 `VM::Handle<Value>` 保根。编译失败从 Result 判断，合法 void 不能当作失败。
+Engine 不自动打印编译错误，也不默认安装 CLI 的 print/Debug/Exception 自举；按需注册。
+
+第五参 executionContext 接受对象：顶层声明落入该对象，读取按 this→global 回落，
+声明函数保持接收者。省略、void 或 null 使用默认全局。这是脚本执行上下文，
+不是模块隔离或完整 TJS2 Dispatch 桥。
+
+宿主继承 `TextStorageReader::read(name, mode, from)` 并返回 `{sourceName, UTF8文本}`，
+调用 `engine.setStorageReader(shared_ptr)` 即可接入 Scripts。name/mode 原样传递，from 为调用块
+源码身份；宿主决定 XP3、编码及路径规则。读取失败抛标准异常，脚本可 catch。
+共享指针不构成 GC 根，读取器里的脚本引用仍需 Handle。默认文件回落支持 UTF-8/UTF-16 BOM，
+但不解释非空 mode。二进制流与 Array/Dictionary 文件 API 尚未接此接口。
+
+## 源码子项目
+
 `Ciallang::Ciallang` 是库目标别名，通过目标传递 C++20、头文件路径和基础依赖。作为子目录引入时默认关闭 CLI 和测试，不修改父项目的全局编译选项（`CMakeLists.txt`）。
 
 ```cmake
@@ -12,7 +68,7 @@ target_link_libraries(host PRIVATE Ciallang::Ciallang)
 
 配置源码工程需 Python 3.10+，用于从 `vcpkg.json` 生成构建目录中的版本定义；运行脚本本身不依赖 Python。
 
-依赖必须由父项目先准备好。如果父项目使用 vcpkg manifest，应在自己的 `vcpkg.json` 中声明 fmt、frozen、utf8proc；父项目的 `project()` 已完成后，子项目不能追溯安装依赖。需要 CLI/测试/JIT 时也由父项目同步声明相应依赖，或独立构建 Ciallang。开关表见 [building.md](building.md)。
+依赖必须由父项目先准备好。如果父项目使用 vcpkg manifest，应在自己的 `vcpkg.json` 中声明 fmt、frozen、utf8proc、oniguruma；父项目的 `project()` 已完成后，子项目不能追溯安装依赖。需要 CLI/测试/JIT 时也由父项目同步声明相应依赖，或独立构建 Ciallang。开关表见 [building.md](building.md)。
 
 ```cpp
 #include "vm/VM.hpp"

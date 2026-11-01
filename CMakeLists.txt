@@ -44,6 +44,7 @@ execute_process(
 include("${CMAKE_CURRENT_BINARY_DIR}/generated/Version.cmake")
 project(Ciallang VERSION ${CIAL_VERSION} LANGUAGES CXX)
 option(CIAL_ENABLE_PACKAGING "Enable standalone CLI archive packaging" OFF)
+option(CIAL_INSTALL_SDK "Install the C++ SDK and CMake package" ${CIAL_TOP_LEVEL})
 
 if(CIAL_BUILD_BENCH AND NOT CIAL_BUILD_CLI)
     message(FATAL_ERROR "CIAL_BUILD_BENCH requires CIAL_BUILD_CLI=ON")
@@ -62,6 +63,13 @@ endif()
 
 find_package(fmt CONFIG REQUIRED)
 find_package(frozen CONFIG REQUIRED)
+find_package(oniguruma CONFIG QUIET)
+if(TARGET oniguruma::onig)
+    set(CIAL_ONIG_TARGET oniguruma::onig)
+else()
+    find_package(unofficial-oniguruma CONFIG REQUIRED)
+    set(CIAL_ONIG_TARGET unofficial::oniguruma::onig)
+endif()
 find_package(utf8proc CONFIG QUIET)
 if(NOT TARGET utf8proc AND NOT TARGET utf8proc::utf8proc)
     find_package(unofficial-utf8proc CONFIG REQUIRED)
@@ -83,6 +91,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/common/SourceFile.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/common/Colorizer.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/common/UTF8.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/UTF16.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gen/IRGenerator.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gen/ControlFlowGraph.cpp
@@ -97,6 +106,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Chunk.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Bytecode.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/VMState.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/VM.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/IntegerJit.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Rlc.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Constant.cpp
@@ -139,8 +149,12 @@ target_compile_features(Ciallang PUBLIC cxx_std_20)
 set_target_properties(Ciallang PROPERTIES
     CXX_EXTENSIONS OFF
     COMPILE_WARNING_AS_ERROR ${CIAL_WARNINGS_AS_ERRORS})
-target_include_directories(Ciallang PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>")
-target_link_libraries(Ciallang PUBLIC fmt::fmt frozen::frozen ${CIAL_UTF8PROC_TARGET})
+include(GNUInstallDirs)
+target_include_directories(Ciallang PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ciallang>")
+target_link_libraries(Ciallang PUBLIC fmt::fmt frozen::frozen ${CIAL_UTF8PROC_TARGET} ${CIAL_ONIG_TARGET})
 if(MSVC)
     target_compile_options(Ciallang PRIVATE /EHsc /MP /utf-8)
 endif()
@@ -224,6 +238,10 @@ endif ()
 if(CIAL_BUILD_FUZZ)
     add_subdirectory(fuzz)
 endif ()
+
+if(CIAL_INSTALL_SDK)
+    include(cmake/SDK.cmake)
+endif()
 
 if(CIAL_ENABLE_PACKAGING)
     if(NOT CIAL_TOP_LEVEL OR NOT CIAL_BUILD_CLI)

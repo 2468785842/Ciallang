@@ -4,7 +4,7 @@
 `tools/generate_version.py` 读取并校验版本，在构建目录生成：
 
 - `generated/Version.cmake`：数值版本、预发布后缀和完整版本，供 `project(VERSION)` 与 CPack 使用。
-- `generated/cial/Version.hpp`：主/次/修订版本宏及完整版本字符串，供 CLI 使用。
+- `generated/cial/Version.hpp`：主/次/修订版本宏及完整版本字符串，供 CLI 与 SDK 使用。
 
 CMake 在 `project()` 前调用生成器；manifest 或生成器变化会触发重新配置。
 内容未变化时不重写生成文件，避免无意义的重新编译。发布脚本直接复用生成器的版本读取逻辑，
@@ -15,8 +15,9 @@ CMake 在 `project()` 前调用生成器；manifest 或生成器变化会触发�
 源码构建（包括 `add_subdirectory` 嵌入方式）因此需要 Python 3.10+；
 已打包的 CLI 运行不需要 Python。生成文件不入库，也不覆盖 `src/config.h`。
 
-本阶段交付 CLI 压缩包，不安装公共 SDK，也不承诺稳定 C++ ABI；SDK、`.d.tjs`、模块和
-DAP 的后续工作见[路线图](roadmap.md)。本机已验证 Windows x64 包；Linux/macOS 流程
+CLI 压缩包只包含 Runtime 组件，SDK 可从源码另行安装，见[宿主集成](embedding.md)；
+不承诺稳定 C++ ABI。SDK、`.d.tjs`、模块和 DAP 的后续工作见[路线图](roadmap.md)。
+本机已验证 Windows x64 包；Linux/macOS 流程
 尚需实际运行 GitHub Actions 验收，本次未创建远端标签或 Release。
 
 ## 本地打包
@@ -72,7 +73,7 @@ ciallang-<version>-<system>-<arch>/
 不能根据 runner 名称猜测或承诺 universal。
 
 许可默认从 `${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share` 收集
-fmt、frozen、utf8proc、argparse 的 copyright；缺失则配置失败。
+fmt、frozen、utf8proc、argparse、Oniguruma 的 copyright；缺失则配置失败。
 通过其他方式提供依赖时，设置 `CIAL_LICENSE_SHARE_DIR`，保留 `<port>/copyright` 布局。
 依赖提供 SPDX 文件时也会收录，供检查依赖版本与来源。测试专用 Catch2 不进入发行包。
 可选 JIT 的手工 CPack 配置额外要求静态 asmjit 及其许可；标准发布入口固定关闭 JIT。

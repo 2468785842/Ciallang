@@ -14,7 +14,7 @@
 - 提供 Array、Dictionary、String、Math、Date、RegExp、Exception 和 Octet 标准库能力。
 - 加载 TJS2 字节码，转译为内部指令执行；兼容范围见[兼容性说明](doc/compatibility.md)。
 - 提供 CLI、REPL、LSP 与 VSCode 客户端，以及控制流和执行路径导出。
-- 作为 CMake 库嵌入，通过 C++ API 注册宿主类、函数和属性。
+- 作为 CMake 子项目或安装后的 SDK 嵌入，通过 C++ API 注册宿主类、函数和属性。
 
 整数 JIT、Trace JIT 与尾递归优化需显式启用，适用范围见 [JIT](doc/jit.md) 和[尾递归](doc/tail-recursion.md)。
 
@@ -56,6 +56,7 @@ println([1, 2, 3].join(", "));
 | [语法](doc/syntax.md) · [兼容性](doc/compatibility.md) · [FAQ](doc/faq.md) | 语言支持与常见问题 |
 | [架构](doc/architecture.md) · [性能记录](doc/performance.md) | 实现与测量依据 |
 | [打包与发布](doc/releasing.md) | CLI 预览版、版本来源与 Release CI |
+| [krkr2 接入](doc/krkr2-integration.md) | 指定宿主分支、已实现基础与替换验收门槛 |
 | [路线图](doc/roadmap.md) | SDK、`.d.tjs` 声明、工具拆仓、模块与调试器规划 |
 | [文档索引](doc/README.md) · [待办](TODO.md) · [开发约定](AGENTS.md) | 查阅与贡献 |
 

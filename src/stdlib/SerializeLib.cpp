@@ -19,6 +19,7 @@
 #include <fstream>
 #include <sstream>
 
+#include "common/UTF16.hpp"
 #include "common/UTF8.hpp"
 #include "types/Octet.hpp"
 #include "vm/VM.hpp"
@@ -86,48 +87,10 @@ namespace cial::stdlib {
 
         // ---------- UTF-8 <-> UTF-16LE（二进制格式的字符串存储态）----------
 
-        std::string utf8ToUtf16Le(const std::string &s) {
-            std::string out;
-            out.reserve(s.size() * 2 + 2);
-            size_t i = 0;
-            while(i < s.size()) {
-                const auto cp = Common::utf8Decode(s.data() + i, s.size() - i);
-                i += cp.width > 0 ? static_cast<size_t>(cp.width) : 1;
-                char32_t c = static_cast<char32_t>(cp.value);
-                if(c <= 0xFFFF) {
-                    out.push_back(static_cast<char>(c & 0xFF));
-                    out.push_back(static_cast<char>((c >> 8) & 0xFF));
-                } else {
-                    c -= 0x10000;
-                    const u32 hi = 0xD800 | (c >> 10);
-                    const u32 lo = 0xDC00 | (c & 0x3FF);
-                    out.push_back(static_cast<char>(hi & 0xFF));
-                    out.push_back(static_cast<char>((hi >> 8) & 0xFF));
-                    out.push_back(static_cast<char>(lo & 0xFF));
-                    out.push_back(static_cast<char>((lo >> 8) & 0xFF));
-                }
-            }
-            return out;
-        }
+        std::string utf8ToUtf16Le(const std::string &s) { return Common::toUtf16LE(s); }
 
         std::string utf16LeToUtf8(const u8 *data, const size_t bytes) {
-            std::string out;
-            out.reserve(bytes);
-            for(size_t i = 0; i + 1 < bytes;) {
-                char32_t u = data[i] | (static_cast<char32_t>(data[i + 1]) << 8);
-                i += 2;
-                if(u >= 0xD800 && u <= 0xDBFF && i + 1 < bytes) {
-                    const char32_t lo = data[i] | (static_cast<char32_t>(data[i + 1]) << 8);
-                    if(lo >= 0xDC00 && lo <= 0xDFFF) {
-                        u = 0x10000 + ((u - 0xD800) << 10) + (lo - 0xDC00);
-                        i += 2;
-                    }
-                }
-                const auto enc = Common::utf8Encode(static_cast<i32>(u));
-                if(enc.width > 0)
-                    out.append(reinterpret_cast<const char *>(enc.data), static_cast<size_t>(enc.width));
-            }
-            return out;
+            return Common::fromUtf16LE({ reinterpret_cast<const char *>(data), bytes });
         }
 
         // ---------- 文件 IO ----------
@@ -375,12 +338,7 @@ namespace cial::stdlib {
             std::string out;
             out.reserve(s.size());
             bool hexflag = false;
-            size_t i = 0;
-            while(i < s.size()) {
-                const auto cp = Common::utf8Decode(s.data() + i, s.size() - i);
-                const int w = cp.width > 0 ? cp.width : 1;
-                const char32_t c = static_cast<char32_t>(cp.value);
-                i += static_cast<size_t>(w);
+            for(const char16_t c : Common::toUtf16(s)) {
                 switch(c) {
                     case 0x07:
                         out += "\\a";
@@ -430,7 +388,7 @@ namespace cial::stdlib {
                     std::snprintf(buf, sizeof(buf), "\\x%02x", static_cast<unsigned>(c));
                     out += buf;
                     hexflag = true;
-                } else if(c < 0x20) {
+                } else if(c < 0x20 || (c >= 0xd800 && c <= 0xdfff)) {
                     std::snprintf(buf, sizeof(buf), "\\x%02x", static_cast<unsigned>(c));
                     out += buf;
                     hexflag = true;
@@ -687,6 +645,7 @@ namespace cial::stdlib {
                     return readOctet(type - TYPE_FIX_RAW_MIN);
                 switch(type) {
                     case TYPE_NIL:
+                        return Value{ static_cast<Object *>(nullptr) };
                     case TYPE_VOID:
                         return Value{};
                     case TYPE_TRUE:
@@ -1832,7 +1791,7 @@ namespace cial::stdlib {
                 if(item.isObject()) {
                     auto *obj = item.asObject().unwrap();
                     if(stackContains(stack, obj)) {
-                        dst->elements.push_back(Value{}); // 环 → null
+                        dst->elements.emplace_back(static_cast<Object *>(nullptr)); // 环 → null
                         continue;
                     }
                     if(auto *sarr = dynamic_cast<const Array *>(obj)) {
@@ -1860,7 +1819,7 @@ namespace cial::stdlib {
                 if(value.isObject()) {
                     auto *obj = value.asObject().unwrap();
                     if(stackContains(stack, obj)) {
-                        dst->members[atom] = Value{};
+                        dst->members[atom] = Value{ static_cast<Object *>(nullptr) };
                         continue;
                     }
                     if(auto *sarr = dynamic_cast<const Array *>(obj)) {
@@ -1886,7 +1845,7 @@ namespace cial::stdlib {
     // ==================== Array ====================
 
     Value arrayLoad(VM *, const Value &thisObj, const size_t argCount, Value *args) {
-        auto *arr = dynamic_cast<Array *>(thisObj.asObject().unwrap());
+        auto *arr = dynamic_cast<Array *>(thisObj.requireObject());
         if(!arr)
             serError("Array.load expects an array");
         const std::string content = readTextDecoded(makeString(argString(argCount, args, 0)));
@@ -1912,7 +1871,7 @@ namespace cial::stdlib {
     }
 
     Value arraySave(VM *, const Value &thisObj, const size_t argCount, Value *args) {
-        auto *arr = dynamic_cast<Array *>(thisObj.asObject().unwrap());
+        auto *arr = dynamic_cast<Array *>(thisObj.requireObject());
         if(!arr)
             serError("Array.save expects an array");
         std::string out;
@@ -1926,7 +1885,7 @@ namespace cial::stdlib {
     }
 
     Value arrayLoadStruct(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
-        auto *arr = dynamic_cast<Array *>(thisObj.asObject().unwrap());
+        auto *arr = dynamic_cast<Array *>(thisObj.requireObject());
         if(!arr)
             serError("Array.loadStruct expects an array");
         const std::string raw = readFileBytes(makeString(argString(argCount, args, 0)));
@@ -1939,7 +1898,7 @@ namespace cial::stdlib {
     }
 
     Value arraySaveStruct(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
-        auto *arr = dynamic_cast<Array *>(thisObj.asObject().unwrap());
+        auto *arr = dynamic_cast<Array *>(thisObj.requireObject());
         if(!arr)
             serError("Array.saveStruct expects an array");
         const String name = makeString(argString(argCount, args, 0));
@@ -1958,7 +1917,7 @@ namespace cial::stdlib {
     }
 
     Value arrayPack(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
-        auto *arr = dynamic_cast<Array *>(thisObj.asObject().unwrap());
+        auto *arr = dynamic_cast<Array *>(thisObj.requireObject());
         if(!arr)
             serError("Array.pack expects an array");
         if(argCount < 1 || !args[0].isString())
@@ -1968,7 +1927,7 @@ namespace cial::stdlib {
     }
 
     Value arrayAssignStruct(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
-        auto *arr = dynamic_cast<Array *>(thisObj.asObject().unwrap());
+        auto *arr = dynamic_cast<Array *>(thisObj.requireObject());
         if(!arr)
             serError("Array.assignStruct expects an array");
         if(argCount < 1 || !args[0].isObject())
@@ -1992,7 +1951,7 @@ namespace cial::stdlib {
     }
 
     Value dictLoadStruct(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
-        auto *dic = dynamic_cast<Dictionary *>(thisObj.asObject().unwrap());
+        auto *dic = dynamic_cast<Dictionary *>(thisObj.requireObject());
         if(!dic)
             serError("Dictionary.loadStruct expects a dictionary");
         dic->members.clear(); // 原版在读文件前即清空自身
@@ -2011,7 +1970,7 @@ namespace cial::stdlib {
     }
 
     Value dictSaveStruct(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
-        auto *dic = dynamic_cast<Dictionary *>(thisObj.asObject().unwrap());
+        auto *dic = dynamic_cast<Dictionary *>(thisObj.requireObject());
         if(!dic)
             serError("Dictionary.saveStruct expects a dictionary");
         const String name = makeString(argString(argCount, args, 0));
@@ -2030,7 +1989,7 @@ namespace cial::stdlib {
     }
 
     Value dictAssignStruct(VM *vm, const Value &thisObj, const size_t argCount, Value *args) {
-        auto *dic = dynamic_cast<Dictionary *>(thisObj.asObject().unwrap());
+        auto *dic = dynamic_cast<Dictionary *>(thisObj.requireObject());
         if(!dic)
             serError("Dictionary.assignStruct expects a dictionary");
         if(argCount < 1 || !args[0].isObject())

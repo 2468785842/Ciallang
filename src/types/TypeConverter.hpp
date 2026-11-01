@@ -4,6 +4,7 @@
 #pragma once
 
 #include "Types.hpp"
+#include "Value.hpp"
 #include "common/Ret.hpp"
 
 namespace cial::TypeConverter {
@@ -15,5 +16,6 @@ namespace cial::TypeConverter {
 
     Ret<Integer> stringToInteger(const String &str);
     Ret<Real> stringToReal(const String &str);
+    Ret<Value> stringToNumber(const String &str);
 
 } // namespace cial::TypeConverter

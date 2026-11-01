@@ -1,0 +1,18 @@
+// 正则使用 UTF-16 搜索位置与 Oniguruma Perl 语法。
+Scripts.execStorage("../../assert.tjs");
+
+var expression = /文/g;
+assertTrue(expression.exec("中😀文文")[0] == "文");
+assertTrue(expression.index == 3 && expression.lastIndex == 4 && expression.start == 4);
+assertTrue(expression.exec("中😀文文")[0] == "文");
+assertTrue(expression.index == 4 && expression.lastIndex == 5);
+assertTrue("a😀b".replace(/😀/g, "文") == "a文b");
+assertTrue("a😀b😀c".split(/😀/).join("|") == "a|b|c");
+assertTrue(/\p{Han}+/.test("中文"));
+var emoji = /./g;
+assertTrue(emoji.exec("😀a")[0] == "😀");
+assertTrue(emoji.lastIndex == 2);
+assertTrue(emoji.exec("😀a")[0] == "a");
+assertTrue(emoji.index == 2 && emoji.lastIndex == 3);
+
+finishTests();

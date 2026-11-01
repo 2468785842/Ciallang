@@ -1,8 +1,8 @@
 // Copyright (c) 2026/10/24
 //
 // RegExp 内建方法（TJS2 tjsRegExp.cpp 语义）：test/match/exec/compile/replace/split；
-// 以及 String.split / Array.split 的分派实现。位置均为字节偏移（UTF-8 码点语义记 TODO）。
-// replace 的函数回调（TJS2 支持以函数为替换串）待脚本回调调用机制，暂仅字符串替换。
+// 以及 String.split / Array.split 的分派实现。位置按 UTF-16 码元计数。
+// replace 支持字符串及函数替换，函数回调通过 VM::callValue 保留绑定和异常值。
 #pragma once
 
 #include "types/RegExp.hpp"

@@ -48,6 +48,8 @@ namespace cial {
         // 16B 表示：短串占前 15B（含 NUL），末字节低 4 位存长度、
         // bit4 标识长串。高 3 位保留给内联 Value 的类型标签。
         [[nodiscard]] static String concat(const String &a, const String &b) {
+            if(needsSurrogateJoin(a, b))
+                return joinSurrogates(a, b);
             String r{};
             const u32 total = a.length() + b.length();
             r.reserveExact(total);
@@ -104,6 +106,16 @@ namespace cial {
         [[nodiscard]] String escapeBackSlash() const;
 
     private:
+        static bool needsSurrogateJoin(const String &a, const String &b) {
+            if(a.length() < 3 || b.length() < 3)
+                return false;
+            const auto *end = reinterpret_cast<const unsigned char *>(a.getData() + a.length() - 3);
+            const auto *begin = reinterpret_cast<const unsigned char *>(b.getData());
+            return end[0] == 0xed && end[1] >= 0xa0 && end[1] <= 0xaf && begin[0] == 0xed && begin[1] >= 0xb0 &&
+                begin[1] <= 0xbf;
+        }
+        static String joinSurrogates(const String &a, const String &b);
+
         struct LongData {
             char *data;
             u32 len;

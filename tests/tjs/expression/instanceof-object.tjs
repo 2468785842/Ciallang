@@ -8,4 +8,12 @@ assertTrue((!!((function() { }) instanceof "Function")) == true);
 assertTrue((!!([1] instanceof "Dictionary")) == false);
 assertTrue((!!(/x/g instanceof "Array")) == false);
 
+assertTrue(1 instanceof "Object");
+assertTrue(1 instanceof "Number");
+assertTrue(!(1 instanceof "Integer"));
+assertTrue(!(1.5 instanceof "Real"));
+assertTrue(!(void instanceof "Object"));
+class Number {}
+assertTrue((new Number()) instanceof "Number");
+
 finishTests();

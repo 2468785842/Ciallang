@@ -208,6 +208,15 @@ namespace cial {
 
         [[nodiscard]] bool isObject() const noexcept { return tag() == (static_cast<u8>(ValueType::Object) << 5); }
 
+        [[nodiscard]] bool isNull() const noexcept { return isObject() && _data.object == nullptr; }
+
+        // asObject() 保留可空闭包语义；只有需要分派成员/调用时才要求有效对象。
+        [[nodiscard]] CIAL_INLINE Object *requireObject() const {
+            if(isObject() && _data.object)
+                return _data.object;
+            return requireObjectSlow();
+        }
+
         [[nodiscard]] const char *name() const;
 
         // 数值取整：Integer/Void/Real 快路径类内内联（派发循环 8 处调用点 +
@@ -316,6 +325,7 @@ namespace cial {
         [[nodiscard]] Ret<bool> greaterThan(const Value &value) const noexcept;
 
     private:
+        CIAL_COLD_NOINLINE Object *requireObjectSlow() const;
         friend struct Constant; // 常量字符串负载缓存直接装配 Value
 
         struct Data {

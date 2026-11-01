@@ -99,7 +99,7 @@ def verify_archive(archive, expected_version=None):
         if root.name != info['package_name']:
             raise ValueError('Package directory does not match build metadata')
         for relative in ['LICENSE', 'README.md', 'examples/hello.tjs',
-                         *[f'licenses/{port}/copyright' for port in ('fmt', 'frozen', 'utf8proc', 'argparse')]]:
+                         *[f'licenses/{port}/copyright' for port in ('fmt', 'frozen', 'utf8proc', 'argparse', 'oniguruma')]]:
             if not (root / relative).is_file():
                 raise ValueError('Missing package file: ' + relative)
         executable = root / 'bin' / ('cial.exe' if info['system'] == 'Windows' else 'cial')

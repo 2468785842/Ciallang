@@ -17,8 +17,17 @@
 #include "Octet.hpp"
 #include "String.hpp"
 #include "TypeConverter.hpp"
+#include "common/UTF16.hpp"
 
 namespace cial {
+
+    Object *Value::requireObjectSlow() const {
+        // 错误路径保留 asObject 的类型转换协议；null 单独报告对象访问错误。
+        auto *object = asObject().unwrap();
+        if(!object)
+            throw std::runtime_error("null object access");
+        return object;
+    }
 
     Value::Value(String value) {
         if(value.length() <= String::SHORT_STR_LEN) {
@@ -148,7 +157,7 @@ namespace cial {
 
         switch(type()) {
             case ValueType::Object: {
-                const String s = TypeConverter::objectToString(*_data.object);
+                const String s = _data.object ? TypeConverter::objectToString(*_data.object) : "(object 0x0)"_str;
                 this->~Value();
                 new(this) Value{ s };
                 return Ret<void>::ok();
@@ -214,17 +223,11 @@ namespace cial {
                 *this = Value{ Integer{ 0 } };
                 return Ret<void>::ok();
             case ValueType::String: {
-                const auto &str = *asString().value();
-                // TJS String::ToNumber：整样貌解析为 int，否则 real
-                if(const auto i = TypeConverter::stringToInteger(str); !i.isFailed()) {
-                    *this = Value{ Integer{ i.value() } };
-                    return Ret<void>::ok();
-                }
-                if(const auto d = TypeConverter::stringToReal(str); !d.isFailed()) {
-                    *this = Value{ d.value() };
-                    return Ret<void>::ok();
-                }
-                return Ret<void>::err(ErrCode::InvalidCast, "cannot convert string to number"_str);
+                const auto number = TypeConverter::stringToNumber(*asString().value());
+                if(number.isFailed())
+                    return Ret<void>::err(number.getErr());
+                *this = number.value();
+                return Ret<void>::ok();
             }
             default:
                 break;
@@ -628,7 +631,8 @@ namespace cial {
         if(lhs.isFailed() || rhs.isFailed())
             return Ret<bool>::err(ErrCode::TypeError, "unsupported operand types for `<`"_str);
 
-        return Ret<bool>::ok(std::strcmp(lhs.value()->getData(), rhs.value()->getData()) < 0);
+        return Ret<bool>::ok(Common::toUtf16({ lhs.value()->getData(), lhs.value()->length() }) <
+                             Common::toUtf16({ rhs.value()->getData(), rhs.value()->length() }));
     }
 
     Ret<bool> Value::greaterThan(const Value &value) const noexcept {
@@ -649,7 +653,8 @@ namespace cial {
         if(lhs.isFailed() || rhs.isFailed())
             return Ret<bool>::err(ErrCode::TypeError, "unsupported operand types for `>`"_str);
 
-        return Ret<bool>::ok(std::strcmp(lhs.value()->getData(), rhs.value()->getData()) > 0);
+        return Ret<bool>::ok(Common::toUtf16({ lhs.value()->getData(), lhs.value()->length() }) >
+                             Common::toUtf16({ rhs.value()->getData(), rhs.value()->length() }));
     }
 
     std::ostream &operator<<(std::ostream &os, const Value &d) {

@@ -16,7 +16,7 @@ namespace cial::stdlib {
             // count 属性
             .property("count"_str, [](const Value &thisObj) {
                 return Value{ Integer{
-                    static_cast<Integer>(dynamic_cast<Dictionary &>(*thisObj.asObject().unwrap()).members.size()) } };
+                    static_cast<Integer>(dynamic_cast<Dictionary &>(*thisObj.requireObject()).members.size()) } };
             });
         context.registerClass<Dictionary>("Dictionary"_str);
     }
@@ -24,8 +24,10 @@ namespace cial::stdlib {
     namespace {
         Dictionary *asDict(const Value &thisObj) {
             // typeId 直判替代 dynamic_cast（Dictionary 为 final，二者等价），见 asArray 同注
-            auto *obj = thisObj.asObject().unwrap();
-            return obj->typeId() == TypeId::Dictionary ? static_cast<Dictionary *>(obj) : nullptr;
+            auto *obj = thisObj.requireObject();
+            if(obj->typeId() != TypeId::Dictionary)
+                throw std::runtime_error("Dictionary receiver required");
+            return static_cast<Dictionary *>(obj);
         }
 
         // 键统一字符串化（Atom 化）

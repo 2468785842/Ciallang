@@ -1,6 +1,6 @@
 # CLI-only archive distribution. This does not install the public C++ SDK.
 include(GNUInstallDirs)
-foreach(dependency IN ITEMS Ciallang fmt::fmt ${CIAL_UTF8PROC_TARGET})
+foreach(dependency IN ITEMS Ciallang fmt::fmt ${CIAL_UTF8PROC_TARGET} ${CIAL_ONIG_TARGET})
     get_target_property(dependency_type ${dependency} TYPE)
     if(NOT dependency_type STREQUAL "STATIC_LIBRARY")
         message(FATAL_ERROR "CLI archives require static libraries: ${dependency} is ${dependency_type}")
@@ -25,7 +25,7 @@ install(CODE [[
     endif()
 ]] COMPONENT Runtime)
 
-set(cial_license_ports fmt frozen utf8proc argparse)
+set(cial_license_ports fmt frozen utf8proc argparse oniguruma)
 if(CIAL_ENABLE_JIT)
     list(APPEND cial_license_ports asmjit)
 endif()

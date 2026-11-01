@@ -6,7 +6,7 @@
 #include <cstring>
 #include <fstream>
 
-#include "common/UTF8.hpp"
+#include "common/UTF16.hpp"
 
 
 namespace cial::tjsbc {
@@ -85,23 +85,7 @@ namespace cial::tjsbc {
         };
 
         std::string utf16LeToUtf8(const u8 *data, const size_t bytes) {
-            std::string out;
-            out.reserve(bytes);
-            for(size_t k = 0; k + 1 < bytes;) {
-                char32_t u = data[k] | (static_cast<char32_t>(data[k + 1]) << 8);
-                k += 2;
-                if(u >= 0xD800 && u <= 0xDBFF && k + 1 < bytes) {
-                    const char32_t lo = data[k] | (static_cast<char32_t>(data[k + 1]) << 8);
-                    if(lo >= 0xDC00 && lo <= 0xDFFF) {
-                        u = 0x10000 + ((u - 0xD800) << 10) + (lo - 0xDC00);
-                        k += 2;
-                    }
-                }
-                const auto enc = Common::utf8Encode(static_cast<i32>(u));
-                if(enc.width > 0)
-                    out.append(reinterpret_cast<const char *>(enc.data), static_cast<size_t>(enc.width));
-            }
-            return out;
+            return Common::fromUtf16LE({ reinterpret_cast<const char *>(data), bytes });
         }
 
         // 常量池 7 段（tjsByteCodeLoader::ReadDataArea 对齐：各段 4 字节对齐补零，

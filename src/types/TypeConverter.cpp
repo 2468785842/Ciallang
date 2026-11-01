@@ -134,6 +134,31 @@ namespace cial::TypeConverter {
         return sign;
     }
 
+    Ret<Value> stringToNumber(const String &str) {
+        String body{};
+        const int sign = stripSign(str, body);
+        auto error = Ret<Value>::err(ErrCode::InvalidCast, "cannot convert string to number"_str);
+        if(sign == 0)
+            return error;
+        Common::SourceFile source{};
+        Common::Result result{};
+        source.load(result, body.toStdStr());
+        if(result.isFailed())
+            return error;
+        PreProcessor pp{};
+        syntax::Lexer lexer{ source, pp };
+        syntax::Token *token{};
+        lexer.next(token, false);
+        if(token->type() != syntax::TokenType::ConstVal)
+            return error;
+        // 保留词法数值类型：不能先转 Integer，否则 +"1.5" 会被截成 1。
+        if(token->valueType() == syntax::TokenValueType::Integer)
+            return Ret<Value>::ok(Value{ sign * token->getInteger() });
+        if(token->valueType() == syntax::TokenValueType::Real)
+            return Ret<Value>::ok(Value{ Real{ sign * token->getReal().value() } });
+        return error;
+    }
+
     Ret<Integer> stringToInteger(const String &str) {
         auto retErr = Ret<Integer>::err(ErrCode::InvalidCast, String{ str.toStdStr() + " can't covert to integer" });
 

@@ -10,7 +10,9 @@
 //                                                            \_/__/
 //
 
-#include <regex>
+#include <algorithm>
+#include <limits>
+#include "common/UTF16.hpp"
 #include "common/UTF8.hpp"
 #include "runtime/Context.hpp"
 
@@ -19,8 +21,6 @@
 #include "types/RegExp.hpp"
 #include "vm/VM.hpp"
 
-// TODO: UTF-8 support
-// TODO: length property support
 namespace cial::stdlib {
     void registerStringLib(Context &context) {
         context.nativeType<String>()
@@ -37,42 +37,31 @@ namespace cial::stdlib {
             .method("trim"_str, &stdlib::stringTrim)
             .method("reverse"_str, &stdlib::stringReverse)
             .method("repeat"_str, &stdlib::stringRepeat)
-            // 字符串长度按 UTF-8 码点计数。
             .property("length"_str, [](const Value &thisObj) {
-                // TJS2 语义：字符数（UTF-16 码元数）；UTF-8 下按码点计数（"abc漢字" == 5）
-                const String *str = thisObj.asString().unwrap();
-                return Value{ Integer{ Common::utf8Strlen(std::string(str->getData(), str->length())) } };
+                const auto *str = thisObj.asString().unwrap();
+                return Value{ Integer{ static_cast<Integer>(Common::utf16Length({ str->getData(), str->length() })) } };
             });
     }
 
 
     String stringCharAt(VM *, const Value &thisObj, size_t, const Integer index) {
         const String *str = thisObj.asString().unwrap();
-        if(str->isEmpty() || index < 0 || index >= str->length())
+        if(index < 0 || static_cast<u64>(index) >= Common::utf16Length({ str->getData(), str->length() }))
             return ""_str;
-        return String(str->getData()[index]);
+        return String{ Common::utf16Slice({ str->getData(), str->length() }, static_cast<size_t>(index), 1) };
     }
 
     Integer stringIndexOf(VM *, const Value &thisObj, size_t, const String *subStr, const Value &vStart) {
         const String *str = thisObj.asString().unwrap();
-        if(str->isEmpty())
+        const Integer start = vStart.isVoid() ? 0 : vStart.asInteger().unwrap();
+        if(start < 0 || str->isEmpty() || subStr->isEmpty())
             return -1;
-
-        Integer start{ 0 };
-
-        if(str->isEmpty() || subStr->isEmpty())
+        const auto units = Common::toUtf16({ str->getData(), str->length() });
+        const auto needle = Common::toUtf16({ subStr->getData(), subStr->length() });
+        if(static_cast<u64>(start) >= units.size())
             return -1;
-        if(!vStart.isVoid())
-            start = vStart.asInteger().unwrap();
-
-        if(start < 0 || start >= str->length()) {
-            return -1;
-        }
-
-        const char *p = std::strstr(str->getData() + start, subStr->getData());
-        if(!p)
-            return -1;
-        return p - str->getData();
+        const auto found = units.find(needle, static_cast<size_t>(start));
+        return found == std::u16string::npos ? -1 : static_cast<Integer>(found);
     }
 
     String stringToUpperCase(VM *, const Value &thisObj, size_t) {
@@ -96,25 +85,14 @@ namespace cial::stdlib {
     }
 
     String stringSubstring(VM *, const Value &thisObj, size_t, const Integer start, const Value &vLength) {
-        // TODO: UTF-8 support
         const String *str = thisObj.asString().unwrap();
-        const Integer sLen = str->length();
-
-        if(start < 0 || start >= sLen) {
+        if(start < 0 || static_cast<u64>(start) >= Common::utf16Length({ str->getData(), str->length() }))
             return ""_str;
-        }
-
-        if(!vLength.isVoid()) {
-            Integer count = vLength.asInteger().unwrap();
-            if(count < 0) {
-                return ""_str;
-            }
-            if(count > sLen - start)
-                count = sLen - start;
-            return String(str->getData() + start, count);
-        }
-
-        return String(str->getData() + start, sLen - start);
+        const Integer count = vLength.isVoid() ? std::numeric_limits<Integer>::max() : vLength.asInteger().unwrap();
+        if(count <= 0)
+            return ""_str;
+        return String{ Common::utf16Slice({ str->getData(), str->length() }, static_cast<size_t>(start),
+                                          static_cast<size_t>(count)) };
     }
 
     String stringSprintf(VM *, const Value &thisObj, const size_t argCount, Value *args) {
@@ -158,18 +136,9 @@ namespace cial::stdlib {
     String stringReverse(VM *, const Value &thisObj, size_t) {
         // TJS2 tjsInterCodeExec.cpp:2603：返回独立结果，不修改接收者。
         const auto *str = thisObj.asString().unwrap();
-        std::string result;
-        result.reserve(str->length());
-        const char *data = str->getData();
-        size_t end = str->length();
-        while(end) {
-            size_t begin = end - 1;
-            while(begin && (static_cast<unsigned char>(data[begin]) & 0xc0) == 0x80)
-                --begin;
-            result.append(data + begin, end - begin);
-            end = begin;
-        }
-        return String{ result };
+        auto units = Common::toUtf16({ str->getData(), str->length() });
+        std::reverse(units.begin(), units.end());
+        return String{ Common::fromUtf16(units) };
     }
 
     // repeat(count)

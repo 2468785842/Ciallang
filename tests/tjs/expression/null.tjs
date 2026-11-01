@@ -1,0 +1,53 @@
+// 空对象闭包与 void 区分；所有非法分派必须进入脚本异常路径。
+Scripts.execStorage("../assert.tjs");
+
+var empty = null;
+assertTrue(empty === null);
+assertTrue(empty !== void);
+assertTrue(typeof empty == "Object");
+assertTrue(!empty);
+assertTrue(empty instanceof "Object");
+assertTrue(!(empty instanceof "Array"));
+assertTrue(empty === null);
+var container = [null, void, (const)[null]];
+assertTrue(container[0] === null && container[1] === void && container[2][0] === null);
+function localOperand() {
+    var value = null;
+    var result = value instanceof "Array";
+    return value === null && result == 0;
+}
+assertTrue(localOperand());
+var caught = 0;
+try { isvalid empty; } catch(e) { caught++; }
+try { invalidate empty; } catch(e) { caught++; }
+try { empty.member; } catch(e) { caught++; }
+try { empty.member = 1; } catch(e) { caught++; }
+try { empty(); } catch(e) { caught++; }
+try { empty[0]; } catch(e) { caught++; }
+try { empty[0] = 1; } catch(e) { caught++; }
+try { &empty.member; } catch(e) { caught++; }
+try { *empty; } catch(e) { caught++; }
+try { delete empty.member; } catch(e) { caught++; }
+try { (Date.getTime incontextof null)(); } catch(e) { caught++; }
+try { (RegExp.exec incontextof null)("x"); } catch(e) { caught++; }
+try { (Array.push incontextof null)(1); } catch(e) { caught++; }
+try { (Dictionary.clear incontextof null)(); } catch(e) { caught++; }
+try { (Array.assignStruct incontextof null)([]); } catch(e) { caught++; }
+var generator = new Math.RandomGenerator(1);
+try { (generator.random incontextof null)(); } catch(e) { caught++; }
+assertTrue(caught == 16);
+empty = 42;
+assertTrue(empty == 42);
+var cyclic = [null, void];
+cyclic.push(cyclic);
+var copy = [];
+copy.assignStruct(cyclic);
+assertTrue(copy[0] === null && copy[1] === void && copy[2] === null);
+var dict = %[empty: null, unset: void];
+dict.self = dict;
+var dictCopy = %[];
+dictCopy.assignStruct(dict);
+assertTrue(dictCopy.empty === null && dictCopy.unset === void && dictCopy.self === null);
+assertTrue(40 + 2 == 42);
+
+finishTests();
