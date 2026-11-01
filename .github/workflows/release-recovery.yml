@@ -1,0 +1,115 @@
+name: recover-release-draft
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 已验证的版本标签
+        required: true
+        type: string
+      package_run_id:
+        description: 三平台原生打包已通过的 package-and-release 运行 ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: recover-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  recover-draft:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+      - name: Verify tag and all native package jobs
+        id: version
+        shell: bash
+        run: |
+          [[ "$PACKAGE_RUN_ID" =~ ^[0-9]+$ ]]
+          version=$(python tools/package.py --check-version --require-clean --tag "$RELEASE_TAG")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          gh run view "$PACKAGE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --json headSha,headBranch,workflowName,event,status,jobs > "$RUNNER_TEMP/package-run.json"
+          python - <<'PY'
+          import json, os, pathlib, subprocess
+          run = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'package-run.json').read_text())
+          revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          assert run['headSha'] == revision and run['headBranch'] == os.environ['RELEASE_TAG']
+          assert run['workflowName'] == 'package-and-release' and run['event'] == 'push' and run['status'] == 'completed'
+          jobs = [job for job in run['jobs'] if job['name'].startswith('package (')]
+          assert len(jobs) == 3 and all(job['conclusion'] == 'success' for job in jobs)
+          assert {job['name'].rsplit(', ', 1)[1][:-1] for job in jobs} == {'Linux', 'MacOS', 'Windows'}
+          print('Verified native packages for', revision)
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.package_run_id }}
+          pattern: ciallang-cli-*
+          merge-multiple: true
+          path: build/release-assets
+      - name: Verify package provenance and normalize checksum text
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, tarfile, zipfile
+          root = pathlib.Path('build/release-assets')
+          version = os.environ['RELEASE_VERSION']
+          revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          archives = {f'ciallang-{version}-{suffix}': (system, arch) for suffix, system, arch in (
+              ('linux-x64.tar.gz', 'Linux', 'x64'), ('macos-arm64.tar.gz', 'Darwin', 'arm64'),
+              ('windows-x64.zip', 'Windows', 'x64'))}
+          assert {p.name for p in root.iterdir()} == set(archives) | {name + '.sha256' for name in archives}
+          for name, (system, arch) in archives.items():
+              archive = root / name
+              checksum = root / (name + '.sha256')
+              digest, filename = checksum.read_text(encoding='ascii').split()
+              assert filename == name and hashlib.sha256(archive.read_bytes()).hexdigest() == digest
+              if name.endswith('.zip'):
+                  with zipfile.ZipFile(archive) as bundle:
+                      metadata = [n for n in bundle.namelist() if n.endswith('/build-info.json')]
+                      assert len(metadata) == 1
+                      info = json.loads(bundle.read(metadata[0]))
+              else:
+                  with tarfile.open(archive) as bundle:
+                      metadata = [n for n in bundle.getnames() if n.endswith('/build-info.json')]
+                      assert len(metadata) == 1
+                      info = json.load(bundle.extractfile(metadata[0]))
+              assert info['revision'] == revision and info['dirty'] == 'false' and info['version'] == version
+              assert info['configuration'] == 'Release' and info['system'] == system and info['architecture'] == arch
+              assert info['jit'] == 'OFF'
+              checksum.write_bytes(f'{digest}  {name}\n'.encode('ascii'))
+              print('Verified', name, digest)
+          PY
+      - name: Create draft with verified assets
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cd build/release-assets
+          sha256sum --check ./*.sha256
+          sha256sum ./*.zip ./*.tar.gz > SHA256SUMS
+          cd ../..
+          release_flags=()
+          if [[ "$RELEASE_VERSION" == *-* ]]; then
+            release_flags=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" build/release-assets/* \
+            --verify-tag --draft "${release_flags[@]}" \
+            --title "Ciallang $RELEASE_VERSION" --notes-file packaging/RELEASE_NOTES.md
