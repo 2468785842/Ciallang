@@ -12,6 +12,14 @@
 
 - [ ] macOS 复测并落地 `thisData` 缓存继承补丁（全局函数调用经 `setThisObj` 对 GlobalObject 做必败 `dynamic_cast`，每次调用一次；Windows 插桩证实 fib(25) 242,787 次/命中 1，消除后严格等价且中性——MSVC ABI 失败转换廉价；macOS 画像 RTTI 链 ~32% 采样，预期为该平台 fib 主收益）。补丁与样本见本机 `bench/results/20261101-fib-call-path/`，测量见[性能记录](doc/performance.md)。
 
+## 字节码反编译器
+
+设计与批次见[反编译器方案](doc/bytecode/decompiler-plan.md)（2026-11-01 采纳 TAC 层直译路径）。
+
+- [ ] M0/M1：`DecompiledOutput{文本,行表}` 类型、CLI `--decompile` 骨架与反汇编级 Printer；转译器为每个转译 Chunk 发 Rlc（Pass 1 接线，行表在 `toBytecode` 前快照 TAC 坐标）；固定参考二进制/版本/样本清单。完成条件：两条入口反汇编级端到端，行表含 TAC 与码字区间。
+
+- [ ] M2–M5：后优化形态表达式恢复（含 BinaryImm/CompareTestImm 逆映射）、语句结构化与短路/三元跨块折叠、壳组装与 `+=` 逆融合双守卫（模板命中 + `computeBlockLiveness` 无其他读者）、任意 CFG/switch 链/try 嵌套兜底；按方案 §7 四环验证逐批验收。
+
 ## SDK 与开发工具路线图
 
 - [ ] 完成诊断重构批次 5 剩余的 JIT 等价位置验证（继续扩展原生互调与异常恢复组合）。故障位置、源码快照、结构化异常栈与栈降级已落地，验收见[诊断重构计划](doc/diagnostics-plan.md)实施状态一节。
