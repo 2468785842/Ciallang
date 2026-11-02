@@ -16,7 +16,8 @@
 
 #include "gc.hpp"
 
-#include "logging/Logger.hpp"
+#include <fmt/format.h>
+#include <stdexcept>
 
 namespace cial {
 
@@ -36,8 +37,10 @@ namespace cial {
             _head = _nextFree = extra;
         }
         if(!_nextFree) {
+            // 池耗尽是可恢复的运行期错误：由宿主按 std::exception 处理，
+            // 不再 abort 或返回空指针（allocate 会解引用空节点）
             auto [used, total] = memoryInfo();
-            CLL_LOG_FATAL("Allocation Failed! OutOfMemory(used/total): %d/%d(B)", used, total);
+            throw std::runtime_error(fmt::format("GC pool exhausted (out of memory): used {}/{} bytes", used, total));
         }
 
         return _nextFree;

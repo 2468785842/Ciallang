@@ -1,0 +1,54 @@
+// GC 分配churn压测：短命字符串/数组/字典/闭包反复触发 mark-sweep，验证长程结果与终结器计数
+Scripts.execStorage("../assert.tjs");
+
+var finalized = 0;
+class Churn {
+    var n;
+    function Churn(v) { n = v; }
+    function finalize() { finalized++; }
+}
+
+// 混合对象 churn：每轮新建并丢弃大量对象，跨越多次收集后结果仍精确
+var checksum = 0;
+for(var round = 0; round < 200; round++) {
+    var bag = [];
+    for(var i = 0; i < 64; i++) {
+        var s = "r" + round + ":" + i;
+        var a = [round * 64 + i, s.length];
+        var d = %["k" => a[0]];
+        bag.push(d["k"] - round * 64);
+        var fn = function(base, k) { return base + k; };
+        checksum += fn(0, i);
+    }
+    for(var j = 0; j < bag.count; j++)
+        assertTrue(bag[j] == j);
+    checksum += round;
+}
+assertTrue(checksum == 423100);
+
+// 终结器：持有 32 个实例后逐个 invalidate，finalize 恰好各执行一次
+var kept = [];
+for(var i = 0; i < 32; i++)
+    kept.push(new Churn(i));
+var sum = 0;
+for(var i = 0; i < kept.count; i++) {
+    sum += kept[i].n;
+    var victim = kept[i];
+    invalidate victim;
+}
+assertTrue(sum == 496);
+assertTrue(finalized == 32);
+
+// 深层嵌套：标记需递归遍历 200 层链且结果完整
+var deep = [];
+for(var i = 0; i < 200; i++)
+    deep = [deep];
+var depth = 0;
+var cur = deep;
+while(cur.count > 0) {
+    cur = cur[0];
+    depth++;
+}
+assertTrue(depth == 200);
+
+finishTests();

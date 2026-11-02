@@ -86,6 +86,8 @@ namespace cial {
             sweep();
         }
 
+        // 无空闲节点时触发 collect，终结对象占满残余节点时扩池；仍无可分配
+        // 节点则抛出 std::runtime_error，绝不返回空指针
         MarkSweepHeader *findIdleNode(const MarkFunc &mark);
 
         void sweep();

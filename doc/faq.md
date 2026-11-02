@@ -20,6 +20,13 @@ JIT/Trace JIT 目前只覆盖受限的 x64 整数路径，默认关闭；SSA 用
 裸指针及 `Value::asString()` 返回值是借用，不能超过所属对象或值的有效期。
 API 与示例见[宿主集成](embedding.md)，实现约束见 `src/runtime/Runtime.hpp`、`src/types/Value.hpp`。
 
+## GC 池耗尽时是什么行为
+
+GC 池默认 512 个固定节点（每节点 512 字节，对象数而非字节数受限）。标记清扫后仍无空闲节点时：
+有待终结对象先扩池 64 节点；仍不足则抛出 `std::runtime_error`，由宿主按运行期错误处理
+（CLI 报告错误并以非零码退出），不会 abort 或解引用空节点。实现见 `src/gc/gc.cpp` 的 `findIdleNode`；
+存活对象数接近池上限的行为由 `tests/runtime_lifetime_test.cpp` 覆盖。
+
 ## Windows 构建为什么不需要复制依赖 DLL
 
 仓库预设使用 `x64-windows-static` 与静态 CRT。自定义 triplet 时要自行保持依赖和运行库一致

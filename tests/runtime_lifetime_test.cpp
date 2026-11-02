@@ -281,3 +281,101 @@ TEST_CASE("constant container graphs survive compilation and collection", "[runt
     REQUIRE(*vm.evalExpr<Integer>(R"(shared()[0]["nested"][0])"_str) == 42);
     REQUIRE(runtime.handles.empty());
 }
+
+TEST_CASE("Exhausting the rooted GC pool throws instead of aborting", "[runtime][gc]") {
+    Runtime rt{ 4 };
+    Vec<RootGuard<Array>> keep;
+    keep.reserve(4);
+    for(int i = 0; i < 4; i++)
+        keep.push_back(rt.create<Array>(&rt));
+    // 全部节点被句柄持有：收集无法腾出节点，分配以运行期错误呈现
+    REQUIRE_THROWS_AS(rt.create<Array>(&rt), std::runtime_error);
+    keep.pop_back();
+    auto guard = rt.create<Array>(&rt);
+    REQUIRE(guard.get() != nullptr);
+    const auto [used, total] = rt.markSweep.memoryInfo();
+    REQUIRE(total == 4 * NODE_SIZE);
+    REQUIRE(used == 4 * NODE_SIZE);
+}
+
+TEST_CASE("Pending finalizers extend the pool instead of failing allocation", "[runtime][gc]") {
+    struct Baggable final : MarkSweepHeader {
+        bool needsFinalization() const noexcept override { return true; }
+    };
+    Runtime rt{ 8 };
+    for(int i = 0; i < 8; i++)
+        rt.create<Baggable>(); // 临时句柄立即析构：对象不入根，等待回收
+    // 第 9 次分配触发收集：待终结对象标记后仍占满节点 → 扩池 64 而非分配失败
+    auto guard = rt.create<Baggable>();
+    REQUIRE(guard.get() != nullptr);
+    REQUIRE(rt.markSweep.pendingFinalizers.size() == 8);
+    const auto [used, total] = rt.markSweep.memoryInfo();
+    REQUIRE(total == (8 + 64) * NODE_SIZE);
+    REQUIRE(used == 9 * NODE_SIZE);
+    auto next = rt.create<Baggable>();
+    REQUIRE(next.get() != nullptr);
+}
+
+TEST_CASE("Deep nested arrays survive marking across collection", "[runtime][gc]") {
+    Runtime rt{ 32768 };
+    Context context{ rt };
+    vm::VMState state{ context };
+    VM vm{ &state };
+    vm.eval(R"(
+        var deep = [];
+        for(var i = 0; i < 20000; i++) deep = [deep];
+        var depth = 0;
+        var cur = deep;
+        while(cur.count > 0) {
+            cur = cur[0];
+            depth++;
+        }
+    )"_str);
+    REQUIRE(state.global("depth").asInteger().unwrap() == 20000);
+    // 标记 2 万层嵌套不栈溢出，且深链在收集中保持完整
+    rt.markSweep.collect([&] { rt.collectAllMark(); });
+    vm.eval(R"(
+        var survived = deep.count;
+        var after = 0;
+        cur = deep;
+        while(cur.count > 0) {
+            cur = cur[0];
+            after++;
+        }
+    )"_str);
+    REQUIRE(state.global("survived").asInteger().unwrap() == 1);
+    REQUIRE(state.global("after").asInteger().unwrap() == 20000);
+    REQUIRE(context.stackTop() == 0);
+}
+
+TEST_CASE("Allocation churn returns pool usage to baseline after collection", "[runtime][gc]") {
+    Runtime rt;
+    Context context{ rt };
+    stdlib::registerStandardLibrary(context);
+    vm::VMState state{ context };
+    VM vm{ &state };
+    vm.eval(R"(
+        function churn() {
+            var sink = 0;
+            for(var i = 0; i < 64; i++) {
+                var a = [i, i * 2];
+                var s = "n" + i;
+                sink += a[1] + s.length;
+            }
+            return sink;
+        }
+    )"_str);
+    const auto baseline = *vm.evalExpr<Integer>("churn()"_str);
+    // 池未满前垃圾滞留节点，先强制收集取得净基线
+    rt.markSweep.collect([&] { rt.collectAllMark(); });
+    const auto [used0, total0] = rt.markSweep.memoryInfo();
+    for(int round = 0; round < 20; round++)
+        REQUIRE(*vm.evalExpr<Integer>("churn()"_str) == baseline);
+    rt.markSweep.collect([&] { rt.collectAllMark(); });
+    const auto [used, total] = rt.markSweep.memoryInfo();
+    // 多轮收集后回到基线：churn 垃圾全部回收，句柄与寄存器不滞留
+    REQUIRE(total == total0);
+    REQUIRE(used == used0);
+    REQUIRE(context.stackTop() == 0);
+    REQUIRE(state.getRegPoolTop() == 0);
+}
