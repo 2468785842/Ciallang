@@ -1491,7 +1491,7 @@ namespace cial::syntax {
             // 若括号内直接跟表达式((int tmp)),则右括号在表达式之后
             if(!parser->peek(r, TokenType::RParenthesis) && !parser->peek(r, TokenType::LParenthesis)) {
                 // (int expr) 形态:表达式在括号内
-                const auto *inner = parser->parseExpression(r, true, Precedence::type);
+                const auto *inner = parser->parseExpression(r, true, Precedence::prefix);
                 if(!inner) {
                     parser->error(r, "type cast expects expression", *token);
                     return nullptr;
@@ -1507,7 +1507,7 @@ namespace cial::syntax {
             if(!parser->expect(r, TokenType::RParenthesis)) {
                 return nullptr;
             }
-            const auto *rhs = parser->parseExpression(r, true, Precedence::type);
+            const auto *rhs = parser->parseExpression(r, true, Precedence::prefix);
             if(!rhs) {
                 parser->error(r, "type cast expects expression", *token);
                 return nullptr;

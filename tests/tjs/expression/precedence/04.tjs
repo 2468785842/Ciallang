@@ -1,0 +1,27 @@
+// 表达式 - 前缀一元（含裸/括号类型转换）紧于乘除、松于后缀（tjs.y unary_expr 同级，2026-11-02 对齐）
+Scripts.execStorage("../../assert.tjs");
+
+var a = 7;
+var o = %["b" => 3, "s" => "12"];
+
+// 类型转换的操作数是 unary_expr：先取成员/下标，再转换；二元运算在转换之外
+assertTrue((int o.b) == 3);
+assertTrue(int o.b == 3);
+assertTrue((int o.s) + 1 == 13);
+assertTrue(int o.s + 1 == 13);
+assertTrue(string a + "x" == "7x");
+assertTrue((string)o.b + "!" == "3!");
+assertTrue(real o.b / 2 == 1.5);
+
+// 前缀之间递归：int (-a)、-(int "3.7")
+assertTrue(int -a == -7);
+assertTrue(-int "3.7" == -3);
+assertTrue(- -a == 7);
+
+// 一元负号先于乘除（数值等价于 -(a * 2)，此处断言不报错且结果一致）
+assertTrue(-a * 2 == -14);
+assertTrue(-a % 4 == -3);
+assertTrue(-o.b * 2 == -6);
+assertTrue(typeof -a == "Integer");
+
+finishTests();

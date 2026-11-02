@@ -567,6 +567,18 @@ selected
                 self.assertEqual(actual.returncode, 0, actual.stderr + "\n--- decompiled ---\n" + decompiled.stdout)
                 self.assertEqual(actual.stdout, expected.stdout, "--- decompiled ---\n" + decompiled.stdout)
 
+    def test_decompile_reflects_prefix_unary_precedence(self):
+        # 前缀一元紧于乘除、松于后缀（tjs.y unary_expr）：-a * 2 发射 ChgSign 再 Mul，
+        # 反编译按 TAC 结构不加括号；显式 -(a * 2) 与 int o.b 保持原形
+        self.script.write_text('var a = 7; var o = %["b" => 3];\n'
+                               'println(-a * 2); println(-(a * 2)); println(int o.b + 1);\n',
+                               encoding="utf-8")
+        process = self.run_cial("--decompile", self.script)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("println(-a * 2);", process.stdout)
+        self.assertIn("println(-(a * 2));", process.stdout)
+        self.assertIn("println(int o.b + 1);", process.stdout)
+
     def test_decompile_strict_rejects_structure_with_batch_reason(self):
         # 语句结构（M3）、声明装配（M4）在严格模式如实拒绝：退出码 2、不产文本、原因含批次号
         for source, batch in [("var a = 1;\nif (a) { println(a); }\n", "M3"),

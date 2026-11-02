@@ -41,10 +41,12 @@ namespace cial::syntax {
         bitwise_shift_or_roll, // >> << >>>
         sum_sub, // + -
         product, // * / \ %
-        prefix, // - ~ ++ -- new
+        // 全部前缀一元同级（tjs.y unary_expr：! ~ ++ -- new invalidate isvalid delete
+        // typeof # $ + - & * 与裸/括号类型转换 int real string），操作数递归为
+        // unary_expr：紧于乘除、松于后缀（2026-11-02 对齐，此前 - 用 sum_sub、
+        // 转换用高于 postfix 的独立层级，导致 -a * 2 → -(a * 2)、int o.b → (int o).b）
+        prefix,
         postfix, // [] () .
-        type,
-        variable,
     };
 
     class DeclParser {
@@ -394,13 +396,11 @@ namespace cial::syntax {
     };
 
     static constinit ConstValPrefixParser S_ConstValPrefixParser{};
-    static constinit UnaryOperatorPrefixParser S_NegatePrefixParser{ Precedence::sum_sub };
     static constinit IdentifierPrefixParser S_IdentifierPrefixParser;
     static constinit UnaryOperatorPrefixParser S_PrefixParser{ Precedence::prefix };
     static constinit InternalIdentifierPrefixParser S_InternalIdentifierPrefixParser;
     static constinit ParenthesizedPrefixParser S_ParenthesizedPrefixParser{};
     static constinit FunctionPrefixParser S_FunctionPrefixParser;
-    static constinit UnaryOperatorPrefixParser S_TypeCastPrefixParser{ Precedence::type };
     static constinit ArrayLiteralPrefixParser S_ArrayLiteralPrefixParser;
     static constinit DictLiteralPrefixParser S_DictLiteralPrefixParser;
     static constinit DotPrefixParser S_DotPrefixParser;
@@ -410,7 +410,7 @@ namespace cial::syntax {
         { { TokenType::Null, &S_ConstValPrefixParser },
           { TokenType::ConstVal, &S_ConstValPrefixParser },
           { TokenType::Void, &S_ConstValPrefixParser }, // void 字面值
-          { TokenType::Minus, &S_NegatePrefixParser }, // "-"
+          { TokenType::Minus, &S_PrefixParser }, // "-"
           { TokenType::Identifier, &S_IdentifierPrefixParser },
           { TokenType::Exclamation, &S_PrefixParser }, // "!"
           { TokenType::Tilde, &S_PrefixParser }, // "~"
@@ -431,9 +431,9 @@ namespace cial::syntax {
           { TokenType::Asterisk, &S_PrefixParser }, // "*" force property access
           { TokenType::LParenthesis, &S_ParenthesizedPrefixParser }, // "(" 括号表达式
           { TokenType::Function, &S_FunctionPrefixParser },
-          { TokenType::Int, &S_TypeCastPrefixParser }, // "int" unary_expr
-          { TokenType::Real, &S_TypeCastPrefixParser }, // "real" unary_expr
-          { TokenType::String, &S_TypeCastPrefixParser }, // "string" unary_expr
+          { TokenType::Int, &S_PrefixParser }, // "int" unary_expr
+          { TokenType::Real, &S_PrefixParser }, // "real" unary_expr
+          { TokenType::String, &S_PrefixParser }, // "string" unary_expr
           { TokenType::LBracket, &S_ArrayLiteralPrefixParser }, // "[" 内联数组
           { TokenType::Percent, &S_DictLiteralPrefixParser }, // "%[" 内联字典（% 仅为前导记号）
           { TokenType::Dot, &S_DotPrefixParser }, // ".member" 裸词链（with 上下文）

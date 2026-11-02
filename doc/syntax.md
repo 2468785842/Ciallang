@@ -69,12 +69,11 @@
 | 11 | 移位 `<< >> >>>`（`>>>` 无符号右移） | ✅ |
 | 12 | 加减 `+ -`（`+` 对字符串为连接） | ✅ |
 | 13 | 乘除类 `% / \ *`（`\` 整除；`*` 与前缀属性访问歧义经专门产生式 `mul_div_expr_and_asterisk` 消解） | ✅ |
-| 14 | **一元前缀** `! ~ ++ -- new invalidate isvalid delete typeof # $ + - & *` | ✅（`&` 取属性本体，`*` 调 getter/setter；全局和成员槽的普通读取会触发 getter；typeof 缺失成员返回 undefined 尚未实现） |
+| 14 | **一元前缀** `! ~ ++ -- new invalidate isvalid delete typeof # $ + - & *`；裸/括号类型转换 `int A real A string A (int)A (real)A (string)A` 同级（tjs.y unary_expr，操作数递归为 unary_expr：紧于乘除、松于后缀） | ✅（`&` 取属性本体，`*` 调 getter/setter；全局和成员槽的普通读取会触发 getter；typeof 缺失成员返回 undefined 尚未实现）。2026-11-02 对齐：此前 `-` 用加/减层、转换用高于后缀的独立层，导致 `-a * 2` 解析为 `-(a * 2)`、`int o.b` 解析为 `(int o).b`（后者直接报类型错误） |
 | 14′ | **一元中缀式** `A instanceof B`（B 为类名）、`A in B` | instanceof ✅（Object 覆盖除 void 外的值（含 null），数值类名为 Number 而非 Integer/Real；2026-10-30 补内置对象：Array/Dictionary/RegExp/函数对象对各自类名恒真——TJS2 TJSDefaultIsInstanceOf 沿原生类链按名匹配，`src/runtime/Runtime.hpp` 保留 Atom + 各类型 instanceOf 覆写，`tests/tjs/expression/`）；`in` ✅（保留字行为对齐：原版 codegen 无 T_IN 分支，节点与操作数均不求值、结果为 void，2026-10-29 实测定论；勿实现成成员存在判断） |
 | 15 | `A isvalid`（**后缀**形态，与前缀并存）、`A incontextof B`（**右结合**，替换函数闭包的 this） | ✅：incontextof ✅；isvalid 前/后缀 ✅（2026-10-30 对齐原版 VM_CHKINV 语义：非对象值恒 true（tjsInterCodeExec.cpp:1177），对象按 IsValid 判定，invalidate 后 false；`src/vm/VMState.cpp` ChkInv、`tests/tjs/judgment/`） |
-| 16 | **类型转换** `(int)A (real)A (string)A` 或裸 `int A real A string A` | ✅ |
-| 17 | **后缀**：调用 `f(args)`、成员 `.sym`（含 `.` 起始的裸词链）、下标 `a[i]`（通用路径：数组/字典/字符串；可写，越界扩展）、后缀 `++ --`（表达式值为旧值；成员形态走 getter/setter 链）、**即时求值 `A !`**（把 A 的字符串值作为 TJS 表达式编译执行） | 全部 ✅：`() . -- ++ []`；后缀 `!` 即时求值（A 字符串化为表达式编译执行，空串原值不变，2026-10-26） |
-| 18 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]`（键形式 `sym :` 与 `"k" => v`）/ 正则 `/pattern/` / 常量式 `(const)[...]` `(const)%[...]` | ✅ 普通字面量与 `(const)` 常量容器（见 §8） |
+| 16 | **后缀**：调用 `f(args)`、成员 `.sym`（含 `.` 起始的裸词链）、下标 `a[i]`（通用路径：数组/字典/字符串；可写，越界扩展）、后缀 `++ --`（表达式值为旧值；成员形态走 getter/setter 链）、**即时求值 `A !`**（把 A 的字符串值作为 TJS 表达式编译执行） | 全部 ✅：`() . -- ++ []`；后缀 `!` 即时求值（A 字符串化为表达式编译执行，空串原值不变，2026-10-26） |
+| 17 | 初等项：字面量 / `(expr)` / `this` `super` `global` / 函数表达式 / 内联 Array `[...]` / 内联 Dictionary `%[...]`（键形式 `sym :` 与 `"k" => v`）/ 正则 `/pattern/` / 常量式 `(const)[...]` `(const)%[...]` | ✅ 普通字面量与 `(const)` 常量容器（见 §8） |
 
 前缀一元语义速查（原版）：
 
