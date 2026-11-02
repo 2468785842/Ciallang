@@ -1,0 +1,27 @@
+// 空语句：tjs.y statement ";"，if/else/while/for 体及顶层 ;;; 均合法且无副作用
+Scripts.execStorage("../assert.tjs");
+
+var x = 0;
+if(x) ;
+assertTrue(x == 0);
+if(x) ; else x = 5;
+assertTrue(x == 5);
+
+var i = 0;
+while(i < 3) i++;
+assertTrue(i == 3);
+while(i < 0) ;
+assertTrue(i == 3);
+
+var k = 0;
+for(k = 0; k < 2; k++) ;
+assertTrue(k == 2);
+
+;;;
+var done = 1;
+assertTrue(done == 1);
+
+do ; while(false);
+assertTrue(done == 1);
+
+finishTests();

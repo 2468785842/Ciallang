@@ -284,6 +284,12 @@ namespace cial::syntax {
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    // tjs.y statement: ";"——空语句：if(cond) ;、for(...) ;、顶层 ;;; 等位置
+    struct EmptyStmtParser final : StmtParser {
+        EmptyStmtParser() = default;
+        StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     static constinit BlockStmtParser S_BlockStmtParser{};
     static constinit TryStmtParser S_TryStmtParser{};
     static constinit IfStmtParser S_IfStmtParser{};
@@ -296,6 +302,7 @@ namespace cial::syntax {
     static constinit ReturnStmtParser S_ReturnStmtParser{};
     static constinit DebuggerStmtParser S_DebuggerStmtParser{};
     static constinit WithStmtParser S_WithStmtParser{};
+    static constinit EmptyStmtParser S_EmptyStmtParser{};
 
     static constinit auto S_StmtParsers =
         frozen::make_unordered_map<TokenType, const StmtParser *>({ { TokenType::LeftCurlyBrace, &S_BlockStmtParser },
@@ -309,7 +316,8 @@ namespace cial::syntax {
                                                                     { TokenType::Continue, &S_ContinueStmtParser },
                                                                     { TokenType::Return, &S_ReturnStmtParser },
                                                                     { TokenType::Debugger, &S_DebuggerStmtParser },
-                                                                    { TokenType::With, &S_WithStmtParser } });
+                                                                    { TokenType::With, &S_WithStmtParser },
+                                                                    { TokenType::SemiColon, &S_EmptyStmtParser } });
 
     /**
      * +----------------------------------------------------------------------------+

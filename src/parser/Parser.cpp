@@ -1258,6 +1258,14 @@ namespace cial::syntax {
         return parser->astBuilder()->makeNode<DebuggerStmtNode>();
     }
 
+    // 分号已由 parseStatement 消费；空语句复用空 BlockStmtNode，IRGenerator 不产出指令
+    StmtNode *EmptyStmtParser::parse(Result &, Parser *parser, Token *token) const {
+        auto *empty = parser->astBuilder()->makeNode<BlockStmtNode>();
+        empty->location.start(token->location.start());
+        empty->location.end(token->location.end());
+        return empty;
+    }
+
     /**
      * 中缀二目运算符解析
      *

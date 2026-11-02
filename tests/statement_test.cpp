@@ -406,3 +406,75 @@ TEST_CASE("语句 - 复杂语句组合") {
         REQUIRE(ifStmt->body != nullptr);
     }
 }
+TEST_CASE("语句 - 空语句") {
+    Common::SourceFile sourceFile{};
+    Common::Result r{};
+    Runtime rt{};
+    Context context{ rt };
+
+    SECTION("顶层连续分号") {
+        sourceFile.load(r, ";;; var x = 1;");
+        syntax::Parser parser{ sourceFile, context.pp() };
+
+        auto *globalNode = parser.parse(r);
+        REQUIRE(globalNode != nullptr);
+        REQUIRE_FALSE(r.isFailed());
+
+        auto *blockNode = dynamic_cast<syntax::BlockStmtNode *>(globalNode);
+        REQUIRE(blockNode != nullptr);
+        REQUIRE(blockNode->childrens.size() == 4);
+        for(size_t i = 0; i < 3; ++i) {
+            auto *stmtDecl = dynamic_cast<syntax::StmtDeclNode *>(blockNode->childrens[i]);
+            REQUIRE(stmtDecl != nullptr);
+            auto *empty = dynamic_cast<const syntax::BlockStmtNode *>(stmtDecl->statement);
+            REQUIRE(empty != nullptr);
+            REQUIRE(empty->childrens.empty());
+        }
+        REQUIRE(dynamic_cast<syntax::VarDeclNode *>(blockNode->childrens[3]) != nullptr);
+    }
+
+    SECTION("if / else 空分支") {
+        sourceFile.load(r, "if(a) ; else ;");
+        syntax::Parser parser{ sourceFile, context.pp() };
+
+        auto *globalNode = parser.parse(r);
+        REQUIRE(globalNode != nullptr);
+        REQUIRE_FALSE(r.isFailed());
+
+        auto *blockNode = dynamic_cast<syntax::BlockStmtNode *>(globalNode);
+        REQUIRE(blockNode != nullptr);
+        auto *stmtDecl = dynamic_cast<syntax::StmtDeclNode *>(blockNode->childrens[0]);
+        REQUIRE(stmtDecl != nullptr);
+        auto *ifStmt = dynamic_cast<const syntax::IfStmtNode *>(stmtDecl->statement);
+        REQUIRE(ifStmt != nullptr);
+        REQUIRE(ifStmt->body != nullptr);
+        REQUIRE(ifStmt->body->childrens.empty());
+        REQUIRE(ifStmt->elseBody != nullptr);
+        REQUIRE(ifStmt->elseBody->childrens.empty());
+    }
+
+    SECTION("循环空体") {
+        sourceFile.load(r, "while(a) ; for(var i = 0; i < 1; i++) ; do ; while(a);");
+        syntax::Parser parser{ sourceFile, context.pp() };
+
+        auto *globalNode = parser.parse(r);
+        REQUIRE(globalNode != nullptr);
+        REQUIRE_FALSE(r.isFailed());
+
+        auto *blockNode = dynamic_cast<syntax::BlockStmtNode *>(globalNode);
+        REQUIRE(blockNode != nullptr);
+        REQUIRE(blockNode->childrens.size() == 3);
+        auto *whileStmt = dynamic_cast<const syntax::WhileStmtNode *>(
+            dynamic_cast<syntax::StmtDeclNode *>(blockNode->childrens[0])->statement);
+        REQUIRE(whileStmt != nullptr);
+        REQUIRE(whileStmt->body->childrens.empty());
+        auto *forStmt = dynamic_cast<const syntax::ForStmtNode *>(
+            dynamic_cast<syntax::StmtDeclNode *>(blockNode->childrens[1])->statement);
+        REQUIRE(forStmt != nullptr);
+        REQUIRE(forStmt->body->childrens.empty());
+        auto *doWhileStmt = dynamic_cast<const syntax::DoWhileStmtNode *>(
+            dynamic_cast<syntax::StmtDeclNode *>(blockNode->childrens[2])->statement);
+        REQUIRE(doWhileStmt != nullptr);
+        REQUIRE(doWhileStmt->body->childrens.empty());
+    }
+}

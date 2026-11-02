@@ -35,10 +35,9 @@ TEST_CASE("类型注解 - 解析接受且无语义") {
         Runtime rt{};
         Context context{ rt };
         syntax::Parser parser{ sourceFile, context.pp() };
-        // 注解本身可解析；`;` 空语句体为 Ciallang 既有不支持（与注解无关），
-        // 期望错误仅来自空语句，不来自 `: int`
-        parser.parse(r);
-        REQUIRE(r.isFailed());
+        // 注解本身可解析；空语句体已支持（tjs.y statement ";"）
+        REQUIRE(parser.parse(r) != nullptr);
+        REQUIRE_FALSE(r.isFailed());
     }
 
     SECTION("for 初始化注解带语句体") {
