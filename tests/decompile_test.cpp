@@ -236,3 +236,154 @@ TEST_CASE("decompile - origin joins debug source positions and converts to lines
     REQUIRE(sawLine0);
     REQUIRE(sawLine1);
 }
+
+// ── M2：表达式恢复（ExprBuilder）──
+
+#include "decompile/ExprBuilder.hpp"
+
+namespace {
+    // 顶层 Chunk 常量图中按名查找函数 FuncMeta
+    FuncMeta *findFunction(Runtime &runtime, vm::Chunk &top, const std::string &name) {
+        for(auto &constant : top.getConstants()) {
+            if(constant.type() != ConstantType::FuncMeta)
+                continue;
+            auto *meta = constant.value<FuncMeta *>();
+            if(const auto *entry = runtime.atomTable.get(meta->name);
+               entry && entry->str && entry->str->toStdStr() == name)
+                return meta;
+        }
+        return nullptr;
+    }
+
+    Vec<std::string> statementTexts(const decompile::ExprRecovery &recovery) {
+        Vec<std::string> out;
+        for(const auto &statement : recovery.statements)
+            out.push_back(statement.text);
+        return out;
+    }
+} // namespace
+
+TEST_CASE("decompile M2 - function body recovers locals, params, fused immediates and return") {
+    Runtime runtime;
+    Context context{ runtime };
+    auto chunk = compileSource(runtime, context,
+                               "function f(x, y) {\n"
+                               "  var t = x * 2 + 1;\n"
+                               "  t = t + y;\n"
+                               "  return t > 3 && x < 10;\n"
+                               "}\n");
+    REQUIRE(chunk.has_value());
+    auto *meta = findFunction(runtime, *chunk, "f");
+    REQUIRE(meta != nullptr);
+
+    const auto recovery = decompile::recoverUnitBody(runtime, *meta->chunk, meta, true);
+    INFO(recovery.unsupported);
+    REQUIRE(recovery.unsupported.empty());
+    // BinaryImm 逆映射（x * 2、+ 1）、具名局部 var 声明、重赋值不带 var、
+    // LAnd 非短路双求值、显式 return；末尾隐式 void return 省略
+    REQUIRE(statementTexts(recovery) ==
+            Vec<std::string>{ "var t = x * 2 + 1;", "t = t + y;", "return t > 3 && x < 10;" });
+}
+
+TEST_CASE("decompile M2 - multi-use temporaries materialize in function bodies") {
+    Runtime runtime;
+    Context context{ runtime };
+    // 链式赋值共享一个调用结果寄存器：函数体内物化为临时变量，调用只发生一次
+    auto chunk = compileSource(runtime, context,
+                               "function g(o) {\n"
+                               "  var a, b;\n"
+                               "  a = b = o.next();\n"
+                               "  return a;\n"
+                               "}\n");
+    REQUIRE(chunk.has_value());
+    auto *meta = findFunction(runtime, *chunk, "g");
+    REQUIRE(meta != nullptr);
+
+    const auto recovery = decompile::recoverUnitBody(runtime, *meta->chunk, meta, true);
+    INFO(recovery.unsupported);
+    REQUIRE(recovery.unsupported.empty());
+    const auto texts = statementTexts(recovery);
+    // 恰一次 o.next() 调用，且先物化再两次读取临时名
+    size_t calls = 0;
+    for(const auto &text : texts)
+        calls += text.find("o.next()") != std::string::npos;
+    REQUIRE(calls == 1);
+    const auto materialized = std::find_if(texts.begin(), texts.end(), [](const std::string &text) {
+        return text.rfind("var v", 0) == 0 && text.find("o.next()") != std::string::npos;
+    });
+    REQUIRE(materialized != texts.end());
+}
+
+TEST_CASE("decompile M2 - strict self path succeeds on straight-line top level with full line coverage") {
+    Runtime runtime;
+    Context context{ runtime };
+    auto chunk = compileSource(runtime, context,
+                               "var a = [1, \"s\", 2.5];\n"
+                               "var d = %[\"k\" => a[0], \"z\" => 2];\n"
+                               "d.k = d.k + 4;\n"
+                               "println(a[1], d.k, -a[0], typeof d);\n");
+    REQUIRE(chunk.has_value());
+
+    decompile::Options options{ .diagnosticView = false };
+    const auto result = decompile::decompileChunk(runtime, *chunk, options);
+    INFO((result.diagnostics.empty() ? std::string{} : result.diagnostics.front()));
+    REQUIRE(result.status == decompile::Status::Success);
+    REQUIRE(result.diagnostics.empty());
+
+    const auto *top = findUnit(result, "<top-level>");
+    REQUIRE(top != nullptr);
+    REQUIRE(top->text.find("var a = [1, \"s\", 2.5];") != std::string::npos);
+    REQUIRE(top->text.find("var d = %[\"k\" => a[0], \"z\" => 2];") != std::string::npos);
+    REQUIRE(top->text.find("d.k = d.k + 4;") != std::string::npos);
+    REQUIRE(top->text.find("println(a[1], d.k, -a[0], typeof d);") != std::string::npos);
+    // 严格模式行表：非 synthetic 行按序闭合，末行延到 Chunk 末尾（覆盖被内联的 TAC）
+    u32 expected = 0;
+    u32 last = 0;
+    for(const auto &row : top->lines) {
+        if(row.synthetic)
+            continue;
+        REQUIRE(row.tacStart == expected);
+        REQUIRE(row.tacEnd > row.tacStart);
+        expected = row.tacEnd;
+        last = row.tacEnd;
+    }
+    REQUIRE(last == chunk->getInstVec().size());
+}
+
+TEST_CASE("decompile M2 - structure and declarations are rejected with batch-specific reasons") {
+    Runtime runtime;
+    Context context{ runtime };
+    struct Case {
+        const char *source;
+        const char *reason;
+    };
+    const Case cases[] = {
+        { "var a = 1;\nif (a) { println(a); }\n", "M3" },
+        { "function f() { return 1; }\n", "M4" },
+        { "var o = %[];\nwith (o) { println(1); }\n", "M3" },
+    };
+    for(const auto &[source, reason] : cases) {
+        auto chunk = compileSource(runtime, context, source);
+        REQUIRE(chunk.has_value());
+        decompile::Options options{ .diagnosticView = false };
+        const auto result = decompile::decompileChunk(runtime, *chunk, options);
+        INFO(source);
+        REQUIRE(result.status == decompile::Status::Unsupported);
+        REQUIRE_FALSE(result.diagnostics.empty());
+        REQUIRE(result.diagnostics.front().find(reason) != std::string::npos);
+    }
+}
+
+TEST_CASE("decompile M2 - diagnostic view annotates recovered statements without claiming success") {
+    Runtime runtime;
+    Context context{ runtime };
+    auto chunk = compileSource(runtime, context, "var a = 1 + 2;\nprintln(a);\n");
+    REQUIRE(chunk.has_value());
+    decompile::Options options{ .diagnosticView = true };
+    const auto result = decompile::decompileChunk(runtime, *chunk, options);
+    // 视图模式恒不含可重编译承诺；恢复结果以注释附加
+    REQUIRE(result.status == decompile::Status::Unsupported);
+    const auto *top = findUnit(result, "<top-level>");
+    REQUIRE(top != nullptr);
+    REQUIRE(top->text.find("//   >> println(a);") != std::string::npos);
+}

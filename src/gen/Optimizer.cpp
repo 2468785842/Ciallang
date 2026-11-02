@@ -363,6 +363,13 @@ namespace cial::inter {
                 remappedLines.emplace_back(newIndex, location);
         }
         lineEntries = std::move(remappedLines);
+
+        // 编译期 pc 锚点（局部变量声明点）与行号同规则重映射
+        for(auto &anchor : chunk.pcAnchors()) {
+            if(anchor > oldSize)
+                throw std::runtime_error("pc anchor exceeds TAC instruction count");
+            anchor = oldBoundaryToNew[anchor];
+        }
         return oldSize - instructions.size();
     }
 

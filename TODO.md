@@ -14,7 +14,11 @@
 
 设计与批次见[反编译器方案](doc/bytecode/decompiler-plan.md)（2026-11-01 采纳 TAC 层直译路径）。
 
-- [ ] M2–M5：后优化形态表达式恢复（含 BinaryImm/CompareTestImm 逆映射）、语句结构化与短路/三元跨块折叠、壳组装与 `+=` 逆融合双守卫（模板命中 + `computeBlockLiveness` 无其他读者）、任意 CFG/switch 链/try 嵌套兜底；按方案 §7 四环验证逐批验收。
+- [ ] M3–M5：语句结构化（if/while/for 归约、短路/三元跨块折叠、默认参数守卫）、壳组装
+  （context 树 → function/class/property 声明，参数列表来自 localVars）与 `+=`/`++` 逆融合
+  双守卫（模板命中 + `computeBlockLiveness` 无其他读者）、任意 CFG/switch 链/try 嵌套兜底；
+  按方案 §7 四环验证逐批验收。M2 遗留小项一并处理：动态键字典字面量、`obj[expr]` 动态
+  成员名、octet 字面量。
 
 M0 已完成（2026-11-01）：`src/decompile/` 的 `{文本, 行表}` 管道、CLI `--decompile`（严格模式
 默认 / `--view` 反汇编视图 / `--map` 行表 JSON / `--source` 偏移换算）、TJS2 路径来源表
@@ -25,6 +29,14 @@ M1 已完成（2026-11-01）：参考编译器新增 `--dump-debug` 导出 outpu
 覆盖 TJS2 仅在控制流点登记位置、条目间继承行号的粒度），语料与固定清单（参考二进制
 与样本哈希、导出选项）见 `tests/test_files/tjsbc/debug/manifest.json`，断言入
 `tests/cli_test.py`；全量 CTest 通过。
+
+M2 已完成（2026-11-02）：`src/decompile/ExprBuilder.*` 单块直线表达式恢复——寄存器版本链
++ 使用点、后优化形态 tile（BinaryImm/CompareTestImm 逆映射、`~x` 降糖逆映射、字面量 SetIndex
+折叠、折叠常量容器重建、Push+Call 归并、具名局部零拷贝声明还原）、干净区间内联守卫（同树
+内联保持求值序，函数体多使用物化为临时变量，顶层纯读复制/非纯拒绝）、TJS2 优先级括号。
+严格模式对直线顶层程序产出可重编译文本（环① round-trip 对拍 9 类形态通过，`tests/cli_test.py`），
+结构/声明按批次号拒绝；视图模式以 `// >>` 附加恢复结果。顺带修复 `FuncMeta::localVars.startPC`
+为优化前 pc 的错位（`Chunk::pcAnchors` 随压缩重映射，调试器局部作用域同样受益）。
 
 ## SDK 与开发工具路线图
 

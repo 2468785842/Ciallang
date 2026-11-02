@@ -80,8 +80,18 @@ namespace cial::inter {
         _chunk->setRegCount(_regNextIndex);
         const auto chunk = std::move(_chunk);
         // 字节码由 VM 进入帧时按需生成。
-        if(_optimize)
+        if(_optimize) {
+            // 局部变量声明点 startPC 是优化前 pc：登记为锚点随压缩重映射后回填，
+            // 否则反编译/调试按 pc 查名会错位（立即数融合等会删指令）
+            auto &anchors = chunk->pcAnchors();
+            anchors.clear();
+            for(const auto &local : _localVars)
+                anchors.push_back(local.startPC.address());
             _optimize(*chunk, optReg);
+            for(size_t i = 0; i < _localVars.size() && i < anchors.size(); ++i)
+                _localVars[i].startPC = Label{ anchors[i] };
+            anchors.clear();
+        }
 
         _chunk = std::make_unique<vm::Chunk>();
         return vm::Chunk{ std::move(*chunk) };

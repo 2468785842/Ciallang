@@ -434,16 +434,24 @@ selected
                 process = self.run_cial(*flags)
                 self.assertEqual(process.returncode, 2, process.stderr)
                 self.assertEqual(process.stdout, "")
-        # 自产路径：严格模式 M0 = Unsupported，退出码 2、不产出文本、逐单元诊断
+        # 自产路径：直线表达式严格模式恢复成功（M2），退出码 0、产出可重编译文本
         process = self.run_cial("--decompile", self.script)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("println(42);", process.stdout)
+        self.assertNotIn("//   @", process.stdout)
+        # 语句结构未落地（M3）：严格模式 Unsupported，退出码 2、不产出文本、逐单元诊断
+        structured = self.root / "structured.tjs"
+        structured.write_text("var a = 1;\nif (a) { println(a); }\n", encoding="utf-8")
+        process = self.run_cial("--decompile", structured)
         self.assertEqual(process.returncode, 2, process.stderr)
         self.assertEqual(process.stdout, "")
         self.assertIn("decompile unsupported", process.stderr)
-        # 诊断视图：输出含行号与 TAC 反汇编，头部标注不可重编译
+        # 诊断视图：输出含行号与 TAC 反汇编，头部标注不可重编译，恢复结果以注释附加
         process = self.run_cial("--decompile", "--view", self.script)
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("not recompilable", process.stdout)
         self.assertIn("@0", process.stdout)
+        self.assertIn("//   >> println(42);", process.stdout)
         # 行表 JSON：状态与行坐标
         mapPath = self.root / "map.json"
         process = self.run_cial("--decompile", "--view", "--map", mapPath, self.script)
@@ -506,6 +514,70 @@ selected
         payload = json.loads(plain_map.read_text(encoding="utf-8"))
         self.assertFalse(any(row.get("srcLine") is not None
                              for unit in payload["units"] for row in unit["lines"]))
+
+    def test_decompile_expression_roundtrip(self):
+        # 环①（方案 §7）：直线表达式程序 源码执行 vs 严格反编译再编译执行，逐形态
+        # 对拍可观察输出。覆盖字面量/算术/位/比较/逻辑/一元/成员/下标/调用/字面量
+        # 构造（含折叠常量容器）/delete/物化；每条独立成程序避免形态互相掩盖
+        cases = [
+            # 字面量与算术优先级（含括号、整除、取模、实数）
+            'var a = 1 + 2 * 3; var b = (1 + 2) * 3; var c = 10 \\ 3; var d = 10 % 3;\n'
+            'var e = 2.5 * 2; var f = 7 - (3 - 1); var g = 2 * 3 % 4;\n'
+            'println(a); println(b); println(c); println(d); println(e); println(f); println(g);\n',
+            # 位运算与移位
+            'var x = 6 & 3 | 8 ^ 1; var y = 1 << 4 >> 1; var z = -16 >>> 2; var w = (6 | 1) & 3;\n'
+            'println(x); println(y); println(z); println(w);\n',
+            # 比较与逻辑（非短路双求值）
+            'var p = 3 < 5 && 5 <= 5 || 1 > 2; var q = 1 == 1 != 0; var r = "1" === 1;\n'
+            'var s = (1 || 0) && 0; var t = 1 !== 1;\n'
+            'println(p); println(q); println(r); println(s); println(t);\n',
+            # 一元族：负号、逻辑非、按位非（降糖 ^-1）、typeof、转换、#/$
+            'var s = "abc"; println(-5); println(!0); println(~5); println(typeof s);\n'
+            'println(int 2.9); println(real 3); println(string 42); println(#s); println($65);\n'
+            'println(-(1 + 2)); println(!(1 && 0)); println(-s.length);\n',
+            # 字符串转义与拼接
+            'println("a\\"b\\\\c\\n" + "d"); println("x" + 1 + 2.5); println("" + (1 + 2));\n',
+            # 数组/字典字面量（动态与折叠常量、嵌套）、下标读写、成员读写
+            'var arr = [1, "s", 2.5]; arr[1] = "t"; println(arr[1]); println(arr.count);\n'
+            'var d = %["k" => 1, "z" => "v"]; d.k = d.k + 4; println(d.k); println(d["z"]);\n'
+            'var n = [[1, 2], %["a" => [3]]]; println(n[0][1]); println(n[1].a[0]);\n'
+            'var fold = [1, 2, 3]; println(fold[2]); var fd = %["p" => 9]; println(fd.p);\n',
+            # 方法调用、内置对象、链式成员
+            'var arr = [3, 1, 2]; arr.sort(); println(arr.join(",")); println(Math.abs(-3));\n'
+            'println("xyz".length); println([1, 2].join("-")); println(arr.count + 1);\n',
+            # delete 语句形态与值形态（dst 被消费）
+            'var dd = %["a" => 1, "b" => 2]; delete dd.a; println(dd.b);\n'
+            'var ok = delete dd.b; println(ok); println(dd.count);\n',
+            # 顶层多使用纯读复制（同一值分发到多处）
+            'var k = 5; var m = k + k; var o = [k, k]; println(m); println(o[1]);\n',
+        ]
+        for index, source in enumerate(cases):
+            with self.subTest(case=index):
+                original = self.root / f"rt{index}.tjs"
+                original.write_text(source, encoding="utf-8")
+                expected = self.run_cial(original)
+                self.assertEqual(expected.returncode, 0, expected.stderr)
+                decompiled = self.run_cial("--decompile", original)
+                self.assertEqual(decompiled.returncode, 0, decompiled.stderr)
+                # 严格模式产物不含反汇编行
+                self.assertNotIn("//   @", decompiled.stdout)
+                recompiled = self.root / f"rt{index}_rt.tjs"
+                recompiled.write_text(decompiled.stdout, encoding="utf-8")
+                actual = self.run_cial(recompiled)
+                self.assertEqual(actual.returncode, 0, actual.stderr + "\n--- decompiled ---\n" + decompiled.stdout)
+                self.assertEqual(actual.stdout, expected.stdout, "--- decompiled ---\n" + decompiled.stdout)
+
+    def test_decompile_strict_rejects_structure_with_batch_reason(self):
+        # 语句结构（M3）、声明装配（M4）在严格模式如实拒绝：退出码 2、不产文本、原因含批次号
+        for source, batch in [("var a = 1;\nif (a) { println(a); }\n", "M3"),
+                              ("function f() { return 1; }\n", "M4"),
+                              ("var i = 0;\nwhile (i < 2) { i = i + 1; }\n", "M3")]:
+            with self.subTest(batch=batch):
+                self.script.write_text(source, encoding="utf-8")
+                process = self.run_cial("--decompile", self.script)
+                self.assertEqual(process.returncode, 2, process.stderr)
+                self.assertEqual(process.stdout, "")
+                self.assertIn(batch, process.stderr)
 
 
 if __name__ == "__main__":

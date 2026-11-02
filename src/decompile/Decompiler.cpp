@@ -13,6 +13,7 @@
 
 #include <fmt/format.h>
 
+#include "ExprBuilder.hpp"
 #include "gen/Instruction.hpp"
 #include "runtime/Runtime.hpp"
 
@@ -70,6 +71,57 @@ namespace cial::decompile {
             u32 &_cursor;
         };
 
+        // 体的反汇编级视图（定义见下；emitUnitBody 先用）
+        void emitBody(UnitBuilder &builder, vm::Chunk &chunk, const Vec<tjsbc::TacOrigin> *origin,
+                      const Common::SourceFile *source);
+
+        // M2 表达式恢复发射。严格模式（annotateOnly=false）：恢复语句为主体，
+        // 行表区间按游标闭合、末语句延到 Chunk 末尾以覆盖被内联/丢弃的 TAC；
+        // 视图模式（annotateOnly=true）：反汇编为主体，恢复结果以 // >> 注释附加。
+        // 失败记录逐单元诊断并返回 false（严格模式由调用方回退反汇编视图）
+        bool emitRecovered(UnitBuilder &builder, Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta,
+                           const bool functionLike, DecompileResult &result, const DecompiledUnit &unit,
+                           const bool annotateOnly) {
+            auto recovery = recoverUnitBody(rt, chunk, meta, functionLike);
+            if(!recovery.unsupported.empty()) {
+                result.diagnostics.push_back(fmt::format("{} '{}': {}", unit.kind, unit.name, recovery.unsupported));
+                if(annotateOnly)
+                    builder.synthetic(fmt::format("//   >> unsupported: {}", recovery.unsupported));
+                return false;
+            }
+            const auto count = chunk.getInstVec().size();
+            if(annotateOnly) {
+                for(const auto &statement : recovery.statements)
+                    builder.synthetic(fmt::format("//   >> {}", statement.text));
+                return true;
+            }
+            u32 cursor = 0;
+            for(const auto &statement : recovery.statements) {
+                LineMapRow row{ .tacStart = cursor, .tacEnd = statement.pc + 1 };
+                builder.line(statement.text, row);
+                cursor = row.tacEnd;
+            }
+            if(!recovery.statements.empty()) {
+                if(cursor < count)
+                    result.units.back().lines.back().tacEnd = static_cast<u32>(count);
+            } else if(count > 0) {
+                builder.synthetic(fmt::format("//   (all {} instructions dropped as dead code)", count));
+            }
+            return true;
+        }
+
+        // 单元体发射：视图模式 = 反汇编 + 恢复注释；严格模式 = 恢复语句，失败回退反汇编
+        void emitUnitBody(UnitBuilder &builder, const Options &options, Runtime &rt, vm::Chunk &chunk,
+                          const FuncMeta *meta, const bool functionLike, DecompileResult &result,
+                          const DecompiledUnit &unit) {
+            if(options.diagnosticView) {
+                emitBody(builder, chunk, nullptr, nullptr);
+                emitRecovered(builder, rt, chunk, meta, functionLike, result, unit, true);
+            } else if(!emitRecovered(builder, rt, chunk, meta, functionLike, result, unit, false)) {
+                emitBody(builder, chunk, nullptr, nullptr);
+            }
+        }
+
         // 体的反汇编级视图：每条 TAC 一行，行表区间 [i, i+1)。bc 路径按来源表附带
         // 码字/源偏移；提供原源码时把偏移换算为行号
         void emitBody(UnitBuilder &builder, vm::Chunk &chunk, const Vec<tjsbc::TacOrigin> *origin,
@@ -113,11 +165,6 @@ namespace cial::decompile {
             builder.synthetic(line);
         }
 
-        void markUnsupported(DecompileResult &result, const DecompiledUnit &unit) {
-            result.diagnostics.push_back(
-                fmt::format("{} '{}': body recovery not implemented (M0 disassembly view only)", unit.kind, unit.name));
-        }
-
         // ── 自产路径：沿常量图收集嵌套单元 ──
         class ChunkTreeCollector {
         public:
@@ -129,7 +176,13 @@ namespace cial::decompile {
                 unit.name = "<header>";
                 unit.kind = "header";
                 UnitBuilder builder{ unit, _cursor };
-                builder.synthetic("// cial decompile (M0): disassembly view, not recompilable");
+                builder.synthetic(_options.diagnosticView
+                                      ? "// cial decompile (diagnostic view): disassembly, not recompilable"
+                                      : "// cial decompile: recovered source (expression recovery, M2)");
+                // 视图产物恒不承诺可重编译：以诊断记录，使状态公式统一为"无诊断即 Success"
+                if(_options.diagnosticView)
+                    _result.diagnostics.push_back(
+                        "diagnostic view: disassembly annotated with recovery, not recompilable");
             }
 
             void topLevel(vm::Chunk &chunk) {
@@ -138,8 +191,7 @@ namespace cial::decompile {
                 unit.kind = "top-level";
                 UnitBuilder builder{ unit, _cursor };
                 builder.synthetic("// ==== top-level ====");
-                emitBody(builder, chunk, nullptr, nullptr);
-                markUnsupported(_result, unit);
+                emitUnitBody(builder, _options, _rt, chunk, nullptr, false, _result, unit);
                 walkConstants(chunk);
             }
 
@@ -172,8 +224,7 @@ namespace cial::decompile {
                 builder.synthetic(fmt::format("// ==== {} {} (arity {}{}) ====", kind, unit.name, meta.arity,
                                               meta.hasCollapse ? ", collapse" : ""));
                 emitLocals(builder, _rt, meta);
-                emitBody(builder, *meta.chunk, nullptr, nullptr);
-                markUnsupported(_result, unit);
+                emitUnitBody(builder, _options, _rt, *meta.chunk, &meta, true, _result, unit);
                 walkConstants(*meta.chunk);
             }
 
@@ -327,8 +378,9 @@ namespace cial::decompile {
         ChunkTreeCollector collector{ rt, options, result };
         collector.header();
         collector.topLevel(top);
-        // M0：无表达式/语句恢复，严格模式一律 Unsupported（诊断视图同样如实标注）
-        result.status = Status::Unsupported;
+        // 逐单元恢复：全部成功 → Success；任一失败 → Unsupported（诊断已逐单元记录，
+        // 视图模式恒不含可重编译承诺，同样按诊断判定）
+        result.status = result.diagnostics.empty() ? Status::Success : Status::Unsupported;
         return result;
     }
 
@@ -346,7 +398,12 @@ namespace cial::decompile {
             unit.name = "<header>";
             unit.kind = "header";
             UnitBuilder builder{ unit, cursor };
-            builder.synthetic("// cial decompile (M0): disassembly view of TJS2 bytecode, not recompilable");
+            builder.synthetic(
+                options.diagnosticView
+                    ? "// cial decompile (diagnostic view): disassembly of TJS2 bytecode, not recompilable"
+                    : "// cial decompile: recovered source of TJS2 bytecode (expression recovery, M2)");
+            if(options.diagnosticView)
+                result.diagnostics.push_back("diagnostic view: disassembly annotated with recovery, not recompilable");
         }
         for(size_t ci = 0; ci < program.contexts.size(); ++ci) {
             const auto &ctx = program.contexts[ci];
@@ -358,7 +415,8 @@ namespace cial::decompile {
             builder.synthetic(fmt::format("// ==== context {} {} {} (parent {}, arity {}) ====", ci, unit.kind,
                                           unit.name, ctx.parent, ctx.arity));
             if(ctx.isClass && ctx.classMeta) {
-                // ctClass 加载期解释、无 TAC 体：只出壳（extends/成员形态）
+                // ctClass 加载期解释、无 TAC 体：只出壳（extends/成员形态）；
+                // 壳装配为可执行声明属 M4，壳单元不计入恢复失败
                 std::string extends;
                 for(const auto base : ctx.classMeta->extends)
                     extends += fmt::format("{}{}", extends.empty() ? "" : ", ", displayName(rt, base, "?"));
@@ -370,14 +428,21 @@ namespace cial::decompile {
                                                       : shape.isProp ? "property"
                                                                      : "var",
                                                   displayName(rt, shape.name, "?")));
+                continue;
             }
             if(ctx.funcMeta)
                 emitLocals(builder, rt, *ctx.funcMeta);
-            if(ctx.chunk)
-                emitBody(builder, *ctx.chunk, &ctx.origin, options.originalSource);
-            markUnsupported(result, unit);
+            if(ctx.chunk) {
+                if(options.diagnosticView) {
+                    emitBody(builder, *ctx.chunk, &ctx.origin, options.originalSource);
+                    emitRecovered(builder, rt, *ctx.chunk, ctx.funcMeta, ctx.isFunctionLike, result, unit, true);
+                } else if(!emitRecovered(builder, rt, *ctx.chunk, ctx.funcMeta, ctx.isFunctionLike, result, unit,
+                                         false)) {
+                    emitBody(builder, *ctx.chunk, &ctx.origin, options.originalSource);
+                }
+            }
         }
-        result.status = Status::Unsupported;
+        result.status = result.diagnostics.empty() ? Status::Success : Status::Unsupported;
         return result;
     }
 } // namespace cial::decompile

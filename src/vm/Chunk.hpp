@@ -196,6 +196,10 @@ namespace cial::vm {
 
         [[nodiscard]] Rlc &rlc() noexcept { return _rlc; }
 
+        // 编译期 pc 锚点（IRGenerator 登记局部变量声明点 startPC）：优化器压缩时
+        // 与跳转/try/行号一同重映射；FuncMeta 装配后由 IRGenerator 清空，不进入运行期
+        [[nodiscard]] Vec<size_t> &pcAnchors() noexcept { return _pcAnchors; }
+
         // 调用者保存的是操作数读取完毕后的返回 PC。精确匹配编码边界，
         // 再取前一条指令；不使用 pc-1，不触发未执行 Chunk 的提前编码。
         [[nodiscard]] Opt<u64> instructionBefore(const u64 resumePc) const {
@@ -236,6 +240,7 @@ namespace cial::vm {
     private:
         Vec<Box<inter::Instruction>> _instructions{};
         Rlc _rlc{};
+        Vec<size_t> _pcAnchors{};
         Vec<Constant> _constants{};
         Vec<ThrowHandler> _throwHandlers{};
         Vec<ThrowHandler> _bcThrowHandlers{}; // try 区间已换算到扁平字节码 pc 空间

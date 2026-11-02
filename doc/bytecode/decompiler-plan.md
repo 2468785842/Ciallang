@@ -41,6 +41,8 @@ TJS2 .tjsbc → TjsBytecodeReader → TjsTranslator ─┐ 壳: TjsTranslatedPro
 | "SSA 可全量复用" | `SSA.hpp` 拒绝 CallOmit/CallExpand/CollapseArgs，未建模 `_zf` 与属性内存。结构化 pass 需自建保守数据流或先扩展 SSA 访问描述 |
 | "+= 逆融合即修复属性行为" | 逆融合只恢复**写法**；不能证明转译执行与 TJS2 一次 `Operation()` 等价（`mapping.md` §6/§8.1 近似清单），两契约须分别报告（§3）。误融合（把非模板来源的 GProp+Add+DProp 合成 `+=`）的守卫复用 `Optimizer.cpp` 的 `computeBlockLiveness`：验证中间寄存器无其他读者 |
 | 局部变量名恢复 | TJS2 导出格式**无局部名表**（参考 `tjsInterCodeGen.cpp:3639` ExportByteCode 记录：parent/name/type/帧尺寸/签名/property/成员表/行号，无名字表）。bc 路径局部名只能合成（`v3`/`l7`）；自产路径 `FuncMeta::localVars` 全量可得。此为格式边界，非实现缺口 |
+| "localVars.startPC 可直接按 pc 查名" | 过时：IRGen 的零拷贝 `var` 在表达式发射后取声明标签（startPC = 定义 pc + 1），且优化器压缩曾不重映射它。M2 起经 `Chunk::pcAnchors` 随压缩重映射（`IRGenerator::parseAst`），查名用"本指令执行后"的 pc |
+| "一元负号优先级高于乘法" | Ciallang Pratt 解析器把 `-a * 2` 解析为 `-(a * 2)`（TAC 先 Mul 后 ChgSign）；数值等价，反编译按 TAC 结构打印 `-(a * 2)`，与 TJS2 标准优先级的差异不属反编译器处理范围 |
 
 ## 3. 行为一致的契约
 
@@ -111,7 +113,7 @@ with、eval 和局部值保活，"生成名字不冲突"不足以保证安全。
 |---|---|---|
 | M0 | `DecompiledOutput{文本,行表}` 类型、CLI `--decompile` 骨架、反汇编级 Printer | {文本,行表} 管道通；环①以反汇编级跑通；错误不留成功文件 |
 | M1 | 转译器发 Rlc（Pass 1 接线）；固定参考二进制/版本/样本清单（哈希与导出选项） | bc 路径反汇编级端到端；行表含码字区间；未知版本被拒 |
-| M2 | ExprBuilder：后优化形态模式表（含 BinaryImm/CompareTestImm 逆映射）、调用族/成员访问族 | 表达式级 round-trip 逐形态对拍 |
+| M2 | ExprBuilder：后优化形态模式表（含 BinaryImm/CompareTestImm 逆映射）、调用族/成员访问族 | 表达式级 round-trip 逐形态对拍；**已完成（2026-11-02，`ExprBuilder.*`）** |
 | M3 | 语句结构化：if/while/for 归约、短路/三元跨块折叠 | 路径副作用、求值次数、break/continue 对拍通过 |
 | M4 | 壳组装（context 树→声明）+ `+=` 逆融合（双守卫） | 类/继承/property/初始化顺序用例；getter 计数不翻倍 |
 | M5 | 硬核兜底：任意 CFG 降级（安全状态机）、switch 链、try/catch 嵌套重抛、覆盖扩展与模糊 | 能力矩阵逐项验收；Unsupported 集合可量化 |
