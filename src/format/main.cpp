@@ -11,10 +11,12 @@
 #include <iterator>
 #include <random>
 #include <stdexcept>
+#include <system_error>
 #include "cial/Version.hpp"
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
+#include <share.h>
 #include <sys/stat.h>
 #include <windows.h>
 #else
@@ -54,14 +56,17 @@ namespace {
             temporary = input.path;
             temporary += ".cial-fmt-" + std::to_string(random()) + ".tmp";
 #ifdef _WIN32
-            descriptor = _wopen(temporary.c_str(), _O_CREAT | _O_EXCL | _O_WRONLY | _O_BINARY, _S_IREAD | _S_IWRITE);
+            const auto status = _wsopen_s(&descriptor, temporary.c_str(), _O_CREAT | _O_EXCL | _O_WRONLY | _O_BINARY,
+                                          _SH_DENYRW, _S_IREAD | _S_IWRITE);
+            if(status != 0)
+                errno = status;
 #else
             descriptor = ::open(temporary.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0600);
 #endif
             if(descriptor >= 0)
                 break;
             if(errno != EEXIST)
-                throw std::runtime_error(std::strerror(errno));
+                throw std::runtime_error(std::error_code(errno, std::generic_category()).message());
         }
         if(descriptor < 0)
             throw std::runtime_error("cannot create temporary file");

@@ -194,6 +194,7 @@ var t=@"x &name; ${1 + 2}";/* outer /* nested */ comment */
             'class A{var x=2;function f(){return x;}}var a=new A();println(a.f());',
             'switch(2){case 1:println(1);break;case 2:println(2);break;default:println(3);}',
             'try{throw 7;}catch(e){println(e);}',
+            'var x=1;switch(1){case (function(){switch(x){case 1:return 1;}})():println(1);}',
         ]
         with tempfile.TemporaryDirectory() as directory:
             for index, source in enumerate(cases):

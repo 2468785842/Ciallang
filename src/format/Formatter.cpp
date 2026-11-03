@@ -283,6 +283,7 @@ namespace cial::format {
             bool forHeader;
             bool switchBlock;
             bool caseBody = false;
+            bool caseLabel = false;
             unsigned ternaries = 0;
         };
 
@@ -437,7 +438,7 @@ namespace cial::format {
             Writer writer(eol, options.indentWidth, input.starts_with("\xef\xbb\xbf"));
             Vec<Frame> stack;
             unsigned indent = 0, topTernaries = 0;
-            bool ended = false, previousUnary = false, caseLabel = false;
+            bool ended = false, previousUnary = false;
             const Piece *lastCode = nullptr, *previous = nullptr;
             for(size_t i = 0; i < pieces.size(); ++i) {
                 auto &p = pieces[i];
@@ -553,15 +554,15 @@ namespace cial::format {
                     auto &ternaries = stack.empty() ? topTernaries : stack.back().ternaries;
                     if(ternaries)
                         --ternaries;
-                    else if(caseLabel && !stack.empty() && stack.back().switchBlock) {
+                    else if(!stack.empty() && stack.back().switchBlock && stack.back().caseLabel) {
                         writer.newline();
                         ++indent;
                         stack.back().caseBody = true;
-                        caseLabel = false;
+                        stack.back().caseLabel = false;
                     }
                 }
                 if(isCase)
-                    caseLabel = true;
+                    stack.back().caseLabel = true;
                 previousUnary = prefix;
                 previous = lastCode = &p;
             }
