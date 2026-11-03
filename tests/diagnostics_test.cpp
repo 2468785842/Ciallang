@@ -5,6 +5,7 @@
 
 #include <catch2/catch_all.hpp>
 
+#include "common/UTF8.hpp"
 #include "parser/Lexer.hpp"
 #include "parser/Parser.hpp"
 #include "vm/VM.hpp"
@@ -502,6 +503,30 @@ TEST_CASE("lexer records byte half-open spans per token class") {
         REQUIRE(num.type() == syntax::TokenType::ConstVal);
         REQUIRE(num.span == Common::SourceSpan{ 0, 4 });
     }
+}
+
+TEST_CASE("CRLF lookahead excludes newline bytes from source lexemes", "[diagnostics][lexer]") {
+    const std::string source = "else\r\ndo\r\nword\r\n123\r\n\"x\"\r\n";
+    const auto result = lexAll(source);
+    REQUIRE_FALSE(result.lexerFailed);
+    const std::string expected[] = { "else", "do", "word", "123", "\"x\"" };
+    REQUIRE(result.tokens.size() == 6);
+    for(size_t i = 0; i < 5; ++i) {
+        const auto &token = result.tokens[i];
+        REQUIRE(source.substr(token.span.begin, token.span.size()) == expected[i]);
+        REQUIRE(token.location.start().line == i);
+        REQUIRE(token.location.start().column == 0);
+    }
+    Common::SourceFile file;
+    Common::Result diagnostics;
+    REQUIRE(file.load(diagnostics, "x\r\n"));
+    REQUIRE(file.next(diagnostics) == 'x');
+    REQUIRE(file.lastWidth() == 1);
+    REQUIRE(file.next(diagnostics) == '\n');
+    REQUIRE(file.lastWidth() == 2);
+    REQUIRE(file.pos() == 3);
+    REQUIRE(file.next(diagnostics) == Common::runeEof);
+    REQUIRE(file.lastWidth() == 0);
 }
 
 TEST_CASE("lexer failure tokens carry code, span and eof relation") {

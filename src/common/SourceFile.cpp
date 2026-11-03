@@ -413,7 +413,7 @@ namespace cial::Common {
         } else if(ch == '\r' && _buffer.size() != _index + 1) {
             // Windows line feed
             if(_buffer[_index + 1] == '\n') {
-                _index++;
+                width = 2;
                 return '\n';
             }
         }

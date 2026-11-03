@@ -63,6 +63,13 @@ namespace cial::syntax {
         if(pos == 0)
             return;
 
+        // SourceFile 把 CRLF 作为一个逻辑换行读取，回看也必须退回完整的两个字节。
+        // 否则标识符/数字末尾的词素范围会多包含一个 CR。
+        if(_sourceFile.lastWidth() == 2 && pos >= 2 && _sourceFile[pos - 2] == '\r' && _sourceFile[pos - 1] == '\n') {
+            _sourceFile.seek(pos - 2);
+            return;
+        }
+
         // 最多回溯 4 个字节
         for(size_t i = 1; i <= 4 && i <= pos; ++i) {
             const u8 ch = _sourceFile[pos - i];

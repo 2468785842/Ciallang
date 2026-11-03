@@ -217,14 +217,16 @@ var t=@"x &name; ${1 + 2}";/* outer /* nested */ comment */
             formatted = Path(directory) / 'formatted.tjs'
             for script in scripts:
                 with self.subTest(script=script.relative_to(root)):
-                    result = self.invoke(script)
-                    self.assertEqual(result.returncode, 0, result.stderr.decode(errors='replace'))
-                    self.assertEqual(self.formatted(result.stdout), result.stdout)
-                    formatted.write_bytes(result.stdout)
                     before = subprocess.run([str(CIAL), '--check-json', str(script)], capture_output=True, timeout=15)
-                    after = subprocess.run([str(CIAL), '--check-json', str(formatted)], capture_output=True, timeout=15)
                     self.assertEqual(before.returncode, 0, before.stdout)
-                    self.assertEqual(after.returncode, 0, after.stdout)
+                    source = script.read_bytes().replace(b'\r\n', b'\n')
+                    for eol in [b'\n', b'\r\n']:
+                        result = self.invoke(source=source.replace(b'\n', eol))
+                        self.assertEqual(result.returncode, 0, result.stderr.decode(errors='replace'))
+                        self.assertEqual(self.formatted(result.stdout), result.stdout)
+                        formatted.write_bytes(result.stdout)
+                        after = subprocess.run([str(CIAL), '--check-json', str(formatted)], capture_output=True, timeout=15)
+                        self.assertEqual(after.returncode, 0, after.stdout)
 
 
 if __name__ == '__main__':
