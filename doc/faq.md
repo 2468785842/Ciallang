@@ -82,3 +82,10 @@ TJSCompiler 的旧入口曾使用固定脚本路径；`d8044c3` 已提交 `TJSCo
 先核对控制流与类型约束。受 `TypeId`/opcode 保护的热路径转换、内部脚本异常载体、
 测试中的自赋值和生命周期检查都有明确用途；拼写、const 或 ranges 建议不等同于运行时缺陷。
 局部协议见 `src/types/TypeId.hpp`、`src/vm/VMState.hpp`；历史诊断数据保留在 [reports/](reports/)。
+
+## Windows CI 的深数组压力测试为什么配置较大栈？
+
+当前 `Array::marked()` 等对象图遍历仍有 C++ 递归，不能把深数组测试通过理解为无栈深限制。
+2 万层数组用例在 Linux 的 1 MiB 栈子进程可复现溢出、8 MiB 可通过；Windows 默认线程栈更小。
+`CiallangTests` 在 Windows 显式预留 16 MiB，保证压力测试有明确资源预算；运行库、`cial`、
+`cial-fmt` 与宿主 SDK 的默认栈未因此调整。后续应将对象图标记迁到显式工作队列。

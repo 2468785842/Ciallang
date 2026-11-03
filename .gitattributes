@@ -1,0 +1,4 @@
+
+# outputdebug 语料的 SHA-256 与源码字节偏移固定为 LF，不能随 checkout 转换。
+/tests/test_files/tjsbc/debug/*.tjs text eol=lf
+/tests/test_files/tjsbc/debug/*.tjsbc -text
