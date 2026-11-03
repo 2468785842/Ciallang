@@ -60,7 +60,7 @@ Windows/macOS 使用对应预设，Windows 程序名为 `cial-fmt.exe`。`CIAL_B
 默认跟随 `CIAL_BUILD_CLI`；嵌入式库模式默认关闭。只需要 formatter 时可选择：
 
 ```sh
-cmake -S . -B build/formatter -DCIAL_BUILD_CLI=OFF -DCIAL_BUILD_FORMATTER=ON -DCIAL_BUILD_TESTS=OFF
+cmake --preset "Linux Debug" -B build/formatter -DCIAL_BUILD_CLI=OFF -DCIAL_BUILD_FORMATTER=ON -DCIAL_BUILD_TESTS=OFF
 cmake --build build/formatter --target cial-fmt
 cmake --install build/formatter --component Runtime --prefix /your/install/prefix
 ```

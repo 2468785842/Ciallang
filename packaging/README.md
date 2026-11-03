@@ -1,6 +1,6 @@
 # Ciallang CLI 预览版
 
-本包提供 CLI（新构建包含 cial-fmt）；C++ SDK 从源码另行安装。版本与构建信息见 `build-info.json`。
+本包提供 CLI（默认新构建包含 cial-fmt）；C++ SDK 从源码另行安装。版本与构建信息见 `build-info.json`。
 
 Windows 使用 `bin/cial.exe`；Linux/macOS 使用 `bin/cial`：
 
