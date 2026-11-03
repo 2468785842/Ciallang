@@ -13,6 +13,7 @@
  */
 
 #include "PreProcessor.hpp"
+#include <sstream>
 
 #include <bit>
 #include <cstdint>

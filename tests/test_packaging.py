@@ -161,6 +161,29 @@ class PackagingTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 package.verify_archive(archive)
 
+    def test_new_packages_require_and_run_the_formatter(self):
+        files = self.package_files()
+        info = json.loads(files['ciallang-test/build-info.json'])
+        info['formatter'] = 'ON'
+        files['ciallang-test/build-info.json'] = json.dumps(info)
+        original = [subprocess.CompletedProcess([], 0, '0.1.0-preview.1\n', ''),
+                    subprocess.CompletedProcess([], 0, '"Hello from Ciallang: 42"\n', ''),
+                    subprocess.CompletedProcess([], 0, '{"diagnostics":[]}', ''),
+                    subprocess.CompletedProcess([], 1, '{"diagnostics":[{}]}', '')]
+        with patch.object(package.subprocess, 'run', side_effect=original):
+            with self.assertRaisesRegex(ValueError, 'Missing packaged cial-fmt'):
+                package.verify_archive(self.archive(files))
+        name = 'cial-fmt.exe' if os.name == 'nt' else 'cial-fmt'
+        files['ciallang-test/bin/' + name] = 'formatter'
+        for code, output in [(0, 'var answer = 42;\n'), (0, 'wrong'), (2, '')]:
+            results = [*original, subprocess.CompletedProcess([], code, output, '')]
+            with patch.object(package.subprocess, 'run', side_effect=results):
+                if code == 0 and output == 'var answer = 42;\n':
+                    package.verify_archive(self.archive(files))
+                else:
+                    with self.assertRaisesRegex(ValueError, 'Packaged formatter failed'):
+                        package.verify_archive(self.archive(files))
+
 
 if __name__ == '__main__':
     unittest.main()

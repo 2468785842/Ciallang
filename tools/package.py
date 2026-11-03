@@ -134,6 +134,15 @@ def verify_archive(archive, expected_version=None):
             report = json.loads(result.stdout)
             if result.returncode != code or bool(report['diagnostics']) != errors:
                 raise ValueError('Packaged checker failed: ' + result.stdout + result.stderr)
+        # 老预览包无 formatter 字段；新包声明启用后必须携带并实际验收工具。
+        formatter = root / 'bin' / ('cial-fmt.exe' if info['system'] == 'Windows' else 'cial-fmt')
+        if info.get('formatter') == 'ON' or formatter.exists():
+            if not formatter.is_file():
+                raise ValueError('Missing packaged cial-fmt')
+            result = subprocess.run([str(formatter)], input='var answer=42;', cwd=work, env=environment,
+                                    capture_output=True, text=True, encoding='utf-8', timeout=15)
+            if result.returncode != 0 or result.stdout != 'var answer = 42;\n':
+                raise ValueError('Packaged formatter failed: ' + result.stdout + result.stderr)
         print('Verified extracted archive:', archive, flush=True)
         return info
 
@@ -165,7 +174,7 @@ def main(argv=None):
     preset = args.preset or (None if (build / 'CMakeCache.txt').exists() else system + ' Release')
     configure = ['cmake', '--preset', preset, '-B', build] if preset else ['cmake', '-S', SOURCE, '-B', build]
     run([*configure, '-DCMAKE_BUILD_TYPE=Release', '-DCIAL_ENABLE_PACKAGING=ON', '-DCIAL_BUILD_CLI=ON',
-         '-DCIAL_BUILD_TESTS=ON', '-DCIAL_ENABLE_JIT=OFF'], cwd=SOURCE)
+         '-DCIAL_BUILD_TESTS=ON', '-DCIAL_BUILD_FORMATTER=ON', '-DCIAL_ENABLE_JIT=OFF'], cwd=SOURCE)
     run(['cmake', '--build', build, '--config', 'Release', '--parallel', args.parallel])
     run(['ctest', '--test-dir', build, '-C', 'Release', '--output-on-failure', '--no-tests=error'])
     if revision and clean_revision(SOURCE, args.tag) != revision:

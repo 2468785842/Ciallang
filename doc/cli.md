@@ -58,3 +58,8 @@ cial --help
 
 `cial --version` 输出由 Python 从 `vcpkg.json` 的 `version-string` 生成的完整运行时版本；预发布后缀也包含在内。
 CLI、vcpkg manifest、压缩包与版本标签的一致性检查见[发布指南](releasing.md)。
+
+## 源码格式化
+
+独立工具 `cial-fmt` 提供标准输入/输出、`--write` 与 `--check`；
+它不执行程序，使用方法与保留范围见[源码格式化](formatting.md)。

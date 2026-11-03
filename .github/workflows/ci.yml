@@ -31,7 +31,7 @@ jobs:
           export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
           cmake --preset "${{ matrix.platform }} ${{ matrix.configuration }}" -DCIAL_ENABLE_JIT=${{ matrix.jit || 'OFF' }}
       - name: Build tests
-        run: cmake --build build/${{ matrix.platform }}/${{ matrix.configuration }} --target cial CiallangTests --parallel 4
+        run: cmake --build build/${{ matrix.platform }}/${{ matrix.configuration }} --target cial cial-fmt CiallangTests --parallel 4
       - name: Test
         run: ctest --test-dir build/${{ matrix.platform }}/${{ matrix.configuration }} --output-on-failure
       - name: Save build and test artifacts
@@ -43,6 +43,8 @@ jobs:
             build/${{ matrix.platform }}/${{ matrix.configuration }}/Testing/Temporary/
             build/${{ matrix.platform }}/${{ matrix.configuration }}/cial
             build/${{ matrix.platform }}/${{ matrix.configuration }}/cial.exe
+            build/${{ matrix.platform }}/${{ matrix.configuration }}/cial-fmt
+            build/${{ matrix.platform }}/${{ matrix.configuration }}/cial-fmt.exe
           if-no-files-found: ignore
       - name: Test relocated installed SDK
         if: matrix.configuration == 'Release'

@@ -93,6 +93,13 @@ if(Python3_Interpreter_FOUND AND TARGET cial)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_tjs_runner.py"
                 --engine "$<TARGET_FILE:cial>")
     set_tests_properties(CiallangTjsRunner PROPERTIES TIMEOUT 30)
+    if(TARGET cial-fmt)
+        add_test(NAME CiallangFormatter
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/formatter_test.py"
+                    --formatter "$<TARGET_FILE:cial-fmt>" --cial "$<TARGET_FILE:cial>"
+                    --expected-version "${CIAL_VERSION_STRING}")
+        set_tests_properties(CiallangFormatter PROPERTIES TIMEOUT 120)
+    endif()
     add_test(NAME CiallangCli
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli_test.py"
                 --cial "$<TARGET_FILE:cial>" --expected-version "${CIAL_VERSION_STRING}")

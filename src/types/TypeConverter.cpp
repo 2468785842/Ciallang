@@ -3,6 +3,7 @@
 //
 #include <cstring>
 
+#include <charconv>
 #include "TypeConverter.hpp"
 
 #include "Octet.hpp"

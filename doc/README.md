@@ -2,7 +2,7 @@
 
 | 主题 | 文档 |
 |---|---|
-| 入门与排错 | [构建](building.md) · [打包与发布](releasing.md) · [命令行与 REPL](cli.md) · [FAQ](faq.md) |
+| 入门与排错 | [构建](building.md) · [打包与发布](releasing.md) · [命令行与 REPL](cli.md) · [源码格式化](formatting.md) · [FAQ](faq.md) |
 | 宿主与编辑器 | [C++ 集成](embedding.md) · [LSP 与 VSCode](lsp.md) |
 | 语言 | [语法与实现范围](syntax.md) · [兼容性](compatibility.md) · [语言参考](language/README.md) |
 | 架构与优化 | [架构](architecture.md) · [SSA](ssa.md) · [JIT](jit.md) · [尾递归](tail-recursion.md) |

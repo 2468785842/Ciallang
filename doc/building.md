@@ -23,6 +23,7 @@ ctest --test-dir build/local --output-on-failure
 | CMake 开关 | 独立构建默认 | `add_subdirectory` 默认 | vcpkg feature / 额外依赖 |
 |---|---|---|---|
 | `CIAL_BUILD_CLI` | ON | OFF | `cli` / argparse |
+| `CIAL_BUILD_FORMATTER` | 跟随 CLI | 跟随 CLI（默认 OFF） | 无额外依赖；构建 `cial-fmt` |
 | `CIAL_BUILD_TESTS` | ON | OFF | `tests` / Catch2（不启用其默认 feature） |
 | `CIAL_ENABLE_JIT` | OFF | OFF | `jit` / asmjit，仅 x64 |
 | `CIAL_BUILD_FUZZ` | OFF | OFF | 无；需 Clang/libFuzzer |
@@ -124,3 +125,8 @@ bash fuzz/run_fuzz_parser.sh -max_total_time=600
 ```
 
 修复后应保存最小输入到 `tests/fuzz_regress/*.tjs`，并用 Catch2 回归测试锁定。短时间没有发现异常不代表输入安全性已被证明。
+
+## 源码格式化工具
+
+默认 CLI 构建同时生成 `cial-fmt`，单独开关为 `CIAL_BUILD_FORMATTER`。
+格式、标准输入、就地写回、CI 检查及 formatter-only 构建见[源码格式化](formatting.md)。

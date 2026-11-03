@@ -87,6 +87,9 @@ namespace cial::syntax {
 
         [[nodiscard]] bool incomplete() const noexcept { return _incomplete; }
 
+        // 无损源码工具把模板字符串作为整体保留，不输出状态机合成的括号/加号。
+        [[nodiscard]] bool inTemplateString() const noexcept { return tmplStrCtx.active; }
+
         [[nodiscard]] size_t tokenSize() const { return _tokens.size(); }
 
         void peekToken(Token *&token) const { token = _tokens.front(); }
