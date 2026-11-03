@@ -22,7 +22,7 @@ Ciallang 是 C++20 实现的 TJS2 解释器。先看 [README](README.md) 和 [�
 | `src/cli/` · `src/main.cpp` | CLI 与 REPL；Compilation/Diagnostics 编为 `cialcli` 静态库供各工具共享 |
 | `tests/` · `bench/` · `fuzz/` | 回归测试、基准、前端 fuzz 及语料 |
 | `src/format/` | cial-fmt 无损词素扫描、布局与安全文件写回 |
-| `tools/` · `editors/vscode/` | 工具骨架（`cial-lsp`/`cial-disasm`/`cial-dbg`，`CIAL_BUILD_*` 门控；lsp 目录另含 stdio 协议原型）与 VSCode 客户端 |
+| `tools/` · `editors/vscode/` | 调试器（`cial-dbg`，[用法](doc/debugger.md)）与工具骨架（`cial-lsp`/`cial-disasm`，`CIAL_BUILD_*` 门控；lsp 目录另含 stdio 协议原型）与 VSCode 客户端 |
 
 ## 构建与验证
 

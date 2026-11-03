@@ -15,6 +15,7 @@
 
 #include "../gen/IRGenerator.hpp"
 #include "../gen/Instruction.hpp"
+#include "DebugHook.hpp"
 #include "VMDebug.hpp"
 #include "common/Defer.hpp"
 #include "common/UTF16.hpp"
@@ -464,22 +465,30 @@ namespace cial::vm {
     }
 
     void VMState::run() {
+        const bool tail = _tailRecursionEnabled;
+        // Debug 走编译期门控实例（见 runLoop 注释）
+#define CIAL_RUN(record, native)                                                                                       \
+    do {                                                                                                               \
+        if(_debugHook) {                                                                                               \
+            if(tail)                                                                                                   \
+                runLoop<record, native, true, true>();                                                                 \
+            else                                                                                                       \
+                runLoop<record, native, false, true>();                                                                \
+        } else {                                                                                                       \
+            if(tail)                                                                                                   \
+                runLoop<record, native, true, false>();                                                                \
+            else                                                                                                       \
+                runLoop<record, native, false, false>();                                                               \
+        }                                                                                                              \
+    } while(false)
         if(_executionTrace) {
-            if(_tailRecursionEnabled)
-                runLoop<true, false, true>();
-            else
-                runLoop<true, false, false>();
+            CIAL_RUN(true, false);
         } else if(_integerJit) {
-            if(_tailRecursionEnabled)
-                runLoop<false, true, true>();
-            else
-                runLoop<false, true, false>();
+            CIAL_RUN(false, true);
         } else {
-            if(_tailRecursionEnabled)
-                runLoop<false, false, true>();
-            else
-                runLoop<false, false, false>();
+            CIAL_RUN(false, false);
         }
+#undef CIAL_RUN
     }
 
     namespace {
@@ -496,7 +505,7 @@ namespace cial::vm {
         }
     } // namespace
 
-    template <bool Record, bool Native, bool Tail>
+    template <bool Record, bool Native, bool Tail, bool Debug>
     void VMState::runLoop() {
         const size_t entryStackTop = _stackTop;
         if(entryStackTop == 0)
@@ -535,6 +544,9 @@ namespace cial::vm {
                     }
                     if constexpr(Record)
                         _executionTrace->record(*chunk, pc, rt, cur->funcMeta);
+                    if constexpr(Debug)
+                        if(_debugHook)
+                            _debugHook->onInstruction(*this, *cur, pc);
                     if constexpr(Native) {
                         if(_integerJit->tryRun(*chunk, regs, pc, _zf))
                             continue;
@@ -638,6 +650,11 @@ namespace cial::vm {
     DISPATCH_OP_METHOD(NOP) { return DispatchRet::Continue; }
 
     DISPATCH_OP_METHOD(Debugger) {
+        if(_debugHook) {
+            cur->pc = pc;
+            _debugHook->onDebugger(*this, *cur, pc);
+            return DispatchRet::Continue;
+        }
         std::string regsDump = dumpCurRegisters();
         std::string localVarDump = dumpCurLocalVars();
         std::string instructionsDump = dumpCurInstructions();

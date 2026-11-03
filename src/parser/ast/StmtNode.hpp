@@ -198,7 +198,7 @@ namespace cial::syntax {
 
     class DebuggerStmtNode final : public StmtNode {
     public:
-        explicit DebuggerStmtNode() : StmtNode("debugger_statement") {}
+        explicit DebuggerStmtNode(Token token) : StmtNode(std::move(token), "debugger_statement") {}
 
         void accept(Visitor *visitor) const override { visitor->visit(this); }
 

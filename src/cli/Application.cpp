@@ -1,7 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "Application.hpp"
-#include "stdlib/StandardLibrary.hpp"
 
 #include <chrono>
 #include <cstdlib>
@@ -13,12 +12,10 @@
 #include "Compilation.hpp"
 #include "Diagnostics.hpp"
 #include "Repl.hpp"
+#include "Session.hpp"
 #include "common/Colorizer.hpp"
 #include "common/Defer.hpp"
 #include "decompile/Decompiler.hpp"
-#include "stdlib/ExceptionLib.hpp"
-#include "stdlib/Print.hpp"
-#include "stdlib/ScriptsLib.hpp"
 #include "tjsbc/TjsBytecodeReader.hpp"
 #include "tjsbc/TjsTranslator.hpp"
 #include "types/Class.hpp"
@@ -26,23 +23,6 @@
 
 namespace cial::cli {
     namespace {
-        void initializeSession(Context &context, VM &vm, vm::VMState &state, const Options &options) {
-            stdlib::registerStandardLibrary(context);
-            context.registryGlobalFunc("print"_str, &stdlib::S_PrintFunction);
-            context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
-            vm.eval(R"(class __DebugShim {
-    function message(s) { println(s); }
-}
-var Debug = new __DebugShim();
-)"_str);
-            stdlib::initExceptionClass(vm);
-            // 重绑定 Scripts：嵌套执行所需的 VMState + 存储基目录（相对路径
-            // 相对当前执行脚本所在目录，krkr2 TVPSearchPlacedPath 的 CLI 语义）
-            stdlib::registerScriptsLib(context, &state,
-                                       options.input.empty() ? std::filesystem::path{}
-                                                             : std::filesystem::path{ options.input }.parent_path());
-        }
-
         int runSource(const Options &options, vm::VMState &state) {
             Common::Result diagnostics;
             // `-` 从 stdin 读取；诊断身份用逻辑名（默认 <stdin>），不暴露宿主临时路径
@@ -192,7 +172,8 @@ var Debug = new __DebugShim();
         const bool compileOnly = options.mode == Mode::CheckJson || options.mode == Mode::DumpCfg ||
             options.mode == Mode::DumpSsa || options.mode == Mode::Decompile;
         if(!compileOnly)
-            initializeSession(context, vm, state, options);
+            setupSession(context, vm, state,
+                         options.input.empty() ? std::filesystem::path{} : std::filesystem::path{ options.input });
         state.setJitMode(options.jit);
         state.setTailRecursionEnabled(options.tailRecursion);
 

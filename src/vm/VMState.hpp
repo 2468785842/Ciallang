@@ -29,6 +29,8 @@
 #include "gen/Register.hpp"
 
 namespace cial::vm {
+    class DebugHook;
+
     enum class PendingCF { None, Throw };
 
     enum class DispatchRet {
@@ -59,6 +61,10 @@ namespace cial::vm {
         void run();
         // 借用记录器；调用方保证它覆盖所有 run（含原生回调）的执行期。
         void setExecutionTrace(ExecutionTrace *trace) noexcept { _executionTrace = trace; }
+        // 借用调试钩子；同上覆盖所有 run 的执行期。onInstruction 在每条指令
+        // 派发前同步调用，可阻塞交互，返回即恢复执行；抛 DebugAbort（非
+        // std::exception）可整段放弃 run，由调用方收尾。会话须关闭 JIT。
+        void setDebugHook(DebugHook *hook) noexcept { _debugHook = hook; }
         [[nodiscard]] u64 tailCallsEliminated() const noexcept { return _tailCallsEliminated; }
         void setTailRecursionEnabled(bool enabled) noexcept { _tailRecursionEnabled = enabled; }
 
@@ -256,7 +262,10 @@ namespace cial::vm {
         }
 
     private:
-        template <bool Record, bool Native, bool Tail>
+        // Debug 为编译期门控：热循环内不做任何钩子检查（实测运行时分支代价 ~7%），
+        // run() 按 _debugHook 是否为空选择实例。Debug=true 时 JIT 派发仍可绕过钩子
+        // （tryRun 整段跳过），调试会话须关闭 JIT
+        template <bool Record, bool Native, bool Tail, bool Debug = false>
         void runLoop();
         DispatchRet dispatchTailCallV(CallFrame *cur, Value *regs, const u8 *ip, u64 &pc);
         bool trySelfTailCall(CallFrame *cur, Value *regs, Object *callee, u16 dst, const u16 *argRegs, u32 argc,
@@ -299,6 +308,7 @@ namespace cial::vm {
 
         // 可选模式状态置于末尾，保持已有解释器热字段的布局。
         ExecutionTrace *_executionTrace{};
+        DebugHook *_debugHook{};
         u64 _tailCallsEliminated{};
         bool _tailRecursionEnabled{};
         std::unique_ptr<IntegerJit> _integerJit;

@@ -191,7 +191,8 @@ if(CIAL_BUILD_CLI)
     # 生成的 Version.hpp 只被 Options.cpp（parseOptions --version）引用
     add_library(cialcli STATIC
         src/cli/Compilation.cpp
-        src/cli/Diagnostics.cpp)
+        src/cli/Diagnostics.cpp
+        src/cli/Session.cpp)
     target_compile_features(cialcli PUBLIC cxx_std_20)
     target_link_libraries(cialcli PUBLIC Ciallang::Ciallang)
     target_include_directories(cialcli PUBLIC
@@ -228,6 +229,29 @@ if(CIAL_BUILD_FORMATTER)
         target_compile_options(cial-fmt PRIVATE /EHsc /utf-8)
     endif()
     install(TARGETS cial-fmt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime)
+endif()
+
+# ------------------------------ auxiliary tools ------------------------------ #
+# 各工具 skeleton 在自身目录内定义 target；依赖尚未具备时以桩入口占位。
+# 共享的编译编排与诊断渲染见 cialcli（CIAL_BUILD_CLI 时定义）；
+# 成品 cial-fmt（CIAL_BUILD_FORMATTER，src/format/）不要求 CLI，一并纳入聚合。
+set(CIAL_TOOL_TARGETS "")
+foreach(tool IN ITEMS LSP DISASM DBG)
+    if(CIAL_BUILD_${tool})
+        string(TOLOWER "${tool}" CIAL_TOOL_DIR)
+        if(NOT CIAL_BUILD_CLI)
+            message(FATAL_ERROR "CIAL_BUILD_${tool} requires CIAL_BUILD_CLI=ON (shares cialcli)")
+        endif()
+        add_subdirectory(tools/${CIAL_TOOL_DIR})
+        list(APPEND CIAL_TOOL_TARGETS cial-${CIAL_TOOL_DIR})
+    endif()
+endforeach()
+if(CIAL_BUILD_FORMATTER)
+    list(APPEND CIAL_TOOL_TARGETS cial-fmt)
+endif()
+if(CIAL_TOOL_TARGETS)
+    add_custom_target(tools DEPENDS ${CIAL_TOOL_TARGETS}
+        COMMENT "Build all enabled auxiliary tools")
 endif()
 
 if(CIAL_BUILD_TESTS)
@@ -288,29 +312,6 @@ endif ()
 if(CIAL_BUILD_FUZZ)
     add_subdirectory(fuzz)
 endif ()
-
-# ------------------------------ auxiliary tools ------------------------------ #
-# 各工具 skeleton 在自身目录内定义 target；依赖尚未具备时以桩入口占位。
-# 共享的编译编排与诊断渲染见 cialcli（CIAL_BUILD_CLI 时定义）；
-# 成品 cial-fmt（CIAL_BUILD_FORMATTER，src/format/）不要求 CLI，一并纳入聚合。
-set(CIAL_TOOL_TARGETS "")
-foreach(tool IN ITEMS LSP DISASM DBG)
-    if(CIAL_BUILD_${tool})
-        string(TOLOWER "${tool}" CIAL_TOOL_DIR)
-        if(NOT CIAL_BUILD_CLI)
-            message(FATAL_ERROR "CIAL_BUILD_${tool} requires CIAL_BUILD_CLI=ON (shares cialcli)")
-        endif()
-        add_subdirectory(tools/${CIAL_TOOL_DIR})
-        list(APPEND CIAL_TOOL_TARGETS cial-${CIAL_TOOL_DIR})
-    endif()
-endforeach()
-if(CIAL_BUILD_FORMATTER)
-    list(APPEND CIAL_TOOL_TARGETS cial-fmt)
-endif()
-if(CIAL_TOOL_TARGETS)
-    add_custom_target(tools DEPENDS ${CIAL_TOOL_TARGETS}
-        COMMENT "Build all enabled auxiliary tools")
-endif()
 
 if(CIAL_INSTALL_SDK)
     include(cmake/SDK.cmake)

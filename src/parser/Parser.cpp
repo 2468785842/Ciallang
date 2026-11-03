@@ -1255,7 +1255,7 @@ namespace cial::syntax {
         if(!parser->expect(r, TokenType::SemiColon))
             return nullptr;
 
-        return parser->astBuilder()->makeNode<DebuggerStmtNode>();
+        return parser->astBuilder()->makeNode<DebuggerStmtNode>(*token);
     }
 
     // 分号已由 parseStatement 消费；空语句复用空 BlockStmtNode，IRGenerator 不产出指令

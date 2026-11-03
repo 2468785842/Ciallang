@@ -28,7 +28,7 @@ ctest --test-dir build/local --output-on-failure
 | `CIAL_ENABLE_JIT` | OFF | OFF | `jit` / asmjit，仅 x64 |
 | `CIAL_BUILD_FUZZ` | OFF | OFF | 无；需 Clang/libFuzzer |
 | `CIAL_BUILD_BENCH` | OFF | OFF | 无；要求 CLI 开启 |
-| `CIAL_BUILD_LSP` / `CIAL_BUILD_DISASM` / `CIAL_BUILD_DBG` | OFF | OFF | `tools` / 无额外依赖；工具骨架，要求 CLI 开启（共享 `cialcli`） |
+| `CIAL_BUILD_LSP` / `CIAL_BUILD_DISASM` / `CIAL_BUILD_DBG` | OFF | OFF | `tools` / 无额外依赖；要求 CLI 开启（共享 `cialcli`）。lsp/disasm 为骨架，dbg 为交互式调试器，见[调试器](debugger.md) |
 | `CIAL_BUILD_TOOLS` | OFF | OFF | 一键启用上述骨架与 `CIAL_BUILD_FORMATTER`；聚合构建 target `tools` |
 | `CIAL_INSTALL_SDK` | ON | OFF | 安装 C++ 库、传递头与 CMake package，见[宿主集成](embedding.md) |
 | `CIAL_ENABLE_PACKAGING` | OFF | OFF | CLI 压缩包，要求独立工程、静态依赖与许可，见[发布指南](releasing.md) |

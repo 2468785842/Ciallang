@@ -209,6 +209,22 @@ namespace cial::vm {
             return *std::prev(it);
         }
 
+        // bc 偏移 → TAC 下标：≤ bcPc 的最近指令起点（调试器反汇编定位用，
+        // 与 instructionBefore 的精确匹配语义不同）。须在 toBytecode() 之后；
+        // 未编码或 bcPc 先于首条指令时返回空。
+        [[nodiscard]] Opt<size_t> tacIndexAtBc(const u64 bcPc) const {
+            const auto it = std::upper_bound(_instructionStarts.begin(), _instructionStarts.end(), bcPc);
+            if(it == _instructionStarts.begin())
+                return {};
+            return static_cast<size_t>(std::prev(it) - _instructionStarts.begin());
+        }
+
+        // TAC 下标 → bc 起始偏移；须在 toBytecode() 之后且下标在界内。
+        [[nodiscard]] u64 bcOffsetAtTac(const size_t tacIndex) const { return _instructionStarts[tacIndex]; }
+
+        // 已编码指令数（= _instructionStarts.size()）；须在 toBytecode() 之后。
+        [[nodiscard]] size_t instructionCount() const { return _instructionStarts.size(); }
+
         // 仅在启用执行记录时分配身份；记录器保存值快照，不持有 GC 对象指针。
         [[nodiscard]] u64 executionTraceId() {
             static std::atomic<u64> next{ 1 };

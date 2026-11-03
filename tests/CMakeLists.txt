@@ -112,6 +112,12 @@ if(Python3_Interpreter_FOUND AND TARGET cial)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/lsp/test_protocol.py"
                 --cial "$<TARGET_FILE:cial>")
     set_tests_properties(CiallangLspProtocol PROPERTIES TIMEOUT 30)
+    if(TARGET cial-dbg)
+        add_test(NAME CiallangDbg
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/dbg_test.py"
+                    --dbg "$<TARGET_FILE:cial-dbg>")
+        set_tests_properties(CiallangDbg PROPERTIES TIMEOUT 30)
+    endif()
     add_test(NAME CiallangBytecodeTool
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../bench/test_bytecode_conformance.py"
                 --cial "$<TARGET_FILE:cial>")

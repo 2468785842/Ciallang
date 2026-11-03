@@ -1750,7 +1750,10 @@ namespace cial::inter {
         _chunk->emit<Ret>(loadVoidReg());
     }
 
-    void IRGenerator::generate(const syntax::DebuggerStmtNode *, OptReg &) { _chunk->emit<Debugger>(); }
+    void IRGenerator::generate(const syntax::DebuggerStmtNode *node, OptReg &) {
+        _chunk->addLine(node->location); // Rlc 行号：调试器停机横幅与断点定位依赖该条目
+        _chunk->emit<Debugger>();
+    }
 
     LocalVariable *IRGenerator::resolveLocalVariable(const Atom identifier) {
         for(const auto index : std::ranges::reverse_view(_activeLocals)) {
