@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include <deque>
+
 #include "common/SourceFile.hpp"
 #include "tjsbc/TjsTranslator.hpp"
 #include "vm/Chunk.hpp"
@@ -52,7 +54,8 @@ namespace cial {
 
         struct DecompileResult {
             Status status{ Status::Unsupported };
-            Vec<DecompiledUnit> units;
+            // deque：壳组装（M4）在体发射中途追加子单元，引用/指针必须稳定
+            std::deque<DecompiledUnit> units;
             Vec<std::string> diagnostics; // Unsupported/InvalidInput 的原因（逐单元）
 
             [[nodiscard]] std::string text() const; // 全部单元文本按序拼接

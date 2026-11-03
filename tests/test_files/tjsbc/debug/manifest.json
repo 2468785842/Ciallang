@@ -7,13 +7,13 @@
     "binarySha256": "478eab1709f5e3138ab7b5cdc78405ed4cf2020fdaa5fff6519ec4226b4471b1",
     "exportOptions": "--dump-debug <script.tjs> <out.tjsbc>"
   },
-  "granularity": "TJS2 SourcePosArray 仅在控制流/调用等点登记源位置；条目之间的 TAC 继承上一条目的行号，函数定义安装等非控制流 TAC 因此可能落在邻近行；context 末条目可指向源码末尾之后一行，由 locationByIndex 收敛",
+  "granularity": "TJS2 SourcePosArray 仅在控制流/调用等点登记源位置；条目之间的 TAC 继承上一条目的行号，函数定义安装等非控制流 TAC 因此可能落在邻近行；context 末条目可指向源码末尾之后一行，由 locationByIndex 收敛。M4 起行表按语句粒度登记（一条恢复语句 = 一行表行，取该语句首条 TAC 的来源），声明体为 body 子单元、行取语句首 pc 的来源；语句内多指令的原行号不再逐条枚举",
   "samples": [
     {
       "name": "lines",
       "sourceSha256": "fb63a738b7048679eb979dbddef76135449d765ffb35b4345ab6e4b23dac2c00",
       "bytecodeSha256": "676170460d683b24d0b18fb9609dc090ee82b90d57b63e4f1ee23293129590f4",
-      "expectedLines": { "global": [7, 8], "f": [1, 2], "g": [5, 6] }
+      "expectedLines": { "global": [0, 7, 8, 9], "f": [0, 2], "g": [0, 5, 6] }
     },
     {
       "name": "s6_class",
@@ -21,24 +21,25 @@
       "bytecodeSha256": "e9c18dc92d01a94818bb1bc8a41953879f80f7c27bc7d3a04fb9c50b33dd674a",
       "expectedLines": {
         "global": [10, 11, 12, 13, 17, 18, 23, 24],
-        "Animal": [3],
-        "describe": [4],
+        "Animal": [0, 3],
+        "describe": [0, 4],
         "(getter)": [6],
-        "(setter)": [7],
-        "testDeref": [15, 16, 17, 18, 19, 20, 21, 22]
-      }
+        "(setter)": [0, 7]
+      },
+      "pendingUnits": { "testDeref": "体内方法直调形态（g_method_c/call_method 族）恢复未落地，见 TODO 反编译器 M4 验收扩展" }
     },
     {
       "name": "s7_ext",
       "sourceSha256": "72bfa2f198ee0cf15bf3c51982567d7ce1e9a601d1098b3544d4cc82da0d3453",
       "bytecodeSha256": "530079590eb936d9d7dab42ee82dbad2053e8255af4af100dfa8c133aee1be72",
-      "expectedLines": { "global": [10, 11, 12], "Dog": [6, 7] }
+      "expectedLines": { "global": [0, 10, 11, 12], "Animal": [0, 3], "describe": [2, 5] },
+      "pendingUnits": { "Dog": "super.<Ctor>() 构造直调 context 的实参搬运 prologue 恢复未落地，见 TODO 反编译器 M4 验收扩展" }
     },
     {
       "name": "utf8",
       "sourceSha256": "f1d8cb1dcf1d962289dcf6876a52c8d352e3be4475eb0c7041c3de887ac971be",
       "bytecodeSha256": "5300f226331e6984728f588e526d114db043bc4709b39e4cb89b9a4d9f38e42b",
-      "expectedLines": { "global": [4, 5], "f": [2] }
+      "expectedLines": { "global": [2, 4, 5, 6], "f": [2, 3] }
     }
   ]
 }

@@ -4,20 +4,22 @@
  * 反编译器 M2 表达式恢复实现（doc/bytecode/decompiler-plan.md §5.2/§5.7）。
  * 见 ExprBuilder.hpp。
  *
- * 管线（单块直线 TAC）：
- *   1. 预检拒绝语句结构（跳转/with/try/条件上下文 → M3/M5）与声明装配
- *      （Load 元对象常量 → M4）；
+ * 管线（CFG 块 + 条件区结构化，M2/M3/M4）：
+ *   1. 预检拒绝不可结构化语句（switch 的 JmpE 与 _zf 直写比较族、with、try、
+ *      eval、展开实参 → M5）；
  *   2. Pass A：寄存器版本链（LIFO 复用使同一寄存器多版本；参数寄存器预播种）
  *      + 使用点收集；
  *   3. Pass B：按后优化形态表建表达式节点、登记语句 tile（BinaryImm/
  *      CompareTestImm 逆映射、字面量 SetIndex 折叠、具名局部定义转 var 语句、
- *      Push+Call 归并）；
- *   4. 死代码：无使用的纯定义丢弃，无使用且有副作用的定义降为表达式语句；
- *   5. 物化决策（按 defPc 降序，消费方先决）：单使用且 def→落点干净区间才内联；
+ *      Push+Call 归并、Load 声明常量 + 安装链折叠为 Decl tile 经宿主装配）；
+ *   4. 复合赋值逆融合（M4）：GProp+Op+DProp 模板且中间值单读者（防 getter
+ *      计数翻倍的误融合）时合并为 +=/++ 语句；
+ *   5. 死代码：无使用的纯定义丢弃，无使用且有副作用的定义降为表达式语句；
+ *   6. 物化决策（按 defPc 降序，消费方先决）：单使用且 def→落点干净区间才内联；
  *      干净区间 = 之间无存储/调用/getter，除非中间定义同落点内联（同树序不变）
  *      或本身是恒可内联的字面量；多使用在函数体内物化为临时变量，顶层纯读复制、
  *      否则拒绝（避免复制出 getter/调用次数变化或物化可观察全局状态）；
- *   6. 按 pc 序发射语句，按 TJS2 优先级加括号。
+ *   7. 按 pc 序发射语句（块结构走 M3 区域归约），按 TJS2 优先级加括号。
  */
 
 #include "ExprBuilder.hpp"
@@ -25,6 +27,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <map>
 #include <ranges>
 #include <set>
@@ -38,6 +41,7 @@
 #include "runtime/Runtime.hpp"
 #include "types/Array.hpp"
 #include "types/Dictionary.hpp"
+#include "types/Octet.hpp"
 
 namespace cial::decompile {
     namespace {
@@ -236,12 +240,14 @@ namespace cial::decompile {
                 Int,
                 Real,
                 Str,
+                OctetLit, // <% hex %>; 字面量（text 预渲染）
                 ArrayLit,
                 DictLit,
                 RegExp,
                 LocalName, // 具名局部（含参数）或全局名
                 ThisVal,
                 GlobalObj,
+                SuperVal, // super（Super 指令定义，仅作成员访问/调用接收者）
                 Member, // obj.name / obj["name"] / obj[expr]
                 Index, // obj[expr]
                 Call, // callee(args)
@@ -275,6 +281,8 @@ namespace cial::decompile {
                 StoreIndex, // OBJ[IDX] = SRC
                 StoreDeref, // *P = SRC
                 StoreLocal, // (var) 具名局部 = SRC（DLocal 目标或具名寄存器直定）
+                CompoundAssign, // TARGET OP= RHS / TARGET++（M4 逆融合，单读者守卫）
+                Decl, // 声明装配（Load 声明常量 + 安装链 → 宿主装配文本）
                 DeleteMember, // delete OBJ.M / OBJ[expr]（dst 无使用）
                 ExprStmt, // EXPR;（死副作用定义降级：调用/getter/转换/delete）
                 Return, // return SRC / return（Void 且单元末尾时省略）
@@ -284,12 +292,18 @@ namespace cial::decompile {
             };
             Kind kind{};
             u32 pc{};
+            u32 tacEnd{}; // >0 = 多指令 tile 的显式区间尾（Decl 安装链）
             u32 obj{ INVALID }, idx{ INVALID }, src{ INVALID }; // 寄存器槽
             u32 exprNode{ INVALID }; // StoreLocal 直定 / ExprStmt 的表达式节点
+            u32 rhsNode{ INVALID }; // CompoundAssign 的右操作数节点
+            u32 constIdx{}; // Decl 的常量下标
             Atom atom{};
-            std::string name; // StoreLocal 变量名
+            std::string name; // StoreLocal 变量名 / Decl 安装名
+            std::string opText; // CompoundAssign 运算符（"++"/"--" 或 "+=" 族）
             bool raw{};
             bool declare{}; // 输出 var 前缀（首次声明）
+            bool contextInstall{}; // Decl 安装链含 ChgThis（FunctionDecl 形态）
+            u8 declInstall{}; // Decl 安装形态：0=无(零拷贝具名槽) 1=全局 2=成员 3=局部
         };
 
         struct DefVersion {
@@ -298,6 +312,7 @@ namespace cial::decompile {
             Vec<u32> usePcs;
             u32 landing{ INVALID }; // 单使用版本的文本落点（消费语句/定义的 pc）
             bool hidden{}; // VM 内部写入（GMethodC receiver）：不产节点
+            bool fused{}; // 逆融合消费（成员读/二目结果）：不物化不复制，landing 保留
             bool materialized{}; // 物化为临时变量（函数体）
             bool duplicated{}; // 顶层纯读复制
             std::string tempName;
@@ -306,20 +321,25 @@ namespace cial::decompile {
 
     class ExprBuilder {
     public:
-        ExprBuilder(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike) :
-            _rt(rt), _chunk(chunk), _meta(meta), _functionLike(functionLike) {}
+        ExprBuilder(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike, DeclHost *host) :
+            _rt(rt), _chunk(chunk), _meta(meta), _functionLike(functionLike), _host(host) {}
 
         ExprRecovery run() {
             ExprRecovery recovery;
             if(!precheck(recovery.unsupported))
                 return recovery;
 
+            // 声明安装链预扫描（M4）：先于版本链扫描折叠，链上 pc 不计使用/定义，
+            // 链内寄存器的链内多次读取（如 global→chg_this→d_prop_raw_c 共用全局
+            // 对象寄存器）不进入物化决策
+            scanDeclarations();
             buildBlocksAndCondZones();
             scanVersions();
             buildNodesAndStmts();
             if(finishUnsupported(recovery))
                 return recovery;
 
+            fuseCompoundAssign();
             foldTernaries();
             collectDeadStatements();
             decideVersions();
@@ -344,7 +364,7 @@ namespace cial::decompile {
             return true;
         }
 
-        // ── 预检：语句结构（M3/M5）与声明装配（M4）如实拒绝 ──
+        // ── 预检：不可结构化语句（M5）如实拒绝 ──
         bool precheck(std::string &reason) {
             if(!_chunk.getThrowHandlers().empty()) {
                 reason = "try/catch 结构化属 M5（throw handler 表非空）";
@@ -377,20 +397,8 @@ namespace cial::decompile {
                     case TacOpCode::CollapseArgs:
                         reason = "展开实参/收拢参数恢复属后续批次";
                         return false;
-                    case TacOpCode::Super:
-                        reason = "super 关键字恢复属 M4（类壳）";
-                        return false;
                     default:
                         break;
-                }
-                // 声明装配（函数/类/property 常量进寄存器）属 M4
-                if(op == TacOpCode::Load) {
-                    const auto &constant = _chunk.getConstants()[instructions[pc]->getOp2().value<ConstIdx>().index()];
-                    if(constant.type() == ConstantType::FuncMeta || constant.type() == ConstantType::ClassMeta ||
-                       constant.type() == ConstantType::PropMeta) {
-                        reason = "声明装配（context 树 → 壳）属 M4";
-                        return false;
-                    }
                 }
             }
             return true;
@@ -476,6 +484,9 @@ namespace cial::decompile {
             auto &instructions = _chunk.getInstVec();
             for(size_t pc = 0; pc < instructions.size(); ++pc) {
                 _instPc = static_cast<u32>(pc);
+                // 声明安装链：整体跳过（链内读写在 Decl tile 内消费）
+                if(_foldedPcs.contains(_instPc))
+                    continue;
                 const Instruction &inst = *instructions[pc];
                 // 同寄存器自拷贝（优化器残留）透明：不计使用，只推进版本
                 const bool selfCopy = (inst.opcode() == TacOpCode::DLocal || inst.opcode() == TacOpCode::GLocal) &&
@@ -680,6 +691,9 @@ namespace cial::decompile {
                 case TacOpCode::ChgThis:
                     callback(inst.getOp1().value<Register>(), true);
                     break;
+                case TacOpCode::Super:
+                    callback(inst.getOp1().value<Register>(), false);
+                    break;
                 case TacOpCode::Add:
                 case TacOpCode::Sub:
                 case TacOpCode::Mul:
@@ -743,6 +757,11 @@ namespace cial::decompile {
             for(size_t pc = 0; pc < instructions.size(); ++pc) {
                 _instPc = static_cast<u32>(pc);
                 const Instruction &inst = *instructions[pc];
+                // 声明安装链：随 Decl tile 折叠，不产节点/语句，也不视为存储
+                if(_foldedPcs.contains(_instPc)) {
+                    _impureOrStore[pc] = false;
+                    continue;
+                }
                 _impureOrStore[pc] = isImpureOrStore(inst);
                 // 跳转是求值时机屏障：跨分支内联会把调用/getter 移入/移出分支，
                 // 改变可观察的执行次数
@@ -863,10 +882,23 @@ namespace cial::decompile {
                 case TacOpCode::Debugger:
                     pushStmt(Stmt{ .kind = Stmt::Kind::DebuggerStmt, .pc = _instPc });
                     break;
-                case TacOpCode::Load:
-                    defineNode(inst.getOp1().value<Register>(), loadConstNode(inst.getOp2().value<ConstIdx>()));
-                    noteNamedDef(inst.getOp1().value<Register>());
+                case TacOpCode::Load: {
+                    const auto dst = inst.getOp1().value<Register>();
+                    const auto constIdx = inst.getOp2().value<ConstIdx>();
+                    if(const auto it = _declSpecs.find(_instPc); it != _declSpecs.end()) {
+                        emitDeclaration(it->second);
+                        break;
+                    }
+                    const auto &constant = _chunk.getConstants()[constIdx.index()];
+                    if(constant.type() == ConstantType::FuncMeta || constant.type() == ConstantType::ClassMeta ||
+                       constant.type() == ConstantType::PropMeta) {
+                        fail("声明常量缺少安装链（匿名声明字面量属后续批次）");
+                        break;
+                    }
+                    defineNode(dst, loadConstNode(constIdx));
+                    noteNamedDef(dst);
                     break;
+                }
                 case TacOpCode::LoadImm:
                     defineNode(inst.getOp1().value<Register>(),
                                makeLeaf(Expr::Kind::Int, inst.getOp2().value<Integer>()));
@@ -877,6 +909,10 @@ namespace cial::decompile {
                     break;
                 case TacOpCode::This:
                     defineNode(inst.getOp1().value<Register>(), makeSimple(Expr::Kind::ThisVal));
+                    break;
+                case TacOpCode::Super:
+                    // super（M4 类壳）：superclass 引用，仅作成员访问/调用接收者
+                    defineNode(inst.getOp1().value<Register>(), makeSimple(Expr::Kind::SuperVal));
                     break;
                 case TacOpCode::GGlobal:
                 case TacOpCode::GThis: {
@@ -1218,6 +1254,361 @@ namespace cial::decompile {
             return true;
         }
 
+        // reg 在 pc 之前的最新版本（声明安装链回填槽位用：折叠时 Pass B 尚未
+        // 推进到安装指令，_current 不能反映安装点版本）
+        [[nodiscard]] u32 versionBefore(const Register reg, const u32 pc) const {
+            const auto index = reg.index();
+            if(index >= _defs.size())
+                return INVALID;
+            u32 found = INVALID;
+            for(u32 v = 0; v < _defs[index].size(); ++v)
+                if(_defs[index][v].defPc < pc)
+                    found = v; // 同寄存器定义按 pc 单调，取最后一个
+            return found;
+        }
+
+        // ── M4 声明装配：Load 声明常量 + 紧随安装链折叠为 Decl tile ──
+        // 安装链 = Load 后连续的 Global（链内定义临时）/ ChgThis / DGlobal / DThis /
+        // DProp 族 / DLocal，且每条必须读链内定义的寄存器（否则是无关语句，折叠
+        // 终止）。安装名取自安装指令（Atom / DProp 名寄存器 / 具名局部）；无安装名
+        // 的表达式位置字面量（如实参函数）如实拒绝。模板形态与 IRGen/转译器一一对
+        // 应：Global+ChgThis+DGlobal = 顶层 function 声明、Load 直落具名局部 = 嵌套
+        // function 声明（零拷贝）、DGlobal 裸写 = var 赋值/类安装、ChgThis+DPropRawC
+        // = property 安装（自产与 bc 同构）
+        // 声明安装链预扫描：Load 声明常量 + 紧随安装链折叠。链 pc 记入 _foldedPcs
+        // （版本链扫描与语句构建整体跳过），Decl tile 规格存入 _declSpecs，待
+        // Pass B 处理到 Load pc 时（版本链已齐）解析槽位并产语句。
+        // 模板形态严格有序：Global* → ChgThis? → 安装指令（终点）。寄存器复用
+        // 使"读链值"判定不充分（安装后的无关语句可能恰读链内寄存器），故安装
+        // 即终止，不向后贪婪
+        struct DeclSpec {
+            u32 constIdx{};
+            u32 installPc{};
+            u32 foldEnd{};
+            u8 install{}; // Install 枚举
+            std::string name;
+            Register objReg{};
+            Register nameReg{};
+            bool hasObj{};
+            bool hasNameReg{};
+            bool raw{};
+            bool declare{};
+            bool contextInstall{};
+        };
+
+        void scanDeclarations() {
+            auto &code = _chunk.getInstVec();
+            for(u32 pc = 0; pc < code.size(); ++pc) {
+                const Instruction &inst = *code[pc];
+                if(inst.opcode() != TacOpCode::Load)
+                    continue;
+                const auto constIdx = inst.getOp2().value<ConstIdx>();
+                const auto &constant = _chunk.getConstants()[constIdx.index()];
+                if(constant.type() != ConstantType::FuncMeta && constant.type() != ConstantType::ClassMeta &&
+                   constant.type() != ConstantType::PropMeta)
+                    continue;
+                const auto dst = inst.getOp1().value<Register>();
+                enum class Install : u8 { None, Global, Member, Local } install{ Install::None };
+                DeclSpec spec{};
+                spec.constIdx = constIdx.index();
+                bool contextInstall = false;
+                u32 foldEnd = pc;
+                for(u32 chain = pc + 1; chain < code.size(); ++chain) {
+                    const Instruction &cand = *code[chain];
+                    const auto op = cand.opcode();
+                    if(op == TacOpCode::Global && install == Install::None && !contextInstall) {
+                        _foldedPcs.insert(chain);
+                        foldEnd = chain;
+                        continue;
+                    }
+                    if(op == TacOpCode::ChgThis && install == Install::None) {
+                        _foldedPcs.insert(chain);
+                        foldEnd = chain;
+                        contextInstall = true;
+                        continue;
+                    }
+                    switch(op) {
+                        case TacOpCode::DGlobal:
+                            spec.name = atomText(_rt, cand.getOp1().value<Atom>());
+                            install = Install::Global;
+                            if(!_functionLike && !_declaredGlobals.contains(spec.name)) {
+                                spec.declare = true;
+                                _declaredGlobals.insert(spec.name);
+                            }
+                            break;
+                        case TacOpCode::DThis:
+                            spec.name = atomText(_rt, cand.getOp1().value<Atom>());
+                            install = Install::Global; // 上下文成员声明：同裸声明形态
+                            contextInstall = true;
+                            break;
+                        case TacOpCode::DPropC:
+                        case TacOpCode::DPropRawC:
+                            spec.name = atomText(_rt, cand.getOp2().value<Atom>());
+                            install = Install::Member;
+                            spec.raw = op == TacOpCode::DPropRawC;
+                            spec.objReg = cand.getOp1().value<Register>();
+                            spec.hasObj = true;
+                            break;
+                        case TacOpCode::DProp:
+                        case TacOpCode::DPropRaw:
+                            install = Install::Member;
+                            spec.raw = op == TacOpCode::DPropRaw;
+                            spec.objReg = cand.getOp1().value<Register>();
+                            spec.hasObj = true;
+                            spec.nameReg = cand.getOp2().value<Register>();
+                            spec.hasNameReg = true;
+                            break;
+                        case TacOpCode::DLocal: {
+                            const auto ldst = cand.getOp2().value<Register>();
+                            spec.name = localNameAt(ldst, chain + 1);
+                            install = spec.name.empty() ? Install::None : Install::Local;
+                            if(install == Install::Local)
+                                spec.declare = declareLocal(ldst.index(), spec.name);
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                    _foldedPcs.insert(chain);
+                    foldEnd = chain;
+                    spec.installPc = chain;
+                    break; // 安装即终点
+                }
+                if(install == Install::None) {
+                    // Load 直落具名局部（嵌套 function 声明的零拷贝形态）
+                    spec.name = localNameAt(dst, pc + 1);
+                    if(spec.name.empty()) {
+                        fail("表达式位置的匿名函数字面量恢复属后续批次");
+                        return;
+                    }
+                }
+                spec.foldEnd = foldEnd;
+                spec.contextInstall = contextInstall;
+                spec.install = static_cast<u8>(install);
+                _declSpecs.emplace(pc, std::move(spec));
+            }
+        }
+
+        // Pass B 到达 Load pc：按预扫描规格解析槽位（versionBefore 需完整版本链）
+        void emitDeclaration(const DeclSpec &spec) {
+            Stmt stmt{ .kind = Stmt::Kind::Decl, .pc = _instPc, .tacEnd = spec.foldEnd + 1, .constIdx = spec.constIdx };
+            if(spec.hasObj)
+                stmt.obj = packSlot(spec.objReg, versionBefore(spec.objReg, spec.installPc));
+            if(spec.hasNameReg) {
+                const auto nameVersion = versionBefore(spec.nameReg, spec.installPc);
+                if(nameVersion != INVALID)
+                    stmt.idx = packSlot(spec.nameReg, nameVersion);
+            }
+            stmt.name = spec.name;
+            stmt.raw = spec.raw;
+            stmt.declare = spec.declare;
+            stmt.contextInstall = spec.contextInstall;
+            stmt.declInstall = spec.install;
+            pushStmt(std::move(stmt));
+        }
+
+        // ── M4 复合赋值逆融合（方案 §5.6）：模板命中 + 单读者双守卫 ──
+        // GProp/DerefGet 读 → 二目运算 → DProp/SetIndex/DerefSet 写，且中间值各
+        // 只有一个读者时合并为 TARGET OP= RHS / TARGET++。单读者守卫防止误融合
+        // 改变 getter 调用次数（读值另有读者时融合会复制/丢失读取）；对象一致性
+        // 按"同一源表达式的两次求值"判定（bc 模板同槽，自产路径比较定义指令
+        // 签名或名字节点），防止 o.x = p.x + 1 类误融为 o.x += 1。Sub(1, X)、
+        // 成员非直接回写等非模板形态不融合。
+        void fuseCompoundAssign() {
+            for(auto &stmt : _stmts) {
+                if(stmt.kind != Stmt::Kind::StoreMember && stmt.kind != Stmt::Kind::StoreIndex &&
+                   stmt.kind != Stmt::Kind::StoreDeref && stmt.kind != Stmt::Kind::StoreLocal)
+                    continue;
+                if(stmt.src == INVALID)
+                    continue;
+                const auto &srcDef = versionOf(stmt.src);
+                if(srcDef.usePcs.size() != 1 || srcDef.usePcs.front() != stmt.pc)
+                    continue; // 结果另有读者：融合会改变求值次数
+                if(srcDef.defPc == INVALID || srcDef.defPc >= _chunk.getInstVec().size())
+                    continue;
+                if(srcDef.node == INVALID || _nodes[srcDef.node].kind != Expr::Kind::Binary)
+                    continue;
+                const auto &bin = _nodes[srcDef.node];
+                // ++ 形态：Add(字面量 1, X)（自产后缀模板）；bc INCPD 展开为成员在
+                // 左的 Add(t, 1)，落入 += 分支按 o.x += 1 恢复（行为等价）
+                const bool incForm = bin.a != INVALID && bin.a < _nodes.size() &&
+                    _nodes[bin.a].kind == Expr::Kind::Int && _nodes[bin.a].integer == 1 && bin.text == "+";
+                std::string opText;
+                u32 memberNodeIdx = INVALID;
+                u32 rhsNodeIdx = INVALID;
+                if(incForm) {
+                    opText = "++";
+                    memberNodeIdx = bin.b;
+                } else if(isCompoundOpText(bin.text)) {
+                    opText = bin.text + "=";
+                    memberNodeIdx = bin.a;
+                    rhsNodeIdx = bin.b;
+                } else {
+                    continue;
+                }
+                // 成员形态归一：&o.x / *p 的裸访问解一层
+                u32 inner = memberNodeIdx;
+                u32 derefOperand = INVALID;
+                bool rawAccess = false;
+                if(inner != INVALID && inner < _nodes.size() && _nodes[inner].kind == Expr::Kind::Unary) {
+                    const auto &un = _nodes[inner];
+                    if(un.text == "&") {
+                        rawAccess = true;
+                        derefOperand = un.a;
+                        inner = un.a;
+                    } else if(un.text == "*") {
+                        derefOperand = un.a;
+                        inner = INVALID; // 解引用形态无内层成员
+                    } else {
+                        continue;
+                    }
+                }
+                Stmt fused{ .kind = Stmt::Kind::CompoundAssign, .pc = stmt.pc, .opText = std::move(opText) };
+                bool matched = false;
+                if(inner != INVALID && inner < _nodes.size() &&
+                   (_nodes[inner].kind == Expr::Kind::Member || _nodes[inner].kind == Expr::Kind::Index)) {
+                    const auto &member = _nodes[inner];
+                    const bool isIndexKind = member.kind == Expr::Kind::Index;
+                    if(stmt.kind == Stmt::Kind::StoreMember) {
+                        if(stmt.atom != ATOM_INVALID) {
+                            matched =
+                                !isIndexKind && member.atom == stmt.atom && sameObjectIdentity(member.a, stmt.obj);
+                        } else {
+                            matched = !isIndexKind && member.atom == ATOM_INVALID &&
+                                sameObjectIdentity(member.a, stmt.obj) && sameObjectIdentity(member.b, stmt.idx);
+                        }
+                        if(matched && rawAccess != stmt.raw)
+                            matched = false;
+                    } else if(stmt.kind == Stmt::Kind::StoreIndex) {
+                        matched = isIndexKind && sameObjectIdentity(member.a, stmt.obj) &&
+                            sameObjectIdentity(member.b, stmt.idx);
+                    }
+                    if(matched) {
+                        fused.obj = stmt.obj;
+                        fused.idx = stmt.idx;
+                        fused.atom = stmt.atom;
+                        fused.raw = stmt.raw;
+                    }
+                } else if(derefOperand != INVALID && stmt.kind == Stmt::Kind::StoreDeref) {
+                    // *p 形态：读侧解引用操作数与写侧引用一致
+                    matched = sameObjectIdentity(derefOperand, stmt.obj);
+                    if(matched) {
+                        fused.obj = stmt.obj;
+                        fused.raw = stmt.raw;
+                    }
+                } else if(stmt.kind == Stmt::Kind::StoreLocal) {
+                    // 具名局部：x++（Add(1, x)）/ x OP= rhs（成员在左）；名字节点
+                    // 直读（非成员/解引用形态）
+                    const u32 nameNode = incForm ? bin.b : bin.a;
+                    if(memberNodeIdx == nameNode && nameNode != INVALID && nameNode < _nodes.size() &&
+                       _nodes[nameNode].kind == Expr::Kind::LocalName && !_nodes[nameNode].globalName &&
+                       _nodes[nameNode].text == stmt.name) {
+                        matched = true;
+                    }
+                }
+                if(!matched)
+                    continue;
+                // 成员读取版本：唯一读者须是本二目指令（中间值单读者守卫）。
+                // 具名局部按名字直读（无 getter），无需该守卫
+                if(stmt.kind != Stmt::Kind::StoreLocal) {
+                    const u32 memberSlot = slotByNodeAndUse(memberNodeIdx, srcDef.defPc);
+                    if(memberSlot == INVALID)
+                        continue;
+                    _defs[memberSlot >> 16][memberSlot & 0xFFFF].fused = true;
+                }
+                _defs[stmt.src >> 16][stmt.src & 0xFFFF].fused = true;
+                fused.rhsNode = rhsNodeIdx;
+                if(stmt.kind == Stmt::Kind::StoreLocal)
+                    fused.name = stmt.name;
+                stmt = std::move(fused);
+            }
+        }
+
+        // 可逆融合为 OP= 的二目运算符（与 Ciallang AssignToken 集一致）
+        [[nodiscard]] static bool isCompoundOpText(const std::string &text) {
+            static const std::set<std::string> ops = { "+", "-", "*",  "/",  "\\",  "%",  "|",
+                                                       "^", "&", "<<", ">>", ">>>", "&&", "||" };
+            return ops.contains(text);
+        }
+
+        // 读侧对象节点与写侧对象槽位的一致性：同节点/同名字读即同值；否则比较
+        // 定义指令签名（同一源表达式的两次求值）。调用族定义保守拒绝（CallV
+        // 实参不在操作数中，签名无法区分不同调用）
+        [[nodiscard]] bool sameObjectIdentity(const u32 readNode, const u32 writeSlot) {
+            if(readNode == INVALID || writeSlot == INVALID || readNode >= _nodes.size())
+                return false;
+            const auto &wd = versionOf(writeSlot);
+            if(wd.node == readNode)
+                return true;
+            if(wd.node == INVALID || wd.node >= _nodes.size() || wd.defPc >= _chunk.getInstVec().size())
+                return false;
+            const auto &rn = _nodes[readNode];
+            const auto &wn = _nodes[wd.node];
+            if(rn.kind == Expr::Kind::LocalName && wn.kind == Expr::Kind::LocalName)
+                return rn.text == wn.text && rn.globalName == wn.globalName;
+            auto &code = _chunk.getInstVec();
+            for(size_t reg = 0; reg < _defs.size(); ++reg) {
+                for(size_t v = 0; v < _defs[reg].size(); ++v) {
+                    const auto &rd = _defs[reg][v];
+                    if(rd.node != readNode || rd.defPc >= code.size())
+                        continue;
+                    const auto &ri = code[rd.defPc];
+                    const auto &wi = code[wd.defPc];
+                    if(ri->opcode() != wi->opcode())
+                        return false;
+                    switch(ri->opcode()) {
+                        case TacOpCode::CallV:
+                        case TacOpCode::CallMethodV:
+                        case TacOpCode::Call:
+                        case TacOpCode::CallOmit:
+                        case TacOpCode::EvalStr:
+                            return false;
+                        default:
+                            break;
+                    }
+                    if(ri->opcode() == TacOpCode::BinaryImm &&
+                       static_cast<const inter::BinaryImm &>(*ri).arithmetic !=
+                           static_cast<const inter::BinaryImm &>(*wi).arithmetic)
+                        return false;
+                    return operandEquals(ri->getOp1(), wi->getOp1()) && operandEquals(ri->getOp2(), wi->getOp2()) &&
+                        operandEquals(ri->getOp3(), wi->getOp3());
+                }
+            }
+            return false;
+        }
+
+        // 版本链中节点恰为 nodeIdx 且唯一读者为 usePc 的定义槽位
+        [[nodiscard]] u32 slotByNodeAndUse(const u32 nodeIdx, const u32 usePc) const {
+            if(nodeIdx == INVALID)
+                return INVALID;
+            for(size_t reg = 0; reg < _defs.size(); ++reg)
+                for(size_t v = 0; v < _defs[reg].size(); ++v) {
+                    const auto &def = _defs[reg][v];
+                    if(def.node == nodeIdx && def.usePcs.size() == 1 && def.usePcs.front() == usePc)
+                        return packSlot(Register{ static_cast<u16>(reg) }, static_cast<u32>(v));
+                }
+            return INVALID;
+        }
+
+        static bool operandEquals(const inter::Operand &a, const inter::Operand &b) {
+            if(a.type() != b.type())
+                return false;
+            switch(a.type()) {
+                case inter::Operand::Type::Register:
+                    return a.value<Register>() == b.value<Register>();
+                case inter::Operand::Type::Label:
+                    return a.value<Label>().address() == b.value<Label>().address();
+                case inter::Operand::Type::ConstIndex:
+                    return a.value<ConstIdx>().index() == b.value<ConstIdx>().index();
+                case inter::Operand::Type::Number:
+                    return a.value<Integer>() == b.value<Integer>();
+                case inter::Operand::Type::Atom:
+                    return a.value<Atom>() == b.value<Atom>();
+                default:
+                    return true;
+            }
+        }
+
         // 字面量构造折叠：SetIndex 到 ArrayLit/DictLit 节点时并入元素。
         // 返回 true 表示该 pc 已消费（透明化：不产语句、不影响干净区间）
         [[nodiscard]] bool foldLiteralElement(const Register obj, const u32 idxNode, const Register src) {
@@ -1240,9 +1631,9 @@ namespace cial::decompile {
                 }
                 _nodes[node].items.push_back(operandNode(src));
             } else {
-                // 字典：键须为编译期字符串常量；动态键恢复属后续批次
-                if(idxNode == INVALID || _nodes[idxNode].kind != Expr::Kind::Str) {
-                    fail("字典字面量键非常量（动态键恢复属后续批次）");
+                // 字典：键为常量字符串或任意表达式节点（%[k => v] 动态键按序求值）
+                if(idxNode == INVALID) {
+                    fail("字典字面量键节点缺失");
                     return true;
                 }
                 _nodes[node].items.push_back(idxNode);
@@ -1299,11 +1690,30 @@ namespace cial::decompile {
                         return makeSimple(Expr::Kind::Null);
                     return containerNode(constant.value<Object *>());
                 }
-                case ConstantType::Octet:
+                case ConstantType::Octet: {
+                    const auto *payload = constant.value<SharedPayload<Octet> *>();
+                    if(payload == nullptr || payload->data == nullptr || payload->data->getSize() == 0) {
+                        fail("octet 常量不可读");
+                        return INVALID;
+                    }
+                    // <% hex hex %> 字面量（语法文档：Octet 十六进制字节流）
+                    const auto node = newNode(Expr::Kind::OctetLit);
+                    std::string out = "<% ";
+                    char buf[4];
+                    const auto *data = payload->data->getData();
+                    const auto size = payload->data->getSize();
+                    for(u32 i = 0; i < size; ++i) {
+                        std::snprintf(buf, sizeof(buf), "%02x ", data[i]);
+                        out += buf;
+                    }
+                    out += "%>";
+                    _nodes[node].text = std::move(out);
+                    return node;
+                }
                 case ConstantType::FuncMeta:
                 case ConstantType::ClassMeta:
                 case ConstantType::PropMeta:
-                    fail("该常量类型无可打印字面量（声明装配属 M4）");
+                    fail("声明常量缺少安装链（匿名声明字面量属后续批次）");
                     return INVALID;
                 default:
                     fail("未知常量类型");
@@ -1499,6 +1909,8 @@ namespace cial::decompile {
                         continue; // 条件区定义：节点为块条件，不降级为语句
                     if(_stmtPcs.contains(def.defPc))
                         continue; // 已是语句（StoreLocal 直定等）
+                    if(_foldedPcs.contains(def.defPc))
+                        continue; // 声明安装链/三元折叠：随 tile 消费
                     if(!hasEffect(def.node))
                         continue;
                     Stmt stmt{ .kind = Stmt::Kind::ExprStmt, .pc = def.defPc, .exprNode = def.node };
@@ -1561,6 +1973,13 @@ namespace cial::decompile {
                 auto &def = _defs[slot >> 16][slot & 0xFFFF];
                 if(def.usePcs.empty())
                     continue;
+                if(def.fused) {
+                    // 逆融合消费的定义：不物化/复制（融合语句按目标文本直读），
+                    // 但保留 landing 供跨区干净判定引用
+                    if(def.usePcs.size() == 1)
+                        def.landing = landingFor(def.usePcs.front(), slot, defSlotAtPc);
+                    continue;
+                }
                 // 具名局部槽本身就是存储（参数/var 变量）：读它就是读变量名，
                 // 任何重赋值都会产生新版本，无需物化也不受干净区间约束
                 if(def.node != INVALID && _nodes[def.node].kind == Expr::Kind::LocalName &&
@@ -1730,6 +2149,8 @@ namespace cial::decompile {
                 }
                 case Expr::Kind::Str:
                     return { expr.text, Prec::Primary };
+                case Expr::Kind::OctetLit:
+                    return { expr.text, Prec::Primary };
                 case Expr::Kind::RegExp:
                     return { fmt::format("/{}/", expr.text), Prec::Postfix };
                 case Expr::Kind::LocalName:
@@ -1738,6 +2159,8 @@ namespace cial::decompile {
                     return { "this", Prec::Primary };
                 case Expr::Kind::GlobalObj:
                     return { "global", Prec::Primary };
+                case Expr::Kind::SuperVal:
+                    return { "super", Prec::Primary };
                 case Expr::Kind::Copy:
                     return { expr.srcVersion == INVALID ? std::string{ "<copy>" } : renderVersion(expr.srcVersion),
                              Prec::Primary };
@@ -1854,20 +2277,26 @@ namespace cial::decompile {
                 const auto it = stmtAtPc.find(static_cast<u32>(pc));
                 if(it == stmtAtPc.end())
                     continue;
+                const auto &stmt = *it->second;
                 std::string text;
-                if(!renderStmt(*it->second, text))
+                if(!renderStmt(stmt, text))
                     return;
                 if(!text.empty())
-                    out.push_back(RecoveredStatement{ .pc = static_cast<u32>(pc), .text = std::move(text) });
+                    out.push_back(RecoveredStatement{ .pc = static_cast<u32>(pc),
+                                                      .text = std::move(text),
+                                                      .tacEnd = stmt.tacEnd,
+                                                      .verbatim = stmt.kind == Stmt::Kind::Decl });
             }
         }
 
-        [[nodiscard]] bool renderStmt(const Stmt &stmt, std::string &out) {
-            // slotOf 失败时已记录原因；此处防 INVALID 槽位进入渲染（versionOf 越界）
+        [[nodiscard]] bool renderStmt(const Stmt &stmt, std::string &out, const u32 indent = 0) {
+            // slotOf 失败时已记录原因；此处防 INVALID 槽位进入渲染（versionOf 越界）。
+            // CompoundAssign/Decl 的槽位在各自 case 内按需校验
             const bool needsObj = stmt.kind == Stmt::Kind::StoreMember || stmt.kind == Stmt::Kind::StoreIndex ||
                 stmt.kind == Stmt::Kind::StoreDeref || stmt.kind == Stmt::Kind::DeleteMember;
             const bool needsSrc = stmt.exprNode == INVALID && stmt.kind != Stmt::Kind::DebuggerStmt &&
-                stmt.kind != Stmt::Kind::DeleteMember && stmt.kind != Stmt::Kind::ExprStmt;
+                stmt.kind != Stmt::Kind::DeleteMember && stmt.kind != Stmt::Kind::ExprStmt &&
+                stmt.kind != Stmt::Kind::Decl && stmt.kind != Stmt::Kind::CompoundAssign;
             if((needsObj && stmt.obj == INVALID) || (needsSrc && stmt.src == INVALID) ||
                (stmt.kind == Stmt::Kind::StoreIndex && stmt.idx == INVALID)) {
                 fail("无效寄存器槽位");
@@ -1954,6 +2383,105 @@ namespace cial::decompile {
                 case Stmt::Kind::StoreDeref:
                     out = fmt::format("*{} = {};", renderVersion(stmt.obj), renderVersion(stmt.src));
                     return true;
+                case Stmt::Kind::CompoundAssign: {
+                    // TARGET OP= RHS / TARGET++（M4 逆融合；目标文本一致性已由
+                    // 融合守卫验证）
+                    std::string target;
+                    if(stmt.atom != ATOM_INVALID || stmt.idx != INVALID) {
+                        const auto obj = renderVersion(stmt.obj);
+                        if(stmt.atom != ATOM_INVALID) {
+                            const auto name = atomText(_rt, stmt.atom);
+                            target = isPlainMemberName(name) ? fmt::format("{}.{}", obj, name)
+                                                             : fmt::format("{}[{}]", obj, escapeString(name));
+                        } else {
+                            target = fmt::format("{}[{}]", obj, renderVersion(stmt.idx));
+                        }
+                        if(stmt.raw)
+                            target = fmt::format("&{}", target);
+                    } else if(stmt.obj != INVALID) {
+                        target = fmt::format("*{}", renderVersion(stmt.obj));
+                    } else {
+                        target = stmt.name;
+                    }
+                    if(stmt.rhsNode == INVALID && (stmt.opText == "++" || stmt.opText == "--")) {
+                        out = fmt::format("{}{};", target, stmt.opText);
+                        return true;
+                    }
+                    if(stmt.rhsNode == INVALID) {
+                        fail("复合赋值缺少右操作数");
+                        return false;
+                    }
+                    out = fmt::format("{} {} {};", target, stmt.opText, renderNode(stmt.rhsNode).text);
+                    return true;
+                }
+                case Stmt::Kind::Decl: {
+                    // 声明装配（M4 壳组装）：宿主装配多行声明块
+                    if(!_host) {
+                        fail("声明装配缺少宿主上下文");
+                        return false;
+                    }
+                    const auto &constant = _chunk.getConstants()[stmt.constIdx];
+                    std::string reason;
+                    DeclForm form = DeclForm::Bare;
+                    std::string literalName = stmt.name;
+                    if(constant.type() == ConstantType::FuncMeta) {
+                        const auto ownName = atomText(_rt, constant.value<FuncMeta *>()->name);
+                        // 裸声明：FunctionDecl 形态（ChgThis / DThis / 零拷贝具名槽），
+                        // 或全局安装且与函数自身名一致；否则按匿名字面量赋值恢复
+                        const bool bare = stmt.contextInstall || stmt.declInstall == 0 ||
+                            (stmt.declInstall == 1 && !ownName.empty() && (stmt.name.empty() || stmt.name == ownName));
+                        if(!bare) {
+                            form = DeclForm::Assign;
+                            literalName = {};
+                        } else {
+                            literalName = !ownName.empty() ? ownName : stmt.name;
+                        }
+                    } else if(constant.type() == ConstantType::ClassMeta) {
+                        const auto className = atomText(_rt, constant.value<ClassMeta *>()->className);
+                        if(stmt.name.empty() || (!className.empty() && stmt.name != className)) {
+                            fail(fmt::format("类名与安装名不一致（{} vs {}）", className, stmt.name));
+                            return false;
+                        }
+                        literalName = className;
+                    } else if(constant.type() == ConstantType::PropMeta) {
+                        if(stmt.name.empty()) {
+                            fail("property 安装名缺失");
+                            return false;
+                        }
+                    } else {
+                        fail("声明常量类型未知");
+                        return false;
+                    }
+                    out = _host->declarationText(constant, form, literalName, indent, reason);
+                    if(!reason.empty()) {
+                        fail(reason);
+                        return false;
+                    }
+                    // 赋值形态包一层：var 前缀/成员目标 + 分号（字面量首行并入赋值行）
+                    if(form == DeclForm::Assign) {
+                        std::string prefix;
+                        if(stmt.obj != INVALID) {
+                            const auto obj = renderVersion(stmt.obj);
+                            const auto name = stmt.atom != ATOM_INVALID ? atomText(_rt, stmt.atom) : stmt.name;
+                            prefix = stmt.atom != ATOM_INVALID && isPlainMemberName(name)
+                                ? fmt::format("{}.{}", obj, name)
+                                : fmt::format("{}[{}]", obj, escapeString(name));
+                            if(stmt.raw)
+                                prefix = fmt::format("&{}", prefix);
+                        } else {
+                            prefix = fmt::format("{}{}", stmt.declare ? "var " : "", stmt.name);
+                        }
+                        const auto nl = out.find('\n');
+                        if(nl == std::string::npos) {
+                            out = prefix + " = " + out + ";";
+                        } else {
+                            auto rest = out.substr(nl);
+                            rest += ';';
+                            out = prefix + " = " + out.substr(0, nl) + rest;
+                        }
+                    }
+                    return true;
+                }
                 case Stmt::Kind::DeleteMember: {
                     const auto obj = renderVersion(stmt.obj);
                     if(stmt.idx != INVALID)
@@ -2401,7 +2929,8 @@ namespace cial::decompile {
 
         [[nodiscard]] static std::string indentText(const u32 level) { return std::string(level * 4, ' '); }
 
-        // 单 pc 发射：物化临时定义（先于消费语句）+ 该 pc 的语句（可多条）
+        // 单 pc 发射：物化临时定义（先于消费语句）+ 该 pc 的语句（可多条）。
+        // verbatim 语句（声明块）文本已含缩进，不叠加 pad
         void emitAt(const u32 pc, const u32 indent, Vec<RecoveredStatement> &out) {
             const std::string pad = indentText(indent);
             for(size_t reg = 0; reg < _defs.size(); ++reg) {
@@ -2415,11 +2944,16 @@ namespace cial::decompile {
                 }
             }
             while(_emitCursor < _stmts.size() && _stmts[_emitCursor].pc == pc) {
+                const auto &stmt = _stmts[_emitCursor];
                 std::string text;
-                if(!renderStmt(_stmts[_emitCursor], text))
+                if(!renderStmt(stmt, text, indent))
                     return;
                 if(!text.empty())
-                    out.push_back(RecoveredStatement{ .pc = pc, .text = pad + text });
+                    out.push_back(
+                        RecoveredStatement{ .pc = pc,
+                                            .text = stmt.kind == Stmt::Kind::Decl ? std::move(text) : pad + text,
+                                            .tacEnd = stmt.tacEnd,
+                                            .verbatim = stmt.kind == Stmt::Kind::Decl });
                 ++_emitCursor;
             }
         }
@@ -2610,6 +3144,7 @@ namespace cial::decompile {
         vm::Chunk &_chunk;
         const FuncMeta *_meta;
         bool _functionLike;
+        DeclHost *_host;
         u32 _instPc{};
         std::string _unsupported;
         Vec<Expr> _nodes;
@@ -2628,6 +3163,7 @@ namespace cial::decompile {
         std::set<std::string> _declaredGlobals;
         std::unordered_set<std::string> _usedNames;
         u32 _tempCounter{};
+        std::unordered_map<u32, DeclSpec> _declSpecs; // Load pc → 声明安装规格（M4）
 
         // ── M3 结构化状态 ──
         Vec<inter::BasicBlock> _blocks;
@@ -2642,8 +3178,9 @@ namespace cial::decompile {
         size_t _emitCursor{};
     };
 
-    ExprRecovery recoverUnitBody(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike) {
-        ExprBuilder builder{ rt, chunk, meta, functionLike };
+    ExprRecovery recoverUnitBody(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike,
+                                 DeclHost *host) {
+        ExprBuilder builder{ rt, chunk, meta, functionLike, host };
         return builder.run();
     }
 } // namespace cial::decompile

@@ -16,11 +16,27 @@
 
 设计与批次见[反编译器方案](doc/bytecode/decompiler-plan.md)（2026-11-01 采纳 TAC 层直译路径）。
 
-- [ ] M4–M5：壳组装（context 树 → function/class/property 声明，参数列表来自 localVars）、
-  `+=`/`++` 逆融合双守卫（模板命中 + `computeBlockLiveness` 无其他读者）、switch 链与
-  try/catch 嵌套兜底（任意 CFG 降级状态机）；按方案 §7 四环验证逐批验收。M3 遗留小项：
-  动态键字典字面量、`obj[expr]` 动态成员名、octet 字面量、顶层 `for` 初始化变量
-  （寄存器携带无名字，当前如实拒绝）、`while` 条件内联存储歧义拒绝。
+- [ ] M4 收尾：成员/全局/`*p` 目标的 `+=`/`++` 逆融合（成员与具名局部已通，StoreGlobal
+  与 DerefSet 目标待接）、property 安装名登记 `_declaredGlobals`（当前顶层 property 后
+  同名赋值会带多余 `var` 前缀，行为等价）、类成员渲染顺序按 memberShapeMetas
+  （IRGen 先注册方法后注册 var，与源码顺序可能不同；字段初始化顺序由 initDefaultVal
+  保持）复核、匿名函数表达式（实参位置字面量）恢复。
+- [ ] M4 验收扩展：bc 路径嵌套体暴露的存量缺口（super 构造直调 context 的实参搬运
+  prologue 读未定义寄存器、`CallMethodV`/`testDeref` 形态）逐个落地后按方案 §7 四环
+  对拍；getter 计数不翻倍用例已有（`cli_test.py` 声明 round-trip）。
+- [ ] M5：switch 链（JmpE + `_zf` 直写比较族）、try/catch 嵌套兜底（任意 CFG 降级
+  状态机）、with、eval 名字依赖；按方案 §7 四环验证逐批验收。M3 遗留小项：
+  顶层 `for` 初始化变量（寄存器携带无名字，如实拒绝）、`while` 条件内联存储歧义拒绝。
+
+M4 进行中（2026-11-03）：壳组装骨架已通——`ExprBuilder` 声明安装链预扫描折叠
+（Load 声明常量 + Global*/ChgThis?/安装 模板，链 pc 不计版本链）、Decl tile 经
+`DeclHost` 回调 `ShellAssembler` 装配 function/class/property 声明文本（参数表来自
+localVars，bc 路径 FuncMeta 名由转译器设置故两条入口同构）；子单元行表按最终文本
+位置登记（文本内联父单元，`DecompileResult::units` 改 deque 保证引用稳定）；
+bc 路径 context 引用扫描 + 成员闭包去重。`+=`/`++` 逆融合已通成员/下标/具名局部
+目标（单读者 + 对象一致性双守卫）；Super 节点、octet 字面量、动态键字典字面量
+已解锁。顶层 `function`/`class`/`property` 声明 round-trip 对拍通过
+（`decompile_test.cpp`、`cli_test.py`）。
 
 M0 已完成（2026-11-01）：`src/decompile/` 的 `{文本, 行表}` 管道、CLI `--decompile`（严格模式
 默认 / `--view` 反汇编视图 / `--map` 行表 JSON / `--source` 偏移换算）、TJS2 路径来源表

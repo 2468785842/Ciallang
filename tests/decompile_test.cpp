@@ -8,6 +8,7 @@
 #include <catch2/catch_all.hpp>
 
 #include <algorithm>
+#include <set>
 
 #include <fmt/format.h>
 
@@ -67,11 +68,13 @@ TEST_CASE("decompile - self path emits text and line table with half-open TAC co
 
     const auto *add = findUnit(result, "add");
     REQUIRE(add != nullptr);
-    REQUIRE(add->kind == "function");
+    // M4：函数体经壳组装内联为 body 子单元（各自 Chunk 的 TAC 坐标）
+    REQUIRE(add->kind == "body");
 
     // 行表不变量：非 synthetic 行的 TAC 区间按行序单调、逐条 [i, i+1)、
     // 并集完备覆盖所在 Chunk 的 [0, 指令数)。顶层单元对应顶层 Chunk；
-    // 函数单元的 Chunk 经常量图可达，其指令数由单元行数自证
+    // M4 起函数体为 body 子单元，行表按语句区间登记（体首被内联的 TAC
+    // 不产独立行，故只要求单调不重叠）
     const auto *topUnit = findUnit(result, "<top-level>");
     REQUIRE(topUnit != nullptr);
     {
@@ -92,36 +95,43 @@ TEST_CASE("decompile - self path emits text and line table with half-open TAC co
     }
     {
         size_t covered = 0;
-        u32 expectedTac = 0;
+        u32 lastEnd = 0;
         for(const auto &row : add->lines) {
             if(row.synthetic) {
                 REQUIRE(row.tacStart == row.tacEnd);
-            } else {
-                REQUIRE(row.tacStart == expectedTac);
-                REQUIRE(row.tacEnd == row.tacStart + 1);
-                expectedTac = row.tacEnd;
-                ++covered;
+                continue;
             }
+            REQUIRE(row.tacStart >= lastEnd);
+            REQUIRE(row.tacEnd > row.tacStart);
+            lastEnd = row.tacEnd;
+            ++covered;
         }
         REQUIRE(covered > 0);
-        REQUIRE(expectedTac == covered); // 函数体连续无缺口
     }
 
-    // 文本与行表一致：每行以 \n 结尾（含末行），行数 = '\n' 计数；
-    // textLine 从 0 起单调递增
-    size_t lineCount = 0;
-    for(const char c : add->text)
-        lineCount += c == '\n';
-    REQUIRE(lineCount == add->lines.size());
+    // 文本与行表一致：M4 起 body 子单元文本内联父单元（自身 text 为空），
+    // 行表描述最终文本位置；顶层单元行数仍与文本行数一致
+    REQUIRE(add->text.empty());
+    REQUIRE_FALSE(add->lines.empty());
+    {
+        size_t lineCount = 0;
+        for(const char c : topUnit->text)
+            lineCount += c == '\n';
+        REQUIRE(lineCount == topUnit->lines.size());
+    }
     // textLine 为跨单元全局游标：单元内单调递增、逐行 +1
     u32 expectedLine = add->lines.front().textLine;
     for(const auto &row : add->lines)
         REQUIRE(row.textLine == expectedLine++);
-    // 全部单元的 textLine 全局无重复且连续
-    u32 globalLine = 0;
+    // 全部单元的 textLine 覆盖输出文本无缺口（声明块行同时由父单元 synthetic
+    // 拆行与子单元行共同登记，允许同一文本行多条行表记录）
+    std::set<u32> textLines;
     for(const auto &unit : result.units)
         for(const auto &row : unit.lines)
-            REQUIRE(row.textLine == globalLine++);
+            textLines.insert(row.textLine);
+    REQUIRE_FALSE(textLines.empty());
+    REQUIRE(*textLines.begin() == 0);
+    REQUIRE(*textLines.rbegin() == textLines.size() - 1);
 
     // 自产路径无码字/源偏移坐标
     for(const auto &row : add->lines) {
@@ -309,9 +319,9 @@ TEST_CASE("decompile M2 - function body recovers locals, params, fused immediate
     INFO(recovery.unsupported);
     REQUIRE(recovery.unsupported.empty());
     // BinaryImm 逆映射（x * 2、+ 1）、具名局部 var 声明、重赋值不带 var、
-    // LAnd 非短路双求值、显式 return；末尾隐式 void return 省略
-    REQUIRE(statementTexts(recovery) ==
-            Vec<std::string>{ "var t = x * 2 + 1;", "t = t + y;", "return t > 3 && x < 10;" });
+    // LAnd 非短路双求值、显式 return；末尾隐式 void return 省略。
+    // M4 复合赋值逆融合：t = t + y 单读者模板合并为 t += y
+    REQUIRE(statementTexts(recovery) == Vec<std::string>{ "var t = x * 2 + 1;", "t += y;", "return t > 3 && x < 10;" });
 }
 
 TEST_CASE("decompile M2 - multi-use temporaries materialize in function bodies") {
@@ -363,7 +373,8 @@ TEST_CASE("decompile M2 - strict self path succeeds on straight-line top level w
     REQUIRE(top != nullptr);
     REQUIRE(top->text.find("var a = [1, \"s\", 2.5];") != std::string::npos);
     REQUIRE(top->text.find("var d = %[\"k\" => a[0], \"z\" => 2];") != std::string::npos);
-    REQUIRE(top->text.find("d.k = d.k + 4;") != std::string::npos);
+    // M4 复合赋值逆融合：d.k = d.k + 4 单读者模板合并为 d.k += 4
+    REQUIRE(top->text.find("d.k += 4;") != std::string::npos);
     REQUIRE(top->text.find("println(a[1], d.k, -a[0], typeof d);") != std::string::npos);
     // 严格模式行表：非 synthetic 行按序闭合，末行延到 Chunk 末尾（覆盖被内联的 TAC）
     u32 expected = 0;
@@ -379,7 +390,7 @@ TEST_CASE("decompile M2 - strict self path succeeds on straight-line top level w
     REQUIRE(last == chunk->getInstVec().size());
 }
 
-TEST_CASE("decompile M2 - structure and declarations are rejected with batch-specific reasons") {
+TEST_CASE("decompile M2 - structure leftovers are rejected with batch-specific reasons") {
     Runtime runtime;
     Context context{ runtime };
     struct Case {
@@ -389,7 +400,6 @@ TEST_CASE("decompile M2 - structure and declarations are rejected with batch-spe
     const Case cases[] = {
         // M3 起可恢复 if/while/do-while；switch 仍是 M5
         { "var a = 1;\nswitch (a) {\ncase 1:\nbreak;\n}\n", "M5" },
-        { "function f() { return 1; }\n", "M4" },
         { "var o = %[];\nwith (o) { println(1); }\n", "M3" },
     };
     for(const auto &[source, reason] : cases) {
@@ -402,6 +412,41 @@ TEST_CASE("decompile M2 - structure and declarations are rejected with batch-spe
         REQUIRE_FALSE(result.diagnostics.empty());
         REQUIRE(result.diagnostics.front().find(reason) != std::string::npos);
     }
+}
+
+TEST_CASE("decompile M4 - declarations assemble into recompilable shells") {
+    Runtime runtime;
+    Context context{ runtime };
+    // 函数声明（顶层安装链）+ 类（构造器/字段初始化/方法）+ property（getter/setter）
+    auto chunk = compileSource(runtime, context,
+                               "function add(a, b) { return a + b; }\n"
+                               "class Box {\n"
+                               "    var v = 10;\n"
+                               "    function Box() { v += 5; }\n"
+                               "    function get() { return v; }\n"
+                               "}\n"
+                               "var value;\n"
+                               "property p {\n"
+                               "    setter(x) { value = x; }\n"
+                               "    getter { return value; }\n"
+                               "}\n"
+                               "println(add(1, 2));\n");
+    REQUIRE(chunk.has_value());
+    decompile::Options options{ .diagnosticView = false };
+    const auto result = decompile::decompileChunk(runtime, *chunk, options);
+    INFO((result.diagnostics.empty() ? std::string{} : result.diagnostics.front()));
+    REQUIRE(result.status == decompile::Status::Success);
+    const auto *top = findUnit(result, "<top-level>");
+    REQUIRE(top != nullptr);
+    const auto &text = top->text;
+    REQUIRE(text.find("function add(a, b) {") != std::string::npos);
+    REQUIRE(text.find("class Box {") != std::string::npos);
+    REQUIRE(text.find("function Box() {") != std::string::npos);
+    REQUIRE(text.find("var v = 10;") != std::string::npos);
+    REQUIRE(text.find("property p {") != std::string::npos);
+    REQUIRE(text.find("getter {") != std::string::npos);
+    REQUIRE(text.find("setter(x) {") != std::string::npos);
+    REQUIRE(text.find("println(add(1, 2));") != std::string::npos);
 }
 
 TEST_CASE("decompile M2 - diagnostic view annotates recovered statements without claiming success") {

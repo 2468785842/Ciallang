@@ -581,9 +581,8 @@ selected
         self.assertIn("println(int o.b + 1);", process.stdout)
 
     def test_decompile_strict_rejects_structure_with_batch_reason(self):
-#语句结构（M3）、声明装配（M4）在严格模式如实拒绝：退出码 2、不产文本、原因含批次号
+#语句结构（switch 属 M5、with 属 M3）在严格模式如实拒绝：退出码 2、不产文本、原因含批次号
         for source, batch in [("var a = 1;\nswitch (a) {\ncase 1:\nbreak;\n}\n", "M5"),
-                              ("function f() { return 1; }\n", "M4"),
                               ("var o = %[];\nwith (o) { println(1); }\n", "M3")]:
             with self.subTest(batch=batch):
                 self.script.write_text(source, encoding="utf-8")
@@ -591,6 +590,47 @@ selected
                 self.assertEqual(process.returncode, 2, process.stderr)
                 self.assertEqual(process.stdout, "")
                 self.assertIn(batch, process.stderr)
+
+    def test_decompile_declaration_roundtrip(self):
+#M4 壳组装：函数/类（继承、字段初始化顺序）/property 声明恢复为可重编译文本；
+#环①逐输入执行比对（含 getter 调用计数不翻倍）
+        source = (
+            'var getterCalls = 0;\n'
+            'function add(a, b) { return a + b; }\n'
+            'class Box {\n'
+            '    var v = 10;\n'
+            '    var w = 2;\n'
+            '    function Box() { v += 5; }\n'
+            '    function total() { return v * w + add(0, 1); }\n'
+            '}\n'
+            'class Labeled extends Box {\n'
+            '    function total() { return super.total() + 1; }\n'
+            '}\n'
+            'property p {\n'
+            '    setter(x) { getterCalls = x; }\n'
+            '    getter { getterCalls += 1; return getterCalls; }\n'
+            '}\n'
+            'var b = new Box();\n'
+            'println(b.total());\n'
+            'var lb = new Labeled();\n'
+            'println(lb.total());\n'
+            'p = 7;\n'
+            'println(p);\n'
+            'println(p);\n')
+        self.script.write_text(source, encoding="utf-8")
+        expected = self.run_cial(self.script)
+        self.assertEqual(expected.returncode, 0, expected.stderr)
+        decompiled = self.run_cial("--decompile", self.script)
+        self.assertEqual(decompiled.returncode, 0, decompiled.stderr)
+        self.assertNotIn("//   @", decompiled.stdout)
+        self.assertIn("class Box {", decompiled.stdout)
+        self.assertIn("class Labeled extends Box {", decompiled.stdout)
+        self.assertIn("property p {", decompiled.stdout)
+        recompiled = self.root / "decl_rt.tjs"
+        recompiled.write_text(decompiled.stdout, encoding="utf-8")
+        actual = self.run_cial(recompiled)
+        self.assertEqual(actual.returncode, 0, actual.stderr + "\n--- decompiled ---\n" + decompiled.stdout)
+        self.assertEqual(actual.stdout, expected.stdout, "--- decompiled ---\n" + decompiled.stdout)
 
 
 if __name__ == "__main__":
