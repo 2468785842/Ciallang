@@ -9,13 +9,19 @@
 
 #include <algorithm>
 
+#include <fmt/format.h>
+
 #include "decompile/Decompiler.hpp"
 #include "gen/IRGenerator.hpp"
 #include "parser/Parser.hpp"
 #include "runtime/Context.hpp"
+#include "stdlib/StandardLibrary.hpp"
 #include "test_config.h"
 #include "tjsbc/TjsBytecodeReader.hpp"
 #include "tjsbc/TjsTranslator.hpp"
+#include "types/Class.hpp"
+#include "types/Function.hpp"
+#include "types/String.hpp"
 #include "vm/VM.hpp"
 
 using namespace cial;
@@ -261,6 +267,29 @@ namespace {
             out.push_back(statement.text);
         return out;
     }
+
+    // 无捕获原生捕获函数（thin 路径，与 stdlib 注册形态一致）；结果经命名空间
+    // 级指针交付，用后即断
+    Vec<std::string> *g_rtCapture = nullptr;
+
+    std::string formatCapturedValue(const Value &val) {
+        if(val.isVoid())
+            return "void";
+        if(val.isInteger())
+            return fmt::format("{}", val.asInteger().unwrap());
+        if(val.isReal())
+            return fmt::format("{}", val.asReal().unwrap().value());
+        if(val.isNull())
+            return "null";
+        if(val.isString())
+            return fmt::format("\"{}\"", val.asString().unwrap()->toStdStr());
+        return "other";
+    }
+
+    NativeFunction g_rtCaptureFn{ [](VM *, const Value &, size_t, Value val) {
+        if(g_rtCapture != nullptr)
+            g_rtCapture->push_back(formatCapturedValue(val));
+    } };
 } // namespace
 
 TEST_CASE("decompile M2 - function body recovers locals, params, fused immediates and return") {
@@ -358,7 +387,8 @@ TEST_CASE("decompile M2 - structure and declarations are rejected with batch-spe
         const char *reason;
     };
     const Case cases[] = {
-        { "var a = 1;\nif (a) { println(a); }\n", "M3" },
+        // M3 起可恢复 if/while/do-while；switch 仍是 M5
+        { "var a = 1;\nswitch (a) {\ncase 1:\nbreak;\n}\n", "M5" },
         { "function f() { return 1; }\n", "M4" },
         { "var o = %[];\nwith (o) { println(1); }\n", "M3" },
     };
@@ -386,4 +416,123 @@ TEST_CASE("decompile M2 - diagnostic view annotates recovered statements without
     const auto *top = findUnit(result, "<top-level>");
     REQUIRE(top != nullptr);
     REQUIRE(top->text.find("//   >> println(a);") != std::string::npos);
+}
+
+// ── M3：语句结构化（if/else、while、do-while、break/continue、三元折叠）──
+
+namespace {
+    // 编译整程序，取函数 f 的 FuncMeta，对输入矩阵执行并收集返回值
+    // 与 CLI 同路径执行：vm.eval（内部走 Compilation 编译 + execute）。结果经
+    // 注册的原生捕获函数收集（不经 stdout，避免与 Catch2 输出互相污染）
+    Vec<std::string> runProgramOutputs(const std::string &program, const Vec<Integer> &inputs) {
+        // 每次独立环境：registerStandardLibrary 不可对同一 Context 重复调用
+        Runtime runtime;
+        Context context{ runtime };
+        stdlib::registerStandardLibrary(context);
+        Vec<std::string> captured;
+        g_rtCapture = &captured;
+        context.registryGlobalFunc("__rt_capture"_str, &g_rtCaptureFn);
+        vm::VMState state{ context };
+        VM vm{ &state };
+
+        std::string calls;
+        for(size_t i = 0; i < inputs.size(); ++i)
+            calls += fmt::format("__rt_capture(f({}));\n", inputs[i]);
+        // 与 CLI execute 同语义：顶层帧 this = global（eval 路径缺这一步，
+        // 函数声明绑定的 objthis 为空会改变名称解析）
+        auto chunk = compileSource(runtime, context, program + "\n" + calls);
+        REQUIRE(chunk.has_value());
+        auto guarded = std::move(*chunk).toHeap(runtime);
+        state.allocCallFrame(guarded.get());
+        state.makeClosure();
+        state.curFrame()->setThisObj(Value{ static_cast<cial::Object *>(context.global()) });
+        state.resetFault();
+        try {
+            state.run();
+        } catch(const std::exception &e) {
+            const auto &fault = state.fault();
+            std::string frames;
+            for(const auto &frame : fault.frames)
+                frames += fmt::format(" [{} @{}]", frame.function, frame.hasLocation ? frame.line : -1);
+            const std::string detail = fmt::format(
+                "run threw: {} fault {} {}:{}{}\n=== PROGRAM ===\n{}\n=== TAC ===\n{}", e.what(), fault.valid,
+                fault.source, fault.line, frames, program, guarded->dumpInstructions().toStdStr());
+            FAIL(detail);
+        }
+        state.freeCallFrame();
+        REQUIRE(captured.size() == inputs.size()); // 一调用一结果
+        g_rtCapture = nullptr;
+        return captured;
+    }
+
+    // 恢复函数体 → 重包 function 壳为完整程序
+    std::string rebuildFunctionProgram(Runtime &runtime, vm::Chunk &top, const std::string &name,
+                                       const std::string &params) {
+        auto *meta = findFunction(runtime, top, name);
+        REQUIRE(meta != nullptr);
+        const auto recovery = decompile::recoverUnitBody(runtime, *meta->chunk, meta, true);
+        INFO(recovery.unsupported);
+        REQUIRE(recovery.unsupported.empty());
+        std::string text = fmt::format("function {}({}) {{\n", name, params);
+        for(const auto &statement : recovery.statements)
+            text += statement.text + "\n";
+        text += "}\n";
+        return text;
+    }
+} // namespace
+
+TEST_CASE("decompile M3 - loop bodies round-trip behavior through recovery") {
+    Runtime runtimeA;
+    Context contextA{ runtimeA };
+    const Vec<Integer> inputs = { -1, 0, 1, 2, 3, 4, 5, 9 };
+
+    struct Case {
+        const char *body;
+        const char *params;
+    };
+    const Case cases[] = {
+        // while + continue（continue 跳过自增 → 迭代次数对拍）
+        { "var i = 0;\nwhile (i < x) {\ni = i + 1;\nif (i == 3) {\ncontinue;\n}\ni = i + 2;\n}\nreturn i;", "x" },
+        // do-while + break
+        { "do {\nx = x - 1;\nif (x == 2) {\nbreak;\n}\n} while (x > 0);\nreturn x;", "x" },
+        // for（while 形态恢复）+ 三元折叠
+        { "var s = 0;\nfor (var i = 0; i < x; i = i + 1) {\nif (i == 2) {\ncontinue;\n}\ns = s + i;\n}\n"
+          "return s > 10 ? 1 : 0;",
+          "x" },
+        // else-if 链（嵌套区域）
+        { "if (x > 5) {\nreturn 1;\n} else if (x > 2) {\nreturn 2;\n} else {\nreturn 3;\n}", "x" },
+        // while(true) + break + 中途 return void
+        { "while (true) {\nx = x + 1;\nif (x > 3) {\nbreak;\n}\n}\nif (x == 4) {\nreturn;\n}\nreturn x;", "x" },
+    };
+
+    for(const auto &[body, params] : cases) {
+        const std::string original = fmt::format("function f({}) {{\n{}\n}}\n", params, body);
+        // 预防：原程序须可编译
+        {
+            auto chunk = compileSource(runtimeA, contextA, original);
+            REQUIRE(chunk.has_value());
+        }
+        DYNAMIC_SECTION(body) {
+            auto chunk = compileSource(runtimeA, contextA, original);
+            REQUIRE(chunk.has_value());
+            const auto rebuilt = rebuildFunctionProgram(runtimeA, *chunk, "f", params);
+            const auto expected = runProgramOutputs(original, inputs);
+            const auto actual = runProgramOutputs(rebuilt, inputs);
+            INFO(rebuilt);
+            REQUIRE(actual == expected);
+        }
+    }
+}
+
+TEST_CASE("decompile M3 - top-level for with register-carried init variable is rejected") {
+    Runtime runtime;
+    Context context{ runtime };
+    // 顶层 for 的初始化变量以寄存器携带（无名字绑定），条件按初值渲染会丢迭代
+    auto chunk = compileSource(runtime, context, "var s = 0;\nfor (var i = 0; i < 3; i = i + 1) {\ns = s + i;\n}\n");
+    REQUIRE(chunk.has_value());
+    decompile::Options options{ .diagnosticView = false };
+    const auto result = decompile::decompileChunk(runtime, *chunk, options);
+    REQUIRE(result.status == decompile::Status::Unsupported);
+    REQUIRE_FALSE(result.diagnostics.empty());
+    REQUIRE(result.diagnostics.front().find("循环携带变量") != std::string::npos);
 }

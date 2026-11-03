@@ -85,11 +85,20 @@ namespace cial::inter {
             // 否则反编译/调试按 pc 查名会错位（立即数融合等会删指令）
             auto &anchors = chunk->pcAnchors();
             anchors.clear();
-            for(const auto &local : _localVars)
+            for(const auto &local : _localVars) {
                 anchors.push_back(local.startPC.address());
+                anchors.push_back(local.endPC.address());
+            }
             _optimize(*chunk, optReg);
-            for(size_t i = 0; i < _localVars.size() && i < anchors.size(); ++i)
-                _localVars[i].startPC = Label{ anchors[i] };
+            // 锚点为 (start,end) 交错对；按对数回填（上限受 anchors 约束，
+            // 旧按变量数上限在多变量时提前终止）
+            for(size_t i = 0; i + 1 < anchors.size(); i += 2) {
+                const auto varIndex = i / 2;
+                if(varIndex >= _localVars.size())
+                    break;
+                _localVars[varIndex].startPC = Label{ anchors[i] };
+                _localVars[varIndex].endPC = Label{ anchors[i + 1] };
+            }
             anchors.clear();
         }
 

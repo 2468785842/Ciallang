@@ -77,28 +77,28 @@ class CliTest(unittest.TestCase):
         self.assertEqual(diagnostic["columnEncoding"], "utf-8")
 
     def test_runtime_error_rendered_with_source_identity(self):
-        # VM 只传播异常值；文件与位置由顶层附加，message 内不再拼行号
+#VM 只传播异常值；文件与位置由顶层附加，message 内不再拼行号
         self.script.write_text('function f(){ throw "inner"; }\nf();\n', encoding="utf-8")
         process = self.run_cial(self.script)
         self.assertEqual(process.returncode, 1)
         self.assertEqual(process.stderr.splitlines()[0],
                          'cial: error: %s:1:15: "inner"' % self.script)  # throw 语句位置
-        # 摘录使用编译时快照，指示符指向 throw
+#摘录使用编译时快照，指示符指向 throw
         excerpt = process.stderr.splitlines()
         self.assertTrue(any(line.rstrip().endswith('throw "inner"; }') for line in excerpt))
         self.assertEqual(excerpt[2], " " * (7 + 14) + "^")
-        # 被捕获的异常 message 保持纯净（println 输出字符串带引号）
+#被捕获的异常 message 保持纯净（println 输出字符串带引号）
         self.script.write_text('try { var v = void; v.x; } catch(e) { println(e.message); }\n',
                                encoding="utf-8")
         process = self.run_cial(self.script)
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertEqual(process.stdout.splitlines()[0], '"cannot access member of void"')
         self.assertNotIn("line", process.stdout)
-        # 连续执行不残留上一轮故障位置
+#连续执行不残留上一轮故障位置
         self.script.write_text('try { throw 1; } catch(e) {}\nthrow "second";\n', encoding="utf-8")
         process = self.run_cial(self.script)
         self.assertEqual(process.stderr.splitlines()[0], 'cial: error: %s:2:1: "second"' % self.script)
-        # 虚拟输入也保留正文
+#虚拟输入也保留正文
         process = self.run_cial("-", input='throw "s";\n')
         self.assertEqual(process.returncode, 1)
         self.assertEqual(process.stderr.splitlines()[0], 'cial: error: <stdin>:1:1: "s"')
@@ -223,7 +223,7 @@ class CliTest(unittest.TestCase):
         process = self.run_cial("--repl", input='''var x = 40;
 x + 2
 function add(v) {
-return v + 1;
+    return v + 1;
 }
 add(x + 1)
 var a = [
@@ -274,7 +274,8 @@ const c = 7
 c
 var flagged = 1 // trailing comment
 flagged
-do { x = x + 1; } while(x < 44)
+do {
+        x = x + 1; } while(x < 44)
 x
 :quit
 ''')
@@ -362,7 +363,7 @@ selected
         self.assertEqual(diagnostic["source"], "untitled:tjs-1")
         self.assertEqual(diagnostic["column"], 13)  # 字节列：var␣中文(6B)␣=␣;
         self.assertEqual(diagnostic["range"], {"begin": 13, "end": 14})
-        # 未保存内容的合法输入同样可走 stdin
+#未保存内容的合法输入同样可走 stdin
         ok = json.loads(self.run_cial("--check-json", "-", input="println(42);").stdout)
         self.assertTrue(ok["ok"])
         self.assertEqual(ok["source"], "<stdin>")
@@ -380,7 +381,7 @@ selected
                          "cial: error[parse.invalid-expression]: %s:1:27: unable prefix parse for token ';'." % self.script)
         excerpt = process.stderr.splitlines()
         self.assertTrue(any(line.rstrip().endswith("var b = ;") for line in excerpt))
-        # 指示符按显示宽度对齐：栏 7 列 + 前缀 16 显示列（中文各 2 列）+ "var b = " 8 列
+#指示符按显示宽度对齐：栏 7 列 + 前缀 16 显示列（中文各 2 列） + "var b = " 8 列
         caret = excerpt[2]
         self.assertEqual(caret.index("^"), 7 + 24)
         self.assertTrue(caret.endswith("^"))
@@ -425,7 +426,7 @@ selected
             self.assertIn("JIT backend not enabled", process.stderr)
 
     def test_decompile_options_and_strict_mode(self):
-        # 互斥与从属校验
+#互斥与从属校验
         for flags in [("--decompile", "--tjsbc", self.script),
                       ("--decompile", "--time", self.script),
                       ("--view", self.script), ("--map", "m.json", self.script),
@@ -434,32 +435,32 @@ selected
                 process = self.run_cial(*flags)
                 self.assertEqual(process.returncode, 2, process.stderr)
                 self.assertEqual(process.stdout, "")
-        # 自产路径：直线表达式严格模式恢复成功（M2），退出码 0、产出可重编译文本
+#自产路径：直线表达式严格模式恢复成功（M2），退出码 0、产出可重编译文本
         process = self.run_cial("--decompile", self.script)
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("println(42);", process.stdout)
         self.assertNotIn("//   @", process.stdout)
-        # 语句结构未落地（M3）：严格模式 Unsupported，退出码 2、不产出文本、逐单元诊断
+#语句结构未落地（M5 switch）：严格模式 Unsupported，退出码 2、不产出文本、逐单元诊断
         structured = self.root / "structured.tjs"
-        structured.write_text("var a = 1;\nif (a) { println(a); }\n", encoding="utf-8")
+        structured.write_text("var a = 1;\nswitch (a) {\ncase 1:\nbreak;\n}\n", encoding="utf-8")
         process = self.run_cial("--decompile", structured)
         self.assertEqual(process.returncode, 2, process.stderr)
         self.assertEqual(process.stdout, "")
         self.assertIn("decompile unsupported", process.stderr)
-        # 诊断视图：输出含行号与 TAC 反汇编，头部标注不可重编译，恢复结果以注释附加
+#诊断视图：输出含行号与 TAC 反汇编，头部标注不可重编译，恢复结果以注释附加
         process = self.run_cial("--decompile", "--view", self.script)
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("not recompilable", process.stdout)
         self.assertIn("@0", process.stdout)
         self.assertIn("//   >> println(42);", process.stdout)
-        # 行表 JSON：状态与行坐标
+#行表 JSON：状态与行坐标
         mapPath = self.root / "map.json"
         process = self.run_cial("--decompile", "--view", "--map", mapPath, self.script)
         self.assertEqual(process.returncode, 0, process.stderr)
         payload = json.loads(mapPath.read_text(encoding="utf-8"))
         self.assertEqual(payload["status"], "unsupported")
         self.assertTrue(payload["units"])
-        # TJS2 路径：语料反汇编视图 + --source 行号换算；非法输入拒绝
+#TJS2 路径：语料反汇编视图 + --source 行号换算；非法输入拒绝
         corpus = pathlib.Path(__file__).resolve().parent / "test_files" / "tjsbc"
         sample = corpus / "s6_class.tjsbc"
         process = self.run_cial("--decompile", "--view", sample)
@@ -474,8 +475,8 @@ selected
         self.assertNotEqual(process.returncode, 0)
 
     def test_decompile_outputdebug_source_lines(self):
-        # 真实 outputdebug 产物（manifest 固定参考二进制/导出选项/样本哈希）经
-        # --source 做偏移→行号换算的端到端；合成用例在 decompile_test.cpp
+#真实 outputdebug 产物（manifest 固定参考二进制 / 导出选项 / 样本哈希）经
+#-- source 做偏移→行号换算的端到端；合成用例在 decompile_test.cpp
         corpus = pathlib.Path(__file__).resolve().parent / "test_files" / "tjsbc" / "debug"
         manifest = json.loads((corpus / "manifest.json").read_text(encoding="utf-8"))
         import hashlib
@@ -493,7 +494,7 @@ selected
                 self.assertEqual(process.returncode, 0, process.stderr)
                 payload = json.loads(map_path.read_text(encoding="utf-8"))
                 self.assertEqual(payload["status"], "unsupported")
-                # 行号落在源文件行数内（0 基；末条目可指向末尾之后，由换算收敛）
+#行号落在源文件行数内（0 基；末条目可指向末尾之后，由换算收敛）
                 line_count = source.read_text(encoding="utf-8").count("\n") + 1
                 units = {unit["name"]: [row.get("srcLine") for row in unit["lines"]]
                          for unit in payload["units"]}
@@ -506,7 +507,7 @@ selected
                     self.assertIn(name, units, f"{sample['name']}/{name}")
                     for line in expected:
                         self.assertIn(line, units[name], f"{sample['name']}/{name}")
-        # 无 outputdebug 表的既有语料不携带 srcLine
+#无 outputdebug 表的既有语料不携带 srcLine
         plain_map = self.root / "plain_map.json"
         process = self.run_cial("--decompile", "--view", "--source", corpus.parent / "s6_class.tjs",
                                 "--map", plain_map, corpus.parent / "s6_class.tjsbc")
@@ -516,39 +517,39 @@ selected
                              for unit in payload["units"] for row in unit["lines"]))
 
     def test_decompile_expression_roundtrip(self):
-        # 环①（方案 §7）：直线表达式程序 源码执行 vs 严格反编译再编译执行，逐形态
-        # 对拍可观察输出。覆盖字面量/算术/位/比较/逻辑/一元/成员/下标/调用/字面量
-        # 构造（含折叠常量容器）/delete/物化；每条独立成程序避免形态互相掩盖
+#环①（方案 §7）：直线表达式程序 源码执行 vs 严格反编译再编译执行，逐形态
+#对拍可观察输出。覆盖字面量 / 算术 / 位 / 比较 / 逻辑 / 一元 / 成员 / 下标 / 调用 / 字面量
+#构造（含折叠常量容器） / delete / 物化；每条独立成程序避免形态互相掩盖
         cases = [
-            # 字面量与算术优先级（含括号、整除、取模、实数）
+#字面量与算术优先级（含括号、整除、取模、实数）
             'var a = 1 + 2 * 3; var b = (1 + 2) * 3; var c = 10 \\ 3; var d = 10 % 3;\n'
             'var e = 2.5 * 2; var f = 7 - (3 - 1); var g = 2 * 3 % 4;\n'
             'println(a); println(b); println(c); println(d); println(e); println(f); println(g);\n',
-            # 位运算与移位
+#位运算与移位
             'var x = 6 & 3 | 8 ^ 1; var y = 1 << 4 >> 1; var z = -16 >>> 2; var w = (6 | 1) & 3;\n'
             'println(x); println(y); println(z); println(w);\n',
-            # 比较与逻辑（非短路双求值）
+#比较与逻辑（非短路双求值）
             'var p = 3 < 5 && 5 <= 5 || 1 > 2; var q = 1 == 1 != 0; var r = "1" === 1;\n'
             'var s = (1 || 0) && 0; var t = 1 !== 1;\n'
             'println(p); println(q); println(r); println(s); println(t);\n',
-            # 一元族：负号、逻辑非、按位非（降糖 ^-1）、typeof、转换、#/$
+#一元族：负号、逻辑非、按位非（降糖 ^ -1）、typeof、转换、 # / $
             'var s = "abc"; println(-5); println(!0); println(~5); println(typeof s);\n'
             'println(int 2.9); println(real 3); println(string 42); println(#s); println($65);\n'
             'println(-(1 + 2)); println(!(1 && 0)); println(-s.length);\n',
-            # 字符串转义与拼接
+#字符串转义与拼接
             'println("a\\"b\\\\c\\n" + "d"); println("x" + 1 + 2.5); println("" + (1 + 2));\n',
-            # 数组/字典字面量（动态与折叠常量、嵌套）、下标读写、成员读写
+#数组 / 字典字面量（动态与折叠常量、嵌套）、下标读写、成员读写
             'var arr = [1, "s", 2.5]; arr[1] = "t"; println(arr[1]); println(arr.count);\n'
             'var d = %["k" => 1, "z" => "v"]; d.k = d.k + 4; println(d.k); println(d["z"]);\n'
             'var n = [[1, 2], %["a" => [3]]]; println(n[0][1]); println(n[1].a[0]);\n'
             'var fold = [1, 2, 3]; println(fold[2]); var fd = %["p" => 9]; println(fd.p);\n',
-            # 方法调用、内置对象、链式成员
+#方法调用、内置对象、链式成员
             'var arr = [3, 1, 2]; arr.sort(); println(arr.join(",")); println(Math.abs(-3));\n'
             'println("xyz".length); println([1, 2].join("-")); println(arr.count + 1);\n',
-            # delete 语句形态与值形态（dst 被消费）
+#delete 语句形态与值形态（dst 被消费）
             'var dd = %["a" => 1, "b" => 2]; delete dd.a; println(dd.b);\n'
             'var ok = delete dd.b; println(ok); println(dd.count);\n',
-            # 顶层多使用纯读复制（同一值分发到多处）
+#顶层多使用纯读复制（同一值分发到多处）
             'var k = 5; var m = k + k; var o = [k, k]; println(m); println(o[1]);\n',
         ]
         for index, source in enumerate(cases):
@@ -559,7 +560,7 @@ selected
                 self.assertEqual(expected.returncode, 0, expected.stderr)
                 decompiled = self.run_cial("--decompile", original)
                 self.assertEqual(decompiled.returncode, 0, decompiled.stderr)
-                # 严格模式产物不含反汇编行
+#严格模式产物不含反汇编行
                 self.assertNotIn("//   @", decompiled.stdout)
                 recompiled = self.root / f"rt{index}_rt.tjs"
                 recompiled.write_text(decompiled.stdout, encoding="utf-8")
@@ -568,8 +569,8 @@ selected
                 self.assertEqual(actual.stdout, expected.stdout, "--- decompiled ---\n" + decompiled.stdout)
 
     def test_decompile_reflects_prefix_unary_precedence(self):
-        # 前缀一元紧于乘除、松于后缀（tjs.y unary_expr）：-a * 2 发射 ChgSign 再 Mul，
-        # 反编译按 TAC 结构不加括号；显式 -(a * 2) 与 int o.b 保持原形
+#前缀一元紧于乘除、松于后缀（tjs.y unary_expr）： - a * 2 发射 ChgSign 再 Mul，
+#反编译按 TAC 结构不加括号；显式 - (a * 2) 与 int o.b 保持原形
         self.script.write_text('var a = 7; var o = %["b" => 3];\n'
                                'println(-a * 2); println(-(a * 2)); println(int o.b + 1);\n',
                                encoding="utf-8")
@@ -580,10 +581,10 @@ selected
         self.assertIn("println(int o.b + 1);", process.stdout)
 
     def test_decompile_strict_rejects_structure_with_batch_reason(self):
-        # 语句结构（M3）、声明装配（M4）在严格模式如实拒绝：退出码 2、不产文本、原因含批次号
-        for source, batch in [("var a = 1;\nif (a) { println(a); }\n", "M3"),
+#语句结构（M3）、声明装配（M4）在严格模式如实拒绝：退出码 2、不产文本、原因含批次号
+        for source, batch in [("var a = 1;\nswitch (a) {\ncase 1:\nbreak;\n}\n", "M5"),
                               ("function f() { return 1; }\n", "M4"),
-                              ("var i = 0;\nwhile (i < 2) { i = i + 1; }\n", "M3")]:
+                              ("var o = %[];\nwith (o) { println(1); }\n", "M3")]:
             with self.subTest(batch=batch):
                 self.script.write_text(source, encoding="utf-8")
                 process = self.run_cial("--decompile", self.script)

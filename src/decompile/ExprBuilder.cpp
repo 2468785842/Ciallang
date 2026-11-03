@@ -33,6 +33,7 @@
 
 #include <fmt/format.h>
 
+#include "gen/ControlFlowGraph.hpp"
 #include "gen/Instruction.hpp"
 #include "runtime/Runtime.hpp"
 #include "types/Array.hpp"
@@ -41,6 +42,7 @@
 namespace cial::decompile {
     namespace {
         using inter::Instruction;
+        using inter::Label;
         using inter::Register;
         using inter::TacOpCode;
 
@@ -122,6 +124,7 @@ namespace cial::decompile {
         // TJS2 优先级（tjs.y，低 → 高）
         enum class Prec : u8 {
             Assign = 1,
+            Ternary = 2,
             Lor = 3,
             Land = 4,
             BitOr = 5,
@@ -246,6 +249,7 @@ namespace cial::decompile {
                 Unary, // 前缀（- ! ~ + typeof int real string octet # $ isvalid & * delete）
                 IncDec, // Inc/Dec 单指令（仅语句形态直接回写时可恢复）
                 Binary,
+                Ternary, // cond ? a : b（跨块折叠，M3；integer 复用为 else 节点下标）
                 Copy, // DLocal/GLocal 匿名拷贝（透明引用源版本）
             };
             Kind kind{};
@@ -310,18 +314,23 @@ namespace cial::decompile {
             if(!precheck(recovery.unsupported))
                 return recovery;
 
+            buildBlocksAndCondZones();
             scanVersions();
             buildNodesAndStmts();
             if(finishUnsupported(recovery))
                 return recovery;
 
+            foldTernaries();
             collectDeadStatements();
             decideVersions();
             assignTempNames();
             if(finishUnsupported(recovery))
                 return recovery;
 
-            emitStatements(recovery.statements);
+            if(_blocks.size() <= 1)
+                emitStatements(recovery.statements);
+            else
+                emitStructured(recovery.statements);
             finishUnsupported(recovery);
             return recovery;
         }
@@ -345,10 +354,16 @@ namespace cial::decompile {
             for(size_t pc = 0; pc < instructions.size(); ++pc) {
                 const auto op = instructions[pc]->opcode();
                 switch(op) {
-                    case TacOpCode::Jmp:
+                    // 跳转/Test/TestVoid 交由块条件区识别（M3 结构化）；switch 的
+                    // JmpE 与直写 _zf 的 Cmp* 族仍属 M5
                     case TacOpCode::JmpE:
-                    case TacOpCode::JmpNE:
-                        reason = "控制流语句结构化属 M3（跳转存在）";
+                        reason = "switch 语句结构化属 M5";
+                        return false;
+                    case TacOpCode::CmpEQ:
+                    case TacOpCode::CmpDEQ:
+                    case TacOpCode::CmpLT:
+                    case TacOpCode::CmpGT:
+                        reason = "_zf 直写比较族属 M5";
                         return false;
                     case TacOpCode::WithPush:
                     case TacOpCode::WithPop:
@@ -361,16 +376,6 @@ namespace cial::decompile {
                     case TacOpCode::CallExpand:
                     case TacOpCode::CollapseArgs:
                         reason = "展开实参/收拢参数恢复属后续批次";
-                        return false;
-                    case TacOpCode::Test:
-                    case TacOpCode::CmpEQ:
-                    case TacOpCode::CmpDEQ:
-                    case TacOpCode::CmpLT:
-                    case TacOpCode::CmpGT:
-                        reason = "_zf 条件上下文属 M3（直线代码不应出现）";
-                        return false;
-                    case TacOpCode::TestVoid:
-                        reason = "默认参数守卫属 M3（条件上下文）";
                         return false;
                     case TacOpCode::Super:
                         reason = "super 关键字恢复属 M4（类壳）";
@@ -389,6 +394,67 @@ namespace cial::decompile {
                 }
             }
             return true;
+        }
+
+        // ── M3：CFG 块与条件区 ──
+        // 条件块尾部形态（优化器 CompareTestFusion 保证相邻）：TestVoid? Test?
+        // CompareTest(+Imm)? JmpNE ——TestVoid/Test/比较的 pc 从语句流剔除，节点
+        // 交由块条件；do-while 尾块为 [... 比较, JmpNE exit, Jmp header]
+        struct CondZone {
+            u32 condNode{ INVALID }; // build 期填充
+            u32 firstPc{ INVALID }; // 条件区起始 pc（此前 = 块前缀语句）
+        };
+
+        void buildBlocksAndCondZones() {
+            inter::ControlFlowGraph cfg;
+            _blocks = cfg.buildCFG(_chunk);
+            _condZones.assign(_blocks.size(), CondZone{});
+            for(size_t bi = 0; bi < _blocks.size(); ++bi) {
+                const auto &block = _blocks[bi];
+                auto &code = _chunk.getInstVec();
+                const size_t lastPc = block.end - 1;
+                const auto lastOp = code[lastPc]->opcode();
+                // do-while 尾：JmpNE 后跟 Jmp 回边，两者同块
+                if(lastOp == TacOpCode::Jmp) {
+                    const auto target = code[lastPc]->getOp1().value<Label>().address();
+                    if(target < block.start && lastPc > block.start && code[lastPc - 1]->opcode() == TacOpCode::JmpNE) {
+                        const size_t condJumpPc = lastPc - 1;
+                        markCondCompare(block, condJumpPc, bi);
+                    }
+                    continue;
+                }
+                if(lastOp != TacOpCode::JmpNE)
+                    continue;
+                markCondCompare(block, lastPc, bi);
+            }
+            precomputeLoops();
+        }
+
+        // 从 condJumpPc 向前收集条件区（TestVoid? Test? CompareTest(+Imm)? JmpNE）
+        void markCondCompare(const inter::BasicBlock &block, const size_t condJumpPc, const size_t blockIdx) {
+            auto &code = _chunk.getInstVec();
+            size_t first = condJumpPc;
+            // JmpNE 前可跟 Test（布尔值判真）或 TestVoid+Test（默认参数守卫）
+            if(first > block.start) {
+                const auto prevOp = code[first - 1]->opcode();
+                if(prevOp == TacOpCode::Test || prevOp == TacOpCode::TestVoid) {
+                    --first;
+                    // TestVoid + Test 链
+                    if(first > block.start && code[first - 1]->opcode() == TacOpCode::TestVoid &&
+                       code[first]->opcode() == TacOpCode::Test)
+                        --first;
+                }
+            }
+            // 再往前是 CompareTest(+Imm)（比较结果仅供 _zf/死寄存器）
+            if(first > block.start) {
+                const auto prevOp = code[first - 1]->opcode();
+                if(prevOp == TacOpCode::CompareTest || prevOp == TacOpCode::CompareTestImm)
+                    --first;
+            }
+            auto &zone = _condZones[blockIdx];
+            zone.firstPc = static_cast<u32>(first);
+            for(size_t pc = first; pc <= condJumpPc; ++pc)
+                _condPcs.insert(static_cast<u32>(pc));
         }
 
         // ── Pass A：寄存器版本链 + 使用点收集 ──
@@ -411,8 +477,12 @@ namespace cial::decompile {
             for(size_t pc = 0; pc < instructions.size(); ++pc) {
                 _instPc = static_cast<u32>(pc);
                 const Instruction &inst = *instructions[pc];
+                // 同寄存器自拷贝（优化器残留）透明：不计使用，只推进版本
+                const bool selfCopy = (inst.opcode() == TacOpCode::DLocal || inst.opcode() == TacOpCode::GLocal) &&
+                    inst.getOp1().value<Register>() == inst.getOp2().value<Register>();
                 // 先使用后定义：Inc/Dec、ChkIns 的操作数寄存器读旧写新
-                forEachUse(inst, [&](const Register reg) { countUse(reg); });
+                if(!selfCopy)
+                    forEachUse(inst, [&](const Register reg) { countUse(reg); });
                 forEachDef(inst, [&](const Register reg, const bool hidden) { pushDef(reg, hidden); });
             }
         }
@@ -674,6 +744,10 @@ namespace cial::decompile {
                 _instPc = static_cast<u32>(pc);
                 const Instruction &inst = *instructions[pc];
                 _impureOrStore[pc] = isImpureOrStore(inst);
+                // 跳转是求值时机屏障：跨分支内联会把调用/getter 移入/移出分支，
+                // 改变可观察的执行次数
+                if(inst.opcode() == TacOpCode::Jmp || inst.opcode() == TacOpCode::JmpNE)
+                    _impureOrStore[pc] = true;
                 buildInstruction(inst);
                 forEachDef(inst, [&](const Register reg, bool) {
                     const auto version = definedVersion(reg);
@@ -768,6 +842,24 @@ namespace cial::decompile {
                     _impureOrStore[_instPc] = false;
                     _pending.push_back({ _instPc, operandNode(inst.getOp1().value<Register>()) });
                     break;
+                case TacOpCode::Test:
+                case TacOpCode::TestVoid:
+                    if(!_condPcs.contains(_instPc)) {
+                        fail("条件上下文出现在非块尾位置");
+                        break;
+                    }
+                    if(inst.opcode() == TacOpCode::TestVoid) {
+                        // 守卫谓词：src 是否为 void（默认参数守卫，语句层暂不展开）
+                        const auto voidLeaf = makeSimple(Expr::Kind::Void);
+                        _condNodeAtPc[_instPc] =
+                            makeBinary(TacOpCode::EQ, operandNode(inst.getOp1().value<Register>()), voidLeaf);
+                    } else {
+                        _condNodeAtPc[_instPc] = operandNode(inst.getOp1().value<Register>());
+                    }
+                    break;
+                case TacOpCode::Jmp:
+                case TacOpCode::JmpNE:
+                    break; // 结构跳转：条件节点由比较/Test pc 捕获
                 case TacOpCode::Debugger:
                     pushStmt(Stmt{ .kind = Stmt::Kind::DebuggerStmt, .pc = _instPc });
                     break;
@@ -869,14 +961,14 @@ namespace cial::decompile {
                                makeBinary(static_cast<const inter::CompareTest &>(inst).comparison,
                                           operandNode(inst.getOp1().value<Register>()),
                                           operandNode(inst.getOp2().value<Register>())));
-                    noteNamedDef(inst.getOp3().value<Register>());
+                    noteCondCompare(inst.getOp3().value<Register>());
                     break;
                 case TacOpCode::CompareTestImm: {
                     const auto &cmp = static_cast<const inter::CompareTestImm &>(inst);
                     const auto imm = makeLeaf(Expr::Kind::Int, cmp.getOp2().value<Integer>());
                     defineNode(cmp.getOp3().value<Register>(),
                                makeBinary(cmp.comparison, operandNode(cmp.getOp1().value<Register>()), imm));
-                    noteNamedDef(cmp.getOp3().value<Register>());
+                    noteCondCompare(cmp.getOp3().value<Register>());
                     break;
                 }
                 case TacOpCode::GPropC:
@@ -1341,8 +1433,9 @@ namespace cial::decompile {
             _current[reg.index()] = version; // 后续同指令内的 noteNamedDef 等读新版本
         }
 
-        // pc 处的局部名：取 reg 匹配且 startPC ≤ pc 的最新声明（寄存器跨作用域
-        // 复用时旧名已被新名覆盖；endPC 未由 IRGen 填写，恒 0 不参与判断）
+        // pc 处的局部名：取 reg 匹配、startPC ≤ pc < endPC 的最新声明。endPC 由
+        // endScope 填写（随压缩重映射）；0 = 未出作用域（参数/函数级变量）。寄存器
+        // 跨作用域复用时，旧名不得外溢到复用者（如循环变量寄存器被三元临时复用）
         [[nodiscard]] std::string localNameAt(const Register reg, const u32 pc) const {
             if(!_meta)
                 return {};
@@ -1352,6 +1445,10 @@ namespace cial::decompile {
             for(const auto &local : _meta->localVars) {
                 if(local.reg != reg || local.startPC.address() > pc)
                     continue;
+                const auto end = local.endPC.address();
+                // 查名 pc 为"本指令执行后"语义（pc+1）：与 endPC 相等仍在作用域内
+                if(end != 0 && pc > end)
+                    continue; // 作用域已结束
                 if(!found || local.startPC.address() >= bestStart) {
                     bestStart = static_cast<u32>(local.startPC.address());
                     best = atomText(_rt, local.identifier);
@@ -1398,6 +1495,8 @@ namespace cial::decompile {
                 for(auto &def : _defs[reg]) {
                     if(def.hidden || !def.usePcs.empty() || def.node == INVALID)
                         continue;
+                    if(_condPcs.contains(def.defPc))
+                        continue; // 条件区定义：节点为块条件，不降级为语句
                     if(_stmtPcs.contains(def.defPc))
                         continue; // 已是语句（StoreLocal 直定等）
                     if(!hasEffect(def.node))
@@ -1699,6 +1798,14 @@ namespace cial::decompile {
                     auto rhs = renderParen(expr.b, prec, true);
                     return { fmt::format("{} {} {}", lhs.text, expr.text, rhs.text), prec };
                 }
+                case Expr::Kind::Ternary: {
+                    // a = 条件，b = then 值，integer 复用为 else 值节点下标
+                    const auto cond = renderParen(expr.a, Prec::Ternary, false);
+                    const auto thenV = renderParen(expr.b, Prec::Assign, false);
+                    const auto elseV =
+                        renderParen(expr.integer == INVALID ? INVALID : expr.integer, Prec::Assign, false);
+                    return { fmt::format("{} ? {} : {}", cond.text, thenV.text, elseV.text), Prec::Ternary };
+                }
             }
             return { "<unknown>", Prec::Primary };
         }
@@ -1886,6 +1993,614 @@ namespace cial::decompile {
             return true;
         }
 
+        // ── M3 语句结构化 ──
+
+        struct WhileLoop {
+            u32 exitPc{}; // JmpNE 出口（break 目标）；INVALID = while (true)
+            u32 latchJmpPc{}; // 回边 Jmp 的 pc（体区结束）
+            u32 continuePc{}; // continue 目标（头块条件区起始）
+            bool hasCond{}; // false = while (true)
+        };
+
+        struct DoLoop {
+            u32 bodyStart{};
+            u32 condStart{}; // 条件比较起始（体区结束）
+            u32 condJumpPc{}; // JmpNE pc
+            u32 exitPc{}; // JmpNE 目标
+            u32 backTarget{}; // Jmp 目标（体首）
+        };
+
+        struct LoopCtx {
+            u32 breakPc{ INVALID }; // 循环出口（break 目标）
+            u32 continuePc{ INVALID }; // 循环条件（while 的 continue 目标）
+            u32 latchPc{ INVALID }; // 锁存 Jmp 的 pc（for 形态 continue 经锁存块中转）
+        };
+
+        [[nodiscard]] size_t blockAtPc(const u32 pc) const {
+            for(size_t i = 0; i < _blocks.size(); ++i)
+                if(_blocks[i].start <= pc && pc < _blocks[i].end)
+                    return i;
+            return _blocks.size();
+        }
+
+        void precomputeLoops() {
+            auto &code = _chunk.getInstVec();
+            for(size_t bi = 0; bi < _blocks.size(); ++bi) {
+                const auto &block = _blocks[bi];
+                const size_t lastPc = block.end - 1;
+                if(code[lastPc]->opcode() != TacOpCode::Jmp)
+                    continue;
+                const auto target = code[lastPc]->getOp1().value<Label>().address();
+                if(target >= block.start)
+                    continue; // 前向跳转非回边
+                // 同块 do-while：[比较…, JmpNE→exit, Jmp→bodyStart]
+                if(lastPc > block.start && code[lastPc - 1]->opcode() == TacOpCode::JmpNE) {
+                    const auto exitTarget = code[lastPc - 1]->getOp1().value<Label>().address();
+                    if(_condZones[bi].firstPc != INVALID && exitTarget == block.end &&
+                       target < _condZones[bi].firstPc) {
+                        DoLoop loop{ .bodyStart = static_cast<u32>(target),
+                                     .condStart = static_cast<u32>(_condZones[bi].firstPc),
+                                     .condJumpPc = static_cast<u32>(lastPc - 1),
+                                     .exitPc = static_cast<u32>(exitTarget),
+                                     .backTarget = static_cast<u32>(target) };
+                        _doLoops.emplace(loop.bodyStart, loop);
+                    }
+                    continue;
+                }
+                // 两块 do-while：前块以 JmpNE→本块末尾结束（条件区），本块仅 Jmp→体首
+                if(bi > 0 && _blocks[bi - 1].end == block.start) {
+                    const auto &cond = _blocks[bi - 1];
+                    const size_t condLast = cond.end - 1;
+                    const auto exitTarget = code[condLast]->opcode() == TacOpCode::JmpNE
+                        ? code[condLast]->getOp1().value<Label>().address()
+                        : INVALID;
+                    // 体严格在条件块之前（while 的回边目标 == 头块 start，据此区分）
+                    if(code[condLast]->opcode() == TacOpCode::JmpNE && exitTarget == block.end &&
+                       _condZones[bi - 1].firstPc != INVALID && target < cond.start) {
+                        DoLoop loop{ .bodyStart = static_cast<u32>(target),
+                                     .condStart = static_cast<u32>(_condZones[bi - 1].firstPc),
+                                     .condJumpPc = static_cast<u32>(condLast),
+                                     .exitPc = static_cast<u32>(exitTarget),
+                                     .backTarget = static_cast<u32>(target) };
+                        _doLoops.emplace(loop.bodyStart, loop);
+                        continue;
+                    }
+                }
+                // while 锁存：Jmp→头块；若锁存目标到条件区之间含存储（do 的体
+                // 语句），实为 do-while（体 + 条件同块/跨块）
+                const size_t header = blockAtPc(static_cast<u32>(target));
+                if(header >= _blocks.size() || header == bi)
+                    continue;
+                const auto &zone = _condZones[header];
+                WhileLoop loop{ .exitPc = INVALID,
+                                .latchJmpPc = static_cast<u32>(lastPc),
+                                .continuePc = static_cast<u32>(target),
+                                .hasCond = false };
+                if(zone.firstPc != INVALID && code[_blocks[header].end - 1]->opcode() == TacOpCode::JmpNE) {
+                    const auto exitTarget = code[_blocks[header].end - 1]->getOp1().value<Label>().address();
+                    if(exitTarget > _blocks[header].end && exitTarget > loop.latchJmpPc) {
+                        loop.exitPc = static_cast<u32>(exitTarget);
+                        loop.hasCond = true;
+                    }
+                }
+                if(loop.hasCond && hasBodyStoreBeforeCond(static_cast<u32>(target), zone.firstPc)) {
+                    DoLoop doLoop{ .bodyStart = static_cast<u32>(target),
+                                   .condStart = static_cast<u32>(zone.firstPc),
+                                   .condJumpPc = static_cast<u32>(_blocks[header].end - 1),
+                                   .exitPc = loop.exitPc,
+                                   .backTarget = static_cast<u32>(target) };
+                    _doLoops.emplace(doLoop.bodyStart, doLoop);
+                    continue;
+                }
+                _whileLoops.emplace(header, loop);
+            }
+        }
+
+        // 锁存目标 → 条件区之间含存储 → do-while 体；纯读取（条件操作数装入）
+        // → while 条件前缀。存储源寄存器若正是条件比较的操作数（如 while (--i > 0)
+        // 的前缀自减），归属歧义 → 记 Unsupported
+        [[nodiscard]] bool hasBodyStoreBeforeCond(const u32 latchTarget, const u32 zoneFirst) {
+            auto &code = _chunk.getInstVec();
+            bool hasStore = false;
+            for(u32 pc = latchTarget; pc < zoneFirst; ++pc) {
+                const Instruction &inst = *code[pc];
+                Opt<Register> storeSrc;
+                switch(inst.opcode()) {
+                    case TacOpCode::DGlobal:
+                    case TacOpCode::DThis:
+                        storeSrc = inst.getOp2().value<Register>();
+                        hasStore = true;
+                        break;
+                    case TacOpCode::SetIndex:
+                        storeSrc = inst.getOp3().value<Register>();
+                        hasStore = true;
+                        break;
+                    case TacOpCode::DPropC:
+                    case TacOpCode::DPropRawC:
+                        storeSrc = inst.getOp3().value<Register>();
+                        hasStore = true;
+                        break;
+                    case TacOpCode::DLocal: {
+                        const auto dst = inst.getOp2().value<Register>();
+                        if(!localNameAt(dst, pc + 1).empty()) {
+                            storeSrc = inst.getOp1().value<Register>();
+                            hasStore = true;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                if(!storeSrc.has_value())
+                    continue;
+                // 存储源寄存器与条件比较操作数同寄存器（前缀自减进条件）：歧义
+                for(u32 zpc = zoneFirst; zpc < code.size(); ++zpc) {
+                    const Instruction &zinst = *code[zpc];
+                    if(zinst.opcode() != TacOpCode::CompareTest && zinst.opcode() != TacOpCode::CompareTestImm &&
+                       zinst.opcode() != TacOpCode::Test)
+                        continue;
+                    bool feeds = false;
+                    forEachUse(zinst, [&](const Register operand) { feeds = feeds || operand == *storeSrc; });
+                    if(feeds) {
+                        fail("循环条件内联存储与 do/while 形态歧义");
+                        return true;
+                    }
+                    break; // 只看条件区第一条比较
+                }
+            }
+            return hasStore;
+        }
+
+        // 循环条件读取的寄存器若在体内重定义且绑定字面量节点（无名字），按初值
+        // 渲染会丢迭代语义 → 拒绝（具名局部/全局名读取不受影响）
+        void guardLoopCond(const size_t blockIdx, const u32 bodyEnd) {
+            const auto &zone = _condZones[blockIdx];
+            if(zone.firstPc == INVALID)
+                return;
+            auto &code = _chunk.getInstVec();
+            for(size_t pc = zone.firstPc; pc < _blocks[blockIdx].end && _unsupported.empty(); ++pc) {
+                const Instruction &inst = *code[pc];
+                switch(inst.opcode()) {
+                    case TacOpCode::CompareTest:
+                    case TacOpCode::CompareTestImm:
+                    case TacOpCode::Test:
+                    case TacOpCode::TestVoid:
+                        break;
+                    default:
+                        continue;
+                }
+                forEachUse(inst, [&](const Register reg) {
+                    const auto vRead = liveVersionAt(reg, static_cast<u32>(pc));
+                    if(vRead == INVALID)
+                        return;
+                    const auto &def = _defs[reg.index()][vRead];
+                    if(def.node == INVALID)
+                        return;
+                    const auto kind = _nodes[def.node].kind;
+                    if(kind != Expr::Kind::Int && kind != Expr::Kind::Real && kind != Expr::Kind::Str)
+                        return;
+                    for(const auto &v : _defs[reg.index()]) {
+                        if(v.defPc > pc && v.defPc <= bodyEnd) {
+                            fail("循环条件读取的寄存器在体内重定义且绑定字面量（循环携带变量渲染不安全）");
+                            return;
+                        }
+                    }
+                });
+            }
+        }
+
+        [[nodiscard]] u32 liveVersionAt(const Register reg, const u32 pc) const {
+            const auto index = reg.index();
+            if(index >= _defs.size())
+                return INVALID;
+            const auto &versions = _defs[index];
+            for(size_t v = versions.size(); v > 0; --v)
+                if(versions[v - 1].defPc <= pc)
+                    return static_cast<u32>(v - 1);
+            return INVALID;
+        }
+
+        // 条件块的条件节点：取条件区内最靠后的捕获节点（比较 > Test > TestVoid）
+        [[nodiscard]] u32 zoneNodeFor(const size_t blockIdx) const {
+            const auto &zone = _condZones[blockIdx];
+            if(zone.firstPc == INVALID)
+                return INVALID;
+            u32 node = INVALID;
+            for(size_t pc = zone.firstPc; pc < _blocks[blockIdx].end; ++pc) {
+                const auto it = _condNodeAtPc.find(static_cast<u32>(pc));
+                if(it != _condNodeAtPc.end())
+                    node = it->second;
+            }
+            return node;
+        }
+
+        struct BranchShape {
+            bool hasElse{};
+            u32 thenBegin{}, thenContentEnd{}; // 体内容 [thenBegin, thenContentEnd)
+            u32 elseBegin{}, elseEnd{}; // [elseBegin, elseEnd)
+            u32 mergePc{}; // 汇合 pc（无 else = JmpNE 目标）
+            u32 thenJmpPc{ INVALID }; // then 体末尾的汇合 Jmp
+        };
+
+        // 头块分支形态扫描：then 体 [end, T)；体末块以 Jmp→M（M > T）结束则
+        // 有 else 区 [T, M)。循环回边目标 < 块末不匹配；break/continue 的前向
+        // 跳转目标（循环出口/锁存）也不是汇合点
+        [[nodiscard]] bool scanBranch(const size_t blockIdx, const LoopCtx &ctx, BranchShape &shape) const {
+            const auto &block = _blocks[blockIdx];
+            auto &code = _chunk.getInstVec();
+            const size_t lastPc = block.end - 1;
+            if(code[lastPc]->opcode() != TacOpCode::JmpNE)
+                return false;
+            const auto t = code[lastPc]->getOp1().value<Label>().address();
+            if(t < block.end || t > code.size())
+                return false; // t == block.end = 空 then 体
+            shape.thenBegin = static_cast<u32>(block.end);
+            shape.hasElse = false;
+            shape.mergePc = static_cast<u32>(t);
+            shape.thenJmpPc = INVALID;
+            shape.thenContentEnd = static_cast<u32>(t);
+            shape.elseBegin = shape.elseEnd = 0;
+            const size_t last = blockAtPc(static_cast<u32>(t - 1));
+            if(last >= _blocks.size())
+                return true;
+            for(size_t bi = blockIdx + 1; bi <= last; ++bi) {
+                const auto &b = _blocks[bi];
+                if(b.start >= t)
+                    break;
+                const size_t bLast = b.end - 1;
+                if(code[bLast]->opcode() != TacOpCode::Jmp)
+                    continue;
+                const auto m = code[bLast]->getOp1().value<Label>().address();
+                if(m == ctx.breakPc || m == ctx.continuePc || m == ctx.latchPc)
+                    continue; // break/continue 跳转，非汇合
+                if(m >= b.end && m > t) {
+                    shape.hasElse = true;
+                    shape.thenContentEnd = static_cast<u32>(bLast);
+                    shape.elseBegin = static_cast<u32>(t);
+                    shape.elseEnd = static_cast<u32>(m);
+                    shape.mergePc = static_cast<u32>(m);
+                    shape.thenJmpPc = static_cast<u32>(bLast);
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] u32 definedVersionAt(const Register reg, const u32 pc) const {
+            const auto index = reg.index();
+            if(index >= _defs.size())
+                return INVALID;
+            const auto &versions = _defs[index];
+            for(size_t v = versions.size(); v > 0; --v)
+                if(versions[v - 1].defPc == pc)
+                    return static_cast<u32>(v - 1);
+            return INVALID;
+        }
+
+        [[nodiscard]] bool isLeafForTernary(const u32 node) const {
+            switch(_nodes[node].kind) {
+                case Expr::Kind::Void:
+                case Expr::Kind::Null:
+                case Expr::Kind::Int:
+                case Expr::Kind::Real:
+                case Expr::Kind::Str:
+                case Expr::Kind::RegExp:
+                case Expr::Kind::LocalName:
+                case Expr::Kind::ThisVal:
+                case Expr::Kind::GlobalObj:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        // 三元折叠 v1：两分支各为「单条纯叶定义 + d_local 拷入同一 dst」。
+        // 命名 dst 合并为单条赋值语句，匿名 dst 绑定汇合版本节点
+        [[nodiscard]] bool tryFoldTernary(const size_t blockIdx, const BranchShape &shape) {
+            if(!shape.hasElse)
+                return false;
+            auto &code = _chunk.getInstVec();
+            const size_t thenValPc = shape.thenBegin;
+            const size_t thenCopyPc = shape.thenBegin + 1;
+            const size_t elseValPc = shape.elseBegin;
+            const size_t elseCopyPc = shape.elseBegin + 1;
+            // thenContentEnd 为半开区间（thenJmpPc = thenContentEnd）：拷贝在其前一位
+            if(thenCopyPc + 1 != shape.thenContentEnd || elseCopyPc + 1 != shape.elseEnd)
+                return false;
+            // 拷贝指令在 thenCopyPc/elseCopyPc（值定义在其前一位）
+            if(code[thenCopyPc]->opcode() != TacOpCode::DLocal || code[elseCopyPc]->opcode() != TacOpCode::DLocal)
+                return false;
+            const auto *thenCopy = static_cast<const inter::DLocal *>(code[thenCopyPc].get());
+            const auto *elseCopy = static_cast<const inter::DLocal *>(code[elseCopyPc].get());
+            if(!(thenCopy->getOp2().value<Register>() == elseCopy->getOp2().value<Register>()))
+                return false;
+            const auto dst = thenCopy->getOp2().value<Register>();
+            const auto valueNodeOf = [&](const size_t valPc, const size_t copyPc, const Register src) -> u32 {
+                if(valPc + 1 != copyPc)
+                    return INVALID;
+                const auto version = definedVersionAt(src, static_cast<u32>(valPc));
+                if(version == INVALID)
+                    return INVALID;
+                const auto &def = _defs[src.index()][version];
+                if(def.node == INVALID || def.usePcs.size() != 1 || def.usePcs.front() != copyPc)
+                    return INVALID;
+                if(!isLeafForTernary(def.node))
+                    return INVALID;
+                return def.node;
+            };
+            const u32 thenNode = valueNodeOf(thenValPc, thenCopyPc, thenCopy->getOp1().value<Register>());
+            const u32 elseNode = valueNodeOf(elseValPc, elseCopyPc, elseCopy->getOp1().value<Register>());
+            if(thenNode == INVALID || elseNode == INVALID)
+                return false;
+            const u32 condNode = zoneNodeFor(blockIdx);
+            if(condNode == INVALID)
+                return false;
+            const auto ternary = newNode(Expr::Kind::Ternary);
+            _nodes[ternary].a = condNode;
+            _nodes[ternary].b = thenNode;
+            _nodes[ternary].integer = static_cast<Integer>(elseNode);
+
+            for(size_t pc = shape.thenBegin; pc <= shape.thenJmpPc; ++pc)
+                _foldedPcs.insert(static_cast<u32>(pc));
+            for(size_t pc = shape.elseBegin; pc < shape.elseEnd; ++pc)
+                _foldedPcs.insert(static_cast<u32>(pc));
+
+            // 命名 dst：两条 StoreLocal 合并为汇合处一条
+            const auto name = localNameAt(dst, static_cast<u32>(thenCopyPc) + 1);
+            if(!name.empty()) {
+                bool declare = false;
+                for(const auto &stmt : _stmts) {
+                    if(stmt.pc == thenCopyPc && stmt.kind == Stmt::Kind::StoreLocal) {
+                        declare = stmt.declare;
+                        break;
+                    }
+                }
+                Vec<Stmt> kept;
+                kept.reserve(_stmts.size());
+                for(auto &stmt : _stmts) {
+                    if((stmt.pc == thenCopyPc || stmt.pc == elseCopyPc) && stmt.kind == Stmt::Kind::StoreLocal)
+                        continue;
+                    kept.push_back(std::move(stmt));
+                }
+                _stmts = std::move(kept);
+                Stmt stmt{ .kind = Stmt::Kind::StoreLocal, .pc = shape.mergePc, .exprNode = ternary, .name = name };
+                stmt.declare = declare;
+                pushStmt(std::move(stmt));
+            } else {
+                // 匿名 dst：else 拷贝产生汇合时的活跃版本，节点替换为三元
+                const auto version = definedVersionAt(dst, static_cast<u32>(elseCopyPc));
+                if(version != INVALID)
+                    _defs[dst.index()][version].node = ternary;
+            }
+            return true;
+        }
+
+        // 三元折叠（decideVersions 之前调用）：逐条件头尝试，成功则区域透明化
+        void foldTernaries() {
+            LoopCtx empty{};
+            for(size_t bi = 0; bi < _blocks.size(); ++bi) {
+                if(_condZones[bi].firstPc == INVALID || _whileLoops.contains(bi))
+                    continue;
+                BranchShape shape;
+                if(!scanBranch(bi, empty, shape))
+                    continue;
+                if(tryFoldTernary(bi, shape)) {
+                    _foldedHeaders.insert(bi);
+                    _foldedHeaderMerge[bi] = shape.mergePc;
+                }
+            }
+        }
+
+        // ── 结构化发射（多块；语句按 pc 排序后由游标消费，区域递归带缩进）──
+        void emitStructured(Vec<RecoveredStatement> &out) {
+            (void)std::stable_sort(_stmts.begin(), _stmts.end(),
+                                   [](const Stmt &a, const Stmt &b) { return a.pc < b.pc; });
+            _emitCursor = 0;
+            const auto count = static_cast<u32>(_chunk.getInstVec().size());
+            emitRegion(0, count, LoopCtx{}, 0, out);
+        }
+
+        [[nodiscard]] static std::string indentText(const u32 level) { return std::string(level * 4, ' '); }
+
+        // 单 pc 发射：物化临时定义（先于消费语句）+ 该 pc 的语句（可多条）
+        void emitAt(const u32 pc, const u32 indent, Vec<RecoveredStatement> &out) {
+            const std::string pad = indentText(indent);
+            for(size_t reg = 0; reg < _defs.size(); ++reg) {
+                for(size_t v = 0; v < _defs[reg].size(); ++v) {
+                    const auto &def = _defs[reg][v];
+                    if(!def.materialized || def.defPc != pc)
+                        continue;
+                    out.push_back(RecoveredStatement{
+                        .pc = pc,
+                        .text = fmt::format("{}var {} = {};", pad, def.tempName, renderNode(def.node).text) });
+                }
+            }
+            while(_emitCursor < _stmts.size() && _stmts[_emitCursor].pc == pc) {
+                std::string text;
+                if(!renderStmt(_stmts[_emitCursor], text))
+                    return;
+                if(!text.empty())
+                    out.push_back(RecoveredStatement{ .pc = pc, .text = pad + text });
+                ++_emitCursor;
+            }
+        }
+
+        void emitRegion(const u32 begin, const u32 end, const LoopCtx &ctx, const u32 indent,
+                        Vec<RecoveredStatement> &out) {
+            u32 pc = begin;
+            while(pc < end) {
+                const auto bi = blockAtPc(pc);
+                if(bi >= _blocks.size()) {
+                    fail("区域跨越未知块边界");
+                    return;
+                }
+                const auto &block = _blocks[bi];
+                auto &code = _chunk.getInstVec();
+                // 区域截断：块可能延伸到区域之外（如循环体区域截在锁存 Jmp 前）
+                const u32 regionEnd = std::min<u32>(block.end, end);
+                const u32 zoneFirst = _condZones[bi].firstPc;
+                // do-while 体首（先于前缀发射：体首即块首，整块前缀属于体；
+                // 消费式移除防体区域重入递归）
+                const auto dl = _doLoops.find(pc);
+                if(dl != _doLoops.end()) {
+                    const DoLoop loop = dl->second;
+                    _doLoops.erase(dl);
+                    pc = emitDoWhile(loop, ctx, indent, out);
+                    continue;
+                }
+                // 头块可能含条件区之前的体语句（如循环体内 k = k + 1; if (...)）：
+                // 先按封闭区域发射前缀语句，再进入头处理
+                const bool atHeader = pc == block.start || pc == zoneFirst;
+                if(atHeader && zoneFirst != INVALID && zoneFirst > pc && regionEnd == block.end) {
+                    // 按 pc 逐个发射：物化临时定义可能落在无语句 tile 的 pc 上
+                    for(u32 p = pc; p < zoneFirst; ++p) {
+                        if(!_foldedPcs.contains(p))
+                            emitAt(p, indent, out);
+                    }
+                    pc = zoneFirst;
+                }
+                // while 头（循环识别优先于 if）
+                const auto wl = _whileLoops.find(bi);
+                if(atHeader && regionEnd == block.end && wl != _whileLoops.end()) {
+                    pc = emitWhile(bi, wl->second, ctx, indent, out);
+                    continue;
+                }
+                // 已折叠三元头：区域透明，直达汇合
+                if(atHeader && regionEnd == block.end && _foldedHeaders.contains(bi)) {
+                    pc = _foldedHeaderMerge[bi];
+                    continue;
+                }
+                // if 头
+                if(atHeader && regionEnd == block.end && zoneFirst != INVALID &&
+                   code[block.end - 1]->opcode() == TacOpCode::JmpNE) {
+                    pc = emitIf(bi, ctx, indent, out);
+                    continue;
+                }
+                // 直线块：先发语句，再判块尾结构跳转（仅整块在区域内时判）
+                u32 stmtEnd = regionEnd;
+                const size_t lastPc = block.end - 1;
+                u32 jumpTarget = INVALID;
+                if(regionEnd == block.end &&
+                   (code[lastPc]->opcode() == TacOpCode::Jmp || code[lastPc]->opcode() == TacOpCode::JmpNE)) {
+                    jumpTarget = static_cast<u32>(code[lastPc]->getOp1().value<Label>().address());
+                    if(_condPcs.contains(static_cast<u32>(lastPc)))
+                        stmtEnd = static_cast<u32>(lastPc); // 条件区：JmpNE 已被条件捕获
+                }
+                // 按 pc 逐个发射（物化临时定义与语句 tile 统一走 emitAt）
+                for(u32 p = pc; p < stmtEnd; ++p) {
+                    if(!_foldedPcs.contains(p))
+                        emitAt(p, indent, out);
+                }
+                if(jumpTarget != INVALID && !_condPcs.contains(static_cast<u32>(lastPc))) {
+                    if(jumpTarget == ctx.breakPc) {
+                        out.push_back(RecoveredStatement{ .pc = static_cast<u32>(lastPc),
+                                                          .text = fmt::format("{}break;", indentText(indent)) });
+                    } else if(jumpTarget == ctx.continuePc || jumpTarget == ctx.latchPc) {
+                        out.push_back(RecoveredStatement{ .pc = static_cast<u32>(lastPc),
+                                                          .text = fmt::format("{}continue;", indentText(indent)) });
+                    } else if(jumpTarget < end && jumpTarget != pc) {
+                        fail(fmt::format("pc {} 的跳转目标 {} 不属于可结构化形态", lastPc, jumpTarget));
+                    }
+                    // 跳到区域末尾（≥ end）等价贯穿，省略
+                }
+                pc = regionEnd;
+            }
+        }
+
+        [[nodiscard]] u32 emitWhile(const size_t blockIdx, const WhileLoop &loop, const LoopCtx &ctx, const u32 indent,
+                                    Vec<RecoveredStatement> &out) {
+            const auto &block = _blocks[blockIdx];
+            std::string condText = "true";
+            const u32 condNode = loop.hasCond ? zoneNodeFor(blockIdx) : INVALID;
+            if(loop.hasCond) {
+                if(condNode == INVALID) {
+                    fail("循环条件节点缺失");
+                    return loop.exitPc;
+                }
+                // Test 绑定非零常量 → while (true)；绑定零 → while (false)
+                if(_nodes[condNode].kind == Expr::Kind::Int) {
+                    condText = _nodes[condNode].integer != 0 ? "true" : "false";
+                } else {
+                    guardLoopCond(blockIdx, loop.latchJmpPc);
+                    if(!_unsupported.empty())
+                        return loop.exitPc;
+                    condText = renderNode(condNode).text;
+                }
+            }
+            const u32 zonePc =
+                _condZones[blockIdx].firstPc == INVALID ? static_cast<u32>(block.start) : _condZones[blockIdx].firstPc;
+            out.push_back(RecoveredStatement{ .pc = zonePc,
+                                              .text = fmt::format("{}while ({}) {{", indentText(indent), condText) });
+            LoopCtx inner{ .breakPc = loop.exitPc, .continuePc = loop.continuePc, .latchPc = loop.latchJmpPc };
+            emitRegion(block.end, loop.latchJmpPc, inner, indent + 1, out);
+            out.push_back(RecoveredStatement{ .pc = loop.latchJmpPc, .text = fmt::format("{}}}", indentText(indent)) });
+            return loop.exitPc == INVALID ? static_cast<u32>(loop.latchJmpPc + 1) : loop.exitPc;
+        }
+
+        [[nodiscard]] u32 emitDoWhile(const DoLoop &loop, const LoopCtx &ctx, const u32 indent,
+                                      Vec<RecoveredStatement> &out) {
+            const size_t latchBlock = blockAtPc(loop.condJumpPc);
+            const u32 condNode = latchBlock < _blocks.size() ? zoneNodeFor(latchBlock) : INVALID;
+            if(condNode == INVALID) {
+                fail("do-while 条件节点缺失");
+                return loop.exitPc;
+            }
+            out.push_back(
+                RecoveredStatement{ .pc = loop.bodyStart, .text = fmt::format("{}do {{", indentText(indent)) });
+            LoopCtx inner{ .breakPc = loop.exitPc, .continuePc = loop.backTarget, .latchPc = loop.condJumpPc };
+            emitRegion(loop.bodyStart, loop.condStart, inner, indent + 1, out);
+            out.push_back(RecoveredStatement{
+                .pc = loop.condJumpPc,
+                .text = fmt::format("{}}} while ({});", indentText(indent), renderNode(condNode).text) });
+            return loop.exitPc;
+        }
+
+        [[nodiscard]] u32 emitIf(const size_t blockIdx, const LoopCtx &ctx, const u32 indent,
+                                 Vec<RecoveredStatement> &out) {
+            const auto &block = _blocks[blockIdx];
+            const u32 condNode = zoneNodeFor(blockIdx);
+            if(condNode == INVALID) {
+                fail("分支条件节点缺失");
+                return block.end;
+            }
+            if(_foldedHeaders.contains(blockIdx))
+                return _foldedHeaderMerge[blockIdx]; // 三元已折叠：区域透明，直达汇合
+            BranchShape shape;
+            if(!scanBranch(blockIdx, ctx, shape)) {
+                fail("分支形态不可识别");
+                return block.end;
+            }
+            if(tryFoldTernary(blockIdx, shape)) {
+                _foldedHeaders.insert(blockIdx);
+                _foldedHeaderMerge[blockIdx] = shape.mergePc;
+                return shape.mergePc;
+            }
+            const std::string pad = indentText(indent);
+            out.push_back(RecoveredStatement{ .pc = _condZones[blockIdx].firstPc,
+                                              .text = fmt::format("{}if ({}) {{", pad, renderNode(condNode).text) });
+            emitRegion(shape.thenBegin, shape.thenContentEnd, ctx, indent + 1, out);
+            if(shape.hasElse) {
+                out.push_back(
+                    RecoveredStatement{ .pc = shape.elseBegin - 1, .text = fmt::format("{}}} else {{", pad) });
+                emitRegion(shape.elseBegin, shape.elseEnd, ctx, indent + 1, out);
+                out.push_back(RecoveredStatement{ .pc = shape.mergePc - 1, .text = fmt::format("{}}}", pad) });
+            } else {
+                out.push_back(RecoveredStatement{ .pc = shape.mergePc - 1, .text = fmt::format("{}}}", pad) });
+            }
+            return shape.mergePc;
+        }
+
+        // 条件区的比较定义：dst 仅供块条件使用（融合后通常死寄存器），不转
+        // var 声明语句，节点直接作为块条件捕获
+        void noteCondCompare(const Register reg) {
+            if(!_condPcs.contains(_instPc)) {
+                noteNamedDef(reg);
+                return;
+            }
+            const auto version = definedVersion(reg);
+            if(version != INVALID)
+                _condNodeAtPc[_instPc] = _defs[reg.index()][version].node;
+        }
+
         void fail(const std::string &reason) {
             if(_unsupported.empty())
                 _unsupported = reason;
@@ -1913,6 +2628,18 @@ namespace cial::decompile {
         std::set<std::string> _declaredGlobals;
         std::unordered_set<std::string> _usedNames;
         u32 _tempCounter{};
+
+        // ── M3 结构化状态 ──
+        Vec<inter::BasicBlock> _blocks;
+        Vec<CondZone> _condZones;
+        std::unordered_set<u32> _condPcs;
+        std::unordered_map<u32, u32> _condNodeAtPc; // 条件区 pc → 捕获的条件节点
+        std::unordered_map<size_t, WhileLoop> _whileLoops; // 头块 → 循环
+        std::unordered_map<u32, DoLoop> _doLoops; // 体首 pc → do-while
+        std::unordered_set<u32> _foldedPcs; // 三元折叠透明的 pc
+        std::unordered_set<size_t> _foldedHeaders; // 已折叠三元条件的头块
+        std::unordered_map<size_t, u32> _foldedHeaderMerge; // 头块 → 汇合 pc
+        size_t _emitCursor{};
     };
 
     ExprRecovery recoverUnitBody(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike) {

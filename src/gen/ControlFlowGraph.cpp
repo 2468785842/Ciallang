@@ -260,6 +260,70 @@ namespace cial::inter {
         }
 
         std::ranges::sort(_loops, [](const LoopInfo &lhs, const LoopInfo &rhs) { return lhs.header < rhs.header; });
+
+        _dominators = std::move(dominators);
+        computePostDominators(predecessors, reachable);
+    }
+
+    // 后支配集：反向数据流，pdom[b] = {b} ∪ ⋂ pdom[succ]；出口块（无后继或仅
+    // Ret/Throw 终结）pdom 仅含自身。不可达块视作自出口，消费方据此保守回退
+    void ControlFlowGraph::computePostDominators(const Vec<Vec<size_t>> &predecessors, const Vec<bool> &reachable) {
+        const size_t blockCount = _basicBlocks.size();
+        _postDominators.assign(blockCount, {});
+        if(blockCount == 0)
+            return;
+
+        // 反向后继（= 原前驱）；出口块 = 无后继，或终结指令（Ret/Throw）后无跳转
+        Vec<bool> isExit(blockCount, true);
+        for(size_t i = 0; i < blockCount; ++i) {
+            if(_basicBlocks[i].successors.empty() || !reachable[i])
+                continue;
+            const TacOpCode last = _basicBlocks[i].parentChunk->inst(_basicBlocks[i].end - 1)->opcode();
+            if(last == TacOpCode::Ret || last == TacOpCode::Throw)
+                continue;
+            isExit[i] = false;
+        }
+
+        Vec<Vec<size_t>> reverseSucc(blockCount);
+        for(size_t i = 0; i < blockCount; ++i) {
+            if(!reachable[i])
+                continue;
+            for(const size_t successor : _basicBlocks[i].successors)
+                reverseSucc[successor].push_back(i);
+        }
+
+        for(size_t i = 0; i < blockCount; ++i)
+            _postDominators[i].assign(blockCount, false);
+        bool changed = true;
+        while(changed) {
+            changed = false;
+            for(size_t i = 0; i < blockCount; ++i) {
+                Vec<bool> next(blockCount, false);
+                if(isExit[i] || !reachable[i]) {
+                    next[i] = true;
+                } else {
+                    // 出口可达性沿反向传播：有后继即可达出口（入口可达图上）
+                    bool hasSuccessor = false;
+                    for(const size_t successor : _basicBlocks[i].successors) {
+                        if(!hasSuccessor) {
+                            next = _postDominators[successor];
+                            hasSuccessor = true;
+                        } else {
+                            for(size_t k = 0; k < blockCount; ++k)
+                                next[k] = next[k] && _postDominators[successor][k];
+                        }
+                    }
+                    if(!hasSuccessor)
+                        next[i] = true;
+                    else
+                        next[i] = true;
+                }
+                if(next != _postDominators[i]) {
+                    _postDominators[i] = std::move(next);
+                    changed = true;
+                }
+            }
+        }
     }
 
     std::string ControlFlowGraph::dumpDot(vm::Chunk &chunk) const {

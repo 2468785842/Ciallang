@@ -114,7 +114,7 @@ with、eval 和局部值保活，"生成名字不冲突"不足以保证安全。
 | M0 | `DecompiledOutput{文本,行表}` 类型、CLI `--decompile` 骨架、反汇编级 Printer | {文本,行表} 管道通；环①以反汇编级跑通；错误不留成功文件 |
 | M1 | 转译器发 Rlc（Pass 1 接线）；固定参考二进制/版本/样本清单（哈希与导出选项） | bc 路径反汇编级端到端；行表含码字区间；未知版本被拒 |
 | M2 | ExprBuilder：后优化形态模式表（含 BinaryImm/CompareTestImm 逆映射）、调用族/成员访问族 | 表达式级 round-trip 逐形态对拍；**已完成（2026-11-02，`ExprBuilder.*`）** |
-| M3 | 语句结构化：if/while/for 归约、短路/三元跨块折叠 | 路径副作用、求值次数、break/continue 对拍通过 |
+| M3 | 语句结构化：if/while/for 归约、短路/三元跨块折叠 | 路径副作用、求值次数、break/continue 对拍通过；**已完成（2026-11-03，ExprBuilder 结构化发射）** |
 | M4 | 壳组装（context 树→声明）+ `+=` 逆融合（双守卫） | 类/继承/property/初始化顺序用例；getter 计数不翻倍 |
 | M5 | 硬核兜底：任意 CFG 降级（安全状态机）、switch 链、try/catch 嵌套重抛、覆盖扩展与模糊 | 能力矩阵逐项验收；Unsupported 集合可量化 |
 

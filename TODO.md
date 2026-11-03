@@ -16,11 +16,11 @@
 
 设计与批次见[反编译器方案](doc/bytecode/decompiler-plan.md)（2026-11-01 采纳 TAC 层直译路径）。
 
-- [ ] M3–M5：语句结构化（if/while/for 归约、短路/三元跨块折叠、默认参数守卫）、壳组装
-  （context 树 → function/class/property 声明，参数列表来自 localVars）与 `+=`/`++` 逆融合
-  双守卫（模板命中 + `computeBlockLiveness` 无其他读者）、任意 CFG/switch 链/try 嵌套兜底；
-  按方案 §7 四环验证逐批验收。M2 遗留小项一并处理：动态键字典字面量、`obj[expr]` 动态
-  成员名、octet 字面量。
+- [ ] M4–M5：壳组装（context 树 → function/class/property 声明，参数列表来自 localVars）、
+  `+=`/`++` 逆融合双守卫（模板命中 + `computeBlockLiveness` 无其他读者）、switch 链与
+  try/catch 嵌套兜底（任意 CFG 降级状态机）；按方案 §7 四环验证逐批验收。M3 遗留小项：
+  动态键字典字面量、`obj[expr]` 动态成员名、octet 字面量、顶层 `for` 初始化变量
+  （寄存器携带无名字，当前如实拒绝）、`while` 条件内联存储歧义拒绝。
 
 M0 已完成（2026-11-01）：`src/decompile/` 的 `{文本, 行表}` 管道、CLI `--decompile`（严格模式
 默认 / `--view` 反汇编视图 / `--map` 行表 JSON / `--source` 偏移换算）、TJS2 路径来源表
@@ -39,6 +39,17 @@ M2 已完成（2026-11-02）：`src/decompile/ExprBuilder.*` 单块直线表达�
 严格模式对直线顶层程序产出可重编译文本（环① round-trip 对拍 9 类形态通过，`tests/cli_test.py`），
 结构/声明按批次号拒绝；视图模式以 `// >>` 附加恢复结果。顺带修复 `FuncMeta::localVars.startPC`
 为优化前 pc 的错位（`Chunk::pcAnchors` 随压缩重映射，调试器局部作用域同样受益）。
+
+M3 已完成（2026-11-03）：`ExprBuilder` 语句结构化——CFG 块 + 条件区（TestVoid? Test?
+CompareTest(+Imm)? JmpNE，优化器融合保证相邻）、if/else 区域归约、while/do-while/
+while(true)（锁存判别：锁存目标到条件区含存储即 do-while，条件内联存储歧义如实拒绝）、
+break/continue（for 与 while+尾部递增 TAC 不可区分，按 while 形态恢复，行为等价）、
+三元跨块折叠（两分支单条纯叶定义 + d_local 拷入同一 dst；命名/匿名 dst 分别合并/绑版本）、
+跳转求值时机屏障（跨分支内联守卫）、`Chunk::pcAnchors` 扩展重映射 endPC、`localNameAt`
+按 startPC ≤ pc < endPC 作用域查名（修 stale 名外溢）。函数体循环 round-trip 对拍
+（while+continue / do-while+break / for+三元 / else-if / while(true)+break+return，
+逐输入执行比对返回值）与顶层 while/do-while CLI 对拍通过；switch → M5、声明 → M4、
+with → M3 遗留，按批次号拒绝。
 
 ## SDK 与开发工具路线图
 
