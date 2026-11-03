@@ -23,6 +23,14 @@
           "default-features": false
         }
       ]
+    },
+    "tools": {
+      "description": "Auxiliary tool skeletons (lsp, disasm, dbg); requires cli",
+      "dependencies": [
+        {
+          "name": "cli"
+        }
+      ]
     }
   },
   "dependencies": [

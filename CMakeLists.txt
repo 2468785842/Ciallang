@@ -21,11 +21,24 @@ option(CIAL_BUILD_FORMATTER "Build the cial-fmt source formatter" ${CIAL_BUILD_C
 option(CIAL_BUILD_FUZZ "Build libFuzzer targets" OFF)
 option(CIAL_BUILD_BENCH "Build benchmark and TJS2 conformance tooling" OFF)
 option(CIAL_ENABLE_JIT "Enable the optional x64 integer JIT backend" OFF)
+option(CIAL_BUILD_LSP "Build the cial-lsp skeleton executable" OFF)
+option(CIAL_BUILD_DISASM "Build the cial-disasm skeleton executable" OFF)
+option(CIAL_BUILD_DBG "Build the cial-dbg skeleton executable" OFF)
+option(CIAL_BUILD_TOOLS "Build all auxiliary tools (lsp/disasm/dbg skeletons + cial-fmt)" OFF)
+if(CIAL_BUILD_TOOLS)
+    # 一键全开：只影响本次配置，不落缓存
+    set(CIAL_BUILD_LSP ON)
+    set(CIAL_BUILD_DISASM ON)
+    set(CIAL_BUILD_DBG ON)
+    set(CIAL_BUILD_FORMATTER ON)
+endif()
 option(CIAL_WARNINGS_AS_ERRORS "Treat Ciallang compiler warnings as errors" ${CIAL_TOP_LEVEL})
-foreach(feature IN ITEMS cli tests jit)
+foreach(feature IN ITEMS cli tests jit tools)
     if((feature STREQUAL "cli" AND CIAL_BUILD_CLI) OR
        (feature STREQUAL "tests" AND CIAL_BUILD_TESTS) OR
-       (feature STREQUAL "jit" AND CIAL_ENABLE_JIT))
+       (feature STREQUAL "jit" AND CIAL_ENABLE_JIT) OR
+       (feature STREQUAL "tools" AND
+           (CIAL_BUILD_LSP OR CIAL_BUILD_DISASM OR CIAL_BUILD_DBG)))
         list(APPEND VCPKG_MANIFEST_FEATURES ${feature})
     endif()
 endforeach()
@@ -174,14 +187,27 @@ endif()
 
 if(CIAL_BUILD_CLI)
     find_package(argparse CONFIG REQUIRED)
+    # 工具共享的编译编排与诊断渲染；main.cpp 与 Repl 留给 cial。
+    # 生成的 Version.hpp 只被 Options.cpp（parseOptions --version）引用
+    add_library(cialcli STATIC
+        src/cli/Compilation.cpp
+        src/cli/Diagnostics.cpp)
+    target_compile_features(cialcli PUBLIC cxx_std_20)
+    target_link_libraries(cialcli PUBLIC Ciallang::Ciallang)
+    target_include_directories(cialcli PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>")
+    set_target_properties(cialcli PROPERTIES COMPILE_WARNING_AS_ERROR ${CIAL_WARNINGS_AS_ERRORS})
+    if(MSVC)
+        target_compile_options(cialcli PRIVATE /EHsc /MP /utf-8)
+    endif()
+
     add_executable(cial
         src/main.cpp
         src/cli/Options.cpp
         src/cli/Application.cpp
-        src/cli/Compilation.cpp
-        src/cli/Diagnostics.cpp
         src/cli/Repl.cpp)
-    target_link_libraries(cial PRIVATE Ciallang::Ciallang argparse::argparse)
+    target_link_libraries(cial PRIVATE Ciallang::Ciallang cialcli argparse::argparse)
     target_include_directories(cial PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
     set_target_properties(cial PROPERTIES COMPILE_WARNING_AS_ERROR ${CIAL_WARNINGS_AS_ERRORS})
     if(MSVC)
@@ -262,6 +288,29 @@ endif ()
 if(CIAL_BUILD_FUZZ)
     add_subdirectory(fuzz)
 endif ()
+
+# ------------------------------ auxiliary tools ------------------------------ #
+# 各工具 skeleton 在自身目录内定义 target；依赖尚未具备时以桩入口占位。
+# 共享的编译编排与诊断渲染见 cialcli（CIAL_BUILD_CLI 时定义）；
+# 成品 cial-fmt（CIAL_BUILD_FORMATTER，src/format/）不要求 CLI，一并纳入聚合。
+set(CIAL_TOOL_TARGETS "")
+foreach(tool IN ITEMS LSP DISASM DBG)
+    if(CIAL_BUILD_${tool})
+        string(TOLOWER "${tool}" CIAL_TOOL_DIR)
+        if(NOT CIAL_BUILD_CLI)
+            message(FATAL_ERROR "CIAL_BUILD_${tool} requires CIAL_BUILD_CLI=ON (shares cialcli)")
+        endif()
+        add_subdirectory(tools/${CIAL_TOOL_DIR})
+        list(APPEND CIAL_TOOL_TARGETS cial-${CIAL_TOOL_DIR})
+    endif()
+endforeach()
+if(CIAL_BUILD_FORMATTER)
+    list(APPEND CIAL_TOOL_TARGETS cial-fmt)
+endif()
+if(CIAL_TOOL_TARGETS)
+    add_custom_target(tools DEPENDS ${CIAL_TOOL_TARGETS}
+        COMMENT "Build all enabled auxiliary tools")
+endif()
 
 if(CIAL_INSTALL_SDK)
     include(cmake/SDK.cmake)

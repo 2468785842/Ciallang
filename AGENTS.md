@@ -19,10 +19,10 @@ Ciallang 是 C++20 实现的 TJS2 解释器。先看 [README](README.md) 和 [�
 | `src/stdlib/` | 各库的实现与注册入口；StandardLibrary 汇总安装 |
 | `src/tjsbc/` | TJS2 字节码读取与转译 |
 | `src/decompile/` | 字节码反编译（{文本, 行表}；方案见 `doc/bytecode/decompiler-plan.md`） |
-| `src/cli/` · `src/main.cpp` | CLI、REPL、编译与诊断输出 |
+| `src/cli/` · `src/main.cpp` | CLI 与 REPL；Compilation/Diagnostics 编为 `cialcli` 静态库供各工具共享 |
 | `tests/` · `bench/` · `fuzz/` | 回归测试、基准、前端 fuzz 及语料 |
 | `src/format/` | cial-fmt 无损词素扫描、布局与安全文件写回 |
-| `tools/lsp/` · `editors/vscode/` | stdio LSP 服务与 VSCode 客户端 |
+| `tools/` · `editors/vscode/` | 工具骨架（`cial-lsp`/`cial-disasm`/`cial-dbg`，`CIAL_BUILD_*` 门控；lsp 目录另含 stdio 协议原型）与 VSCode 客户端 |
 
 ## 构建与验证
 
