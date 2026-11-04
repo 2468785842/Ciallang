@@ -94,7 +94,7 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 | 项 | TJSCompiler | Ciallang | 处理 |
 |---|---|---|---|
 | 内存管理 | 纯引用计数（tTJSVariant CopyRef） | 标记清除 GC + 引用计数混合 | 对象存活依赖显式根；见 [FAQ](faq.md#宿主持有-value-或-shared_ptr-就能保住脚本对象吗) |
-| 性能 | fib(25) 基准 | 2026-10-28 同机对照：fib 约 1.5×、原生方法约 1.9×；整数循环/字符串拼接已与旧版持平或反超（详见 doc/performance.md） | [性能待办](../TODO.md#性能与优化) |
+| 性能 | fib(25) 基准 | 2026-10-28 同机对照：fib 约 1.5×、原生方法约 1.9×；整数循环/字符串拼接已与旧版持平或反超（详见 doc/performance.md） | [性能提案](../.agents/notes/proposed/performance/) |
 | 字符串内部编码 | UTF-16（目标 krkr2 为 char16_t） | UTF-8/WTF-8 | 基础脚本操作与正则位置按 UTF-16 码元，内部允许保存孤立代理码元；源码仍严格校验 UTF-8 |
 | 调用栈深度 | 无同值上限 | 1024 | 记录差异 |
 | 局部变量名（字节码态） | 序列化不含 Namespace | 同样无 | 一致 |
@@ -109,7 +109,7 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 | 回调异常值传播 | 宿主回调（sort 比较器/replace 回调/即时求值）抛出的脚本异常，外层 catch(e) 收到抛出值本身（try handler 的 exValueReg 回写） | 一致（2026-10-30 修正——ThrowHandler 以 0 表示"无槽位"与寄存器 0 冲突，异常值曾丢失、catch 读到池内陈旧值；现以 0xFFFF 为无槽位哨兵，寄存器 0 合法；`src/vm/VMState.cpp` unwind、`src/vm/Bytecode.hpp`、回归 tests/try_catch_test.cpp） | 无差异 |
 | `+` 的 void 幺元 / `(string)void` | `operator+=`：任一侧为 String 时两侧 `AsString()`（void→NULL 即空串，tjsVariant.cpp:1095-1128、683-686）；void±Integer/Real 恒等；void+void → AsReal 兜底得 Real 0；octet+String 抛错。`ToString()` 对 void 给空串（:411-415）、octet 抛错（:443-445） | 一致（2026-10-30 修正——`(string)void` 与 `"a"+void` 曾报 "Invalid type cast / unsupported operand"；`src/types/Value.cpp` toString Void 分支） | 无差异 |
 | `&` 引用作用域 | 全局/局部/对象成员均可存属性引用；普通全局/成员读取触发 getter，局部读取仅复制引用 | 一致；`&name` / `&obj.member` 取引用本体，`*(&name)` 可显式解引用全局槽 | 无差异；回归见 `tests/tjs/property/` |
-| RegExp `index` 属性单位 | 字节偏移：`tjsRegExp.cpp:669` `Index = Start + region->beg[0]` 漏除 `sizeof(tjs_char)`，同函数 `lastIndex`（:676）与 :677/:680/:682 均有除——同一对象两属性单位不自洽；字符位 1 的匹配实测 Windows 返回 2、macOS arm64 返回 4（= 字符位 × sizeof(tjs_char)） | 字符位（TJS2 语义），与 `lastIndex` 一致 | 参考侧缺陷，记录不追仿（2026-10-31 macOS 稳定构建裁决，数据见 [报告 §6](reports/2026-10-31-semantic-diff-tasks.md)） |
+| RegExp `index` 属性单位 | 字节偏移：`tjsRegExp.cpp:669` `Index = Start + region->beg[0]` 漏除 `sizeof(tjs_char)`，同函数 `lastIndex`（:676）与 :677/:680/:682 均有除——同一对象两属性单位不自洽；字符位 1 的匹配实测 Windows 返回 2、macOS arm64 返回 4（= 字符位 × sizeof(tjs_char)） | 字符位（TJS2 语义），与 `lastIndex` 一致 | 参考侧缺陷，记录不追仿（2026-10-31 macOS 稳定构建裁决，数据见 [报告 §6](../.agents/reports/2026-10-31-semantic-diff-tasks.md)） |
 | 后缀 `!` 编译失败可捕获性 | 不可捕获：`try { "1 +"!; } catch` 得 caught=0（macOS 稳定复现）；`VM_EVAL`→`Eval` 的编译错误以原生异常逃逸（tjsInterCodeExec.cpp:1222、:2713 `catch(...) { throw; }`） | 可捕获（caught=1），与 kirkr2 一致 | 记录差异，保持我方；参考侧疑似未实现可捕获 |
 | 字典字面量 count / 下标赋值 | 最小复现（混合键字面量、字面量后下标赋值）SIGSEGV，两平台一致；套件形态不崩时亦稳定 assertion 1/4 failed（count 不符） | `count=2`/`count=3` 正确，符合 TJS2 字面量语义 | 参考侧缺陷，记录不追仿 |
 
@@ -125,7 +125,7 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 
 ## 5. 后续工作
 
-未完成事项集中记录在 [TODO.md](../TODO.md)，性能测量见 [performance.md](performance.md)。
+未决问题与提案见 [.agents/notes](../.agents/notes/README.md)，性能测量见 [performance.md](performance.md)。
 
 krkr2 替换验收以指定仓库为准，当前完成嵌入基础，不代表可直接替换其 TJS2 核心。见[接入说明](krkr2-integration.md)。
 

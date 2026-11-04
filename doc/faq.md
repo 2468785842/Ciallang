@@ -81,7 +81,7 @@ TJSCompiler 的旧入口曾使用固定脚本路径；`d8044c3` 已提交 `TJSCo
 
 先核对控制流与类型约束。受 `TypeId`/opcode 保护的热路径转换、内部脚本异常载体、
 测试中的自赋值和生命周期检查都有明确用途；拼写、const 或 ranges 建议不等同于运行时缺陷。
-局部协议见 `src/types/TypeId.hpp`、`src/vm/VMState.hpp`；历史诊断数据保留在 [reports/](reports/)。
+局部协议见 `src/types/TypeId.hpp`、`src/vm/VMState.hpp`；历史诊断数据保留在 [.agents/reports/](../.agents/reports/)。
 
 ## Windows CI 的深数组压力测试为什么配置较大栈？
 

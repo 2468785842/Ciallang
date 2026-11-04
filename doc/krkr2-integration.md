@@ -48,4 +48,5 @@
 
 完成标准是目标宿主在相同资源与脚本下通过验收，且能切回原 TJS2 差分。
 单元测试、fixture 匹配与 SDK 链接分别证明各自范围，不单独构成“核心可替换”。
-未完成项见 [TODO](../TODO.md#krkr2-接入)，CLI 公开发布另见[发布指南](releasing.md)。
+未完成项见[接入任务 note](../.agents/notes/proposed/architecture/2026-11-04-krkr2-integration.md)，
+CLI 公开发布另见[发布指南](releasing.md)。

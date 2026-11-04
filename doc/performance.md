@@ -87,7 +87,7 @@ macOS arm64；参考 `bin/darwin/TJSCompiler`（d8044c3，SHA `35169f56…537`�
 生成 TAC 与缓存读取函数反汇编一致，仅主循环布局变化；去掉强制 PIC 后回退仍存在，
 Unicode 冷路径外提实验无稳定收益已撤回，保留非空对象读取内联、错误路径外联与
 全局整数读取提前返回；SDK 链接进共享库时由宿主显式启用 PIC。原始样本、环境和
-二进制 SHA-256 见[测量数据](reports/2026-11-01-sdk-alignment-benchmark.json)。
+二进制 SHA-256 见[测量数据](../.agents/reports/2026-11-01-sdk-alignment-benchmark.json)。
 
 ## 2026-11-01 运行期诊断源码快照
 
@@ -98,7 +98,7 @@ Windows x64、Clang 19.1.5、Release `-O3 -DNDEBUG` 静态 CRT，基线为上一
 （2048 行注释）峰值工作集 +2.38 MiB；CLI 编译/执行期间同时持有原缓冲与快照，
 嵌套 Chunk 共享快照不按函数复制。Catch2 验证重装载、延迟函数、GC 回收、故障
 重置与关闭保留；Windows Debug/Release/Release+JIT 各 235 项 CTest 通过。原始
-样本见[测量数据](reports/2026-11-01-source-snapshot-benchmark.json)。
+样本见[测量数据](../.agents/reports/2026-11-01-source-snapshot-benchmark.json)。
 
 ## 2026-11-01 结构化异常栈与 getter 异常隔离
 
@@ -110,7 +110,7 @@ loop_int −3.9%、native +7.0%、string −2.9%、字符串/原生/getter 压�
 每 Chunk 一个 Vec、每条 TAC 约 4 字节，异常栈仅错误路径分配（≤64 帧）。Windows
 Debug/Release/Release+JIT 各 235 项 CTest 通过；实现见 `src/vm/VMState.*`、
 `Chunk.hpp`、`CallFrame.hpp`、`src/types/Property.hpp`，原始样本见
-[测量数据](reports/2026-11-01-runtime-stack-benchmark.json)。
+[测量数据](../.agents/reports/2026-11-01-runtime-stack-benchmark.json)。
 
 ## 2026-11-01 fib 调用路径批次（A 帧级字节码缓存 / D 立即数融合 / B 释放帧免重建）
 

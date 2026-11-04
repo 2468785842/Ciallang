@@ -7,7 +7,7 @@
 项目定位为可嵌入的 TJS2 兼容运行时，开发工具独立发布；现代模块能力作为扩展逐步加入。
 优先稳定核心与工具的接口，再拆分仓库，避免各端重复实现语言规则。
 实际支持范围仍以[语法说明](syntax.md)、[兼容性说明](compatibility.md)和
-[宿主集成](embedding.md)为准；可执行任务索引见[待办](../TODO.md)。
+[宿主集成](embedding.md)为准；活动任务见 [.agents/notes](../.agents/notes/README.md)。
 
 ## 1. 当前基础与缺口
 

@@ -84,7 +84,7 @@ Debug.message("T6 i1=" + g.index + " li1=" + g.lastIndex);
 TJS2 字符位语义**。处理建议：
 1. 在参考仓库 `src/syntax/library` 的 RegExp 实现中确认 index 的计算单位（预期找到
    ×2/字节偏移痕迹）作为最终证据；
-2. 保持我方行为，在本文件与 [compatibility.md](../compatibility.md) 增补差异条目
+2. 保持我方行为，在本文件与 [compatibility.md](../../doc/compatibility.md) 增补差异条目
    （沿用 §4 表格风格）；
 3. 若确认要兼容参考输出（不建议），须经 `CIAL_TJS_TEST_REFERENCE` 全量对拍复核。
 
@@ -150,7 +150,7 @@ for i in 1 2 3; do $R tests/tjs/scope/block/04.tjs >/dev/null 2>&1; printf "rc=%
 2. 用稳定构建裁决 §3.3 两个容器项与 §3.1 的 index 单位证据（查参考源码）。
 3. §3.2 按参考源码 + リファレンス裁决，落 compatibility.md 差异条目。
 4. 全部裁决后：将确认的我方修复项拆独立提交；参考侧缺陷项只记录不追仿；
-   更新 [TODO](../../TODO.md) 与 [2026-10-31 审计报告](2026-10-31-reference-audit.md)。
+   更新 [AI 协作 notes](../notes/README.md) 与 [2026-10-31 审计报告](2026-10-31-reference-audit.md)。
 5. 验收：`python tests/run_tjs_tests.py --engine <新参考> --report ...` 全量对拍，
    差异逐项归因到本清单编号或新条目；CTest 全绿。
 
@@ -195,7 +195,7 @@ UTF-16LE 固定编码对 32 位 `tjs_char` 平台的错配一致（tests/tjs/REA
    `_this->Index = _this->Start + region->beg[0];` 漏除 `sizeof(tjs_char)`——
    同函数 `lastIndex`（:676）与 :677/:680/:682 的 `beg[]` 使用均做了除。
    `region->beg[]` 为字节偏移，故 index 按字节、lastIndex 按字符位。
-   我方按字符位保持不变；差异已记入 [compatibility.md §4](../compatibility.md)。
+   我方按字符位保持不变；差异已记入 [compatibility.md §4](../../doc/compatibility.md)。
 2. **§3.2 后缀 `!` 编译失败可捕获性：记录差异，保持我方。** 参考 `VM_EVAL`
    （tjsInterCodeExec.cpp:1222）→ `Eval`（:2713）将编译错误以原生异常重抛
    （`catch(...) { throw; }`），脚本层 catch 不可捕获（t3 caught=0 稳定）。

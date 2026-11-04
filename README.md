@@ -65,7 +65,7 @@ println([1, 2, 3].join(", "));
 | [打包与发布](doc/releasing.md) | CLI 预览版、版本来源与 Release CI |
 | [krkr2 接入](doc/krkr2-integration.md) | 指定宿主分支、已实现基础与替换验收门槛 |
 | [路线图](doc/roadmap.md) | SDK、`.d.tjs` 声明、工具拆仓、模块与调试器规划 |
-| [文档索引](doc/README.md) · [待办](TODO.md) · [开发约定](AGENTS.md) | 查阅与贡献 |
+| [文档索引](doc/README.md) · [开发约定](AGENTS.md) · [AI 协作](.agents/README.md) | 查阅与贡献 |
 
 提交前运行相关测试，并按 `.clang-format` 格式化修改的 C++ 文件。
 CI 覆盖三平台 Debug/Release，另有 Windows x64 Release + JIT 配置。

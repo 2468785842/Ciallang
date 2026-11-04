@@ -1,7 +1,8 @@
 # 开发约定与项目导航
 
-Ciallang 是 C++20 实现的 TJS2 解释器。先看 [README](README.md) 和 [待办](TODO.md)，
-专题资料见[文档索引](doc/README.md)，常见使用限制见 [FAQ](doc/faq.md)。
+Ciallang 是 C++20 实现的 TJS2 解释器。先读 [README](README.md) 和[文档索引](doc/README.md)，
+常见使用限制见 [FAQ](doc/faq.md)。本文适用于人工和 AI 协作；用户本次任务的明确指令优先。
+以本地代码、CMake 和实际验证为准，外部教程及旧规划不能替代实现事实。
 
 ## 代码地图
 
@@ -40,6 +41,21 @@ C++ 测试显式登记在 `tests/CMakeLists.txt`；纯语言/标准库行为放�
 用 TJS 断言并自动登记为 CTest；原生注册与内部状态检查保留 Catch2。见[脚本测试指南](tests/tjs/README.md)。
 CLI、LSP 与字节码工具测试也通过 CTest 运行。
 性能修改需做同机 Release 对照，并覆盖异常恢复、可观察结果与 GC 生命周期。
+
+## AI 工作记录与技能
+
+组织方式与接续顺序见 [AI 协作方案](.agents/README.md)。接续任务先按主题查找
+[活动 notes](.agents/notes/README.md)，读取相关记录中的证据和下一步；无需加载全部笔记。
+问题调查更新原 note，完成后同步专题文档和生命周期；未复现不能作为修复结论。
+
+项目技能按任务读取，不要求每次运行全部流程：
+
+- [cial-verify](.agents/skills/cial-verify/SKILL.md)：选择构建/测试范围，检查实际注册与结果证据。
+- [cial-diff](.agents/skills/cial-diff/SKILL.md)：与参考 TJS2 引擎对拍行为、转译与反编译结果。
+
+技能正文保存在仓库；是否自动发现由当前宿主决定，未发现时直接按上述路径读取。
+原始日志、dump 与临时脚本放在忽略的 `out/`，notes 保留必要摘要和定位信息。
+当前实现与操作指南放 `doc/` 并更新索引；AI 流程、问题、提案和历史验证放 `.agents/`。
 
 ## 代码惯例
 
@@ -83,4 +99,5 @@ CLI、LSP 与字节码工具测试也通过 CTest 运行。
 - 改指令编码同步更新内部字节码文档；改语言行为同步更新语法与兼容性说明。
 - 新增模块或文档时更新对应索引；事实性说明引用实现文件，文档使用中文。
 - 局部约束放接口或实现注释，使用方法放专题指南，常见排错放 FAQ。
-- TODO 只保留未完成项；删除已完成任务与重复修复流水。性能记录保留测量环境和基线。
+- 未决问题与提案维护在 `.agents/notes` 并跟踪生命周期（proposed/implemented/rejected/archived）；
+  已验证结论同步到专题文档。性能记录保留测量环境和基线。
