@@ -1,0 +1,21 @@
+// M5: reference direct flag comparisons with both branch outcomes.
+function eq(x) { if(x == -x) { return 1; } else { return 2; } }
+println(eq(-2));
+println(eq(0));
+println(eq(2));
+function deq(x) { if(x === -x) { return 1; } else { return 2; } }
+println(deq(-2));
+println(deq(0));
+println(deq(2));
+function lt(x) { if(x < -x) { return 1; } else { return 2; } }
+println(lt(-2));
+println(lt(0));
+println(lt(2));
+function gt(x) { if(x > -x) { return 1; } else { return 2; } }
+println(gt(-2));
+println(gt(0));
+println(gt(2));
+function eqPair(a,b) { if(a == b) { return 1; } else { return 2; } }
+function deqPair(a,b) { if(a === b) { return 1; } else { return 2; } }
+println(eqPair(1,1)); println(eqPair(1,"1"));
+println(deqPair(1,1)); println(deqPair(1,"1"));

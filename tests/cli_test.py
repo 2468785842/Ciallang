@@ -440,9 +440,9 @@ selected
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("println(42);", process.stdout)
         self.assertNotIn("//   @", process.stdout)
-#语句结构未落地（M5 switch）：严格模式 Unsupported，退出码 2、不产出文本、逐单元诊断
+#语句结构未落地（M5 try）：严格模式 Unsupported，退出码 2、不产出文本、逐单元诊断
         structured = self.root / "structured.tjs"
-        structured.write_text("var a = 1;\nswitch (a) {\ncase 1:\nbreak;\n}\n", encoding="utf-8")
+        structured.write_text("try { throw 1; } catch (e) { println(e); }", encoding="utf-8")
         process = self.run_cial("--decompile", structured)
         self.assertEqual(process.returncode, 2, process.stderr)
         self.assertEqual(process.stdout, "")
@@ -600,8 +600,8 @@ selected
         self.assertIn("var b;", process.stdout)
 
     def test_decompile_strict_rejects_structure_with_batch_reason(self):
-#语句结构（switch 属 M5、with 属 M3）在严格模式如实拒绝：退出码 2、不产文本、原因含批次号
-        for source, batch in [("var a = 1;\nswitch (a) {\ncase 1:\nbreak;\n}\n", "M5"),
+#语句结构（try 属 M5、with 属 M3）在严格模式如实拒绝：退出码 2、不产文本、原因含批次号
+        for source, batch in [("try { throw 1; } catch (e) { println(e); }", "M5"),
                               ("var o = %[];\nwith (o) { println(1); }\n", "M3")]:
             with self.subTest(batch=batch):
                 self.script.write_text(source, encoding="utf-8")
@@ -609,6 +609,113 @@ selected
                 self.assertEqual(process.returncode, 2, process.stderr)
                 self.assertEqual(process.stdout, "")
                 self.assertIn(batch, process.stderr)
+
+    def test_decompile_switch_roundtrip(self):
+        # M5 自产派发链：求值次数、多值、贯穿、default与无匹配。
+        sources = [
+            'function f(x) { var r = ""; switch(x) { case 1: case 2: '
+            'r += "a"; case 3: r += "b"; break; default: r += "z"; } return r; } '
+            'println(f(1)); println(f(2)); println(f(3)); println(f(9));',
+            'function f(x) { switch(x) { case 1: return 7; case 2: return 8; } '
+            'return 9; } println(f(1)); println(f(2)); println(f(3));',
+            'var calls = 0; function key() { calls += 1; return 2; } '
+            'switch(key()) { case 1: println(1); break; case 2: println(2); '
+            'break; default: println(3); } println(calls);',
+            'var x = 1; switch(x) { case 1: break; } println(42);',
+            'function f(x) { switch(x) { case 1: if(x > 0) { println(7); } '
+            'else { println(8); } break; default: println(9); } } f(1); f(2);',
+            'var x = "a"; switch(x) { case "a": println(1); break; default: println(2); }',
+            'function f(x) { switch(x) { case "a": case "b": println(1); break; '
+            'case "c": println(2); break; default: println(3); } } '
+            'f("a"); f("b"); f("c"); f("z");',
+            'var i = 0; while(i < 4) { i += 1; switch(i) { case 2: continue; '
+            'case 3: println(30); break; default: println(i); } println(99); }',
+            'var i=0; do { i++; switch(i) { case 1: continue; case 2: println(20); '
+            'break; default: println(i); } println(99); } while(i<3);',
+        ]
+        for source in sources:
+            with self.subTest(source=source):
+                self.script.write_text(source, encoding="utf-8")
+                original = self.run_cial(self.script)
+                self.assertEqual(original.returncode, 0, original.stderr)
+                recovered = self.run_cial("--decompile", self.script)
+                self.assertEqual(recovered.returncode, 0, recovered.stderr)
+                self.assertIn("switch (", recovered.stdout)
+                self.assertNotIn("[dbg]", recovered.stderr)
+                target = self.root / "recovered.tjs"
+                target.write_text(recovered.stdout, encoding="utf-8")
+                replay = self.run_cial(target)
+                self.assertEqual(replay.returncode, 0, replay.stderr)
+                self.assertEqual(replay.stdout, original.stdout)
+
+    def test_decompile_switch_for_update_continue_rejected(self):
+        self.script.write_text(
+            'for(var i=0; i<4; i++) { switch(i) { case 1: continue; '
+            'case 2: println(20); break; default: println(i); } println(99); }',
+            encoding="utf-8")
+        recovered = self.run_cial("--decompile", self.script)
+        self.assertEqual(recovered.returncode, 2, recovered.stderr)
+        self.assertEqual(recovered.stdout, "")
+        self.assertIn("switch", recovered.stderr)
+
+    def test_decompile_reference_flag_conditions(self):
+        corpus = pathlib.Path(__file__).resolve().parent / "test_files" / "tjsbc" / "decompile"
+        source = corpus / "m5_flag_conditions.tjs"
+        bytecode = source.with_suffix(".tjsbc")
+        original = self.run_cial(source)
+        translated = self.run_cial("--tjsbc", bytecode)
+        self.assertEqual(original.returncode, 0, original.stderr)
+        self.assertEqual(translated.returncode, 0, translated.stderr)
+        self.assertEqual(translated.stdout, original.stdout)
+        restored = self.run_cial("--decompile", bytecode)
+        self.assertEqual(restored.returncode, 0, restored.stderr)
+        self.assertIn(" === ", restored.stdout)
+        target = self.root / "restored-flags.tjs"
+        target.write_text(restored.stdout, encoding="utf-8")
+        replay = self.run_cial(target)
+        self.assertEqual(replay.returncode, 0, replay.stderr)
+        self.assertEqual(replay.stdout, original.stdout)
+
+    def test_decompile_reference_switches(self):
+        corpus = pathlib.Path(__file__).resolve().parent / "test_files" / "tjsbc" / "decompile"
+        manifest = json.loads((corpus / "manifest.json").read_text(encoding="utf-8"))
+        for sample in manifest["samples"]:
+            if not sample["name"].startswith("m5_switch_"):
+                continue
+            with self.subTest(sample=sample["name"]):
+                source = corpus / (sample["name"] + ".tjs")
+                bytecode = source.with_suffix(".tjsbc")
+                restored = self.run_cial("--decompile", bytecode)
+                if sample["expectedRecovery"] == "unsupported":
+                    self.assertEqual(restored.returncode, 2, restored.stderr)
+                    self.assertEqual(restored.stdout, "")
+                    self.assertIn("寄存器合流", restored.stderr)
+                    continue
+                self.assertEqual(restored.returncode, 0, restored.stderr)
+                self.assertIn("switch (", restored.stdout)
+                original = self.run_cial(source)
+                translated = self.run_cial("--tjsbc", bytecode)
+                target = self.root / "restored-switch.tjs"
+                target.write_text(restored.stdout, encoding="utf-8")
+                replay = self.run_cial(target)
+                for result in (original, translated, replay):
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(translated.stdout, original.stdout)
+                self.assertEqual(replay.stdout, original.stdout)
+
+    def test_decompile_reference_local_return(self):
+        corpus = pathlib.Path(__file__).resolve().parent / "test_files" / "tjsbc" / "decompile"
+        source = corpus / "m5_return_local.tjs"
+        original = self.run_cial(source)
+        translated = self.run_cial("--tjsbc", source.with_suffix(".tjsbc"))
+        restored = self.run_cial("--decompile", source.with_suffix(".tjsbc"))
+        self.assertEqual(restored.returncode, 0, restored.stderr)
+        target = self.root / "return-local.tjs"
+        target.write_text(restored.stdout, encoding="utf-8")
+        replay = self.run_cial(target)
+        for result in (original, translated, replay):
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "6\n5\n-1\n")
 
     def test_decompile_declaration_roundtrip(self):
 #M4 壳组装：函数/类（继承、字段初始化顺序）/property 声明恢复为可重编译文本；

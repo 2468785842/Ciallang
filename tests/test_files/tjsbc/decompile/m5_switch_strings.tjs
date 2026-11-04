@@ -1,0 +1,2 @@
+// M5: reference switch recovery corpus.
+function f(x) { switch(x) { case "a": println(10); break; case "b": println(20); break; default: println(30); } } f("a"); f("b"); f("c");

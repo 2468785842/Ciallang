@@ -398,8 +398,8 @@ TEST_CASE("decompile M2 - structure leftovers are rejected with batch-specific r
         const char *reason;
     };
     const Case cases[] = {
-        // M3 起可恢复 if/while/do-while；switch 仍是 M5
-        { "var a = 1;\nswitch (a) {\ncase 1:\nbreak;\n}\n", "M5" },
+        // M5 首批已恢复封闭 switch；异常表仍按批次拒绝
+        { "try { throw 1; } catch (e) { var a = e; }", "M5" },
         { "var o = %[];\nwith (o) { println(1); }\n", "M3" },
     };
     for(const auto &[source, reason] : cases) {
@@ -580,4 +580,46 @@ TEST_CASE("decompile M3 - top-level for with register-carried init variable is r
     REQUIRE(result.status == decompile::Status::Unsupported);
     REQUIRE_FALSE(result.diagnostics.empty());
     REQUIRE(result.diagnostics.front().find("循环携带变量") != std::string::npos);
+}
+
+TEST_CASE("decompile M5 - direct flag comparisons preserve condition semantics") {
+    const char *operators[] = { "==", "===", "<", ">" };
+    for(size_t kind = 0; kind < 4; ++kind) {
+        Runtime runtime;
+        Context context{ runtime };
+        const auto source =
+            fmt::format("function f(x) {{ if (x {} -x) {{ return 1; }} else {{ return 2; }} }}", operators[kind]);
+        auto top = compileSource(runtime, context, source);
+        REQUIRE(top.has_value());
+        auto *meta = findFunction(runtime, *top, "f");
+        REQUIRE(meta != nullptr);
+        auto &code = meta->chunk->getInstVec();
+        size_t cmpPc = code.size();
+        for(size_t pc = 0; pc < code.size(); ++pc) {
+            if(code[pc]->opcode() != inter::TacOpCode::CompareTest)
+                continue;
+            const auto lhs = code[pc]->getOp1().value<inter::Register>();
+            const auto rhs = code[pc]->getOp2().value<inter::Register>();
+            if(kind == 0)
+                meta->chunk->repl<inter::CmpEQ>(pc, lhs, rhs);
+            if(kind == 1)
+                meta->chunk->repl<inter::CmpDEQ>(pc, lhs, rhs);
+            if(kind == 2)
+                meta->chunk->repl<inter::CmpLT>(pc, lhs, rhs);
+            if(kind == 3)
+                meta->chunk->repl<inter::CmpGT>(pc, lhs, rhs);
+            cmpPc = pc;
+            break;
+        }
+        REQUIRE(cmpPc < code.size());
+        const auto rebuilt = rebuildFunctionProgram(runtime, *top, "f", "x");
+        INFO(rebuilt);
+        REQUIRE(runProgramOutputs(rebuilt, { -2, 0, 2 }) == runProgramOutputs(source, { -2, 0, 2 }));
+        REQUIRE(code[cmpPc + 1]->opcode() == inter::TacOpCode::JmpNE);
+        const auto target = code[cmpPc + 1]->getOp1().value<inter::Label>();
+        meta->chunk->repl<inter::JmpE>(cmpPc + 1, target);
+        const auto rejected = decompile::recoverUnitBody(runtime, *meta->chunk, meta, true);
+        REQUIRE(rejected.unsupported.find("相邻 JmpNE") != std::string::npos);
+        REQUIRE(rejected.statements.empty());
+    }
 }

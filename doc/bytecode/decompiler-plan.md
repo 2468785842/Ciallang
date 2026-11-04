@@ -116,7 +116,7 @@ with、eval 和局部值保活，"生成名字不冲突"不足以保证安全。
 | M2 | ExprBuilder：后优化形态模式表（含 BinaryImm/CompareTestImm 逆映射）、调用族/成员访问族 | 表达式级 round-trip 逐形态对拍；**已完成（2026-11-02，`ExprBuilder.*`）** |
 | M3 | 语句结构化：if/while/for 归约、短路/三元跨块折叠 | 路径副作用、求值次数、break/continue 对拍通过；**已完成（2026-11-03，ExprBuilder 结构化发射）** |
 | M4 | 壳组装（context 树→声明）+ `+=` 逆融合（双守卫） | 类/继承/property/初始化顺序用例；getter 计数不翻倍。**已完成（2026-11-04，`ExprBuilder.*`/`Decompiler.cpp` 壳组装）：顶层与体内 function/class/property 声明 round-trip 通过；`+=`/`++` 逆融合覆盖成员/下标/具名局部/全局/`*p` 目标（单读者 + 对象一致性双守卫，匿名拷贝按源头解析）；实参位置匿名函数字面量恢复；类成员注册按源码位置排序（枚举序对齐 TJS2）；property 安装名登记 `_declaredGlobals`。验收扩展项（super 构造 prologue、`CallMethodV`/`testDeref` 形态）移交 M5** |
-| M5 | 硬核兜底：任意 CFG 降级（安全状态机）、switch 链、try/catch 嵌套重抛、覆盖扩展与模糊 | 能力矩阵逐项验收；Unsupported 集合可量化 |
+| M5 | 硬核兜底：任意 CFG 降级（安全状态机）、switch 链、try/catch 嵌套重抛、覆盖扩展与模糊 | 能力矩阵逐项验收；Unsupported 集合可量化。**进行中：自产 CompareTest/CompareTestImm + JmpE 前向封闭 switch 链已恢复，覆盖多值 case、贯穿、break、尾部 default、无匹配及判别值单次求值；后续派发支持常量装入前缀，覆盖字符串多值标签；while/do-while 中 switch 的 continue 保留外围循环语义。比较以透明拷贝源节点核对判别值。嵌套、for 更新段 continue、有副作用的后续 case 派发仍未验收；bc 相邻 `CmpEQ/CmpDEQ/CmpLT/CmpGT + JmpNE` 已恢复为条件节点，参考 switch 单值常量标签链已恢复为 switch，覆盖调用判别值单次求值、字符串、break/default、返回及显式存储贯穿；多值标签已固定验收；函数内跨 case 合流在具有共同初始化点时恢复为局部存储（保留分支前快照、避开名字冲突）；顶层合流与复杂嵌套仍拒绝。固定语料见 `tests/test_files/tjsbc/decompile/manifest.json`。实现见 `ExprBuilder.cpp`，回归见 `cli_test.py`** |
 
 M0/M1 后以真实产物的语义缺口重新估算工期；属性协议、异常、动态作用域是主要不确定项。
 

@@ -1,0 +1,2 @@
+// M5: reference decompile regression.
+function f(x) {var r=0;switch(x) {case 1:r+=1;break;case 2:r+=2;break;default:r+=3;} switch(x) {case 1:r+=10;break;case 2:r+=20;break;default:r+=30;}return r;}println(f(1));println(f(2));println(f(3));

@@ -735,7 +735,8 @@ namespace cial::tjsbc {
             Vec<std::pair<size_t, size_t>> offsetMap{}; // 字偏移 → TAC 下标
             Vec<JumpFixup> jumpFixups{};
             Vec<EntryFixup> entryFixups{};
-            i32 srvTjsReg = -1;
+            // 负寄存器编号可指向局部/实参；不能用负数哨兵表示尚无 SRV。
+            Opt<i32> srvTjsReg;
 
             const auto targetWord = [&](const i32 base, const i32 relative) {
                 const i64 target = static_cast<i64>(base) + relative;
@@ -1331,9 +1332,9 @@ namespace cial::tjsbc {
                         srvTjsReg = d.r1;
                         break;
                     case OP_RET:
-                        chunk.emit<inter::Ret>(inter::Register{
-                            static_cast<u16>(srvTjsReg >= 0 ? srvTjsReg + k : k) }); // 无 SRV → ra[0]=void
-                        srvTjsReg = -1;
+                        chunk.emit<inter::Ret>(
+                            inter::Register{ static_cast<u16>(srvTjsReg ? *srvTjsReg + k : k) }); // 无 SRV → ra[0]=void
+                        srvTjsReg.reset();
                         break;
                     case OP_THROW:
                         chunk.emit<inter::Throw>(r1);

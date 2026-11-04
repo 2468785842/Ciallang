@@ -1,0 +1,2 @@
+// M5: reference decompile regression.
+function f(x){var y=x+5;return y;}println(f(1));println(f(0));println(f(-6));

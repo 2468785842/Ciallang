@@ -33,7 +33,7 @@
 
 - [反编译器 M5 与移交遗留](notes/proposed/architecture/2026-11-04-decompiler-m5.md)：M0–M4 已完成
   （记录在方案 §6）；顶层物化项闭环、类体逗号声明链与 outputdebug 行表读取修复
-  （CTest 243/243）；M5 首批为 switch 链，super/`CallMethodV` 恢复形态与
+  （CTest 243/243）；M5 自产封闭 switch 链、常量前缀及 while/do continue 已恢复（Windows CTest 243/243；bc 相邻 `_zf` 比较条件、常量多值 switch 与函数局部合流已恢复；嵌套待推进），super/`CallMethodV` 恢复形态与
   表达式位置 FuncLit 在册。
 - [krkr2 接入](notes/proposed/architecture/2026-11-04-krkr2-integration.md)：五个阶段均未开始，
   入口为双向 `iTJSDispatch2` 桥；完成标准见[接入说明](../doc/krkr2-integration.md)。

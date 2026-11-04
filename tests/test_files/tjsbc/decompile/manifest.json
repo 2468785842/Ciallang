@@ -1,0 +1,81 @@
+{
+  "description": "M5 参考字节码条件、switch 与局部返回语料；无 outputdebug；顶层合流保守拒绝",
+  "reference": {
+    "commit": "40a736c48f40dff7c737e9c5dc9c0e46f145e9e5",
+    "binarySha256": "8f370f2bb7460c8b7b8090a8bc71b7d0fb94a25e98ee2ff20d01bf3df358c60b",
+    "exportOptions": "--dump <source> <bytecode>"
+  },
+  "samples": [
+    {
+      "name": "m5_flag_conditions",
+      "sourceSha256": "291cf274c407982a61a0b3e05b92cafe56cebe567ceda8e5f16d1b4cda9f4f78",
+      "bytecodeSha256": "01950d894b7a7aedb1f99d3f76623ff00a2f02026714c26b3089dfe0fc218785"
+    },
+    {
+      "name": "m5_switch_calls",
+      "sourceSha256": "7f0b41d1c022e6e3ccdf8316785a74f79f693e71c3d3f64e607da7940f487e17",
+      "bytecodeSha256": "5d094f42140c54ffeab40d94dcef49f8a26c5b50e49fe549a5c304710a6ad33f",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_strings",
+      "sourceSha256": "5d58d8ffc6e8f08d094634f7e7afd0855e4bfc2b6e250961f0b08de3ceb7ecaf",
+      "bytecodeSha256": "74532852c18c89ce777a579a49196605ffe5f0adb95b8d1656ff36f23c98f4da",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_returns",
+      "sourceSha256": "952e2b32a83d70df80836f163c046eac9aa68764a615aa62ba84e2a47df45d4a",
+      "bytecodeSha256": "0abfb90c56b31421bf3f46158cc11cc8b2c235c51a5f49b6be66692099d0b122",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_fallthrough",
+      "sourceSha256": "1344bd6abfb6146fb868a57a73053e09a8969de74bf603ca533e22855802d2b2",
+      "bytecodeSha256": "131f723f3f27804d6b8810aff3427cdc61024d608775d390f7e6e1ad4a602381",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_register_merge",
+      "sourceSha256": "01e686786bb89606abb7ae5787b9baa9490b122616dc47edd711757f00b033b0",
+      "bytecodeSha256": "6115d2834da7141d4b1675248c161ccaf9864f552ad552176b2ccceaa6577486",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_snapshot",
+      "sourceSha256": "6582df288105f8f9d1d8062a502c24515b22d4f27146ecedd7d00e378f6aaa06",
+      "bytecodeSha256": "f4f1c156941ccb95757a1cd37b7714f77238af9462748ac4085557a11b6513d2",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_name_collision",
+      "sourceSha256": "72900fdbf5fb25e7fe202857fb414a7fd80fca5391aa6b80111179d55aa8ad5e",
+      "bytecodeSha256": "8247ae83c79e41cd3152b4af6df1471e7a08f4bcfd443d853bff42a95b7129f7",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_double",
+      "sourceSha256": "26529f3902cb743c54f38ee4c6531cc16b7533d62a263a5d8d71b7ef27188c43",
+      "bytecodeSha256": "0e6da84f8f95fc9a27165d42234fb4a62545cd10fbdc0b0b9c00105439f4ceb8",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_multilabel",
+      "sourceSha256": "6e46bfde50d20814a22b31ef5e2bcf82ed12affb746f5bac6ff573b51bf23384",
+      "bytecodeSha256": "803b20d949917645ff7f19cb95c25f9e484d4ddfd1a5e2cb55af2946353beec6",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_top_merge",
+      "sourceSha256": "d6b2b4a69626790b279c2fe35d4bc92e9b5c5ff6e22191cb9225d6be80f9aa94",
+      "bytecodeSha256": "6e46dfdb06c536bd28b806ea48b42d36ee2dd27bc2df73a5262fa35f47fb694a",
+      "expectedRecovery": "unsupported"
+    },
+    {
+      "name": "m5_return_local",
+      "sourceSha256": "492131e0ed6621c617584715898eac55b2120e3910fd4cad5c63351645c09d15",
+      "bytecodeSha256": "d3afe8936022061fab1b83f77b6e747163576a729cd027438856bbf0c79b901a",
+      "expectedRecovery": "success"
+    }
+  ]
+}

@@ -38,6 +38,10 @@ TJS2 100\0 文件
 实际实参收拢成 Array。超额实参另由调用帧保留，以供 `CallOmit` / `CallExpand` 使用。
 缺省形参补 void，默认参数的求值逻辑保留在原字节码中。
 
+`SRV r` 指定后续 `RET` 的返回寄存器，`r` 可以为负数（局部/实参槽）。
+转译器用可选值区分“尚未设置 SRV”与合法的负编号；仅没有 SRV 时才返回 `ra[0]` 的 void。
+实现见 `TjsTranslator.cpp`，固定回归语料见 `tests/test_files/tjsbc/decompile/m5_return_local.tjs`。
+
 ## 3. 标志与控制流
 
 不相邻的 flag 生产者和消费者通过专用寄存器 `%F` 物化；相邻比较/TT/TF 与 JF/JNF
