@@ -275,6 +275,14 @@ namespace cial::syntax {
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
     };
 
+    // tjs.y throw : "throw" expr ";"——throw 是语句，操作数为整表达式。
+    // 复用 PrefixUnaryExprNode(throw) + ExprStmtNode 装配，IRGenerator 的
+    // Throw 特判经空 optReg 正确发射（throw 不产值，TJS2 亦不可用于表达式位）
+    struct ThrowStmtParser final : StmtParser {
+        ThrowStmtParser() = default;
+        StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
+    };
+
     struct DebuggerStmtParser final : StmtParser {
         DebuggerStmtParser() = default;
         StmtNode *parse(Result &r, Parser *parser, Token *token) const override;
@@ -302,6 +310,7 @@ namespace cial::syntax {
     static constinit BreakStmtParser S_BreakStmtParser{};
     static constinit ContinueStmtParser S_ContinueStmtParser{};
     static constinit ReturnStmtParser S_ReturnStmtParser{};
+    static constinit ThrowStmtParser S_ThrowStmtParser{};
     static constinit DebuggerStmtParser S_DebuggerStmtParser{};
     static constinit WithStmtParser S_WithStmtParser{};
     static constinit EmptyStmtParser S_EmptyStmtParser{};
@@ -317,6 +326,7 @@ namespace cial::syntax {
                                                                     { TokenType::Break, &S_BreakStmtParser },
                                                                     { TokenType::Continue, &S_ContinueStmtParser },
                                                                     { TokenType::Return, &S_ReturnStmtParser },
+                                                                    { TokenType::Throw, &S_ThrowStmtParser },
                                                                     { TokenType::Debugger, &S_DebuggerStmtParser },
                                                                     { TokenType::With, &S_WithStmtParser },
                                                                     { TokenType::SemiColon, &S_EmptyStmtParser } });
@@ -406,39 +416,39 @@ namespace cial::syntax {
     static constinit DotPrefixParser S_DotPrefixParser;
     static constinit RegexLiteralPrefixParser S_RegexLiteralPrefixParser;
 
-    static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>(
-        { { TokenType::Null, &S_ConstValPrefixParser },
-          { TokenType::ConstVal, &S_ConstValPrefixParser },
-          { TokenType::Void, &S_ConstValPrefixParser }, // void 字面值
-          { TokenType::Minus, &S_PrefixParser }, // "-"
-          { TokenType::Identifier, &S_IdentifierPrefixParser },
-          { TokenType::Exclamation, &S_PrefixParser }, // "!"
-          { TokenType::Tilde, &S_PrefixParser }, // "~"
-          { TokenType::Decrement, &S_PrefixParser }, // "--"
-          { TokenType::Increment, &S_PrefixParser }, // "++"
-          { TokenType::New, &S_PrefixParser }, // "new" 函数调用, 或创建新对象
-          { TokenType::Global, &S_InternalIdentifierPrefixParser },
-          { TokenType::Super, &S_InternalIdentifierPrefixParser },
-          { TokenType::This, &S_InternalIdentifierPrefixParser },
-          { TokenType::Invalidate, &S_PrefixParser }, // "invalidate"
-          { TokenType::Isvalid, &S_PrefixParser }, // "isvalid"
-          { TokenType::Delete, &S_PrefixParser }, //"delete"
-          { TokenType::Typeof, &S_PrefixParser }, //"typeof
-          { TokenType::Sharp, &S_PrefixParser }, //"#" 获取字符串第一个字符,转为int
-          { TokenType::Dollar, &S_PrefixParser }, //"$" 将int, 转为char
-          { TokenType::Plus, &S_PrefixParser }, //"+"
-          { TokenType::Ampersand, &S_PrefixParser }, // "&" substance accessing (ignores property operation)
-          { TokenType::Asterisk, &S_PrefixParser }, // "*" force property access
-          { TokenType::LParenthesis, &S_ParenthesizedPrefixParser }, // "(" 括号表达式
-          { TokenType::Function, &S_FunctionPrefixParser },
-          { TokenType::Int, &S_PrefixParser }, // "int" unary_expr
-          { TokenType::Real, &S_PrefixParser }, // "real" unary_expr
-          { TokenType::String, &S_PrefixParser }, // "string" unary_expr
-          { TokenType::LBracket, &S_ArrayLiteralPrefixParser }, // "[" 内联数组
-          { TokenType::Percent, &S_DictLiteralPrefixParser }, // "%[" 内联字典（% 仅为前导记号）
-          { TokenType::Dot, &S_DotPrefixParser }, // ".member" 裸词链（with 上下文）
-          { TokenType::RegExp, &S_RegexLiteralPrefixParser }, // /pattern/ 正则字面量
-          { TokenType::Throw, &S_PrefixParser } });
+    static constinit auto S_PrefixParsers = frozen::make_unordered_map<TokenType, const PrefixParser *>({
+        { TokenType::Null, &S_ConstValPrefixParser },
+        { TokenType::ConstVal, &S_ConstValPrefixParser },
+        { TokenType::Void, &S_ConstValPrefixParser }, // void 字面值
+        { TokenType::Minus, &S_PrefixParser }, // "-"
+        { TokenType::Identifier, &S_IdentifierPrefixParser },
+        { TokenType::Exclamation, &S_PrefixParser }, // "!"
+        { TokenType::Tilde, &S_PrefixParser }, // "~"
+        { TokenType::Decrement, &S_PrefixParser }, // "--"
+        { TokenType::Increment, &S_PrefixParser }, // "++"
+        { TokenType::New, &S_PrefixParser }, // "new" 函数调用, 或创建新对象
+        { TokenType::Global, &S_InternalIdentifierPrefixParser },
+        { TokenType::Super, &S_InternalIdentifierPrefixParser },
+        { TokenType::This, &S_InternalIdentifierPrefixParser },
+        { TokenType::Invalidate, &S_PrefixParser }, // "invalidate"
+        { TokenType::Isvalid, &S_PrefixParser }, // "isvalid"
+        { TokenType::Delete, &S_PrefixParser }, //"delete"
+        { TokenType::Typeof, &S_PrefixParser }, //"typeof
+        { TokenType::Sharp, &S_PrefixParser }, //"#" 获取字符串第一个字符,转为int
+        { TokenType::Dollar, &S_PrefixParser }, //"$" 将int, 转为char
+        { TokenType::Plus, &S_PrefixParser }, //"+"
+        { TokenType::Ampersand, &S_PrefixParser }, // "&" substance accessing (ignores property operation)
+        { TokenType::Asterisk, &S_PrefixParser }, // "*" force property access
+        { TokenType::LParenthesis, &S_ParenthesizedPrefixParser }, // "(" 括号表达式
+        { TokenType::Function, &S_FunctionPrefixParser },
+        { TokenType::Int, &S_PrefixParser }, // "int" unary_expr
+        { TokenType::Real, &S_PrefixParser }, // "real" unary_expr
+        { TokenType::String, &S_PrefixParser }, // "string" unary_expr
+        { TokenType::LBracket, &S_ArrayLiteralPrefixParser }, // "[" 内联数组
+        { TokenType::Percent, &S_DictLiteralPrefixParser }, // "%[" 内联字典（% 仅为前导记号）
+        { TokenType::Dot, &S_DotPrefixParser }, // ".member" 裸词链（with 上下文）
+        { TokenType::RegExp, &S_RegexLiteralPrefixParser } // /pattern/ 正则字面量
+    });
 
     /**
      * +----------------------------------------------------------------------------+

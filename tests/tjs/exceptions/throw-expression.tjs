@@ -1,0 +1,24 @@
+// throw 语句操作数为整表达式（tjs.y throw : "throw" expr ";"）：
+// 二目/优先级/后缀 if 操作数与表达式位置拒绝同参考引擎一致
+Scripts.execStorage("../assert.tjs");
+
+function throwValue(v) {
+    try {
+        throw v;
+    } catch(e) {
+        return e;
+    }
+}
+
+assertTrue(throwValue("W" + 1) == "W1", "throw binary string concat");
+assertTrue(throwValue(1 + 2 * 3) == 7, "throw binary arithmetic precedence");
+assertTrue(throwValue("a" + 1 + 2) == "a12", "string concat left associativity");
+assertTrue(throwValue("v" + (1 + 2)) == "v3", "parenthesized operand");
+var suffix = 0;
+try {
+    throw "x" if suffix == 0;
+} catch(e) {
+    assertTrue(e == "x", "suffix-if operand");
+}
+
+finishTests();

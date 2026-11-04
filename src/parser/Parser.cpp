@@ -1254,6 +1254,27 @@ namespace cial::syntax {
         return parser->astBuilder()->makeNode<ReturnStmtNode>(nullptr);
     }
 
+    StmtNode *ThrowStmtParser::parse(Result &r, Parser *parser, Token *token) const {
+        // tjs.y throw : "throw" expr ";"（expr 含 comma_expr 与后缀 if）；
+        // 操作数以整表达式解析，此前挂前缀运算符路径时 throw "W" + x
+        // 被读作 (throw "W") + x，throw 不产值导致取值失败
+        const auto expr = parser->parseExpression(r, true);
+        if(!expr) {
+            if(!r.isFailed())
+                parser->error(r, "throw expects an expression", *token, "parse.invalid-expression");
+            return nullptr;
+        }
+
+        if(!parser->expect(r, TokenType::SemiColon))
+            return nullptr;
+
+        const auto throwExpr = parser->astBuilder()->makeNode<PrefixUnaryExprNode>(*token, expr);
+        auto *statementNode = parser->astBuilder()->makeNode<ExprStmtNode>(throwExpr);
+        // 语句位置取 throw 关键字：未捕获异常的报错行:列指向语句起点
+        statementNode->location = token->location;
+        return statementNode;
+    }
+
     StmtNode *DebuggerStmtParser::parse(Result &r, Parser *parser, Token *token) const {
         if(!parser->expect(r, TokenType::SemiColon))
             return nullptr;
