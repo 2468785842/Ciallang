@@ -257,6 +257,7 @@ namespace cial::decompile {
                 Binary,
                 Ternary, // cond ? a : b（跨块折叠，M3；integer 复用为 else 节点下标）
                 Copy, // DLocal/GLocal 匿名拷贝（透明引用源版本）
+                FuncLit, // 匿名函数字面量（实参/赋值右值；integer 复用为常量下标）
             };
             Kind kind{};
             Integer integer{};
@@ -632,6 +633,28 @@ namespace cial::decompile {
         // op2 为寄存器（而非 Atom/Integer）的三槽指令族
         [[nodiscard]] static bool isRegisterOperand2(const TacOpCode op) {
             switch(op) {
+                case TacOpCode::Add:
+                case TacOpCode::Sub:
+                case TacOpCode::Mul:
+                case TacOpCode::Div:
+                case TacOpCode::Idiv:
+                case TacOpCode::Mod:
+                case TacOpCode::BXor:
+                case TacOpCode::BOr:
+                case TacOpCode::BAnd:
+                case TacOpCode::BlShift:
+                case TacOpCode::BrShift:
+                case TacOpCode::BurShift:
+                case TacOpCode::EQ:
+                case TacOpCode::NEQ:
+                case TacOpCode::AbsEQ:
+                case TacOpCode::AbsNEQ:
+                case TacOpCode::LT:
+                case TacOpCode::LE:
+                case TacOpCode::GT:
+                case TacOpCode::GE:
+                case TacOpCode::LAnd:
+                case TacOpCode::LOr:
                 case TacOpCode::GProp:
                 case TacOpCode::GPropRaw:
                 case TacOpCode::DelProp:
@@ -890,9 +913,26 @@ namespace cial::decompile {
                         break;
                     }
                     const auto &constant = _chunk.getConstants()[constIdx.index()];
-                    if(constant.type() == ConstantType::FuncMeta || constant.type() == ConstantType::ClassMeta ||
-                       constant.type() == ConstantType::PropMeta) {
-                        fail("声明常量缺少安装链（匿名声明字面量属后续批次）");
+                    if(constant.type() == ConstantType::FuncMeta) {
+                        // 无安装链的函数常量 = 表达式位置字面量（实参/赋值右值）。
+                        // 恒按匿名渲染（具名函数表达式的名字绑定差异未验证）；
+                        // 类/property 无表达式字面量语法，如实拒绝
+                        if(!atomText(_rt, constant.value<FuncMeta *>()->name).empty()) {
+                            fail("具名函数表达式恢复属后续批次");
+                            break;
+                        }
+                        if(!_host) {
+                            fail("匿名函数字面量缺少装配宿主");
+                            break;
+                        }
+                        const auto node = newNode(Expr::Kind::FuncLit);
+                        _nodes[node].integer = static_cast<Integer>(constIdx.index());
+                        defineNode(dst, node);
+                        noteNamedDef(dst);
+                        break;
+                    }
+                    if(constant.type() == ConstantType::ClassMeta || constant.type() == ConstantType::PropMeta) {
+                        fail("类/property 无表达式位置字面量语法");
                         break;
                     }
                     defineNode(dst, loadConstNode(constIdx));
@@ -1012,6 +1052,14 @@ namespace cial::decompile {
                     defineNode(
                         inst.getOp3().value<Register>(),
                         memberNode(operandNode(inst.getOp1().value<Register>()), inst.getOp2().value<Atom>(), INVALID));
+                    noteNamedDef(inst.getOp3().value<Register>());
+                    break;
+                case TacOpCode::GPropRawC:
+                    // &o.x（Atom 直引）：property 引用，"&" 前缀形态
+                    defineNode(inst.getOp3().value<Register>(),
+                               makeUnary("&",
+                                         memberNode(operandNode(inst.getOp1().value<Register>()),
+                                                    inst.getOp2().value<Atom>(), INVALID)));
                     noteNamedDef(inst.getOp3().value<Register>());
                     break;
                 case TacOpCode::GProp:
@@ -1222,7 +1270,7 @@ namespace cial::decompile {
                         .kind = Stmt::Kind::ThrowStmt, .pc = _instPc, .src = slotOf(inst.getOp1().value<Register>()) });
                     break;
                 default:
-                    fail("预检未覆盖的指令");
+                    fail(fmt::format("预检未覆盖的指令（opcode {}）", static_cast<int>(inst.opcode())));
                     break;
             }
         }
@@ -1327,6 +1375,11 @@ namespace cial::decompile {
                         contextInstall = true;
                         continue;
                     }
+                    // 仅安装指令族可作为链终点；其余指令（调用、拷贝、控制流…）属于
+                    // 后续语句——不折叠、不终止于它（此前 default 分支误把紧随语句
+                    // 折进安装链，吞掉如"零拷贝局部声明后紧跟的调用"，读被吞定义的
+                    // 寄存器误报未定义）
+                    bool matched = false;
                     switch(op) {
                         case TacOpCode::DGlobal:
                             spec.name = atomText(_rt, cand.getOp1().value<Atom>());
@@ -1335,11 +1388,13 @@ namespace cial::decompile {
                                 spec.declare = true;
                                 _declaredGlobals.insert(spec.name);
                             }
+                            matched = true;
                             break;
                         case TacOpCode::DThis:
                             spec.name = atomText(_rt, cand.getOp1().value<Atom>());
                             install = Install::Global; // 上下文成员声明：同裸声明形态
                             contextInstall = true;
+                            matched = true;
                             break;
                         case TacOpCode::DPropC:
                         case TacOpCode::DPropRawC:
@@ -1348,6 +1403,12 @@ namespace cial::decompile {
                             spec.raw = op == TacOpCode::DPropRawC;
                             spec.objReg = cand.getOp1().value<Register>();
                             spec.hasObj = true;
+                            // 顶层 property 安装（Global+ChgThis+DPropRawC 模板）占据
+                            // 全局名：后续同名 DGlobal 是赋值，不再补 var（property
+                            // 声明注册的是属性对象本体，名字已被占据）
+                            if(contextInstall && !_functionLike && !_declaredGlobals.contains(spec.name))
+                                _declaredGlobals.insert(spec.name);
+                            matched = true;
                             break;
                         case TacOpCode::DProp:
                         case TacOpCode::DPropRaw:
@@ -1357,30 +1418,36 @@ namespace cial::decompile {
                             spec.hasObj = true;
                             spec.nameReg = cand.getOp2().value<Register>();
                             spec.hasNameReg = true;
+                            matched = true;
                             break;
                         case TacOpCode::DLocal: {
                             const auto ldst = cand.getOp2().value<Register>();
                             spec.name = localNameAt(ldst, chain + 1);
-                            install = spec.name.empty() ? Install::None : Install::Local;
-                            if(install == Install::Local)
+                            if(!spec.name.empty()) {
+                                install = Install::Local;
                                 spec.declare = declareLocal(ldst.index(), spec.name);
+                                matched = true;
+                            }
+                            // 匿名拷入（dst 无名）：值进入表达式流，不是安装
                             break;
                         }
                         default:
                             break;
                     }
+                    if(!matched)
+                        break; // 非安装指令：安装链不存在，留待语句/表达式处理
                     _foldedPcs.insert(chain);
                     foldEnd = chain;
                     spec.installPc = chain;
                     break; // 安装即终点
                 }
                 if(install == Install::None) {
-                    // Load 直落具名局部（嵌套 function 声明的零拷贝形态）
+                    // Load 直落具名局部（嵌套 function 声明的零拷贝形态）；无名 =
+                    // 表达式位置字面量（实参/赋值右值），不登记 spec，由 Pass B 的
+                    // Load case 生成 FuncLit 节点或按常量种类拒绝
                     spec.name = localNameAt(dst, pc + 1);
-                    if(spec.name.empty()) {
-                        fail("表达式位置的匿名函数字面量恢复属后续批次");
-                        return;
-                    }
+                    if(spec.name.empty())
+                        continue;
                 }
                 spec.foldEnd = foldEnd;
                 spec.contextInstall = contextInstall;
@@ -1404,6 +1471,11 @@ namespace cial::decompile {
             stmt.declare = spec.declare;
             stmt.contextInstall = spec.contextInstall;
             stmt.declInstall = spec.install;
+            // 零拷贝局部声明（无安装指令，Load 直落变量存储寄存器）：后续读按
+            // 局部名渲染（调用/传参读的就是该寄存器）。install == 0 = 无安装指令
+            if(spec.install == 0 && !stmt.name.empty())
+                defineNode(_chunk.getInstVec()[_instPc]->getOp1().value<Register>(),
+                           makeNamed(Expr::Kind::LocalName, stmt.name, false));
             pushStmt(std::move(stmt));
         }
 
@@ -1417,7 +1489,8 @@ namespace cial::decompile {
         void fuseCompoundAssign() {
             for(auto &stmt : _stmts) {
                 if(stmt.kind != Stmt::Kind::StoreMember && stmt.kind != Stmt::Kind::StoreIndex &&
-                   stmt.kind != Stmt::Kind::StoreDeref && stmt.kind != Stmt::Kind::StoreLocal)
+                   stmt.kind != Stmt::Kind::StoreDeref && stmt.kind != Stmt::Kind::StoreLocal &&
+                   stmt.kind != Stmt::Kind::StoreGlobal)
                     continue;
                 if(stmt.src == INVALID)
                     continue;
@@ -1505,6 +1578,15 @@ namespace cial::decompile {
                        _nodes[nameNode].text == stmt.name) {
                         matched = true;
                     }
+                } else if(stmt.kind == Stmt::Kind::StoreGlobal) {
+                    // 全局：g OP= rhs（GGlobal 名节点在左）/ g++（Add(1, g)，bc
+                    // proxy 模板成员在左）；读侧为 globalName 节点，写侧按 Atom 名
+                    const u32 nameNode = incForm ? bin.b : bin.a;
+                    if(memberNodeIdx == nameNode && nameNode != INVALID && nameNode < _nodes.size() &&
+                       _nodes[nameNode].kind == Expr::Kind::LocalName && _nodes[nameNode].globalName &&
+                       _nodes[nameNode].text == atomText(_rt, stmt.atom) && isPlainMemberName(_nodes[nameNode].text)) {
+                        matched = true;
+                    }
                 }
                 if(!matched)
                     continue;
@@ -1520,6 +1602,8 @@ namespace cial::decompile {
                 fused.rhsNode = rhsNodeIdx;
                 if(stmt.kind == Stmt::Kind::StoreLocal)
                     fused.name = stmt.name;
+                else if(stmt.kind == Stmt::Kind::StoreGlobal)
+                    fused.name = _nodes[incForm ? bin.b : bin.a].text;
                 stmt = std::move(fused);
             }
         }
@@ -1531,7 +1615,25 @@ namespace cial::decompile {
             return ops.contains(text);
         }
 
-        // 读侧对象节点与写侧对象槽位的一致性：同节点/同名字读即同值；否则比较
+        // 匿名拷贝透明解析：Copy 节点沿 srcVersion 追到源头节点（拷贝不改变值，
+        // 两侧各自拷贝同一源版本时是同一值）
+        [[nodiscard]] u32 resolveCopyNode(u32 nodeIdx) const {
+            for(auto guard = 0; guard < 16; ++guard) {
+                if(nodeIdx == INVALID || nodeIdx >= _nodes.size())
+                    break;
+                const auto &node = _nodes[nodeIdx];
+                if(node.kind != Expr::Kind::Copy || node.srcVersion == INVALID)
+                    break;
+                const auto &srcDef = versionOf(node.srcVersion);
+                if(srcDef.node == nodeIdx)
+                    break; // 防自环
+                nodeIdx = srcDef.node;
+            }
+            return nodeIdx;
+        }
+
+        // 读侧对象节点与写侧对象槽位的一致性：同节点/同名字读即同值；匿名拷贝
+        // 按源头解析（如 *p 模板读写两侧各自 g_local 拷贝同一引用）；否则比较
         // 定义指令签名（同一源表达式的两次求值）。调用族定义保守拒绝（CallV
         // 实参不在操作数中，签名无法区分不同调用）
         [[nodiscard]] bool sameObjectIdentity(const u32 readNode, const u32 writeSlot) {
@@ -1542,15 +1644,21 @@ namespace cial::decompile {
                 return true;
             if(wd.node == INVALID || wd.node >= _nodes.size() || wd.defPc >= _chunk.getInstVec().size())
                 return false;
-            const auto &rn = _nodes[readNode];
-            const auto &wn = _nodes[wd.node];
+            const u32 rnIdx = resolveCopyNode(readNode);
+            const u32 wnIdx = resolveCopyNode(wd.node);
+            if(rnIdx != INVALID && rnIdx == wnIdx)
+                return true;
+            if(rnIdx == INVALID || wnIdx == INVALID || rnIdx >= _nodes.size() || wnIdx >= _nodes.size())
+                return false;
+            const auto &rn = _nodes[rnIdx];
+            const auto &wn = _nodes[wnIdx];
             if(rn.kind == Expr::Kind::LocalName && wn.kind == Expr::Kind::LocalName)
                 return rn.text == wn.text && rn.globalName == wn.globalName;
             auto &code = _chunk.getInstVec();
             for(size_t reg = 0; reg < _defs.size(); ++reg) {
                 for(size_t v = 0; v < _defs[reg].size(); ++v) {
                     const auto &rd = _defs[reg][v];
-                    if(rd.node != readNode || rd.defPc >= code.size())
+                    if(rd.node != rnIdx || rd.defPc >= code.size())
                         continue;
                     const auto &ri = code[rd.defPc];
                     const auto &wi = code[wd.defPc];
@@ -2164,6 +2272,22 @@ namespace cial::decompile {
                 case Expr::Kind::Copy:
                     return { expr.srcVersion == INVALID ? std::string{ "<copy>" } : renderVersion(expr.srcVersion),
                              Prec::Primary };
+                case Expr::Kind::FuncLit: {
+                    // 匿名函数字面量（实参/赋值右值）：渲染期经宿主装配多行文本。
+                    // 相对缩进——首行顶格随所在表达式嵌入，体内层行带装配层级缩进
+                    if(!_host) {
+                        fail("匿名函数字面量缺少装配宿主");
+                        return { "<invalid>", Prec::Primary };
+                    }
+                    const auto &constant = _chunk.getConstants()[static_cast<size_t>(expr.integer)];
+                    std::string reason;
+                    auto text = _host->declarationText(constant, DeclForm::Assign, {}, 0, reason);
+                    if(!reason.empty()) {
+                        fail(reason);
+                        return { "<invalid>", Prec::Primary };
+                    }
+                    return { std::move(text), Prec::Primary };
+                }
                 case Expr::Kind::Member:
                 case Expr::Kind::Index: {
                     const auto obj = renderParen(expr.a, Prec::Postfix, false);
@@ -2282,10 +2406,8 @@ namespace cial::decompile {
                 if(!renderStmt(stmt, text))
                     return;
                 if(!text.empty())
-                    out.push_back(RecoveredStatement{ .pc = static_cast<u32>(pc),
-                                                      .text = std::move(text),
-                                                      .tacEnd = stmt.tacEnd,
-                                                      .verbatim = stmt.kind == Stmt::Kind::Decl });
+                    out.push_back(RecoveredStatement{
+                        .pc = static_cast<u32>(pc), .text = std::move(text), .tacEnd = stmt.tacEnd });
             }
         }
 
@@ -2930,7 +3052,7 @@ namespace cial::decompile {
         [[nodiscard]] static std::string indentText(const u32 level) { return std::string(level * 4, ' '); }
 
         // 单 pc 发射：物化临时定义（先于消费语句）+ 该 pc 的语句（可多条）。
-        // verbatim 语句（声明块）文本已含缩进，不叠加 pad
+        // 语句文本均为相对缩进（首行由此处补 pad，写入期再叠加体 pad）
         void emitAt(const u32 pc, const u32 indent, Vec<RecoveredStatement> &out) {
             const std::string pad = indentText(indent);
             for(size_t reg = 0; reg < _defs.size(); ++reg) {
@@ -2949,11 +3071,7 @@ namespace cial::decompile {
                 if(!renderStmt(stmt, text, indent))
                     return;
                 if(!text.empty())
-                    out.push_back(
-                        RecoveredStatement{ .pc = pc,
-                                            .text = stmt.kind == Stmt::Kind::Decl ? std::move(text) : pad + text,
-                                            .tacEnd = stmt.tacEnd,
-                                            .verbatim = stmt.kind == Stmt::Kind::Decl });
+                    out.push_back(RecoveredStatement{ .pc = pc, .text = pad + std::move(text), .tacEnd = stmt.tacEnd });
                 ++_emitCursor;
             }
         }

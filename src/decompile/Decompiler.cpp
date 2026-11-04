@@ -300,7 +300,8 @@ namespace cial::decompile {
             }
 
             void writeFunction(const FuncMeta &meta, const DeclForm form, const std::string &literalName,
-                               const u32 indent, const Writer &writer, std::string &reason) {
+                               const u32 indent, const Writer &writer, std::string &reason,
+                               const std::string &firstPad = {}) {
                 if(!_visited.insert(&meta).second) {
                     reason = "重复声明的函数常量";
                     return;
@@ -313,17 +314,19 @@ namespace cial::decompile {
                 const auto pad = indentText(indent);
                 // 赋值形态恒为匿名字面量（具名函数表达式不参与恢复：转译与重解析
                 // 的名字绑定差异未验证）
+                // 缩进为相对量：首行由调用方决定（声明 tile 顶格 bare，类/property
+                // 内嵌成员带成员 pad），写入期再叠加体 pad；内层行保留相对 pad
                 if(form == DeclForm::Assign)
-                    writer(fmt::format("{}function ({}) {{", pad, params));
+                    writer(fmt::format("{}function ({}) {{", firstPad, params));
                 else
-                    writer(fmt::format("{}function {}({}) {{", pad, literalName, params));
+                    writer(fmt::format("{}function {}({}) {{", firstPad, literalName, params));
                 writeBody(*meta.chunk, &meta, indent + 1, writer, reason);
                 if(reason.empty())
                     writer(fmt::format("{}}}", pad));
             }
 
             void writeAccessor(const FuncMeta &meta, const char *kind, const u32 indent, const Writer &writer,
-                               std::string &reason) {
+                               std::string &reason, const std::string &firstPad = {}) {
                 if(!_visited.insert(&meta).second) {
                     reason = "重复声明的函数常量";
                     return;
@@ -335,38 +338,39 @@ namespace cial::decompile {
                 const auto params = parameterList(meta);
                 const auto pad = indentText(indent);
                 if(params.empty())
-                    writer(fmt::format("{}{} {{", pad, kind));
+                    writer(fmt::format("{}{} {{", firstPad, kind));
                 else
-                    writer(fmt::format("{}{}({}) {{", pad, kind, params));
+                    writer(fmt::format("{}{}({}) {{", firstPad, kind, params));
                 writeBody(*meta.chunk, &meta, indent + 1, writer, reason);
                 if(reason.empty())
                     writer(fmt::format("{}}}", pad));
             }
 
             void writeProperty(const PropMeta &meta, const std::string &name, const u32 indent, const Writer &writer,
-                               std::string &reason) {
+                               std::string &reason, const std::string &firstPad = {}) {
                 if(!_visited.insert(&meta).second) {
                     reason = "重复声明的 property 常量";
                     return;
                 }
                 const auto pad = indentText(indent);
-                writer(fmt::format("{}property {} {{", pad, name));
+                writer(fmt::format("{}property {} {{", firstPad, name));
+                const auto memberPad = indentText(indent + 1);
                 if(meta.getFunc)
-                    writeAccessor(*meta.getFunc, "getter", indent + 1, writer, reason);
+                    writeAccessor(*meta.getFunc, "getter", indent + 1, writer, reason, memberPad);
                 if(reason.empty() && meta.setFunc)
-                    writeAccessor(*meta.setFunc, "setter", indent + 1, writer, reason);
+                    writeAccessor(*meta.setFunc, "setter", indent + 1, writer, reason, memberPad);
                 if(reason.empty())
                     writer(fmt::format("{}}}", pad));
             }
 
             void writeClass(const ClassMeta &meta, const std::string &name, const u32 indent, const Writer &writer,
-                            std::string &reason) {
+                            std::string &reason, const std::string &firstPad = {}) {
                 if(!_visited.insert(&meta).second) {
                     reason = "重复声明的类常量";
                     return;
                 }
                 const auto pad = indentText(indent);
-                std::string header = fmt::format("{}class {}", pad, name);
+                std::string header = fmt::format("{}class {}", firstPad, name);
                 for(const auto base : meta.extends)
                     header += fmt::format("{}{}", header.find(" extends ") == std::string::npos ? " extends " : ", ",
                                           displayName(_rt, base, "?"));
@@ -383,18 +387,18 @@ namespace cial::decompile {
                     initUnit->name = displayName(_rt, meta.className, "<anonymous>");
                     initUnit->kind = "class-field-init";
                 }
+                const auto memberPad = indentText(indent + 1);
                 // 构造器在前（成员表不含构造器；new 时按名调用）
                 if(meta.constructor) {
                     auto ctorName = functionName(*meta.constructor);
                     if(ctorName.empty())
                         ctorName = name;
-                    writeFunction(*meta.constructor, DeclForm::Bare, ctorName, indent + 1, writer, reason);
+                    writeFunction(*meta.constructor, DeclForm::Bare, ctorName, indent + 1, writer, reason, memberPad);
                     if(!reason.empty())
                         return;
                 }
                 for(size_t i = 0; i < meta.memberShapeMetas.size() && i < meta.memberMetas.size(); ++i) {
                     const auto &shape = meta.memberShapeMetas[i];
-                    const auto memberPad = indentText(indent + 1);
                     const auto staticPrefix = shape.isStatic ? "static " : "";
                     if(shape.isVar) {
                         const FieldInit *init = nullptr;
@@ -417,12 +421,12 @@ namespace cial::decompile {
                         if(meta.memberMetas[i].funcMeta->syntheticFinalizer)
                             continue;
                         writeFunction(*meta.memberMetas[i].funcMeta, DeclForm::Bare, displayName(_rt, shape.name, "?"),
-                                      indent + 1, writer, reason);
+                                      indent + 1, writer, reason, memberPad);
                         if(!reason.empty())
                             return;
                     } else if(shape.isProp && meta.memberMetas[i].propMeta) {
                         writeProperty(*meta.memberMetas[i].propMeta, displayName(_rt, shape.name, "?"), indent + 1,
-                                      writer, reason);
+                                      writer, reason, memberPad);
                         if(!reason.empty())
                             return;
                     }
@@ -430,7 +434,7 @@ namespace cial::decompile {
                 writer(fmt::format("{}}}", pad));
             }
 
-            // 体装配：恢复语句写入父文本（非 verbatim 行叠加缩进），行表记入
+            // 体装配：恢复语句写入父文本（行文本为相对缩进，此处叠加体 pad），行表记入
             // body 子单元（该 Chunk 的 TAC 坐标）
             void writeBody(vm::Chunk &chunk, const FuncMeta *meta, const u32 indent, const Writer &writer,
                            std::string &reason) {
@@ -459,45 +463,62 @@ namespace cial::decompile {
                 const auto pad = indentText(indent);
                 const auto count = chunk.getInstVec().size();
                 u32 covered = 0;
-                for(const auto &statement : recovery.statements) {
-                    LineMapRow row{ .tacStart = statement.pc,
-                                    .tacEnd = statement.tacEnd != 0 ? statement.tacEnd : statement.pc + 1 };
-                    if(origin != nullptr && !origin->empty()) {
-                        const auto oit = std::upper_bound(
-                            origin->begin(), origin->end(), statement.pc,
-                            [](const size_t value, const tjsbc::TacOrigin &entry) { return value < entry.tacIdx; });
-                        if(oit != origin->begin()) {
-                            const auto &entry = *std::prev(oit);
-                            row.tjsWordStart = entry.tjsWord;
-                            row.sourceOffset = entry.sourceOffset;
-                            if(entry.sourceOffset && _originalSource != nullptr) {
-                                const auto location = _originalSource->locationByIndex(
-                                    utf16UnitsToByteIndex(_originalSource->buffer(), *entry.sourceOffset));
-                                row.sourceLine = location.start().line;
+                for(size_t si = 0; si < recovery.statements.size(); ++si) {
+                    const auto &statement = recovery.statements[si];
+                    const u32 tacStart = statement.pc;
+                    // 末语句区间延到 Chunk 末尾（覆盖被内联/丢弃的尾段），先于
+                    // origin 分段——扩展区间内的来源条目同样登记
+                    u32 tacEnd = statement.tacEnd != 0 ? statement.tacEnd : statement.pc + 1;
+                    if(si + 1 == recovery.statements.size() && tacEnd < count)
+                        tacEnd = count;
+                    // 语句区间按 origin 条目分段（bc 路径）：一条语句跨多条来源条目
+                    // 时各段独立成行表行、同 textLine——只取起点条目会丢失段内
+                    // 行号变化（TJS2 outputdebug 仅在控制流点登记）。每段来源取
+                    // ≤ 段起点的最后一项（继承语义与反汇编视图一致）。
+                    // 自产路径 origin 为空，恒单段
+                    Vec<u32> cuts{ tacStart };
+                    if(origin != nullptr)
+                        for(const auto &entry : *origin)
+                            if(entry.tacIdx > tacStart && entry.tacIdx < tacEnd)
+                                cuts.push_back(entry.tacIdx);
+                    Vec<LineMapRow> headRows;
+                    for(size_t s = 0; s < cuts.size(); ++s) {
+                        const u32 segStart = cuts[s];
+                        const u32 segEnd = s + 1 < cuts.size() ? cuts[s + 1] : tacEnd;
+                        LineMapRow row{ .textLine = 0, .tacStart = segStart, .tacEnd = segEnd };
+                        if(origin != nullptr && !origin->empty()) {
+                            const auto oit = std::upper_bound(
+                                origin->begin(), origin->end(), segStart,
+                                [](const size_t value, const tjsbc::TacOrigin &entry) { return value < entry.tacIdx; });
+                            if(oit != origin->begin()) {
+                                const auto &entry = *std::prev(oit);
+                                row.tjsWordStart = entry.tjsWord;
+                                row.sourceOffset = entry.sourceOffset;
+                                if(entry.sourceOffset && _originalSource != nullptr) {
+                                    const auto location = _originalSource->locationByIndex(
+                                        utf16UnitsToByteIndex(_originalSource->buffer(), *entry.sourceOffset));
+                                    row.sourceLine = location.start().line;
+                                }
                             }
                         }
+                        headRows.push_back(row);
                     }
                     bool firstLine = true;
                     forEachTextLine(statement.text, [&](const std::string &lineText) {
-                        if(firstLine)
-                            unit.lines.push_back(LineMapRow{ .textLine = base + _frames.back().count,
-                                                             .tacStart = row.tacStart,
-                                                             .tacEnd = row.tacEnd,
-                                                             .tjsWordStart = row.tjsWordStart,
-                                                             .sourceOffset = row.sourceOffset,
-                                                             .sourceLine = row.sourceLine });
-                        else
+                        if(firstLine) {
+                            for(auto row : headRows) {
+                                row.textLine = base + _frames.back().count;
+                                unit.lines.push_back(row);
+                            }
+                        } else
                             unit.lines.push_back(
                                 LineMapRow{ .textLine = base + _frames.back().count, .synthetic = true });
-                        writer((statement.verbatim ? std::string{} : pad) + lineText);
+                        writer(pad + lineText);
                         firstLine = false;
                     });
-                    covered = row.tacEnd;
+                    covered = tacEnd;
                 }
-                if(!recovery.statements.empty()) {
-                    if(covered < count && !unit.lines.empty())
-                        unit.lines.back().tacEnd = count;
-                } else if(count > 0) {
+                if(recovery.statements.empty() && count > 0) {
                     writer(fmt::format("{}// (all {} instructions dropped as dead code)", pad, count));
                 }
             }

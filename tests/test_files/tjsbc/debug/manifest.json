@@ -7,7 +7,7 @@
     "binarySha256": "478eab1709f5e3138ab7b5cdc78405ed4cf2020fdaa5fff6519ec4226b4471b1",
     "exportOptions": "--dump-debug <script.tjs> <out.tjsbc>"
   },
-  "granularity": "TJS2 SourcePosArray 仅在控制流/调用等点登记源位置；条目之间的 TAC 继承上一条目的行号，函数定义安装等非控制流 TAC 因此可能落在邻近行；context 末条目可指向源码末尾之后一行，由 locationByIndex 收敛。M4 起行表按语句粒度登记（一条恢复语句 = 一行表行，取该语句首条 TAC 的来源），声明体为 body 子单元、行取语句首 pc 的来源；语句内多指令的原行号不再逐条枚举",
+  "granularity": "TJS2 SourcePosArray 仅在控制流/调用等点登记源位置；条目之间的 TAC 继承上一条目的行号，函数定义安装等非控制流 TAC 因此可能落在邻近行；context 末条目可指向源码末尾之后一行，由 locationByIndex 收敛。M4 起行表按语句粒度登记（一条恢复语句 = 一行表行），声明体为 body 子单元；语句区间跨多条来源条目时按条目分段（同文本行多行表行），段来源取 ≤ 段首 pc 的条目",
   "samples": [
     {
       "name": "lines",
@@ -32,8 +32,10 @@
       "name": "s7_ext",
       "sourceSha256": "72bfa2f198ee0cf15bf3c51982567d7ce1e9a601d1098b3544d4cc82da0d3453",
       "bytecodeSha256": "530079590eb936d9d7dab42ee82dbad2053e8255af4af100dfa8c133aee1be72",
-      "expectedLines": { "global": [0, 10, 11, 12], "Animal": [0, 3], "describe": [2, 5] },
-      "pendingUnits": { "Dog": "super.<Ctor>() 构造直调 context 的实参搬运 prologue 恢复未落地，见 TODO 反编译器 M4 验收扩展" }
+      "expectedLines": { "global": [0, 10, 11, 12], "Animal": [0, 3], "describe": [2, 4] },
+      "pendingUnits": {
+        "describe (Dog)": "super.<Ctor>() 构造直调 context 的实参搬运 prologue 与 super.<方法>() 直调形态恢复未落地，Dog.describe 未进壳装配；行表中的 describe = Animal.describe，见 TODO 反编译器 M4 验收扩展"
+      }
     },
     {
       "name": "utf8",

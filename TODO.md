@@ -16,27 +16,36 @@
 
 设计与批次见[反编译器方案](doc/bytecode/decompiler-plan.md)（2026-11-01 采纳 TAC 层直译路径）。
 
-- [ ] M4 收尾：成员/全局/`*p` 目标的 `+=`/`++` 逆融合（成员与具名局部已通，StoreGlobal
-  与 DerefSet 目标待接）、property 安装名登记 `_declaredGlobals`（当前顶层 property 后
-  同名赋值会带多余 `var` 前缀，行为等价）、类成员渲染顺序按 memberShapeMetas
-  （IRGen 先注册方法后注册 var，与源码顺序可能不同；字段初始化顺序由 initDefaultVal
-  保持）复核、匿名函数表达式（实参位置字面量）恢复。
-- [ ] M4 验收扩展：bc 路径嵌套体暴露的存量缺口（super 构造直调 context 的实参搬运
-  prologue 读未定义寄存器、`CallMethodV`/`testDeref` 形态）逐个落地后按方案 §7 四环
-  对拍；getter 计数不翻倍用例已有（`cli_test.py` 声明 round-trip）。
 - [ ] M5：switch 链（JmpE + `_zf` 直写比较族）、try/catch 嵌套兜底（任意 CFG 降级
   状态机）、with、eval 名字依赖；按方案 §7 四环验证逐批验收。M3 遗留小项：
   顶层 `for` 初始化变量（寄存器携带无名字，如实拒绝）、`while` 条件内联存储歧义拒绝。
+- [ ] M4→M5 移交的 bc 路径验收扩展：super 构造直调 context 的实参搬运 prologue
+  （读未定义寄存器形态）、`CallMethodV`/`testDeref` 形态逐个落地后按方案 §7 四环
+  对拍（语料见 `tests/test_files/tjsbc/debug/manifest.json` pendingUnits）。
+- [ ] 顶层 getter+调用混合链的临时值跨脏区间需物化而顶层无局部作用域
+  （`o.a + o.b + o.m()` 形态），物化策略待定（合成局部名有 §3 动态名查找风险）。
 
-M4 进行中（2026-11-03）：壳组装骨架已通——`ExprBuilder` 声明安装链预扫描折叠
-（Load 声明常量 + Global*/ChgThis?/安装 模板，链 pc 不计版本链）、Decl tile 经
-`DeclHost` 回调 `ShellAssembler` 装配 function/class/property 声明文本（参数表来自
-localVars，bc 路径 FuncMeta 名由转译器设置故两条入口同构）；子单元行表按最终文本
-位置登记（文本内联父单元，`DecompileResult::units` 改 deque 保证引用稳定）；
-bc 路径 context 引用扫描 + 成员闭包去重。`+=`/`++` 逆融合已通成员/下标/具名局部
-目标（单读者 + 对象一致性双守卫）；Super 节点、octet 字面量、动态键字典字面量
-已解锁。顶层 `function`/`class`/`property` 声明 round-trip 对拍通过
-（`decompile_test.cpp`、`cli_test.py`）。
+## 语言兼容缺口（待评估）
+
+按[兼容定位](README.md)逐条评估，不为对齐而修复；确认要修再排批次。
+
+- [ ] `throw` 后接二目表达式解析失败（`throw "W" + x;` 报 "except a return value of
+  expression"；`throw "W";` 合法），TJS2 语法 throw 取表达式。
+- [ ] 嵌套函数自由变量解析失败（函数体内 `function inner(){ return a + 2; }` 引用
+  外层局部 `a` 运行期报 "in global object Not found property"），TJS2 嵌套作用域链
+  未实现；反编译侧已可恢复该形态，执行语义待补。
+
+M4 已完成（2026-11-04）：壳组装（2026-11-03 落地）+ 收尾项全通——全局/`*p` 目标
+`+=`/`++` 逆融合（`sameObjectIdentity` 补匿名拷贝源头解析，读写两侧各持 `g_local`
+拷贝的模板可融合；`isRegisterOperand2` 漏列二元算术族致 op2 使用漏计的守卫 bug
+修复）；property/class/function 安装名登记 `_declaredGlobals`（顶层 property 后
+同名赋值不再带多余 `var`）；IRGen 类成员按源码位置排序注册（原 AST 三向量分组
+注册使方法前移，成员枚举序对齐 TJS2）；实参位置匿名函数字面量恢复（`FuncLit`
+节点渲染期经 DeclHost 装配，恒匿名渲染）；函数体内零拷贝嵌套声明修复
+（`scanDeclarations` 非安装指令误折叠吞掉后续语句）；声明文本统一相对缩进；
+bc 行表语句区间按 origin 条目分段（修 `test_decompile_outputdebug_source_lines`
+M4 结构变化后的期望）。回归：`cli_test.py` M4 复合赋值/解引用/字面量 round-trip
+新增用例，CTest 431 全绿。
 
 M0 已完成（2026-11-01）：`src/decompile/` 的 `{文本, 行表}` 管道、CLI `--decompile`（严格模式
 默认 / `--view` 反汇编视图 / `--map` 行表 JSON / `--source` 偏移换算）、TJS2 路径来源表

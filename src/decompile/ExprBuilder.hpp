@@ -30,12 +30,11 @@ namespace cial {
 
         // 一条恢复出的语句：文本 + 产生它的 TAC 区间（行表按序闭合）。
         // tacEnd = 0 表示单指令（pc+1）；声明装配等多指令 tile 给出显式区间。
-        // verbatim = 文本已含缩进（声明装配多行块），发射时不再叠加
+        // 文本为相对缩进：首行顶格、内层行按层级带缩进，写入期由宿主叠加体 pad
         struct RecoveredStatement {
             u32 pc{};
             std::string text;
             u32 tacEnd{};
-            bool verbatim{};
         };
 
         struct ExprRecovery {

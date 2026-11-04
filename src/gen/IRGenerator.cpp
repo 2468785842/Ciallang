@@ -1095,55 +1095,93 @@ namespace cial::inter {
 
         beginScope();
 
-        for(const auto *funcDeclNode : node->funcDeclVec) {
-            const auto funName = getAtomFromToken(funcDeclNode->token);
-            const auto funcMeta = generateFuncMeta(funcDeclNode->parameters, funcDeclNode->body);
+        // 成员注册按源码位置排序：AST 把类体拆成 funcDecl/propertyDecl/varDecl
+        // 三个向量，源序在 AST 层被拆散（IRGen 原先按 方法→property→var 分组注册）。
+        // 成员枚举顺序脚本可观察（成员枚举/反编译渲染），对齐 TJS2 按源码序注册；
+        // 字段初始化（initDefaultVal）的发射顺序随之变为源码序
+        enum class MemberKind : u8 { Method, Prop, Var };
+        struct MemberOrder {
+            u32 line{};
+            u32 column{};
+            MemberKind kind{};
+            size_t index{};
+        };
+        Vec<MemberOrder> memberOrder;
+        for(size_t i = 0; i < node->funcDeclVec.size(); ++i)
+            memberOrder.push_back({ node->funcDeclVec[i]->location.start().line,
+                                    node->funcDeclVec[i]->location.start().column, MemberKind::Method, i });
+        for(size_t i = 0; i < node->propertyDeclVec.size(); ++i)
+            memberOrder.push_back({ node->propertyDeclVec[i]->location.start().line,
+                                    node->propertyDeclVec[i]->location.start().column, MemberKind::Prop, i });
+        for(size_t i = 0; i < node->varDeclVec.size(); ++i)
+            memberOrder.push_back({ node->varDeclVec[i]->location.start().line,
+                                    node->varDeclVec[i]->location.start().column, MemberKind::Var, i });
+        std::sort(memberOrder.begin(), memberOrder.end(), [](const MemberOrder &a, const MemberOrder &b) {
+            return a.line != b.line ? a.line < b.line : a.column < b.column;
+        });
 
-            if(!funcMeta) {
-                error("generate chunk failed with class function declaration", node->location);
-                return;
+        auto gen = IRGenerator{ _r, _rt, _sourceFile, _optimize };
+        gen.makeVirtualGlobalScope();
+
+        for(const auto &order : memberOrder) {
+            switch(order.kind) {
+                case MemberKind::Method: {
+                    const auto *funcDeclNode = node->funcDeclVec[order.index];
+                    const auto funName = getAtomFromToken(funcDeclNode->token);
+                    const auto funcMeta = generateFuncMeta(funcDeclNode->parameters, funcDeclNode->body);
+
+                    if(!funcMeta) {
+                        error("generate chunk failed with class function declaration", node->location);
+                        return;
+                    }
+                    classMeta->setMember(MemberShapeMeta{ .name = funName, .isMethod = true },
+                                         ClassFieldMeta{ funcMeta });
+                    break;
+                }
+                case MemberKind::Prop: {
+                    const auto *propertyDeclNode = node->propertyDeclVec[order.index];
+                    FuncMeta *setFuncMeta{};
+                    if(propertyDeclNode->setter)
+                        setFuncMeta =
+                            generateFuncMeta(propertyDeclNode->setter->parameters, propertyDeclNode->setter->body);
+
+                    FuncMeta *getFuncMeta{};
+                    if(propertyDeclNode->getter)
+                        getFuncMeta =
+                            generateFuncMeta(propertyDeclNode->getter->parameters, propertyDeclNode->getter->body);
+
+                    auto *propMeta = _rt.createCompilationObject<PropMeta>(setFuncMeta, getFuncMeta);
+
+                    const auto varName = getAtomFromToken(propertyDeclNode->token);
+
+                    classMeta->setMember(MemberShapeMeta{ .name = varName, .isProp = true },
+                                         ClassFieldMeta{ propMeta });
+                    break;
+                }
+                case MemberKind::Var: {
+                    const auto *varDeclNode = node->varDeclVec[order.index];
+                    const auto varName = getAtomFromToken(varDeclNode->token);
+
+                    // can init
+                    if(varDeclNode->rhs) {
+                        Register defaultVarReg{ 0 };
+                        if(!gen.expectValue(varDeclNode->rhs, defaultVarReg)) {
+                            return;
+                        }
+                        gen._chunk->emit<DThis>(varName, defaultVarReg);
+                    }
+
+                    classMeta->setMember(MemberShapeMeta{ .name = varName, .isVar = true }, ClassFieldMeta{});
+                    break;
+                }
             }
-            classMeta->setMember(MemberShapeMeta{ .name = funName, .isMethod = true }, ClassFieldMeta{ funcMeta });
         }
 
         for(const auto *ext : node->extends) {
             classMeta->extends.push_back(getAtomFromToken(ext->token));
         }
 
-        for(const auto *propertyDeclNode : node->propertyDeclVec) {
-            FuncMeta *setFuncMeta{};
-            if(propertyDeclNode->setter)
-                setFuncMeta = generateFuncMeta(propertyDeclNode->setter->parameters, propertyDeclNode->setter->body);
-
-            FuncMeta *getFuncMeta{};
-            if(propertyDeclNode->getter)
-                getFuncMeta = generateFuncMeta(propertyDeclNode->getter->parameters, propertyDeclNode->getter->body);
-
-            auto *propMeta = _rt.createCompilationObject<PropMeta>(setFuncMeta, getFuncMeta);
-
-            const auto varName = getAtomFromToken(propertyDeclNode->token);
-
-            classMeta->setMember(MemberShapeMeta{ .name = varName, .isProp = true }, ClassFieldMeta{ propMeta });
-        }
-
         {
-            auto gen = IRGenerator{ _r, _rt, _sourceFile, _optimize };
-            gen.makeVirtualGlobalScope();
-
-            for(const auto *varDeclNode : node->varDeclVec) {
-                const auto varName = getAtomFromToken(varDeclNode->token);
-
-                // can init
-                if(varDeclNode->rhs) {
-                    Register defaultVarReg{ 0 };
-                    if(!gen.expectValue(varDeclNode->rhs, defaultVarReg)) {
-                        return;
-                    }
-                    gen._chunk->emit<DThis>(varName, defaultVarReg);
-                }
-
-                classMeta->setMember(MemberShapeMeta{ .name = varName, .isVar = true }, ClassFieldMeta{});
-            }
             OptReg ignoreReg{};
             auto funChunk = gen.parseAst(nullptr, ignoreReg);
             if(!funChunk) {

@@ -626,7 +626,96 @@ selected
         self.assertIn("class Box {", decompiled.stdout)
         self.assertIn("class Labeled extends Box {", decompiled.stdout)
         self.assertIn("property p {", decompiled.stdout)
+#property 安装占据全局名：后续赋值不再补 var（行为等价但带 var 是多余前缀）
+        self.assertNotIn("var p = 7;", decompiled.stdout)
         recompiled = self.root / "decl_rt.tjs"
+        recompiled.write_text(decompiled.stdout, encoding="utf-8")
+        actual = self.run_cial(recompiled)
+        self.assertEqual(actual.returncode, 0, actual.stderr + "\n--- decompiled ---\n" + decompiled.stdout)
+        self.assertEqual(actual.stdout, expected.stdout, "--- decompiled ---\n" + decompiled.stdout)
+
+    def test_decompile_m4_compound_and_literal_roundtrip(self):
+#M4 收尾：全局/解引用目标的 +=/++ 逆融合、类成员源码序、实参位置匿名函数
+#字面量；环①逐输入执行比对
+        source = (
+            'var g = 10;\n'
+            'class Mix {\n'
+            '    function early() { return 1; }\n'
+            '    var late = 2;\n'
+            '}\n'
+            'function apply(f) { return f(); }\n'
+            'function bump() {\n'
+            '    g += 5;\n'
+            '    g++;\n'
+            '    return g;\n'
+            '}\n'
+            'property flag {\n'
+            '    setter(x) { hidden = x; }\n'
+            '    getter { return hidden; }\n'
+            '}\n'
+            'var probe = new Mix();\n'
+            'probe.late += 3;\n'
+            'probe.early();\n'
+            'flag = 1;\n'
+            'flag++;\n'
+            'var lit = apply(function() { return 42; });\n'
+            'if (bump() != 16) { println("bump-wrong"); }\n'
+            'if (probe.late != 5) { println("late-wrong"); }\n'
+            'if (flag != 2) { println("flag-wrong"); }\n'
+            'if (lit != 42) { println("lit-wrong"); }\n'
+            'println(g);\n'
+            'println(probe.late);\n'
+            'println(flag);\n'
+            'println(lit);\n')
+        self.script.write_text(source, encoding="utf-8")
+        expected = self.run_cial(self.script)
+        self.assertEqual(expected.returncode, 0, expected.stderr)
+        decompiled = self.run_cial("--decompile", self.script)
+        self.assertEqual(decompiled.returncode, 0, decompiled.stderr)
+        self.assertNotIn("//   @", decompiled.stdout)
+#逆融合写法还原（Top-level 与函数体内的全局目标）
+        self.assertIn("g += 5;", decompiled.stdout)
+        self.assertIn("g++;", decompiled.stdout)
+        self.assertIn("flag++;", decompiled.stdout)
+#类成员按源码序（方法注册不再前移）
+        self.assertLess(decompiled.stdout.index("function early()"), decompiled.stdout.index("var late"))
+#实参位置匿名函数字面量
+        self.assertIn("apply(function () {", decompiled.stdout)
+        recompiled = self.root / "m4_rt.tjs"
+        recompiled.write_text(decompiled.stdout, encoding="utf-8")
+        actual = self.run_cial(recompiled)
+        self.assertEqual(actual.returncode, 0, actual.stderr + "\n--- decompiled ---\n" + decompiled.stdout)
+        self.assertEqual(actual.stdout, expected.stdout, "--- decompiled ---\n" + decompiled.stdout)
+
+    def test_decompile_deref_compound_roundtrip(self):
+#*p 目标逆融合：property 引用读写两侧各持匿名拷贝（同源即同值），融合为
+#*= 形态且 setter 计数不变；环①执行比对
+        source = (
+            'var setCalls = 0;\n'
+            'class Cell {\n'
+            '    var m;\n'
+            '    property x {\n'
+            '        setter(v) { setCalls += 1; m = v; }\n'
+            '        getter { return m; }\n'
+            '    }\n'
+            '}\n'
+            'var o = new Cell();\n'
+            'function bump() {\n'
+            '    var p = &o.x;\n'
+            '    *p += 3;\n'
+            '    return *p;\n'
+            '}\n'
+            'if (bump() != 3) { println("bump-wrong"); }\n'
+            'if (setCalls != 1) { println("setCalls-wrong"); }\n'
+            'println(o.x);\n'
+            'println(setCalls);\n')
+        self.script.write_text(source, encoding="utf-8")
+        expected = self.run_cial(self.script)
+        self.assertEqual(expected.returncode, 0, expected.stderr)
+        decompiled = self.run_cial("--decompile", self.script)
+        self.assertEqual(decompiled.returncode, 0, decompiled.stderr)
+        self.assertIn("*p += 3;", decompiled.stdout)
+        recompiled = self.root / "deref_rt.tjs"
         recompiled.write_text(decompiled.stdout, encoding="utf-8")
         actual = self.run_cial(recompiled)
         self.assertEqual(actual.returncode, 0, actual.stderr + "\n--- decompiled ---\n" + decompiled.stdout)
