@@ -4,36 +4,61 @@ Status: proposed
 
 ## 问题
 
-反编译器进入 M5（硬核兜底）前有三类未闭环：M5 本体的 switch 链、try/catch 嵌套兜底、
-with 与 eval 名字依赖；M4→M5 移交的 bc 路径验收扩展；以及顶层 getter+调用混合链的
-临时值物化策略尚未决定。
+反编译器进入 M5（硬核兜底）前的未闭环项：M5 本体的 switch 链、try/catch 嵌套兜底、
+with 与 eval 名字依赖；M4→M5 移交的 bc 路径验收扩展（super 构造 prologue、
+`CallMethodV`/`testDeref` 形态）；表达式位置匿名函数字面量；以及一批顶层物化
+相关形态的最终裁定。
 
 ## 已知事实与证据
 
 - 设计与批次见[反编译器方案 §6](../../../../doc/bytecode/decompiler-plan.md#6-实施批次)；
-  M0–M4 已完成并逐批记录在该表（M4 收尾 2026-11-04，CTest 431 全绿），不再重复维护流水。
-- M5 范围：switch 链（JmpE + `_zf` 直写比较族）、try/catch 嵌套兜底（任意 CFG 降级
-  状态机）、with、eval 名字依赖；按[方案 §7 四环](../../../../doc/bytecode/decompiler-plan.md#7-验证闭环)逐批验收。
-- M4 移交的 bc 路径验收扩展：super 构造直调 context 的实参搬运 prologue
-  （读未定义寄存器形态）、`CallMethodV`/`testDeref` 形态逐个落地后按四环对拍；
-  语料见 `tests/test_files/tjsbc/debug/manifest.json` 的 pendingUnits。
-- M3 遗留小项：顶层 `for` 初始化变量（寄存器携带无名字，如实拒绝）、
-  `while` 条件内联存储歧义拒绝。
-- 未决设计点：顶层 getter+调用混合链（`o.a + o.b + o.m()` 形态）的临时值跨脏区间
-  需物化而顶层无局部作用域；合成局部名有方案 §3 动态名查找风险。
+  M0–M4 已完成并逐批记录在该表（M4 收尾 2026-11-04，Linux CTest 431 全绿）。
+- **顶层物化项已闭环（2026-11-04 本机验证）**：`f() + g() + f()`、`o.a + o.b + o.m()`
+  （存储与裸语句形态）、多次成员读混合链在 HEAD 全部恢复成功——M4 的落点传播与
+  "同树内联"豁免已覆盖该形态；顶层非纯多使用维持拒绝（合成全局名有方案 §3
+  动态名查找风险），不再需要新物化策略。
+  注意：早先"pc 12 跨脏区间"失败来自 11-03 旧二进制（M3 时代产物）——当时
+  `src/format/Files.cpp` 缺 `<io.h>`/`<fcntl.h>`（clang-cl 无法编译）使增量构建
+  静默失败、探测跑在旧 exe 上。已补显式 include（本机 clang-cl 构建恢复）。
+  证据核对产物身份的教训与 [cial-verify](../../skills/cial-verify/SKILL.md) 一致。
+- **类体逗号声明链修复（2026-11-04）**：`class C { var a, b; }` 此前只注册首名
+  （`VarDeclNode::next` 链未走，`Parser.cpp` 类体循环只收头节点；IRGen 每条目
+  单名），实例化不预注册后续成员、反编译如实输出 `var a;`。修复后逐名注册
+  （`varDeclVec` 改存 const 指针 + 遍历链），含初始化器链（`var a = 1, b = 2;`
+  逐名 DThis）端到端验证。回归：`tests/tjs/oop/field-comma-declaration.tjs`、
+  `cli_test.py` 逗号字段文本断言与 3 个混合链 round-trip 用例；
+  Windows Debug CTest 241/242 通过。
+- **s7_ext 行表失败为预存问题（与本修复无关，已隔离）**：
+  `test_decompile_outputdebug_source_lines` 的 s7_ext 样本期望 `describe`
+  含行 4、实际 `[None, 2, 5]`——`function describe() { return "dog:" +
+  super.describe(); }`（Dog 侧，0 基行 4）的 super 方法调用（TJS2 编译为
+  `CallMethodV`）行表收敛到行 5。回退解析器改动重建后同样失败，确认与本次
+  改动无关；与 M4 记录"CTest 431 全绿（Linux）"冲突，平台或批次差异待核。
+  属 M4→M5 移交的 `CallMethodV` 形态验收扩展，修复方向：`writeBody` 的
+  origin 分段/末语句区间延展对超调用形态的继承条目选择。
+- 表达式位置匿名函数字面量仍拒绝：`o.m = function(){...}`（赋值右值，
+  非 M4 已支持的实参位置）报"表达式位置的匿名函数字面量恢复属后续批次"
+  （`out/m5-probe/probe.tjs` 形态）。M4 的 FuncLit 恢复只覆盖实参位置。
 
 ## 建议下一步
 
-1. 先定顶层临时值物化策略（合成局部名与拒绝之间取舍），再进 M5 批次。
-2. switch/try/with/eval 按方案 §6 M5 行拆小批，逐形态四环验收。
-3. M4 移交形态随 bc 路径逐个落地，同步补 pendingUnits 语料。
+1. switch 链（JmpE + `_zf` 直写比较族）：严格模式当前按 M5 批次号拒绝
+   （`test_decompile_strict_rejects_structure_with_batch_reason` 锁定），
+   按[方案 §6 M5 行](../../../../doc/bytecode/decompiler-plan.md#6-实施批次)
+   与 §7 四环验收，是 M5 首个实现批次。
+2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
+   origin 分段继承。
+3. try/catch 嵌套兜底（任意 CFG 降级状态机）、with、eval 名字依赖按方案批次推进。
+4. 表达式位置 FuncLit（赋值右值）随壳装配批次落地。
 
 ## 完成条件
 
 方案 §6 M5 行的验收达成：能力矩阵逐项验收、Unsupported 集合可量化；
-移交的验收扩展逐个通过；物化策略形成决定并回写方案文档。
+移交的验收扩展（super prologue、`CallMethodV`/`testDeref`）逐个通过；
+s7_ext 差异归因并修复；表达式位置 FuncLit round-trip 通过。
 
 ## 风险或备选方案
 
-任意 CFG 降级状态机可能显著扩大 Unsupported 拒绝面；若选合成局部名物化，
-需先核实方案 §3 动态名查找的实际触达范围。
+任意 CFG 降级状态机可能显著扩大 Unsupported 拒绝面；switch 链恢复必须
+证明比较顺序与贯穿语义等价才输出，宁可拒绝不可猜。`CallMethodV` 行表修复
+不得为凑期望值而特判语料，应以 origin 条目语义为准。

@@ -32,7 +32,8 @@
 ## 当前各项工作的顺序
 
 - [反编译器 M5 与移交遗留](notes/proposed/architecture/2026-11-04-decompiler-m5.md)：M0–M4 已完成
-  （记录在方案 §6）；顶层临时值物化策略待定，M5 批次未开始。
+  （记录在方案 §6）；顶层物化项已闭环（M4 落点传播覆盖），类体逗号声明链解析修复；
+  M5 首批为 switch 链，`CallMethodV` 行表收敛与表达式位置 FuncLit 在册。
 - [krkr2 接入](notes/proposed/architecture/2026-11-04-krkr2-integration.md)：五个阶段均未开始，
   入口为双向 `iTJSDispatch2` 桥；完成标准见[接入说明](../doc/krkr2-integration.md)。
 - [语言兼容缺口](notes/proposed/bug-fix/2026-11-04-language-compat-gaps.md)：`throw` 二目表达式与
