@@ -24,6 +24,12 @@
         }
       ]
     },
+    "formatter": {
+      "description": "cial-fmt source formatter CLI",
+      "dependencies": [
+        "argparse"
+      ]
+    },
     "tools": {
       "description": "Auxiliary tool skeletons (lsp, disasm, dbg); requires cli",
       "dependencies": [

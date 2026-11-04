@@ -33,10 +33,11 @@ if(CIAL_BUILD_TOOLS)
     set(CIAL_BUILD_FORMATTER ON)
 endif()
 option(CIAL_WARNINGS_AS_ERRORS "Treat Ciallang compiler warnings as errors" ${CIAL_TOP_LEVEL})
-foreach(feature IN ITEMS cli tests jit tools)
+foreach(feature IN ITEMS cli tests jit formatter tools)
     if((feature STREQUAL "cli" AND CIAL_BUILD_CLI) OR
        (feature STREQUAL "tests" AND CIAL_BUILD_TESTS) OR
        (feature STREQUAL "jit" AND CIAL_ENABLE_JIT) OR
+       (feature STREQUAL "formatter" AND CIAL_BUILD_FORMATTER) OR
        (feature STREQUAL "tools" AND
            (CIAL_BUILD_LSP OR CIAL_BUILD_DISASM OR CIAL_BUILD_DBG)))
         list(APPEND VCPKG_MANIFEST_FEATURES ${feature})
@@ -185,8 +186,12 @@ if(CIAL_ENABLE_JIT)
     target_link_libraries(Ciallang PUBLIC asmjit::asmjit)
 endif()
 
-if(CIAL_BUILD_CLI)
+# cial 与 cial-fmt 均用 argparse 解析命令行；formatter-only 构建同样需要。
+if(CIAL_BUILD_CLI OR CIAL_BUILD_FORMATTER)
     find_package(argparse CONFIG REQUIRED)
+endif()
+
+if(CIAL_BUILD_CLI)
     # 工具共享的编译编排与诊断渲染；main.cpp 与 Repl 留给 cial。
     # 生成的 Version.hpp 只被 Options.cpp（parseOptions --version）引用
     add_library(cialcli STATIC
@@ -216,25 +221,39 @@ if(CIAL_BUILD_CLI)
     endif()
 endif()
 
-# 源码工具独立于运行库/SDK；formatter-only 不安装 argparse 或创建 cial。
+# 源码格式化：词素扫描、布局与安全写回以 CiallangFormat 库形态放在 src/format/，
+# exe 入口在 tools/fmt；formatter-only 独立于运行库/SDK，不创建 cial。
 if(CIAL_BUILD_FORMATTER)
-    add_library(CiallangFormat STATIC src/format/Formatter.cpp)
+    add_library(CiallangFormat STATIC
+        src/format/Formatter.cpp
+        src/format/Files.cpp)
     target_link_libraries(CiallangFormat PUBLIC Ciallang::Ciallang)
-    add_executable(cial-fmt src/format/main.cpp)
-    target_link_libraries(cial-fmt PRIVATE CiallangFormat)
-    set_target_properties(CiallangFormat cial-fmt PROPERTIES CXX_EXTENSIONS OFF
+    target_include_directories(CiallangFormat PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>")
+    set_target_properties(CiallangFormat PROPERTIES CXX_EXTENSIONS OFF
         COMPILE_WARNING_AS_ERROR ${CIAL_WARNINGS_AS_ERRORS})
     if(MSVC)
         target_compile_options(CiallangFormat PRIVATE /EHsc /utf-8)
-        target_compile_options(cial-fmt PRIVATE /EHsc /utf-8)
     endif()
+    add_subdirectory(tools/fmt)
     install(TARGETS cial-fmt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime)
 endif()
 
 # ------------------------------ auxiliary tools ------------------------------ #
-# 各工具 skeleton 在自身目录内定义 target；依赖尚未具备时以桩入口占位。
-# 共享的编译编排与诊断渲染见 cialcli（CIAL_BUILD_CLI 时定义）；
-# 成品 cial-fmt（CIAL_BUILD_FORMATTER，src/format/）不要求 CLI，一并纳入聚合。
+# 各工具目录内只保留 exe 入口（main.cpp）；功能实现以库形态放在 src/ 下供外部复用：
+# CiallangFormat（src/format，formatter-only 可用）与 cialdbg（src/dbg）。
+# 各工具 skeleton 依赖尚未具备时以桩入口占位；共享的编译编排与诊断渲染见 cialcli。
+if(CIAL_BUILD_DBG)
+    add_library(cialdbg STATIC src/dbg/DebugSession.cpp)
+    target_link_libraries(cialdbg PUBLIC Ciallang::Ciallang)
+    target_include_directories(cialdbg PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>")
+    set_target_properties(cialdbg PROPERTIES CXX_EXTENSIONS OFF
+        COMPILE_WARNING_AS_ERROR ${CIAL_WARNINGS_AS_ERRORS})
+    if(MSVC)
+        target_compile_options(cialdbg PRIVATE /EHsc /utf-8)
+    endif()
+endif()
 set(CIAL_TOOL_TARGETS "")
 foreach(tool IN ITEMS LSP DISASM DBG)
     if(CIAL_BUILD_${tool})

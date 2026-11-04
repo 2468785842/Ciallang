@@ -23,7 +23,7 @@ ctest --test-dir build/local --output-on-failure
 | CMake 开关 | 独立构建默认 | `add_subdirectory` 默认 | vcpkg feature / 额外依赖 |
 |---|---|---|---|
 | `CIAL_BUILD_CLI` | ON | OFF | `cli` / argparse |
-| `CIAL_BUILD_FORMATTER` | 跟随 CLI | 跟随 CLI（默认 OFF） | 无额外依赖；构建 `cial-fmt` |
+| `CIAL_BUILD_FORMATTER` | 跟随 CLI | 跟随 CLI（默认 OFF） | `formatter` / argparse；构建 `cial-fmt` |
 | `CIAL_BUILD_TESTS` | ON | OFF | `tests` / Catch2（不启用其默认 feature） |
 | `CIAL_ENABLE_JIT` | OFF | OFF | `jit` / asmjit，仅 x64 |
 | `CIAL_BUILD_FUZZ` | OFF | OFF | 无；需 Clang/libFuzzer |

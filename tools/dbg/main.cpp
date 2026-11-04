@@ -14,33 +14,34 @@
 // cial-dbg：TJS2 交互式调试器（终端 CLI）。用法：cial-dbg <script.tjs>。
 // 断点/单步/debugger 语句停机后进入命令提示符，见 doc/debugger.md。
 
+#include <argparse/argparse.hpp>
+
 #include <exception>
 #include <filesystem>
-#include <iostream>
+#include <string>
 
-#include "DebugSession.hpp"
+#include "cial/Version.hpp"
 #include "cli/Compilation.hpp"
 #include "cli/Diagnostics.hpp"
 #include "cli/Session.hpp"
 #include "common/SourceFile.hpp"
+#include "dbg/DebugSession.hpp"
 #include "fmt/format.h"
 #include "types/Class.hpp"
 #include "vm/VM.hpp"
 
-namespace {
-    int printUsage() {
-        fmt::println(stderr, "usage: cial-dbg <script.tjs>");
-        return 2;
-    }
-} // namespace
-
 int main(const int argc, char **argv) {
     setvbuf(stdout, nullptr, _IONBF, 0);
-    if(argc != 2)
-        return printUsage();
-    const std::string arg = argv[1];
-    if(arg == "-h" || arg == "--help")
-        return printUsage();
+    argparse::ArgumentParser parser{ "cial-dbg", CIAL_VERSION_STRING };
+    parser.add_description("TJS2 interactive terminal debugger (see doc/debugger.md).");
+    parser.add_argument("script").help("script to debug (.tjs)");
+    try {
+        parser.parse_args(argc, argv);
+    } catch(const std::exception &error) {
+        fmt::println(stderr, "cial-dbg: {}", error.what());
+        return 2;
+    }
+    const std::string arg = parser.get<std::string>("script");
 
     // 调试会话强制走解释器：JIT 会整段跳过派发环，绕过 DebugHook
     cial::Runtime runtime;

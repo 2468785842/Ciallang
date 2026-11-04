@@ -21,8 +21,9 @@ Ciallang 是 C++20 实现的 TJS2 解释器。先看 [README](README.md) 和 [�
 | `src/decompile/` | 字节码反编译（{文本, 行表}；方案见 `doc/bytecode/decompiler-plan.md`） |
 | `src/cli/` · `src/main.cpp` | CLI 与 REPL；Compilation/Diagnostics 编为 `cialcli` 静态库供各工具共享 |
 | `tests/` · `bench/` · `fuzz/` | 回归测试、基准、前端 fuzz 及语料 |
-| `src/format/` | cial-fmt 无损词素扫描、布局与安全文件写回 |
-| `tools/` · `editors/vscode/` | 调试器（`cial-dbg`，[用法](doc/debugger.md)）与工具骨架（`cial-lsp`/`cial-disasm`，`CIAL_BUILD_*` 门控；lsp 目录另含 stdio 协议原型）与 VSCode 客户端 |
+| `src/format/` | cial-fmt 无损词素扫描、布局与安全文件写回（CiallangFormat 库） |
+| `src/dbg/` | 调试会话 DebugSession（`vm::DebugHook` 实现，`cialdbg` 库） |
+| `tools/` · `editors/vscode/` | 工具 exe 入口：各目录只放 main.cpp（argparse 解析），功能实现放 src/ 对应库。`cial-fmt`（fmt，[格式化](doc/formatting.md)）、调试器 `cial-dbg`（dbg，[用法](doc/debugger.md)）、`cial-lsp`/`cial-disasm` 桩（`CIAL_BUILD_*` 门控；lsp 目录另含 stdio 协议原型）与 VSCode 客户端 |
 
 ## 构建与验证
 

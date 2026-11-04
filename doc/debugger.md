@@ -65,7 +65,7 @@ program finished
   借用挂接，派发环在每条指令前同步调用 `onInstruction`（`VMState.cpp`，与
   ExecutionTrace 同位）；脚本 `debugger` 语句走 `onDebugger`。会话内抛
   `vm::DebugAbort`（非 `std::exception`，不被 runLoop 包装成脚本异常）可整段放弃执行。
-- 会话核心 `tools/dbg/DebugSession.cpp`：断点按 `(chunk, bc 偏移)` 存站点；
+- 会话核心 `src/dbg/DebugSession.cpp`（`cialdbg` 库，exe 入口在 `tools/dbg/`）：断点按 `(chunk, bc 偏移)` 存站点；
   行→pc 经 `Chunk::rlc().rawEntries()` 反查；反汇编定位用 `Chunk::tacIndexAtBc`。
   入口 Chunk 由 `RootGuard` 保 GC 根贯穿会话，函数 Chunk 经常量图保持可达。
 - `step`/`next` 以（帧深度，源码行）为基线：行号未知或同语句的中间指令不停。

@@ -65,10 +65,10 @@ cmake --build build/formatter --target cial-fmt
 cmake --install build/formatter --component Runtime --prefix /your/install/prefix
 ```
 
-仍需核心前端的 fmt、frozen、utf8proc、Oniguruma，不需要 argparse。`CiallangFormat` 是
+仍需核心前端的 fmt、frozen、utf8proc、Oniguruma，以及 argparse（命令行解析）。`CiallangFormat` 是
 仓库内部工具目标，不进入安装 SDK 的兼容承诺。Runtime 打包包含启用的 formatter；
 官方打包脚本显式启用它，并在解压后的精简环境中实际检查格式化输出。
 
 端到端测试位于 `tests/formatter_test.py`，覆盖 CLI、字面量/预处理保留、幂等性、
 中文路径、权限、错误不写回、运行结果对照，以及 `tests/tjs` 语料格式化前后重新编译。
-源码使用 `src/parser/Lexer.*` 的真实词法规则；布局和命令行实现在 `src/format/`。
+源码使用 `src/parser/Lexer.*` 的真实词法规则；布局与安全写回实现在 `src/format/`（CiallangFormat 库），CLI 入口在 `tools/fmt/`。
