@@ -1414,7 +1414,9 @@ namespace cial::tjsbc {
                 sortedSrcPos.reserve(ctx.codePos.size());
                 for(size_t k = 0; k < ctx.codePos.size(); ++k)
                     sortedSrcPos.emplace_back(ctx.codePos[k], ctx.sourcePos[k]);
-                std::ranges::sort(sortedSrcPos, {}, &std::pair<i32, i32>::first);
+                // 稳定排序：相同 codePos 的条目保留导出顺序。ranges::sort 不稳定，
+                // 平局顺序随标准库实现而异，二分继承的行号随平台漂移
+                std::ranges::stable_sort(sortedSrcPos, {}, &std::pair<i32, i32>::first);
             }
             for(const auto &[word, tac] : offsetMap) {
                 Opt<i32> src{};

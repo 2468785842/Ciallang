@@ -192,15 +192,24 @@ namespace cial::tjsbc {
             ctx.propGetter = c.i32At();
             ctx.superClassGetter = c.i32At();
 
-            // 源位置表（仅 outputdebug 产物非 0；先全部 CodePos 再全部 SourcePos）
-            const i32 srcPosCount = c.i32At();
+            // 源位置表（仅 outputdebug 产物非 0；先全部 CodePos 再全部 SourcePos）。
+            // 参考导出器（tjsInterCodeGen ExportByteCode）把 count 写成字节数
+            // （SourcePosArraySize*8）却按条目循环越界自读——文件尾随导出时进程堆
+            // 的垃圾条目；只取真实条目（字节数/8），垃圾尾跳过保持流对齐
+            const i32 srcPosBytes = c.i32At();
+            const i32 srcPosCount = srcPosBytes > 0 ? srcPosBytes / 8 : 0;
+            const i32 srcPosSkip = srcPosBytes > 0 ? srcPosBytes - srcPosCount : 0;
             if(srcPosCount > 0) {
                 ctx.codePos.resize(static_cast<size_t>(srcPosCount));
                 for(i32 k = 0; k < srcPosCount; ++k)
                     ctx.codePos[static_cast<size_t>(k)] = c.i32At();
+                c.skip(static_cast<size_t>(srcPosSkip) * 4);
                 ctx.sourcePos.resize(static_cast<size_t>(srcPosCount));
                 for(i32 k = 0; k < srcPosCount; ++k)
                     ctx.sourcePos[static_cast<size_t>(k)] = c.i32At();
+                c.skip(static_cast<size_t>(srcPosSkip) * 4);
+            } else if(srcPosBytes < 0) {
+                bcError("tjs bytecode: negative source position table size");
             }
 
             const i32 codeCount = c.i32At();
