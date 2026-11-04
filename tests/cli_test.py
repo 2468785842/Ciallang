@@ -624,6 +624,15 @@ selected
             'var x = 1; switch(x) { case 1: break; } println(42);',
             'function f(x) { switch(x) { case 1: if(x > 0) { println(7); } '
             'else { println(8); } break; default: println(9); } } f(1); f(2);',
+            'function f(x, c) { var r = 0; switch(x) { case 1: r += 1; break; '
+            'default: if(c > 0) { r += 2; } else { r += 3; } break; } return r; } '
+            'println(f(1, 5)); println(f(9, 5)); println(f(9, -5));',
+            'function f(x, c) { var r = 0; switch(x) { case 1: if(c > 0) { r += 1; } '
+            'if(c > 1) { r += 2; } r += 100; break; case 2: r += 7; break; } return r; } '
+            'println(f(1, 2)); println(f(1, 1)); println(f(1, -1)); println(f(2, 0));',
+            'function f(x, c) { var r = 0; switch(x) { case 1: if(c > 0) { r += 1; } '
+            'else { r += 2; break; } r += 100; break; case 2: r += 7; break; } return r; } '
+            'println(f(1, 1)); println(f(1, -1)); println(f(2, 0));',
             'var x = "a"; switch(x) { case "a": println(1); break; default: println(2); }',
             'function f(x) { switch(x) { case "a": case "b": println(1); break; '
             'case "c": println(2); break; default: println(3); } } '
@@ -689,13 +698,39 @@ selected
                 if sample["expectedRecovery"] == "unsupported":
                     self.assertEqual(restored.returncode, 2, restored.stderr)
                     self.assertEqual(restored.stdout, "")
-                    self.assertIn("寄存器合流", restored.stderr)
+                    self.assertIn(sample.get("rejectReason", "寄存器合流"), restored.stderr)
                     continue
                 self.assertEqual(restored.returncode, 0, restored.stderr)
                 self.assertIn("switch (", restored.stdout)
                 original = self.run_cial(source)
                 translated = self.run_cial("--tjsbc", bytecode)
                 target = self.root / "restored-switch.tjs"
+                target.write_text(restored.stdout, encoding="utf-8")
+                replay = self.run_cial(target)
+                for result in (original, translated, replay):
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(translated.stdout, original.stdout)
+                self.assertEqual(replay.stdout, original.stdout)
+
+    def test_decompile_reference_switch_nested_branches(self):
+#M5 参考开关 case/default 体内嵌套条件分支：三路 stdout 一致 + 结构断言；
+#语料由 darwin 参考编译器导出（manifest referenceDarwin 记录身份）
+        corpus = pathlib.Path(__file__).resolve().parent / "test_files" / "tjsbc" / "decompile"
+        for name, expectIf in [("m5_switch_nested_if", True),
+                               ("m5_switch_nested_default", True),
+                               ("m5_switch_nested_elsebreak", True),
+                               ("m5_switch_nested_elseif", True)]:
+            with self.subTest(sample=name):
+                source = corpus / (name + ".tjs")
+                bytecode = source.with_suffix(".tjsbc")
+                original = self.run_cial(source)
+                translated = self.run_cial("--tjsbc", bytecode)
+                restored = self.run_cial("--decompile", bytecode)
+                self.assertEqual(restored.returncode, 0, restored.stderr)
+                self.assertIn("switch (", restored.stdout)
+                if expectIf:
+                    self.assertIn("if (", restored.stdout)
+                target = self.root / "restored-nested-switch.tjs"
                 target.write_text(restored.stdout, encoding="utf-8")
                 replay = self.run_cial(target)
                 for result in (original, translated, replay):

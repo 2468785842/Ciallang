@@ -1,5 +1,5 @@
 {
-  "description": "M5 参考字节码条件、switch 与局部返回语料；无 outputdebug；顶层合流保守拒绝",
+  "description": "M5 参考字节码条件、switch（含 case/default 内嵌套条件分支）与局部返回语料；无 outputdebug；顶层合流与嵌套 switch 保守拒绝",
   "reference": {
     "commit": "40a736c48f40dff7c737e9c5dc9c0e46f145e9e5",
     "binarySha256": "8f370f2bb7460c8b7b8090a8bc71b7d0fb94a25e98ee2ff20d01bf3df358c60b",
@@ -76,6 +76,47 @@
       "sourceSha256": "492131e0ed6621c617584715898eac55b2120e3910fd4cad5c63351645c09d15",
       "bytecodeSha256": "d3afe8936022061fab1b83f77b6e747163576a729cd027438856bbf0c79b901a",
       "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_nested_if",
+      "sourceSha256": "dffba7e6a508027cdaf1e8b1ebeb0819c3b89cd2ce3ab78d88b5b09eef1194f0",
+      "bytecodeSha256": "a94c07b39cb1ee9f49dec35bb9b85f749a9f1d2e7b680e527b0b0db5a51880b8",
+      "expectedRecovery": "success",
+      "reference": "darwin"
+    },
+    {
+      "name": "m5_switch_nested_default",
+      "sourceSha256": "97885f9004ade43796050476f23eaf780ba7deb0dfa225027b0616a532ec9650",
+      "bytecodeSha256": "7279140c1de30026364e096bbf58c6f1f2234bbf2cda5802aedb6c2fd04befe0",
+      "expectedRecovery": "success",
+      "reference": "darwin"
+    },
+    {
+      "name": "m5_switch_nested_elsebreak",
+      "sourceSha256": "ddcf4903c4124673d3048c7243b25e5bbed85f1b93f75f19c7648536917c3c70",
+      "bytecodeSha256": "c75f466c212385b72cd4f314f711d03d3fb042ebe35053ea907b1d596ede5446",
+      "expectedRecovery": "success",
+      "reference": "darwin"
+    },
+    {
+      "name": "m5_switch_nested_elseif",
+      "sourceSha256": "990b7ee7e48c9a08404dc4a04904eefd006293f34a655999c00721ec8b681d17",
+      "bytecodeSha256": "54bfbac7a405e66b174d1f179ba1c0be3a71aa9d5f68f1768746580b3d870255",
+      "expectedRecovery": "success",
+      "reference": "darwin"
+    },
+    {
+      "name": "m5_switch_nested_switch",
+      "sourceSha256": "9b3016c5d991a39723e90403fe541006ed5696f19f36daac04149b3af87005ae",
+      "bytecodeSha256": "aa54435954626aa763f9badb3921ea419a66b16d1c42e7b0d061d02b53de2693",
+      "expectedRecovery": "unsupported",
+      "reference": "darwin",
+      "rejectReason": "嵌套复合分支"
     }
-  ]
+  ],
+  "referenceDarwin": {
+    "commit": "d8044c3 (本地 darwin 构建，src/main.cpp 有未提交改动)",
+    "binarySha256": "478eab1709f5e3138ab7b5cdc78405ed4cf2020fdaa5fff6519ec4226b4471b1",
+    "exportOptions": "--dump <source> <bytecode>"
+  }
 }

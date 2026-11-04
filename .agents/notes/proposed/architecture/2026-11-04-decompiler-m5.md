@@ -183,11 +183,49 @@ with 与 eval 名字依赖；M4→M5 移交的 bc 路径验收扩展（super 构
   **243/243 通过**，31.06s，日志 `out/m5-local-merge/ctest.log`。配置沿用上一批。
   clang-format 20.1.0 dry-run 与 `git diff --check` 通过。
 
+## case/default 体内嵌套条件分支（2026-11-05，darwin 本机）
+
+- `precomputeReferenceSwitches` 的 case/default 体校验重写为共享 `validateBody`：
+  活 `JmpNE` 经 `scanBranch` 形态校验（封闭于体区域、合并点 ≤ bodyEnd）后按嵌套
+  if 恢复；发射端 `emitSwitch → emitRegion → emitIf` 本就通用，无需改动。参考
+  编译器跳转线程化使多数 if-else 的 then 尾直接 `Jmp→出口`，恢复为
+  if + 直线 else 体（语义等价）；else 含 break 的真 if-else 形态保持显式 if-else。
+- 嵌套子区域（then/else/合并后）纳入既有 writes/liveIn 合流检查与函数局部存储
+  物化；default 体活 `JmpNE` 同规则（旧 "default 控制流尚未恢复" 仅对 Jmp 目标
+  越界保留）。不可达跳转一律折叠（旧实现对不可达 `JmpNE` 误硬拒，已顺带修正）。
+- **嵌套 switch（case 内同判别值派发链）保守拒绝**：两轮探测发现函数级会把标签
+  常量寄存器跨 case 合流物化成合成局部名，`case 1/2` 被渲染成 `case v1`（语义
+  错误恢复）；顶层则因合流寄存器无头块/入口块初始化点被既有守卫拒绝。据此
+  validateBody 拒绝 then/else 子区域含更深条件跳转的复合分支（`嵌套复合分支
+  尚未恢复（M5）`）；头块在已认领外层 case/default 体区域且出口越界时不认领，
+  退回嵌套 if 路径。同判别值 else-if 链在 break 线程化后经嵌套 if 恢复（语义
+  等价，非 switch 形态）。
+- 新增 5 组 darwin 参考语料（`m5_switch_nested_{if,default,elsebreak,elseif,
+  switch}`，末组 expectedRecovery=unsupported + rejectReason）；
+  `referenceDarwin` 记录本机参考身份：commit `d8044c3`（本地构建，main.cpp 有
+  未提交改动）、SHA-256 `478eab17…b4471b1`、`--dump` 导出。执行/导出实测可用；
+  与既有 Windows 语料（`8f370f2b…`，commit `40a736c`）分列。
+- 自产路径新增 3 个 CLI roundtrip 样本（default 内嵌套 if、case 内顺序 if、
+  else 含 break）；`test_decompile_reference_switches` 支持按样本 `rejectReason`
+  断言；新增 `test_decompile_reference_switch_nested_branches`（4 组三路 stdout
+  一致 + `switch (`/`if (` 结构断言）。
+- 本机验证：6 组探测形态自产/参考三路 stdout 逐字节一致；嵌套 switch 两种层级
+  均诚实拒绝。macOS Debug 全量 CTest **434/434 通过**（本轮新增用例后）；
+  clang-format 20.1.0 dry-run 与 `git diff --check` 通过。
+- **新发现（未修复，均属既有路径）**：
+  1. 单 case + default 的参考开关不满足 `cases.size() >= 2` 走通用恢复，default
+     体含嵌套 if 时通用路径误恢复出 `while (true)`（静默错误输出，非拒绝；
+     `out/m5-nested/probe_defif.tjs`）。通用路径对参考派发尾形态的结构识别待补。
+  2. 顶层参考 switch 嵌套在 while 体内被临时值多使用守卫拒绝（与嵌套 if 无关，
+     无嵌套分支同拒；`out/m5-nested/probe_loop*.tjs`）。Windows 侧既往验收的
+     循环组合均为自产路径，参考路径循环组合未验收。
+
 ## 建议下一步
 
-1. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue 组合；
-   扩展参考 switch 的嵌套与 case 内条件分支；多值标签与具有共同初始化点的函数局部
-   合流已恢复，顶层合流仍拒绝；按方案 §7 继续参考 TJS2 四环验收。
+1. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue
+   组合；参考路径循环组合（本机已复现拒绝）；嵌套 switch 的标签常量寄存器
+   物化方案（或专用 case 标签常量渲染）；单 case + default 走通用路径的误恢复
+   防线；按方案 §7 继续参考 TJS2 四环验收。
 2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
 3. try/catch 嵌套兜底（任意 CFG 降级状态机）、with、eval 名字依赖按方案批次推进。

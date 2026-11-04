@@ -1,0 +1,3 @@
+// M5: reference switch with nested if-else in case body.
+function f(x, c) { var r = 0; switch(x) { case 1: if (c > 0) { r += 1; } else { r += 2; } break; case 2: r += 10; break; default: r += 99; } return r; }
+println(f(1, 1)); println(f(1, -1)); println(f(2, 0)); println(f(9, 0));

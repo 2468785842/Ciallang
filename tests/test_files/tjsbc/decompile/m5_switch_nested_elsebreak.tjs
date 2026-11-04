@@ -1,0 +1,3 @@
+// M5: reference switch; else branch containing break keeps explicit if-else.
+function k(x, c) { var r = 0; switch(x) { case 1: if (c > 0) { r += 1; } else { r += 2; break; } r += 100; break; case 2: r += 7; break; } return r; }
+println(k(1, 1)); println(k(1, -1)); println(k(2, 0));

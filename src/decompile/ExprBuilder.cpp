@@ -3042,42 +3042,46 @@ namespace cial::decompile {
                 info.hasDefault = exit > next;
                 info.defaultPc = next;
                 info.exitPc = exit;
-                for(size_t i = 0; i < info.cases.size(); ++i) {
-                    const auto &c = info.cases[i];
-                    const auto fall = i + 1 < info.cases.size() ? info.cases[i + 1].bodyPc : next;
-                    for(u32 p = c.bodyPc; p < c.bodyEnd; ++p) {
-                        const auto op = code[p]->opcode();
-                        if(op != TacOpCode::Jmp && op != TacOpCode::JmpNE && op != TacOpCode::JmpE)
-                            continue;
-                        if(deadJumps.contains(p))
-                            continue;
-                        if(op != TacOpCode::Jmp) {
-                            fail("参考 switch 的嵌套分支尚未恢复（M5）");
-                            return;
-                        }
-                        const auto target = static_cast<u32>(code[p]->getOp1().value<Label>().address());
-                        if(target <= p || (target >= c.bodyEnd && target != fall && target != exit))
-                            valid = false;
+                // 头块位于已认领 switch 的 case/default 体区域时，本链是嵌套
+                // switch 或 else-if 链：出口越出所在体区域则不认领，退回外层
+                // 嵌套 if 恢复；否则 emitSwitch 的区域越界守卫会硬拒，或嵌套
+                // 发射与外层派发段重入。取包含本头的最小体边界。
+                {
+                    const auto headPc = static_cast<u32>(_blocks[bi].start);
+                    u32 bound = INVALID;
+                    for(const auto &[outerBi, outer] : _switches) {
+                        u32 regionEnd = INVALID;
+                        for(const auto &c : outer.cases)
+                            if(c.bodyPc <= headPc && headPc < c.bodyEnd)
+                                regionEnd = regionEnd == INVALID ? c.bodyEnd : std::min(regionEnd, c.bodyEnd);
+                        if(outer.hasDefault && outer.defaultPc <= headPc && headPc < outer.exitPc)
+                            regionEnd = regionEnd == INVALID ? outer.exitPc : std::min(regionEnd, outer.exitPc);
+                        if(regionEnd != INVALID)
+                            bound = bound == INVALID ? regionEnd : std::min(bound, regionEnd);
+                    }
+                    if(bound != INVALID && exit > bound)
+                        continue;
+                }
+                // 外围循环上下文：嵌套 if 的 else 探测需识别 continue/锁存跳转
+                LoopCtx enclosing;
+                u32 enclosingStart = 0;
+                for(const auto &[header, loop] : _whileLoops) {
+                    const auto lstart = static_cast<u32>(_blocks[header].start);
+                    if(lstart <= start && exit <= loop.latchJmpPc && lstart >= enclosingStart) {
+                        enclosing = LoopCtx{ .continuePc = loop.continuePc, .latchPc = loop.latchJmpPc };
+                        enclosingStart = lstart;
                     }
                 }
-                // 参考导出保留 break/return 后的不可达跳转；仅跳过 CFG 证明不可达的 Jmp。
-                for(u32 p = next; p < exit; ++p) {
-                    const auto op = code[p]->opcode();
-                    if(op == TacOpCode::Jmp && !reachable[blockAtPc(p)]) {
-                        deadJumps.insert(p);
-                        continue;
-                    }
-                    if(!reachable[blockAtPc(p)])
-                        continue;
-                    if(op == TacOpCode::JmpNE || op == TacOpCode::JmpE ||
-                       (op == TacOpCode::Jmp && code[p]->getOp1().value<Label>().address() != exit)) {
-                        fail("参考 switch 的 default 控制流尚未恢复（M5）");
-                        return;
+                for(const auto &[bodyStart, loop] : _doLoops) {
+                    if(bodyStart <= start && exit <= loop.condStart && bodyStart >= enclosingStart) {
+                        enclosing = LoopCtx{ .continuePc = loop.condStart, .latchPc = loop.condJumpPc };
+                        enclosingStart = bodyStart;
                     }
                 }
-                if(!valid)
-                    continue;
-                // 无调试名字的寄存器不能按线性版本跨 case 合流：某条路径写入
+                const LoopCtx swCtx{ .breakPc = exit,
+                                     .continuePc = enclosing.continuePc,
+                                     .latchPc = enclosing.latchPc };
+                // 无调试名字的寄存器不能按线性版本跨区域合流：某条路径写入
                 // 的值不支配其它入口。函数内须恢复为具有共同初始化点的局部存储。
                 struct RegionRegs {
                     std::unordered_set<u16> writes;
@@ -3097,6 +3101,76 @@ namespace cial::decompile {
                     }
                     regions.push_back(std::move(regs));
                 };
+                // 体区域（case 或 default）内的活跳转校验：Jmp 目标须封闭在体
+                // 区域（fall/出口例外）；活 JmpNE 须为可结构化的嵌套 if
+                // （scanBranch 形态封闭），空 then 与越界合并点显式拒绝。
+                // 派发链形态的 JmpNE（嵌套 switch / 同判别值 else-if 链）交由
+                // 其自身块位的 precompute 认领，此处按保守子区域接纳。
+                // fallPc 取 INVALID 表示无贯穿（default 体）。
+                auto validateBody = [&](const u32 bodyBegin, const u32 bodyEnd, const u32 fallPc,
+                                        const bool isDefault) {
+                    for(u32 p = bodyBegin; p < bodyEnd; ++p) {
+                        const auto op = code[p]->opcode();
+                        if(op != TacOpCode::Jmp && op != TacOpCode::JmpNE && op != TacOpCode::JmpE)
+                            continue;
+                        // 参考导出保留 break/return 后的不可达跳转；CFG 证明
+                        // 不可达的跳转折叠，不参与结构校验
+                        if(!reachable[blockAtPc(p)]) {
+                            deadJumps.insert(p);
+                            continue;
+                        }
+                        if(op == TacOpCode::JmpE) {
+                            fail("参考 switch 体内 JmpE 消费属 M5 后续批次");
+                            return;
+                        }
+                        if(op == TacOpCode::Jmp) {
+                            const auto target = static_cast<u32>(code[p]->getOp1().value<Label>().address());
+                            if(target <= p || (target >= bodyEnd && target != fallPc && target != exit)) {
+                                if(isDefault)
+                                    fail("参考 switch 的 default 控制流尚未恢复（M5）");
+                                else
+                                    valid = false;
+                                return;
+                            }
+                            continue;
+                        }
+                        BranchShape shape;
+                        if(!scanBranch(blockAtPc(p), swCtx, shape) || shape.mergePc > bodyEnd ||
+                           (shape.hasElse && shape.elseEnd > bodyEnd)) {
+                            fail("参考 switch 的嵌套分支无法结构化（空 then 或合并点越界，M5）");
+                            return;
+                        }
+                        // then/else 子区域含更深条件跳转（嵌套复合分支、同判别值
+                        // 派发链）时，线性区域分析不足以证明恢复等价：嵌套 switch
+                        // 的标签常量寄存器会跨区合流，保守拒绝，属后续批次
+                        const auto hasCondJmp = [&](u32 begin, u32 end) {
+                            for(u32 q = begin; q < end; ++q)
+                                if(code[q]->opcode() == TacOpCode::JmpNE && reachable[blockAtPc(q)])
+                                    return true;
+                            return false;
+                        };
+                        if(hasCondJmp(shape.thenBegin, shape.thenContentEnd) ||
+                           (shape.hasElse && hasCondJmp(shape.elseBegin, shape.elseEnd))) {
+                            fail("参考 switch 的嵌套复合分支尚未恢复（M5）");
+                            return;
+                        }
+                        addRegion(shape.thenBegin, shape.thenContentEnd);
+                        if(shape.hasElse)
+                            addRegion(shape.elseBegin, shape.elseEnd);
+                        addRegion(shape.mergePc, bodyEnd);
+                    }
+                };
+                for(size_t i = 0; i < info.cases.size(); ++i) {
+                    const auto &c = info.cases[i];
+                    const auto fall = i + 1 < info.cases.size() ? info.cases[i + 1].bodyPc : next;
+                    validateBody(c.bodyPc, c.bodyEnd, fall, false);
+                }
+                if(info.hasDefault)
+                    validateBody(next, exit, INVALID, true);
+                if(!_unsupported.empty())
+                    return;
+                if(!valid)
+                    continue;
                 for(size_t i = 0; i < info.cases.size(); ++i) {
                     const auto begin = i == 0 ? info.firstPc - 1 : info.cases[i - 1].bodyEnd;
                     addRegion(begin, info.cases[i].bodyEnd);
