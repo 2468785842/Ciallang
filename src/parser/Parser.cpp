@@ -805,7 +805,7 @@ namespace cial::syntax {
         parser->consume(r);
 
         FunctionDeclNode *constructor{};
-        Vec<VarDeclNode *> varDeclVec{};
+        Vec<const VarDeclNode *> varDeclVec{};
         Vec<FunctionDeclNode *> funcDeclVec{};
         Vec<PropertyDeclNode *> propertyDeclVec{};
 
@@ -815,7 +815,10 @@ namespace cial::syntax {
                 return nullptr;
 
             if(auto *varDecl = dynamic_cast<VarDeclNode *>(stmt)) {
-                varDeclVec.push_back(varDecl);
+                // `var a, b;` 是单节点 + next 逗号链：逐个登记，链上后续名字
+                // 与首个名字同等注册（此前只收头节点，实例化缺后续成员）
+                for(const VarDeclNode *node = varDecl; node; node = node->next)
+                    varDeclVec.push_back(node);
                 continue;
             }
 

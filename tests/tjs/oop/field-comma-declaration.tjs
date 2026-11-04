@@ -1,0 +1,28 @@
+// OOP - 类体逗号字段声明链：var a = 1, b = 2; 每个名字同等注册并初始化
+Scripts.execStorage("../assert.tjs");
+
+class C {
+    var a = 1, b = 2;
+    var x, y;
+}
+
+var o = new C();
+assertTrue(o.a == 1, "comma field first initializer");
+assertTrue(o.b == 2, "comma field second initializer registered");
+
+// 未初始化的链上名字仍可赋值
+o.x = 10;
+o.y = 20;
+assertTrue(o.x + o.y == 30, "uninitialized comma fields assignable");
+
+// 分开声明的行为一致（对照）
+class D {
+    var a;
+    var b;
+}
+var p = new D();
+p.a = 3;
+p.b = 4;
+assertTrue(p.a + p.b == 7, "separate declarations equivalent");
+
+finishTests();

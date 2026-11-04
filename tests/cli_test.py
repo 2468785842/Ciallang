@@ -551,6 +551,17 @@ selected
             'var ok = delete dd.b; println(ok); println(dd.count);\n',
 #顶层多使用纯读复制（同一值分发到多处）
             'var k = 5; var m = k + k; var o = [k, k]; println(m); println(o[1]);\n',
+#顶层 getter/调用混合链（临时值跨调用同树内联，落点传播）
+            'class C { var a; var b; function m() { return 3; } }\n'
+            'var o = C(); o.a = 1; o.b = 2;\n'
+            'var r = o.a + o.b + o.m(); println(r);\n',
+#顶层裸表达式语句混合链
+            'class C { var a; var b; function m() { return 4; } }\n'
+            'var o = C(); o.a = 2; o.b = 3;\n'
+            'o.a + o.b + o.m(); println("done");\n',
+#类体逗号字段声明（逐名注册，恢复为逐行 var）
+            'class C { var a = 1, b = 2; function m() { return a + b; } }\n'
+            'var o = C(); println(o.m());\n',
         ]
         for index, source in enumerate(cases):
             with self.subTest(case=index):
@@ -579,6 +590,14 @@ selected
         self.assertIn("println(-a * 2);", process.stdout)
         self.assertIn("println(-(a * 2));", process.stdout)
         self.assertIn("println(int o.b + 1);", process.stdout)
+
+    def test_decompile_class_comma_fields_recovered(self):
+#类体 var a, b; 逗号链：解析逐名登记（Parser next 链），壳按成员表逐行恢复
+        self.script.write_text('class C { var a, b; }\nvar o = C();\n', encoding="utf-8")
+        process = self.run_cial("--decompile", self.script)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("var a;", process.stdout)
+        self.assertIn("var b;", process.stdout)
 
     def test_decompile_strict_rejects_structure_with_batch_reason(self):
 #语句结构（switch 属 M5、with 属 M3）在严格模式如实拒绝：退出码 2、不产文本、原因含批次号

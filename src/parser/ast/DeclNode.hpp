@@ -63,7 +63,7 @@ namespace cial::syntax {
         Vec<IdentifierExprNode *> extends{};
         FunctionDeclNode *constructor{};
 
-        Vec<VarDeclNode *> varDeclVec{};
+        Vec<const VarDeclNode *> varDeclVec{};
         Vec<PropertyDeclNode *> propertyDeclVec{};
         Vec<FunctionDeclNode *> funcDeclVec{};
 
