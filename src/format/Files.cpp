@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <system_error>
 #ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
 #include <share.h>
 #include <sys/stat.h>
 #include <windows.h>
