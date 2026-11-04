@@ -28,14 +28,18 @@ with 与 eval 名字依赖；M4→M5 移交的 bc 路径验收扩展（super 构
   逐名 DThis）端到端验证。回归：`tests/tjs/oop/field-comma-declaration.tjs`、
   `cli_test.py` 逗号字段文本断言与 3 个混合链 round-trip 用例；
   Windows Debug CTest 241/242 通过。
-- **s7_ext 行表失败为预存问题（与本修复无关，已隔离）**：
-  `test_decompile_outputdebug_source_lines` 的 s7_ext 样本期望 `describe`
-  含行 4、实际 `[None, 2, 5]`——`function describe() { return "dog:" +
-  super.describe(); }`（Dog 侧，0 基行 4）的 super 方法调用（TJS2 编译为
-  `CallMethodV`）行表收敛到行 5。回退解析器改动重建后同样失败，确认与本次
-  改动无关；与 M4 记录"CTest 431 全绿（Linux）"冲突，平台或批次差异待核。
-  属 M4→M5 移交的 `CallMethodV` 形态验收扩展，修复方向：`writeBody` 的
-  origin 分段/末语句区间延展对超调用形态的继承条目选择。
+- **s7_ext 行表失败已修复（2026-11-04，根因在参考导出器）**：
+  `test_decompile_outputdebug_source_lines` 失败的根因是参考编译器
+  `ExportByteCode` 把 count 写成**字节数**（`SourcePosArraySize*8`）却按条目
+  循环写 `SourcePosArray[i]`——越界自读 8 倍条目，导出进程的堆垃圾被冻结进
+  fixture；读取端把字节数当条目数全收，垃圾条目（`src@0`、`src@-2147483648`）
+  污染行表继承，且与各平台标准库的不稳定排序平局差异叠加，产出随平台漂移
+  （Linux"全绿"是垃圾+平局运气，期望值整体被污染）。修复：读取端按
+  count/8 截断真实条目并跳过垃圾尾（`TjsBytecodeReader.cpp`），origin 排序
+  改稳定序（`TjsTranslator.cpp`），manifest 期望按真实条目重新生成（全部
+  `0`/`2` 类垃圾行消失，`describe` 收敛到真实的行 4）。附带修复：throw 语句
+  位置回归（报错列从语句起点漂到表达式起点，取回 throw 关键字位置）。
+  Windows Debug **CTest 243/243 全绿**（首次）。
 - 表达式位置匿名函数字面量仍拒绝：`o.m = function(){...}`（赋值右值，
   非 M4 已支持的实参位置）报"表达式位置的匿名函数字面量恢复属后续批次"
   （`out/m5-probe/probe.tjs` 形态）。M4 的 FuncLit 恢复只覆盖实参位置。

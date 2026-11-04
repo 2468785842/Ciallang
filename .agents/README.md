@@ -32,12 +32,11 @@
 ## 当前各项工作的顺序
 
 - [反编译器 M5 与移交遗留](notes/proposed/architecture/2026-11-04-decompiler-m5.md)：M0–M4 已完成
-  （记录在方案 §6）；顶层物化项已闭环（M4 落点传播覆盖），类体逗号声明链解析修复；
-  M5 首批为 switch 链，`CallMethodV` 行表收敛与表达式位置 FuncLit 在册。
+  （记录在方案 §6）；顶层物化项闭环、类体逗号声明链与 outputdebug 行表读取修复
+  （CTest 243/243）；M5 首批为 switch 链，super/`CallMethodV` 恢复形态与
+  表达式位置 FuncLit 在册。
 - [krkr2 接入](notes/proposed/architecture/2026-11-04-krkr2-integration.md)：五个阶段均未开始，
   入口为双向 `iTJSDispatch2` 桥；完成标准见[接入说明](../doc/krkr2-integration.md)。
-- [语言兼容缺口](notes/proposed/bug-fix/2026-11-04-language-compat-gaps.md)：`throw` 二目表达式与
-  嵌套函数自由变量两处差异待逐条评估，不为对齐而修复。
 - [SDK 与工具路线图批次](notes/proposed/architecture/2026-11-04-sdk-tooling-roadmap.md)：
   批次 1 部分完成，批次 2–4 未开始；设计边界以[路线图](../doc/roadmap.md)为准。
 - [诊断批次 5 剩余](../doc/diagnostics-plan.md#5-实施状态2026-10-31)：剩余 JIT 等价位置验证
@@ -52,4 +51,6 @@
   优化候补，先测拷贝占比再决定是否立批次。
 
 其他提案按需浏览 `notes/proposed/`，不因为文件已存在就视为已实现。
-历史测量与验证放 `notes/implemented/`，早期失效分析放 `notes/archived/`。
+历史测量与验证放 `notes/implemented/`，否决提案与理由放 `notes/rejected/`
+（如[嵌套函数自由变量](notes/rejected/bug-fix/2026-11-04-nested-function-free-vars.md)，
+参考 TJS2 同样拒绝，非兼容缺口），早期失效分析放 `notes/archived/`。
