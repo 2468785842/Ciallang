@@ -11,6 +11,7 @@
 | 测量与诊断 | [性能记录](performance.md) · [历史测量与审计数据](../.agents/reports/) · [参考侧复核](../.agents/reports/2026-10-31-reference-audit.md) |
 | 规划 | [SDK、开发工具与模块化路线图](roadmap.md) · [诊断与源码位置重构](diagnostics-plan.md) |
 | 参与开发 | [开发约定](../AGENTS.md) · [AI 协作](../.agents/README.md) |
+| 测试导航 | [目录、进程回归与固定语料](../tests/README.md) |
 | 脚本单元测试 | [TJS 用例与双引擎运行](../tests/tjs/README.md) |
 
 官方语法参考：[TJS2 リファレンス](https://hydrozoa.felisworks.com/doc/tjs2doc/contents/index.html)。

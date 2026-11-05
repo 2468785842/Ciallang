@@ -174,5 +174,5 @@ TJSCompiler `d8044c3` 的 CLI 已支持这些参数，不应继续将其描述�
 这项检查验证参考导出到转译执行的链路，不替代三方语义或全部脚本覆盖。
 
 回归见 `tests/tjsbc_reader_test.cpp`、`tests/tjsbc_translator_test.cpp`、
-`tests/cli_test.py` 与 `bench/test_bytecode_conformance.py`。
+`tests/cli/test_decompile.py` / `tests/cli/test_switch.py` 与 `bench/test_bytecode_conformance.py`。
 设置 `TJS_REFERENCE` 可启用工具测试的参考引擎真实子进程部分。

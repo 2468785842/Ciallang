@@ -105,9 +105,17 @@ if(Python3_Interpreter_FOUND AND TARGET cial)
         set_tests_properties(CiallangFormatter PROPERTIES TIMEOUT 120)
     endif()
     add_test(NAME CiallangCli
-        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli_test.py"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli/test_cli.py"
                 --cial "$<TARGET_FILE:cial>" --expected-version "${CIAL_VERSION_STRING}")
     set_tests_properties(CiallangCli PROPERTIES TIMEOUT 60)
+    add_test(NAME CiallangDecompile
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli/test_decompile.py"
+                --cial "$<TARGET_FILE:cial>")
+    add_test(NAME CiallangSwitch
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli/test_switch.py"
+                --cial "$<TARGET_FILE:cial>")
+    set_tests_properties(CiallangDecompile CiallangSwitch PROPERTIES TIMEOUT 60)
+
     add_test(NAME CiallangLspProtocol
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/lsp/test_protocol.py"
                 --cial "$<TARGET_FILE:cial>")

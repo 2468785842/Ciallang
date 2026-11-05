@@ -31,6 +31,7 @@
     },
     {
       "name": "s7_ext",
+      "source": "../s7_ext.tjs",
       "sourceSha256": "72bfa2f198ee0cf15bf3c51982567d7ce1e9a601d1098b3544d4cc82da0d3453",
       "bytecodeSha256": "530079590eb936d9d7dab42ee82dbad2053e8255af4af100dfa8c133aee1be72",
       "expectedLines": { "global": [10, 11, 12], "Animal": [3], "describe": [4] },

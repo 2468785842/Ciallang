@@ -382,7 +382,10 @@ namespace cial::decompile {
                     case TacOpCode::CmpDEQ:
                     case TacOpCode::CmpLT:
                     case TacOpCode::CmpGT:
-                        if(pc + 1 >= instructions.size() || instructions[pc + 1]->opcode() != TacOpCode::JmpNE) {
+                        if(pc + 1 >= instructions.size() ||
+                           (instructions[pc + 1]->opcode() != TacOpCode::JmpNE &&
+                            !(instructions[pc + 1]->opcode() == TacOpCode::JmpE &&
+                              instructions[pc + 1]->getOp1().value<Label>().address() < pc))) {
                             reason = "_zf 直写比较需要相邻 JmpNE（其它 flag 形态属 M5）";
                             return false;
                         }
@@ -433,7 +436,8 @@ namespace cial::decompile {
                     }
                     continue;
                 }
-                if(lastOp != TacOpCode::JmpNE)
+                if(lastOp != TacOpCode::JmpNE &&
+                   !(lastOp == TacOpCode::JmpE && code[lastPc]->getOp1().value<Label>().address() <= block.start))
                     continue;
                 markCondCompare(block, lastPc, bi);
             }
@@ -1303,6 +1307,17 @@ namespace cial::decompile {
         // 具名局部寄存器的直接定义 = var 声明（IRGen 零拷贝：表达式 dst 直接成为
         // 变量槽）。转为 StoreLocal 语句，版本改绑为变量名
         void noteNamedDef(const Register reg) {
+            // 仅供派发比较的标签常量是该定义版本的值，不是跨 case 存储。
+            // 物理寄存器复用不应将其改绑为合成名字或留下无法发射的赋值。
+            if(_switchLabelPcs.contains(_instPc) && _switchLocalNames.contains(reg.index())) {
+                const auto v = currentVersion(reg);
+                if(v != INVALID && std::ranges::all_of(_defs[reg.index()][v].usePcs, [&](u32 pc) {
+                       return _switchCmpPcs.contains(pc);
+                   }))
+                    return;
+                fail("参考 switch 标签常量具有派发之外的使用，尚不能局部物化（M5）");
+                return;
+            }
             // 声明标签在表达式发射之后取（startPC = 定义 pc + 1）：查"本指令
             // 执行后"该寄存器的名字
             const auto name = localNameAt(reg, _instPc + 1);
@@ -1321,6 +1336,9 @@ namespace cial::decompile {
         }
 
         [[nodiscard]] bool declareLocal(const u16 regIndex, const std::string &name) {
+            const auto synthetic = _switchLocalNames.find(regIndex);
+            if(synthetic != _switchLocalNames.end() && synthetic->second.first == name)
+                return false; // 合成存储在函数体入口统一声明，赋值仍保留原 pc。
             if(_declaredLocals.contains({ regIndex, name }))
                 return false;
             _declaredLocals.emplace(regIndex, name);
@@ -2683,6 +2701,7 @@ namespace cial::decompile {
         struct WhileLoop {
             u32 exitPc{}; // JmpNE 出口（break 目标）；INVALID = while (true)
             u32 latchJmpPc{}; // 回边 Jmp 的 pc（体区结束）
+            u32 updatePc{ INVALID }; // for 更新块入口（由锁存块的前向入边证明）
             u32 continuePc{}; // continue 目标（头块条件区起始）
             bool hasCond{}; // false = while (true)
         };
@@ -2698,6 +2717,7 @@ namespace cial::decompile {
         struct LoopCtx {
             u32 breakPc{ INVALID }; // 循环出口（break 目标）
             u32 continuePc{ INVALID }; // 循环条件（while 的 continue 目标）
+            u32 updatePc{ INVALID }; // continue 前执行的 for 更新区
             u32 latchPc{ INVALID }; // 锁存 Jmp 的 pc（for 形态 continue 经锁存块中转）
         };
 
@@ -2708,11 +2728,51 @@ namespace cial::decompile {
             return _blocks.size();
         }
 
+        [[nodiscard]] u32 loopConditionStart(size_t bi) const {
+            u32 pc = _condZones[bi].firstPc;
+            const auto &code = _chunk.getInstVec();
+            while(pc > _blocks[bi].start) {
+                const auto op = code[pc - 1]->opcode();
+                if(op != TacOpCode::Load && op != TacOpCode::LoadImm && op != TacOpCode::GThis &&
+                   op != TacOpCode::GGlobal && op != TacOpCode::GLocal)
+                    break;
+                --pc;
+            }
+            return pc;
+        }
+
         void precomputeLoops() {
             auto &code = _chunk.getInstVec();
+            Vec<bool> reachable(_blocks.size(), false);
+            Vec<size_t> pending;
+            if(!_blocks.empty())
+                pending.push_back(0);
+            while(!pending.empty()) {
+                const auto bi = pending.back();
+                pending.pop_back();
+                if(reachable[bi])
+                    continue;
+                reachable[bi] = true;
+                for(const auto next : _blocks[bi].successors)
+                    pending.push_back(next);
+            }
             for(size_t bi = 0; bi < _blocks.size(); ++bi) {
+                if(!reachable[bi])
+                    continue;
                 const auto &block = _blocks[bi];
                 const size_t lastPc = block.end - 1;
+                if(code[lastPc]->opcode() == TacOpCode::JmpE &&
+                   code[lastPc]->getOp1().value<Label>().address() <= block.start &&
+                   _condZones[bi].firstPc != INVALID) {
+                    const auto body = static_cast<u32>(code[lastPc]->getOp1().value<Label>().address());
+                    _doLoops.emplace(body,
+                                     DoLoop{ .bodyStart = body,
+                                             .condStart = loopConditionStart(bi),
+                                             .condJumpPc = static_cast<u32>(lastPc),
+                                             .exitPc = static_cast<u32>(block.end),
+                                             .backTarget = body });
+                    continue;
+                }
                 if(code[lastPc]->opcode() != TacOpCode::Jmp)
                     continue;
                 const auto target = code[lastPc]->getOp1().value<Label>().address();
@@ -2743,7 +2803,7 @@ namespace cial::decompile {
                     if(code[condLast]->opcode() == TacOpCode::JmpNE && exitTarget == block.end &&
                        _condZones[bi - 1].firstPc != INVALID && target < cond.start) {
                         DoLoop loop{ .bodyStart = static_cast<u32>(target),
-                                     .condStart = static_cast<u32>(cond.start),
+                                     .condStart = loopConditionStart(bi - 1),
                                      .condJumpPc = static_cast<u32>(condLast),
                                      .exitPc = static_cast<u32>(exitTarget),
                                      .backTarget = static_cast<u32>(target) };
@@ -2777,8 +2837,24 @@ namespace cial::decompile {
                     _doLoops.emplace(doLoop.bodyStart, doLoop);
                     continue;
                 }
-                _whileLoops.emplace(header, loop);
+                // 前向 continue 入锁存块时，该块前缀为 for 更新区。
+                // 仅有回边 Jmp 的空前缀无需额外处理。
+                if(block.start < lastPc) {
+                    for(size_t q = _blocks[header].end; q < block.start; ++q)
+                        if(code[q]->opcode() == TacOpCode::Jmp &&
+                           code[q]->getOp1().value<Label>().address() == block.start)
+                            loop.updatePc = static_cast<u32>(block.start);
+                }
+                const auto prior = _whileLoops.find(header);
+                if(prior == _whileLoops.end() || prior->second.latchJmpPc < loop.latchJmpPc)
+                    _whileLoops.insert_or_assign(header, loop);
             }
+            // while 体内的 if (...) continue 会呈现 do 的双块尾模板；
+            // 同入口更晚的正常回边证明它仍属于外围 while。
+            std::erase_if(_doLoops, [&](const auto &entry) {
+                const auto wi = _whileLoops.find(blockAtPc(entry.first));
+                return wi != _whileLoops.end() && wi->second.latchJmpPc > entry.second.condJumpPc;
+            });
         }
 
         // 锁存目标 → 条件区之间含存储 → do-while 体；纯读取（条件操作数装入）
@@ -2863,6 +2939,7 @@ namespace cial::decompile {
             u32 exitPc{}; // 出口（break 目标，也是区域末）
         };
         std::unordered_map<size_t, SwitchInfo> _switches; // 派发头块 → switch
+        std::unordered_set<u32> _switchLabelPcs; // 参考派发的常量装入 pc
         std::unordered_set<u32> _switchCmpPcs; // 已认领的派发比较 pc
         std::unordered_set<u32> _switchPcs; // 已认领的全部派发段 pc
 
@@ -2947,6 +3024,24 @@ namespace cial::decompile {
             return false;
         }
 
+        // 仅跳过完整封闭于 case 区域的已识别循环；嵌套循环拥有自己的
+        // break/continue 上下文，不能用外层 switch 的跳转规则校验它。
+        [[nodiscard]] bool enclosedLoopJump(u32 pc, u32 begin, u32 end, u32 regionExit = INVALID) const {
+            const auto &code = _chunk.getInstVec();
+            const auto target = static_cast<u32>(code[pc]->getOp1().value<Label>().address());
+            for(const auto &[header, loop] : _whileLoops) {
+                const auto start = static_cast<u32>(_blocks[header].start);
+                if(begin <= start && start <= pc && pc <= loop.latchJmpPc && loop.latchJmpPc < end &&
+                   (loop.exitPc <= end || loop.exitPc == regionExit) && start <= target && target <= loop.exitPc)
+                    return true;
+            }
+            for(const auto &[start, loop] : _doLoops)
+                if(begin <= start && start <= pc && pc < loop.exitPc && loop.exitPc <= end && start <= target &&
+                   target <= loop.exitPc)
+                    return true;
+            return false;
+        }
+
         // 参考编译器：常量标签装入、CmpEQ、JmpNE→下一派发头；匹配则落入体。
         // 首批只认单匹配值、前向封闭体。共享判别值在发射时按版本源节点复核。
         void precomputeReferenceSwitches() {
@@ -3014,9 +3109,24 @@ namespace cial::decompile {
                     body = followingBody;
                     next = followingNext;
                 }
-                // 单个等值 if 仍走通用条件恢复，不猜测它是否来自 switch。
-                if(info.cases.size() < 2)
-                    continue;
+                // 外围循环上下文：嵌套 if 的 else 探测需识别 continue/锁存跳转
+                LoopCtx enclosing;
+                u32 enclosingStart = 0;
+                for(const auto &[header, loop] : _whileLoops) {
+                    const auto lstart = static_cast<u32>(_blocks[header].start);
+                    if(lstart <= start && next <= loop.latchJmpPc && lstart >= enclosingStart) {
+                        enclosing = LoopCtx{ .continuePc = loop.continuePc,
+                                             .updatePc = loop.updatePc,
+                                             .latchPc = loop.latchJmpPc };
+                        enclosingStart = lstart;
+                    }
+                }
+                for(const auto &[bodyStart, loop] : _doLoops) {
+                    if(bodyStart <= start && next <= loop.condStart && bodyStart >= enclosingStart) {
+                        enclosing = LoopCtx{ .continuePc = loop.condStart, .latchPc = loop.condJumpPc };
+                        enclosingStart = bodyStart;
+                    }
+                }
                 u32 exit = next;
                 bool valid = true;
                 std::unordered_set<u32> deadJumps;
@@ -3030,13 +3140,18 @@ namespace cial::decompile {
                             continue;
                         }
                         const auto target = static_cast<u32>(code[p]->getOp1().value<Label>().address());
-                        if(target > next) {
-                            if(exit != next && exit != target)
+                        if(target > next && target != enclosing.continuePc && target != enclosing.latchPc) {
+                            if(exit != next && exit != target && exit != enclosing.updatePc &&
+                               target != enclosing.updatePc)
                                 valid = false;
-                            exit = target;
+                            exit = exit == next ? target : std::min(exit, target);
                         }
                     }
                 }
+                // 单个等值分支仅在具有尾部 default 区域时尝试 switch 恢复；
+                // 它与 if-else 语义等价，仍须通过下方的区域及寄存器合流检查。
+                if(info.cases.size() == 1 && (exit == next || deadJumps.empty()))
+                    continue;
                 if(!valid || exit > code.size())
                     continue;
                 info.hasDefault = exit > next;
@@ -3061,22 +3176,6 @@ namespace cial::decompile {
                     }
                     if(bound != INVALID && exit > bound)
                         continue;
-                }
-                // 外围循环上下文：嵌套 if 的 else 探测需识别 continue/锁存跳转
-                LoopCtx enclosing;
-                u32 enclosingStart = 0;
-                for(const auto &[header, loop] : _whileLoops) {
-                    const auto lstart = static_cast<u32>(_blocks[header].start);
-                    if(lstart <= start && exit <= loop.latchJmpPc && lstart >= enclosingStart) {
-                        enclosing = LoopCtx{ .continuePc = loop.continuePc, .latchPc = loop.latchJmpPc };
-                        enclosingStart = lstart;
-                    }
-                }
-                for(const auto &[bodyStart, loop] : _doLoops) {
-                    if(bodyStart <= start && exit <= loop.condStart && bodyStart >= enclosingStart) {
-                        enclosing = LoopCtx{ .continuePc = loop.condStart, .latchPc = loop.condJumpPc };
-                        enclosingStart = bodyStart;
-                    }
                 }
                 const LoopCtx swCtx{ .breakPc = exit,
                                      .continuePc = enclosing.continuePc,
@@ -3119,12 +3218,17 @@ namespace cial::decompile {
                             deadJumps.insert(p);
                             continue;
                         }
+                        if(enclosedLoopJump(p, bodyBegin, bodyEnd, exit))
+                            continue;
                         if(op == TacOpCode::JmpE) {
                             fail("参考 switch 体内 JmpE 消费属 M5 后续批次");
                             return;
                         }
                         if(op == TacOpCode::Jmp) {
                             const auto target = static_cast<u32>(code[p]->getOp1().value<Label>().address());
+                            if(target == enclosing.continuePc || target == enclosing.latchPc ||
+                               target == enclosing.updatePc)
+                                continue;
                             if(target <= p || (target >= bodyEnd && target != fallPc && target != exit)) {
                                 if(isDefault)
                                     fail("参考 switch 的 default 控制流尚未恢复（M5）");
@@ -3138,20 +3242,6 @@ namespace cial::decompile {
                         if(!scanBranch(blockAtPc(p), swCtx, shape) || shape.mergePc > bodyEnd ||
                            (shape.hasElse && shape.elseEnd > bodyEnd)) {
                             fail("参考 switch 的嵌套分支无法结构化（空 then 或合并点越界，M5）");
-                            return;
-                        }
-                        // then/else 子区域含更深条件跳转（嵌套复合分支、同判别值
-                        // 派发链）时，线性区域分析不足以证明恢复等价：嵌套 switch
-                        // 的标签常量寄存器会跨区合流，保守拒绝，属后续批次
-                        const auto hasCondJmp = [&](u32 begin, u32 end) {
-                            for(u32 q = begin; q < end; ++q)
-                                if(code[q]->opcode() == TacOpCode::JmpNE && reachable[blockAtPc(q)])
-                                    return true;
-                            return false;
-                        };
-                        if(hasCondJmp(shape.thenBegin, shape.thenContentEnd) ||
-                           (shape.hasElse && hasCondJmp(shape.elseBegin, shape.elseEnd))) {
-                            fail("参考 switch 的嵌套复合分支尚未恢复（M5）");
                             return;
                         }
                         addRegion(shape.thenBegin, shape.thenContentEnd);
@@ -3228,8 +3318,10 @@ namespace cial::decompile {
                             _switchLocalNames.emplace(reg, std::pair{ nextTempName(), localStarts.at(reg) });
                     }
                 }
-                for(const auto &c : info.cases)
+                for(const auto &c : info.cases) {
                     _switchCmpPcs.insert(c.matches.front().cmpPc);
+                    _switchLabelPcs.insert(c.matches.front().cmpPc - 1);
+                }
                 _switchPcs.merge(claimed);
                 std::erase_if(_whileLoops,
                               [&](const auto &entry) { return deadJumps.contains(entry.second.latchJmpPc); });
@@ -3245,7 +3337,28 @@ namespace cial::decompile {
         void precomputeSwitches() {
             precomputeReferenceSwitches();
             auto &code = _chunk.getInstVec();
-            for(size_t bi = 0; bi < _blocks.size(); ++bi) {
+            // 后续 case 派发头属于同一条链，不能在反向归约时先独立认领。
+            std::unordered_set<u32> continuations;
+            for(const auto &block : _blocks) {
+                SwitchInfo part, following;
+                u32 next{}, end{}, followingNext{}, followingEnd{};
+                if(!scanDispatch(static_cast<u32>(block.start), part, next, end))
+                    continue;
+                for(const auto &inside : _blocks)
+                    if(block.start < inside.start && inside.start < end)
+                        continuations.insert(static_cast<u32>(inside.start));
+                if(!scanDispatch(next, following, followingNext, followingEnd))
+                    continue;
+                bool constants = true;
+                for(u32 pc = next; pc < following.firstPc; ++pc)
+                    constants &= code[pc]->opcode() == TacOpCode::Load || code[pc]->opcode() == TacOpCode::LoadImm;
+                if(constants)
+                    continuations.insert(next);
+            }
+            for(size_t remaining = _blocks.size(); remaining > 0; --remaining) {
+                const auto bi = remaining - 1;
+                if(continuations.contains(static_cast<u32>(_blocks[bi].start)))
+                    continue;
                 SwitchInfo head;
                 u32 nextPc = 0;
                 u32 endPc = 0;
@@ -3285,7 +3398,8 @@ namespace cial::decompile {
                         }
                 const u32 t = nextPc;
                 for(u32 p = headStart; p < t; ++p) {
-                    if(code[p]->opcode() == TacOpCode::JmpE && !claimed.contains(p)) {
+                    if(code[p]->opcode() == TacOpCode::JmpE && !claimed.contains(p) && !_condPcs.contains(p) &&
+                       !_switchPcs.contains(p)) {
                         fail("嵌套 switch 派发链尚未支持（M5）");
                         return;
                     }
@@ -3296,7 +3410,9 @@ namespace cial::decompile {
                 for(const auto &[header, loop] : _whileLoops) {
                     const auto start = static_cast<u32>(_blocks[header].start);
                     if(start <= headStart && t <= loop.latchJmpPc && start >= enclosingStart) {
-                        enclosing = LoopCtx{ .continuePc = loop.continuePc, .latchPc = loop.latchJmpPc };
+                        enclosing = LoopCtx{ .continuePc = loop.continuePc,
+                                             .updatePc = loop.updatePc,
+                                             .latchPc = loop.latchJmpPc };
                         enclosingStart = start;
                     }
                 }
@@ -3320,10 +3436,11 @@ namespace cial::decompile {
                         continue;
                     if(exitTarget == INVALID)
                         exitTarget = target;
-                    else if(exitTarget != target) {
+                    else if(exitTarget != target && exitTarget != enclosing.updatePc && target != enclosing.updatePc) {
                         fail(fmt::format("switch 体尾跳转目标不一致（pc {} → {} 与 {}）", lp, target, exitTarget));
                         return;
                     }
+                    exitTarget = std::min(exitTarget, static_cast<u32>(target));
                 }
                 SwitchInfo chain;
                 chain.headStart = headStart;
@@ -3351,8 +3468,11 @@ namespace cial::decompile {
                         const auto op = code[p]->opcode();
                         if(op != TacOpCode::Jmp && op != TacOpCode::JmpNE && op != TacOpCode::JmpE)
                             continue;
+                        if(enclosedLoopJump(p, c.bodyPc, c.bodyEnd, chain.exitPc))
+                            continue;
                         const auto target = code[p]->getOp1().value<Label>().address();
-                        if(target == enclosing.continuePc || target == enclosing.latchPc)
+                        if(target == enclosing.continuePc || target == enclosing.latchPc ||
+                           target == enclosing.updatePc)
                             continue;
                         if(target <= p || (target >= c.bodyEnd && target != fallPc && target != chain.exitPc)) {
                             fail("switch 分支跳转超出封闭区域（M5）");
@@ -3367,7 +3487,8 @@ namespace cial::decompile {
             for(size_t pc = 0; pc < code.size(); ++pc) {
                 if(code[pc]->opcode() != TacOpCode::JmpE)
                     continue;
-                if(_switchPcs.contains(static_cast<u32>(pc)))
+                if(_switchPcs.contains(static_cast<u32>(pc)) ||
+                   std::ranges::any_of(_doLoops, [&](const auto &entry) { return entry.second.condJumpPc == pc; }))
                     continue;
                 fail("switch 派发链形态不可识别（JmpE 不在可恢复的派发头上，M5）");
                 return;
@@ -3402,6 +3523,10 @@ namespace cial::decompile {
                         return;
                     const auto &def = _defs[reg.index()][vRead];
                     if(def.node == INVALID)
+                        return;
+                    // 条件块内的定义每轮都会重新执行；体内复用物理寄存器
+                    // 不会改变下一轮比较读取的值，不属于循环携带依赖。
+                    if(def.defPc >= _blocks[blockIdx].start)
                         return;
                     const auto kind = _nodes[def.node].kind;
                     if(kind != Expr::Kind::Int && kind != Expr::Kind::Real && kind != Expr::Kind::Str)
@@ -3478,7 +3603,7 @@ namespace cial::decompile {
                 if(code[bLast]->opcode() != TacOpCode::Jmp)
                     continue;
                 const auto m = code[bLast]->getOp1().value<Label>().address();
-                if(m == ctx.breakPc || m == ctx.continuePc || m == ctx.latchPc)
+                if(m == ctx.breakPc || m == ctx.continuePc || m == ctx.latchPc || m == ctx.updatePc)
                     continue; // break/continue 跳转，非汇合
                 if(m >= b.end && m > t) {
                     shape.hasElse = true;
@@ -3620,6 +3745,12 @@ namespace cial::decompile {
 
         // ── 结构化发射（多块；语句按 pc 排序后由游标消费，区域递归带缩进）──
         void emitStructured(Vec<RecoveredStatement> &out) {
+            // case 的词法局部不能供兄弟 case 使用；合成合流存储必须属于函数。
+            std::set<std::string> syntheticNames;
+            for(const auto &[reg, storage] : _switchLocalNames)
+                syntheticNames.insert(storage.first);
+            for(const auto &name : syntheticNames)
+                out.push_back(RecoveredStatement{ .pc = 0, .text = fmt::format("var {};", name) });
             (void)std::stable_sort(_stmts.begin(), _stmts.end(),
                                    [](const Stmt &a, const Stmt &b) { return a.pc < b.pc; });
             _emitCursor = 0;
@@ -3704,6 +3835,15 @@ namespace cial::decompile {
                 const auto wl = _whileLoops.find(bi);
                 if(atHeader && regionEnd == block.end && wl != _whileLoops.end()) {
                     pc = emitWhile(bi, wl->second, ctx, indent, out);
+                    if(pc > end) {
+                        if(pc != ctx.breakPc) {
+                            fail("循环出口超出当前结构化区域");
+                            return;
+                        }
+                        out.push_back(
+                            RecoveredStatement{ .pc = end - 1, .text = fmt::format("{}break;", indentText(indent)) });
+                        pc = end;
+                    }
                     continue;
                 }
                 // 已折叠三元头：区域透明，直达汇合
@@ -3736,7 +3876,16 @@ namespace cial::decompile {
                     if(jumpTarget == ctx.breakPc) {
                         out.push_back(RecoveredStatement{ .pc = static_cast<u32>(lastPc),
                                                           .text = fmt::format("{}break;", indentText(indent)) });
-                    } else if(jumpTarget == ctx.continuePc || jumpTarget == ctx.latchPc) {
+                    } else if(jumpTarget == ctx.continuePc || jumpTarget == ctx.latchPc || jumpTarget == ctx.updatePc) {
+                        if(jumpTarget == ctx.updatePc) {
+                            const auto savedCursor = _emitCursor;
+                            _emitCursor = static_cast<size_t>(
+                                std::lower_bound(_stmts.begin(), _stmts.end(), ctx.updatePc,
+                                                 [](const Stmt &stmt, u32 at) { return stmt.pc < at; }) -
+                                _stmts.begin());
+                            emitRegion(ctx.updatePc, ctx.latchPc, LoopCtx{}, indent, out);
+                            _emitCursor = savedCursor;
+                        }
                         out.push_back(RecoveredStatement{ .pc = static_cast<u32>(lastPc),
                                                           .text = fmt::format("{}continue;", indentText(indent)) });
                     } else if(jumpTarget < end && jumpTarget != pc) {
@@ -3772,7 +3921,10 @@ namespace cial::decompile {
                 _condZones[blockIdx].firstPc == INVALID ? static_cast<u32>(block.start) : _condZones[blockIdx].firstPc;
             out.push_back(RecoveredStatement{ .pc = zonePc,
                                               .text = fmt::format("{}while ({}) {{", indentText(indent), condText) });
-            LoopCtx inner{ .breakPc = loop.exitPc, .continuePc = loop.continuePc, .latchPc = loop.latchJmpPc };
+            LoopCtx inner{ .breakPc = loop.exitPc,
+                           .continuePc = loop.continuePc,
+                           .updatePc = loop.updatePc,
+                           .latchPc = loop.latchJmpPc };
             emitRegion(block.end, loop.latchJmpPc, inner, indent + 1, out);
             out.push_back(RecoveredStatement{ .pc = loop.latchJmpPc, .text = fmt::format("{}}}", indentText(indent)) });
             return loop.exitPc == INVALID ? static_cast<u32>(loop.latchJmpPc + 1) : loop.exitPc;
@@ -3857,7 +4009,9 @@ namespace cial::decompile {
             const std::string pad1 = indentText(indent + 1);
             out.push_back(
                 RecoveredStatement{ .pc = info.firstPc, .text = fmt::format("{}switch ({}) {{", pad, testText) });
-            LoopCtx swCtx{ .breakPc = info.exitPc, .continuePc = ctx.continuePc, .latchPc = ctx.latchPc };
+            LoopCtx swCtx{
+                .breakPc = info.exitPc, .continuePc = ctx.continuePc, .updatePc = ctx.updatePc, .latchPc = ctx.latchPc
+            };
             for(const auto &c : info.cases) {
                 for(const auto &m : c.matches) {
                     const auto mv = liveVersionAt(m.test, m.cmpPc);

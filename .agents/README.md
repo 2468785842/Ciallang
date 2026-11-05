@@ -31,10 +31,12 @@
 
 ## 当前各项工作的顺序
 
-- [反编译器 M5 与移交遗留](notes/proposed/architecture/2026-11-04-decompiler-m5.md)：M0–M4 已完成
-  （记录在方案 §6）；顶层物化项闭环、类体逗号声明链与 outputdebug 行表读取修复
-  （CTest 243/243）；M5 自产封闭 switch 链、常量前缀及 while/do continue 已恢复（Windows CTest 243/243；bc 相邻 `_zf` 比较条件、常量多值 switch 与函数局部合流已恢复；嵌套待推进），super/`CallMethodV` 恢复形态与
-  表达式位置 FuncLit 在册。
+- [反编译器 M5 与移交遗留](notes/proposed/architecture/2026-11-04-decompiler-m5.md)：
+  M0–M4 已完成；switch/循环组合、自产双层/三层及参考双层嵌套已验收。
+  M5 仍在进行，参考嵌套返回/三层合流、CFG/异常兜底与移交验收等剩余项见
+  [当前状态表](../doc/bytecode/decompiler-plan.md#m5-当前状态2026-11-05)。
+  测试脚本已按 CLI/反编译/switch 分组，入口见[测试导航](../tests/README.md)；
+  最新 Windows Debug CTest **245/245**。
 - [krkr2 接入](notes/proposed/architecture/2026-11-04-krkr2-integration.md)：五个阶段均未开始，
   入口为双向 `iTJSDispatch2` 桥；完成标准见[接入说明](../doc/krkr2-integration.md)。
 - [SDK 与工具路线图批次](notes/proposed/architecture/2026-11-04-sdk-tooling-roadmap.md)：

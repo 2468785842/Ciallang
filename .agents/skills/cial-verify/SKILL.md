@@ -21,7 +21,7 @@ description: 为 Ciallang 的 C++、字节码或文档改动选择并执行构�
 - C++ 内部状态（AST、编译诊断、Value API、GC/调用帧/优化器、原生注册与宿主回调）
   保留 Catch2（`tests/*_test.cpp`）；新测试必须显式登记进 `tests/CMakeLists.txt`，
   放入目录不会自动成为测试。
-- 改 CLI、cial-dbg、cial-fmt 或字节码工具时运行对应 CTest（`cli_test.py` 等）。
+- 改 CLI、cial-dbg、cial-fmt 或字节码工具时运行对应 CTest（`tests/cli/test_cli.py`、`test_decompile.py`、`test_switch.py` 等）。
   有界 fuzz 只在 Linux（含 WSL）运行；Windows 链接 `clang_rt` 后具名捕获
   `std::runtime_error` 会崩溃，属已验证工具链问题，见
   [FAQ](../../../doc/faq.md#windows-上为什么跑不了-libfuzzer-有界-fuzz)。

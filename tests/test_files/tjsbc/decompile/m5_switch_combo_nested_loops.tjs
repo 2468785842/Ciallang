@@ -1,0 +1,1 @@
+var i=0;var j=0;while(i<3){i++;j=0;while(j<3){j++;switch(j){case 1: println(10);continue;case 2:println(20);break;default:println(i);break;}println(j);}println(i);}

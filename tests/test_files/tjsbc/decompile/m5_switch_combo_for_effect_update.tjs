@@ -1,0 +1,1 @@
+var updates=0;function step(x){updates++;return x+1;}var i=0;for(i=0;i<4;i=step(i)){switch(i){case 1:continue;case 2:println(20);break;default:println(i);break;}println(99);}println(updates);

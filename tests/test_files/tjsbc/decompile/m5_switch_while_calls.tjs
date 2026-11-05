@@ -1,0 +1,4 @@
+// M5: switch discriminant must execute once per loop iteration.
+var calls = 0; function pick(x) { calls++; return x; }
+var i = 0; while (i < 4) { switch(pick(i)) { case 1: println(10); break; case 2: println(20); break; default: println(30); break; } i++; }
+println(calls);

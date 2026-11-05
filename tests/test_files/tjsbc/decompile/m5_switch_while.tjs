@@ -1,0 +1,2 @@
+// M5: loop-condition constant register is reused by switch labels and bodies.
+var i = 0; while (i < 4) { switch(i) { case 1: println(10); break; case 2: println(20); break; default: println(30); break; } i++; }

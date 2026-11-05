@@ -1,0 +1,2 @@
+function h(x,c,d) { var r=0; switch(x) {case 1: if(c>0){if(d>0){r+=1;}else{r+=2;}}else{r+=3;} break;case 2:r+=4;break;default:if(c>0){if(d>0){r+=5;}else{r+=6;}}else{r+=7;}break;}return r;}
+println(h(1,1,1));println(h(1,1,-1));println(h(1,-1,1));println(h(2,1,1));println(h(9,1,1));println(h(9,1,-1));println(h(9,-1,1));

@@ -117,7 +117,7 @@
 |---|---|
 | 基础/前端 | Catch2 精确断言字节范围、错误码与相关位置；新增 C++ 测试登记在 `tests/CMakeLists.txt` |
 | 语言/异常 | `tests/tjs/` 检查可观察语义；内部异常元数据、GC/快照持有关系用 Catch2 |
-| CLI | 扩充 `tests/cli_test.py`，检查 stdout/stderr、无颜色摘录、JSON schema；文本快照只覆盖稳定格式 |
+| CLI | 扩充 `tests/cli/test_cli.py`，检查 stdout/stderr、无颜色摘录、JSON schema；文本快照只覆盖稳定格式 |
 | LSP | 扩充 `tools/lsp/test_protocol.py`，通过真实子进程验证 Unicode、版本竞争、关闭清空、URI、相关位置及兼容回退 |
 | 编辑器 | 扩充 VSCode smoke 验收 Problems 范围与修复清空；CLion/IDEA 用通用 LSP 客户端手工验证中文与跨行导航，记录未验收范围 |
 | VM/优化 | Debug/Release 相关测试与全量 CTest；启用 JIT 的配置验证异常点、映射与恢复；性能涉及正常派发路径时做同机 Release 基线对照，记录时间和源码资料内存成本 |
@@ -128,7 +128,7 @@
 
 ## 5. 实施状态（2026-10-31）
 
-首批已落地，按批次拆分提交；验收测试见 `tests/diagnostics_test.cpp`（Catch2）、`tests/cli_test.py` 与 `tools/lsp/test_protocol.py`。
+首批已落地，按批次拆分提交；验收测试见 `tests/diagnostics_test.cpp`（Catch2）、`tests/cli/test_cli.py` 与 `tools/lsp/test_protocol.py`。
 
 | 批次 | 状态 | 落地内容 |
 |---|---|---|

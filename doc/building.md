@@ -47,7 +47,7 @@ cmake --preset "Linux Release" -DCIAL_ENABLE_JIT=ON
 
 ## 测试与基准
 
-C++ 测试由 Catch2 注册；CLI 开启时，CTest 还运行 `tests/cli_test.py` 和 `tools/lsp/test_protocol.py`。测试从顶层启用，可在整个构建目录运行（`tests/CMakeLists.txt`）。
+C++ 测试由 Catch2 注册；CLI 开启时，CTest 还运行 `tests/cli/test_cli.py` 、`tests/cli/test_decompile.py`、`tests/cli/test_switch.py` 和 `tools/lsp/test_protocol.py`。测试从顶层启用，可在整个构建目录运行（`tests/CMakeLists.txt`）。
 
 语言和标准库行为已迁到 [TJS 脚本单元测试](../tests/tjs/README.md)，启用 CLI 时
 逐文件注册为 CTest；原生绑定、AST、GC 及宿主接口仍使用 Catch2。脚本可直接交给

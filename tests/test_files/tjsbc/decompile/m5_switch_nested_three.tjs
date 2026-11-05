@@ -1,0 +1,1 @@
+function f(x,y,z){var r=0;switch(x){case 1:switch(y){case 1:switch(z){case 1:r+=1;break;case 2:r+=2;break;default:r+=3;break;}r+=10;break;case 2:r+=20;break;default:r+=30;break;}r+=100;break;case 2:r+=200;break;default:r+=300;break;}return r;}println(f(1,1,1));println(f(1,1,2));println(f(1,1,9));println(f(1,2,1));println(f(1,9,1));println(f(2,1,1));println(f(9,1,1));

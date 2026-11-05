@@ -82,36 +82,283 @@
       "sourceSha256": "dffba7e6a508027cdaf1e8b1ebeb0819c3b89cd2ce3ab78d88b5b09eef1194f0",
       "bytecodeSha256": "a94c07b39cb1ee9f49dec35bb9b85f749a9f1d2e7b680e527b0b0db5a51880b8",
       "expectedRecovery": "success",
-      "reference": "darwin"
+      "reference": "darwin",
+      "bytecodeChecks": {
+        "contains": [
+          "if ("
+        ]
+      }
     },
     {
       "name": "m5_switch_nested_default",
       "sourceSha256": "97885f9004ade43796050476f23eaf780ba7deb0dfa225027b0616a532ec9650",
       "bytecodeSha256": "7279140c1de30026364e096bbf58c6f1f2234bbf2cda5802aedb6c2fd04befe0",
       "expectedRecovery": "success",
-      "reference": "darwin"
+      "reference": "darwin",
+      "bytecodeChecks": {
+        "contains": [
+          "if ("
+        ]
+      }
     },
     {
       "name": "m5_switch_nested_elsebreak",
       "sourceSha256": "ddcf4903c4124673d3048c7243b25e5bbed85f1b93f75f19c7648536917c3c70",
       "bytecodeSha256": "c75f466c212385b72cd4f314f711d03d3fb042ebe35053ea907b1d596ede5446",
       "expectedRecovery": "success",
-      "reference": "darwin"
+      "reference": "darwin",
+      "bytecodeChecks": {
+        "contains": [
+          "if ("
+        ]
+      }
     },
     {
       "name": "m5_switch_nested_elseif",
       "sourceSha256": "990b7ee7e48c9a08404dc4a04904eefd006293f34a655999c00721ec8b681d17",
       "bytecodeSha256": "54bfbac7a405e66b174d1f179ba1c0be3a71aa9d5f68f1768746580b3d870255",
       "expectedRecovery": "success",
-      "reference": "darwin"
+      "reference": "darwin",
+      "bytecodeChecks": {
+        "contains": [
+          "if ("
+        ]
+      }
     },
     {
       "name": "m5_switch_nested_switch",
       "sourceSha256": "9b3016c5d991a39723e90403fe541006ed5696f19f36daac04149b3af87005ae",
       "bytecodeSha256": "aa54435954626aa763f9badb3921ea419a66b16d1c42e7b0d061d02b53de2693",
-      "expectedRecovery": "unsupported",
+      "expectedRecovery": "success",
       "reference": "darwin",
-      "rejectReason": "嵌套复合分支"
+      "sourceChecks": {
+        "minSwitches": 2
+      },
+      "bytecodeChecks": {
+        "minSwitches": 2,
+        "entryLocals": true
+      }
+    },
+    {
+      "name": "m5_switch_single_default",
+      "sourceSha256": "7ea3655c7df143db347114c0a289306c793845baab54638343718d28b8b42623",
+      "bytecodeSha256": "75658110b86ef800f9a7af403b91b4beaee11c1bd9622a945c6a6fc0a02a406b",
+      "expectedRecovery": "success",
+      "bytecodeChecks": {
+        "contains": [
+          "if ("
+        ]
+      }
+    },
+    {
+      "name": "m5_switch_while",
+      "sourceSha256": "92a4eb2e7ab2ddc8bb1dc00eaca9271af83dbd63d66d4fae6731fb898532ca5a",
+      "bytecodeSha256": "8f01542e71b5e99dbb08eedd3670ec6b829e6bb4fda1a1cdb9dd51f4c8582664",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_while_calls",
+      "sourceSha256": "4289d7a4b7a5a44aa627a42c8a33f16f8c37b39579db4fa531a826bc0ea19d94",
+      "bytecodeSha256": "df1cf3ce12fbb77d1461fcf482fab82833f0fb03818ca53b487295171f0eb1a7",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_switch_combo_default_continue",
+      "sourceSha256": "8cd8cb06289b8a30896fa5e540920ed5dfe7755c7738ea0b99299adaa5d723a8",
+      "bytecodeSha256": "28b0722bbc4df496b1ab91c4d08d7dd78f8159345705a4dfa590e0ea55b078f0",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_for_effect_update",
+      "sourceSha256": "9bdf135b7d2c4432689e364b9e0d99f00ab5b7a4d6f358db46c815d581b2eb1d",
+      "bytecodeSha256": "3a5592ab20a6743f7a20fd9d310f63d69abe62ce9d4b630d2a1f61755bd54acf",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_loop_in_default",
+      "sourceSha256": "9ab591dbcf18157be7adc23a0740eccb4f30b9277e551fd77320f6417fd008c9",
+      "bytecodeSha256": "03fd1fe4ffc48cd397c60606b436753cf52030acc8822b5a4297446f526d7850",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_do_break",
+      "sourceSha256": "35063bbd0ed961342fe7e568616ae0ee0691feb4bb54a3ef67fa2668ae5f7bea",
+      "bytecodeSha256": "8d6843af4300aa2d9164a8b4226e7f08eaa93892a399bf56a9b0a7952a9136e1",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_while_continue",
+      "sourceSha256": "86aa401fac57aa8f36463fdcd835b8caf7b85302fa7776c1d88254d5b0d6d2be",
+      "bytecodeSha256": "eb8ab886a9bc05787d2797f93d5265ff7ffb4f63450afd222c1e8df75f0f51d9",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_do_continue",
+      "sourceSha256": "00aa9872ad28464383dfbdc6cce63a63dd5f10e0608f42c63dd570b85b3b47f8",
+      "bytecodeSha256": "bd763703a27d19e66c8f833e2a418ba94a9de0bb4766d77b12d7f0e7954c5da0",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_for_continue",
+      "sourceSha256": "283e1b0ecdbe62be936fe745f4107c2fe6fff374a43412409fa9b122cd25d29c",
+      "bytecodeSha256": "5036906785c142c4a84e664879ae4833188e04fda097aa1c7263a2be4bd2c559",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_for_break",
+      "sourceSha256": "1040712505f5a00e46c85f7aa0e09898bc2452bec8d1c262bff5bd0e9b677b5a",
+      "bytecodeSha256": "a2a59f479ce05449efea9e23ec0e524937f6eb9a72456bc75c8e0e3ff72a598d",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_nested_loops",
+      "sourceSha256": "a556abf40d124f596307c46b12275810f0057494d13a34e11ba9077cd5b47708",
+      "bytecodeSha256": "9554785248d72bb8ee81164b211e0d844718b2b81b68984ed6e7c1b5414a0a38",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_loop_in_case",
+      "sourceSha256": "a87780565a305c31f4f9928ebf0d6c6d30963b3e71f3e56ec8713f994808ec28",
+      "bytecodeSha256": "f6ef8bb3837a154165fb9c9576f718dc5a82a32f37b095baac04ef873983f79e",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_do_in_case",
+      "sourceSha256": "d724bbf5cc4b61068e0b3c0b8091c6b8cb5769fd2d85d0174af1ec32c52bf296",
+      "bytecodeSha256": "8bff80fd11c14a3d0afd46cc0f1ae4fbd1f2e9563c6b462420e934d4b2561e36",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_combo_for_in_default",
+      "sourceSha256": "a6b5eb41884168c79462749cc6a9550f235922da48c1b4438923ff72450026e2",
+      "bytecodeSha256": "81584c07ae803eee5d387625833f799b064817947b9be453cf8cd8f23b8569ba",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 1
+      }
+    },
+    {
+      "name": "m5_switch_deep_if",
+      "sourceSha256": "4e06041111890611653a36cf7f145e611b14a991acbfe2d8e7f85e9a8dd55b82",
+      "bytecodeSha256": "11967aa3d07b0b64914616b34a396020e7d23067ce5a62032ae8a06a2ba75b16",
+      "expectedRecovery": "success",
+      "bytecodeChecks": {
+        "contains": [
+          "if ("
+        ]
+      }
+    },
+    {
+      "name": "m5_switch_deep_calls",
+      "sourceSha256": "4a746d699652377607b52cfb259b87fbfd98d4eb49d3d70339c27cb2cd9940b8",
+      "bytecodeSha256": "6cc014ee9491607143c1930c5d8a1ff97515dcfab795d4bacf7d19e1026a9b9e",
+      "expectedRecovery": "success",
+      "bytecodeChecks": {
+        "contains": [
+          "if ("
+        ]
+      }
+    },
+    {
+      "name": "m5_switch_nested_same",
+      "sourceSha256": "64bf5f910aa204e73fee3e6032e261a3087a3d9ca947bfdc84da7b7442e7d963",
+      "bytecodeSha256": "87b44bb15de39194eb8f72e57bbd685a20f0d585f841f8b5697495cdf8fedd48",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 2
+      },
+      "bytecodeChecks": {
+        "minSwitches": 2,
+        "entryLocals": true
+      }
+    },
+    {
+      "name": "m5_switch_nested_calls",
+      "sourceSha256": "9518b2316107fbf9c3952b5ce3b4fc16579f0af149df4ab69f2f5ed3b0d1b710",
+      "bytecodeSha256": "b746eaef0355b5db50e3fe998c70e9c1cc33af2d83691fc37e14640be3e44270",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 2
+      },
+      "bytecodeChecks": {
+        "minSwitches": 2,
+        "entryLocals": true
+      }
+    },
+    {
+      "name": "m5_switch_nested_default_inner",
+      "sourceSha256": "16b4489790858c97062a0a86dd42ef5f48e910411b72f822fcce4b6c816bf01f",
+      "bytecodeSha256": "8a316056f502912521b4291b9882a2d85ae5a6cdc514922c8b321080fe07275e",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 2
+      },
+      "bytecodeChecks": {
+        "minSwitches": 2,
+        "entryLocals": true
+      }
+    },
+    {
+      "name": "m5_switch_nested_fallthrough",
+      "sourceSha256": "c2e5f23c02cb022989c9c40b78036712fa7b6e1b585db88f43f9968060f8a2b7",
+      "bytecodeSha256": "4a191c6acfbbda1a20d6e348126fc0955b8bd5cb4b24ab051d813aa830941189",
+      "expectedRecovery": "success",
+      "sourceChecks": {
+        "minSwitches": 2
+      }
+    },
+    {
+      "name": "m5_switch_nested_returns",
+      "sourceSha256": "1b549285f76a90f768705ea9c3c60f179dad496ce144994786fc34e839f431d1",
+      "bytecodeSha256": "7f2dfbadf4d91719c88f336885509210da3918bf2d1368fdd231153662ba0dfe",
+      "expectedRecovery": "unsupported",
+      "rejectReason": "跳转目标",
+      "sourceChecks": {
+        "minSwitches": 2
+      }
+    },
+    {
+      "name": "m5_switch_nested_three",
+      "sourceSha256": "02e3b338c85332be6cf010a181545f8eadd4b09d79a5e19ad14069223886b26a",
+      "bytecodeSha256": "c5211948d1db481534db007d1b8f9887dbdeb2539c977441b0192ef63272df15",
+      "expectedRecovery": "unsupported",
+      "rejectReason": "寄存器合流",
+      "sourceChecks": {
+        "minSwitches": 3
+      }
     }
   ],
   "referenceDarwin": {

@@ -1,0 +1,2 @@
+function n(x,y){var r=0;switch(x){case 1:r+=10;break;case 2:r+=20;break;default:switch(y){case 1:r+=1;break;case 2:r+=2;break;default:r+=3;break;}r+=100;break;}return r;}
+println(n(1,1));println(n(2,1));println(n(9,1));println(n(9,2));println(n(9,9));

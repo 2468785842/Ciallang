@@ -2,6 +2,15 @@
 
 Status: proposed
 
+## 当前状态（2026-11-05，接续先读此节）
+
+M5 仍在进行；当前能力与剩余六类工作以
+[方案当前状态表](../../../../doc/bytecode/decompiler-plan.md#m5-当前状态2026-11-05)为准。
+下面各批次保留当时的拒绝与验证事实，后续修复不覆盖历史失败记录。
+特别是早期“嵌套 switch 一律拒绝”和“赋值右值 FuncLit 待实现”不再是现状：
+自产双层/三层与参考函数内双层 switch 已验收；赋值右值 FuncLit 的源码
+恢复已复核，参考字节码路径仍待验收。参考嵌套返回与三层合流固定拒绝样本仍有效。
+
 ## 问题
 
 反编译器进入 M5（硬核兜底）前的未闭环项：M5 本体的 switch 链、try/catch 嵌套兜底、
@@ -220,16 +229,238 @@ with 与 eval 名字依赖；M4→M5 移交的 bc 路径验收扩展（super 构
      无嵌套分支同拒；`out/m5-nested/probe_loop*.tjs`）。Windows 侧既往验收的
      循环组合均为自产路径，参考路径循环组合未验收。
 
+## 单 case + default 误恢复修复（2026-11-05，Windows）
+
+- 基线 `607638e`、起始工作区干净。新增固定样本 `m5_switch_single_default`
+  在原实现成功输出 `while (true)`，属于已复现的静默错误。
+- 移除“至少两标签”的前置限制；单标签仅在 case 跳转证明存在尾部 default
+  区域时进入 switch 恢复，继续执行已有区域封闭、嵌套条件和寄存器合流校验。
+  单个等值 if-else 可输出语义等价的 switch；无尾部区域仍走通用恢复。
+  首次尝试依赖不可达回跳的守卫未命中语料，针对性测试失败，已替换。
+- 固定语料和 manifest 保存源/字节码 SHA-256；参考身份沿用 Windows
+  `40a736c` / `8f370f2b…358c60b`，实测 `--dump <source> <bytecode>` 成功。
+  CLI 嵌套分支回归纳入该样本；输入覆盖 case 命中与 default 条件两侧。
+- `out/m5-single/reference-report.json`：源码、参考字节码转译执行、恢复源码
+  执行三路输出一致（1、1、2、3）；参考原源码与恢复源码标记序列一致，
+  两进程退出 0。参考原字节码直接执行入口仍缺，未宣称四环全部通过。
+- 最终 `cmd /c out\m5-build.cmd` 构建退出 0（`build4.log`）；Windows Debug，
+  CLI/TESTS/FORMATTER ON、JIT OFF、clang++、x64-windows-static，vcpkg
+  `D:/cpp_tool/vcpkg`。中途并发构建曾报 ninja 日志锁失败，待前次构建完成后重跑成功。
+- `ctest -N` 确认 243 项；全量 `ctest --test-dir build/Windows/Debug
+  --output-on-failure --no-tests=error -j 10` **243/243 通过**（27.38s），
+  日志 `out/m5-single/ctest.log`；clang-format 20.1.0 dry-run、diff 检查通过。
+- 上节“新发现”第 1 项已解决；第 2 项参考 switch 外围循环拒绝及嵌套 switch
+  保持待办，M5 整体仍未完成。
+
+## 参考 while/switch 的条件常量寄存器复用（2026-11-05，Windows）
+
+- 接续 `607638e` 上一批 dirty 工作区，保留单 case 修复。原 darwin
+  `out/m5-nested/probe_loop*` 本机不存在，重新生成顶层 while/switch 样本。
+  实际首个拒绝为“循环条件读取的寄存器在体内重定义且绑定字面量”，
+  与旧记录的多使用拒绝不同；不据此宣布旧样本同因或全部循环组合完成。
+- TAC 显示 while 条件块每轮加载 `%4 = 4`，switch 标签/实参复用 `%4`。
+  `guardLoopCond` 现在区分条件块内定义与循环外初值：前者每轮重新执行，
+  无需循环携带守卫；后者仍执行原检查。既有顶层 for 无名携带变量拒绝测试保留通过。
+- 新固定样本 `m5_switch_while` / `m5_switch_while_calls` 保存源码、字节码与
+  manifest 哈希，由现有 CLI manifest 回归自动执行。覆盖两个 case、default、
+  多轮迭代及调用判别值每轮恰好一次（总计 4）。
+- 参考 exe SHA-256 `8f370f2b…358c60b`、仓库 `40a736c`，实际 `--dump`
+  导出成功；两样本三路执行 stdout 一致，参考原源码与字节码恢复源码的
+  标记序列一致，两侧退出 0。报告 `out/m5-loop/reference-report.json`；
+  参考原字节码直接执行环仍未覆盖。
+- Windows Debug 构建沿用 CLI/TESTS/FORMATTER ON、JIT OFF、clang++、
+  x64-windows-static、vcpkg `D:/cpp_tool/vcpkg`；`cmd /c out\m5-build.cmd`
+  退出 0（`out/m5-loop/build.log`）。`ctest -N` 确认 243 项；全量
+  `ctest --test-dir build/Windows/Debug --output-on-failure --no-tests=error -j 10`
+  **243/243 通过**（23.54s，`out/m5-loop/ctest.log`）。clang-format 20.1.0
+  dry-run 与 git diff 检查通过。
+- 待办仍包括参考循环 continue/do/for 组合、旧多使用拒绝样本重新复现、
+  嵌套 switch 与有副作用派发前缀。
+
+## switch 与循环组合验收（2026-11-05，Windows）
+
+- 接续前两批 dirty 工作区，基线仍为 `607638e`。本批恢复参考 while/do/for
+  内 switch 的 break/continue、default continue、嵌套外围循环，以及 switch
+  case/default 内的 while/do/for（含循环内条件 continue）。不代表任意 CFG 或
+  嵌套 switch 已完成。
+- 循环预计算先排除 CFG 不可达块；同一头选择最晚的正常回边，避免较早的
+  continue 抢占锁存点；剔除外围 while 内 if/continue 误认出的 do 尾模板。
+- 接纳相邻比较 + 后向 JmpE 的 do 条件真回跳；条件区包括所需名字/常量
+  装入前缀，尾部已有调用语句仍留在循环体内，避免 break 后漏输出。
+- for 更新块由前向入锁存块的边确定。恢复成 while 时，continue 分支显式
+  发射更新段再 continue，普通路径仍执行原更新段；保存/恢复语句游标，避免
+  提前发射吞掉后续正文。带副作用 step(i) 的样本确认更新恰好执行四次。
+- switch 出口推断区分外围条件/锁存与更新段，取已证明的较早公共出口；
+  case/default 内已识别循环使用自身上下文。参考跳转线程化使循环条件直达
+  switch 出口时，循环后显式补 break。单标签恢复额外要求 case 有参考导出
+  保留的不可达跳转，避免把循环内普通 if/continue 误认成 switch。
+- 过程中执行回放捕获并修复：更新段发射漏语句、公共尾部被误排除导致丢
+  default/假无限循环、do 条件块误吞尾部 println、if/continue 被误识别为 do。
+  早期成功反编译但超时/输出错误的探测不计验收；日志与探测位于
+  `out/m5-combinations/`，最终采用 `build8.log` 与 `reference-report.json`。
+- 固定语料 `m5_switch_combo_*` 共 12 组：while_continue、do_continue、
+  do_break、for_continue、for_break、for_effect_update、default_continue、
+  nested_loops、loop_in_case、loop_in_default、do_in_case、for_in_default。
+  manifest 保存全部源/字节码 SHA-256；参考 Windows 二进制和导出身份沿用
+  `40a736c` / `8f370f2b…358c60b`，实际 --dump 成功。
+- CLI 新增组合测试，24 条自产/参考字节码恢复路径执行结果均与原源码一致；
+  manifest 测试另核对参考字节码转译执行。12/12 参考原源码 vs 字节码恢复
+  源码的标记序列一致，各参考进程退出 0。参考原字节码直接加载环仍缺入口。
+- 具名循环变量或显式全局存储覆盖本批组合；自产顶层 `for(var i=...)` 的
+  无名寄存器携带初值仍严格拒绝，旧测试改为断言真实的“循环携带变量”原因。
+  本批没有以合成全局名绕开该限制。
+
+- 最终 Windows Debug 配置仍为 CLI/TESTS/FORMATTER ON、JIT OFF、clang++、
+  x64-windows-static、vcpkg `D:/cpp_tool/vcpkg`。`cmd /c out\m5-build.cmd`
+  退出 0；CTest 注册数 243，全量 `ctest --test-dir build/Windows/Debug
+  --output-on-failure --no-tests=error -j 10` **243/243 通过**（24.48s），
+  日志 `out/m5-combinations/ctest-final.log`；clang-format 20.1.0 dry-run 与
+  git diff 检查通过。此结论包含前两批未提交改动。
+
+## 深层条件分支与嵌套 switch 复核（2026-11-05，Windows）
+
+- 延续前批 dirty 工作区。本轮先探测嵌套 switch：去掉深层条件守卫并把
+  case 标签从原始常量装入渲染后，既有 `m5_switch_nested_switch` 虽输出了
+  正确的 case 1/2，却漏掉外层第二 case 的赋值和函数 return，四次调用均
+  返回 void。该实验已全部撤回，不将成功退出当作支持；原 fixture 保持拒绝。
+  原始实验输出 `out/m5-nested-next/restored.tjs`；后续须同时处理合成寄存器
+  存储与嵌套派发段跳过后语句游标滞留，单修标签不足以闭环。
+- 可独立推进的深层 if 已落地：旧守卫拒绝 then/else 内任意更深条件跳转，
+  现仅对疑似常量等值派发链保守拒绝；普通多层 if 继续逐个执行 scanBranch
+  区域封闭校验，并收集各层 then/else/合并后区域的写集合/live-in，沿用
+  函数局部合流存储恢复。常量等值 if 可能保守落入派发形态，不宣称全量接纳。
+- 新固定 Windows 语料 `m5_switch_deep_if` / `m5_switch_deep_calls` 保存
+  源/字节码 SHA-256，覆盖 case 与 default 内两层 if 的全部分支；后者将
+  条件改为 sign 调用，确认只沿实际路径调用，总计 10 次。参考导出身份
+  仍为 `40a736c` / SHA-256 `8f370f2b…358c60b`，实际 --dump 成功。
+- CLI 嵌套分支测试与 manifest 测试纳入两样本；原源码、字节码转译执行、
+  字节码恢复执行三路结果一致，两样本自产 round-trip 亦一致。参考原源码
+  与字节码恢复源码标记序列 2/2 一致，原进程退出 0；报告
+  `out/m5-nested-next/reference-report.json`。参考原字节码加载环仍缺入口。
+- 最终 `cmd /c out\m5-build.cmd` 退出 0（build3.log）；Windows Debug
+  配置延续 CLI/TESTS/FORMATTER ON、JIT OFF、clang++、x64-windows-static、
+  vcpkg `D:/cpp_tool/vcpkg`。原嵌套 switch 拒绝回归保留，未弱化期望。
+
+- CTest 注册数 243；全量 `ctest --test-dir build/Windows/Debug
+  --output-on-failure --no-tests=error -j 10` **243/243 通过**（24.97s），
+  日志 `out/m5-nested-next/ctest.log`。clang-format 20.1.0 dry-run 与
+  git diff 检查通过，包含先前所有未提交修改。
+
+## 参考函数内嵌套 switch 首批闭环（2026-11-05，Windows）
+
+- 基线 `607638e` + 前批 dirty 工作区。前批确认的“标签显示错误 + 后续语句
+  丢失”根因是同一物理寄存器被合流恢复为合成存储后，仅供派发比较使用的
+  标签 Load 也被 noteNamedDef 改绑为合成名字并生成 StoreLocal；后续派发段
+  不逐条发射这些赋值，语句游标滞留在旧 pc，外层赋值/return 不再消费。
+- 现在登记参考标签装入 pc；仅在该定义版本的全部使用都为已认领派发比较时，
+  保留其常量节点、不生成合成存储赋值。标签版本存在其它用途且需局部物化时
+  明确拒绝。移除深层条件的派发形态硬拒后，仍逐个执行区域/合流校验。
+  没有通过任意推进语句游标跳过未知语句来掩盖遗漏。
+- 第一轮 Ciallang 回放 4/4 一致，但参考恢复源码在兄弟 case 使用 v1 时崩溃，
+  退出 `3221226505`，原源码退出 0；参考反汇编显示 v1 被编译为全局属性访问。
+  根因为合成局部第一次在 case 的词法域声明，对兄弟 case 不可见。现将合成
+  存储声明统一放在函数体入口，所有初始化/赋值保持原 pc 和执行路径。
+  原失败报告已由最终报告替代，关键证据和错误码在此保留。
+- 既有 darwin `m5_switch_nested_switch` 从拒绝改为成功，源/字节码哈希不变，
+  历史源码首行的“本批拒绝”注释属于导出时背景。新增 Windows 语料
+  `m5_switch_nested_same` / `m5_switch_nested_calls` /
+  `m5_switch_nested_default_inner`，分别覆盖同判别值、调用判别值及 default
+  内嵌套。每个样本都包含外层其它 case 与 return，防止漏语句回归。
+  Windows 导出身份仍为 `40a736c` / `8f370f2b…358c60b`，实际 --dump 成功。
+- CLI 增加函数入口声明与至少两个 switch 的结构断言；manifest 回放核对
+  三路执行。4/4 新增/升级样本参考对拍通过。声明提升影响既有合流恢复，故
+  扩展复核全部成功 switch 语料：**34/34** 三路输出及参考原源码/恢复源码
+  标记序列一致，参考进程退出 0；顶层合流仍拒绝。报告
+  `out/m5-nested-fix/all-switches/reference-report.json`。全部 37 组 manifest
+  的源/字节码哈希核对通过，参考原字节码直接加载环仍未覆盖。
+- 最终构建 `cmd /c out\m5-build.cmd` 退出 0（build3.log）；Windows Debug
+  CLI/TESTS/FORMATTER ON、JIT OFF、clang++、x64-windows-static，vcpkg
+  `D:/cpp_tool/vcpkg`。CLI **49 项通过**；CTest 注册数 243，全量
+  `ctest --test-dir build/Windows/Debug --output-on-failure --no-tests=error -j 10`
+  **243/243 通过**（24.12s，`out/m5-nested-fix/ctest-final.log`）。
+  clang-format 20.1.0 dry-run、git diff 检查通过。
+- 限制：自产嵌套 switch 仍在派发链预检拒绝；顶层需合成全局名的嵌套 switch
+  仍拒绝；参考函数内更广泛的贯穿、返回线程化与三层嵌套还需扩展语料。
+
+## 自产嵌套 switch、贯穿与返回扩展（2026-11-05，Windows）
+
+- 续接 `607638e` + 前批 dirty 工作区。自产派发改为由内向外归约，先认领
+  子 switch，再校验外层；既有 JmpE 硬拒仅针对未被任何结构认领的跳转。
+  区域封闭和出口检查保留，未对未知跳转任意放行。
+- 直接反向遍历块曾误将后续 case 派发头/多值标签的内部比较块各自恢复成
+  switch，CLI 首轮 11 项失败，补后续链头识别后仍有字符串多值标签 1 项失败。
+  现预扫描完整派发跨度与仅含常量前缀的后续链，标记其内部块为续接点，
+  不作为独立 switch 根；原多值字符串、循环组合回归重新通过。
+- 自产函数内 7 组样本通过回放与参考 TJS2 源码对拍：既有 nested_switch、
+  nested_same、nested_calls、nested_default_inner，以及新 nested_fallthrough、
+  nested_returns、nested_three。后 3 组保存 Windows 原源码/字节码哈希，
+  参考导出身份仍为 `40a736c` / `8f370f2b…358c60b`，实际 --dump 成功。
+  贯穿覆盖内/外两层，返回覆盖每个 case/default，三层覆盖所有层的不同入口。
+- CLI 新增自产嵌套测试，断言至少两层/三层 switch 及输出逐字节一致。
+  7/7 原源码与自产恢复源码在参考引擎的标记序列一致，进程退出 0；报告
+  `out/m5-source-nested/source-reference-report.json`。参考字节码贯穿样本
+  也成功，全部成功 switch 字节码语料 **35/35** 三路 stdout 与参考标记序列
+  一致（`reference-report.json`）。40 组 manifest 源/字节码哈希全部核对。
+- 不同路径的能力分别登记：`nested_returns.tjsbc` 仍报 pc 39 跳转目标 41
+  不可结构化；`nested_three.tjsbc` 仍报不可局部物化的寄存器合流。manifest
+  明确将这两组字节码登记为 unsupported，并断言真实拒绝原因；源码恢复成功
+  不能替代字节码能力验收。顶层合流仍拒绝，参考原字节码直接加载环仍缺入口。
+- 最终 `cmd /c out\m5-build.cmd` 退出 0（build3.log）；配置沿用 Windows
+  Debug、clang++、CLI/TESTS/FORMATTER ON、JIT OFF、x64-windows-static、vcpkg
+  `D:/cpp_tool/vcpkg`。CLI **50 项通过**，CTest 注册 243 项，全量
+  `ctest --test-dir build/Windows/Debug --output-on-failure --no-tests=error -j 10`
+  **243/243 通过**（23.89s，`out/m5-source-nested/ctest.log`）。
+  clang-format 20.1.0 dry-run 与 git diff 检查通过。
+
+## 状态核对与测试脚本整理（2026-11-05，Windows）
+
+- 当前状态集中到方案 §6 的能力/剩余工作表，note 顶部增加接续入口；历史失败
+  和旧命令保留原路径，不将早期拒绝描述当作现状。M5 整体仍为 proposed。
+- 复核 `o.m = function(x){...}` 的自产恢复已成功，新增固定输出和调用计数
+  回归（3、5、2），从“待实现”改为“自产已验收、参考字节码路径待验收”。
+- 原 tests/cli_test.py 的 50 个测试方法按 AST 清单逐个核对并迁移：
+  tests/cli/test_cli.py（32）、test_decompile.py（原 11 + 新增 FuncLit 1）、
+  test_switch.py（7）。support.py 共用参数、独立临时目录、进程运行与语料路径，
+  导入时不解析参数。未减少原用例或放宽其断言；原始方法清单存于
+  out/test-organization/test-inventory.json。新增 tests/README.md 说明各类脚本
+  与固定语料的边界，当前文档和 cial-verify 的路径已更新。
+- CTest 保留 CiallangCli，新增 CiallangDecompile/CiallangSwitch，因此 Windows
+  注册项由 243 变为 **245**，Python 用例共 **51**。CMake 自动重新生成后构建
+  退出 0（out/test-organization/build.log）；配置仍为 Windows Debug、clang++、
+  CLI/TESTS/FORMATTER ON、JIT OFF、x64-windows-static、D:/cpp_tool/vcpkg。
+- 全量 ctest --test-dir build/Windows/Debug --output-on-failure --no-tests=error
+  -j 10：**245/245 通过**（23.84s，out/test-organization/ctest.log）。
+  随后删除未使用 import，再执行三组进程 CTest **3/3 通过**
+  （cli-groups.log）。git diff --check 通过。本轮没有修改 C++ 实现或字节码语料。
+
+## 测试执行去重（2026-11-05，Windows）
+
+- 用户要求精简重复测试，本轮仅整理测试与语料引用，未改反编译实现。
+  原 switch 基础遍历与循环/嵌套/结构检查重复恢复同一份字节码，5 个语料测试
+  合为一次 test_switch_corpus；独立源码形态与寄存器携带拒绝测试保留。
+- manifest 作为单一预期来源：sourceChecks 覆盖原 19 份源码恢复；
+  bytecodeChecks 保留 4 处函数入口声明和 7 处嵌套 if 检查、嵌套层数要求。
+  每份字节码只恢复一次，移除 **23 次重复恢复**；源码与字节码的预期仍独立。
+  与整理前清单核对：原样本、源/字节码哈希、成功/拒绝预期及拒绝原因均未变化。
+  新增运行时哈希核对、非空语料/重复名字/未知结构检查字段校验。
+- tests/test_files/tjsbc/debug/s7_ext.tjs 与上层 s7_ext.tjs 逐字节相同，删除
+  debug 目录的重复源码，通过 debug manifest 的 source 字段引用上层；
+  outputdebug 与普通字节码不相同，均保留。debug/decompile 全部输入哈希通过。
+- runner 自测、SDK 安装与打包检查职责不同，未为减少文件数合并。测试导航
+  已说明职责和新增样本方式。Python 测试方法从 51 合为 **47**（32/12/3），
+  变化来自重复遍历合并，原结构与行为断言保留；CTest 仍注册 **245 项**。
+- 全量 ctest --test-dir build/Windows/Debug --output-on-failure --no-tests=error
+  -j 10：**245/245 通过**（22.49s，out/test-dedup/ctest.log）。
+  覆盖核对摘要在 out/test-dedup/coverage.json，git diff --check 通过。
+
 ## 建议下一步
 
 1. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue
-   组合；参考路径循环组合（本机已复现拒绝）；嵌套 switch 的标签常量寄存器
-   物化方案（或专用 case 标签常量渲染）；单 case + default 走通用路径的误恢复
-   防线；按方案 §7 继续参考 TJS2 四环验收。
+   组合的更多数据流形态；参考嵌套 switch 的返回线程化与三层合流（固定拒绝样本已入库）；按方案 §7 继续参考 TJS2 四环验收。
 2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
 3. try/catch 嵌套兜底（任意 CFG 降级状态机）、with、eval 名字依赖按方案批次推进。
-4. 表达式位置 FuncLit（赋值右值）随壳装配批次落地。
+4. 赋值右值 FuncLit 补参考字节码与对拍验收；自产路径已复核并加入回归。
 
 ## 完成条件
 

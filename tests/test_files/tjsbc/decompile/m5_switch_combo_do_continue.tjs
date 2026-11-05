@@ -1,0 +1,1 @@
+var i=0; do {i++; switch(i){case 1: println(10); continue; case 2: println(20); break; default: println(30); break;} println(i);} while(i<4);

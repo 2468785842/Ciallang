@@ -129,4 +129,4 @@ Reader 与转译执行已接入；当前有 7 个带源码的入库 fixture。�
 
 krkr2 替换验收以指定仓库为准，当前完成嵌入基础，不代表可直接替换其 TJS2 核心。见[接入说明](krkr2-integration.md)。
 
-运行期诊断栈独立于脚本异常值和 `e.message`。宿主回调/存储执行的哨兵不消费首次故障位置，脚本 catch 消费诊断后，显式重抛按新的 throw 位置重新记录。getter 的同步重入通过哨兵转交异常，外层 catch 与后续语句仅恢复一次（`src/types/Property.hpp`、`src/vm/VMState.cpp`；`tests/cli_test.py`）。
+运行期诊断栈独立于脚本异常值和 `e.message`。宿主回调/存储执行的哨兵不消费首次故障位置，脚本 catch 消费诊断后，显式重抛按新的 throw 位置重新记录。getter 的同步重入通过哨兵转交异常，外层 catch 与后续语句仅恢复一次（`src/types/Property.hpp`、`src/vm/VMState.cpp`；`tests/cli/test_cli.py`）。
