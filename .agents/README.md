@@ -33,7 +33,7 @@
 
 - [反编译器 M5 与移交遗留](notes/proposed/architecture/2026-11-04-decompiler-m5.md)：
   M0–M4 已完成；switch/循环组合、自产双层/三层及参考双层嵌套已验收。
-  M5 仍在进行，参考嵌套返回/三层合流、CFG/异常兜底与移交验收等剩余项见
+  M5 仍在进行，参考返回/三层固定样本与 ExprFunction 变量赋值已验收；函数内标量 CFG 安全降级首版已验收；异常兜底、对象成员构造/this 与移交验收等剩余项见
   [当前状态表](../doc/bytecode/decompiler-plan.md#m5-当前状态2026-11-05)。
   测试脚本已按 CLI/反编译/switch 分组，入口见[测试导航](../tests/README.md)；
   最新 Windows Debug CTest **245/245**。

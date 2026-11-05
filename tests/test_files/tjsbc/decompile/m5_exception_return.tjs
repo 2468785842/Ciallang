@@ -1,0 +1,1 @@
+function f(x){try{if(x)throw "caught";return "normal";}catch(e){return e;}}println(f(0));println(f(1));

@@ -9,7 +9,7 @@ M5 仍在进行；当前能力与剩余六类工作以
 下面各批次保留当时的拒绝与验证事实，后续修复不覆盖历史失败记录。
 特别是早期“嵌套 switch 一律拒绝”和“赋值右值 FuncLit 待实现”不再是现状：
 自产双层/三层与参考函数内双层 switch 已验收；赋值右值 FuncLit 的源码
-恢复已复核，参考字节码路径仍待验收。参考嵌套返回与三层合流固定拒绝样本仍有效。
+恢复已复核，参考字节码路径仍待验收。参考嵌套返回与三层合流的固定样本现已通过；对象成员 FuncLit 的 NEW/this 差异仍未闭环。
 
 ## 问题
 
@@ -453,14 +453,66 @@ with 与 eval 名字依赖；M4→M5 移交的 bc 路径验收扩展（super 构
   -j 10：**245/245 通过**（22.49s，out/test-dedup/ctest.log）。
   覆盖核对摘要在 out/test-dedup/coverage.json，git diff --check 通过。
 
+## 参考返回/三层合流与 ExprFunction（2026-11-05，Windows）
+
+- 上一批累计提交已保存并同步为 `ce18c00`（master 与 origin/master 一致），
+  本批在其上继续，修改尚未提交。
+- 嵌套返回失败是 default/尾部 return 后不可达跳转没有落在已认领 switch
+  区域内，仍被尝试发射。现在按 CFG 可达性折叠所有不可达块的跳转，
+  不依赖 switch 是否认领该区域。没有删除可达跳转。
+- 三层合流失败是重叠子区域把内层判别值 r9 当作跨区域存储，外层头之前又
+  没有 r9 初始化。无回边 CFG 中逐读取核对其线性前驱定义的支配关系，
+  全部支配时从合流候选排除；存在回边、隐式 receiver 写入或无法证明时
+  保留原守卫。共享初值及真分支合流不因此放宽。
+- 固定 `m5_switch_nested_returns` / `m5_switch_nested_three` 从 unsupported
+  转为 success，保留所有源/字节码哈希，新增 bytecodeChecks 的 2/3 层断言。
+  两组原源码、转译执行、恢复执行一致，参考原源码与恢复源码标记序列一致，
+  原/恢复参考进程退出 0。`out/m5-next-close/reference-targeted.json` 留存证据。
+- 赋值右值/实参 FuncLit 的参考字节码失败原因：参考文法 func_expr_def 创建
+  ctExprFunction，显示名固定为 (anonymous)，非空名字并不代表具名表达式。
+  DeclHost 新增来源判定，由 ShellAssembler 根据 TjsTranslatedContext::type
+  判断 ExprFunction；这类常量不走具名声明安装链，按匿名表达式恢复。
+  缺少此来源证明的非空具名表达式仍拒绝，不依赖显示名字字符串特判。
+  依据：参考 src/syntax/bison/tjs.y func_expr_def、现有 translator context.type。
+- 新固定 `m5_funclit_assignment`（变量赋值）与 `m5_funclit_argument`，Windows
+  --dump 导出，manifest 保存哈希及参考身份（40a736c / 8f370f2b…358c60b）。
+  CLI 新增三路固定输出测试（3/5/2 与 5），两组参考源码/恢复源码对拍通过，
+  `out/m5-next-close/funclit-reference.json`。
+- 对象成员赋值探测并未闭环：参考原程序 calls 为 0，Ciallang 为 2；恢复
+  源码用 global.Dictionary() 构造空字典，参考返回 void，随后 spde 报错，
+  退出 3221226505。该失败涉及 NEW 构造恢复与接收者/this 语义，独立保留
+  `funclit-object-assignment-failure.json`；变量赋值的成功不能替代这项验收。
+- 扩展全 switch 对拍时参考二进制出现间歇失败：一次原 do_in_case 退出
+  3221225477，恢复 deep_calls 退出 3221226505；两份相同输入随后各重跑
+  3/3 退出 0（reference-retries.json）。第二次扩展运行另有 nested_elseif
+  失败。失败对应的既有恢复源码与此前通过报告逐字节一致，暂未归因，不能
+  把重跑成功覆盖失败。两组新 switch 的针对性对拍通过；此次没有宣称新一轮
+  37 组参考进程全部稳定通过。原始扩展报告 reference-report.json/reference-final.json。
+
+- 最终构建 build-final.log 退出 0；Windows Debug，clang++、CLI/TESTS/FORMATTER
+  ON、JIT OFF、x64-windows-static、vcpkg D:/cpp_tool/vcpkg。新增 1 个 FuncLit
+  测试方法，Python CLI 共 48 项；CTest 注册数仍 245，全量
+  `ctest --test-dir build/Windows/Debug --output-on-failure --no-tests=error -j 10`
+  **245/245 通过**（22.45s，ctest-accepted.log）。全部 42 组语料哈希核对，
+  clang-format 20.1.0 dry-run 与 git diff 检查通过。M5 总体仍未完成。
+
+## CFG 安全降级首版完成（2026-11-05）
+
+函数内 51 类受支持 TAC 的不可约 CFG 降级已实现并验收。实现不变量、拒绝边界、
+首轮失败、原始 TAC/恢复源码/独立模型比较与参考验证见
+[已实现记录](../../implemented/architecture/2026-11-05-decompiler-cfg-fallback.md)。
+M5 专项 552 assertions / 4 cases 通过，最终全量 CTest 245/245（22.00s）；
+4 份实际状态机函数的参考执行一致。下一大项是异常区域与重抛，不能把 CFG
+拓扑支持等同于已经覆盖异常边、调用隐式写入、闭包或对象常量。
+
 ## 建议下一步
 
 1. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue
-   组合的更多数据流形态；参考嵌套 switch 的返回线程化与三层合流（固定拒绝样本已入库）；按方案 §7 继续参考 TJS2 四环验收。
+   组合的更多数据流形态；参考更复杂合流与有副作用标签（返回/三层固定样本已通过）；按方案 §7 继续参考 TJS2 四环验收。
 2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
-3. try/catch 嵌套兜底（任意 CFG 降级状态机）、with、eval 名字依赖按方案批次推进。
-4. 赋值右值 FuncLit 补参考字节码与对拍验收；自产路径已复核并加入回归。
+3. 在已完成的函数内标量 CFG 状态机基础上推进 try/catch 嵌套与重抛；调用/接收者、with/eval 等协议仍需独立验证。
+4. ExprFunction 变量赋值/实参的参考路径已验收；继续检查对象成员赋值的 NEW/this 差异。
 
 ## 完成条件
 

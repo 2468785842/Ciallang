@@ -1,0 +1,1 @@
+property bad{getter{throw 9;}} function f(){var r=2;try{r+=3;r=bad;r+=100;}catch(e){r+=e;}return r;}println(f());

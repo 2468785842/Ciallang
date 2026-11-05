@@ -90,8 +90,10 @@ class DecompileTest(CliTestCase):
                 self.assertEqual(payload["status"], "unsupported")
         # 行号落在源文件行数内（0 基；末条目可指向末尾之后，由换算收敛）
                 line_count = source.read_text(encoding="utf-8").count("\n") + 1
-                units = {unit["name"]: [row.get("srcLine") for row in unit["lines"]]
-                         for unit in payload["units"]}
+                # 同名类方法是不同单元，不能让后一个 describe 覆盖前一个。
+                units = {}
+                for unit in payload["units"]:
+                    units.setdefault(unit["name"], []).extend(row.get("srcLine") for row in unit["lines"])
                 for name, lines in units.items():
                     for line in lines:
                         if line is not None:
@@ -203,6 +205,44 @@ class DecompileTest(CliTestCase):
                 self.assertEqual(process.returncode, 2, process.stderr)
                 self.assertEqual(process.stdout, "")
                 self.assertIn(batch, process.stderr)
+
+    def test_exception_regions_roundtrip(self):
+        corpus = TJSBC_CORPUS / "decompile"
+        manifest = json.loads((corpus / "manifest.json").read_text(encoding="utf-8"))
+        samples = [sample for sample in manifest["samples"] if sample["name"].startswith("m5_exception_")]
+        self.assertTrue(samples)
+        for sample in samples:
+            with self.subTest(sample=sample["name"]):
+                source = corpus / (sample["name"] + ".tjs")
+                original = self.run_cial(source)
+                self.assertEqual(original.returncode, 0, original.stderr)
+                translated = self.run_cial("--tjsbc", source.with_suffix(".tjsbc"))
+                self.assertEqual(translated.returncode, 0, translated.stderr)
+                self.assertEqual(translated.stdout, original.stdout)
+                for input_path in (source, source.with_suffix(".tjsbc")):
+                    recovered = self.run_cial("--decompile", input_path)
+                    self.assertEqual(recovered.returncode, 0, recovered.stderr)
+                    self.assertIn("catch (", recovered.stdout)
+                    target = self.root / "exception-roundtrip.tjs"
+                    target.write_text(recovered.stdout, encoding="utf-8")
+                    replay = self.run_cial(target)
+                    self.assertEqual(replay.returncode, 0, replay.stderr)
+                    self.assertEqual(replay.stdout, original.stdout)
+
+    def test_reference_function_expressions(self):
+        corpus = TJSBC_CORPUS / "decompile"
+        for name, expected in (("m5_funclit_assignment", "3\n5\n2\n"), ("m5_funclit_argument", "5\n")):
+            with self.subTest(sample=name):
+                source = corpus / (name + ".tjs")
+                recovered = self.run_cial("--decompile", source.with_suffix(".tjsbc"))
+                self.assertEqual(recovered.returncode, 0, recovered.stderr)
+                self.assertIn("function (", recovered.stdout)
+                target = self.root / "function-expression.tjs"
+                target.write_text(recovered.stdout, encoding="utf-8")
+                for arguments in ((source,), ("--tjsbc", source.with_suffix(".tjsbc")), (target,)):
+                    result = self.run_cial(*arguments)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, expected)
 
     def test_decompile_reference_flag_conditions(self):
         corpus = TJSBC_CORPUS / "decompile"

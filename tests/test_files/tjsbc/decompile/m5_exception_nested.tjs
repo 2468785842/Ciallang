@@ -1,0 +1,1 @@
+function f(x){var r=1;try{r+=2;try{if(x>0)throw x;r+=4;}catch(e){r+=e;throw r;}r+=8;}catch(e){r=e+100;}return r;}println(f(-1));println(f(0));println(f(2));

@@ -1381,8 +1381,10 @@ namespace cial::tjsbc {
                 }
             }
 
-            // ENTRY 异常处理器登记（tryEnd = catch 地址 = 恢复点）
-            for(const auto &entry : entryFixups) {
+            // ENTRY 按外层先出现；VM 查表取首个匹配，必须先登记内层。
+            // 顺序反转不影响不相交区域，嵌套时与源码 IRGen 的内层优先一致。
+            for(auto it = entryFixups.rbegin(); it != entryFixups.rend(); ++it) {
+                const auto &entry = *it;
                 const auto tac = wordToTac(entry.catchWord);
                 if(!tac)
                     trError("catch target not at instruction boundary");

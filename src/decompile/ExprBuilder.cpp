@@ -322,10 +322,14 @@ namespace cial::decompile {
 
     class ExprBuilder {
     public:
-        ExprBuilder(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike, DeclHost *host) :
-            _rt(rt), _chunk(chunk), _meta(meta), _functionLike(functionLike), _host(host) {}
+        ExprBuilder(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike, DeclHost *host,
+                    bool stateMachine = false) :
+            _rt(rt), _chunk(chunk), _meta(meta), _functionLike(functionLike), _host(host), _stateMachine(stateMachine) {
+        }
 
         ExprRecovery run() {
+            if(_stateMachine)
+                return runStateMachine();
             ExprRecovery recovery;
             if(!precheck(recovery.unsupported))
                 return recovery;
@@ -357,6 +361,226 @@ namespace cial::decompile {
         }
 
     private:
+        ExprRecovery runStateMachine() {
+            ExprRecovery result;
+            if(!_functionLike || !_meta || !precheck(result.unsupported)) {
+                if(result.unsupported.empty())
+                    result.unsupported = "CFG 状态机需要函数局部作用域";
+                return result;
+            }
+            if(_meta->hasCollapse) {
+                result.unsupported = "CFG 状态机不支持变长参数保留区";
+                return result;
+            }
+            const auto &code = _chunk.getInstVec();
+            size_t registers = std::max<size_t>(_chunk.getRegCount(), _meta->arity);
+            for(const auto &inst : code) {
+                switch(inst->opcode()) {
+                    case TacOpCode::NOP:
+                    case TacOpCode::LoadImm:
+                    case TacOpCode::This:
+                    case TacOpCode::Global:
+                    case TacOpCode::DLocal:
+                    case TacOpCode::GLocal:
+                    case TacOpCode::GThis:
+                    case TacOpCode::GGlobal:
+                    case TacOpCode::DThis:
+                    case TacOpCode::DGlobal:
+                    case TacOpCode::Add:
+                    case TacOpCode::Sub:
+                    case TacOpCode::Mul:
+                    case TacOpCode::Div:
+                    case TacOpCode::Idiv:
+                    case TacOpCode::Mod:
+                    case TacOpCode::EQ:
+                    case TacOpCode::NEQ:
+                    case TacOpCode::AbsEQ:
+                    case TacOpCode::AbsNEQ:
+                    case TacOpCode::LT:
+                    case TacOpCode::LE:
+                    case TacOpCode::GT:
+                    case TacOpCode::GE:
+                    case TacOpCode::BAnd:
+                    case TacOpCode::BOr:
+                    case TacOpCode::BXor:
+                    case TacOpCode::BlShift:
+                    case TacOpCode::BrShift:
+                    case TacOpCode::BurShift:
+                    case TacOpCode::LAnd:
+                    case TacOpCode::LOr:
+                    case TacOpCode::BNot:
+                    case TacOpCode::LNot:
+                    case TacOpCode::ChgSign:
+                    case TacOpCode::ToInt:
+                    case TacOpCode::ToReal:
+                    case TacOpCode::Inc:
+                    case TacOpCode::Dec:
+                    case TacOpCode::TypeOf:
+                    case TacOpCode::BinaryImm:
+                    case TacOpCode::CompareTest:
+                    case TacOpCode::CompareTestImm:
+                    case TacOpCode::CmpEQ:
+                    case TacOpCode::CmpDEQ:
+                    case TacOpCode::CmpLT:
+                    case TacOpCode::CmpGT:
+                    case TacOpCode::Test:
+                    case TacOpCode::Jmp:
+                    case TacOpCode::JmpNE:
+                    case TacOpCode::JmpE:
+                    case TacOpCode::Ret:
+                    case TacOpCode::Throw:
+                        break;
+                    case TacOpCode::Load: {
+                        const auto kind = _chunk.getConstants()[inst->getOp2().value<ConstIdx>().index()].type();
+                        if(kind == ConstantType::None || kind == ConstantType::Real || kind == ConstantType::Atom)
+                            break;
+                    }
+                        [[fallthrough]];
+                    default:
+                        result.unsupported = "CFG 状态机尚不支持该指令的生命周期/接收者协议";
+                        return result;
+                }
+                forEachUse(*inst, [&](Register r) { registers = std::max(registers, size_t(r.index()) + 1); });
+                forEachDef(*inst, [&](Register r, bool) { registers = std::max(registers, size_t(r.index()) + 1); });
+                for(const auto &operand : { inst->getOp1(), inst->getOp2(), inst->getOp3() })
+                    if(operand.type() == inter::Operand::Type::Atom)
+                        _usedNames.insert(atomText(_rt, operand.value<Atom>()));
+            }
+            for(const auto &handler : _chunk.getThrowHandlers()) {
+                if(handler.tryStart >= handler.tryEnd || handler.tryEnd >= code.size()) {
+                    result.unsupported = "CFG 异常区域或 catch 入口越界";
+                    return result;
+                }
+                if(handler.exValueReg != vm::ThrowHandler::exValueRegNone)
+                    registers = std::max(registers, size_t(handler.exValueReg) + 1);
+            }
+            if(registers >= vm::ThrowHandler::exValueRegNone) {
+                result.unsupported = "CFG 状态机寄存器数量越界";
+                return result;
+            }
+            Vec<std::string> parameters;
+            for(u16 i = 0; i < _meta->arity; ++i) {
+                auto name = localNameAt(Register{ i }, 0);
+                if(name.empty())
+                    name = fmt::format("a{}", i);
+                _usedNames.insert(name);
+                parameters.push_back(name);
+            }
+            std::set<std::string> uniqueParameters(parameters.begin(), parameters.end());
+            if(uniqueParameters.size() != parameters.size()) {
+                result.unsupported = "CFG 状态机参数名存在冲突";
+                return result;
+            }
+            for(const auto &inst : code) {
+                const auto op = inst->opcode();
+                if(op == TacOpCode::GThis || op == TacOpCode::GGlobal || op == TacOpCode::DThis ||
+                   op == TacOpCode::DGlobal) {
+                    if(uniqueParameters.contains(atomText(_rt, inst->getOp1().value<Atom>()))) {
+                        result.unsupported = "CFG 状态机参数与动态名字查找冲突";
+                        return result;
+                    }
+                }
+            }
+            for(const auto &local : _meta->localVars)
+                _usedNames.insert(atomText(_rt, local.identifier));
+            for(size_t i = 0; i < registers; ++i)
+                _machineNames.push_back(nextTempName());
+            const auto state = nextTempName();
+            const auto flag = nextTempName();
+            const auto exception = nextTempName();
+            buildBlocksAndCondZones();
+            scanVersions();
+            buildNodesAndStmts();
+            if(finishUnsupported(result))
+                return result;
+            auto &out = result.statements;
+            for(size_t i = 0; i < registers; ++i)
+                out.push_back({ .pc = 0,
+                                .text = fmt::format("var {} = {};", _machineNames[i],
+                                                    i < parameters.size() ? parameters[i] : "void"),
+                                .synthetic = true });
+            // 参数备份到物理寄存器后立即清除入口参数，避免旧对象被额外保活。
+            for(const auto &parameter : parameters)
+                out.push_back({ .pc = 0, .text = fmt::format("{} = void;", parameter), .synthetic = true });
+            out.push_back({ .pc = 0, .text = fmt::format("var {} = 0;", state), .synthetic = true });
+            out.push_back({ .pc = 0, .text = fmt::format("var {} = 0;", flag), .synthetic = true });
+            out.push_back({ .pc = 0, .text = "while (true) {", .synthetic = true });
+            out.push_back({ .pc = 0, .text = fmt::format("    switch ({}) {{", state), .synthetic = true });
+            std::stable_sort(_stmts.begin(), _stmts.end(), [](const Stmt &a, const Stmt &b) { return a.pc < b.pc; });
+            _emitCursor = 0;
+            for(size_t bi = 0; bi < _blocks.size(); ++bi) {
+                const auto &block = _blocks[bi];
+                out.push_back({ .pc = static_cast<u32>(block.start),
+                                .text = fmt::format("        case {}:", block.start),
+                                .synthetic = true });
+                for(u32 pc = static_cast<u32>(block.start); pc < block.end; ++pc) {
+                    const auto handler = _chunk.findThrowHandler(pc);
+                    const u32 indent = handler ? 4 : 3;
+                    if(handler)
+                        out.push_back({ .pc = pc, .text = "            try {", .synthetic = true });
+                    emitAt(pc, indent, out);
+                    // 在原比较/Test 指令处求值；不能移到跳转处再求值，否则
+                    // 异常的所属 try 区域、部分寄存器写入和副作用都会漂移。
+                    const auto condition = _condNodeAtPc.find(pc);
+                    if(condition != _condNodeAtPc.end())
+                        out.push_back({ .pc = pc,
+                                        .text = fmt::format("{}{} = !(!({}));", indentText(indent), flag,
+                                                            renderNode(condition->second).text) });
+                    if(handler) {
+                        out.push_back({ .pc = pc,
+                                        .text = fmt::format("            }} catch ({}) {{", exception),
+                                        .synthetic = true });
+                        if(handler->exValueReg != vm::ThrowHandler::exValueRegNone)
+                            out.push_back({ .pc = pc,
+                                            .text = fmt::format("                {} = {};",
+                                                                _machineNames[handler->exValueReg], exception),
+                                            .synthetic = true });
+                        out.push_back({ .pc = pc,
+                                        .text = fmt::format("                {} = void;", exception),
+                                        .synthetic = true });
+                        out.push_back({ .pc = pc,
+                                        .text = fmt::format("                {} = {};", state, handler->tryEnd),
+                                        .synthetic = true });
+                        out.push_back({ .pc = pc, .text = "                continue;", .synthetic = true });
+                        out.push_back({ .pc = pc, .text = "            }", .synthetic = true });
+                    }
+                }
+                const auto last = static_cast<u32>(block.end - 1);
+                const auto op = code[last]->opcode();
+                if(op == TacOpCode::Ret || op == TacOpCode::Throw)
+                    continue;
+                u32 target = static_cast<u32>(block.end);
+                if(op == TacOpCode::Jmp || op == TacOpCode::JmpNE || op == TacOpCode::JmpE) {
+                    target = static_cast<u32>(code[last]->getOp1().value<Label>().address());
+                    if(target > code.size()) {
+                        fail("CFG 状态机跳转目标越界");
+                        break;
+                    }
+                }
+                std::string next = std::to_string(target);
+                if(op == TacOpCode::JmpNE || op == TacOpCode::JmpE) {
+                    const auto condition = zoneNodeFor(bi);
+                    if(condition == INVALID) {
+                        fail("CFG 状态机条件缺失");
+                        break;
+                    }
+                    next = fmt::format("({}) ? {} : {}", flag,
+                                       op == TacOpCode::JmpE ? target : static_cast<u32>(block.end),
+                                       op == TacOpCode::JmpE ? static_cast<u32>(block.end) : target);
+                }
+                out.push_back({ .pc = last,
+                                .text = fmt::format("            {} = {};", state, next),
+                                .synthetic = op != TacOpCode::Jmp && op != TacOpCode::JmpNE && op != TacOpCode::JmpE });
+                out.push_back({ .pc = last, .text = "            continue;", .synthetic = true });
+            }
+            out.push_back(
+                { .pc = static_cast<u32>(code.size()), .text = "        default: return;", .synthetic = true });
+            out.push_back({ .pc = static_cast<u32>(code.size()), .text = "    }", .synthetic = true });
+            out.push_back({ .pc = static_cast<u32>(code.size()), .text = "}", .synthetic = true });
+            finishUnsupported(result);
+            return result;
+        }
+
         bool finishUnsupported(ExprRecovery &recovery) const {
             if(_unsupported.empty())
                 return false;
@@ -367,7 +591,7 @@ namespace cial::decompile {
 
         // ── 预检：不可结构化语句（M5）如实拒绝 ──
         bool precheck(std::string &reason) {
-            if(!_chunk.getThrowHandlers().empty()) {
+            if(!_stateMachine && !_chunk.getThrowHandlers().empty()) {
                 reason = "try/catch 结构化属 M5（throw handler 表非空）";
                 return false;
             }
@@ -385,7 +609,7 @@ namespace cial::decompile {
                         if(pc + 1 >= instructions.size() ||
                            (instructions[pc + 1]->opcode() != TacOpCode::JmpNE &&
                             !(instructions[pc + 1]->opcode() == TacOpCode::JmpE &&
-                              instructions[pc + 1]->getOp1().value<Label>().address() < pc))) {
+                              (_stateMachine || instructions[pc + 1]->getOp1().value<Label>().address() < pc)))) {
                             reason = "_zf 直写比较需要相邻 JmpNE（其它 flag 形态属 M5）";
                             return false;
                         }
@@ -421,6 +645,7 @@ namespace cial::decompile {
         void buildBlocksAndCondZones() {
             inter::ControlFlowGraph cfg;
             _blocks = cfg.buildCFG(_chunk);
+            _dominators = cfg.getDominators();
             _condZones.assign(_blocks.size(), CondZone{});
             for(size_t bi = 0; bi < _blocks.size(); ++bi) {
                 const auto &block = _blocks[bi];
@@ -437,12 +662,15 @@ namespace cial::decompile {
                     continue;
                 }
                 if(lastOp != TacOpCode::JmpNE &&
-                   !(lastOp == TacOpCode::JmpE && code[lastPc]->getOp1().value<Label>().address() <= block.start))
+                   !(lastOp == TacOpCode::JmpE &&
+                     (_stateMachine || code[lastPc]->getOp1().value<Label>().address() <= block.start)))
                     continue;
                 markCondCompare(block, lastPc, bi);
             }
-            precomputeLoops();
-            precomputeSwitches();
+            if(!_stateMachine) {
+                precomputeLoops();
+                precomputeSwitches();
+            }
         }
 
         // 从 condJumpPc 向前收集条件区（TestVoid? Test? CompareTest(+Imm)? JmpNE）
@@ -477,8 +705,15 @@ namespace cial::decompile {
         // ── Pass A：寄存器版本链 + 使用点收集 ──
         void scanVersions() {
             _current.assign(std::max<size_t>(_chunk.getRegCount() + 8, 64), INVALID);
+            if(_stateMachine) {
+                _instPc = 0;
+                for(u16 i = 0; i < _machineNames.size(); ++i) {
+                    pushDef(Register{ i }, false);
+                    _defs[i].back().node = makeNamed(Expr::Kind::LocalName, _machineNames[i], false);
+                }
+            }
             // 参数寄存器 0..arity-1 由调用方装入（帧约定），预播种具名版本
-            if(_meta) {
+            if(_meta && !_stateMachine) {
                 _instPc = 0;
                 for(u16 i = 0; i < static_cast<u16>(_meta->arity); ++i) {
                     const auto reg = Register{ i };
@@ -786,7 +1021,10 @@ namespace cial::decompile {
             auto &instructions = _chunk.getInstVec();
             _impureOrStore.assign(instructions.size(), false);
             std::fill(_current.begin(), _current.end(), INVALID);
-            if(_meta)
+            if(_stateMachine) {
+                for(size_t i = 0; i < _machineNames.size(); ++i)
+                    _current[i] = 0;
+            } else if(_meta)
                 for(u16 i = 0; i < static_cast<u16>(_meta->arity); ++i)
                     _current[i] = 0;
             for(size_t pc = 0; pc < instructions.size(); ++pc) {
@@ -803,6 +1041,17 @@ namespace cial::decompile {
                 if(inst.opcode() == TacOpCode::Jmp || inst.opcode() == TacOpCode::JmpNE)
                     _impureOrStore[pc] = true;
                 buildInstruction(inst);
+                if(_stateMachine)
+                    forEachDef(inst, [&](Register reg, bool hidden) {
+                        if(hidden)
+                            return;
+                        const auto v = definedVersion(reg);
+                        if(v != INVALID && _defs[reg.index()][v].node != INVALID) {
+                            const auto &node = _nodes[_defs[reg.index()][v].node];
+                            if(node.kind != Expr::Kind::LocalName || node.text != _machineNames[reg.index()])
+                                noteNamedDef(reg);
+                        }
+                    });
                 forEachDef(inst, [&](const Register reg, bool) {
                     const auto version = definedVersion(reg);
                     if(version != INVALID)
@@ -930,7 +1179,8 @@ namespace cial::decompile {
                         // 无安装链的函数常量 = 表达式位置字面量（实参/赋值右值）。
                         // 恒按匿名渲染（具名函数表达式的名字绑定差异未验证）；
                         // 类/property 无表达式字面量语法，如实拒绝
-                        if(!atomText(_rt, constant.value<FuncMeta *>()->name).empty()) {
+                        if(!atomText(_rt, constant.value<FuncMeta *>()->name).empty() &&
+                           (!_host || !_host->isAnonymousExpression(*constant.value<FuncMeta *>()))) {
                             fail("具名函数表达式恢复属后续批次");
                             break;
                         }
@@ -1336,6 +1586,8 @@ namespace cial::decompile {
         }
 
         [[nodiscard]] bool declareLocal(const u16 regIndex, const std::string &name) {
+            if(_stateMachine)
+                return false;
             const auto synthetic = _switchLocalNames.find(regIndex);
             if(synthetic != _switchLocalNames.end() && synthetic->second.first == name)
                 return false; // 合成存储在函数体入口统一声明，赋值仍保留原 pc。
@@ -1397,6 +1649,10 @@ namespace cial::decompile {
                 const auto &constant = _chunk.getConstants()[constIdx.index()];
                 if(constant.type() != ConstantType::FuncMeta && constant.type() != ConstantType::ClassMeta &&
                    constant.type() != ConstantType::PropMeta)
+                    continue;
+                // ctExprFunction 的变量存储是赋值，不是具名声明安装链。
+                if(constant.type() == ConstantType::FuncMeta && _host &&
+                   _host->isAnonymousExpression(*constant.value<FuncMeta *>()))
                     continue;
                 const auto dst = inst.getOp1().value<Register>();
                 enum class Install : u8 { None, Global, Member, Local } install{ Install::None };
@@ -1998,6 +2254,8 @@ namespace cial::decompile {
         // endScope 填写（随压缩重映射）；0 = 未出作用域（参数/函数级变量）。寄存器
         // 跨作用域复用时，旧名不得外溢到复用者（如循环变量寄存器被三元临时复用）
         [[nodiscard]] std::string localNameAt(const Register reg, const u32 pc) const {
+            if(_stateMachine && reg.index() < _machineNames.size())
+                return _machineNames[reg.index()];
             if(!_meta)
                 return {};
             std::string best;
@@ -3059,6 +3317,22 @@ namespace cial::decompile {
                 for(const auto next : _blocks[bi].successors)
                     work.push_back(next);
             }
+            // return 后参考导出仍保留跳转；整个不可达块的跳转都应折叠，
+            // 包括未被 switch 认领的 default/尾部区域。
+            bool acyclic = true;
+            for(size_t bi = 0; bi < _blocks.size(); ++bi) {
+                if(!reachable[bi]) {
+                    for(u32 pc = static_cast<u32>(_blocks[bi].start); pc < _blocks[bi].end; ++pc) {
+                        const auto op = code[pc]->opcode();
+                        if(op == TacOpCode::Jmp || op == TacOpCode::JmpNE || op == TacOpCode::JmpE)
+                            _foldedPcs.insert(pc);
+                    }
+                } else {
+                    for(const auto next : _blocks[bi].successors)
+                        if(next <= bi)
+                            acyclic = false;
+                }
+            }
             auto constantLoad = [&](u32 pc) {
                 return code[pc]->opcode() == TacOpCode::Load || code[pc]->opcode() == TacOpCode::LoadImm;
             };
@@ -3280,6 +3554,33 @@ namespace cial::decompile {
                             }
                         }
                     }
+                }
+                // 区域重叠会产生假合流：在无回边 CFG 中，如果每个读取的
+                // 线性前驱定义都支配该读取，则无需合成存储。含循环时保留原守卫，
+                // 不能仅凭初始定义支配读点就忽略回边带来的其它版本。
+                if(acyclic) {
+                    std::erase_if(mergeRegs, [&](u16 reg) {
+                        u32 lastDef = INVALID;
+                        bool safe = true;
+                        for(u32 pc = 0; pc < code.size() && safe; ++pc) {
+                            const auto block = blockAtPc(pc);
+                            if(!reachable[block])
+                                continue;
+                            forEachUse(*code[pc], [&](Register r) {
+                                if(r.index() == reg && (lastDef == INVALID || !_dominators[block][blockAtPc(lastDef)]))
+                                    safe = false;
+                            });
+                            forEachDef(*code[pc], [&](Register r, bool hidden) {
+                                if(r.index() != reg)
+                                    return;
+                                if(hidden)
+                                    safe = false; // 隐式 receiver 写入不参与本次消除证明。
+                                else
+                                    lastDef = pc;
+                            });
+                        }
+                        return safe;
+                    });
                 }
                 std::unordered_map<u16, u32> localStarts;
                 for(const auto reg : mergeRegs) {
@@ -4050,6 +4351,8 @@ namespace cial::decompile {
         // 条件区的比较定义：dst 仅供块条件使用（融合后通常死寄存器），不转
         // var 声明语句，节点直接作为块条件捕获
         void noteCondCompare(const Register reg) {
+            if(_stateMachine)
+                noteNamedDef(reg);
             if(!_condPcs.contains(_instPc)) {
                 noteNamedDef(reg);
                 return;
@@ -4069,6 +4372,8 @@ namespace cial::decompile {
         const FuncMeta *_meta;
         bool _functionLike;
         DeclHost *_host;
+        bool _stateMachine{};
+        Vec<std::string> _machineNames;
         u32 _instPc{};
         std::string _unsupported;
         Vec<Expr> _nodes;
@@ -4092,6 +4397,7 @@ namespace cial::decompile {
 
         // ── M3 结构化状态 ──
         Vec<inter::BasicBlock> _blocks;
+        Vec<Vec<bool>> _dominators;
         Vec<CondZone> _condZones;
         std::unordered_set<u32> _condPcs;
         std::unordered_map<u32, u32> _condNodeAtPc; // 条件区 pc → 捕获的条件节点
@@ -4105,7 +4411,13 @@ namespace cial::decompile {
 
     ExprRecovery recoverUnitBody(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike,
                                  DeclHost *host) {
-        ExprBuilder builder{ rt, chunk, meta, functionLike, host };
-        return builder.run();
+        auto recovered = ExprBuilder{ rt, chunk, meta, functionLike, host }.run();
+        if(!recovered.unsupported.empty() && functionLike) {
+            auto fallback = ExprBuilder{ rt, chunk, meta, functionLike, host, true }.run();
+            if(fallback.unsupported.empty())
+                return fallback;
+            recovered.unsupported += "；CFG 降级：" + fallback.unsupported;
+        }
+        return recovered;
     }
 } // namespace cial::decompile

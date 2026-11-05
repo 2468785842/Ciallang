@@ -97,7 +97,7 @@ with、eval 和局部值保活，"生成名字不冲突"不足以保证安全。
    异常发生时寄存器可能处于指令中间状态，不能仅把块末值送进 catch。
 4. **结构化**：if/else、循环、break/continue、短路/三元（跨块折叠需支配/后支配与副作用
    条件）、switch 比较链（证明顺序与贯穿语义等价才输出）、try/catch 嵌套与重抛。
-   不可约 CFG 第一版返回 `Unsupported`，不输出 TJS 不支持的 goto，不嵌字节码解释器。
+   函数内受支持标量指令的不可约 CFG 降为基本块状态机；其它协议仍返回 `Unsupported`。不输出 TJS 不支持的 goto，不嵌字节码解释器。
 5. **程序组装**：壳（context 树→嵌套函数/类/property/extends/字段初始化顺序）+ 体。
    保留声明安装顺序、共享函数身份与求值时机；不能把每次 `Load` 创建的闭包提升为共享函数。
 6. **属性读改写**：`GProp+Add+DProp` 逆融合为 `+=` 需双守卫——来源确认是转译模板（§1
@@ -116,7 +116,7 @@ with、eval 和局部值保活，"生成名字不冲突"不足以保证安全。
 | M2 | ExprBuilder：后优化形态模式表（含 BinaryImm/CompareTestImm 逆映射）、调用族/成员访问族 | 表达式级 round-trip 逐形态对拍；**已完成（2026-11-02，`ExprBuilder.*`）** |
 | M3 | 语句结构化：if/while/for 归约、短路/三元跨块折叠 | 路径副作用、求值次数、break/continue 对拍通过；**已完成（2026-11-03，ExprBuilder 结构化发射）** |
 | M4 | 壳组装（context 树→声明）+ `+=` 逆融合（双守卫） | 类/继承/property/初始化顺序用例；getter 计数不翻倍。**已完成（2026-11-04，`ExprBuilder.*`/`Decompiler.cpp` 壳组装）：顶层与体内 function/class/property 声明 round-trip 通过；`+=`/`++` 逆融合覆盖成员/下标/具名局部/全局/`*p` 目标（单读者 + 对象一致性双守卫，匿名拷贝按源头解析）；实参位置匿名函数字面量恢复；类成员注册按源码位置排序（枚举序对齐 TJS2）；property 安装名登记 `_declaredGlobals`。验收扩展项（super 构造 prologue、`CallMethodV`/`testDeref` 形态）移交 M5** |
-| M5 | 硬核兜底：任意 CFG 降级、switch、嵌套异常及覆盖扩展 | **进行中**。switch 主干、循环组合与自产嵌套已验收；参考嵌套返回/三层合流及通用 CFG/异常兜底未完成。当前状态见下节，历史证据见 M5 note。 |
+| M5 | 硬核兜底：任意 CFG 降级、switch、嵌套异常及覆盖扩展 | **进行中**。switch 主干、循环组合与自产嵌套已验收；参考嵌套返回/三层合流固定样本已验收；函数内标量 CFG 状态机首版已完成，异常兜底未完成。当前状态见下节，历史证据见 M5 note。 |
 
 M0/M1 后以真实产物的语义缺口重新估算工期；属性协议、异常、动态作用域是主要不确定项。
 
@@ -124,18 +124,31 @@ M0/M1 后以真实产物的语义缺口重新估算工期；属性协议、异�
 
 | 项目 | 已验收能力 | 剩余工作 |
 |---|---|---|
-| switch | 常量/多值标签、贯穿、break/default、判别值单次求值；自产双层/三层嵌套及直接返回；参考函数内双层嵌套和贯穿 | 参考嵌套返回线程化、三层寄存器合流；有副作用的后续 case 表达式 |
+| switch | 常量/多值标签、贯穿、break/default、判别值单次求值；自产双层/三层嵌套及直接返回；参考函数内双层嵌套、贯穿、返回线程化与三层合流 | 更多合流形态；有副作用的后续 case 表达式 |
 | 循环组合 | 自产/参考 while、do、for 与 switch 的 break/continue；case/default 内循环；for 更新段调用计数 | 更多数据流形态；顶层无名寄存器携带的 for 初值仍拒绝 |
-| 控制流与异常 | 可结构化区域恢复，未知形态严格拒绝 | 任意 CFG 安全降级、try/catch 嵌套与重抛 |
+| 控制流与异常 | 结构化优先；函数内 51 类受支持 TAC 的任意 CFG（含不可约）可降为状态机，寄存器逐次赋值，合成行不伪造来源 | try/catch 嵌套与重抛；调用/接收者、闭包及对象常量的降级协议扩展 |
 | 动态名字 | 避让已有参数、局部与 Atom 名；合成存储仅限函数，声明提升、赋值留原路径 | with/eval 名字依赖与不能恢复的边界裁定 |
-| M4 移交 | s7_ext outputdebug 读取已修复；实参及赋值右值匿名函数字面量的自产恢复已验证 | super 构造 prologue、CallMethodV 行表、testDeref 形态验收；赋值右值 FuncLit 的参考字节码路径待验收 |
-| 最终验收 | 35 组成功 switch 字节码三路执行和参考源码对拍一致；拒绝样本固定登记 | 完整能力矩阵与 Unsupported 清单、模糊覆盖；参考原字节码直接加载环缺入口 |
+| M4 移交 | s7_ext outputdebug 读取已修复；实参及赋值右值匿名函数字面量的自产恢复已验证 | super 构造 prologue、CallMethodV 行表、testDeref 形态验收；ExprFunction 变量赋值/实参参考路径已验收；对象成员赋值的 NEW/this 差异待修 |
+| 最终验收 | 37 组成功 switch 字节码三路执行一致；新返回/三层及 ExprFunction 针对性参考对拍通过，扩展参考运行有间歇失败，见 note；拒绝样本固定登记 | 完整能力矩阵与 Unsupported 清单、模糊覆盖；参考原字节码直接加载环缺入口 |
 
 实现见 `src/decompile/ExprBuilder.cpp`；回归按接口/表达式与控制流分在
 `tests/cli/test_decompile.py`、`tests/cli/test_switch.py`，运行入口见
 [测试导航](../../tests/README.md)。固定输入与参考身份见
 `tests/test_files/tjsbc/decompile/manifest.json`。M5 总体仍为进行中；
 各批次命令和失败证据见 [M5 note](../../.agents/notes/proposed/architecture/2026-11-04-decompiler-m5.md)。
+
+### CFG 降级首版（2026-11-05）
+
+结构化路径失败时，仅在函数局部作用域及受支持指令白名单内启用状态机。
+每个物理寄存器对应一个局部槽，按原基本块执行顺序更新；参数转存后清除入口
+副本，生成名字避开已有名字。该路径不做跨块内联、死加载删除或逆融合。
+框架、声明与参数清除在行表中标记 synthetic，保留实际计算/跳转的来源。
+
+当前支持 51 类 TAC，Load 仅限 None/Real/Atom。顶层、with/eval、throw handler、
+变长参数、调用/接收者、函数/类/property/容器对象常量等仍严格拒绝。
+详细白名单、边界与完整证据见 [CFG 降级实现记录](../../.agents/notes/implemented/architecture/2026-11-05-decompiler-cfg-fallback.md)。
+验收包含不可约双入口循环、32 组有界输入、全局写入、名称冲突、对象实参回收、
+合成行及区间检查；4 份实际恢复函数在参考引擎中与独立逻辑程序输出一致。
 
 ## 7. 验证闭环
 

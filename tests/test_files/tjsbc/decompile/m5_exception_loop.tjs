@@ -1,0 +1,1 @@
+function f(n){var r=0;for(var i=0;i<n;i++){try{if(i==1)throw i;r+=10;}catch(e){r+=e;continue;}r+=100;}return r;}println(f(0));println(f(1));println(f(3));

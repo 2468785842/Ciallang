@@ -344,9 +344,11 @@
       "name": "m5_switch_nested_returns",
       "sourceSha256": "1b549285f76a90f768705ea9c3c60f179dad496ce144994786fc34e839f431d1",
       "bytecodeSha256": "7f2dfbadf4d91719c88f336885509210da3918bf2d1368fdd231153662ba0dfe",
-      "expectedRecovery": "unsupported",
-      "rejectReason": "跳转目标",
+      "expectedRecovery": "success",
       "sourceChecks": {
+        "minSwitches": 2
+      },
+      "bytecodeChecks": {
         "minSwitches": 2
       }
     },
@@ -354,11 +356,55 @@
       "name": "m5_switch_nested_three",
       "sourceSha256": "02e3b338c85332be6cf010a181545f8eadd4b09d79a5e19ad14069223886b26a",
       "bytecodeSha256": "c5211948d1db481534db007d1b8f9887dbdeb2539c977441b0192ef63272df15",
-      "expectedRecovery": "unsupported",
-      "rejectReason": "寄存器合流",
+      "expectedRecovery": "success",
       "sourceChecks": {
         "minSwitches": 3
+      },
+      "bytecodeChecks": {
+        "minSwitches": 3
       }
+    },
+    {
+      "name": "m5_funclit_assignment",
+      "sourceSha256": "dfbdd4c22421cd7485359aae19c2e0d6d604e1456188aa805b8724d0e88ff0a8",
+      "bytecodeSha256": "f3f5321180291fa2b8586164325ddfb17020f5a3f96908518210621fba911575",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_funclit_argument",
+      "sourceSha256": "fd960330552f9c112282817584d4dee5b25e1e7238c0c7d2798d7219343f80c9",
+      "bytecodeSha256": "2d911130bca6c8534791d7505b780904fd0d1ab9b3ba08e5aad41c5e1255071c",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_exception_nested",
+      "sourceSha256": "2ac44164a1ef83c3d1bf887f44efccdebb8bd3b4552e90d1a69620152f779d67",
+      "bytecodeSha256": "8fd1e28afd8d54a51a761e6bce2c44715d5699c2109bd6e958665e99826669b5",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_exception_empty",
+      "sourceSha256": "b9650ce0a1c02df208006b86cf57991b5ab3f45a1c9e5d91221520287d117b3e",
+      "bytecodeSha256": "d0e46ee532339e9486e8b4545e6eb6d5a692dcabe8f5df09ac64a35ccda4636d",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_exception_return",
+      "sourceSha256": "d2ad600d25a94af9846baca580d191d2b755313c86366edcb25f3d0e7d775069",
+      "bytecodeSha256": "b74588f1a91caef451f0e5ea3edc905ce67bf8deecfb1d2d3971d35c98c210aa",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_exception_getter",
+      "sourceSha256": "d628cfa69418cdd9b0af78aed11f970cd8bfc71cd5f8d87b530b194c6645dd00",
+      "bytecodeSha256": "ed9438349abab02c10e03eef378f7671479fd32d72b6ea112fde7cc92e0a052d",
+      "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_exception_loop",
+      "sourceSha256": "21b2c2fb0f47308853a9a70826861ebde1018b9f8a054cc0c796f6589c469a2a",
+      "bytecodeSha256": "8122912abdac6644b1e00990bef5b2ba55ed4c2bb3f4f67d8021c1ae97d3b7f4",
+      "expectedRecovery": "success"
     }
   ],
   "referenceDarwin": {

@@ -618,8 +618,284 @@ TEST_CASE("decompile M5 - direct flag comparisons preserve condition semantics")
         REQUIRE(code[cmpPc + 1]->opcode() == inter::TacOpCode::JmpNE);
         const auto target = code[cmpPc + 1]->getOp1().value<inter::Label>();
         meta->chunk->repl<inter::JmpE>(cmpPc + 1, target);
-        const auto rejected = decompile::recoverUnitBody(runtime, *meta->chunk, meta, true);
-        REQUIRE(rejected.unsupported.find("相邻 JmpNE") != std::string::npos);
-        REQUIRE(rejected.statements.empty());
+        const auto inverse = rebuildFunctionProgram(runtime, *top, "f", "x");
+        const auto expectedInverse =
+            fmt::format("function f(x) {{ if (!(x {} -x)) {{ return 1; }} else {{ return 2; }} }}", operators[kind]);
+        REQUIRE(runProgramOutputs(inverse, { -2, 0, 2 }) == runProgramOutputs(expectedInverse, { -2, 0, 2 }));
+    }
+}
+
+namespace {
+    void makeIrreducibleChunk(vm::Chunk &chunk, bool truthy = false) {
+        using namespace cial::inter;
+        chunk.getInstVec().clear();
+        chunk.setRegCount(4);
+        chunk.emit<LoadImm>(Register{ 1 }, Integer{ 0 });
+        chunk.emit<LoadImm>(Register{ 2 }, Integer{ 0 });
+        if(truthy)
+            chunk.emit<Test>(Register{ 0 });
+        else
+            chunk.emitRaw<CompareTestImm>(TacOpCode::GT, Register{ 0 }, Integer{ 0 }, Register{ 3 });
+        chunk.emit<JmpNE>(Label{ 8 });
+        chunk.emitRaw<BinaryImm>(TacOpCode::Add, Register{ 2 }, Integer{ 1 }, Register{ 2 });
+        chunk.emitRaw<BinaryImm>(TacOpCode::Add, Register{ 1 }, Integer{ 1 }, Register{ 1 });
+        chunk.emitRaw<CompareTestImm>(TacOpCode::LT, Register{ 1 }, Integer{ 3 }, Register{ 3 });
+        chunk.emit<JmpNE>(Label{ 14 });
+        chunk.emitRaw<BinaryImm>(TacOpCode::Add, Register{ 2 }, Integer{ 10 }, Register{ 2 });
+        chunk.emitRaw<BinaryImm>(TacOpCode::Add, Register{ 1 }, Integer{ 1 }, Register{ 1 });
+        chunk.emitRaw<CompareTestImm>(TacOpCode::LT, Register{ 1 }, Integer{ 3 }, Register{ 3 });
+        chunk.emit<JmpNE>(Label{ 14 });
+        chunk.emit<Jmp>(Label{ 4 });
+        chunk.emit<NOP>();
+        chunk.emit<inter::Ret>(Register{ 2 });
+    }
+} // namespace
+
+TEST_CASE("decompile M5 - irreducible scalar CFG falls back without losing carried values") {
+    using namespace cial::inter;
+    Runtime runtime;
+    Context context{ runtime };
+    const std::string parameter = GENERATE(std::string{ "x" }, std::string{ "v0" });
+    const bool observable = GENERATE(false, true);
+    auto top = compileSource(runtime, context, fmt::format("function f({0}) {{ return {0}; }}", parameter));
+    REQUIRE(top.has_value());
+    auto *meta = findFunction(runtime, *top, "f");
+    REQUIRE(meta != nullptr);
+    auto rooted = std::move(*top).toHeap(runtime);
+    auto &chunk = *meta->chunk;
+    makeIrreducibleChunk(chunk);
+    const auto effect = runtime.atomTable.intern("v1"_str);
+    if(observable) {
+        chunk.repl<DGlobal>(4, effect, Register{ 1 });
+        context.global()->setProp(effect, Value{ Integer{ 0 } });
+    }
+    const auto rebuilt = rebuildFunctionProgram(runtime, *rooted.get(), "f", parameter);
+    INFO(rebuilt);
+    REQUIRE(rebuilt.find("while (true)") != std::string::npos);
+    REQUIRE(rebuilt.find("switch (") != std::string::npos);
+    // Two entries into the SCC: positive inputs enter A, all others enter B.
+    const Vec<Integer> inputs{ -3, 0, 1, 8 };
+    REQUIRE(rebuilt.find(parameter + " = void;") != std::string::npos);
+    if(observable) {
+        REQUIRE(rebuilt.find("var v1 ") == std::string::npos);
+        auto wrapped = rebuilt;
+        wrapped.replace(wrapped.find("function f("), std::string{ "function f(" }.size(), "function body(");
+        wrapped = "var v1=0;\n" + wrapped + "function f(x){var r=body(x);return r*100+v1;}\n";
+        REQUIRE(runProgramOutputs(wrapped, inputs) ==
+                runProgramOutputs("function f(x){return x>0?1002:2001;}", inputs));
+    } else {
+        REQUIRE(runProgramOutputs(rebuilt, inputs) == runProgramOutputs("function f(x){return x>0?12:21;}", inputs));
+    }
+    const auto mapped = decompile::decompileChunk(runtime, *rooted.get(), decompile::Options{});
+    INFO((mapped.diagnostics.empty() ? std::string{} : mapped.diagnostics.front()));
+    REQUIRE(mapped.status == decompile::Status::Success);
+    const auto *unit = findUnit(mapped, "f");
+    REQUIRE(unit != nullptr);
+    REQUIRE(std::ranges::any_of(unit->lines, [](const auto &row) { return row.synthetic; }));
+    for(const auto &row : unit->lines) {
+        REQUIRE(row.tacEnd <= chunk.getInstVec().size());
+        if(row.synthetic)
+            REQUIRE(row.tacStart == row.tacEnd);
+    }
+    const auto topRejected = decompile::recoverUnitBody(runtime, chunk, meta, false);
+    REQUIRE_FALSE(topRejected.unsupported.empty());
+    REQUIRE(topRejected.statements.empty());
+    vm::VMState state{ context };
+    VM vm{ &state };
+    const auto function = runtime.create<Function>(meta);
+    for(const auto input : inputs) {
+        const Value arg{ input };
+        const auto value = vm.callValue(Value{ static_cast<Object *>(function.get()) }, 1, &arg);
+        REQUIRE(value.isInteger());
+        REQUIRE(value.asInteger().unwrap() == (observable ? (input > 0 ? 10 : 20) : (input > 0 ? 12 : 21)));
+        if(observable)
+            REQUIRE(context.global()->getProp(effect).asInteger().unwrap() == (input > 0 ? 2 : 1));
+    }
+    chunk.repl<GThis>(13, runtime.atomTable.intern(String{ parameter }), Register{ 3 });
+    const auto collision = decompile::recoverUnitBody(runtime, chunk, meta, true);
+    REQUIRE(collision.unsupported.find("参数与动态名字查找冲突") != std::string::npos);
+    REQUIRE(collision.statements.empty());
+    chunk.repl<Call>(13, Register{ 2 }, Register{ 3 }, Integer{ 0 });
+    const auto call = decompile::recoverUnitBody(runtime, chunk, meta, true);
+    REQUIRE(call.unsupported.find("生命周期/接收者协议") != std::string::npos);
+    REQUIRE(call.statements.empty());
+    chunk.repl<EvalStr>(13, Register{ 0 }, Register{ 3 });
+    const auto dynamic = decompile::recoverUnitBody(runtime, chunk, meta, true);
+    REQUIRE(dynamic.unsupported.find("动态求值") != std::string::npos);
+    REQUIRE(dynamic.statements.empty());
+}
+
+TEST_CASE("decompile M5 - CFG fallback releases object argument roots after return") {
+    struct Tracked final : Object {
+        int &destroyed;
+        explicit Tracked(int &count) : destroyed(count) {}
+        ~Tracked() override { ++destroyed; }
+        void call(vm::VMState &, u32, size_t) override {}
+    };
+    int destroyedOriginal = 0;
+    int destroyedRestored = 0;
+    Runtime originalRuntime;
+    Context originalContext{ originalRuntime };
+    auto source = compileSource(originalRuntime, originalContext, "function f(x){return x;}");
+    REQUIRE(source.has_value());
+    auto originalRoot = std::move(*source).toHeap(originalRuntime);
+    auto *original = findFunction(originalRuntime, *originalRoot.get(), "f");
+    REQUIRE(original != nullptr);
+    makeIrreducibleChunk(*original->chunk, true);
+    const auto rebuilt = rebuildFunctionProgram(originalRuntime, *originalRoot.get(), "f", "x");
+    Runtime restoredRuntime;
+    Context restoredContext{ restoredRuntime };
+    auto restoredSource = compileSource(restoredRuntime, restoredContext, rebuilt);
+    REQUIRE(restoredSource.has_value());
+    auto restoredRoot = std::move(*restoredSource).toHeap(restoredRuntime);
+    auto *restored = findFunction(restoredRuntime, *restoredRoot.get(), "f");
+    REQUIRE(restored != nullptr);
+    for(const bool replay : { false, true }) {
+        auto &runtime = replay ? restoredRuntime : originalRuntime;
+        auto &context = replay ? restoredContext : originalContext;
+        auto *meta = replay ? restored : original;
+        int &destroyed = replay ? destroyedRestored : destroyedOriginal;
+        vm::VMState state{ context };
+        VM vm{ &state };
+        const auto function = runtime.create<Function>(meta);
+        Value argument;
+        {
+            const auto object = runtime.create<Tracked>(destroyed);
+            argument = Value{ static_cast<Object *>(object.get()) };
+        }
+        const auto result = vm.callValue(Value{ static_cast<Object *>(function.get()) }, 1, &argument);
+        REQUIRE(result.asInteger().unwrap() == 12);
+        runtime.markSweep.collect([&] { runtime.collectAllMark(); });
+        REQUIRE(destroyed == 1);
+    }
+}
+
+TEST_CASE("decompile M5 - bounded generated CFGs agree with VM and alternating-sum oracle") {
+    using namespace cial::inter;
+    const Vec<Integer> inputs{ -4, 0, 1, 7 };
+    for(Integer trial = 0; trial < 8; ++trial) {
+        DYNAMIC_SECTION("graph " << trial) {
+            Runtime runtime;
+            Context context{ runtime };
+            auto source = compileSource(runtime, context, "function f(x){return x;}");
+            REQUIRE(source.has_value());
+            auto rooted = std::move(*source).toHeap(runtime);
+            auto *meta = findFunction(runtime, *rooted.get(), "f");
+            REQUIRE(meta != nullptr);
+            auto &chunk = *meta->chunk;
+            makeIrreducibleChunk(chunk);
+            const Integer a = trial % 3 - 2;
+            const Integer b = trial + 3;
+            const Integer limit = trial % 5 + 1;
+            chunk.getInstVec()[4] = std::make_unique<BinaryImm>(TacOpCode::Add, Register{ 2 }, a, Register{ 2 });
+            chunk.getInstVec()[8] = std::make_unique<BinaryImm>(TacOpCode::Add, Register{ 2 }, b, Register{ 2 });
+            for(const size_t pc : { 6u, 10u })
+                chunk.getInstVec()[pc] =
+                    std::make_unique<CompareTestImm>(TacOpCode::LT, Register{ 1 }, limit, Register{ 3 });
+            const auto rebuilt = rebuildFunctionProgram(runtime, *rooted.get(), "f", "x");
+            REQUIRE(rebuilt.find("switch (") != std::string::npos);
+            Vec<std::string> expected;
+            vm::VMState state{ context };
+            VM vm{ &state };
+            const auto function = runtime.create<Function>(meta);
+            for(const auto input : inputs) {
+                Integer sum = 0;
+                bool useA = input > 0;
+                for(Integer i = 0; i < limit; ++i) {
+                    sum += useA ? a : b;
+                    useA = !useA;
+                }
+                const Value argument{ input };
+                REQUIRE(
+                    vm.callValue(Value{ static_cast<Object *>(function.get()) }, 1, &argument).asInteger().unwrap() ==
+                    sum);
+                expected.push_back(std::to_string(sum));
+            }
+            REQUIRE(runProgramOutputs(rebuilt, inputs) == expected);
+        }
+    }
+}
+
+TEST_CASE("decompile M5 - exception slot zero and absent slot preserve exact register state") {
+    using namespace cial::inter;
+    const bool keepException = GENERATE(false, true);
+    Runtime runtime;
+    Context context{ runtime };
+    auto source = compileSource(runtime, context, "function f(x){return x;}");
+    REQUIRE(source.has_value());
+    auto rooted = std::move(*source).toHeap(runtime);
+    auto *meta = findFunction(runtime, *rooted.get(), "f");
+    REQUIRE(meta != nullptr);
+    auto &chunk = *meta->chunk;
+    chunk.getInstVec().clear();
+    chunk.getThrowHandlers().clear();
+    chunk.setRegCount(2);
+    chunk.emit<LoadImm>(Register{ 1 }, Integer{ 7 });
+    chunk.emit<Throw>(Register{ 1 });
+    chunk.emit<LoadImm>(Register{ 1 }, Integer{ 100 });
+    chunk.emit<Jmp>(Label{ 6 });
+    chunk.emit<inter::Ret>(Register{ 0 });
+    chunk.emit<NOP>();
+    chunk.emit<inter::Ret>(Register{ 1 });
+    chunk.addThrowHandler({ 0, 4, keepException ? u16{ 0 } : vm::ThrowHandler::exValueRegNone });
+    const auto rebuilt = rebuildFunctionProgram(runtime, *rooted.get(), "f", "x");
+    INFO(rebuilt);
+    REQUIRE(rebuilt.find("catch (") != std::string::npos);
+    const Vec<Integer> inputs{ -2, 0, 2 };
+    REQUIRE(runProgramOutputs(rebuilt, inputs) ==
+            runProgramOutputs(keepException ? "function f(x){return 7;}" : "function f(x){return x;}", inputs));
+    vm::VMState state{ context };
+    VM vm{ &state };
+    const auto function = runtime.create<Function>(meta);
+    for(const auto input : inputs) {
+        const Value argument{ input };
+        REQUIRE(vm.callValue(Value{ static_cast<Object *>(function.get()) }, 1, &argument).asInteger().unwrap() ==
+                (keepException ? 7 : input));
+    }
+    chunk.getThrowHandlers()[0].tryEnd = chunk.getInstVec().size();
+    const auto invalid = decompile::recoverUnitBody(runtime, chunk, meta, true);
+    REQUIRE(invalid.unsupported.find("catch 入口越界") != std::string::npos);
+    REQUIRE(invalid.statements.empty());
+}
+
+TEST_CASE("decompile M5 - rethrow crosses function boundary with original exception value") {
+    Runtime runtime;
+    Context context{ runtime };
+    const std::string original = "function g(x){try{throw x;}catch(e){if(e<0)throw e;return e+10;}}";
+    const std::string caller = "function f(x){try{return g(x);}catch(e){return e-100;}}";
+    auto top = compileSource(runtime, context, original);
+    REQUIRE(top.has_value());
+    auto rooted = std::move(*top).toHeap(runtime);
+    const auto rebuilt = rebuildFunctionProgram(runtime, *rooted.get(), "g", "x");
+    REQUIRE(runProgramOutputs(rebuilt + caller, { -4, -1, 0, 2 }) ==
+            runProgramOutputs(original + caller, { -4, -1, 0, 2 }));
+}
+
+TEST_CASE("decompile M5 - caught opaque objects preserve identity") {
+    struct Token final : Object {
+        void call(vm::VMState &, u32, size_t) override {}
+    };
+    Runtime runtime;
+    Context context{ runtime };
+    auto source = compileSource(runtime, context, "function f(x){try{throw x;}catch(e){return e;}}");
+    REQUIRE(source.has_value());
+    auto originalRoot = std::move(*source).toHeap(runtime);
+    auto *original = findFunction(runtime, *originalRoot.get(), "f");
+    REQUIRE(original != nullptr);
+    const auto text = rebuildFunctionProgram(runtime, *originalRoot.get(), "f", "x");
+    auto restored = compileSource(runtime, context, text);
+    REQUIRE(restored.has_value());
+    auto restoredRoot = std::move(*restored).toHeap(runtime);
+    auto *restoredMeta = findFunction(runtime, *restoredRoot.get(), "f");
+    REQUIRE(restoredMeta != nullptr);
+    const auto token = runtime.create<Token>();
+    const Value argument{ static_cast<Object *>(token.get()) };
+    vm::VMState state{ context };
+    VM vm{ &state };
+    for(auto *meta : { original, restoredMeta }) {
+        const auto function = runtime.create<Function>(meta);
+        const auto result = vm.callValue(Value{ static_cast<Object *>(function.get()) }, 1, &argument);
+        REQUIRE(result.isObject());
+        REQUIRE(result.asObject().unwrap() == token.get());
     }
 }

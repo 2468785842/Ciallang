@@ -1,0 +1,1 @@
+var calls=0; var f; f=function(x){calls++;return x+1;}; println(f(2)); println(f(4)); println(calls);

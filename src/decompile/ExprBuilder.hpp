@@ -35,6 +35,7 @@ namespace cial {
             u32 pc{};
             std::string text;
             u32 tacEnd{};
+            bool synthetic{}; // 降级框架/合成局部声明不冒充原始 TAC 来源。
         };
 
         struct ExprRecovery {
@@ -55,6 +56,9 @@ namespace cial {
         class DeclHost {
         public:
             virtual ~DeclHost() = default;
+            // 参考 ctExprFunction 的显示名非空，但没有词法自绑定；仅来源元数据
+            // 可以证明它能按匿名字面量输出，不能仅凭名字字符串猜测。
+            [[nodiscard]] virtual bool isAnonymousExpression(const FuncMeta &) const { return false; }
             [[nodiscard]] virtual std::string declarationText(const Constant &constant, DeclForm form,
                                                               const std::string &literalName, u32 indent,
                                                               std::string &reason) = 0;

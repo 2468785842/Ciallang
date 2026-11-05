@@ -465,7 +465,12 @@ namespace cial::inter {
         for(size_t blockIndex = 0; blockIndex < blocks.size(); ++blockIndex) {
             const auto &block = blocks[blockIndex];
             std::fill(hasCopy.begin(), hasCopy.end(), 0);
-            if(predecessorCount[blockIndex] == 1) {
+            // 异常可在前驱块中途发生，不能将其正常出口拷贝事实带入 catch；
+            // 异常值槽还会由 VM 隐式写入，可能正好覆盖出口事实指向的源寄存器。
+            const bool catchEntry = std::ranges::any_of(chunk.getThrowHandlers(), [&](const ThrowHandler &handler) {
+                return handler.tryEnd == blocks[blockIndex].start;
+            });
+            if(predecessorCount[blockIndex] == 1 && !catchEntry) {
                 const size_t predecessor = predecessorIndex[blockIndex];
                 if(predecessor < blockIndex && !blockOutHas[predecessor].empty()) {
                     hasCopy = blockOutHas[predecessor];

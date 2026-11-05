@@ -1,0 +1,12 @@
+// getter 抛错时 catch 读取的是抛出点的寄存器状态，不能继承正常出口的拷贝事实。
+Scripts.execStorage("../assert.tjs");
+property bad { getter { throw 9; } }
+function f() {
+    var r = 2;
+    try { r += 3; r = bad; r += 100; }
+    catch (e) { r += e; }
+    return r;
+}
+assertTrue(f() == 14, "catch must preserve r=5 and exception=9");
+finishTests();
+

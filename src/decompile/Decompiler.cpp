@@ -122,6 +122,10 @@ namespace cial::decompile {
             }
             u32 cursor = 0;
             for(const auto &statement : recovery.statements) {
+                if(statement.synthetic) {
+                    forEachTextLine(statement.text, [&](const std::string &line) { builder.synthetic(line); });
+                    continue;
+                }
                 LineMapRow row{ .tacStart = cursor,
                                 .tacEnd = statement.tacEnd != 0 ? statement.tacEnd : statement.pc + 1 };
                 bool firstLine = true;
@@ -136,8 +140,12 @@ namespace cial::decompile {
                 cursor = row.tacEnd;
             }
             if(!recovery.statements.empty()) {
-                if(cursor < count && !unit.lines.empty())
-                    unit.lines.back().tacEnd = static_cast<u32>(count);
+                if(cursor < count) {
+                    const auto last = std::find_if(unit.lines.rbegin(), unit.lines.rend(),
+                                                   [](const LineMapRow &row) { return !row.synthetic; });
+                    if(last != unit.lines.rend())
+                        last->tacEnd = static_cast<u32>(count);
+                }
             } else if(count > 0) {
                 builder.synthetic(fmt::format("//   (all {} instructions dropped as dead code)", count));
             }
@@ -219,6 +227,12 @@ namespace cial::decompile {
                     for(size_t i = 0; i < program->contexts.size(); ++i)
                         if(program->contexts[i].funcMeta != nullptr)
                             _originByFunc.emplace(program->contexts[i].funcMeta, i);
+            }
+
+            bool isAnonymousExpression(const FuncMeta &meta) const override {
+                const auto found = _originByFunc.find(&meta);
+                return _program && found != _originByFunc.end() &&
+                    _program->contexts[found->second].type == tjsbc::TjsContextType::ExprFunction;
             }
 
             std::string declarationText(const Constant &constant, const DeclForm form, const std::string &literalName,
@@ -465,6 +479,14 @@ namespace cial::decompile {
                 u32 covered = 0;
                 for(size_t si = 0; si < recovery.statements.size(); ++si) {
                     const auto &statement = recovery.statements[si];
+                    if(statement.synthetic) {
+                        forEachTextLine(statement.text, [&](const std::string &line) {
+                            unit.lines.push_back(
+                                LineMapRow{ .textLine = base + _frames.back().count, .synthetic = true });
+                            writer(pad + line);
+                        });
+                        continue;
+                    }
                     const u32 tacStart = statement.pc;
                     // 末语句区间延到 Chunk 末尾（覆盖被内联/丢弃的尾段），先于
                     // origin 分段——扩展区间内的来源条目同样登记
