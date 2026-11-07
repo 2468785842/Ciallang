@@ -211,9 +211,13 @@ class DecompileTest(CliTestCase):
         manifest = json.loads((corpus / "manifest.json").read_text(encoding="utf-8"))
         samples = [sample for sample in manifest["samples"] if sample["name"].startswith("m5_exception_")]
         self.assertTrue(samples)
+        import hashlib
         for sample in samples:
             with self.subTest(sample=sample["name"]):
                 source = corpus / (sample["name"] + ".tjs")
+                for name, field in (("source", source), ("bytecode", source.with_suffix(".tjsbc"))):
+                    digest = hashlib.sha256(field.read_bytes()).hexdigest()
+                    self.assertEqual(digest, sample[f"{name}Sha256"], sample["name"])
                 original = self.run_cial(source)
                 self.assertEqual(original.returncode, 0, original.stderr)
                 translated = self.run_cial("--tjsbc", source.with_suffix(".tjsbc"))

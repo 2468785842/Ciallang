@@ -1,5 +1,5 @@
 {
-  "description": "M5 参考字节码条件、switch（含 case/default 内嵌套条件分支）与局部返回语料；无 outputdebug；顶层合流与嵌套 switch 保守拒绝",
+  "description": "M5 参考字节码条件、switch（含 case/default 内嵌套条件分支）、局部返回与异常区域语料；无 outputdebug；顶层合流与嵌套 switch 保守拒绝",
   "reference": {
     "commit": "40a736c48f40dff7c737e9c5dc9c0e46f145e9e5",
     "binarySha256": "8f370f2bb7460c8b7b8090a8bc71b7d0fb94a25e98ee2ff20d01bf3df358c60b",
@@ -8,72 +8,72 @@
   "samples": [
     {
       "name": "m5_flag_conditions",
-      "sourceSha256": "291cf274c407982a61a0b3e05b92cafe56cebe567ceda8e5f16d1b4cda9f4f78",
+      "sourceSha256": "df5198e26104a70e0e3f9b6be33e5b1c6072edfd8c0866bf78f3fd69c9242d9c",
       "bytecodeSha256": "01950d894b7a7aedb1f99d3f76623ff00a2f02026714c26b3089dfe0fc218785"
     },
     {
       "name": "m5_switch_calls",
-      "sourceSha256": "7f0b41d1c022e6e3ccdf8316785a74f79f693e71c3d3f64e607da7940f487e17",
+      "sourceSha256": "dd810db888d3e3d4a2d046b8953326abe72bf17e7bdc6724ed1d9301c9b7b047",
       "bytecodeSha256": "5d094f42140c54ffeab40d94dcef49f8a26c5b50e49fe549a5c304710a6ad33f",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_strings",
-      "sourceSha256": "5d58d8ffc6e8f08d094634f7e7afd0855e4bfc2b6e250961f0b08de3ceb7ecaf",
+      "sourceSha256": "b4e580febb633fa8f63b6978d03b4b48e0d83de2116ca5983770a5fb02d6488d",
       "bytecodeSha256": "74532852c18c89ce777a579a49196605ffe5f0adb95b8d1656ff36f23c98f4da",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_returns",
-      "sourceSha256": "952e2b32a83d70df80836f163c046eac9aa68764a615aa62ba84e2a47df45d4a",
+      "sourceSha256": "4e75656d26495d62641583c6731fdde5902dc8d1f1e3af92cad120ba6e99a097",
       "bytecodeSha256": "0abfb90c56b31421bf3f46158cc11cc8b2c235c51a5f49b6be66692099d0b122",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_fallthrough",
-      "sourceSha256": "1344bd6abfb6146fb868a57a73053e09a8969de74bf603ca533e22855802d2b2",
+      "sourceSha256": "f39e25a9b6a949567e14283eef1aa59d60ea79fdf9c0e2d1c2970465bf863479",
       "bytecodeSha256": "131f723f3f27804d6b8810aff3427cdc61024d608775d390f7e6e1ad4a602381",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_register_merge",
-      "sourceSha256": "01e686786bb89606abb7ae5787b9baa9490b122616dc47edd711757f00b033b0",
+      "sourceSha256": "eb0218e7c2c9c807422033d5c961d58111ae8b1390f78a656936faa3b42d5649",
       "bytecodeSha256": "6115d2834da7141d4b1675248c161ccaf9864f552ad552176b2ccceaa6577486",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_snapshot",
-      "sourceSha256": "6582df288105f8f9d1d8062a502c24515b22d4f27146ecedd7d00e378f6aaa06",
+      "sourceSha256": "64e85919cb17654ecf06cea27fb4f3d4029b02a1a8661b9606bbbbe3adac57e1",
       "bytecodeSha256": "f4f1c156941ccb95757a1cd37b7714f77238af9462748ac4085557a11b6513d2",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_name_collision",
-      "sourceSha256": "72900fdbf5fb25e7fe202857fb414a7fd80fca5391aa6b80111179d55aa8ad5e",
+      "sourceSha256": "57349856bbdfc31751ded2e2a08e912c4c1e9b36ec58ac487fabe879b19e6e94",
       "bytecodeSha256": "8247ae83c79e41cd3152b4af6df1471e7a08f4bcfd443d853bff42a95b7129f7",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_double",
-      "sourceSha256": "26529f3902cb743c54f38ee4c6531cc16b7533d62a263a5d8d71b7ef27188c43",
+      "sourceSha256": "0d594e6f54dda91c4b6954b34b77d48f3bc55f43c896b8a0b76a6973d4a00669",
       "bytecodeSha256": "0e6da84f8f95fc9a27165d42234fb4a62545cd10fbdc0b0b9c00105439f4ceb8",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_multilabel",
-      "sourceSha256": "6e46bfde50d20814a22b31ef5e2bcf82ed12affb746f5bac6ff573b51bf23384",
+      "sourceSha256": "f188be6db8593f5e18f56f4617105b6d2e95122cebfec28fff022698ef9a5e0d",
       "bytecodeSha256": "803b20d949917645ff7f19cb95c25f9e484d4ddfd1a5e2cb55af2946353beec6",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_top_merge",
-      "sourceSha256": "d6b2b4a69626790b279c2fe35d4bc92e9b5c5ff6e22191cb9225d6be80f9aa94",
+      "sourceSha256": "2086fb8b7741d281c4dcc2bbb75b9740a295846a3cbb13319ac106854035593d",
       "bytecodeSha256": "6e46dfdb06c536bd28b806ea48b42d36ee2dd27bc2df73a5262fa35f47fb694a",
       "expectedRecovery": "unsupported"
     },
     {
       "name": "m5_return_local",
-      "sourceSha256": "492131e0ed6621c617584715898eac55b2120e3910fd4cad5c63351645c09d15",
+      "sourceSha256": "7f996ad472a827b7a88e838077a5de7a6840099258c20a134869102119e90553",
       "bytecodeSha256": "d3afe8936022061fab1b83f77b6e747163576a729cd027438856bbf0c79b901a",
       "expectedRecovery": "success"
     },
@@ -141,7 +141,7 @@
     },
     {
       "name": "m5_switch_single_default",
-      "sourceSha256": "7ea3655c7df143db347114c0a289306c793845baab54638343718d28b8b42623",
+      "sourceSha256": "988079be743446ad3056d4bee51eac74f70d12bc37ff3aea3969e6f77d12a8fe",
       "bytecodeSha256": "75658110b86ef800f9a7af403b91b4beaee11c1bd9622a945c6a6fc0a02a406b",
       "expectedRecovery": "success",
       "bytecodeChecks": {
@@ -152,19 +152,19 @@
     },
     {
       "name": "m5_switch_while",
-      "sourceSha256": "92a4eb2e7ab2ddc8bb1dc00eaca9271af83dbd63d66d4fae6731fb898532ca5a",
+      "sourceSha256": "57b4c9b67cd2767992852246cbe3a0340f5df4feb3d391af0474c0a2de069195",
       "bytecodeSha256": "8f01542e71b5e99dbb08eedd3670ec6b829e6bb4fda1a1cdb9dd51f4c8582664",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_while_calls",
-      "sourceSha256": "4289d7a4b7a5a44aa627a42c8a33f16f8c37b39579db4fa531a826bc0ea19d94",
+      "sourceSha256": "b50d67be7a213a71500d394908c4887ca1c4a8e3d4bcd48e58f3699f528f3f65",
       "bytecodeSha256": "df1cf3ce12fbb77d1461fcf482fab82833f0fb03818ca53b487295171f0eb1a7",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_switch_combo_default_continue",
-      "sourceSha256": "8cd8cb06289b8a30896fa5e540920ed5dfe7755c7738ea0b99299adaa5d723a8",
+      "sourceSha256": "c868bc1b7ec2fc28a0487f4a9ec802d30e793e01907cda9a22df454321c1c1f6",
       "bytecodeSha256": "28b0722bbc4df496b1ab91c4d08d7dd78f8159345705a4dfa590e0ea55b078f0",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -173,7 +173,7 @@
     },
     {
       "name": "m5_switch_combo_for_effect_update",
-      "sourceSha256": "9bdf135b7d2c4432689e364b9e0d99f00ab5b7a4d6f358db46c815d581b2eb1d",
+      "sourceSha256": "d3a773036f03814d0c6328ffbbfd4ae5664423f14f755d5bc802322e70e431c3",
       "bytecodeSha256": "3a5592ab20a6743f7a20fd9d310f63d69abe62ce9d4b630d2a1f61755bd54acf",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -182,7 +182,7 @@
     },
     {
       "name": "m5_switch_combo_loop_in_default",
-      "sourceSha256": "9ab591dbcf18157be7adc23a0740eccb4f30b9277e551fd77320f6417fd008c9",
+      "sourceSha256": "596098c2f9b04f56e7d6c01754171e4a442a9adde1b226a5a63843a4ad6c2309",
       "bytecodeSha256": "03fd1fe4ffc48cd397c60606b436753cf52030acc8822b5a4297446f526d7850",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -191,7 +191,7 @@
     },
     {
       "name": "m5_switch_combo_do_break",
-      "sourceSha256": "35063bbd0ed961342fe7e568616ae0ee0691feb4bb54a3ef67fa2668ae5f7bea",
+      "sourceSha256": "fce241eeab99708802cf68c513d7b6c634499b233c86afe27da84e90f632ab40",
       "bytecodeSha256": "8d6843af4300aa2d9164a8b4226e7f08eaa93892a399bf56a9b0a7952a9136e1",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -200,7 +200,7 @@
     },
     {
       "name": "m5_switch_combo_while_continue",
-      "sourceSha256": "86aa401fac57aa8f36463fdcd835b8caf7b85302fa7776c1d88254d5b0d6d2be",
+      "sourceSha256": "9847a7cb992fcf853f245f71fb0d758450ac7536454fc6ca6f366f9763999b90",
       "bytecodeSha256": "eb8ab886a9bc05787d2797f93d5265ff7ffb4f63450afd222c1e8df75f0f51d9",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -209,7 +209,7 @@
     },
     {
       "name": "m5_switch_combo_do_continue",
-      "sourceSha256": "00aa9872ad28464383dfbdc6cce63a63dd5f10e0608f42c63dd570b85b3b47f8",
+      "sourceSha256": "8e762f6548c6f20e495f3616c0cc8faf8f582abfd0501518dfcdbbfa377fc4b9",
       "bytecodeSha256": "bd763703a27d19e66c8f833e2a418ba94a9de0bb4766d77b12d7f0e7954c5da0",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -218,7 +218,7 @@
     },
     {
       "name": "m5_switch_combo_for_continue",
-      "sourceSha256": "283e1b0ecdbe62be936fe745f4107c2fe6fff374a43412409fa9b122cd25d29c",
+      "sourceSha256": "48334bdb85c681fbb1870c98f10386c529cffead9c706a240438c13878c1bb51",
       "bytecodeSha256": "5036906785c142c4a84e664879ae4833188e04fda097aa1c7263a2be4bd2c559",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -227,7 +227,7 @@
     },
     {
       "name": "m5_switch_combo_for_break",
-      "sourceSha256": "1040712505f5a00e46c85f7aa0e09898bc2452bec8d1c262bff5bd0e9b677b5a",
+      "sourceSha256": "cd37bfcf44a05cd389d330e67bcc98fd0ae46fed460221fabbdebd5a1bdfb927",
       "bytecodeSha256": "a2a59f479ce05449efea9e23ec0e524937f6eb9a72456bc75c8e0e3ff72a598d",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -236,7 +236,7 @@
     },
     {
       "name": "m5_switch_combo_nested_loops",
-      "sourceSha256": "a556abf40d124f596307c46b12275810f0057494d13a34e11ba9077cd5b47708",
+      "sourceSha256": "1de2130a8af5f0db48a0e5c42e8d46a036b6d1a9fbee0b03ee4032f3b622f905",
       "bytecodeSha256": "9554785248d72bb8ee81164b211e0d844718b2b81b68984ed6e7c1b5414a0a38",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -245,7 +245,7 @@
     },
     {
       "name": "m5_switch_combo_loop_in_case",
-      "sourceSha256": "a87780565a305c31f4f9928ebf0d6c6d30963b3e71f3e56ec8713f994808ec28",
+      "sourceSha256": "e1e9fefe74390624d0238d186d9686b1fdd0a72145315cb62344110f649a739c",
       "bytecodeSha256": "f6ef8bb3837a154165fb9c9576f718dc5a82a32f37b095baac04ef873983f79e",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -254,7 +254,7 @@
     },
     {
       "name": "m5_switch_combo_do_in_case",
-      "sourceSha256": "d724bbf5cc4b61068e0b3c0b8091c6b8cb5769fd2d85d0174af1ec32c52bf296",
+      "sourceSha256": "75e5780ddd502f4dc5889e95b0bdf623b926f0c427062b64b8ca989f60f4dfd8",
       "bytecodeSha256": "8bff80fd11c14a3d0afd46cc0f1ae4fbd1f2e9563c6b462420e934d4b2561e36",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -263,7 +263,7 @@
     },
     {
       "name": "m5_switch_combo_for_in_default",
-      "sourceSha256": "a6b5eb41884168c79462749cc6a9550f235922da48c1b4438923ff72450026e2",
+      "sourceSha256": "8511e6fceec99356f509ba6ae5f2d0c00682632a79634f8954988857bebc87a8",
       "bytecodeSha256": "81584c07ae803eee5d387625833f799b064817947b9be453cf8cd8f23b8569ba",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -272,7 +272,7 @@
     },
     {
       "name": "m5_switch_deep_if",
-      "sourceSha256": "4e06041111890611653a36cf7f145e611b14a991acbfe2d8e7f85e9a8dd55b82",
+      "sourceSha256": "6cdd2973ca6213f02a0543401e6ade609d97c5c44d8d6275284cb96efb9f929d",
       "bytecodeSha256": "11967aa3d07b0b64914616b34a396020e7d23067ce5a62032ae8a06a2ba75b16",
       "expectedRecovery": "success",
       "bytecodeChecks": {
@@ -283,7 +283,7 @@
     },
     {
       "name": "m5_switch_deep_calls",
-      "sourceSha256": "4a746d699652377607b52cfb259b87fbfd98d4eb49d3d70339c27cb2cd9940b8",
+      "sourceSha256": "86b55f29cfd60a53549f1942922e9d9dc584fc7d44751a5d1da026e6382fc7d9",
       "bytecodeSha256": "6cc014ee9491607143c1930c5d8a1ff97515dcfab795d4bacf7d19e1026a9b9e",
       "expectedRecovery": "success",
       "bytecodeChecks": {
@@ -294,7 +294,7 @@
     },
     {
       "name": "m5_switch_nested_same",
-      "sourceSha256": "64bf5f910aa204e73fee3e6032e261a3087a3d9ca947bfdc84da7b7442e7d963",
+      "sourceSha256": "07a9f563baca08594df58857ae713925b10800e97b036bad70cb2f5cef786f61",
       "bytecodeSha256": "87b44bb15de39194eb8f72e57bbd685a20f0d585f841f8b5697495cdf8fedd48",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -307,7 +307,7 @@
     },
     {
       "name": "m5_switch_nested_calls",
-      "sourceSha256": "9518b2316107fbf9c3952b5ce3b4fc16579f0af149df4ab69f2f5ed3b0d1b710",
+      "sourceSha256": "73cb1257eefe96bd9f5b8d90c0da0cb18c7c23c4e6eebfc7b28be69ee5ca4e24",
       "bytecodeSha256": "b746eaef0355b5db50e3fe998c70e9c1cc33af2d83691fc37e14640be3e44270",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -320,7 +320,7 @@
     },
     {
       "name": "m5_switch_nested_default_inner",
-      "sourceSha256": "16b4489790858c97062a0a86dd42ef5f48e910411b72f822fcce4b6c816bf01f",
+      "sourceSha256": "5bd5de87373dc1ebbe6ce93ffc66cf6d67ec4f3a7809c9b067b8b84f6466d902",
       "bytecodeSha256": "8a316056f502912521b4291b9882a2d85ae5a6cdc514922c8b321080fe07275e",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -333,7 +333,7 @@
     },
     {
       "name": "m5_switch_nested_fallthrough",
-      "sourceSha256": "c2e5f23c02cb022989c9c40b78036712fa7b6e1b585db88f43f9968060f8a2b7",
+      "sourceSha256": "e25ea16c1d7f2b7221e9ee128f5e68a7787c89ba8cfc01a789a890bf7eb6a214",
       "bytecodeSha256": "4a191c6acfbbda1a20d6e348126fc0955b8bd5cb4b24ab051d813aa830941189",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -342,7 +342,7 @@
     },
     {
       "name": "m5_switch_nested_returns",
-      "sourceSha256": "1b549285f76a90f768705ea9c3c60f179dad496ce144994786fc34e839f431d1",
+      "sourceSha256": "0c688b2114e49a3a42279ad6ce6a9038534f06696ce5610380fcd64158d9ea32",
       "bytecodeSha256": "7f2dfbadf4d91719c88f336885509210da3918bf2d1368fdd231153662ba0dfe",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -354,7 +354,7 @@
     },
     {
       "name": "m5_switch_nested_three",
-      "sourceSha256": "02e3b338c85332be6cf010a181545f8eadd4b09d79a5e19ad14069223886b26a",
+      "sourceSha256": "f9636e151e459d917ac7e8b72db65ece7a3aaad775bd12597ec72eba2df3a6c8",
       "bytecodeSha256": "c5211948d1db481534db007d1b8f9887dbdeb2539c977441b0192ef63272df15",
       "expectedRecovery": "success",
       "sourceChecks": {
@@ -366,45 +366,73 @@
     },
     {
       "name": "m5_funclit_assignment",
-      "sourceSha256": "dfbdd4c22421cd7485359aae19c2e0d6d604e1456188aa805b8724d0e88ff0a8",
+      "sourceSha256": "6ef8478d347be7b564ed894e1d5e213a86867761cb90419424ecc8b79713f9b1",
       "bytecodeSha256": "f3f5321180291fa2b8586164325ddfb17020f5a3f96908518210621fba911575",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_funclit_argument",
-      "sourceSha256": "fd960330552f9c112282817584d4dee5b25e1e7238c0c7d2798d7219343f80c9",
+      "sourceSha256": "91355ff0f5fb2935b8ac068c1382e8877c9062b274b38155b8e2d8442dbd0467",
       "bytecodeSha256": "2d911130bca6c8534791d7505b780904fd0d1ab9b3ba08e5aad41c5e1255071c",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_exception_nested",
-      "sourceSha256": "2ac44164a1ef83c3d1bf887f44efccdebb8bd3b4552e90d1a69620152f779d67",
+      "sourceSha256": "736a7fad88ef51ef8bd517caf590cbfc25c94ea471ab08f43e53c07c38c21c38",
       "bytecodeSha256": "8fd1e28afd8d54a51a761e6bce2c44715d5699c2109bd6e958665e99826669b5",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_exception_empty",
-      "sourceSha256": "b9650ce0a1c02df208006b86cf57991b5ab3f45a1c9e5d91221520287d117b3e",
+      "sourceSha256": "6b4ce5600e75edb1d31c54f28950707461d5e4e5896319b1933e1d7accd8da4d",
       "bytecodeSha256": "d0e46ee532339e9486e8b4545e6eb6d5a692dcabe8f5df09ac64a35ccda4636d",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_exception_return",
-      "sourceSha256": "d2ad600d25a94af9846baca580d191d2b755313c86366edcb25f3d0e7d775069",
+      "sourceSha256": "c993fe2756c381695cacc67d5c2504d8c3468dfbed82fa19f01cd34e5cccadda",
       "bytecodeSha256": "b74588f1a91caef451f0e5ea3edc905ce67bf8deecfb1d2d3971d35c98c210aa",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_exception_getter",
-      "sourceSha256": "d628cfa69418cdd9b0af78aed11f970cd8bfc71cd5f8d87b530b194c6645dd00",
+      "sourceSha256": "1a4b1d0e6df08bef9905539cf8115779ad0fdbae4d85b6fc1c7843d8dbc772c5",
       "bytecodeSha256": "ed9438349abab02c10e03eef378f7671479fd32d72b6ea112fde7cc92e0a052d",
       "expectedRecovery": "success"
     },
     {
       "name": "m5_exception_loop",
-      "sourceSha256": "21b2c2fb0f47308853a9a70826861ebde1018b9f8a054cc0c796f6589c469a2a",
+      "sourceSha256": "05644803b1ea172c1124b53b014ac236600be29e9b5600ac0201c4fec0c995d7",
       "bytecodeSha256": "8122912abdac6644b1e00990bef5b2ba55ed4c2bb3f4f67d8021c1ae97d3b7f4",
       "expectedRecovery": "success"
+    },
+    {
+      "name": "m5_exception_try_switch",
+      "sourceSha256": "ec6444a053cc04a00fe4822892aa9105b2d9b4c2878c295c3fd1020a0a801392",
+      "bytecodeSha256": "67e11ff0225f489bde4cb1e67f520d8351af4ca73b7f3c676a1e61be17838aa5",
+      "expectedRecovery": "success",
+      "reference": "darwin"
+    },
+    {
+      "name": "m5_exception_catch_switch",
+      "sourceSha256": "eedfdf4aa8c7741927ae5ebd8499d761527b0db1136d5e1047e20a6e68e459f3",
+      "bytecodeSha256": "bf7955f744dc887402ba708f2a5b72d1d31ca938a6a2b110636f148e1df12926",
+      "expectedRecovery": "success",
+      "reference": "darwin"
+    },
+    {
+      "name": "m5_exception_nested_three",
+      "sourceSha256": "aeea137f9659f65d492fbc6bbfce23a747708cd73bd816b2a3ccbea1f0da0f51",
+      "bytecodeSha256": "401e85932cace9cc62bc0c65fecaed5d6d0c09d769ad1bb6e16d7667d8e7e680",
+      "expectedRecovery": "success",
+      "reference": "darwin"
+    },
+    {
+      "name": "m5_exception_catch_reads_try_local",
+      "sourceSha256": "b113f9e37d019b76fbc050c304d313b6487ba97b54474ae115be4ef98c9cbb23",
+      "bytecodeSha256": "6f84806d4d8e0e235ad36502c0de040b553463d583bb7ed22a20e9a345fa4f37",
+      "expectedRecovery": "success",
+      "reference": "darwin"
     }
   ],
   "referenceDarwin": {

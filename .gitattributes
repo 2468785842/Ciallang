@@ -2,3 +2,7 @@
 # outputdebug 语料的 SHA-256 与源码字节偏移固定为 LF，不能随 checkout 转换。
 /tests/test_files/tjsbc/debug/*.tjs text eol=lf
 /tests/test_files/tjsbc/debug/*.tjsbc -text
+# decompile 语料同理：manifest 源码哈希按 LF 字节登记（2026-11-07 起），
+# 字节码为二进制不参与任何换行转换。
+/tests/test_files/tjsbc/decompile/*.tjs text eol=lf
+/tests/test_files/tjsbc/decompile/*.tjsbc -text

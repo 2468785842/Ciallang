@@ -1,0 +1,2 @@
+function f(x){var r=0;try{if(x)throw x;}catch(e){switch(e){case 1:r=11;break;case 2:r=22;break;default:r=99;}}return r;}
+println(f(0));println(f(1));println(f(2));println(f(7));

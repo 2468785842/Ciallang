@@ -2,10 +2,14 @@
 
 Status: proposed
 
-## 当前状态（2026-11-05，接续先读此节）
+## 当前状态（2026-11-07，接续先读此节）
 
-M5 仍在进行；当前能力与剩余六类工作以
+M5 仍在进行；当前能力与剩余工作以
 [方案当前状态表](../../../../doc/bytecode/decompiler-plan.md#m5-当前状态2026-11-05)为准。
+异常区域状态机首版已完成并登记
+（[实现记录](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)）：
+函数内 try/catch（嵌套/重抛/无绑定）经 CFG 降级状态机恢复，9 组语料 darwin
+参考对拍一致；结构化 try/catch 区域恢复是下一个实现批次。
 下面各批次保留当时的拒绝与验证事实，后续修复不覆盖历史失败记录。
 特别是早期“嵌套 switch 一律拒绝”和“赋值右值 FuncLit 待实现”不再是现状：
 自产双层/三层与参考函数内双层 switch 已验收；赋值右值 FuncLit 的源码
@@ -502,17 +506,49 @@ with 与 eval 名字依赖；M4→M5 移交的 bc 路径验收扩展（super 构
 首轮失败、原始 TAC/恢复源码/独立模型比较与参考验证见
 [已实现记录](../../implemented/architecture/2026-11-05-decompiler-cfg-fallback.md)。
 M5 专项 552 assertions / 4 cases 通过，最终全量 CTest 245/245（22.00s）；
-4 份实际状态机函数的参考执行一致。下一大项是异常区域与重抛，不能把 CFG
+4 份实际状态机函数的参考执行一致。当时记录的“下一大项异常区域与重抛”已在
+`edbf3ae` 落地并于 2026-11-07 完成验收，见下节；不能把 CFG
 拓扑支持等同于已经覆盖异常边、调用隐式写入、闭包或对象常量。
+
+## 异常区域状态机首版验收（2026-11-07，darwin）
+
+实现随 `edbf3ae`（2026-11-05）提交：状态机逐 pc 包 try、条件求值固定在原
+比较 pc、catch 写异常槽后跳 `tryEnd`；Optimizer catch 入口不继承前驱拷贝事实、
+转译器 ENTRY 内层优先登记配套修复。实现不变量与拒绝边界见
+[异常区域实现记录](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)。
+本批补齐的验收与修复：
+
+- 基线复现 CiallangSwitch 33 个子失败：`decompile/` 语料源码哈希全部平台行尾
+  依赖（manifest 按 Windows CRLF 检出计算、blob 为 LF、`.gitattributes` 漏了
+  该目录），另 `m5_switch_single_default.tjs` 哈希与任何行尾变体不符（源码后改
+  哈希未刷新；磁盘源/字节码对三路执行验证一致）。修复：`.gitattributes` 补
+  `decompile/*.tjs text eol=lf` 与 `*.tjsbc -text`，manifest 42 组 sourceSha256
+  按实际 LF 字节重生成。**Windows 侧拉取后须重检出该目录**。
+- 参考二进制 `bin/darwin/TJSCompiler` SHA-256 `478eab17…b4471b1` 与 manifest
+  `referenceDarwin` 一致。新增 4 组 darwin 语料（try_switch、catch_switch、
+  nested_three、catch_reads_try_local，样本标 `reference: darwin`），异常语料
+  共 9 组。
+- `out/m5-exception/reference-check.py` / `reference-report.json`：9/9 哈希、
+  三路 stdout、恢复回放逐字节一致；参考原源码 vs 字节码恢复源码标记序列
+  9/9 一致、参考进程退出 0。参考原字节码直接加载环仍缺入口，不宣称四环
+  全部通过。
+- 边界探测 `out/m5-exception/probe_*.tjs`：try 体内含调用诚实拒绝（结构化
+  M5 原因 + 状态机调用协议原因复合）；try+while+break/continue 穿越、catch 内
+  switch、三层嵌套、catch 读 try 体局部经状态机成功（try_while 探针未固化）。
+- `test_exception_regions_roundtrip` 补 manifest 哈希校验；断言保持形态无关。
+  macOS Debug 全量 CTest **443/443 通过**（17.93s）。
 
 ## 建议下一步
 
-1. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue
+1. 结构化 try/catch 区域恢复：emitRegion 认领 try 区域、输出真 try/catch 结构
+   （现状全部经状态机平铺）；catch 体读 try 体重定义寄存器等数据流形态保守
+   拒绝落回状态机。详设见本 note 会话记录。
+2. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue
    组合的更多数据流形态；参考更复杂合流与有副作用标签（返回/三层固定样本已通过）；按方案 §7 继续参考 TJS2 四环验收。
-2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
+3. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
-3. 在已完成的函数内标量 CFG 状态机基础上推进 try/catch 嵌套与重抛；调用/接收者、with/eval 等协议仍需独立验证。
-4. ExprFunction 变量赋值/实参的参考路径已验收；继续检查对象成员赋值的 NEW/this 差异。
+4. 状态机调用/接收者、闭包及对象常量协议扩展（try 体内含调用当前整单拒绝）。
+5. ExprFunction 变量赋值/实参的参考路径已验收；继续检查对象成员赋值的 NEW/this 差异。
 
 ## 完成条件
 

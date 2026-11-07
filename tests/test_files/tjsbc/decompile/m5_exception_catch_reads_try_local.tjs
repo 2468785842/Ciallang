@@ -1,0 +1,2 @@
+function f(x){var r=0;try{r=x*3;if(x==0)throw 7;}catch(e){r=r+e;}return r;}
+println(f(0));println(f(5));
