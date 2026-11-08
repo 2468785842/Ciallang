@@ -14,11 +14,13 @@ None/Real/Atom 常量。具体白名单以 ExprBuilder::runStateMachine 为准�
 
 以下保持 Unsupported：顶层无局部作用域、缺少 FuncMeta、重复参数名、
 参数与动态名字查找冲突、with/eval、变长/展开实参、
-Call/CallV/CallMethodV 等调用与接收者协议、函数/类/property/容器对象常量，
-以及其它不在白名单中的指令。闭包、容器和方法调用是后续协议扩展，
-不能因为 CFG 已可遍历就猜测它们的生命周期或隐式写入。
-throw handler 首版记录时保持 Unsupported，现已由异常区域首版支持
-（见[异常区域实现记录](2026-11-07-decompiler-exception-regions.md)）。
+函数/类/property 声明常量，以及其它不在白名单中的指令。闭包提升和
+声明常量是后续协议扩展，不能因为 CFG 已可遍历就猜测它们的生命周期或隐式
+写入。首版记录时保持 Unsupported 的 throw handler 与调用族/容器/成员语句/
+字符串及函数字面量 Load 已由后续批次支持（见
+[异常区域实现记录](2026-11-07-decompiler-exception-regions.md)）；仍拒：
+ChgThis、TestVoid、With/EvalStr、CallExpand/CollapseArgs、Super、
+ClassMeta/PropMeta 声明常量。
 
 ## 实现与不变量
 
@@ -73,6 +75,7 @@ manifest 同时要求行 4 和行 8，未跳过检查或改源位置数据。最
 
 ## 后续边界
 
-异常区域与重抛已由状态机首版支持（见[异常区域实现记录](2026-11-07-decompiler-exception-regions.md)）；
-调用/接收者、闭包及对象常量需各自建立状态保存和
-求值时机协议后，才能扩展本白名单。M5 整体状态仍见活动 note 与方案当前状态表。
+异常区域与重抛、调用族/容器/成员语句/字符串及函数字面量 Load 已由后续批次
+支持（见[异常区域实现记录](2026-11-07-decompiler-exception-regions.md)）；
+闭包提升与声明常量需各自建立状态保存和求值时机协议后，才能扩展本白名单。
+M5 整体状态仍见活动 note 与方案当前状态表。

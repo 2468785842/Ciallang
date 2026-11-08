@@ -429,10 +429,42 @@ namespace cial::decompile {
                     case TacOpCode::JmpE:
                     case TacOpCode::Ret:
                     case TacOpCode::Throw:
+                    // 调用族与成员读：Pass B 的 tile 构建与 Push/Call 线性配对
+                    // 与块无关，状态机按 pc 重放机器变量即可；接收者协议见
+                    // buildNodesAndStmts 的内联旁路。容器/成员存储/下标/删除/
+                    // 转换等语句族 tile 同样按定义点物化；函数字面量每次 Load
+                    // 独立创建（不提升为共享函数）。CallExpand/CollapseArgs、
+                    // ChgThis、TestVoid、With/EvalStr、Super 仍由 precheck 拒绝
+                    case TacOpCode::Push:
+                    case TacOpCode::Call:
+                    case TacOpCode::CallV:
+                    case TacOpCode::CallMethodV:
+                    case TacOpCode::CallOmit:
+                    case TacOpCode::GPropC:
+                    case TacOpCode::GMethodC:
+                    case TacOpCode::GPropRawC:
+                    case TacOpCode::GProp:
+                    case TacOpCode::GPropRaw:
+                    case TacOpCode::NewArray:
+                    case TacOpCode::NewDict:
+                    case TacOpCode::GetIndex:
+                    case TacOpCode::SetIndex:
+                    case TacOpCode::DPropC:
+                    case TacOpCode::DProp:
+                    case TacOpCode::DPropRawC:
+                    case TacOpCode::DPropRaw:
+                    case TacOpCode::DelPropC:
+                    case TacOpCode::DelProp:
+                    case TacOpCode::DerefGet:
+                    case TacOpCode::DerefSet:
+                    case TacOpCode::ToString:
+                    case TacOpCode::Inv:
+                    case TacOpCode::Debugger:
                         break;
                     case TacOpCode::Load: {
                         const auto kind = _chunk.getConstants()[inst->getOp2().value<ConstIdx>().index()].type();
-                        if(kind == ConstantType::None || kind == ConstantType::Real || kind == ConstantType::Atom)
+                        if(kind == ConstantType::None || kind == ConstantType::Real || kind == ConstantType::Atom ||
+                           kind == ConstantType::Object || kind == ConstantType::FuncMeta)
                             break;
                     }
                         [[fallthrough]];
@@ -1028,6 +1060,58 @@ namespace cial::decompile {
             }
         }
 
+        // 状态机方法接收者内联判定：Member 节点（GMethodC/GPropC dst）的唯一
+        // 使用是同块后续调用的 callee，且基址在两者之间未被重定义——内联渲染
+        // o.m(...)，getter 求值时机与异常归属随块保持
+        [[nodiscard]] bool memberCalleeInlineOk(const Register reg, const u32 version) const {
+            const auto &def = _defs[reg.index()][version];
+            if(def.usePcs.size() != 1)
+                return false;
+            const auto usePc = def.usePcs.front();
+            const auto &use = _chunk.getInstVec()[usePc];
+            Register callee{ 0xFFFF };
+            switch(use->opcode()) {
+                case TacOpCode::Call:
+                    callee = use->getOp2().value<Register>();
+                    break;
+                case TacOpCode::CallV:
+                case TacOpCode::CallMethodV:
+                    callee = static_cast<const inter::CallV &>(*use).func;
+                    break;
+                default:
+                    return false;
+            }
+            if(!(callee == reg))
+                return false;
+            if(blockAtPc(def.defPc) != blockAtPc(usePc))
+                return false; // 跨块：getter 求值时机会漂移，回落逐 pc 物化
+            const auto &member = _nodes[def.node];
+            const auto objNode = member.a;
+            if(objNode == INVALID)
+                return false;
+            const auto &obj = _nodes[objNode];
+            if(obj.kind == Expr::Kind::LocalName && !obj.globalName) {
+                for(size_t i = 0; i < _machineNames.size(); ++i) {
+                    if(_machineNames[i] != obj.text)
+                        continue;
+                    const auto objReg = Register{ static_cast<u16>(i) };
+                    for(u32 q = def.defPc + 1; q < usePc; ++q) {
+                        bool redefined = false;
+                        forEachDef(*_chunk.getInstVec()[q], [&](const Register r, const bool) {
+                            if(r == objReg)
+                                redefined = true;
+                        });
+                        if(redefined)
+                            return false;
+                    }
+                    break;
+                }
+            } else if(obj.kind != Expr::Kind::GlobalObj && obj.kind != Expr::Kind::ThisVal) {
+                return false; // 嵌套成员链等复杂基址：保守回落逐 pc 物化
+            }
+            return true;
+        }
+
         // ── Pass B：构建表达式节点与语句 tile ──
         // 版本游标按 pc 回放：操作数读取"本指令之前"的版本，定义落到 Pass A 在
         // 本 pc 登记的版本（definedVersion），指令处理完后提交推进
@@ -1067,11 +1151,20 @@ namespace cial::decompile {
                         if(hidden)
                             return;
                         const auto v = definedVersion(reg);
-                        if(v != INVALID && _defs[reg.index()][v].node != INVALID) {
-                            const auto &node = _nodes[_defs[reg.index()][v].node];
-                            if(node.kind != Expr::Kind::LocalName || node.text != _machineNames[reg.index()])
-                                noteNamedDef(reg);
-                        }
+                        if(v == INVALID)
+                            return;
+                        const auto nodeIdx = _defs[reg.index()][v].node;
+                        if(nodeIdx == INVALID)
+                            return;
+                        // 方法接收者内联：GMethodC/GPropC 的 Member 节点若其唯
+                        // 一使用是同块后续调用的 callee，内联渲染 o.m(...)（求
+                        // 值时机与异常归属随块保持）；跨块或基址不稳定时回落
+                        // 逐 pc 物化为机器变量
+                        if(_nodes[nodeIdx].kind == Expr::Kind::Member && memberCalleeInlineOk(reg, v))
+                            return;
+                        const auto &node = _nodes[nodeIdx];
+                        if(node.kind != Expr::Kind::LocalName || node.text != _machineNames[reg.index()])
+                            noteNamedDef(reg);
                     });
                 forEachDef(inst, [&](const Register reg, bool) {
                     const auto version = definedVersion(reg);
@@ -1352,7 +1445,13 @@ namespace cial::decompile {
                     defineNode(
                         inst.getOp3().value<Register>(),
                         memberNode(operandNode(inst.getOp1().value<Register>()), inst.getOp2().value<Atom>(), INVALID));
-                    noteNamedDef(inst.getOp3().value<Register>());
+                    // 状态机接收者内联：Member 唯一使用是同块调用的 callee 时
+                    // 保留节点内联渲染 o.m(...)（判定见 memberCalleeInlineOk），
+                    // 否则按机器变量逐 pc 物化
+                    if(!(_stateMachine &&
+                         memberCalleeInlineOk(inst.getOp3().value<Register>(),
+                                              definedVersion(inst.getOp3().value<Register>()))))
+                        noteNamedDef(inst.getOp3().value<Register>());
                     break;
                 case TacOpCode::GPropRawC:
                     // &o.x（Atom 直引）：property 引用，"&" 前缀形态
@@ -1504,10 +1603,19 @@ namespace cial::decompile {
                     }
                     const auto dstVersion = definedVersion(dst);
                     for(auto it = _pending.end() - static_cast<ptrdiff_t>(argc); it != _pending.end(); ++it) {
+                        // 实参 Push 与 Call 分属不同块时，线性配对可能把别的路
+                        // 径的实参配到本调用——两个发射器都保证同块相邻，此校
+                        // 验防未来发射器变化
+                        if(_stateMachine && blockAtPc(it->pc) != blockAtPc(_instPc)) {
+                            fail("Push 实参与 Call 跨块，状态机配对不安全");
+                            break;
+                        }
                         _nodes[node].args.push_back(it->node);
                         if(dstVersion != INVALID)
                             _redirect[it->pc] = packSlot(dst, dstVersion);
                     }
+                    if(!_unsupported.empty())
+                        break;
                     _pending.resize(_pending.size() - static_cast<size_t>(argc));
                     defineNode(dst, node);
                     noteNamedDef(dst);
@@ -3196,6 +3304,9 @@ namespace cial::decompile {
                 std::unordered_set<u16> bodyDefs;
                 for(u32 pc = handler.tryStart; pc < handler.tryEnd; ++pc)
                     forEachDef(*code[pc], [&](const Register reg, const bool) { bodyDefs.insert(reg.index()); });
+                std::unordered_set<u16> regionDefs(bodyDefs);
+                for(u32 pc = handler.tryEnd; pc < join; ++pc)
+                    forEachDef(*code[pc], [&](const Register reg, const bool) { regionDefs.insert(reg.index()); });
                 std::unordered_set<u16> contested;
                 for(u32 pc = handler.tryEnd; pc < join; ++pc) {
                     forEachUse(*code[pc], [&](const Register reg) {
@@ -3211,6 +3322,16 @@ namespace cial::decompile {
                                 return; // 更近的 catch 局部定义
                         }
                         contested.insert(reg.index());
+                    });
+                }
+                // join 之后的读取：no-throw 路径携带体区值、throw 路径携带
+                // catch 区值，线性链绑定到最后定义会丢另一条路径的值（如
+                // try{r=g();}catch(e){r=-1;} return r; 恒渲染 -1）——汇合点
+                // 版本合流同样交存储提升
+                for(u32 pc = join; pc < code.size(); ++pc) {
+                    forEachUse(*code[pc], [&](const Register reg) {
+                        if(reg.index() != handler.exValueReg && regionDefs.contains(reg.index()))
+                            contested.insert(reg.index());
                     });
                 }
                 for(const auto regIndex : contested) {

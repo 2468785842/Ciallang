@@ -12,7 +12,9 @@ M5 仍在进行；当前能力与剩余工作以
 **异常语料 9/9 全部结构化 try/catch**（无名寄存器与无名循环携带变量提升为合
 成存储），具名局部被 catch 读取（声明落点未证明）保持诚实回退，9 组语料
 darwin 参考对拍一致。switch 主线的调用标签表达式（`case f():`，自产与参考
-模板）已验收，新增 4 组 calllabel 语料。
+模板）已验收，新增 4 组 calllabel 语料。状态机调用族白名单扩展（含接收者内
+联 `o.m(...)`）与 try 写入侧 join 合流提升已验收，新增 `m5_exception_call_in_try`
+语料，异常语料 10/10 结构化。
 下面各批次保留当时的拒绝与验证事实，后续修复不覆盖历史失败记录。
 特别是早期“嵌套 switch 一律拒绝”和“赋值右值 FuncLit 待实现”不再是现状：
 自产双层/三层与参考函数内双层 switch 已验收；赋值右值 FuncLit 的源码
@@ -613,15 +615,38 @@ pcAnchors 平移（Optimizer 压缩重映射 + parseAst 回填），此前"不�
   multigroup}`；无 break 模板下 default 落为 switch 后直线语句（语义等价，
   回放逐字节一致）。全量 CTest 447/447；clang-format、diff --check 通过。
 
+## 状态机调用族与 try 写入侧合流（2026-11-08，darwin，基线 a9ffb22）
+
+状态机白名单扩展（调研确认 Pass B tile 与 Push/Call 线性配对与块无关，状态机
+按 pc 重放机器变量即可承载）：调用族 Push/Call/CallV/CallMethodV/CallOmit、
+成员与容器语句族（GProp 族、NewArray/NewDict、Get/SetIndex、DProp 族、
+DelProp 族、DerefGet/DerefSet、ToString/Inv/Debugger）、Load 的 Object 与
+FuncMeta 常量。Call 实参 Push 与 Call 跨块时防御性拒绝（防未来发射器变化）。
+
+- 接收者内联 `memberCalleeInlineOk`：GMethodC/GPropC 的 Member 节点唯一使用
+  是同块调用的 callee 且基址（机器寄存器）未被重定义时，跳过逐 pc 物化、内联
+  渲染 `o.m(...)`——getter 求值时机与异常归属随块保持；跨块回落物化。首版实
+  现挂在 noteNamedDef 兜底处但 GMethodC 的构建点已先物化，旁路前移到
+  buildInstruction 的 GPropC/GMethodC case 后生效。
+- try 写入侧合流：体/catch 区定义、join 后读取的寄存器提升（此前只覆盖 catch
+  读取方向）。`try{r=g();}catch(e){r=-1;} return r;` 的 bc 恢复曾恒渲染 -1
+  （no-throw 路径值丢失），提升后 `v0 = g(); … v0 = -1; … return v0;` 回放一致。
+- 函数字面量在状态机路径需装配宿主（`rebuildFunctionProgram` 不传宿主如实拒
+  绝），CLI 路径经 ShellAssembler 提供宿主。每次 Load 独立创建闭包，不提升。
+- 新增语料 `m5_exception_call_in_try`（bc 结构化 + 调用族，structured 标记）；
+  Catch2 新增"状态机方法调用内联接收者"用例（Math.abs 形态）、旧"Call 必须拒
+  绝"断言改为成功断言。异常语料 10/10 结构化。全量 CTest **448/448**；
+  clang-format、diff --check 通过。
+
 ## 建议下一步
 
 1. switch 后续批次：嵌套与 for 更新段 continue 组合的更多数据流形态；参考更
    复杂合流与多调用标签共享定义链形态；按方案 §7 继续参考 TJS2 四环验收。
 2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
-3. 状态机调用/接收者、闭包及对象常量协议扩展（try 体内含调用当前整单拒绝）。
-4. ExprFunction 变量赋值/实参的参考路径已验收；继续检查对象成员赋值的 NEW/this 差异。
-5. 具名局部被 catch 读取的声明落点协议（需 IRGen 侧把 `var` 落点锚定到
+3. 对象成员 FuncLit 赋值的 NEW/this 差异（`o.m = function...` 的参考恢复曾
+   0/2 调用计数不符，涉及 NEW 构造恢复与接收者语义）。
+4. 具名局部被 catch 读取的声明落点协议（需 IRGen 侧把 `var` 落点锚定到
    localVars 语义位置），优先级低于上述主线。
 
 ## 完成条件

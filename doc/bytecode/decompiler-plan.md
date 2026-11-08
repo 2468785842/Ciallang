@@ -126,7 +126,7 @@ M0/M1 后以真实产物的语义缺口重新估算工期；属性协议、异�
 |---|---|---|
 | switch | 常量/多值标签、贯穿、break/default、判别值单次求值（含调用判别值）；自产双层/三层嵌套及直接返回；参考函数内双层嵌套、贯穿、返回线程化与三层合流；调用标签表达式（`case f():`，首组/后续组/多组，自产与参考模板） | 更多合流形态；参考更复杂副作用标签形态 |
 | 循环组合 | 自产/参考 while、do、for 与 switch 的 break/continue；case/default 内循环；for 更新段调用计数 | 更多数据流形态；顶层无名寄存器携带的 for 初值仍拒绝 |
-| 控制流与异常 | 结构化优先；函数内 51 类受支持 TAC 的任意 CFG（含不可约）可降为状态机，寄存器逐次赋值，合成行不伪造来源；函数内 try/catch 结构化恢复（嵌套/重抛/无绑定/同起点嵌套），catch 体读取的体定义无名寄存器与无名循环携带变量提升为合成存储（spanClean 跨重定义判脏），9 组语料全部结构化且参考对拍一致 | 具名局部被 catch 读取的声明落点协议；调用/接收者、闭包及对象常量的降级协议扩展 |
+| 控制流与异常 | 结构化优先；函数内受支持 TAC 的任意 CFG（含不可约）可降为状态机（调用族、容器/成员/下标语句、字符串与函数字面量已入白名单，接收者内联渲染 `o.m(...)`），寄存器逐次赋值，合成行不伪造来源；函数内 try/catch 结构化恢复（嵌套/重抛/无绑定/同起点嵌套），体/catch 定义寄存器的 catch 读取与 join 后读取提升为合成存储（含无名循环携带），10 组语料全部结构化且参考对拍一致 | 具名局部被 catch 读取的声明落点协议；函数字面量在状态机中需装配宿主；闭包及对象常量中仍拒的协议形态（ChgThis/TestVoid/With/EvalStr/CallExpand/CollapseArgs/Super） |
 | 动态名字 | 避让已有参数、局部与 Atom 名；合成存储仅限函数，声明提升、赋值留原路径 | with/eval 名字依赖与不能恢复的边界裁定 |
 | M4 移交 | s7_ext outputdebug 读取已修复；实参及赋值右值匿名函数字面量的自产恢复已验证 | super 构造 prologue、CallMethodV 行表、testDeref 形态验收；ExprFunction 变量赋值/实参参考路径已验收；对象成员赋值的 NEW/this 差异待修 |
 | 最终验收 | 37 组成功 switch 字节码三路执行一致；新返回/三层及 ExprFunction 针对性参考对拍通过，扩展参考运行有间歇失败，见 note；拒绝样本固定登记 | 完整能力矩阵与 Unsupported 清单、模糊覆盖；参考原字节码直接加载环缺入口 |
@@ -208,6 +208,24 @@ Inc/Dec、NewArray/NewDict 路径（IncDec 经语句形态渲染 `name++;`）；
 - 新增固定语料 `m5_switch_calllabel_{first,later,discriminant,multigroup}`
   （darwin 导出，manifest `bytecodeChecks` 断言 `case lbl()` / `switch (d(`）。
   默认体在无 break 模板下落为 switch 后直线语句（语义等价）。
+
+### 状态机调用族与 try 写入侧合流（2026-11-08 第五批，darwin）
+
+- 状态机白名单扩展：调用族（Push/Call/CallV/CallMethodV/CallOmit）、成员与
+  容器语句族（GProp 族、NewArray/NewDict、GetIndex/SetIndex、DProp 族、
+  DelProp 族、DerefGet/DerefSet、ToString/Inv/Debugger）、Load 的 Object 与
+  FuncMeta 常量。Pass B 的 tile 构建与 Push/Call 线性配对与块无关，状态机按
+  pc 重放机器变量；Call 实参 Push 与 Call 跨块时防御性拒绝。函数字面量每次
+  Load 独立创建（不提升为共享函数）；状态机路径无装配宿主时函数字面量如实
+  拒绝。仍拒：ChgThis/TestVoid/With/EvalStr/CallExpand/CollapseArgs/Super。
+- 接收者内联（`memberCalleeInlineOk`）：GMethodC/GPropC 的 Member 节点唯一
+  使用是同块调用的 callee 且基址稳定时，内联渲染 `o.m(...)`（getter 求值时机
+  与异常归属随块保持）；跨块或基址重定义回落逐 pc 物化。
+- try 写入侧合流提升：体/catch 区定义、join 之后读取的寄存器提升为合成存储
+  （no-throw 路径携带体区值、throw 路径携带 catch 区值，线性链绑定到最后定
+  义会丢另一条路径的值）。新增语料 `m5_exception_call_in_try`（bc 结构化 +
+  调用族）；自产同名形态经状态机回退验收（声明落点守卫 + 状态机调用族）。
+  异常语料 10/10 结构化。
 
 ## 7. 验证闭环
 

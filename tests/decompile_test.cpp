@@ -716,13 +716,37 @@ TEST_CASE("decompile M5 - irreducible scalar CFG falls back without losing carri
     REQUIRE(collision.unsupported.find("参数与动态名字查找冲突") != std::string::npos);
     REQUIRE(collision.statements.empty());
     chunk.repl<Call>(13, Register{ 2 }, Register{ 3 }, Integer{ 0 });
+    // 调用族白名单扩展后，状态机按 pc 重放调用 tile（不可达块同理）
     const auto call = decompile::recoverUnitBody(runtime, chunk, meta, true);
-    REQUIRE(call.unsupported.find("生命周期/接收者协议") != std::string::npos);
-    REQUIRE(call.statements.empty());
+    INFO(call.unsupported);
+    REQUIRE(call.unsupported.empty());
+    REQUIRE_FALSE(call.statements.empty());
+    REQUIRE(std::ranges::any_of(call.statements,
+                                [](const auto &stmt) { return stmt.text.find("()") != std::string::npos; }));
     chunk.repl<EvalStr>(13, Register{ 0 }, Register{ 3 });
     const auto dynamic = decompile::recoverUnitBody(runtime, chunk, meta, true);
     REQUIRE(dynamic.unsupported.find("动态求值") != std::string::npos);
     REQUIRE(dynamic.statements.empty());
+}
+
+TEST_CASE("decompile M5 - state machine recovers method calls with inline receivers") {
+    Runtime runtime;
+    Context context{ runtime };
+    // 具名局部 + try + 调用：结构化被声明落点守卫拒绝，落回状态机；
+    // CallMethodV 的接收者经 memberCalleeInlineOk 内联渲染 o.m(...)
+    const std::string source = "function f(x) {\n"
+                               "    var r = 0;\n"
+                               "    try { r = Math.abs(x); if (x > 1) throw r; } catch (e) { r = -1; }\n"
+                               "    return r;\n"
+                               "}\n";
+    auto top = compileSource(runtime, context, source);
+    REQUIRE(top.has_value());
+    auto rooted = std::move(*top).toHeap(runtime);
+    const auto rebuilt = rebuildFunctionProgram(runtime, *rooted.get(), "f", "x");
+    INFO(rebuilt);
+    REQUIRE(rebuilt.find("while (true)") != std::string::npos);
+    REQUIRE(rebuilt.find(".abs(") != std::string::npos);
+    REQUIRE(runProgramOutputs(rebuilt, { 0, 2 }) == runProgramOutputs(source, { 0, 2 }));
 }
 
 TEST_CASE("decompile M5 - CFG fallback releases object argument roots after return") {

@@ -490,6 +490,14 @@
           "case lbl()"
         ]
       }
+    },
+    {
+      "name": "m5_exception_call_in_try",
+      "sourceSha256": "c3108a206471cac3e42e5fcdcf4aceea70174902cb95c0ca005bf799a4b7ad47",
+      "bytecodeSha256": "901226ac5944fe452962ff3885cb1bf593853da0c274020be92572cae5027a2a",
+      "expectedRecovery": "success",
+      "structured": true,
+      "reference": "darwin"
     }
   ],
   "referenceDarwin": {

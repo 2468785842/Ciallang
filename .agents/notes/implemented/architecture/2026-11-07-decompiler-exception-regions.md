@@ -150,6 +150,19 @@ catch 体读取的体定义无名寄存器提升为函数局部合成存储（`_
   复跑 9/9 一致；macOS Debug 全量 CTest **447/447**；clang-format 20.1.0、
   git diff --check 通过。
 
+## 状态机调用族与 join 写入侧合流（2026-11-08 第四批，darwin）
+
+- 状态机白名单扩展到调用族与容器/成员/下标/删除/转换语句族及 Load 的
+  Object/FuncMeta 常量（tile 已存在，状态机按 pc 物化机器变量即正确）；
+  Call 实参 Push 跨块防御性拒绝。接收者内联 `memberCalleeInlineOk`（唯一使用
+  = 同块调用 callee + 基址未重定义）渲染 `o.m(...)`，旁路须挂在
+  buildInstruction 的 GPropC/GMethodC case（兜底处已晚）。函数字面量每次 Load
+  独立创建；状态机无装配宿主时如实拒绝。
+- try 写入侧合流提升：体/catch 区定义、join 后读取的寄存器提升为合成存储
+  （no-throw/throw 两路径在汇合点的值不同，线性链绑定最后定义丢另一条路径）。
+- 新增语料 `m5_exception_call_in_try`（bc 结构化 + 调用族）；异常语料 10/10
+  结构化。全量 CTest **448/448**；参考对拍 10/10 一致。
+
 ## 后续边界
 
 - 具名局部的声明落点协议：需 IRGen 侧把声明与幸存定义解耦（如把 `var` 落点
