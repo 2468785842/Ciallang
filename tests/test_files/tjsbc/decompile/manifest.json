@@ -512,6 +512,31 @@
       "bytecodeSha256": "f2ef5b67d8791a57221097fe53d9ef8076e80885f20519eff0381813c637252f",
       "expectedRecovery": "success",
       "reference": "darwin"
+    },
+    {
+      "name": "m5_switch_calllabel_multi2",
+      "sourceSha256": "288d384911cfc7048c5159fac08b8ae981f1444b89c146b7eeb08eb1a8c294c9",
+      "bytecodeSha256": "ce3e380a589cc22f1da1a4726917ddb70fd29dc40caf340752e3dda98c887c44",
+      "expectedRecovery": "success",
+      "reference": "darwin",
+      "bytecodeChecks": {
+        "contains": [
+          "case f1()",
+          "case f2()"
+        ]
+      }
+    },
+    {
+      "name": "m5_switch_calllabel_mixed",
+      "sourceSha256": "7ef11c6ad779cf863ce9f36e47e4984e25d7c5dc66bea70d7b2c544e8e91a2e3",
+      "bytecodeSha256": "72e333e60ae3ee3401cc66006f6f4afbc8e49fee07548f4fb783c7c0890f3d51",
+      "expectedRecovery": "success",
+      "reference": "darwin",
+      "bytecodeChecks": {
+        "contains": [
+          "case f1()"
+        ]
+      }
     }
   ],
   "referenceDarwin": {

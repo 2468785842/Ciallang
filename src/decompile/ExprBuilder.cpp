@@ -758,7 +758,7 @@ namespace cial::decompile {
                         name = fmt::format("a{}", i);
                     pushDef(reg, false);
                     _defs[i].back().node = makeNamed(Expr::Kind::LocalName, name, false);
-                    _declaredLocals.emplace(i, name);
+                    _declaredScopeStarts[{ i, name }] = 0;
                 }
             }
             auto &instructions = _chunk.getInstVec();
@@ -1361,7 +1361,7 @@ namespace cial::decompile {
                         // 具名局部赋值（IRGen 的 var 零拷贝路径由 noteNamedDef 处理，
                         // 这里是"作用域已有 → DLocal"的重赋值/拷入路径）
                         Stmt stmt{ .kind = Stmt::Kind::StoreLocal, .pc = _instPc, .src = slotOf(src), .name = name };
-                        stmt.declare = declareLocal(dst.index(), name);
+                        stmt.declare = declareLocal(dst.index(), name, _instPc);
                         pushStmt(std::move(stmt));
                         defineNode(dst, makeNamed(Expr::Kind::LocalName, name, false));
                     } else {
@@ -1713,21 +1713,48 @@ namespace cial::decompile {
             auto &def = _defs[reg.index()][version];
             // var x; 的 void 初始化也走此路径（Load *0 到具名寄存器）
             Stmt stmt{ .kind = Stmt::Kind::StoreLocal, .pc = _instPc, .exprNode = def.node, .name = name };
-            stmt.declare = declareLocal(reg.index(), name);
+            stmt.declare = declareLocal(reg.index(), name, _instPc);
             pushStmt(std::move(stmt));
             const auto nameNode = makeNamed(Expr::Kind::LocalName, name, false);
             def.node = nameNode;
         }
 
-        [[nodiscard]] bool declareLocal(const u16 regIndex, const std::string &name) {
+        // localVars 中该 (寄存器, 名字) 在定义点 pc 处活跃或即将开始的作用域
+        // startPC（endPC > pc 或未封闭；无名时 INVALID）。寄存器复用使同名局
+        // 部拥有多个不相交条目，按定义点选取所属作用域
+        [[nodiscard]] u32 localScopeStart(const u16 regIndex, const std::string &name, const u32 pc) const {
+            if(!_meta)
+                return INVALID;
+            u32 best = INVALID;
+            for(const auto &local : _meta->localVars) {
+                if(local.reg.index() != regIndex || local.identifier == ATOM_INVALID)
+                    continue;
+                if(atomText(_rt, local.identifier) != name)
+                    continue;
+                const auto end = local.endPC.address();
+                if(end != 0 && end <= pc)
+                    continue; // 作用域已在定义点前结束
+                const auto start = static_cast<u32>(local.startPC.address());
+                if(best == INVALID || start < best)
+                    best = start;
+            }
+            return best;
+        }
+
+        [[nodiscard]] bool declareLocal(const u16 regIndex, const std::string &name, const u32 pc) {
             if(_stateMachine)
                 return false;
             const auto synthetic = _switchLocalNames.find(regIndex);
             if(synthetic != _switchLocalNames.end() && synthetic->second.first == name)
                 return false; // 合成存储在函数体入口统一声明，赋值仍保留原 pc。
-            if(_declaredLocals.contains({ regIndex, name }))
-                return false;
-            _declaredLocals.emplace(regIndex, name);
+            const auto promoted = _promotedStorage.find(regIndex);
+            if(promoted != _promotedStorage.end() && promoted->second.first == name)
+                return false; // 提升存储在函数体入口统一声明。
+            const auto start = localScopeStart(regIndex, name, pc);
+            const auto it = _declaredScopeStarts.find({ regIndex, name });
+            if(it != _declaredScopeStarts.end() && (start == INVALID || it->second == start))
+                return false; // 同一作用域内已声明
+            _declaredScopeStarts[{ regIndex, name }] = start;
             return true;
         }
 
@@ -1858,7 +1885,7 @@ namespace cial::decompile {
                             spec.name = localNameAt(ldst, chain + 1);
                             if(!spec.name.empty()) {
                                 install = Install::Local;
-                                spec.declare = declareLocal(ldst.index(), spec.name);
+                                spec.declare = declareLocal(ldst.index(), spec.name, chain);
                                 matched = true;
                             }
                             // 匿名拷入（dst 无名）：值进入表达式流，不是安装
@@ -3156,7 +3183,7 @@ namespace cial::decompile {
                 return false;
             const auto storageName = nextTempName();
             _promotedStorage.emplace(regIndex, std::pair{ storageName, firstDef + 1 });
-            _declaredLocals.emplace(regIndex, storageName);
+            _declaredScopeStarts[{ regIndex, storageName }] = firstDef + 1;
             if(_meta && regIndex < _meta->arity) {
                 // 参数槽在体内重定义：入口拷贝兜住"重定义前"的读取（与状态机
                 // var vN = aN 同语义）
@@ -3186,6 +3213,17 @@ namespace cial::decompile {
                         continue;
                     if(!localNameAt(Register{ regIndex }, condEnd).empty())
                         continue; // 具名/参数：读变量名即运行时值
+                    // 条件区内定义（每轮重载的常量/拷贝）不是循环携带变量：
+                    // 交由 guardLoopCond 的字面量绑定判定处理
+                    bool condZoneDef = false;
+                    for(u32 pc = condBegin; pc < condEnd && !condZoneDef; ++pc) {
+                        forEachDef(*code[pc], [&](const Register r, const bool) {
+                            if(r.index() == regIndex)
+                                condZoneDef = true;
+                        });
+                    }
+                    if(condZoneDef)
+                        continue;
                     bool redefined = false;
                     for(u32 pc = bodyBegin; pc <= bodyEndIncl && !redefined; ++pc) {
                         forEachDef(*code[pc], [&](const Register r, const bool) {
@@ -4548,6 +4586,18 @@ namespace cial::decompile {
 
         // ── 结构化发射（多块；语句按 pc 排序后由游标消费，区域递归带缩进）──
         void emitStructured(Vec<RecoveredStatement> &out) {
+            if(getenv("CIAL_DECOMPILE_DEBUG")) {
+                for(const auto &entry : _promotedStorage)
+                    fprintf(stderr, "[dbg] promoted reg=%u name=%s start=%u\n", entry.first,
+                            entry.second.first.c_str(), entry.second.second);
+                if(_meta)
+                    for(const auto &local : _meta->localVars)
+                        fprintf(stderr, "[dbg] local reg=%u name=%s start=%u end=%u\n",
+                                static_cast<unsigned>(local.reg.index()),
+                                atomText(_rt, local.identifier).c_str(),
+                                static_cast<unsigned>(local.startPC.address()),
+                                static_cast<unsigned>(local.endPC.address()));
+            }
             // case 的词法局部不能供兄弟 case 使用；合成合流存储必须属于函数。
             // try 提升存储同理；参数槽以入口拷贝初始化（异常可先于体内重定义发生）
             std::set<std::string> syntheticNames;
@@ -4942,7 +4992,7 @@ namespace cial::decompile {
             u32 node;
         };
         Vec<PendingArg> _pending; // 转译路径 Push 序列
-        std::set<std::pair<u16, std::string>> _declaredLocals;
+        std::map<std::pair<u16, std::string>, u32> _declaredScopeStarts;
         std::set<std::string> _declaredGlobals;
         std::unordered_set<std::string> _usedNames;
         std::unordered_map<u16, std::pair<std::string, u32>> _switchLocalNames; // 参考 switch 合流寄存器的函数局部存储
@@ -4969,6 +5019,12 @@ namespace cial::decompile {
 
     ExprRecovery recoverUnitBody(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike,
                                  DeclHost *host) {
+        if(getenv("CIAL_DECOMPILE_DEBUG") && chunk.getInstVec().size() > 15) {
+            static int n = 0;
+            if(n++ < 2)
+                for(size_t pc = 0; pc < chunk.getInstVec().size(); ++pc)
+                    fprintf(stderr, "[dbg]   @%zu %s\n", pc, chunk.getInstVec()[pc]->dump(nullptr).c_str());
+        }
         auto recovered = ExprBuilder{ rt, chunk, meta, functionLike, host }.run();
         if(!recovered.unsupported.empty() && functionLike) {
             auto fallback = ExprBuilder{ rt, chunk, meta, functionLike, host, true }.run();

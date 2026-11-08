@@ -1,0 +1,2 @@
+function f1(){return 2;} function f(x){switch(x){case f1():case 2:return 20;case 3:return 30;default:return 40;}}
+println(f(2));println(f(3));println(f(9));

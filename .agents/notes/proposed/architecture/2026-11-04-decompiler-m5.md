@@ -657,10 +657,38 @@ initDefaultVal 单元的物化临时（单元尾 `ret %0` 使 void 初值多使�
 - 新增 2 组 darwin 语料 `m5_funclit_object_{newdict,classmember}`；全量 CTest
   **448/448**；clang-format、diff --check 通过。探针 out/m5-newthis/。
 
+## 模糊覆盖落地与三个修复（2026-11-08，darwin，基线 c576dd5）
+
+方案 §6 最终验收的"模糊覆盖"项落地：`tests/cli/test_fuzz.py`（CiallangFuzz，
+120 个种子固定程序，受支持语句模板随机组合——表达式/赋值/容器/if/while/for/
+do/switch/try/catch/调用，环①逐程序比对；棘轮式 KNOWN_FAILURES 登记——已知
+失败程序显式跳过并打印，修复后不移除即断言失败）。多调用标签链
+（`case f1(): case f2():` 混合常量组）探针全过，新增 2 组语料
+`m5_switch_calllabel_{multi2,mixed}`。
+
+模糊首跑抓到三个真缺陷，全部修复：
+
+1. **条件区内定义的寄存器被循环携带提升**（`while (i < 0)` 的常量 0 装入寄
+   存器被提升为 `v0`，恢复文本引用未定义变量）：precomputeLoopStorage 排除
+   条件区内定义的寄存器，交回 guardLoopCond 既有判定。
+2. **同名局部遮蔽塌缩**：同一寄存器索引在不相交 pc 段承载两个同名局部（作
+   用域结束后的寄存器复用），`_declaredLocals` 按 (reg,name) 去重吞掉第二个
+   作用域的 `var` 声明，两个运行时槽塌缩成一个名字导致死循环。改为按定义点
+   所属作用域起点判定（`localScopeStart(reg,name,pc)`：endPC > pc 中 startPC
+   最小者），新增 `_declaredScopeStarts`。
+3. **恢复源码回放挂起**（1、2 的叠加形态）。
+
+仍登记的已知缺口（棘轮）：**嵌套 do-while + 死初始化消除**的声明落点与区域
+归约变形（program 49，repro 存 out/fuzz-known-issues/）——外层 do 体对局部 a
+的赋值被渲染成块内 `var a = 2;`（顶层 a 初始化被优化器删除后，声明落点未锚
+定到 localVars 语义位置）+ 内层 do 的常量条件提升泄漏，属同一声明落点协议缺
+口。模糊测试生成器相应规避同层同名循环变量（注册于 KNOWN_FAILURES 并可棘轮
+收紧）。全量 CTest **449/449**（新增 CiallangFuzz）。
+
 ## 建议下一步
 
-1. switch 后续批次：嵌套与 for 更新段 continue 组合的更多数据流形态；参考更
-   复杂合流与多调用标签共享定义链形态；按方案 §7 继续参考 TJS2 四环验收。
+1. 嵌套 do-while + 死初始化消除的声明落点协议（模糊已登记 repro）。
+2. switch 后续批次：参考更复杂合流形态；按方案 §7 继续参考 TJS2 四环验收。
 2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
 3. 具名局部被 catch 读取的声明落点协议（需 IRGen 侧把 `var` 落点锚定到
