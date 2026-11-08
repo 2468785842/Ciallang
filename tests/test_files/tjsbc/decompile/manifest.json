@@ -380,13 +380,15 @@
       "name": "m5_exception_nested",
       "sourceSha256": "736a7fad88ef51ef8bd517caf590cbfc25c94ea471ab08f43e53c07c38c21c38",
       "bytecodeSha256": "8fd1e28afd8d54a51a761e6bce2c44715d5699c2109bd6e958665e99826669b5",
-      "expectedRecovery": "success"
+      "expectedRecovery": "success",
+      "structured": true
     },
     {
       "name": "m5_exception_empty",
       "sourceSha256": "6b4ce5600e75edb1d31c54f28950707461d5e4e5896319b1933e1d7accd8da4d",
       "bytecodeSha256": "d0e46ee532339e9486e8b4545e6eb6d5a692dcabe8f5df09ac64a35ccda4636d",
-      "expectedRecovery": "success"
+      "expectedRecovery": "success",
+      "structured": true
     },
     {
       "name": "m5_exception_return",
@@ -399,7 +401,8 @@
       "name": "m5_exception_getter",
       "sourceSha256": "1a4b1d0e6df08bef9905539cf8115779ad0fdbae4d85b6fc1c7843d8dbc772c5",
       "bytecodeSha256": "ed9438349abab02c10e03eef378f7671479fd32d72b6ea112fde7cc92e0a052d",
-      "expectedRecovery": "success"
+      "expectedRecovery": "success",
+      "structured": true
     },
     {
       "name": "m5_exception_loop",
@@ -412,7 +415,8 @@
       "sourceSha256": "ec6444a053cc04a00fe4822892aa9105b2d9b4c2878c295c3fd1020a0a801392",
       "bytecodeSha256": "67e11ff0225f489bde4cb1e67f520d8351af4ca73b7f3c676a1e61be17838aa5",
       "expectedRecovery": "success",
-      "reference": "darwin"
+      "reference": "darwin",
+      "structured": true
     },
     {
       "name": "m5_exception_catch_switch",
@@ -427,14 +431,16 @@
       "sourceSha256": "aeea137f9659f65d492fbc6bbfce23a747708cd73bd816b2a3ccbea1f0da0f51",
       "bytecodeSha256": "401e85932cace9cc62bc0c65fecaed5d6d0c09d769ad1bb6e16d7667d8e7e680",
       "expectedRecovery": "success",
-      "reference": "darwin"
+      "reference": "darwin",
+      "structured": true
     },
     {
       "name": "m5_exception_catch_reads_try_local",
       "sourceSha256": "b113f9e37d019b76fbc050c304d313b6487ba97b54474ae115be4ef98c9cbb23",
       "bytecodeSha256": "6f84806d4d8e0e235ad36502c0de040b553463d583bb7ed22a20e9a345fa4f37",
       "expectedRecovery": "success",
-      "reference": "darwin"
+      "reference": "darwin",
+      "structured": true
     }
   ],
   "referenceDarwin": {

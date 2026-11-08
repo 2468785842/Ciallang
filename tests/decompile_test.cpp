@@ -945,11 +945,12 @@ TEST_CASE("decompile M5 - structured bare catch without exception slot") {
     REQUIRE(runProgramOutputs(rebuilt, { 0, 9 }) == runProgramOutputs(source, { 0, 9 }));
 }
 
-TEST_CASE("decompile M5 - catch reading try-body register falls back to state machine") {
+TEST_CASE("decompile M5 - catch reading named try-body register falls back to state machine") {
     Runtime runtime;
     Context context{ runtime };
-    // 数据流守卫拒绝（异常时点的版本不明确），自动落回状态机且语义正确；
-    // 存储提升需先解决寄存器复用快照与无名循环携带交互，属后续批次
+    // 具名局部不提升（优化器删除体外死初始化后幸存定义内移，`var` 声明落点
+    // 随之漂移，块作用域下 catch 不可见）——数据流守卫拒绝，落回状态机且语义
+    // 正确。无名寄存器的提升由固定 bc 语料端到端覆盖（manifest structured 标记）
     const std::string source = "function f(x){var r=0;try{r=x*3;if(x==0)throw 7;}catch(e){r=r+e;}return r;}";
     auto top = compileSource(runtime, context, source);
     REQUIRE(top.has_value());

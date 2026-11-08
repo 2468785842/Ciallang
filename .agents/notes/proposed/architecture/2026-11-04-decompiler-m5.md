@@ -6,11 +6,12 @@ Status: proposed
 
 M5 仍在进行；当前能力与剩余工作以
 [方案当前状态表](../../../../doc/bytecode/decompiler-plan.md#m5-当前状态2026-11-05)为准。
-异常区域已完成状态机首版（2026-11-07 验收）与结构化 try/catch 首版
-（2026-11-08），实现与边界见
+异常区域已完成状态机首版（2026-11-07 验收）、结构化 try/catch 首版与 catch
+数据流存储提升（2026-11-08 两批），实现与边界见
 [实现记录](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)：
-已证明形态输出真 try/catch，未证明形态落回状态机，9 组语料 darwin 参考对拍
-一致；catch 体读 try 体内寄存器的数据流协议是异常主线剩余项。
+bc 语料 8/9 走结构化 try/catch（无名寄存器提升为合成存储），`m5_exception_loop`
+（无名循环携带）与具名局部被 catch 读取（声明落点未证明）保持诚实回退，
+9 组语料 darwin 参考对拍一致。
 下面各批次保留当时的拒绝与验证事实，后续修复不覆盖历史失败记录。
 特别是早期“嵌套 switch 一律拒绝”和“赋值右值 FuncLit 待实现”不再是现状：
 自产双层/三层与参考函数内双层 switch 已验收；赋值右值 FuncLit 的源码
@@ -556,11 +557,29 @@ M5 专项 552 assertions / 4 cases 通过，最终全量 CTest 245/245（22.00s�
 - 9 组语料参考对拍复跑 9/9 一致；macOS Debug 全量 CTest **447/447**（含 4 个
   新用例）；clang-format 20.1.0 与 git diff --check 通过。
 
+## catch 数据流存储提升（2026-11-08，darwin，基线 f347ff9）
+
+catch 体读取的体定义无名寄存器提升为函数局部合成存储（`_tryStorageNames`）。
+首批回退的三个根因按挂点解决：spanClean 跨提升存储重定义判脏（正确性关键，
+先于 `_impureOrStore` 短路）、guardLoopCond 字面量判定前 resolveCopyNode 下钻
+（修复 `0 < a0` 无名循环携带逃逸的独立漏洞）、noteNamedDef 补 Inc/Dec 与
+NewArray/NewDict（IncDec 渲染 `name++;` 语句形态）。参数槽附入口拷贝并预登记
+`_declaredLocals` 保证唯一 `var`。**修正记录**：localVars 的 pc 索引已随
+pcAnchors 平移（Optimizer 压缩重映射 + parseAst 回填），此前"不重映射"表述
+不准；真实缺口是死初始化删除后声明落点语义不保。
+
+- 覆盖面：bc 语料 **8/9** 结构化（nested/empty/return/getter/try_switch/
+  catch_switch/nested_three/catch_reads_try_local，manifest `structured: true`
+  对 .tjsbc 输入断言无 `while (true)`）；`m5_exception_loop` 因无名循环携带 `i`
+  被修复后的 guardLoopCond 正确拒绝，保持状态机回退。具名局部被 catch 读取
+  （声明落点未证明）与 try 体内含调用保持诚实拒绝。
+- 9 组语料参考对拍复跑 9/9 一致；macOS Debug 全量 CTest **447/447**；
+  clang-format 20.1.0、git diff --check 通过。
+
 ## 建议下一步
 
-1. catch 体读 try 体内寄存器的数据流协议：寄存器复用拷贝快照、无名循环携带
-   渲染、Optimizer localVars 重映射（独立既有缺口），三者齐备后再评估合成
-   存储提升。
+1. 无名循环携带变量的渲染协议（`m5_exception_loop` 的 `i`：条件/自增读取的
+   无名寄存器提升或物化），使循环内 try + catch 读体寄存器走结构化。
 2. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue
    组合的更多数据流形态；参考更复杂合流与有副作用标签（返回/三层固定样本已通过）；按方案 §7 继续参考 TJS2 四环验收。
 3. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修

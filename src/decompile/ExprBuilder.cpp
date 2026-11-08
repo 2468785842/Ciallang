@@ -1459,11 +1459,13 @@ namespace cial::decompile {
                 case TacOpCode::NewArray: {
                     const auto node = newNode(Expr::Kind::ArrayLit);
                     defineNode(inst.getOp1().value<Register>(), node);
+                    noteNamedDef(inst.getOp1().value<Register>());
                     break;
                 }
                 case TacOpCode::NewDict: {
                     const auto node = newNode(Expr::Kind::DictLit);
                     defineNode(inst.getOp1().value<Register>(), node);
+                    noteNamedDef(inst.getOp1().value<Register>());
                     break;
                 }
                 case TacOpCode::NewRegExp: {
@@ -1538,12 +1540,15 @@ namespace cial::decompile {
                 case TacOpCode::Inc:
                 case TacOpCode::Dec: {
                     // 单指令自增：旧版本为操作数、新版本承载结果。仅"结果直接回写
-                    // 同名目标"的语句形态可恢复（IRGen 不发射；来自 TJS2 转译）
+                    // 同名目标"的语句形态可恢复（IRGen 不发射；来自 TJS2 转译）。
+                    // 具名/合成存储经 noteNamedDef 落为 `name++;` 语句并改绑新版
+                    // 本，避免后续读取内联出 `name++` 表达式（后缀值语义错误）
                     const auto reg = inst.getOp1().value<Register>();
                     const auto node = newNode(Expr::Kind::IncDec);
                     _nodes[node].text = inst.opcode() == TacOpCode::Inc ? "++" : "--";
                     _nodes[node].a = operandNode(reg);
                     defineNode(reg, node);
+                    noteNamedDef(reg);
                     break;
                 }
                 case TacOpCode::ChkIns: {
@@ -2298,6 +2303,9 @@ namespace cial::decompile {
                 const auto recovered = _switchLocalNames.find(reg.index());
                 if(recovered != _switchLocalNames.end() && pc >= recovered->second.second)
                     return recovered->second.first;
+                const auto promoted = _tryStorageNames.find(reg.index());
+                if(promoted != _tryStorageNames.end() && pc >= promoted->second.second)
+                    return promoted->second.first;
             }
             return best;
         }
@@ -2486,16 +2494,19 @@ namespace cial::decompile {
         }
 
         // def → landing 开区间干净：无存储/调用/getter，除非中间定义同落点内联
-        // （同一表达式树，求值序不变）或本身恒可内联
+        // （同一表达式树，求值序不变）或本身恒可内联。提升存储的重定义任何内联
+        // 都不可跨越（Copy.srcVersion 渲染期实时解析，会读到重定义前/后的值）
         [[nodiscard]] bool spanClean(const DefVersion &def, const std::unordered_map<u32, u32> &defSlotAtPc) const {
             if(alwaysInlinable(def.node))
                 return true;
             if(def.landing == INVALID || def.landing <= def.defPc)
                 return true; // 自引用/同 pc
             for(u32 pc = def.defPc + 1; pc < def.landing; ++pc) {
+                const auto it = defSlotAtPc.find(pc);
+                if(it != defSlotAtPc.end() && _tryStorageNames.contains(static_cast<u16>(it->second >> 16)))
+                    return false; // 跨越提升存储重定义
                 if(!_impureOrStore[pc])
                     continue;
-                const auto it = defSlotAtPc.find(pc);
                 if(it != defSlotAtPc.end()) {
                     const auto &mid = _defs[it->second >> 16][it->second & 0xFFFF];
                     if(mid.landing == def.landing && !mid.materialized)
@@ -3086,17 +3097,20 @@ namespace cial::decompile {
                         }
                     }
                 }
-                // 数据流守卫：catch 体读取 try 体内定义的寄存器 = SSA 版本在异常
-                // 时点不明确（异常可发生在定义前的任意 pc），且优化器可能删除体
-                // 外的死初始化使具名局部的幸存定义内移（声明落点随之漂移，块作
-                // 用域下 catch 不可见）——保守拒绝落回状态机（其逐 pc 槽赋值本
-                // 就正确）。例外：读取之前 catch 体内已有同号寄存器定义（寄存器
-                // 复用），线性链绑定到 catch 局部定义，值语义正确。exValueReg 由
-                // VM 写入，经 Pass A/B 重绑定放行
+                // 数据流守卫：catch 体读取 try 体内定义的寄存器时，SSA 版本在异
+                // 常时点不明确（异常可发生在定义前的任意 pc）。无名寄存器提升为
+                // 函数局部合成存储（全部定义经 noteNamedDef 落为同名赋值，catch
+                // 读取即抛出点值；spanClean 把跨越提升存储重定义的内联判脏），
+                // 与 switch 合流存储同机制。具名局部不提升：优化器删除体外死初
+                // 始化后幸存定义内移，`var` 声明落点随之漂移，块作用域下 catch
+                // 不可见（声明落点守卫保持拒绝）。读取之前 catch 体内已有同号
+                // 寄存器定义（复用）的线性链绑定 catch 局部定义，无需提升。
+                // exValueReg 由 VM 写入，经 Pass A/B 重绑定放行
                 std::unordered_set<u16> bodyDefs;
                 for(u32 pc = handler.tryStart; pc < handler.tryEnd; ++pc)
                     forEachDef(*code[pc], [&](const Register reg, const bool) { bodyDefs.insert(reg.index()); });
-                for(u32 pc = handler.tryEnd; pc < join && _unsupported.empty(); ++pc) {
+                std::unordered_set<u16> contested;
+                for(u32 pc = handler.tryEnd; pc < join; ++pc) {
                     forEachUse(*code[pc], [&](const Register reg) {
                         if(reg.index() == handler.exValueReg || !bodyDefs.contains(reg.index()))
                             return;
@@ -3109,11 +3123,41 @@ namespace cial::decompile {
                             if(redefined)
                                 return; // 更近的 catch 局部定义
                         }
-                        fail(fmt::format("catch 体读取 try 体内定义的寄存器 %{}，数据流属后续批次（M5）", reg.index()));
+                        contested.insert(reg.index());
                     });
                 }
-                if(!_unsupported.empty())
-                    return;
+                for(const auto regIndex : contested) {
+                    if(_tryStorageNames.contains(regIndex) || _switchLocalNames.contains(regIndex))
+                        continue; // 已是合成存储（本 handler 提升 / switch 合流）
+                    if(!localNameAt(Register{ regIndex }, handler.tryEnd).empty()) {
+                        fail(fmt::format("catch 体读取 try 体内定义的具名寄存器 %{}，声明落点未证明（M5）", regIndex));
+                        return;
+                    }
+                    // 存储名从最早定义之后可见（对齐 localNameAt 的"定义后"契约）；
+                    // 体前无定义时首定义在体内，语义相同
+                    u32 firstDef = INVALID;
+                    for(u32 pc = 0; pc < join && firstDef == INVALID; ++pc) {
+                        forEachDef(*code[pc], [&](const Register r, const bool) {
+                            if(r.index() == regIndex && firstDef == INVALID)
+                                firstDef = pc;
+                        });
+                    }
+                    if(firstDef == INVALID) {
+                        fail(fmt::format("catch 体读取的寄存器 %{} 缺少定义点", regIndex));
+                        return;
+                    }
+                    const auto storageName = nextTempName();
+                    _tryStorageNames.emplace(static_cast<u16>(regIndex), std::pair{ storageName, firstDef + 1 });
+                    // 入口声明是唯一的 var；后续命名定义不再带 declare 前缀
+                    _declaredLocals.emplace(static_cast<u16>(regIndex), storageName);
+                    if(_meta && regIndex < _meta->arity) {
+                        // 参数槽在体内重定义且被 catch 读取：入口拷贝兜住"异常先
+                        // 于体内重定义"的读取（与状态机 var vN = aN 同语义）
+                        const auto src = localNameAt(Register{ regIndex }, 0);
+                        _tryParamCopies.emplace(static_cast<u16>(regIndex),
+                                                src.empty() ? fmt::format("a{}", regIndex) : src);
+                    }
+                }
                 // 声明落点守卫：具名局部最早的命名定义点若落在 try 体内且体外
                 // （catch 体 / try 后代码 / 体前）存在同名引用，`var` 声明会随
                 // 幸存定义内移（优化器删除体外死初始化时不重映射 localVars），
@@ -4027,7 +4071,9 @@ namespace cial::decompile {
                     // 不会改变下一轮比较读取的值，不属于循环携带依赖。
                     if(def.defPc >= _blocks[blockIdx].start)
                         return;
-                    const auto kind = _nodes[def.node].kind;
+                    // 匿名拷贝链（LoadImm → DLocal）按源头判字面量，否则
+                    // Copy 节点绕过下方的 kind 判定，渲染出 `0 < a0` 类文本
+                    const auto kind = _nodes[resolveCopyNode(def.node)].kind;
                     if(kind != Expr::Kind::Int && kind != Expr::Kind::Real && kind != Expr::Kind::Str)
                         return;
                     for(const auto &v : _defs[reg.index()]) {
@@ -4245,11 +4291,20 @@ namespace cial::decompile {
         // ── 结构化发射（多块；语句按 pc 排序后由游标消费，区域递归带缩进）──
         void emitStructured(Vec<RecoveredStatement> &out) {
             // case 的词法局部不能供兄弟 case 使用；合成合流存储必须属于函数。
+            // try 提升存储同理；参数槽以入口拷贝初始化（异常可先于体内重定义发生）
             std::set<std::string> syntheticNames;
             for(const auto &[reg, storage] : _switchLocalNames)
                 syntheticNames.insert(storage.first);
             for(const auto &name : syntheticNames)
                 out.push_back(RecoveredStatement{ .pc = 0, .text = fmt::format("var {};", name) });
+            for(const auto &[reg, storage] : _tryStorageNames) {
+                const auto copy = _tryParamCopies.find(reg);
+                if(copy != _tryParamCopies.end())
+                    out.push_back(RecoveredStatement{
+                        .pc = 0, .text = fmt::format("var {} = {};", storage.first, copy->second) });
+                else
+                    out.push_back(RecoveredStatement{ .pc = 0, .text = fmt::format("var {};", storage.first) });
+            }
             (void)std::stable_sort(_stmts.begin(), _stmts.end(),
                                    [](const Stmt &a, const Stmt &b) { return a.pc < b.pc; });
             _emitCursor = 0;
@@ -4633,6 +4688,9 @@ namespace cial::decompile {
         std::set<std::string> _declaredGlobals;
         std::unordered_set<std::string> _usedNames;
         std::unordered_map<u16, std::pair<std::string, u32>> _switchLocalNames; // 参考 switch 合流寄存器的函数局部存储
+        std::unordered_map<u16, std::pair<std::string, u32>>
+            _tryStorageNames; // catch 数据流提升的寄存器存储（reg → {名, 起始 pc}）
+        std::unordered_map<u16, std::string> _tryParamCopies; // 提升参数槽 → 入口拷贝源名
         u32 _tempCounter{};
         std::unordered_map<u32, DeclSpec> _declSpecs; // Load pc → 声明安装规格（M4）
 

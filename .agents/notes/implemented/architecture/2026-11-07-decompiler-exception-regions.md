@@ -93,32 +93,54 @@ manifest 42 组 sourceSha256 按实际 LF 字节重生成（字节码哈希全�
   Pass B（buildNodesAndStmts）重置 `_current` 后需按 Pass A 记录的版本下标恢
   复（首轮只在 Pass A 重绑定，裸 catch/具名槽样本在 Pass B 报"使用未定义寄存
   器"，双游标修复后通过）。无绑定槽输出裸 `catch {`。
-- 数据流守卫（保守拒绝，落回状态机语义不回退）：
+- 数据流守卫（2026-11-08 首版保守拒绝；同日第二批改为无名寄存器提升，见下节）：
   1. catch 体读 try 体内定义的寄存器——异常时点版本不明确；例外：读取之前
      catch 体内已有同号寄存器定义（寄存器复用，线性链绑定 catch 局部定义）。
-     曾尝试把此类寄存器提升为合成存储（与 switch 合流存储同机制），但与本机
-     观察到的寄存器复用（参数槽被后续变量复用）交互产生错误输出（条件读到重
-     定义后的存储、`0++` 渲染），提升需先解决拷贝快照与无名循环携带两个协议，
-     已回退为拒绝。
-  2. 具名局部声明落点守卫：优化器删除体外死初始化时不重映射 localVars（独立
-     既有缺口），幸存定义内移使 `var` 声明落进 try 体，块作用域下 catch 与
-     try 后代码不可见（`catch(e){ r += e; }` 报 Not found property 的真实回放
-     失败）。当某具名局部最早的命名定义在体区内、体前无同名定义、且体外有
-     同名引用时拒绝。
-- 覆盖面（本机验证）：bc 路径 `m5_exception_return`/`m5_exception_catch_switch`
-  走结构化（manifest 标 `structured: true`，CLI 测试断言无 `while (true)`）；
-  自产路径 catch 仅读异常槽/无绑定/嵌套重抛的结构化输出经 Catch2 断言与回放
-  验证。其余 7 组 bc 语料与 catch 读体寄存器的自产形态经状态机回退，9 组语料
-  参考对拍 9/9 一致（`out/m5-exception/reference-report.json` 复跑）。
+  2. 具名局部声明落点守卫：localVars 的 pc 索引已随 pcAnchors 平移
+     （`Optimizer.cpp` 压缩时重映射锚点，`IRGenerator::parseAst` 回填），但
+     优化器删除体外死初始化后**幸存定义内移**，`var` 声明落进 try 体，块作用
+     域下 catch 与 try 后代码不可见（`catch(e){ r += e; }` 报 Not found
+     property 的真实回放失败）。当某具名局部最早的命名定义在体区内、体前无
+     同名定义、且体外有同名引用时拒绝。
+- 覆盖面（2026-11-08 首版）：bc 路径 `m5_exception_return`/`m5_exception_catch_switch`
+  走结构化；自产路径 catch 仅读异常槽/无绑定/嵌套重抛经 Catch2 断言与回放
+  验证；其余经状态机回退，9 组语料参考对拍 9/9 一致。
 - macOS Debug 全量 CTest **447/447 通过**（新增 4 个结构化 Catch2 用例；
-  clang-format 20.1.0、git diff --check 通过）。catch 读体寄存器、调用在 try 体
-  （复合原因：声明落点守卫 + 状态机调用协议）保持诚实拒绝。
+  clang-format 20.1.0、git diff --check 通过）。
+
+## 存储提升协议（2026-11-08 第二批，darwin）
+
+catch 体读取的体定义无名寄存器提升为函数局部合成存储（`_tryStorageNames`，
+与 switch 合流存储同机制），首批回退的两个根因按挂点解决：
+
+- **spanClean 脏规则（正确性关键）**：span 内出现对提升寄存器的定义 → 脏，
+  先于 `_impureOrStore` 短路检查——挡住 Copy.srcVersion 渲染期实时解析的内联
+  穿越存储重定义（寄存器复用下条件节点读到重定义后的值的现象 a）。
+- **guardLoopCond 修复（独立既有漏洞）**：字面量判定前 `resolveCopyNode` 下钻
+  匿名拷贝链——`for(var i=0;...)` 的 Copy→Int 链此前绕过"绑定字面量"判定渲染
+  出 `0 < a0`（现象 b 的条件侧）。提升存储本身是变量语义，跨迭代携带正确，
+  无需额外拒绝。
+- **noteNamedDef 补 Inc/Dec、NewArray/NewDict**：IncDec 经 StoreLocal 语句形态
+  渲染 `name++;` 并改绑新版本（避免后续读取内联出后缀 `name++` 表达式）。
+- **提升登记**（precomputeTryRegions）：contested 寄存器（catch 读 ∧ 体定义 ∧
+  非 exValueReg ∧ 读取前无 catch 局部重定义）中 `localNameAt` 无名者 → 合成名
+  （startPc = 体前最早定义 pc+1，对齐"定义后可见"契约）；已在合成存储
+  （switch 合流/其它 handler 提升）中的直接放行；具名局部保持拒绝（声明落点
+  未证明）。参数槽附入口拷贝 `var name = a{i};`，并预登记 `_declaredLocals`
+  使入口声明成为唯一 `var`。
+- **发射**：`emitStructured` 入口发 `var name;` / `var name = a{i};`。
+- 覆盖面：bc 语料 **8/9** 走结构化（manifest `structured: true`，CLI 测试对
+  .tjsbc 输入断言无 `while (true)`；自产源码路径的具名局部按设计回退）；
+  `m5_exception_loop` 因无名循环携带变量 `i`（修复后的 guardLoopCond 正确拒绝）
+  保持状态机回退。9 组语料参考对拍复跑 9/9 一致；macOS Debug 全量 CTest
+  **447/447**；clang-format 20.1.0、git diff --check 通过。
 
 ## 后续边界
 
-- catch 体读 try 体内定义寄存器的数据流协议：需先建立寄存器复用下的拷贝快照
-  （提升为合成存储时，拷贝出值不得内联穿越存储重定义）与无名循环携带变量
-  （`0++` 类渲染）两个协议，并补 Optimizer 对 localVars 的重映射。
+- 无名循环携带变量的渲染协议（`m5_exception_loop` 的 `i`）：条件/自增读取的
+  无名寄存器需各自提升或物化后，循环内 try 才能结构化。
+- 具名局部的声明落点协议：需 IRGen 侧把声明与幸存定义解耦（如把 `var` 落点
+  锚定到 localVars 语义位置），具名局部被 catch 读取的形态才能结构化。
 - 状态机调用/接收者、闭包及对象常量协议扩展照旧独立推进。
 - 顶层 try/catch（无函数局部作用域）维持 M5 拒绝；`finally` 在文法、TAC、
   字节码与参考引擎中均不存在，不在范围内。
