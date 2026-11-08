@@ -1,0 +1,1 @@
+var calls=0; class C { var v; function C(){ this.v=5; } } var o=new C(); o.m=function(a){calls++;return a;}; println(o.m(2)); println(o.v); println(calls);

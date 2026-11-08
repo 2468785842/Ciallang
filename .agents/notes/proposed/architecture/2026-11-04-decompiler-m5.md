@@ -638,15 +638,32 @@ FuncMeta 常量。Call 实参 Push 与 Call 跨块时防御性拒绝（防未来
   绝"断言改为成功断言。异常语料 10/10 结构化。全量 CTest **448/448**；
   clang-format、diff --check 通过。
 
+## 对象成员 FuncLit 与类字段初始化（2026-11-08，darwin，基线 481461a）
+
+重建 2026-11-05 记录的 NEW/this 探针（Windows 原始产物不在本机）。当前 HEAD
+下字典/全局成员/`new Dictionary()` 的 FuncLit 赋值自产与 bc 双路径均已通过
+（批次 5/6 的调用族与成员语句修复的连带收益）；`this` 在函数字面量体内引用
+全局定义处上下文报 Not found property 是正确的 TJS 语义（函数字面量捕获定义
+处上下文），非缺陷。
+
+闭环的真缺陷：类实例成员 FuncLit 赋值（`var o=new C(); o.m=function...;`，
+类含无初始化器字段 `var v;`）的 bc 恢复把类字段渲染成 `var v = v0;`——v0 是
+initDefaultVal 单元的物化临时（单元尾 `ret %0` 使 void 初值多使用而物化），
+字段装配只取 DThis 语句、丢弃定义语句，类定义时求值即报 Not found property。
+修复：collectFieldInits 把被字段初始化引用的 `var <名> = <值>;` 内联回初始
+化值（`var v = void;`，语义与裸字段等价；临时名避开 Atom，全局同名不误替换；
+链式临时迭代替换）。注意语句文本带尾分号，查表前剥离。
+
+- 新增 2 组 darwin 语料 `m5_funclit_object_{newdict,classmember}`；全量 CTest
+  **448/448**；clang-format、diff --check 通过。探针 out/m5-newthis/。
+
 ## 建议下一步
 
 1. switch 后续批次：嵌套与 for 更新段 continue 组合的更多数据流形态；参考更
    复杂合流与多调用标签共享定义链形态；按方案 §7 继续参考 TJS2 四环验收。
 2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
-3. 对象成员 FuncLit 赋值的 NEW/this 差异（`o.m = function...` 的参考恢复曾
-   0/2 调用计数不符，涉及 NEW 构造恢复与接收者语义）。
-4. 具名局部被 catch 读取的声明落点协议（需 IRGen 侧把 `var` 落点锚定到
+3. 具名局部被 catch 读取的声明落点协议（需 IRGen 侧把 `var` 落点锚定到
    localVars 语义位置），优先级低于上述主线。
 
 ## 完成条件

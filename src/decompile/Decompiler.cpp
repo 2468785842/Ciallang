@@ -556,6 +556,40 @@ namespace cial::decompile {
                     return;
                 }
                 auto &code = meta.chunk->getInstVec();
+                // 字段初始化单元的物化临时不产类字段承载点（单元尾 ret 使
+                // void 初值等多使用而物化，如 `var v0 = void;` + `v = v0;`）：
+                // 把被字段初始化引用的 `var <名> = <值>;` 内联回初始化值。临时
+                // 名避开单元内 Atom，全局同名不会误替换
+                std::unordered_map<std::string, std::string> tempValues;
+                for(const auto &statement : recovery.statements) {
+                    if(statement.text.rfind("var ", 0) != 0)
+                        continue;
+                    const auto eq = statement.text.find(" = ");
+                    if(eq == std::string::npos || statement.text.back() != ';')
+                        continue;
+                    const auto name = statement.text.substr(4, eq - 4);
+                    if(name.empty() || name.find(' ') != std::string::npos)
+                        continue;
+                    tempValues.emplace(name, statement.text.substr(eq + 3, statement.text.size() - eq - 4));
+                };
+                auto inlineTemps = [&](const std::string &text) {
+                    const auto eq = text.find(" = ");
+                    if(eq == std::string::npos)
+                        return text;
+                    std::string value = text.substr(eq + 3);
+                    std::string tail;
+                    if(!value.empty() && value.back() == ';') {
+                        tail = ';';
+                        value.pop_back();
+                    }
+                    for(int iter = 0; iter < 8; ++iter) {
+                        const auto it = tempValues.find(value);
+                        if(it == tempValues.end())
+                            break;
+                        value = it->second;
+                    }
+                    return text.substr(0, eq + 3) + value + tail;
+                };
                 for(const auto &statement : recovery.statements) {
                     if(statement.text.find('\n') != std::string::npos) {
                         reason = "字段初始化含多行语句（函数字面量初始化器属后续批次）";
@@ -570,7 +604,7 @@ namespace cial::decompile {
                     }
                     if(atom == ATOM_INVALID)
                         continue;
-                    auto text = statement.text;
+                    auto text = inlineTemps(statement.text);
                     if(!text.empty() && text.back() == ';')
                         text.pop_back();
                     out.push_back({ atom,

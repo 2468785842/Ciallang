@@ -1,0 +1,1 @@
+var calls=0; var o=new Dictionary(); o.m=function(a){calls++;return a+1;}; println(o.m(2)); println(calls);

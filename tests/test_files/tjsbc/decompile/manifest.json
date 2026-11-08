@@ -498,6 +498,20 @@
       "expectedRecovery": "success",
       "structured": true,
       "reference": "darwin"
+    },
+    {
+      "name": "m5_funclit_object_newdict",
+      "sourceSha256": "320400baefa796cee9bb0736ce00827a697d98f866f8316aad60b9295c40744c",
+      "bytecodeSha256": "88f83d1f9d08b4ba7fa45877b943016d3e7254f83d043217755d218c71ba291e",
+      "expectedRecovery": "success",
+      "reference": "darwin"
+    },
+    {
+      "name": "m5_funclit_object_classmember",
+      "sourceSha256": "99976bbcb23faba64ba02671ccc379cf9f80c44714308bb0e5a617f6701a4797",
+      "bytecodeSha256": "f2ef5b67d8791a57221097fe53d9ef8076e80885f20519eff0381813c637252f",
+      "expectedRecovery": "success",
+      "reference": "darwin"
     }
   ],
   "referenceDarwin": {
