@@ -537,6 +537,13 @@
           "case f1()"
         ]
       }
+    },
+    {
+      "name": "m5_deref_property",
+      "sourceSha256": "d8df37c53148f6d8fc512b6f1a9d67747f066505a19084a824f4fd52b288fc2c",
+      "bytecodeSha256": "31a94e66d8241c81fb189f29afa4fa180d68c6212f1b0b6e4c7df2a4adbea6c7",
+      "expectedRecovery": "success",
+      "reference": "darwin"
     }
   ],
   "referenceDarwin": {

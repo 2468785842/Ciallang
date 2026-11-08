@@ -1481,7 +1481,11 @@ namespace cial::decompile {
                                                    true, inst.getOp1().value<Atom>())));
                     break;
                 case TacOpCode::DerefGet: {
-                    const auto node = makeUnary("*", operandNode(inst.getOp1().value<Register>()));
+                    const auto prop = inst.getOp1().value<Register>();
+                    const auto node = makeUnary("*", operandNode(prop));
+                    // 解引用操作数按版本槽渲染：prop 寄存器多使用物化后，捕获的
+                    // 节点不感知临时名，会内联出重复求值的 & 表达式
+                    _nodes[node].srcVersion = packSlot(prop, currentVersion(prop));
                     defineNode(inst.getOp2().value<Register>(), node);
                     noteNamedDef(inst.getOp2().value<Register>());
                     break;
@@ -2801,6 +2805,12 @@ namespace cial::decompile {
                     return { out + ")", Prec::Postfix };
                 }
                 case Expr::Kind::Unary: {
+                    // 解引用（*）的操作数按版本槽渲染（构建期捕获的节点不感知
+                    // 物化改名）；其余一元保持节点渲染
+                    if(expr.text == "*" && expr.srcVersion != INVALID) {
+                        const auto operand = renderVersion(expr.srcVersion);
+                        return { fmt::format("*({})", operand), Prec::Unary };
+                    }
                     const auto operand = renderNode(expr.a);
                     const bool word =
                         std::isalnum(static_cast<unsigned char>(expr.text.empty() ? 0 : expr.text[0])) != 0 ||
@@ -4588,13 +4598,12 @@ namespace cial::decompile {
         void emitStructured(Vec<RecoveredStatement> &out) {
             if(getenv("CIAL_DECOMPILE_DEBUG")) {
                 for(const auto &entry : _promotedStorage)
-                    fprintf(stderr, "[dbg] promoted reg=%u name=%s start=%u\n", entry.first,
-                            entry.second.first.c_str(), entry.second.second);
+                    fprintf(stderr, "[dbg] promoted reg=%u name=%s start=%u\n", entry.first, entry.second.first.c_str(),
+                            entry.second.second);
                 if(_meta)
                     for(const auto &local : _meta->localVars)
                         fprintf(stderr, "[dbg] local reg=%u name=%s start=%u end=%u\n",
-                                static_cast<unsigned>(local.reg.index()),
-                                atomText(_rt, local.identifier).c_str(),
+                                static_cast<unsigned>(local.reg.index()), atomText(_rt, local.identifier).c_str(),
                                 static_cast<unsigned>(local.startPC.address()),
                                 static_cast<unsigned>(local.endPC.address()));
             }
@@ -5019,7 +5028,7 @@ namespace cial::decompile {
 
     ExprRecovery recoverUnitBody(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike,
                                  DeclHost *host) {
-        if(getenv("CIAL_DECOMPILE_DEBUG") && chunk.getInstVec().size() > 15) {
+        if(getenv("CIAL_DECOMPILE_DEBUG") && chunk.getInstVec().size() > 10) {
             static int n = 0;
             if(n++ < 2)
                 for(size_t pc = 0; pc < chunk.getInstVec().size(); ++pc)

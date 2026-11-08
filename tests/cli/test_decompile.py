@@ -237,6 +237,58 @@ class DecompileTest(CliTestCase):
                     self.assertEqual(replay.returncode, 0, replay.stderr)
                     self.assertEqual(replay.stdout, original.stdout)
 
+    def test_super_prologue_roundtrip(self):
+        # M4 移交验收：派生构造器内的基类构造调用（prologue）恢复为可重编译文本
+        source = (
+            'var log = "";\n'
+            'class B {\n'
+            '    var v;\n'
+            '    function B(n) {\n'
+            '        v = n;\n'
+            '        log += "B" + n + ";";\n'
+            '    }\n'
+            '}\n'
+            'class D extends B {\n'
+            '    var w;\n'
+            '    function D() {\n'
+            '        B(7);\n'
+            '        w = 9;\n'
+            '        log += "D;";\n'
+            '    }\n'
+            '}\n'
+            'var o = new D();\n'
+            'println(o.v);\n'
+            'println(o.w);\n'
+            'println(log);\n')
+        self.script.write_text(source, encoding="utf-8")
+        expected = self.run_cial(self.script)
+        self.assertEqual(expected.returncode, 0, expected.stderr)
+        decompiled = self.run_cial("--decompile", self.script)
+        self.assertEqual(decompiled.returncode, 0, decompiled.stderr)
+        self.assertIn("class D extends B {", decompiled.stdout)
+        self.assertIn("B(7);", decompiled.stdout)
+        recompiled = self.root / "super_rt.tjs"
+        recompiled.write_text(decompiled.stdout, encoding="utf-8")
+        actual = self.run_cial(recompiled)
+        self.assertEqual(actual.returncode, 0, actual.stderr + "\n--- decompiled ---\n" + decompiled.stdout)
+        self.assertEqual(actual.stdout, expected.stdout)
+
+    def test_deref_property_bc_recovery(self):
+        # M4 移交验收：property 引用（&o.x + *p 读写）的参考字节码恢复；
+        # 解引用操作数按版本槽渲染（物化临时不感知缺陷已修）
+        corpus = TJSBC_CORPUS / "decompile"
+        source = corpus / "m5_deref_property.tjs"
+        original = self.run_cial(source)
+        self.assertEqual(original.returncode, 0, original.stderr)
+        recovered = self.run_cial("--decompile", source.with_suffix(".tjsbc"))
+        self.assertEqual(recovered.returncode, 0, recovered.stderr)
+        self.assertIn("*(", recovered.stdout)
+        target = self.root / "deref-recovery.tjs"
+        target.write_text(recovered.stdout, encoding="utf-8")
+        replay = self.run_cial(target)
+        self.assertEqual(replay.returncode, 0, replay.stderr)
+        self.assertEqual(replay.stdout, original.stdout)
+
     def test_reference_function_expressions(self):
         corpus = TJSBC_CORPUS / "decompile"
         for name, expected in (("m5_funclit_assignment", "3\n5\n2\n"), ("m5_funclit_argument", "5\n")):

@@ -685,6 +685,23 @@ do/switch/try/catch/调用，环①逐程序比对；棘轮式 KNOWN_FAILURES �
 口。模糊测试生成器相应规避同层同名循环变量（注册于 KNOWN_FAILURES 并可棘轮
 收紧）。全量 CTest **449/449**（新增 CiallangFuzz）。
 
+## M4 移交验收：deref 修复 + super prologue（2026-11-08，darwin，基线 b2d2291）
+
+- **deref bc 恢复缺陷修复**：`*p` 读取 tile 在 Pass B 捕获操作数节点，不感知
+  后续物化改名——property 引用多使用物化后，读取渲染成 `*&Cell().n`（& 表达
+  式每次重新求值，receiver/计数漂移）。修复：DerefGet 的解引用节点携带版本槽
+  （srcVersion），渲染走 renderVersion（`*(v2)`）。新增语料
+  `m5_deref_property`（property 引用 + *p 读写的 bc 恢复）+ CLI 断言。
+- **super 构造 prologue**：自产路径恢复验收通过（派生构造器内基类构造调用
+  `B(7);` 正确恢复，CLI roundtrip 断言 `B(7);` 结构）。bc 路径被参考编译器
+  **段错误阻断**（exit 139；单行类形态参考运行期亦异常）——参考侧平台缺陷，
+  按cial-diff 纪律记录绕开。
+- **独立语言层发现（非反编译器）**：`&o.成员` 在**顶层上下文**走 getter 取值
+  （*p 报 not a property），**函数内**同形态走引用协议——IRGen 的 & 协议上下
+  文差异；`&` 对普通 var 成员同样被 deref 拒绝（VM 仅接受 Property 对象）。
+  需单独开问题调查（proposed/bug-fix）。
+- 全量 CTest **449/449**；参考对拍 10/10 一致；clang-format、diff --check 通过。
+
 ## 建议下一步
 
 1. 嵌套 do-while + 死初始化消除的声明落点协议（模糊已登记 repro）。
@@ -697,7 +714,9 @@ do/switch/try/catch/调用，环①逐程序比对；棘轮式 KNOWN_FAILURES �
 ## 完成条件
 
 方案 §6 M5 行的验收达成：能力矩阵逐项验收、Unsupported 集合可量化；
-移交的验收扩展（super prologue、`CallMethodV`/`testDeref`）逐个通过；
+移交的验收扩展：deref（testDeref 记法所指的 &/* 形态）bc 恢复已修复并验收、
+super 构造 prologue 自产路径已验收（bc 侧被参考编译器崩溃阻断，见 2026-11-08
+批次）；`CallMethodV` 行表需 Linux 侧；
 s7_ext 差异归因并修复；表达式位置 FuncLit round-trip 通过。
 
 ## 风险或备选方案

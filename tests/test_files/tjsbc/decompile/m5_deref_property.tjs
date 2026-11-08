@@ -1,0 +1,2 @@
+class Cell { var m; property n { setter(v) { m=v; } getter { return m; } } } function f(x) { var o=new Cell(); var p=&o.n; *p=x; *p=*p*2; return *p; }
+println(f(5)); println(f(0));
