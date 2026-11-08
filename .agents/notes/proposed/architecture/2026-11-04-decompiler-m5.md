@@ -11,7 +11,8 @@ M5 仍在进行；当前能力与剩余工作以
 [实现记录](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)：
 **异常语料 9/9 全部结构化 try/catch**（无名寄存器与无名循环携带变量提升为合
 成存储），具名局部被 catch 读取（声明落点未证明）保持诚实回退，9 组语料
-darwin 参考对拍一致。
+darwin 参考对拍一致。switch 主线的调用标签表达式（`case f():`，自产与参考
+模板）已验收，新增 4 组 calllabel 语料。
 下面各批次保留当时的拒绝与验证事实，后续修复不覆盖历史失败记录。
 特别是早期“嵌套 switch 一律拒绝”和“赋值右值 FuncLit 待实现”不再是现状：
 自产双层/三层与参考函数内双层 switch 已验收；赋值右值 FuncLit 的源码
@@ -592,10 +593,30 @@ pcAnchors 平移（Optimizer 压缩重映射 + parseAst 回填），此前"不�
   9 组语料参考对拍复跑 9/9 一致；macOS Debug 全量 CTest **447/447**；
   clang-format 20.1.0、git diff --check 通过。
 
+## 调用标签表达式（2026-11-08，darwin，基线 29a11fd）
+
+`case f():` 恢复。探针定位：判别值调用（`switch(d(x))`）与首组调用标签此前
+已支持；后续分组调用标签被两条"仅常量装入"约束拒绝。放宽为**标签定义链**证
+明（`isLabelDefChain`：前缀每条指令有定义、定义版本的全部使用落在分组派发区
+内、无外溢——标签表达式按派发顺序求值一次，结果不外溢；结果无人消费的默认
+体副作用不得移入标签）：
+
+- 自产 `scanDispatch`：组间材料先纳入待校验，扫描结束统一校验；尾部未被比较
+  闭合的材料保持仅常量的旧行为（链上下一分组的标签常量经版本链渲染，避免
+  回归既有语料）。
+- 参考模板 `dispatch`：块尾标签值判定从"常量装入"放宽为"定义比较右值"
+  （`definesRegister(end - 3, match.rhs)`，调用 dst 在专用字段，op1 检查不再
+  适用）；组间前缀同用 `isLabelDefChain`。
+- 过程中发现两轮探针结果假阴性：工作目录漂移使 cmake 静默失败，测的是旧二
+  进制（与 cial-verify 的产物身份核对教训一致）。
+- 新增 4 组 darwin 语料 `m5_switch_calllabel_{first,later,discriminant,
+  multigroup}`；无 break 模板下 default 落为 switch 后直线语句（语义等价，
+  回放逐字节一致）。全量 CTest 447/447；clang-format、diff --check 通过。
+
 ## 建议下一步
 
-1. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue
-   组合的更多数据流形态；参考更复杂合流与有副作用标签（返回/三层固定样本已通过）；按方案 §7 继续参考 TJS2 四环验收。
+1. switch 后续批次：嵌套与 for 更新段 continue 组合的更多数据流形态；参考更
+   复杂合流与多调用标签共享定义链形态；按方案 §7 继续参考 TJS2 四环验收。
 2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
 3. 状态机调用/接收者、闭包及对象常量协议扩展（try 体内含调用当前整单拒绝）。

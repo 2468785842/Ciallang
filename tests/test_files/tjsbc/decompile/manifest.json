@@ -442,6 +442,54 @@
       "expectedRecovery": "success",
       "reference": "darwin",
       "structured": true
+    },
+    {
+      "name": "m5_switch_calllabel_first",
+      "sourceSha256": "b923223e6bbedb14de61bd6e821dba40336dd09d25d8956657cba944efe7f012",
+      "bytecodeSha256": "5cb7793d33df6451c04217a789f2df0179f607f0da272dfd434a32ac0f3a706e",
+      "expectedRecovery": "success",
+      "reference": "darwin",
+      "bytecodeChecks": {
+        "contains": [
+          "case lbl()"
+        ]
+      }
+    },
+    {
+      "name": "m5_switch_calllabel_later",
+      "sourceSha256": "150fec412d731c4857164823049126802238a0a431f991a49a0944a1697272df",
+      "bytecodeSha256": "625ed69a00fe0b1eb94ab29f92afe99085ef4277713275757c3c095cc8f61d2d",
+      "expectedRecovery": "success",
+      "reference": "darwin",
+      "bytecodeChecks": {
+        "contains": [
+          "case lbl()"
+        ]
+      }
+    },
+    {
+      "name": "m5_switch_calllabel_discriminant",
+      "sourceSha256": "7b433b5ad311740b2aebec3ab5a9180507ea7965d1bd617c38be9ef150196dde",
+      "bytecodeSha256": "b510fc48519edcbb8d130d2dc95fd37561e6a0080ba6fa4257dc3ee8a25fedb5",
+      "expectedRecovery": "success",
+      "reference": "darwin",
+      "bytecodeChecks": {
+        "contains": [
+          "switch (d("
+        ]
+      }
+    },
+    {
+      "name": "m5_switch_calllabel_multigroup",
+      "sourceSha256": "51d359246bb4a993cb03a81e8b8bb0c51a9e87b91b22b29afecf78494861a54b",
+      "bytecodeSha256": "406d3963cc40612dc05405ab4dbccab8789596a47ddcf6f023f435ae5611a0b6",
+      "expectedRecovery": "success",
+      "reference": "darwin",
+      "bytecodeChecks": {
+        "contains": [
+          "case lbl()"
+        ]
+      }
     }
   ],
   "referenceDarwin": {

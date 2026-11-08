@@ -3537,6 +3537,11 @@ namespace cial::decompile {
             if(pos >= code.size() || pos >= prefixEnd)
                 return false;
             part.firstPc = INVALID;
+            // 组间标签材料段：常量装入之外，调用等标签表达式定义链也先纳入，
+            // 扫描结束后统一按 isLabelDefChain 校验（尾部未被比较闭合的材料
+            // 保持旧行为：仅接纳常量装入）
+            Vec<std::pair<u32, u32>> labelSegments;
+            u32 labelBegin = INVALID;
             while(pos < code.size()) {
                 const auto op = code[pos]->opcode();
                 if(op == TacOpCode::Jmp) {
@@ -3544,15 +3549,32 @@ namespace cial::decompile {
                     if(nextPc <= pos || nextPc > code.size())
                         return false;
                     endPc = static_cast<u32>(pos + 1);
+                    if(labelBegin != INVALID) {
+                        // 尾部未被比较闭合的材料（链上下一分组的标签常量）：仅
+                        // 接纳常量装入（旧行为），其值由下一分组经版本链渲染
+                        for(u32 p = labelBegin; p < pos; ++p) {
+                            const auto tailOp = code[p]->opcode();
+                            if(tailOp != TacOpCode::Load && tailOp != TacOpCode::LoadImm)
+                                return false;
+                        }
+                    }
+                    for(const auto &[b, e] : labelSegments)
+                        if(!isLabelDefChain(b, e, endPc))
+                            return false;
                     return part.cases.size() == 1 && part.cases.front().bodyPc == endPc;
                 }
-                // 常量装入属于下一个 case 标签的表达式，不产生独立语句。
-                if(op == TacOpCode::Load || op == TacOpCode::LoadImm) {
+                // 常量装入属于下一个 case 标签的表达式，不产生独立语句；其它
+                // 定义链指令（如 case f(): 的调用）同样先纳入待校验。
+                if(op != TacOpCode::CompareTest && op != TacOpCode::CompareTestImm) {
+                    if(labelBegin == INVALID)
+                        labelBegin = pos;
                     ++pos;
                     continue;
                 }
-                if(op != TacOpCode::CompareTest && op != TacOpCode::CompareTestImm)
-                    return false;
+                if(labelBegin != INVALID) {
+                    labelSegments.emplace_back(labelBegin, pos);
+                    labelBegin = INVALID;
+                }
                 if(pos + 1 >= code.size() || code[pos + 1]->opcode() != TacOpCode::JmpE)
                     return false;
                 const auto bodyPc = code[pos + 1]->getOp1().value<Label>().address();
@@ -3645,19 +3667,29 @@ namespace cial::decompile {
             auto constantLoad = [&](u32 pc) {
                 return code[pc]->opcode() == TacOpCode::Load || code[pc]->opcode() == TacOpCode::LoadImm;
             };
+            auto definesRegister = [&](u32 pc, const Register reg) {
+                bool found = false;
+                forEachDef(*code[pc], [&](const Register r, const bool) {
+                    if(r == reg)
+                        found = true;
+                });
+                return found;
+            };
             auto dispatch = [&](u32 start, SwitchMatch &match, u32 &body, u32 &next) {
                 const auto bi = blockAtPc(start);
                 if(bi >= _blocks.size() || _switchPcs.contains(start))
                     return false;
                 const auto end = static_cast<u32>(_blocks[bi].end);
                 if(end < start + 3 || code[end - 2]->opcode() != TacOpCode::CmpEQ ||
-                   code[end - 1]->opcode() != TacOpCode::JmpNE || !constantLoad(end - 3))
+                   code[end - 1]->opcode() != TacOpCode::JmpNE)
                     return false;
                 const auto cmp = end - 2;
                 match = SwitchMatch{ .cmpPc = cmp,
                                      .test = code[cmp]->getOp1().value<Register>(),
                                      .rhs = code[cmp]->getOp2().value<Register>() };
-                if(!(code[end - 3]->getOp1().value<Register>() == match.rhs))
+                // 标签值定义：紧邻比较的指令定义比较右值（常量装入是其特例；
+                // case f(): 的调用结果同样只被本次比较消费）
+                if(!definesRegister(end - 3, match.rhs))
                     return false;
                 body = end;
                 next = static_cast<u32>(code[end - 1]->getOp1().value<Label>().address());
@@ -3682,10 +3714,8 @@ namespace cial::decompile {
                     u32 followingBody{}, followingNext{};
                     if(!dispatch(next, following, followingBody, followingNext))
                         break;
-                    bool constants = true;
-                    for(u32 p = next; p < following.cmpPc; ++p)
-                        constants &= constantLoad(p);
-                    if(!constants || !(following.test == info.test))
+                    // 组间前缀须为下一组标签表达式的定义链（常量装入是特例）
+                    if(!isLabelDefChain(next, following.cmpPc, followingBody) || !(following.test == info.test))
                         break;
                     dispatchStart = next;
                     match = following;
@@ -3942,7 +3972,54 @@ namespace cial::decompile {
             }
         }
 
-        // 链归约：从派发头沿 [Jmp→next] 走到头（后续前缀仅接纳常量装入），按体尾 break 目标区分 default/出口，bodyEnd
+        // 后续派发分组的标签定义链判定：前缀 [begin, end) 的每条指令必须有
+        // 定义，且该定义版本的全部使用都落在分组派发区 [begin, groupEnd) 内
+        // （被比较链消费）——标签表达式按派发顺序求值一次，结果不外溢。纯常
+        // 量装入是其特例；结果无人消费的语句（默认体副作用）不得移入标签
+        [[nodiscard]] bool isLabelDefChain(const u32 begin, const u32 end, const u32 groupEnd) const {
+            const auto &code = _chunk.getInstVec();
+            for(u32 p = begin; p < end; ++p) {
+                bool defines = false;
+                bool ok = true;
+                forEachDef(*code[p], [&](const Register r, const bool hidden) {
+                    defines = true;
+                    if(hidden) {
+                        ok = false; // 隐藏写入（接收者协议）不属于标签表达式
+                        return;
+                    }
+                    const auto dst = r.index();
+                    bool consumed = false;
+                    bool escapes = false;
+                    for(u32 q = p + 1; q < code.size() && !escapes; ++q) {
+                        if(q < groupEnd) {
+                            forEachUse(*code[q], [&](const Register u) {
+                                if(u.index() == dst)
+                                    consumed = true;
+                            });
+                        } else {
+                            forEachUse(*code[q], [&](const Register u) {
+                                if(u.index() == dst)
+                                    escapes = true;
+                            });
+                        }
+                        bool redefined = false;
+                        forEachDef(*code[q], [&](const Register d, const bool) {
+                            if(d.index() == dst)
+                                redefined = true;
+                        });
+                        if(redefined)
+                            return; // 该定义版本生命周期结束
+                    }
+                    if(!consumed || escapes)
+                        ok = false;
+                });
+                if(!defines || !ok)
+                    return false;
+            }
+            return true;
+        }
+
+        // 链归约：从派发头沿 [Jmp→next] 走到头（后续前缀须为标签定义链），按体尾 break 目标区分 default/出口，bodyEnd
         // 按下一派发头 封界；未被认领的 JmpE 如实拒绝
         void precomputeSwitches() {
             precomputeReferenceSwitches();
@@ -3959,10 +4036,7 @@ namespace cial::decompile {
                         continuations.insert(static_cast<u32>(inside.start));
                 if(!scanDispatch(next, following, followingNext, followingEnd))
                     continue;
-                bool constants = true;
-                for(u32 pc = next; pc < following.firstPc; ++pc)
-                    constants &= code[pc]->opcode() == TacOpCode::Load || code[pc]->opcode() == TacOpCode::LoadImm;
-                if(constants)
+                if(isLabelDefChain(next, following.firstPc, followingEnd))
                     continuations.insert(next);
             }
             for(size_t remaining = _blocks.size(); remaining > 0; --remaining) {
@@ -3986,13 +4060,9 @@ namespace cial::decompile {
                     u32 nend = 0;
                     if(!scanDispatch(nextPc, npart, nnext, nend))
                         break;
-                    // 后续派发前缀仅接纳常量装入，禁止将默认体副作用移入标签。
-                    bool constantPrefix = true;
-                    for(u32 p = nextPc; p < npart.firstPc; ++p) {
-                        const auto op = code[p]->opcode();
-                        constantPrefix &= op == TacOpCode::Load || op == TacOpCode::LoadImm;
-                    }
-                    if(!constantPrefix)
+                    // 后续派发前缀须为下一组标签表达式的定义链，禁止把默认体
+                    // 副作用（结果无人消费的语句）移入标签。
+                    if(!isLabelDefChain(nextPc, npart.firstPc, nend))
                         break;
                     parts.push_back(npart);
                     headStarts.push_back(nextPc);

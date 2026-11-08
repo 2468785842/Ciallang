@@ -1,0 +1,2 @@
+function lbl(){return 1;} function f(x){switch(x){case lbl():return 10;case 2:return 20;default:return 30;}}
+println(f(1));println(f(2));println(f(9));
