@@ -673,6 +673,7 @@ namespace cial::decompile {
                 precomputeLoops();
                 precomputeSwitches();
                 precomputeTryRegions();
+                precomputeLoopStorage();
             }
         }
 
@@ -2303,8 +2304,8 @@ namespace cial::decompile {
                 const auto recovered = _switchLocalNames.find(reg.index());
                 if(recovered != _switchLocalNames.end() && pc >= recovered->second.second)
                     return recovered->second.first;
-                const auto promoted = _tryStorageNames.find(reg.index());
-                if(promoted != _tryStorageNames.end() && pc >= promoted->second.second)
+                const auto promoted = _promotedStorage.find(reg.index());
+                if(promoted != _promotedStorage.end() && pc >= promoted->second.second)
                     return promoted->second.first;
             }
             return best;
@@ -2503,7 +2504,7 @@ namespace cial::decompile {
                 return true; // 自引用/同 pc
             for(u32 pc = def.defPc + 1; pc < def.landing; ++pc) {
                 const auto it = defSlotAtPc.find(pc);
-                if(it != defSlotAtPc.end() && _tryStorageNames.contains(static_cast<u16>(it->second >> 16)))
+                if(it != defSlotAtPc.end() && _promotedStorage.contains(static_cast<u16>(it->second >> 16)))
                     return false; // 跨越提升存储重定义
                 if(!_impureOrStore[pc])
                     continue;
@@ -3023,6 +3024,92 @@ namespace cial::decompile {
             u32 exVersion{ INVALID }; // Pass A 在 tryEnd 登记的异常槽版本
         };
 
+        // 寄存器是否已是合成存储（switch 合流 / 既有提升）：读取直接走变量语义
+        [[nodiscard]] bool storageReady(const u16 regIndex) const {
+            return _promotedStorage.contains(regIndex) || _switchLocalNames.contains(regIndex);
+        }
+
+        // 将无名寄存器提升为函数局部合成存储（catch 数据流 / 无名循环携带共用）。
+        // 存储名从最早定义之后可见（对齐 localNameAt 的"定义后"契约）；入口声明
+        // 是唯一的 var，后续命名定义经 _declaredLocals 去掉 declare 前缀；参数槽
+        // 以入口拷贝初始化。返回 false = 单元内无定义点（调用方拒绝）
+        bool promoteRegister(const u16 regIndex) {
+            if(storageReady(regIndex))
+                return true;
+            auto &code = _chunk.getInstVec();
+            u32 firstDef = INVALID;
+            for(u32 pc = 0; pc < code.size() && firstDef == INVALID; ++pc) {
+                forEachDef(*code[pc], [&](const Register r, const bool) {
+                    if(r.index() == regIndex && firstDef == INVALID)
+                        firstDef = pc;
+                });
+            }
+            if(firstDef == INVALID)
+                return false;
+            const auto storageName = nextTempName();
+            _promotedStorage.emplace(regIndex, std::pair{ storageName, firstDef + 1 });
+            _declaredLocals.emplace(regIndex, storageName);
+            if(_meta && regIndex < _meta->arity) {
+                // 参数槽在体内重定义：入口拷贝兜住"重定义前"的读取（与状态机
+                // var vN = aN 同语义）
+                const auto src = localNameAt(Register{ regIndex }, 0);
+                _promotedParamCopies.emplace(regIndex, src.empty() ? fmt::format("a{}", regIndex) : src);
+            }
+            return true;
+        }
+
+        // 无名循环携带变量提升：循环条件读取、体内（含更新区）重定义、无名字
+        // 绑定的寄存器提升为合成存储——条件渲染变量名保住迭代语义，自增经
+        // IncDec 语句形态渲染，跨迭代读取即变量当前值。具名/参数读取本就是
+        // 变量语义，不提升
+        void precomputeLoopStorage() {
+            if(!_meta || !_functionLike)
+                return;
+            auto &code = _chunk.getInstVec();
+            auto scanCond = [&](const u32 condBegin, const u32 condEnd, const u32 bodyBegin, const u32 bodyEndIncl) {
+                std::unordered_set<u16> reads;
+                for(u32 pc = condBegin; pc < condEnd; ++pc) {
+                    if(_foldedPcs.contains(pc))
+                        continue;
+                    forEachUse(*code[pc], [&](const Register r) { reads.insert(r.index()); });
+                }
+                for(const auto regIndex : reads) {
+                    if(storageReady(regIndex) || _promotedStorage.contains(regIndex))
+                        continue;
+                    if(!localNameAt(Register{ regIndex }, condEnd).empty())
+                        continue; // 具名/参数：读变量名即运行时值
+                    bool redefined = false;
+                    for(u32 pc = bodyBegin; pc <= bodyEndIncl && !redefined; ++pc) {
+                        forEachDef(*code[pc], [&](const Register r, const bool) {
+                            if(r.index() == regIndex)
+                                redefined = true;
+                        });
+                    }
+                    if(!redefined)
+                        continue; // 体内无重定义：线性链绑定条件外定义，渲染正确
+                    if(!promoteRegister(regIndex))
+                        fail(fmt::format("循环条件读取的寄存器 %{} 缺少定义点", regIndex));
+                }
+            };
+            for(const auto &[blockIdx, loop] : _whileLoops) {
+                const auto &zone = _condZones[blockIdx];
+                if(!loop.hasCond || zone.firstPc == INVALID)
+                    continue;
+                scanCond(zone.firstPc, static_cast<u32>(_blocks[blockIdx].end), static_cast<u32>(_blocks[blockIdx].end),
+                         loop.latchJmpPc);
+            }
+            for(const auto &[bodyStart, loop] : _doLoops) {
+                const auto latchBlock = blockAtPc(loop.condJumpPc);
+                if(latchBlock >= _blocks.size())
+                    continue;
+                const auto &zone = _condZones[latchBlock];
+                if(zone.firstPc == INVALID)
+                    continue;
+                scanCond(loop.condStart, loop.condJumpPc + 1, loop.bodyStart,
+                         loop.condStart > 0 ? loop.condStart - 1 : 0);
+            }
+        }
+
         void precomputeTryRegions() {
             const auto &handlers = _chunk.getThrowHandlers();
             if(handlers.empty())
@@ -3127,35 +3214,15 @@ namespace cial::decompile {
                     });
                 }
                 for(const auto regIndex : contested) {
-                    if(_tryStorageNames.contains(regIndex) || _switchLocalNames.contains(regIndex))
+                    if(storageReady(regIndex))
                         continue; // 已是合成存储（本 handler 提升 / switch 合流）
                     if(!localNameAt(Register{ regIndex }, handler.tryEnd).empty()) {
                         fail(fmt::format("catch 体读取 try 体内定义的具名寄存器 %{}，声明落点未证明（M5）", regIndex));
                         return;
                     }
-                    // 存储名从最早定义之后可见（对齐 localNameAt 的"定义后"契约）；
-                    // 体前无定义时首定义在体内，语义相同
-                    u32 firstDef = INVALID;
-                    for(u32 pc = 0; pc < join && firstDef == INVALID; ++pc) {
-                        forEachDef(*code[pc], [&](const Register r, const bool) {
-                            if(r.index() == regIndex && firstDef == INVALID)
-                                firstDef = pc;
-                        });
-                    }
-                    if(firstDef == INVALID) {
+                    if(!promoteRegister(regIndex)) {
                         fail(fmt::format("catch 体读取的寄存器 %{} 缺少定义点", regIndex));
                         return;
-                    }
-                    const auto storageName = nextTempName();
-                    _tryStorageNames.emplace(static_cast<u16>(regIndex), std::pair{ storageName, firstDef + 1 });
-                    // 入口声明是唯一的 var；后续命名定义不再带 declare 前缀
-                    _declaredLocals.emplace(static_cast<u16>(regIndex), storageName);
-                    if(_meta && regIndex < _meta->arity) {
-                        // 参数槽在体内重定义且被 catch 读取：入口拷贝兜住"异常先
-                        // 于体内重定义"的读取（与状态机 var vN = aN 同语义）
-                        const auto src = localNameAt(Register{ regIndex }, 0);
-                        _tryParamCopies.emplace(static_cast<u16>(regIndex),
-                                                src.empty() ? fmt::format("a{}", regIndex) : src);
                     }
                 }
                 // 声明落点守卫：具名局部最早的命名定义点若落在 try 体内且体外
@@ -4297,9 +4364,9 @@ namespace cial::decompile {
                 syntheticNames.insert(storage.first);
             for(const auto &name : syntheticNames)
                 out.push_back(RecoveredStatement{ .pc = 0, .text = fmt::format("var {};", name) });
-            for(const auto &[reg, storage] : _tryStorageNames) {
-                const auto copy = _tryParamCopies.find(reg);
-                if(copy != _tryParamCopies.end())
+            for(const auto &[reg, storage] : _promotedStorage) {
+                const auto copy = _promotedParamCopies.find(reg);
+                if(copy != _promotedParamCopies.end())
                     out.push_back(RecoveredStatement{
                         .pc = 0, .text = fmt::format("var {} = {};", storage.first, copy->second) });
                 else
@@ -4689,8 +4756,8 @@ namespace cial::decompile {
         std::unordered_set<std::string> _usedNames;
         std::unordered_map<u16, std::pair<std::string, u32>> _switchLocalNames; // 参考 switch 合流寄存器的函数局部存储
         std::unordered_map<u16, std::pair<std::string, u32>>
-            _tryStorageNames; // catch 数据流提升的寄存器存储（reg → {名, 起始 pc}）
-        std::unordered_map<u16, std::string> _tryParamCopies; // 提升参数槽 → 入口拷贝源名
+            _promotedStorage; // catch 数据流提升的寄存器存储（reg → {名, 起始 pc}）
+        std::unordered_map<u16, std::string> _promotedParamCopies; // 提升参数槽 → 入口拷贝源名
         u32 _tempCounter{};
         std::unordered_map<u32, DeclSpec> _declSpecs; // Load pc → 声明安装规格（M4）
 

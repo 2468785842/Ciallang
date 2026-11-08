@@ -6,12 +6,12 @@ Status: proposed
 
 M5 仍在进行；当前能力与剩余工作以
 [方案当前状态表](../../../../doc/bytecode/decompiler-plan.md#m5-当前状态2026-11-05)为准。
-异常区域已完成状态机首版（2026-11-07 验收）、结构化 try/catch 首版与 catch
-数据流存储提升（2026-11-08 两批），实现与边界见
+异常区域已完成状态机首版（2026-11-07 验收）、结构化 try/catch 首版、catch
+数据流存储提升与无名循环携带提升（2026-11-08 三批），实现与边界见
 [实现记录](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)：
-bc 语料 8/9 走结构化 try/catch（无名寄存器提升为合成存储），`m5_exception_loop`
-（无名循环携带）与具名局部被 catch 读取（声明落点未证明）保持诚实回退，
-9 组语料 darwin 参考对拍一致。
+**异常语料 9/9 全部结构化 try/catch**（无名寄存器与无名循环携带变量提升为合
+成存储），具名局部被 catch 读取（声明落点未证明）保持诚实回退，9 组语料
+darwin 参考对拍一致。
 下面各批次保留当时的拒绝与验证事实，后续修复不覆盖历史失败记录。
 特别是早期“嵌套 switch 一律拒绝”和“赋值右值 FuncLit 待实现”不再是现状：
 自产双层/三层与参考函数内双层 switch 已验收；赋值右值 FuncLit 的源码
@@ -576,16 +576,32 @@ pcAnchors 平移（Optimizer 压缩重映射 + parseAst 回填），此前"不�
 - 9 组语料参考对拍复跑 9/9 一致；macOS Debug 全量 CTest **447/447**；
   clang-format 20.1.0、git diff --check 通过。
 
+## 无名循环携带变量提升（2026-11-08，darwin，基线 c36a27e）
+
+提升机制泛化到循环：成员更名 `_promotedStorage`/`_promotedParamCopies`（不再
+限于 try），抽 `storageReady`/`promoteRegister` 共用 helper；新增
+`precomputeLoopStorage` 扫描已识别 while/do 循环的条件区——条件读取、体内
+（含 for 更新区与锁存）重定义、无名绑定的寄存器提升为合成存储。条件渲染变量
+名保住迭代语义，自增经 IncDec 语句形态渲染（批次 3 的 noteNamedDef 补路径），
+跨迭代读取即变量当前值；`guardLoopCond` 对提升寄存器经 LocalName 早退自然放
+行。顶层单元（无函数作用域）不提升，"循环携带变量"拒绝仅保留在顶层路径
+（既有两个顶层拒绝测试保持通过）。
+
+- 覆盖面：异常语料 **9/9 全部结构化**（`m5_exception_loop` 的 for + try +
+  catch 读体寄存器 + catch 内 continue 翻转成功，manifest `structured: true`）。
+  9 组语料参考对拍复跑 9/9 一致；macOS Debug 全量 CTest **447/447**；
+  clang-format 20.1.0、git diff --check 通过。
+
 ## 建议下一步
 
-1. 无名循环携带变量的渲染协议（`m5_exception_loop` 的 `i`：条件/自增读取的
-   无名寄存器提升或物化），使循环内 try + catch 读体寄存器走结构化。
-2. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue
+1. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue
    组合的更多数据流形态；参考更复杂合流与有副作用标签（返回/三层固定样本已通过）；按方案 §7 继续参考 TJS2 四环验收。
-3. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
+2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
-4. 状态机调用/接收者、闭包及对象常量协议扩展（try 体内含调用当前整单拒绝）。
-5. ExprFunction 变量赋值/实参的参考路径已验收；继续检查对象成员赋值的 NEW/this 差异。
+3. 状态机调用/接收者、闭包及对象常量协议扩展（try 体内含调用当前整单拒绝）。
+4. ExprFunction 变量赋值/实参的参考路径已验收；继续检查对象成员赋值的 NEW/this 差异。
+5. 具名局部被 catch 读取的声明落点协议（需 IRGen 侧把 `var` 落点锚定到
+   localVars 语义位置），优先级低于上述主线。
 
 ## 完成条件
 

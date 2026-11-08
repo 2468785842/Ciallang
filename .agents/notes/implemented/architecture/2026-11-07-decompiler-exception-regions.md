@@ -135,10 +135,23 @@ catch 体读取的体定义无名寄存器提升为函数局部合成存储（`_
   保持状态机回退。9 组语料参考对拍复跑 9/9 一致；macOS Debug 全量 CTest
   **447/447**；clang-format 20.1.0、git diff --check 通过。
 
+## 无名循环携带变量提升（2026-11-08 第三批，darwin）
+
+提升机制泛化到循环：成员更名 `_promotedStorage`/`_promotedParamCopies`，抽
+`storageReady`/`promoteRegister` 共用 helper；`precomputeLoopStorage` 扫描已
+识别 while/do 循环条件区，条件读取 ∧ 体内（含 for 更新区与锁存）重定义 ∧
+无名绑定 → 提升为合成存储。条件渲染变量名保住迭代语义，自增经 IncDec 语句
+形态渲染，跨迭代读取即变量当前值；`guardLoopCond` 对提升寄存器经 LocalName
+早退自然放行。顶层单元（无函数作用域）不提升，"循环携带变量"拒绝仅保留在
+顶层路径（既有两个顶层拒绝测试保持通过）。
+
+- 覆盖面：异常语料 **9/9 全部结构化**（`m5_exception_loop` 翻转成功，输出
+  `while (v2 < a0)` + 更新区 `v2++;` + catch 内 continue）。9 组语料参考对拍
+  复跑 9/9 一致；macOS Debug 全量 CTest **447/447**；clang-format 20.1.0、
+  git diff --check 通过。
+
 ## 后续边界
 
-- 无名循环携带变量的渲染协议（`m5_exception_loop` 的 `i`）：条件/自增读取的
-  无名寄存器需各自提升或物化后，循环内 try 才能结构化。
 - 具名局部的声明落点协议：需 IRGen 侧把声明与幸存定义解耦（如把 `var` 落点
   锚定到 localVars 语义位置），具名局部被 catch 读取的形态才能结构化。
 - 状态机调用/接收者、闭包及对象常量协议扩展照旧独立推进。

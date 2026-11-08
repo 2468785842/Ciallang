@@ -408,7 +408,8 @@
       "name": "m5_exception_loop",
       "sourceSha256": "05644803b1ea172c1124b53b014ac236600be29e9b5600ac0201c4fec0c995d7",
       "bytecodeSha256": "8122912abdac6644b1e00990bef5b2ba55ed4c2bb3f4f67d8021c1ae97d3b7f4",
-      "expectedRecovery": "success"
+      "expectedRecovery": "success",
+      "structured": true
     },
     {
       "name": "m5_exception_try_switch",
