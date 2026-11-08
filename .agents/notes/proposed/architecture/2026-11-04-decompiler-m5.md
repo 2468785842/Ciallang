@@ -2,14 +2,15 @@
 
 Status: proposed
 
-## 当前状态（2026-11-07，接续先读此节）
+## 当前状态（2026-11-08，接续先读此节）
 
 M5 仍在进行；当前能力与剩余工作以
 [方案当前状态表](../../../../doc/bytecode/decompiler-plan.md#m5-当前状态2026-11-05)为准。
-异常区域状态机首版已完成并登记
-（[实现记录](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)）：
-函数内 try/catch（嵌套/重抛/无绑定）经 CFG 降级状态机恢复，9 组语料 darwin
-参考对拍一致；结构化 try/catch 区域恢复是下一个实现批次。
+异常区域已完成状态机首版（2026-11-07 验收）与结构化 try/catch 首版
+（2026-11-08），实现与边界见
+[实现记录](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)：
+已证明形态输出真 try/catch，未证明形态落回状态机，9 组语料 darwin 参考对拍
+一致；catch 体读 try 体内寄存器的数据流协议是异常主线剩余项。
 下面各批次保留当时的拒绝与验证事实，后续修复不覆盖历史失败记录。
 特别是早期“嵌套 switch 一律拒绝”和“赋值右值 FuncLit 待实现”不再是现状：
 自产双层/三层与参考函数内双层 switch 已验收；赋值右值 FuncLit 的源码
@@ -538,11 +539,28 @@ M5 专项 552 assertions / 4 cases 通过，最终全量 CTest 245/245（22.00s�
 - `test_exception_regions_roundtrip` 补 manifest 哈希校验；断言保持形态无关。
   macOS Debug 全量 CTest **443/443 通过**（17.93s）。
 
+## 结构化 try/catch 首版（2026-11-08，darwin）
+
+基线 `9b819be`。结构化路径放开 handler 表整单拒绝（顶层仍拒）：`precomputeTryRegions`
+认领 try 区域（区间/嵌套/出口 Jmp/唯一入口证明），`emitRegion` 优先认领 try 头，
+体区与 catch 体递归发射；异常槽 Pass A/B 双游标重绑定；无绑定槽输出裸 catch。
+实现不变量、首轮失败（同起点嵌套 map 碰撞、Pass B 游标重置、存储提升回退、
+声明落点守卫）与验收证据见
+[实现记录"结构化区域恢复首版"](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)。
+
+- 能力：bc 路径 return/catch_switch 走结构化（manifest `structured: true`）；
+  自产 catch 仅读异常槽/裸 catch/嵌套重抛结构化输出经 4 个新 Catch2 用例断言
+  与回放验证。被拒形态自动落回状态机。
+- 诚实拒绝保持：catch 读体寄存器（数据流）、声明落点内移（块作用域）、try 体
+  内调用（复合原因）。`out/m5-exception/` 探针复核 11/11 行为符合登记。
+- 9 组语料参考对拍复跑 9/9 一致；macOS Debug 全量 CTest **447/447**（含 4 个
+  新用例）；clang-format 20.1.0 与 git diff --check 通过。
+
 ## 建议下一步
 
-1. 结构化 try/catch 区域恢复：emitRegion 认领 try 区域、输出真 try/catch 结构
-   （现状全部经状态机平铺）；catch 体读 try 体重定义寄存器等数据流形态保守
-   拒绝落回状态机。详设见本 note 会话记录。
+1. catch 体读 try 体内寄存器的数据流协议：寄存器复用拷贝快照、无名循环携带
+   渲染、Optimizer localVars 重映射（独立既有缺口），三者齐备后再评估合成
+   存储提升。
 2. switch 后续批次：扩展有副作用的 case 派发前缀、嵌套与 for 更新段 continue
    组合的更多数据流形态；参考更复杂合流与有副作用标签（返回/三层固定样本已通过）；按方案 §7 继续参考 TJS2 四环验收。
 3. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修

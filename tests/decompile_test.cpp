@@ -840,7 +840,8 @@ TEST_CASE("decompile M5 - exception slot zero and absent slot preserve exact reg
     chunk.addThrowHandler({ 0, 4, keepException ? u16{ 0 } : vm::ThrowHandler::exValueRegNone });
     const auto rebuilt = rebuildFunctionProgram(runtime, *rooted.get(), "f", "x");
     INFO(rebuilt);
-    REQUIRE(rebuilt.find("catch (") != std::string::npos);
+    // 有槽 = catch (名字)；无槽 = 裸 catch（结构化路径；状态机输出恒带括号）
+    REQUIRE((rebuilt.find("catch (") != std::string::npos || rebuilt.find("catch {") != std::string::npos));
     const Vec<Integer> inputs{ -2, 0, 2 };
     REQUIRE(runProgramOutputs(rebuilt, inputs) ==
             runProgramOutputs(keepException ? "function f(x){return 7;}" : "function f(x){return x;}", inputs));
@@ -898,4 +899,64 @@ TEST_CASE("decompile M5 - caught opaque objects preserve identity") {
         REQUIRE(result.isObject());
         REQUIRE(result.asObject().unwrap() == token.get());
     }
+}
+
+TEST_CASE("decompile M5 - structured try/catch recovers region without state machine") {
+    Runtime runtime;
+    Context context{ runtime };
+    // catch 体只读异常槽：结构化路径输出真 try/catch，不落状态机平铺
+    const std::string source = "function f(x){try{if(x)throw x;}catch(e){return e;}return -1;}";
+    auto top = compileSource(runtime, context, source);
+    REQUIRE(top.has_value());
+    auto rooted = std::move(*top).toHeap(runtime);
+    const auto rebuilt = rebuildFunctionProgram(runtime, *rooted.get(), "f", "x");
+    INFO(rebuilt);
+    REQUIRE(rebuilt.find("try {") != std::string::npos);
+    REQUIRE(rebuilt.find("catch (") != std::string::npos);
+    REQUIRE(rebuilt.find("while (true)") == std::string::npos);
+    REQUIRE(runProgramOutputs(rebuilt, { -2, 0, 5 }) == runProgramOutputs(source, { -2, 0, 5 }));
+}
+
+TEST_CASE("decompile M5 - nested structured try regions keep inner rethrow semantics") {
+    Runtime runtime;
+    Context context{ runtime };
+    const std::string source = "function f(x){try{try{throw x;}catch(a){throw a+1;}}catch(b){return b;}return -1;}";
+    auto top = compileSource(runtime, context, source);
+    REQUIRE(top.has_value());
+    auto rooted = std::move(*top).toHeap(runtime);
+    const auto rebuilt = rebuildFunctionProgram(runtime, *rooted.get(), "f", "x");
+    INFO(rebuilt);
+    REQUIRE(rebuilt.find("try {") != std::string::npos);
+    REQUIRE(rebuilt.find("while (true)") == std::string::npos);
+    REQUIRE(runProgramOutputs(rebuilt, { -3, 0, 5 }) == runProgramOutputs(source, { -3, 0, 5 }));
+}
+
+TEST_CASE("decompile M5 - structured bare catch without exception slot") {
+    Runtime runtime;
+    Context context{ runtime };
+    const std::string source = "function f(x){try{if(x)throw x;}catch{return 42;}return -1;}";
+    auto top = compileSource(runtime, context, source);
+    REQUIRE(top.has_value());
+    auto rooted = std::move(*top).toHeap(runtime);
+    const auto rebuilt = rebuildFunctionProgram(runtime, *rooted.get(), "f", "x");
+    INFO(rebuilt);
+    REQUIRE(rebuilt.find("} catch {") != std::string::npos);
+    REQUIRE(rebuilt.find("while (true)") == std::string::npos);
+    REQUIRE(runProgramOutputs(rebuilt, { 0, 9 }) == runProgramOutputs(source, { 0, 9 }));
+}
+
+TEST_CASE("decompile M5 - catch reading try-body register falls back to state machine") {
+    Runtime runtime;
+    Context context{ runtime };
+    // 数据流守卫拒绝（异常时点的版本不明确），自动落回状态机且语义正确；
+    // 存储提升需先解决寄存器复用快照与无名循环携带交互，属后续批次
+    const std::string source = "function f(x){var r=0;try{r=x*3;if(x==0)throw 7;}catch(e){r=r+e;}return r;}";
+    auto top = compileSource(runtime, context, source);
+    REQUIRE(top.has_value());
+    auto rooted = std::move(*top).toHeap(runtime);
+    const auto rebuilt = rebuildFunctionProgram(runtime, *rooted.get(), "f", "x");
+    INFO(rebuilt);
+    REQUIRE(rebuilt.find("catch (") != std::string::npos);
+    REQUIRE(rebuilt.find("while (true)") != std::string::npos);
+    REQUIRE(runProgramOutputs(rebuilt, { 0, 5 }) == runProgramOutputs(source, { 0, 5 }));
 }

@@ -352,7 +352,7 @@ namespace cial::decompile {
             if(finishUnsupported(recovery))
                 return recovery;
 
-            if(_blocks.size() <= 1)
+            if(_blocks.size() <= 1 && _tryHeads.empty())
                 emitStatements(recovery.statements);
             else
                 emitStructured(recovery.statements);
@@ -591,8 +591,10 @@ namespace cial::decompile {
 
         // ── 预检：不可结构化语句（M5）如实拒绝 ──
         bool precheck(std::string &reason) {
-            if(!_stateMachine && !_chunk.getThrowHandlers().empty()) {
-                reason = "try/catch 结构化属 M5（throw handler 表非空）";
+            // 函数内 try/catch 交由 precomputeTryRegions 校验（失败落回状态机）；
+            // 顶层无函数局部作用域，维持批次拒绝
+            if(!_stateMachine && !_functionLike && !_chunk.getThrowHandlers().empty()) {
+                reason = "try/catch 顶层结构化属 M5（throw handler 表非空）";
                 return false;
             }
             auto &instructions = _chunk.getInstVec();
@@ -670,6 +672,7 @@ namespace cial::decompile {
             if(!_stateMachine) {
                 precomputeLoops();
                 precomputeSwitches();
+                precomputeTryRegions();
             }
         }
 
@@ -728,6 +731,16 @@ namespace cial::decompile {
             auto &instructions = _chunk.getInstVec();
             for(size_t pc = 0; pc < instructions.size(); ++pc) {
                 _instPc = static_cast<u32>(pc);
+                // catch 入口：异常槽由 VM 在 unwind 时写入（异常发生时寄存器处于
+                // 指令中间状态，方案 §5.3），从此 pc 起重绑定为 catch 变量名节点；
+                // 体区内的同号版本不受影响。版本下标记录供 Pass B 恢复游标
+                for(auto &[tryStart, region] : _tryHeads) {
+                    if(region.tryEnd != _instPc || region.exValueReg == vm::ThrowHandler::exValueRegNone)
+                        continue;
+                    pushDef(Register{ region.exValueReg }, false);
+                    region.exVersion = static_cast<u32>(_defs[region.exValueReg].size() - 1);
+                    _defs[region.exValueReg].back().node = makeNamed(Expr::Kind::LocalName, region.catchName, false);
+                }
                 // 声明安装链：整体跳过（链内读写在 Decl tile 内消费）
                 if(_foldedPcs.contains(_instPc))
                     continue;
@@ -1029,6 +1042,13 @@ namespace cial::decompile {
                     _current[i] = 0;
             for(size_t pc = 0; pc < instructions.size(); ++pc) {
                 _instPc = static_cast<u32>(pc);
+                // catch 入口：恢复 Pass A 登记的异常槽版本（游标重置后参数之外
+                // 的版本不延续，catch 体首条指令可能读取异常值）
+                for(const auto &[tryStart, region] : _tryHeads) {
+                    if(region.tryEnd != _instPc || region.exVersion == INVALID)
+                        continue;
+                    _current[region.exValueReg] = region.exVersion;
+                }
                 const Instruction &inst = *instructions[pc];
                 // 声明安装链：随 Decl tile 折叠，不产节点/语句，也不视为存储
                 if(_foldedPcs.contains(_instPc)) {
@@ -2979,6 +2999,184 @@ namespace cial::decompile {
             u32 latchPc{ INVALID }; // 锁存 Jmp 的 pc（for 形态 continue 经锁存块中转）
         };
 
+        // try/catch 区域（M5）：[tryStart, tryEnd) 体区 + [tryEnd, joinPc) catch 体。
+        // handler 表内层优先（IRGen 与转译器共同保证）；出口取体区末尾跳过 catch
+        // 的 Jmp 目标（IRGen 模板恒有；优化器不折叠不可达 Jmp，转译器要求 catch
+        // 目标落在指令边界）
+        struct TryRegion {
+            u32 tryStart{};
+            u32 tryEnd{};
+            u32 joinPc{};
+            u16 exValueReg{}; // vm::ThrowHandler::exValueRegNone = 无绑定
+            std::string catchName; // catch 变量名（具名局部或合成临时）
+            u32 exVersion{ INVALID }; // Pass A 在 tryEnd 登记的异常槽版本
+        };
+
+        void precomputeTryRegions() {
+            const auto &handlers = _chunk.getThrowHandlers();
+            if(handlers.empty())
+                return;
+            auto &code = _chunk.getInstVec();
+            for(const auto &handler : handlers) {
+                if(handler.tryStart >= handler.tryEnd || handler.tryEnd >= code.size()) {
+                    fail("CFG 异常区域或 catch 入口越界");
+                    return;
+                }
+            }
+            // 区域两两真嵌套或不相交；完全重叠 = 同一区域重复登记，归属不明
+            for(size_t i = 0; i < handlers.size(); ++i) {
+                for(size_t j = i + 1; j < handlers.size(); ++j) {
+                    const auto &a = handlers[i];
+                    const auto &b = handlers[j];
+                    if(a.tryStart == b.tryStart && a.tryEnd == b.tryEnd) {
+                        fail("异常区域完全重叠，无法结构化（M5）");
+                        return;
+                    }
+                    const bool disjoint = b.tryStart >= a.tryEnd || a.tryStart >= b.tryEnd;
+                    const bool nested = (b.tryStart >= a.tryStart && b.tryEnd <= a.tryEnd) ||
+                        (a.tryStart >= b.tryStart && a.tryEnd <= b.tryEnd);
+                    if(!disjoint && !nested) {
+                        fail("异常区域部分重叠，无法结构化（M5）");
+                        return;
+                    }
+                }
+            }
+            // 名字避让与既有合成存储一致：参数、局部与 Atom（catch 变量名之后
+            // 供临时物化分配器共用）
+            for(u16 p = 0; p < (_meta ? _meta->arity : u16{ 0 }); ++p)
+                _usedNames.insert(fmt::format("a{}", p));
+            for(const auto &local : _meta ? _meta->localVars : Vec<inter::LocalVariable>{})
+                if(local.identifier != ATOM_INVALID)
+                    _usedNames.insert(atomText(_rt, local.identifier));
+            for(const auto &inst : code) {
+                for(const auto &operand : { inst->getOp1(), inst->getOp2(), inst->getOp3() }) {
+                    if(operand.type() == inter::Operand::Type::Atom)
+                        _usedNames.insert(atomText(_rt, operand.value<Atom>()));
+                }
+            }
+            for(const auto &handler : handlers) {
+                // 出口证明：体区末块尾必须是跳过 catch 体的 Jmp。体区以 Ret/Throw
+                // 收尾（Jmp 不可达仍保留于自产路径；缺失即形态未证明）→ 拒绝
+                if(code[handler.tryEnd - 1]->opcode() != TacOpCode::Jmp) {
+                    fail("try 体缺少跳过 catch 的出口跳转，结构化恢复属后续批次（M5）");
+                    return;
+                }
+                const auto join = static_cast<u32>(code[handler.tryEnd - 1]->getOp1().value<Label>().address());
+                if(join < handler.tryEnd || join > code.size()) {
+                    fail("try 出口越界（M5）");
+                    return;
+                }
+                // join 必须是块边界（Jmp 目标即 leader；函数尾除外）
+                if(join < code.size() && blockAtPc(join) < _blocks.size() && _blocks[blockAtPc(join)].start != join) {
+                    fail("try 出口未落在块边界（M5）");
+                    return;
+                }
+                // catch 体区域唯一入口证明：区域外块的普通后继不得落入
+                // [tryEnd, join)（异常只能经 unwind 进入 catch；区域内的 try 体
+                // 异常边由 CFG 已建模）
+                for(size_t bi = 0; bi < _blocks.size(); ++bi) {
+                    const auto &block = _blocks[bi];
+                    if(block.start >= handler.tryStart && block.start < join)
+                        continue;
+                    for(const auto next : block.successors) {
+                        const auto &succ = _blocks[next];
+                        if(succ.start >= handler.tryEnd && succ.start < join) {
+                            fail("catch 体区域存在区域外的第二入口（M5）");
+                            return;
+                        }
+                    }
+                }
+                // 数据流守卫：catch 体读取 try 体内定义的寄存器 = SSA 版本在异常
+                // 时点不明确（异常可发生在定义前的任意 pc），且优化器可能删除体
+                // 外的死初始化使具名局部的幸存定义内移（声明落点随之漂移，块作
+                // 用域下 catch 不可见）——保守拒绝落回状态机（其逐 pc 槽赋值本
+                // 就正确）。例外：读取之前 catch 体内已有同号寄存器定义（寄存器
+                // 复用），线性链绑定到 catch 局部定义，值语义正确。exValueReg 由
+                // VM 写入，经 Pass A/B 重绑定放行
+                std::unordered_set<u16> bodyDefs;
+                for(u32 pc = handler.tryStart; pc < handler.tryEnd; ++pc)
+                    forEachDef(*code[pc], [&](const Register reg, const bool) { bodyDefs.insert(reg.index()); });
+                for(u32 pc = handler.tryEnd; pc < join && _unsupported.empty(); ++pc) {
+                    forEachUse(*code[pc], [&](const Register reg) {
+                        if(reg.index() == handler.exValueReg || !bodyDefs.contains(reg.index()))
+                            return;
+                        for(u32 q = handler.tryEnd; q < pc; ++q) {
+                            bool redefined = false;
+                            forEachDef(*code[q], [&](const Register r, const bool) {
+                                if(r.index() == reg.index())
+                                    redefined = true;
+                            });
+                            if(redefined)
+                                return; // 更近的 catch 局部定义
+                        }
+                        fail(fmt::format("catch 体读取 try 体内定义的寄存器 %{}，数据流属后续批次（M5）", reg.index()));
+                    });
+                }
+                if(!_unsupported.empty())
+                    return;
+                // 声明落点守卫：具名局部最早的命名定义点若落在 try 体内且体外
+                // （catch 体 / try 后代码 / 体前）存在同名引用，`var` 声明会随
+                // 幸存定义内移（优化器删除体外死初始化时不重映射 localVars），
+                // 块作用域下 catch 与 try 后代码不可见——保守拒绝
+                if(_meta) {
+                    for(const auto &local : _meta->localVars) {
+                        if(local.identifier == ATOM_INVALID)
+                            continue;
+                        const auto regIndex = local.reg.index();
+                        const auto name = atomText(_rt, local.identifier);
+                        bool defInBody = false;
+                        for(u32 pc = handler.tryStart; pc < handler.tryEnd && !defInBody; ++pc) {
+                            forEachDef(*code[pc], [&](const Register r, const bool) {
+                                if(r.index() == regIndex && localNameAt(r, pc + 1) == name)
+                                    defInBody = true;
+                            });
+                        }
+                        if(!defInBody)
+                            continue;
+                        bool defBefore = false;
+                        for(u32 pc = 0; pc < handler.tryStart && !defBefore; ++pc) {
+                            forEachDef(*code[pc], [&](const Register r, const bool) {
+                                if(r.index() == regIndex && localNameAt(r, pc + 1) == name)
+                                    defBefore = true;
+                            });
+                        }
+                        if(defBefore)
+                            continue;
+                        bool referencedOutside = false;
+                        for(u32 pc = 0; pc < code.size() && !referencedOutside; ++pc) {
+                            if(pc >= handler.tryStart && pc < handler.tryEnd)
+                                continue;
+                            forEachUse(*code[pc], [&](const Register r) {
+                                if(r.index() == regIndex && localNameAt(r, pc) == name)
+                                    referencedOutside = true;
+                            });
+                            forEachDef(*code[pc], [&](const Register r, const bool) {
+                                if(r.index() == regIndex && localNameAt(r, pc + 1) == name)
+                                    referencedOutside = true;
+                            });
+                        }
+                        if(referencedOutside) {
+                            fail(fmt::format("局部 {} 的声明落点随幸存定义内移进 try 体，块作用域可见性未证明（M5）",
+                                             name));
+                            return;
+                        }
+                    }
+                }
+                std::string catchName;
+                if(handler.exValueReg != vm::ThrowHandler::exValueRegNone)
+                    catchName = localNameAt(Register{ handler.exValueReg }, handler.tryEnd);
+                if(catchName.empty())
+                    catchName = nextTempName();
+                _usedNames.insert(catchName);
+                _tryHeads.emplace(static_cast<u32>(handler.tryStart),
+                                  TryRegion{ .tryStart = static_cast<u32>(handler.tryStart),
+                                             .tryEnd = static_cast<u32>(handler.tryEnd),
+                                             .joinPc = join,
+                                             .exValueReg = handler.exValueReg,
+                                             .catchName = std::move(catchName) });
+            }
+        }
+
         [[nodiscard]] size_t blockAtPc(const u32 pc) const {
             for(size_t i = 0; i < _blocks.size(); ++i)
                 if(_blocks[i].start <= pc && pc < _blocks[i].end)
@@ -4109,6 +4307,23 @@ namespace cial::decompile {
                     pc = emitDoWhile(loop, ctx, indent, out);
                     continue;
                 }
+                // try/catch 头（先于 switch/while/if：tryStart 可能同时是这些
+                // 结构的头块起点，必须由 try 认领后再递归内层；消费式移除防
+                // 体区域重入递归）。try{try{…} 同起点嵌套时先认领最外层
+                // （tryEnd 最大），内层由递归在同一 pc 命中
+                {
+                    const auto range = _tryHeads.equal_range(pc);
+                    if(range.first != range.second) {
+                        auto best = range.first;
+                        for(auto it = range.first; it != range.second; ++it)
+                            if(it->second.tryEnd > best->second.tryEnd)
+                                best = it;
+                        const TryRegion region = best->second;
+                        _tryHeads.erase(best);
+                        pc = emitTry(region, ctx, indent, out);
+                        continue;
+                    }
+                }
                 // 头块可能含条件区之前的体语句（如循环体内 k = k + 1; if (...)）：
                 // 先按封闭区域发射前缀语句，再进入头处理
                 const bool atHeader = pc == block.start || pc == zoneFirst;
@@ -4284,6 +4499,32 @@ namespace cial::decompile {
             return shape.mergePc;
         }
 
+        // try/catch 发射（M5）：体区与 catch 体各自作为封闭区域递归发射，继承
+        // 外层 LoopCtx（体内 break/continue 照常分类）。出口跳转目标 = joinPc ≥
+        // 体区末尾，被 emitRegion 按贯穿省略；catch 变量无绑定时输出裸 catch。
+        // 结构行不对应任何 TAC 指令（异常表为旁表），标记 synthetic
+        [[nodiscard]] u32 emitTry(const TryRegion &region, const LoopCtx &ctx, const u32 indent,
+                                  Vec<RecoveredStatement> &out) {
+            const std::string pad = indentText(indent);
+            out.push_back(RecoveredStatement{ .pc = region.tryStart, .text = pad + "try {", .synthetic = true });
+            emitRegion(region.tryStart, region.tryEnd, ctx, indent + 1, out);
+            if(!_unsupported.empty())
+                return region.joinPc;
+            if(region.exValueReg == vm::ThrowHandler::exValueRegNone)
+                out.push_back(RecoveredStatement{ .pc = region.tryEnd, .text = pad + "} catch {", .synthetic = true });
+            else
+                out.push_back(RecoveredStatement{ .pc = region.tryEnd,
+                                                  .text = fmt::format("{}}} catch ({}) {{", pad, region.catchName),
+                                                  .synthetic = true });
+            emitRegion(region.tryEnd, region.joinPc, ctx, indent + 1, out);
+            if(!_unsupported.empty())
+                return region.joinPc;
+            out.push_back(RecoveredStatement{ .pc = region.joinPc > region.tryEnd ? region.joinPc - 1 : region.tryEnd,
+                                              .text = pad + "}",
+                                              .synthetic = true });
+            return region.joinPc;
+        }
+
         // switch 派发链发射（M5）：块前缀（判别值装入/物化临时）→ switch 头 →
         // 逐 case 渲染匹配值与体（break 经 LoopCtx.breakPc 命中出口；贯穿 Jmp
         // 目标在体区域之外被 emitRegion 静默省略）→ default → 收尾
@@ -4403,6 +4644,7 @@ namespace cial::decompile {
         std::unordered_map<u32, u32> _condNodeAtPc; // 条件区 pc → 捕获的条件节点
         std::unordered_map<size_t, WhileLoop> _whileLoops; // 头块 → 循环
         std::unordered_map<u32, DoLoop> _doLoops; // 体首 pc → do-while
+        std::unordered_multimap<u32, TryRegion> _tryHeads; // tryStart → try/catch 区域（同起点嵌套并存）
         std::unordered_set<u32> _foldedPcs; // 三元折叠透明的 pc
         std::unordered_set<size_t> _foldedHeaders; // 已折叠三元条件的头块
         std::unordered_map<size_t, u32> _foldedHeaderMerge; // 头块 → 汇合 pc

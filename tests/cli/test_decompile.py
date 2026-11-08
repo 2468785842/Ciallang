@@ -227,6 +227,9 @@ class DecompileTest(CliTestCase):
                     recovered = self.run_cial("--decompile", input_path)
                     self.assertEqual(recovered.returncode, 0, recovered.stderr)
                     self.assertIn("catch (", recovered.stdout)
+                    if sample.get("structured"):
+                        # 结构化路径样本：真 try/catch 输出，不得退化为状态机平铺
+                        self.assertNotIn("while (true)", recovered.stdout, sample["name"])
                     target = self.root / "exception-roundtrip.tjs"
                     target.write_text(recovered.stdout, encoding="utf-8")
                     replay = self.run_cial(target)

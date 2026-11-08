@@ -392,7 +392,8 @@
       "name": "m5_exception_return",
       "sourceSha256": "c993fe2756c381695cacc67d5c2504d8c3468dfbed82fa19f01cd34e5cccadda",
       "bytecodeSha256": "b74588f1a91caef451f0e5ea3edc905ce67bf8deecfb1d2d3971d35c98c210aa",
-      "expectedRecovery": "success"
+      "expectedRecovery": "success",
+      "structured": true
     },
     {
       "name": "m5_exception_getter",
@@ -418,7 +419,8 @@
       "sourceSha256": "eedfdf4aa8c7741927ae5ebd8499d761527b0db1136d5e1047e20a6e68e459f3",
       "bytecodeSha256": "bf7955f744dc887402ba708f2a5b72d1d31ca938a6a2b110636f148e1df12926",
       "expectedRecovery": "success",
-      "reference": "darwin"
+      "reference": "darwin",
+      "structured": true
     },
     {
       "name": "m5_exception_nested_three",
