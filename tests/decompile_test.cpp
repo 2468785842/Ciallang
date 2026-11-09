@@ -398,9 +398,8 @@ TEST_CASE("decompile M2 - structure leftovers are rejected with batch-specific r
         const char *reason;
     };
     const Case cases[] = {
-        // M5 首批已恢复封闭 switch；异常表仍按批次拒绝
+        // 顶层 try（无函数局部作用域）仍按批次拒绝
         { "try { throw 1; } catch (e) { var a = e; }", "M5" },
-        { "var o = %[];\nwith (o) { println(1); }\n", "M3" },
     };
     for(const auto &[source, reason] : cases) {
         auto chunk = compileSource(runtime, context, source);
@@ -723,10 +722,10 @@ TEST_CASE("decompile M5 - irreducible scalar CFG falls back without losing carri
     REQUIRE_FALSE(call.statements.empty());
     REQUIRE(std::ranges::any_of(call.statements,
                                 [](const auto &stmt) { return stmt.text.find("()") != std::string::npos; }));
-    chunk.repl<EvalStr>(13, Register{ 0 }, Register{ 3 });
-    const auto dynamic = decompile::recoverUnitBody(runtime, chunk, meta, true);
-    REQUIRE(dynamic.unsupported.find("动态求值") != std::string::npos);
-    REQUIRE(dynamic.statements.empty());
+    chunk.repl<WithPush>(13, Register{ 3 });
+    const auto withFlat = decompile::recoverUnitBody(runtime, chunk, meta, true);
+    REQUIRE(withFlat.unsupported.find("with 语句状态机无法平铺") != std::string::npos);
+    REQUIRE(withFlat.statements.empty());
 }
 
 TEST_CASE("decompile M5 - state machine recovers method calls with inline receivers") {

@@ -247,6 +247,7 @@ namespace cial::decompile {
                 LocalName, // 具名局部（含参数）或全局名
                 ThisVal,
                 GlobalObj,
+                WithBase, // with 体的隐式基座（GetWith 物化）：渲染为空接收者 `.member`
                 SuperVal, // super（Super 指令定义，仅作成员访问/调用接收者）
                 Member, // obj.name / obj["name"] / obj[expr]
                 Index, // obj[expr]
@@ -257,6 +258,7 @@ namespace cial::decompile {
                 Binary,
                 Ternary, // cond ? a : b（跨块折叠，M3；integer 复用为 else 节点下标）
                 Copy, // DLocal/GLocal 匿名拷贝（透明引用源版本）
+                EvalPostfix, // 动态求值后缀 `child!`（EvalStr；名字恒为全局+with 栈）
                 FuncLit, // 匿名函数字面量（实参/赋值右值；integer 复用为常量下标）
             };
             Kind kind{};
@@ -353,7 +355,7 @@ namespace cial::decompile {
             if(finishUnsupported(recovery))
                 return recovery;
 
-            if(_blocks.size() <= 1 && _tryHeads.empty())
+            if(_blocks.size() <= 1 && _tryHeads.empty() && _withHeads.empty())
                 emitStatements(recovery.statements);
             else
                 emitStructured(recovery.statements);
@@ -446,6 +448,7 @@ namespace cial::decompile {
                     case TacOpCode::GPropRawC:
                     case TacOpCode::GProp:
                     case TacOpCode::GPropRaw:
+                    case TacOpCode::EvalStr: // 逐 pc 物化求值结果（名字恒全局+with 栈）
                     case TacOpCode::NewArray:
                     case TacOpCode::NewDict:
                     case TacOpCode::GetIndex:
@@ -652,11 +655,20 @@ namespace cial::decompile {
                     case TacOpCode::WithPush:
                     case TacOpCode::WithPop:
                     case TacOpCode::GetWith:
-                        reason = "with 语句结构化属 M3";
-                        return false;
+                        // 结构化路径由 precomputeWithRegions 配对恢复（emitRegion
+                        // 认领 + GetWith 空接收者渲染）；状态机无法平铺 with 栈
+                        // 语义（GetWith 的值依赖运行期栈形态，无源码级表达式），
+                        // 保留拒绝使含 with 单元在结构化失败时整单诚实拒绝
+                        if(_stateMachine) {
+                            reason = "with 语句状态机无法平铺（with 栈语义属结构化恢复）";
+                            return false;
+                        }
+                        break;
                     case TacOpCode::EvalStr:
-                        reason = "动态求值（后缀 !）可按名字访问局部，恢复保守拒绝";
-                        return false;
+                        // eval 字符串用全新 IRGenerator 编译，名字恒为 GGlobal 直读
+                        // 全局槽（+with 栈 .member），局部/参数/合成临时不可能被
+                        // 按名引用——verbatim 渲染 `(<src>)!` 语义安全
+                        break;
                     case TacOpCode::CallExpand:
                     case TacOpCode::CollapseArgs:
                         reason = "展开实参/收拢参数恢复属后续批次";
@@ -707,6 +719,7 @@ namespace cial::decompile {
                 precomputeSwitches();
                 precomputeTryRegions();
                 precomputeLoopStorage();
+                precomputeWithRegions();
             }
         }
 
@@ -839,6 +852,8 @@ namespace cial::decompile {
                 case TacOpCode::DerefGet:
                 case TacOpCode::DLocal:
                 case TacOpCode::GLocal:
+                case TacOpCode::WithPush:
+                case TacOpCode::EvalStr:
                     callback(inst.getOp1().value<Register>());
                     break;
                 case TacOpCode::CmpEQ:
@@ -977,6 +992,7 @@ namespace cial::decompile {
                 case TacOpCode::NewArray:
                 case TacOpCode::NewDict:
                 case TacOpCode::NewRegExp:
+                case TacOpCode::GetWith:
                     callback(inst.getOp1().value<Register>(), false);
                     break;
                 case TacOpCode::ToInt:
@@ -998,6 +1014,7 @@ namespace cial::decompile {
                 case TacOpCode::DerefGet:
                 case TacOpCode::GGlobal:
                 case TacOpCode::GThis:
+                case TacOpCode::EvalStr:
                     callback(inst.getOp2().value<Register>(), false);
                     break;
                 case TacOpCode::ChkIns:
@@ -1223,6 +1240,10 @@ namespace cial::decompile {
                 case TacOpCode::ToOctet:
                 case TacOpCode::Asc:
                 case TacOpCode::Chr:
+                case TacOpCode::EvalStr:
+                case TacOpCode::WithPush:
+                case TacOpCode::WithPop:
+                    // with 栈进出是可观察状态变化：表达式不得内联穿越边界
                     return true;
                 default:
                     return false;
@@ -1328,6 +1349,23 @@ namespace cial::decompile {
                 case TacOpCode::This:
                     defineNode(inst.getOp1().value<Register>(), makeSimple(Expr::Kind::ThisVal));
                     break;
+                case TacOpCode::GetWith:
+                    // with 体的隐式基座：只作为成员访问接收者消费（Member 渲染
+                    // 空接收者 `.atom`）；成员访问之外的使用在消费点诚实拒绝
+                    defineNode(inst.getOp1().value<Register>(), makeSimple(Expr::Kind::WithBase));
+                    break;
+                case TacOpCode::WithPush:
+                case TacOpCode::WithPop:
+                    // 由 emitRegion 的 with 区域认领承载（emitWith 结构行），无语句
+                    break;
+                case TacOpCode::EvalStr: {
+                    // 动态求值后缀：名字恒为全局槽 + with 栈，verbatim 渲染安全
+                    const auto node = newNode(Expr::Kind::EvalPostfix);
+                    _nodes[node].a = operandNode(inst.getOp1().value<Register>());
+                    defineNode(inst.getOp2().value<Register>(), node);
+                    noteNamedDef(inst.getOp2().value<Register>());
+                    break;
+                }
                 case TacOpCode::Super:
                     // super（M4 类壳）：superclass 引用，仅作成员访问/调用接收者
                     defineNode(inst.getOp1().value<Register>(), makeSimple(Expr::Kind::SuperVal));
@@ -2516,6 +2554,7 @@ namespace cial::decompile {
                 case Expr::Kind::Member: // getter 语义
                 case Expr::Kind::Index: // 任意对象下标读取保守视作可观察
                 case Expr::Kind::IncDec:
+                case Expr::Kind::EvalPostfix: // eval 字符串可赋全局/调用
                     return true;
                 case Expr::Kind::Unary:
                     if(expr.text == "delete" || expr.text == "*" || expr.text == "int" || expr.text == "real" ||
@@ -2755,6 +2794,14 @@ namespace cial::decompile {
                     return { "global", Prec::Primary };
                 case Expr::Kind::SuperVal:
                     return { "super", Prec::Primary };
+                case Expr::Kind::WithBase:
+                    // 空接收者：Member 拼接 `.atom` 自然成裸词链（DotPrefixParser
+                    // 重解析为 WithBase，round-trip）；Postfix 精度防 renderParen 加括号
+                    return { "", Prec::Postfix };
+                case Expr::Kind::EvalPostfix: {
+                    const auto operand = renderParen(expr.a, Prec::Unary, false);
+                    return { fmt::format("{}!", operand.text), Prec::Postfix };
+                }
                 case Expr::Kind::Copy:
                     return { expr.srcVersion == INVALID ? std::string{ "<copy>" } : renderVersion(expr.srcVersion),
                              Prec::Primary };
@@ -3270,6 +3317,42 @@ namespace cial::decompile {
             }
         }
 
+        // with 区域（M5）：WithPush/WithPop 线性深度配对（IRGen 严格嵌套发射，
+        // 无补偿 WithPop——break/continue 穿越使栈项滞留至帧释放，恢复按原形
+        // 重发即逐位一致）。体区域允许提前离出
+        struct WithRegion {
+            u32 pushPc{};
+            u32 popPc{};
+            Register objReg{};
+        };
+
+        void precomputeWithRegions() {
+            const auto &code = _chunk.getInstVec();
+            Vec<WithRegion> open;
+            for(u32 pc = 0; pc < code.size(); ++pc) {
+                switch(code[pc]->opcode()) {
+                    case TacOpCode::WithPush:
+                        open.push_back(WithRegion{
+                            .pushPc = pc, .popPc = INVALID, .objReg = code[pc]->getOp1().value<Register>() });
+                        break;
+                    case TacOpCode::WithPop:
+                        if(open.empty()) {
+                            fail("with_pop 无配对的 with_push（M5）");
+                            return;
+                        }
+                        open.back().popPc = pc;
+                        _withHeads.emplace(open.back().pushPc, open.back());
+                        open.pop_back();
+                        break;
+                    default:
+                        break;
+                }
+            }
+            if(!open.empty()) {
+                fail("with_push 缺少 with_pop（M5）");
+            }
+        }
+
         void precomputeTryRegions() {
             const auto &handlers = _chunk.getThrowHandlers();
             if(handlers.empty())
@@ -3396,54 +3479,6 @@ namespace cial::decompile {
                     if(!promoteRegister(regIndex)) {
                         fail(fmt::format("catch 体读取的寄存器 %{} 缺少定义点", regIndex));
                         return;
-                    }
-                }
-                // 声明落点守卫：具名局部最早的命名定义点若落在 try 体内且体外
-                // （catch 体 / try 后代码 / 体前）存在同名引用，`var` 声明会随
-                // 幸存定义内移（优化器删除体外死初始化时不重映射 localVars），
-                // 块作用域下 catch 与 try 后代码不可见——保守拒绝
-                if(_meta) {
-                    for(const auto &local : _meta->localVars) {
-                        if(local.identifier == ATOM_INVALID)
-                            continue;
-                        const auto regIndex = local.reg.index();
-                        const auto name = atomText(_rt, local.identifier);
-                        bool defInBody = false;
-                        for(u32 pc = handler.tryStart; pc < handler.tryEnd && !defInBody; ++pc) {
-                            forEachDef(*code[pc], [&](const Register r, const bool) {
-                                if(r.index() == regIndex && localNameAt(r, pc + 1) == name)
-                                    defInBody = true;
-                            });
-                        }
-                        if(!defInBody)
-                            continue;
-                        bool defBefore = false;
-                        for(u32 pc = 0; pc < handler.tryStart && !defBefore; ++pc) {
-                            forEachDef(*code[pc], [&](const Register r, const bool) {
-                                if(r.index() == regIndex && localNameAt(r, pc + 1) == name)
-                                    defBefore = true;
-                            });
-                        }
-                        if(defBefore)
-                            continue;
-                        bool referencedOutside = false;
-                        for(u32 pc = 0; pc < code.size() && !referencedOutside; ++pc) {
-                            if(pc >= handler.tryStart && pc < handler.tryEnd)
-                                continue;
-                            forEachUse(*code[pc], [&](const Register r) {
-                                if(r.index() == regIndex && localNameAt(r, pc) == name)
-                                    referencedOutside = true;
-                            });
-                            forEachDef(*code[pc], [&](const Register r, const bool) {
-                                if(r.index() == regIndex && localNameAt(r, pc + 1) == name)
-                                    referencedOutside = true;
-                            });
-                        }
-                        if(referencedOutside) {
-                            fail(fmt::format("局部 {} 的声明落点随幸存定义内移进 try 体，块作用域可见性未证明（M5）",
-                                             name));
-                            return;
-                        }
                     }
                 }
                 std::string catchName;
@@ -4725,6 +4760,15 @@ namespace cial::decompile {
                         continue;
                     }
                 }
+                // with 区域头（try 之后；体允许 break/continue/return 提前离出，
+                // WithPop 由收尾行承载，不作为语句发射）
+                {
+                    const auto wh = _withHeads.find(pc);
+                    if(wh != _withHeads.end()) {
+                        pc = emitWith(wh->second, ctx, indent, out);
+                        continue;
+                    }
+                }
                 // 头块可能含条件区之前的体语句（如循环体内 k = k + 1; if (...)）：
                 // 先按封闭区域发射前缀语句，再进入头处理
                 const bool atHeader = pc == block.start || pc == zoneFirst;
@@ -4741,10 +4785,20 @@ namespace cial::decompile {
                     }
                 }
                 if(atHeader && zoneFirst != INVALID && zoneFirst > pc && regionEnd == block.end) {
-                    // 按 pc 逐个发射：物化临时定义可能落在无语句 tile 的 pc 上
-                    for(u32 p = pc; p < zoneFirst; ++p) {
+                    // 按 pc 逐个发射：物化临时定义可能落在无语句 tile 的 pc 上。
+                    // with push 在前缀段内时先截断（with 头必须由认领发射，直发
+                    // 会让体语句脱离 with 栈形态）
+                    u32 prefixEnd = zoneFirst;
+                    for(const auto &entry : _withHeads)
+                        if(entry.first > pc && entry.first < prefixEnd)
+                            prefixEnd = entry.first;
+                    for(u32 p = pc; p < prefixEnd; ++p) {
                         if(!_foldedPcs.contains(p))
                             emitAt(p, indent, out);
+                    }
+                    if(prefixEnd != zoneFirst) {
+                        pc = prefixEnd;
+                        continue;
                     }
                     pc = zoneFirst;
                 }
@@ -4784,10 +4838,19 @@ namespace cial::decompile {
                     if(_condPcs.contains(static_cast<u32>(lastPc)))
                         stmtEnd = static_cast<u32>(lastPc); // 条件区：JmpNE 已被条件捕获
                 }
-                // 按 pc 逐个发射（物化临时定义与语句 tile 统一走 emitAt）
-                for(u32 p = pc; p < stmtEnd; ++p) {
+                // 按 pc 逐个发射（物化临时定义与语句 tile 统一走 emitAt）。
+                // with push 在直线段内时先截断到它（下一次迭代由 with 认领）
+                u32 linearEnd = stmtEnd;
+                for(const auto &entry : _withHeads)
+                    if(entry.first > pc && entry.first < linearEnd)
+                        linearEnd = entry.first;
+                for(u32 p = pc; p < linearEnd; ++p) {
                     if(!_foldedPcs.contains(p))
                         emitAt(p, indent, out);
+                }
+                if(linearEnd != stmtEnd) {
+                    pc = linearEnd;
+                    continue;
                 }
                 if(jumpTarget != INVALID && !_condPcs.contains(static_cast<u32>(lastPc))) {
                     if(jumpTarget == ctx.breakPc) {
@@ -4810,7 +4873,13 @@ namespace cial::decompile {
                     }
                     // 跳到区域末尾（≥ end）等价贯穿，省略
                 }
-                pc = regionEnd;
+                // 区域起点在块中间时（with 体 push+1 等），直线迭代可能停在条
+                // 件区内部 pc（> zoneFirst），atHeader（== zoneFirst）判定失败，
+                // 块尾 if 认领被跳过——统一回到条件区起点 zoneFirst：已发射段
+                // 是条件指令（无语句文本）不重复；认领必然触发（本分支前提即
+                // regionEnd == block.end + 块尾条件区），emitIf/emitWhile 推进
+                pc = (jumpTarget != INVALID && _condPcs.contains(static_cast<u32>(lastPc))) ? _condZones[bi].firstPc
+                                                                                            : regionEnd;
             }
         }
 
@@ -4904,6 +4973,29 @@ namespace cial::decompile {
         // 外层 LoopCtx（体内 break/continue 照常分类）。出口跳转目标 = joinPc ≥
         // 体区末尾，被 emitRegion 按贯穿省略；catch 变量无绑定时输出裸 catch。
         // 结构行不对应任何 TAC 指令（异常表为旁表），标记 synthetic
+        // with 发射（M5）：对象表达式取 WithPush src 寄存器定义节点（对象在
+        // push 前求值，寄存器随即释放，GetWith 读 VM withStack 不依赖寄存器存
+        // 活期）；体区域 [push+1, pop) 递归，继承外层 LoopCtx。结构行带真实
+        // WithPush/WithPop pc，不标 synthetic
+        [[nodiscard]] u32 emitWith(const WithRegion &region, const LoopCtx &ctx, const u32 indent,
+                                   Vec<RecoveredStatement> &out) {
+            const auto version = liveVersionAt(region.objReg, region.pushPc);
+            if(version == INVALID) {
+                fail("with 对象节点缺失");
+                return region.popPc + 1;
+            }
+            const std::string pad = indentText(indent);
+            out.push_back(
+                RecoveredStatement{ .pc = region.pushPc,
+                                    .text = fmt::format("{}with ({}) {{", pad,
+                                                        renderNode(_defs[region.objReg.index()][version].node).text) });
+            emitRegion(region.pushPc + 1, region.popPc, ctx, indent + 1, out);
+            if(!_unsupported.empty())
+                return region.popPc + 1;
+            out.push_back(RecoveredStatement{ .pc = region.popPc, .text = pad + "}" });
+            return region.popPc + 1;
+        }
+
         [[nodiscard]] u32 emitTry(const TryRegion &region, const LoopCtx &ctx, const u32 indent,
                                   Vec<RecoveredStatement> &out) {
             const std::string pad = indentText(indent);
@@ -5051,6 +5143,7 @@ namespace cial::decompile {
         std::unordered_map<size_t, WhileLoop> _whileLoops; // 头块 → 循环
         std::unordered_map<u32, DoLoop> _doLoops; // 体首 pc → do-while
         std::unordered_multimap<u32, TryRegion> _tryHeads; // tryStart → try/catch 区域（同起点嵌套并存）
+        std::unordered_map<u32, WithRegion> _withHeads; // pushPc → with 区域
         std::unordered_set<u32> _foldedPcs; // 三元折叠透明的 pc
         std::unordered_set<size_t> _foldedHeaders; // 已折叠三元条件的头块
         std::unordered_map<size_t, u32> _foldedHeaderMerge; // 头块 → 汇合 pc
