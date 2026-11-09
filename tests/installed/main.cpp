@@ -18,5 +18,12 @@ int main() {
     auto unused = engine.execute("var = ;", invalid, "host://invalid");
     if(!invalid.isFailed() || invalid.messages().empty() || invalid.messages()[0].source() != "host://invalid")
         return 2;
-    return CIAL_VERSION_STRING[0] != '\0' && cial::SDK_API_VERSION == 1 ? 0 : 3;
+    // 能力查询（doc/roadmap.md §3.1）：constexpr 查询与宏一致，别名过渡保留。
+    if(cial::capabilities::hasJit() != (CIAL_CAP_JIT != 0))
+        return 4;
+    return CIAL_VERSION_STRING[0] != '\0' && CIAL_SDK_API_VERSION == 1 &&
+            cial::SDK_API_VERSION == CIAL_SDK_API_VERSION &&
+            cial::capabilities::capabilitySchemaVersion() == CIAL_CAPABILITY_SCHEMA_VERSION
+        ? 0
+        : 3;
 }

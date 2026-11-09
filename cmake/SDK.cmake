@@ -11,14 +11,17 @@ install(TARGETS Ciallang EXPORT CiallangTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT SDK
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT SDK
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT SDK)
-# 公共入口为 cial/Engine.hpp 与 Binding.hpp；传递依赖的内部头随 SDK 分发，
-# 不代表 VM/IR 的内部布局获得 ABI 或源码兼容承诺。
-# cli/format/dbg 为工具层模块（工具 exe 与共享库的源码形态），不进入 SDK 公共头。
+# 公共入口（Tier 1）为 cial/Engine.hpp、cial/Storage.hpp、Binding.hpp 与生成的
+# cial/Version.hpp、cial/Capability.hpp；其余传递依赖的内部头随 SDK 分发以便编译，
+# 不代表 VM/IR 的内部布局获得 ABI 或源码兼容承诺（分层表见 doc/embedding.md）。
+# cli/format/dbg 与 tjsbc/decompile 为工具层模块（工具 exe 与共享库的源码形态），
+# 不进入 SDK 公共头，也不在公共闭包内。
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/src/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/ciallang" COMPONENT SDK
     FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h" PATTERN "cli" EXCLUDE PATTERN "format" EXCLUDE
-    PATTERN "dbg" EXCLUDE)
+    PATTERN "dbg" EXCLUDE PATTERN "tjsbc" EXCLUDE PATTERN "decompile" EXCLUDE)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/generated/cial/Version.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/cial/Capability.hpp"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/ciallang/cial" COMPONENT SDK)
 install(EXPORT CiallangTargets NAMESPACE Ciallang::
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Ciallang" COMPONENT SDK)

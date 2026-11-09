@@ -23,9 +23,25 @@ target_link_libraries(host PRIVATE Ciallang::Ciallang)
 示例位于 `share/ciallang/examples/host`；`python tests/sdk_install_test.py --build build/sdk`
 会安装、移动前缀并独立构建运行示例。
 
-公共入口为 `cial/Engine.hpp`、`Binding.hpp` 和 `cial/Storage.hpp`；`cial/Version.hpp`
-从 manifest 生成，`SDK_API_VERSION` 为预览源码接口版本。附带的 VM/IR 头是传递依赖，
-不承诺内部接口稳定，也不承诺跨编译器、CRT 或动态库 ABI。
+公共接口按两层承诺分层（设计依据见 `.agents/notes` 的 SDK note 与 `cmake/SDK.cmake`）：
+
+| 层 | 头文件 | 承诺 |
+|---|---|---|
+| Tier 1 公共头 | `cial/Engine.hpp`、`cial/Storage.hpp`、`Binding.hpp`、生成的 `cial/Version.hpp` 与 `cial/Capability.hpp` | 明确范围内的 C++ 源码兼容；破坏性修改提升 `CIAL_SDK_API_VERSION` |
+| 签名闭包 | Tier 1 签名引用的类型所在头：`common/Result.hpp`、`common/ResultMessage.hpp`、`types/Value.hpp`、`vm/VM.hpp`（Handle）、`runtime/Runtime.hpp`、`runtime/Context.hpp` | 与 Tier 1 同承诺，不随 Tier 1 独立变化 |
+| Tier 2 其余传递头 | 其余随 SDK 分发的 VM/IR/前端头 | 可编译但不承诺稳定，宿主不应直接包含 |
+
+附带的传递头随 SDK 分发仅为编译可用，不代表 VM/IR 内部布局稳定，也不承诺跨编译器、
+CRT 或动态库 ABI。`tjsbc`、`decompile`、`cli`、`format`、`dbg` 为工具层源码，
+不在 SDK 头安装范围内。`Binding.hpp` 的模板绑定与 `Engine` 的按值成员决定了内部头
+无法从安装中移除，这是两层模型而非精选头清单的原因。
+
+能力查询：链接宿主用生成的 `cial/Capability.hpp` 提供 `cial::capabilities::` 下的
+constexpr 查询（`sdkApiVersion()`、`capabilitySchemaVersion()`、`hasJit()` 及模块/
+调试/声明元数据预留位）；不链接 SDK 的工具用 `cial --capabilities` 取单行 JSON，
+按 `schemaVersion` 判断兼容并忽略未知字段。预留能力位在对应能力落地前保持关闭，
+宿主与工具不得报告为已支持；`CIAL_DEBUG` 反映包含方构建配置，不属于库能力
+（`cmake/Capability.hpp.in`、`tools/generate_version.py`）。
 
 ```cpp
 #include "cial/Engine.hpp"

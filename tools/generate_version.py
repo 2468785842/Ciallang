@@ -5,6 +5,11 @@ from pathlib import Path
 import re
 
 
+# SDK 公共接口（Tier 1 头与签名闭包）的源码兼容版本；破坏性修改时提升。
+# 与 CIAL_VERSION_* 一起写入 cial/Version.hpp，查询函数在生成的 cial/Capability.hpp。
+SDK_API_VERSION = 1
+
+
 def read_version(manifest):
     data = json.loads(Path(manifest).read_text(encoding='utf-8'))
     if not isinstance(data, dict):
@@ -43,6 +48,7 @@ def generate(manifest, output):
     for part in ('major', 'minor', 'patch'):
         header += f'#define CIAL_VERSION_{part.upper()} {version[part]}\n'
     header += f'#define CIAL_VERSION_STRING "{version["string"]}"\n'
+    header += f'#define CIAL_SDK_API_VERSION {SDK_API_VERSION}\n'
     write_if_changed(output / 'Version.cmake', cmake)
     write_if_changed(output / 'cial/Version.hpp', header)
     return version

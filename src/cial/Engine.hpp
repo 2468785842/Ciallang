@@ -1,13 +1,15 @@
 #pragma once
 
-#include "cial/Version.hpp"
+#include "cial/Capability.hpp"
 #include "stdlib/ScriptsLib.hpp"
 #include "stdlib/StandardLibrary.hpp"
 #include "vm/VM.hpp"
 
 namespace cial {
-    // 预览 SDK 的源码接口版本；不承诺跨编译器/运行库的二进制 ABI。
-    inline constexpr unsigned SDK_API_VERSION = 1;
+    // 源码接口版本由生成的 cial/Version.hpp 提供（CIAL_SDK_API_VERSION /
+    // capabilities::sdkApiVersion()）；此别名过渡保留，0.2 移除。
+    // 不承诺跨编译器/运行库的二进制 ABI。
+    inline constexpr unsigned SDK_API_VERSION = capabilities::sdkApiVersion();
 
     class Engine final {
     public:

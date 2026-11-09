@@ -10,8 +10,10 @@ Status: proposed
 ## 已知事实与证据
 
 - 批次 1（SDK 兼容承诺与仓库拆分）：install/export、Engine 入口、逻辑源码身份、
-  安装后示例与三平台远端安装验收已完成；剩余为收敛公共 SDK 兼容承诺与能力查询，
-  再拆分核心与开发工具仓库并建立独立发行。
+  安装后示例、公共头两层承诺与能力查询（`cial/Capability.hpp` + `cial --capabilities`，
+  证据见 [implemented note](../implemented/architecture/2026-11-09-sdk-public-header-capability.md)）
+  已完成；剩余为三平台远端安装验收（CI 结果为准），再拆分核心与开发工具仓库并建立
+  独立发行。
 - 批次 2 未开始：API 元数据与 `.d.tjs` 声明模式，连接标准库/宿主导出与 LSP，
   逐步统一核心前端分析；执行器和脚本扫描须正确区分声明文件。
 - 批次 3 未开始：模块作用域、显式导出、宿主解析、Context 缓存、循环诊断及

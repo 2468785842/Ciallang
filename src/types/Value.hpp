@@ -17,7 +17,7 @@
 
 #include "Types.hpp"
 
-#include "config.h"
+#include "common/Config.hpp"
 
 #include "Octet.hpp"
 #include "Real.hpp"

@@ -58,6 +58,14 @@ execute_process(
     COMMAND_ERROR_IS_FATAL ANY)
 include("${CMAKE_CURRENT_BINARY_DIR}/generated/Version.cmake")
 project(Ciallang VERSION ${CIAL_VERSION} LANGUAGES CXX)
+# 能力查询头：来自构建开关（doc/roadmap.md §3.1）；在 option() 处理之后生成。
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Capability.hpp.in")
+set(CIAL_CAP_JIT 0)
+if(CIAL_ENABLE_JIT)
+    set(CIAL_CAP_JIT 1)
+endif()
+configure_file(cmake/Capability.hpp.in "${CMAKE_CURRENT_BINARY_DIR}/generated/cial/Capability.hpp" @ONLY)
 option(CIAL_ENABLE_PACKAGING "Enable standalone CLI archive packaging" OFF)
 option(CIAL_INSTALL_SDK "Install the C++ SDK and CMake package" ${CIAL_TOP_LEVEL})
 

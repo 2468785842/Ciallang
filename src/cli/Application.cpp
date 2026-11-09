@@ -13,6 +13,7 @@
 #include "Diagnostics.hpp"
 #include "Repl.hpp"
 #include "Session.hpp"
+#include "cial/Capability.hpp"
 #include "common/Colorizer.hpp"
 #include "common/Defer.hpp"
 #include "decompile/Decompiler.hpp"
@@ -159,12 +160,25 @@ namespace cial::cli {
             fmt::print("{}", decompiled.text());
             return 0;
         }
+
+        // 单行 JSON 能力报告（doc/roadmap.md §3.1），供不链接 SDK 的工具查询；
+        // 消费方按 schemaVersion 判断兼容并忽略未知字段。版本串经 generate_version.py
+        // 语义校验，不含需转义字符。
+        int runCapabilities() {
+            fmt::println(
+                "{{\"schemaVersion\":{},\"sdkApiVersion\":{},\"version\":\"{}\",\"capabilities\":{{\"jit\":{}}}}}",
+                cial::capabilities::capabilitySchemaVersion(), cial::capabilities::sdkApiVersion(), CIAL_VERSION_STRING,
+                cial::capabilities::hasJit() ? "true" : "false");
+            return 0;
+        }
     } // namespace
 
     int runApplication(const Options &options) {
         const auto start = std::chrono::steady_clock::now();
         if(options.noColor)
             Common::G_ColorEnabled = false;
+        if(options.mode == Mode::Capabilities)
+            return runCapabilities();
         Runtime runtime;
         Context context{ runtime };
         vm::VMState state{ context };

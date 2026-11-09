@@ -13,7 +13,7 @@
  */
 #pragma once
 
-#include "config.h"
+#include "common/Config.hpp"
 #include "logging/Logger.hpp"
 
 #if CIAL_DEBUG

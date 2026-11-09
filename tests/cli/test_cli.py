@@ -22,6 +22,26 @@ class CliTest(CliTestCase):
                 self.assertEqual(process.returncode, 2, process.stderr)
                 self.assertEqual(process.stdout, "")
 
+    def test_capabilities_json(self):
+        # 能力查询（doc/roadmap.md §3.1）：单行 JSON，消费方按 schemaVersion 兼容
+        process = self.run_cial("--capabilities")
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(process.stderr, "")
+        payload = json.loads(process.stdout)
+        self.assertEqual(payload["schemaVersion"], 1)
+        self.assertEqual(payload["sdkApiVersion"], 1)
+        self.assertTrue(payload["version"])
+        if self.expected_version:
+            self.assertEqual(payload["version"], self.expected_version)
+        self.assertEqual(payload["capabilities"]["jit"], False)
+        # 互斥与不接受输入/执行选项
+        for flags in [("--capabilities", "--tjsbc"), ("--capabilities", self.script),
+                      ("--capabilities", "--time", self.script), ("--capabilities", "--trace-execution")]:
+            with self.subTest(flags=flags):
+                process = self.run_cial(*flags)
+                self.assertEqual(process.returncode, 2, process.stderr)
+                self.assertEqual(process.stdout, "")
+
     def test_script_output_and_timing(self):
         process = self.run_cial(self.script)
         self.assertEqual(process.returncode, 0, process.stderr)

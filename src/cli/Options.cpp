@@ -22,7 +22,8 @@ namespace cial::cli {
                                          { "--trace-execution", "record execution; takes input and output.dot" },
                                          { "--time", "report elapsed time on stderr" },
                                          { "--no-color", "disable colored diagnostics even on a terminal" },
-                                         { "--dump-tac", "dump compiled TAC on stderr before execution" } })
+                                         { "--dump-tac", "dump compiled TAC on stderr before execution" },
+                                         { "--capabilities", "print SDK version and capability JSON and exit" } })
             parser.add_argument(name).flag().help(help);
         parser.add_argument("--json-schema")
             .help("JSON diagnostics schema version (1 legacy, 2 half-open ranges; default 2)")
@@ -44,15 +45,16 @@ namespace cial::cli {
                                          { "--dump-cfg", Mode::DumpCfg },
                                          { "--dump-ssa", Mode::DumpSsa },
                                          { "--decompile", Mode::Decompile },
-                                         { "--repl", Mode::Repl } }) {
+                                         { "--repl", Mode::Repl },
+                                         { "--capabilities", Mode::Capabilities } }) {
             if(parser.get<bool>(flag)) {
                 options.mode = mode;
                 ++modes;
             }
         }
         if(modes > 1)
-            throw std::runtime_error(
-                "choose only one of --tjsbc, --check-json, --dump-cfg, --dump-ssa, --decompile, --repl");
+            throw std::runtime_error("choose only one of --tjsbc, --check-json, --dump-cfg, --dump-ssa, "
+                                     "--decompile, --repl, --capabilities");
         options.decompileView = parser.get<bool>("--view");
         if(parser.is_used("--map"))
             options.decompileMap = parser.get<std::string>("--map");
@@ -90,11 +92,12 @@ namespace cial::cli {
         }
         if(inputs.empty() && modes == 0)
             options.mode = Mode::Repl;
-        const size_t expected = options.mode == Mode::Repl ? 0 : trace ? 2 : 1;
+        const size_t expected = options.mode == Mode::Repl || options.mode == Mode::Capabilities ? 0 : trace ? 2 : 1;
         if(inputs.size() != expected)
             throw std::runtime_error(trace ? "usage: cial --trace-execution <script-file> <output.dot>"
-                                         : options.mode == Mode::Repl
-                                         ? "--repl does not accept an input file"
+                                         : options.mode == Mode::Repl ? "--repl does not accept an input file"
+                                         : options.mode == Mode::Capabilities
+                                         ? "--capabilities does not accept an input file"
                                          : "expected exactly one input file; use --help for usage");
         if(!inputs.empty())
             options.input = inputs[0];
@@ -105,7 +108,10 @@ namespace cial::cli {
         if(compileOnly &&
            (trace || options.jit != vm::JitMode::Off || options.tailRecursion || options.timing || options.dumpTac))
             throw std::runtime_error("compile-only modes do not accept execution options");
-        if(options.mode == Mode::Repl && trace)
+        if(options.mode == Mode::Capabilities &&
+           (trace || options.jit != vm::JitMode::Off || options.tailRecursion || options.timing || options.dumpTac))
+            throw std::runtime_error("--capabilities does not accept execution options");
+        if((options.mode == Mode::Repl || options.mode == Mode::Capabilities) && trace)
             throw std::runtime_error("--trace-execution requires an input file");
         if(!options.sourceName.empty() && options.input != "-")
             throw std::runtime_error("--source-name only applies to stdin input ('-')");

@@ -2163,8 +2163,7 @@ namespace cial::vm {
         const auto &val = regs[r1];
         if(getenv("CIAL_AMP_DEBUG") && val.isObject()) {
             fprintf(stderr, "[amp] g_prop_raw_c obj typeId=%d prop=%d\n",
-                    static_cast<int>(val.requireObject()->typeId()),
-                    static_cast<int>(TypeId::Property));
+                    static_cast<int>(val.requireObject()->typeId()), static_cast<int>(TypeId::Property));
         }
         if(!val.isObject()) {
             throw std::runtime_error("'&' operand is not an object");

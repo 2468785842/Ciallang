@@ -18,7 +18,7 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include "config.h"
+#include "common/Config.hpp"
 
 #define CLL_LOG_INFO(fmt, ...) ::cial::logFmt(::cial::Level::kInfo, fmt, ##__VA_ARGS__)
 #define CLL_LOG_WARN(fmt, ...) ::cial::logFmt(::cial::Level::kWarn, fmt, ##__VA_ARGS__)

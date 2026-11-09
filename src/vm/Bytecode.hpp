@@ -5,7 +5,7 @@
 
 #include <cstring>
 
-#include "config.h"
+#include "common/Config.hpp"
 #include "gen/Instruction.hpp"
 #include "types/Types.hpp"
 
