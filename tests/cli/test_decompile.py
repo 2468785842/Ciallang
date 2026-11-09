@@ -205,6 +205,35 @@ class DecompileTest(CliTestCase):
                 self.assertEqual(process.stdout, "")
                 self.assertIn(batch, process.stderr)
 
+    def test_eval_postfix_roundtrip(self):
+#M5：动态求值后缀 `(...) !` verbatim 恢复——eval 字符串只解析全局 + with
+#栈（全新 IRGenerator），局部 / 合成名不可能被引用，恢复语义安全；
+#空串 / 非串直通与嵌套 eval 一并覆盖。参考引擎对该形态-- dump 段错误
+# （登记绕开），仅自产路径验收
+        source = (
+            'var g = 0;\n'
+            'var x = 3;\n'
+            'var a = ("g = g + x")!;\n'
+            'var b = ("g * 2")! + 1;\n'
+            'println(a);\n'
+            'println(b);\n'
+            'println(g);\n'
+            'println(("")! == "");\n'
+            'println((5)! == 5);\n'
+            'println(("\\\"1+1\\\"!")!);\n')
+        self.script.write_text(source, encoding="utf-8")
+        expected = self.run_cial(self.script)
+        self.assertEqual(expected.returncode, 0, expected.stderr)
+        self.assertEqual(expected.stdout, "3\n7\n3\n1\n1\n2\n")
+        decompiled = self.run_cial("--decompile", self.script)
+        self.assertEqual(decompiled.returncode, 0, decompiled.stderr)
+        self.assertIn('!', decompiled.stdout)
+        recompiled = self.root / "eval_rt.tjs"
+        recompiled.write_text(decompiled.stdout, encoding="utf-8")
+        actual = self.run_cial(recompiled)
+        self.assertEqual(actual.returncode, 0, actual.stderr + "\n--- decompiled ---\n" + decompiled.stdout)
+        self.assertEqual(actual.stdout, expected.stdout)
+
     def test_with_statement_roundtrip(self):
 #M5：with 结构化恢复（with 头 / 体 / 收尾 + GetWith 空接收者 `.member` 链）
         source = (
