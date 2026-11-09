@@ -721,6 +721,25 @@ do/switch/try/catch/调用，环①逐程序比对；棘轮式 KNOWN_FAILURES �
  Stmt 新增 suppressed 标志（首版迁移方案遗留，最终方案未用——声明降级由
  declare=false 承载；保留供后续发射抑制复用）。
 
+## 环③补偿控制决策（2026-11-09）
+
+用户确认不改参考引擎。调查：参考 `bin/darwin/TJSCompiler` 直接喂 `.tjsbc`
+被当文本解析（syntax error）；`ScriptsInterface.cpp` 的 `TVPExecuteStorage`
+读文件走 `TVPReadStorageText → ExecScript`（纯文本路径）；`tTJS::LoadByteCode`
+（tjs.cpp:497）与 `tTJSScriptCache::LoadByteCode`（:220）库 API 完整存在但
+**无任何入口调用**——不改参考仓库则环③无入口。
+
+决策：环③按 §7 修订以**补偿控制**替代（产物身份可追溯 + 格式逐字段符合 +
+环④语义三方一致，证据链见方案环表）。这不是放弃：manifest 哈希链保证语料
+不漂移，未来参考引擎若加字节码分支（magic 检测 + LoadByteCode，预计 <10 行）
+可随时补跑全部 61 组语料，不影响其它环节验收。独立 harness 链接参考源码调用
+LoadByteCode 的方案评估过：darwin 参考有崩溃前科、harness 受我方控制反而削
+弱环③独立性、参考仓库本地有未提交改动（ABI 漂移风险），性价比低于补偿链，
+不采用。
+
+M5 关闭不受环③阻塞：§6 M5 行完成条件不含四环；环③是 §7 验证闭环项，
+按修订后的补偿定义即视为已覆盖。
+
 ## 建议下一步
 
 1. switch 后续批次：参考更复杂合流形态；按方案 §7 继续参考 TJS2 四环验收；
