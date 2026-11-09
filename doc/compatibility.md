@@ -22,6 +22,7 @@
 | 容器成员 | Array/Dictionary 方法面（sort/split/save/load/pack 系含） | ✅（逐方法状态见 §3 标准库兼容） |
 | 中缀 | instanceof / incontextof / `in` | instanceof ✅（基础类型按类型名匹配）/ incontextof ✅；`in` ✅ 保留字行为对齐（原版 codegen 无 T_IN 分支——节点与操作数均不求值、结果 void；官方リファレンス亦无此运算符，2026-10-29 实测定论，见 `tests/compat_reserved_test.cpp`） |
 | 字面量 | 全部标量（含 i64 大整数字面量精确解析）+ 函数表达式 + @"…" 模板串 | ✅ |
+| 闭包捕获 | 函数字面量体内引用外层局部：**两引擎一致不支持捕获**——自由名经 this-proxy 降级（Ciallang `GThis`→全局槽回退；TJS2 编译期改写 `this.<名>`，tjsInterCodeGen.cpp:2027-2047），裸调用下即全局，缺失报 member-not-found | ✅ 语义一致（`tests/tjs/scope/parent-function.tjs` 锁定；2026-11-09 复核确认为对齐特性而非缺口，真闭包属超集扩展、不做） |
 | 字面量 | `[...]` Array、`%[...]` Dictionary、`<%%>` Octet、`(const)` 常量形 | ✅ 普通字面量与 `(const)` 编译期容器、常量元素限制及跨调用共享，见 [语法 §8](syntax.md#8-内联字面量array--dictionary--常量折叠形) |
 | 后缀条件 | `expr if cond`（假条件整体不赋值，tjs.y expr 层级绑定） | ✅ |
 | 函数 | 默认参数（TestVoid 守卫，实参优先） | ✅ |

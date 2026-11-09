@@ -116,7 +116,7 @@ with、eval 和局部值保活，"生成名字不冲突"不足以保证安全。
 | M2 | ExprBuilder：后优化形态模式表（含 BinaryImm/CompareTestImm 逆映射）、调用族/成员访问族 | 表达式级 round-trip 逐形态对拍；**已完成（2026-11-02，`ExprBuilder.*`）** |
 | M3 | 语句结构化：if/while/for 归约、短路/三元跨块折叠 | 路径副作用、求值次数、break/continue 对拍通过；**已完成（2026-11-03，ExprBuilder 结构化发射）** |
 | M4 | 壳组装（context 树→声明）+ `+=` 逆融合（双守卫） | 类/继承/property/初始化顺序用例；getter 计数不翻倍。**已完成（2026-11-04，`ExprBuilder.*`/`Decompiler.cpp` 壳组装）：顶层与体内 function/class/property 声明 round-trip 通过；`+=`/`++` 逆融合覆盖成员/下标/具名局部/全局/`*p` 目标（单读者 + 对象一致性双守卫，匿名拷贝按源头解析）；实参位置匿名函数字面量恢复；类成员注册按源码位置排序（枚举序对齐 TJS2）；property 安装名登记 `_declaredGlobals`。验收扩展项（super 构造 prologue、`CallMethodV`/`testDeref` 形态）移交 M5** |
-| M5 | 硬核兜底：任意 CFG 降级、switch、嵌套异常及覆盖扩展 | **进行中（收尾）**。switch/循环/异常区域/数据流提升/调用族/声明落点全部验收；模糊覆盖落地且 KNOWN_FAILURES 清零；能力矩阵与 Unsupported 清单已量化（见下文）。剩余：with/eval 名字依赖、闭包捕获恢复（依赖语言层）、四环环③参考入口。当前状态见下节，历史证据见 M5 note。 |
+| M5 | 硬核兜底：任意 CFG 降级、switch、嵌套异常及覆盖扩展 | **进行中（收尾）**。switch/循环/异常区域/数据流提升/调用族/声明落点/**with/eval 恢复**全部验收；模糊覆盖落地且 KNOWN_FAILURES 清零；能力矩阵与 Unsupported 清单已量化（见下文）；闭包捕获经复核为**两引擎一致的对齐特性**（自由名 this-proxy 降级，非缺口），项关闭。剩余：CallMethodV 行表（需 Linux）。当前状态见下节，历史证据见 M5 note。 |
 
 M0/M1 后以真实产物的语义缺口重新估算工期；属性协议、异常、动态作用域是主要不确定项。
 
@@ -243,12 +243,12 @@ property owner 是全局对象时触发（`&o.x` 引用存入全局 var 不再�
 | 维度 | 已验收 | 诚实拒绝（原因串前缀） |
 |---|---|---|
 | 表达式 | 字面量/算术/位/比较/逻辑/一元/成员/下标/调用/容器字面量/delete/物化/逆融合 | — |
-| 语句 | if/while/do/for/break/continue/switch（含贯穿/多值/调用标签）/try-catch（嵌套/重抛/无绑定） | with（"with 语句结构化属 M3"）；顶层 try（"try/catch 顶层结构化属 M5"） |
+| 语句 | if/while/do/for/break/continue/switch（含贯穿/多值/调用标签）/**with（嵌套/裸词链）**/try-catch（嵌套/重抛/无绑定）/**后缀 eval** | 顶层 try（"try/catch 顶层结构化属 M5"）；with 体 try 且 catch 读体定义具名局部（声明落点守卫，放宽尝试回归 21 个模糊程序已回退）；状态机平铺 with 栈（"with 语句状态机无法平铺"） |
 | 声明 | function/class（继承/构造器 prologue）/property/var；赋值右值与实参 FuncLit | 具名函数表达式（"具名函数表达式恢复属后续批次"） |
 | 数据流 | SSA 版本链、单次求值内联、多使用物化、合成存储提升（catch/循环/join）、声明落点提升 | 同名多作用域遮蔽（原位声明，非拒绝） |
 | CFG | 结构化归约 + 任意 CFG（含不可约）状态机降级 | ChgThis/TestVoid/With/EvalStr/CallExpand/CollapseArgs/Super/"预检未覆盖的指令" |
 | 顶层 | 直线表达式、声明、裸语句 | 需合成全局名的形态（"顶层无局部作用域可物化"/"顶层复制会改变可观察行为"）；循环携带变量（"循环条件读取的寄存器在体内重定义"） |
-| 协议 | 闭包字面量创建（每次 Load 独立） | 闭包捕获变量恢复（语言层缺口：跨函数 var 捕获源码即失败，非反编译器范围） |
+| 协议 | 闭包字面量创建（每次 Load 独立）；eval 名字依赖（恒全局+with 栈，verbatim 安全） | 闭包捕获——两引擎一致不支持（对齐特性，见 compatibility.md），反编译无此形态 |
 
 量化锚点：61 组固定语料（manifest `expectedRecovery`/`rejectReason` 断言）+
 CiallangFuzz 120 程序（KNOWN_FAILURES 空）+ CLI/Catch2 拒绝原因断言。

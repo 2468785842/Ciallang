@@ -740,10 +740,41 @@ LoadByteCode 的方案评估过：darwin 参考有崩溃前科、harness 受我�
 M5 关闭不受环③阻塞：§6 M5 行完成条件不含四环；环③是 §7 验证闭环项，
 按修订后的补偿定义即视为已覆盖。
 
+## with/eval 恢复 + 闭包边界登记（2026-11-09，darwin，基线 5f51a48）
+
+- **with 结构化恢复**（`precomputeWithRegions` 深度配对 + emitRegion 认领 +
+  emitWith；GetWith 物化 WithBase 节点使成员链渲染裸词链 `.member`，顶层裸链
+  形态独立生效）。实现中发现并修复 emitRegion 通用缺口：区域起点在块中间时
+  （with 体 push+1），直线迭代停在条件区内部 pc 使块尾 if 认领失效——统一回
+  退 `zoneFirst` 让 if/while 认领接管（已发射段为条件指令无文本，回退安全）。
+  直线批发射与条件区前缀发射在 with push 处截断。6 组 with 测试 round-trip
+  + 嵌套/循环 continue/with 内 try 探针验收（w3 形态在放宽尝试期间损坏，回退
+  后按守卫诚实拒绝）。bc 路径不涉及（TJS2 字节码无 WITH 操作码）。
+- **eval（EvalStr）恢复**：调研证实旧拒绝理由不成立（eval 字符串用全新
+  IRGenerator 编译，名字恒 GGlobal 直读全局槽 + with 栈 `.member`，局部/合成
+  名不可能被引用）——verbatim 渲染 `(<src>)!` 语义安全；isImpureOrStore/
+  hasEffect/状态机白名单接入。CLI round-trip 覆盖值/语句位置、空串/非串直
+  通、嵌套 eval。参考引擎 `!` 运行异常 + --dump 段错误（139，登记绕开），
+  自产路径验收。
+- **闭包捕获项关闭（用户决策：不做超集）**：复核确认 Ciallang 自由名降级
+  （GThis→全局回退）与 TJS2 this-proxy 语义一致（tjsInterCodeGen.cpp:2027-2047
+  自由名改写 `this.<名>`），`tests/tjs/scope/parent-function.tjs` 锁定；登记
+  compatibility.md 为对齐特性。语言层无捕获指令/形态，反编译无恢复需求。
+  调研记录（装箱方案 a/b 对比、VM 半成品 getUpVal 分析）保留于会话，若未来
+  做超集扩展可复用。
+- **放宽尝试的教训**：catch 读具名体定义寄存器的声明落点守卫放宽（依赖批次 10
+  提升）使模糊回归 21 个程序（14 mismatch + 7 回放挂起），立即回退；批次 10
+  的入口提升覆盖的是"声明落点"而非"catch 时点值的版本合流"，两类数据流不等
+  价。守卫保持拒绝，登记为 with+try 组合的诚实边界。
+- 全量 CTest **450/450**；模糊 **119/119**（KNOWN_FAILURES 空）；clang-format、
+  git diff --check 通过。参考对拍 10/10（异常语料）。
+
 ## 建议下一步
 
-1. switch 后续批次：参考更复杂合流形态；按方案 §7 继续参考 TJS2 四环验收；
-   能力矩阵与 Unsupported 清单量化（M5 完成条件）。
+1. M5 关闭评审：对照 §6 完成条件逐项核对（能力矩阵已量化、Unsupported 已登
+   记、移交项除 CallMethodV 行表外全部闭环）。
+2. CallMethodV 行表收敛（需 Linux 侧复核 M4 记录与本机差异）。
+3. 参考更复杂合流形态按需扩展（switch 主线剩余）。
 2. switch 后续批次：参考更复杂合流形态；按方案 §7 继续参考 TJS2 四环验收。
 2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
