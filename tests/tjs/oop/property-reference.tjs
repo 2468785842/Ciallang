@@ -1,0 +1,41 @@
+// &property成员 引用协议：顶层与函数内一致（& 捕获成员本体，不触发 getter）；
+// *p 经引用读写触发 setter/getter
+Scripts.execStorage("../assert.tjs");
+
+var log = "";
+class Cell {
+    var m;
+    property x {
+        setter(v) { log += "s;"; m = v; }
+        getter { log += "g;"; return m; }
+    }
+}
+
+// 函数内引用协议
+function bump(p) { *p = *p + 1; }
+function useInFunction() {
+    var o = new Cell();
+    var p = &o.x;
+    *p = 7;
+    bump(p);
+    return *p;
+}
+assertTrue(useInFunction() == 8, "function-level deref read/write");
+assertTrue(log == "s;g;s;g;", "function-level setter/getter counts, got " + log);
+
+// 顶层引用协议（2026-11-09 修复：全局 var 持有 property 本体引用不再被
+// loadGlobal 的 getter 快路径劫持）
+log = "";
+var o = new Cell();
+var p = &o.x;
+*p = 7;
+bump(p);
+assertTrue(*p == 8, "top-level deref read/write");
+assertTrue(log == "s;g;s;g;", "top-level setter/getter counts, got " + log);
+
+// 全局声明的 property 读取仍触发 getter（不受修复影响）
+log = "";
+property declared { getter { log += "g;"; return 42; } }
+assertTrue(declared == 42, "declared property getter");
+assertTrue(log == "g;", "declared property getter count, got " + log);
+finishTests();

@@ -1104,9 +1104,16 @@ namespace cial::vm {
             // typeId 直判替代 dynamic_cast（Property 为 final，二者等价）：
             // 循环体内的对象型全局读（如 arr.push 的 arr）每次省一次 RTTI 遍历
             if(g->isObject() && !g->isNull() && g->asObject().unwrap()->typeId() == TypeId::Property) {
-                Value srcVal = *g;
-                propObjectGet(*this, srcVal, srcVal, resumePc);
-                dst = srcVal;
+                // 全局声明的 property（thisObj = 全局对象）读取触发 getter；
+                // &o.x 捕获的成员本体引用（thisObj = o 等实例）是普通值，透传
+                const auto *prop = static_cast<const Property *>(g->asObject().unwrap());
+                if(prop->thisObj == context.global()) {
+                    Value srcVal = *g;
+                    propObjectGet(*this, srcVal, srcVal, resumePc);
+                    dst = srcVal;
+                    return;
+                }
+                dst = *g;
                 return;
             }
             dst = *g;
@@ -2154,10 +2161,16 @@ namespace cial::vm {
         const u32 atomV = read<u32>(ip, pc); // 成员名 Atom
         const u16 r3 = read<u16>(ip, pc); // dst
         const auto &val = regs[r1];
+        if(getenv("CIAL_AMP_DEBUG") && val.isObject()) {
+            fprintf(stderr, "[amp] g_prop_raw_c obj typeId=%d prop=%d\n",
+                    static_cast<int>(val.requireObject()->typeId()),
+                    static_cast<int>(TypeId::Property));
+        }
         if(!val.isObject()) {
             throw std::runtime_error("'&' operand is not an object");
         }
-        regs[r3] = val.requireObject()->getProp(Atom{ atomV });
+        const auto got = val.requireObject()->getProp(Atom{ atomV });
+        regs[r3] = got;
         return DispatchRet::Continue;
     }
 
