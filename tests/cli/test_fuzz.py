@@ -11,18 +11,16 @@ from support import CliTestCase, run_tests
 SEED = 20261108
 PROGRAMS = 120
 INPUTS = (-4, 0, 3, 9)
-# 已知恢复缺口（棘轮登记：修复后须从此移除并让其参与断言）。
-# repro 存 out/fuzz-known-issues/。
-KNOWN_FAILURES = {
-    49: "嵌套 do-while + 死初始化消除：声明落点与区域归约变形（a/b 顶层初始化"
-        "被内移、内层 do 的常量条件提升泄漏）",
-}
+#已知恢复缺口（棘轮登记：修复后须从此移除并让其参与断言）。
+#repro 存 out / fuzz - known - issues /。2026 - 11 - 09：声明落点提升落地后 program 49
+#通过并移除登记；同名遮蔽类生成器规避保留（多作用域同名不提升）。
+KNOWN_FAILURES = {}
 
 
 class DecompilerFuzzTest(CliTestCase):
     def _expr(self, depth):
         rng = self._rng
-        # 叶子不含字符串全局 s：数值比较（< ==）混入字符串会运行期类型错误
+#叶子不含字符串全局 s：数值比较（ < ==）混入字符串会运行期类型错误
         choices = ["x", str(rng.randint(-9, 9)), "a", "b", "c", "g"]
         if depth > 0:
             choices += [
@@ -47,8 +45,8 @@ class DecompilerFuzzTest(CliTestCase):
 
     def _stmt(self, depth):
         rng = self._rng
-        # 循环变量每次唯一命名：同名局部遮蔽（含兄弟作用域寄存器复用）是
-        # 已知恢复缺口（out/fuzz-known-issues/program49-shadowed-do-while.tjs）
+#循环变量每次唯一命名：同名局部遮蔽（含兄弟作用域寄存器复用）是
+#已知恢复缺口（out / fuzz - known - issues / program49 - shadowed - do - while.tjs）
         loop = f"i{self._loopSeq}"
         self._loopSeq += 1
         choices = [
@@ -64,7 +62,7 @@ class DecompilerFuzzTest(CliTestCase):
             choices += [
                 f"if ({self._cmp()}) {{\n{inner}}}\n",
                 f"if ({self._cmp()}) {{\n{inner}}} else {{\n{inner2}}}\n",
-                # 有界循环模板（计数器恒递增，避免死循环）
+#有界循环模板（计数器恒递增，避免死循环）
                 f"var i = 0;\nwhile (i < {rng.randint(0, 3)}) {{\ni = i + 1;\n{inner}}}\n",
                 f"for (var i = 0; i < {rng.randint(0, 3)}; i = i + 1) {{\n{inner}}}\n",
                 f"var i = 0;\ndo {{\ni = i + 1;\n{inner}}} while (i < {rng.randint(0, 3)});\n",
@@ -114,7 +112,7 @@ class DecompilerFuzzTest(CliTestCase):
                     continue
                 recovered = self.run_cial("--decompile", self.script)
                 if recovered.returncode != 0:
-                    # 诚实拒绝：须有诊断且不产文本
+#诚实拒绝：须有诊断且不产文本
                     self.assertEqual(recovered.stdout, "", source)
                     rejected += 1
                     continue
@@ -132,7 +130,7 @@ class DecompilerFuzzTest(CliTestCase):
                 if known:
                     self.fail(f"program {index} 已通过：从 KNOWN_FAILURES 移除"
                               f"（{KNOWN_FAILURES[index]}）")
-        # 生成器有效性：绝大多数程序可执行；拒绝须为少数且诚实
+#生成器有效性：绝大多数程序可执行；拒绝须为少数且诚实
         self.assertGreater(accepted + rejected, PROGRAMS * 9 // 10)
         self.assertEqual(set(KNOWN_FAILURES) - knownFailed, set(),
                          "KNOWN_FAILURES 中有程序不再失败：移除登记使其参与断言")

@@ -304,6 +304,7 @@ namespace cial::decompile {
             bool raw{};
             bool declare{}; // 输出 var 前缀（首次声明）
             bool contextInstall{}; // Decl 安装链含 ChgThis（FunctionDecl 形态）
+            bool suppressed{}; // 声明落点提升：入口行替代，原位语句不发射
             u8 declInstall{}; // Decl 安装形态：0=无(零拷贝具名槽) 1=全局 2=成员 3=局部
         };
 
@@ -1759,6 +1760,9 @@ namespace cial::decompile {
             if(it != _declaredScopeStarts.end() && (start == INVALID || it->second == start))
                 return false; // 同一作用域内已声明
             _declaredScopeStarts[{ regIndex, name }] = start;
+            // 声明落点提升登记：每个 (reg,name) 作用域的声明语句原位产出
+            // （declare=true），发射期统一判定单作用域名字迁移到入口
+            _entryDeclarations[{ regIndex, name }] = start;
             return true;
         }
 
@@ -4596,17 +4600,6 @@ namespace cial::decompile {
 
         // ── 结构化发射（多块；语句按 pc 排序后由游标消费，区域递归带缩进）──
         void emitStructured(Vec<RecoveredStatement> &out) {
-            if(getenv("CIAL_DECOMPILE_DEBUG")) {
-                for(const auto &entry : _promotedStorage)
-                    fprintf(stderr, "[dbg] promoted reg=%u name=%s start=%u\n", entry.first, entry.second.first.c_str(),
-                            entry.second.second);
-                if(_meta)
-                    for(const auto &local : _meta->localVars)
-                        fprintf(stderr, "[dbg] local reg=%u name=%s start=%u end=%u\n",
-                                static_cast<unsigned>(local.reg.index()), atomText(_rt, local.identifier).c_str(),
-                                static_cast<unsigned>(local.startPC.address()),
-                                static_cast<unsigned>(local.endPC.address()));
-            }
             // case 的词法局部不能供兄弟 case 使用；合成合流存储必须属于函数。
             // try 提升存储同理；参数槽以入口拷贝初始化（异常可先于体内重定义发生）
             std::set<std::string> syntheticNames;
@@ -4621,6 +4614,38 @@ namespace cial::decompile {
                         .pc = 0, .text = fmt::format("var {} = {};", storage.first, copy->second) });
                 else
                     out.push_back(RecoveredStatement{ .pc = 0, .text = fmt::format("var {};", storage.first) });
+            }
+            // 声明落点提升（M5）：优化器删除体外死初始化后，具名局部的幸存定义
+            // 会内移（进循环体/try 体），`var` 声明随之落进内层块，块作用域下
+            // 外层读取不可见（模糊 program 49）。把每个局部作用域的声明提升到
+            // 函数体入口（`var name;`，初值 void 与块内声明等价——赋值保留原
+            // pc，执行路径不变）；作用域内的后续赋值不再带 var 前缀。
+            // _entryDeclarations 在 declareLocal 首次声明时登记。同名单作用域
+            // 才可提升：同名多作用域（遮蔽）提升会合并两个运行时槽、把内层
+            // 作用域的初始化变成对外层名字的重赋值（语义改变）——回退原位
+            std::map<std::string, u32> nameScopes;
+            std::set<std::string> multiScopeNames;
+            for(const auto &entry : _entryDeclarations) {
+                const auto ins = nameScopes.emplace(entry.first.second, entry.second);
+                if(!ins.second && ins.first->second != entry.second)
+                    multiScopeNames.insert(entry.first.second);
+            }
+            std::set<std::string> promotedNames;
+            for(const auto &entry : _entryDeclarations) {
+                if(multiScopeNames.contains(entry.first.second))
+                    continue; // 同名多作用域（遮蔽）：保留原位 declare 语义
+                promotedNames.insert(entry.first.second);
+            }
+            if(!promotedNames.empty()) {
+                // 提升名字的全部 StoreLocal 降为普通赋值（初值留在原 pc 执行，
+                // 语义不变：TJS var 在作用域内声明即完成，赋值路径照旧），
+                // 声明由入口 `var name;` 承载
+                for(auto &stmt : _stmts) {
+                    if(stmt.kind == Stmt::Kind::StoreLocal && stmt.declare && promotedNames.contains(stmt.name))
+                        stmt.declare = false;
+                }
+                for(const auto &name : promotedNames)
+                    out.push_back(RecoveredStatement{ .pc = 0, .text = fmt::format("var {};", name) });
             }
             (void)std::stable_sort(_stmts.begin(), _stmts.end(),
                                    [](const Stmt &a, const Stmt &b) { return a.pc < b.pc; });
@@ -4648,6 +4673,10 @@ namespace cial::decompile {
             while(_emitCursor < _stmts.size() && _stmts[_emitCursor].pc == pc) {
                 const auto &stmt = _stmts[_emitCursor];
                 std::string text;
+                if(stmt.suppressed) {
+                    ++_emitCursor;
+                    continue;
+                }
                 if(!renderStmt(stmt, text, indent))
                     return;
                 if(!text.empty())
@@ -5002,6 +5031,8 @@ namespace cial::decompile {
         };
         Vec<PendingArg> _pending; // 转译路径 Push 序列
         std::map<std::pair<u16, std::string>, u32> _declaredScopeStarts;
+        std::map<std::pair<u16, std::string>, u32>
+            _entryDeclarations; // 声明落点提升：入口 var 行（reg,name → 作用域起点）
         std::set<std::string> _declaredGlobals;
         std::unordered_set<std::string> _usedNames;
         std::unordered_map<u16, std::pair<std::string, u32>> _switchLocalNames; // 参考 switch 合流寄存器的函数局部存储
@@ -5028,12 +5059,6 @@ namespace cial::decompile {
 
     ExprRecovery recoverUnitBody(Runtime &rt, vm::Chunk &chunk, const FuncMeta *meta, const bool functionLike,
                                  DeclHost *host) {
-        if(getenv("CIAL_DECOMPILE_DEBUG") && chunk.getInstVec().size() > 10) {
-            static int n = 0;
-            if(n++ < 2)
-                for(size_t pc = 0; pc < chunk.getInstVec().size(); ++pc)
-                    fprintf(stderr, "[dbg]   @%zu %s\n", pc, chunk.getInstVec()[pc]->dump(nullptr).c_str());
-        }
         auto recovered = ExprBuilder{ rt, chunk, meta, functionLike, host }.run();
         if(!recovered.unsupported.empty() && functionLike) {
             auto fallback = ExprBuilder{ rt, chunk, meta, functionLike, host, true }.run();

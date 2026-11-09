@@ -702,9 +702,29 @@ do/switch/try/catch/调用，环①逐程序比对；棘轮式 KNOWN_FAILURES �
   需单独开问题调查（proposed/bug-fix）。
 - 全量 CTest **449/449**；参考对拍 10/10 一致；clang-format、diff --check 通过。
 
+## 声明落点提升与模糊清零（2026-11-09，darwin，基线 ffaa123）
+
+模糊唯一已知失败（program 49：嵌套 do-while + 死初始化消除）修复。方案：
+**声明落点提升**（反编译侧，IRGen 无需改动）——优化器删除体外死初始化后具名
+局部的幸存定义会内移（进循环体/try 体），`var` 声明随之落进内层块、块作用域
+下外层读取不可见。每个 (reg,name) 作用域的声明语句在 declareLocal 登记
+（_entryDeclarations）；发射期把**同名单作用域**名字的全部 StoreLocal 降为
+普通赋值（初值留原 pc，执行路径不变）、入口统一 `var name;` 承载声明。
+**同名多作用域（遮蔽）不提升**——提升会合并两个运行时槽、把内层初始化变成
+对外层名字的重赋值（首版实现踩过：`var i; var i;` + 内层 `i = 0` 丢失声明致
+死循环），保留原位 declare 语义。
+
+- 棘轮收紧：KNOWN_FAILURES 清空（program 49 通过并移除登记），模糊
+  **119/119 全过**（knownFailed=[]）。生成器对同层同名循环变量的规避保留
+  （多作用域同名不提升，属诚实边界而非缺口）。
+- 全量 CTest **449/449**；参考对拍 10/10；clang-format、diff --check 通过。
+ Stmt 新增 suppressed 标志（首版迁移方案遗留，最终方案未用——声明降级由
+ declare=false 承载；保留供后续发射抑制复用）。
+
 ## 建议下一步
 
-1. 嵌套 do-while + 死初始化消除的声明落点协议（模糊已登记 repro）。
+1. switch 后续批次：参考更复杂合流形态；按方案 §7 继续参考 TJS2 四环验收；
+   能力矩阵与 Unsupported 清单量化（M5 完成条件）。
 2. switch 后续批次：参考更复杂合流形态；按方案 §7 继续参考 TJS2 四环验收。
 2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
    origin 分段继承。
