@@ -6,3 +6,7 @@
 # 字节码为二进制不参与任何换行转换。
 /tests/test_files/tjsbc/decompile/*.tjs text eol=lf
 /tests/test_files/tjsbc/decompile/*.tjsbc -text
+# debug manifest 经 source 字段引用上层 s7_ext.tjs（../s7_ext.tjs），
+# 上层路径同样钉 LF——Windows 检出转 CRLF 会让哈希校验漂移（2026-11-10）
+/tests/test_files/tjsbc/*.tjs text eol=lf
+/tests/test_files/tjsbc/*.tjsbc -text
