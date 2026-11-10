@@ -85,7 +85,8 @@ TJSCompiler 的旧入口曾使用固定脚本路径；`d8044c3` 已提交 `TJSCo
 
 ## Windows CI 的深数组压力测试为什么配置较大栈？
 
-当前 `Array::marked()` 等对象图遍历仍有 C++ 递归，不能把深数组测试通过理解为无栈深限制。
-2 万层数组用例在 Linux 的 1 MiB 栈子进程可复现溢出、8 MiB 可通过；Windows 默认线程栈更小。
-`CiallangTests` 在 Windows 显式预留 16 MiB，保证压力测试有明确资源预算；运行库、`cial`、
-`cial-fmt` 与宿主 SDK 的默认栈未因此调整。后续应将对象图标记迁到显式工作队列。
+**历史条目（2026-11-10 起不再适用）**：对象图标记已改为显式工作队列
+（`MarkSweepHeader::marked()` 入队 + `drainMarkQueue` 排空，`src/gc/gc.hpp`），
+深图遍历不消耗宿主线程栈；此前为此在 Windows 上给 `CiallangTests` 显式预留的
+16 MiB 链接栈预算已移除，2 万层深数组用例在默认栈通过。
+保留条目供追溯当时 Linux 1 MiB 栈溢出、8 MiB 通过的实测结论。

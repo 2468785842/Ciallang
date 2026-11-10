@@ -51,10 +51,7 @@ namespace cial {
         Value getProp(Atom name) override;
         [[nodiscard]] bool hasProp(Atom name) const override;
         [[nodiscard]] Runtime *runtime() const noexcept { return _rt; }
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            Object::marked();
+        void markChildren() noexcept override {
             if(matches)
                 matches->marked();
         }

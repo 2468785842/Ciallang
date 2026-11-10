@@ -36,7 +36,7 @@ namespace cial {
 
         [[nodiscard]] bool hasProp(Atom a) const override { return a == rgAtom && rgClass; }
 
-        void marked() noexcept override;
+        void markChildren() noexcept override;
 
     private:
         Atom rgAtom = ATOM_INVALID;

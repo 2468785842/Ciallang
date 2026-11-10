@@ -225,10 +225,7 @@ namespace cial {
         throw std::runtime_error("Math member not found");
     }
 
-    void MathNS::marked() noexcept {
-        if(_marked)
-            return;
-        Object::marked();
+    void MathNS::markChildren() noexcept {
         if(rgClass)
             rgClass->marked();
     }

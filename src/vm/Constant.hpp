@@ -60,7 +60,7 @@ namespace cial {
         explicit FuncMeta(const FuncMeta &) noexcept = delete;
         FuncMeta &operator=(const FuncMeta &) noexcept = delete;
 
-        void marked() noexcept override;
+        void markChildren() noexcept override;
 
         bool operator==(const FuncMeta &) const { return false; }
 
@@ -83,10 +83,7 @@ namespace cial {
         FuncMeta *setFunc;
         FuncMeta *getFunc;
 
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            MarkSweepHeader::marked();
+        void markChildren() noexcept override {
             if(setFunc) {
                 setFunc->marked();
             }
@@ -161,10 +158,7 @@ namespace cial {
 
         void setConstructor(FuncMeta *funcMeta) { this->constructor = funcMeta; }
 
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            MarkSweepHeader::marked();
+        void markChildren() noexcept override {
             // constructor/initDefaultVal 不在成员表里，必须单独标记，
             // 否则 GC 触发时被回收，后续 new 将使用脏内存
             if(constructor)

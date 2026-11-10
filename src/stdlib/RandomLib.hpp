@@ -41,7 +41,6 @@ namespace cial {
         [[nodiscard]] i64 random64();
         [[nodiscard]] Value serialize(VM *vm); // Dictionary{state, left, next}
 
-        void marked() noexcept override;
 
     private:
         // MT19937 状态（对齐 tTJSMersenneTwisterData：state + left + next 指针语义）。

@@ -145,10 +145,7 @@ namespace cial::binding {
             return it->second;
         }
         void setProp(const Atom name, const Value &value) override { members[name] = value; }
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            Object::marked();
+        void markChildren() noexcept override {
             if(constructor)
                 constructor->marked();
             for(const auto &value : members | std::views::values)

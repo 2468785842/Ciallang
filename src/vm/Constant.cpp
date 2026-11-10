@@ -24,12 +24,7 @@
 
 namespace cial {
 
-    void FuncMeta::marked() noexcept {
-        if(_marked)
-            return;
-        MarkSweepHeader::marked();
-        chunk->marked();
-    }
+    void FuncMeta::markChildren() noexcept { chunk->marked(); }
 
     Value Constant::createValue(Runtime *rt) const noexcept {
         switch(type()) {

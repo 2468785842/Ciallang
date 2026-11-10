@@ -42,10 +42,6 @@ add_executable(CiallangTests ${SOURCES})
 if(MSVC)
     target_compile_options(CiallangTests PRIVATE /EHsc /MP /utf-8)
 endif()
-if(WIN32)
-    # 2 万层对象图标记用例的主机栈预算；仅作用于测试进程，不修改 SDK/宿主默认值。
-    target_link_options(CiallangTests PRIVATE "LINKER:/STACK:16777216")
-endif()
 
 target_link_libraries(CiallangTests
     PRIVATE

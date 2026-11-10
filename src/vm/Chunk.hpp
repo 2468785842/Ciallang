@@ -150,10 +150,7 @@ namespace cial::vm {
 
         [[nodiscard]] String dumpInstructions(const VMState *vmState) const;
 
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            MarkSweepHeader::marked();
+        void markChildren() noexcept override {
             for(auto &inst : _constants) {
                 if(inst.type() == ConstantType::Object) {
                     if(auto *object = inst.value<Object *>())

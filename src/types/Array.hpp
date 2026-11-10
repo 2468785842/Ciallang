@@ -31,10 +31,7 @@ namespace cial {
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            Object::marked();
+        void markChildren() noexcept override {
             for(auto &v : elements) {
                 if(v.isObject()) {
                     if(auto *h = v.asObject().unwrap()) {

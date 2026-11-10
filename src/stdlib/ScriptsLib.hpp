@@ -66,7 +66,7 @@ namespace cial {
 
         [[nodiscard]] bool hasProp(Atom a) const override;
 
-        void marked() noexcept override;
+        void markChildren() noexcept override;
 
     private:
         std::filesystem::path _baseDir;

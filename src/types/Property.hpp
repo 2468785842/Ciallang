@@ -87,10 +87,9 @@ namespace cial {
             throw std::runtime_error("Not Support call operator for property");
         }
 
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            MarkSweepHeader::marked(); // 旧实现漏了基类调用，自身永远不会被标记
+        void markChildren() noexcept override {
+            // 历史注记：旧递归实现曾漏调基类标记，自身永远不会被标记；
+            // 标记语义现已收敛到基类 marked()，派生类只负责枚举子对象
             if(thisObj)
                 thisObj->marked();
             if(propMeta)

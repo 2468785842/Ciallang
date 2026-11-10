@@ -44,10 +44,7 @@ namespace cial {
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            Object::marked();
+        void markChildren() noexcept override {
             meta->marked();
             if(thisObj)
                 thisObj->marked();
@@ -119,10 +116,7 @@ namespace cial {
         // propGetMember 现场生成的绑定方法持有接收者）
         [[nodiscard]] const Value &boundThis() const noexcept { return _thisObj; }
 
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            Object::marked();
+        void markChildren() noexcept override {
             if(_thisObj.isObject() && !_thisObj.isNull())
                 _thisObj.asObject().value()->marked();
         }

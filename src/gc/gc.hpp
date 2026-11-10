@@ -35,14 +35,30 @@ namespace cial {
         virtual bool canFinalizeIn(const vm::VMState &) const noexcept { return true; }
         virtual void finalizeDeferred(vm::VMState &) {}
 
+        // 标记自身并入队；子对象遍历延后到 drainMarkQueue（显式工作队列），
+        // 深对象图不再消耗宿主线程栈。守卫语义与旧递归版一致：对象图可能有环，
+        // 已标记节点不得重复入队，否则遍历不终止。
         virtual void marked() noexcept {
-            if(!_marked)
+            if(!_marked) {
                 _marked = true;
+                markQueue().push_back(this);
+            }
+        }
+
+        // 枚举子对象：仅在自身已标记、由工作队列弹出时调用（无并发、无重入）。
+        // 子对象经 marked()（基类）标记并入队；默认无子对象。
+        virtual void markChildren() noexcept {}
+
+        // 标记工作队列：仅由 VM 安全点的 collect/drainMarkQueue 访问（单线程协议，
+        // 见 MarkSweep::collect 注释），每线程一份避免多 Runtime 串扰
+        static Vec<MarkSweepHeader *> &markQueue() noexcept {
+            static thread_local Vec<MarkSweepHeader *> queue;
+            return queue;
         }
 
     protected:
-        // 派生类 marked() 先执行 if(_marked) return，再调用基类标记并遍历子对象。
-        // 对象图可能有环；漏掉守卫会无限递归，漏调基类会使对象在 sweep 中被回收。
+        // 派生类 markChildren() 遍历子对象；漏调基类标记语义由基类 marked() 承担，
+        // 派生类不再自行判守卫
         bool _marked{ false };
 
     private:
@@ -73,8 +89,21 @@ namespace cial {
             }
         }
 
+        // 排空标记队列：弹出已标记节点并枚举其子对象，子对象经 marked() 再入队，
+        // 直至队列为空。标记集合与旧递归遍历一致，仅访问顺序不同（对 sweep 与
+        // 弱引用不可观察）；队列峰值 ≤ 活跃对象数（每项一个指针）
+        static void drainMarkQueue() noexcept {
+            auto &queue = MarkSweepHeader::markQueue();
+            while(!queue.empty()) {
+                MarkSweepHeader *node = queue.back();
+                queue.pop_back();
+                node->markChildren();
+            }
+        }
+
         void collect(const MarkFunc &mark) {
             mark();
+            drainMarkQueue();
             // 先快照所有不可达对象，再标记队列；对象之间的环不能使另一个
             // 待终结对象被遗漏。回调仅由 VM 安全点执行，绝不在 sweep 重入。
             const size_t first = pendingFinalizers.size();
@@ -83,6 +112,7 @@ namespace cial {
                     pendingFinalizers.push_back(node);
             for(size_t i = first; i < pendingFinalizers.size(); ++i)
                 pendingFinalizers[i]->marked();
+            drainMarkQueue();
             sweep();
         }
 

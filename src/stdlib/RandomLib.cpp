@@ -166,12 +166,6 @@ namespace cial {
         inited = true;
     }
 
-    void RandomGen::marked() noexcept {
-        if(_marked)
-            return;
-        Object::marked();
-    }
-
     void RandomGen::randomizeNoArg() { initGenRand(static_cast<u32>(std::time(nullptr))); }
 
     void RandomGen::randomizeByKey(const u32 key[2]) { initByArray(key, 2); }

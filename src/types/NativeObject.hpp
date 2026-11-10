@@ -26,10 +26,8 @@ namespace cial {
         void call(vm::VMState &, u32, size_t) override { throw std::runtime_error("native instance is not callable"); }
         [[nodiscard]] bool hasProp(Atom) const override { return false; }
         Value getProp(Atom) override { throw std::runtime_error("native member not found"); }
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            Object::marked();
+        void markChildren() noexcept override {
+            // trace 回调经 binding::Tracer 调 marked()（标记并入队），由队列排空续遍历
             if(_type->trace)
                 _type->trace(_payload.get());
         }

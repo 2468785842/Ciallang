@@ -150,10 +150,7 @@ namespace cial {
 
     bool ScriptsNS::hasProp(const Atom a) const { return (a == execAtom && execFn) || (a == evalAtom && evalFn); }
 
-    void ScriptsNS::marked() noexcept {
-        if(_marked)
-            return;
-        Object::marked();
+    void ScriptsNS::markChildren() noexcept {
         if(execFn)
             execFn->marked();
         if(evalFn)

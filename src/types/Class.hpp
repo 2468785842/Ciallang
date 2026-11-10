@@ -31,10 +31,7 @@ namespace cial {
 
         void call(vm::VMState &vmState, u32 ret, size_t argCount) override;
 
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            Object::marked();
+        void markChildren() noexcept override {
             if(meta)
                 meta->marked();
             for(auto &v : _props | std::views::values) {
@@ -99,10 +96,7 @@ namespace cial {
 
         [[nodiscard]] ClassObject *klass() const noexcept { return _class; }
 
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            Object::marked();
+        void markChildren() noexcept override {
             if(_class)
                 _class->marked();
 
@@ -185,10 +179,8 @@ namespace cial {
         static constexpr TypeId nativeTypeId = TypeId::Global;
         [[nodiscard]] TypeId typeId() const noexcept override { return TypeId::Global; }
 
-        void marked() noexcept override {
-            if(_marked)
-                return;
-            ClassObject::marked();
+        void markChildren() noexcept override {
+            ClassObject::markChildren();
             if(proxy)
                 proxy->marked();
         }
