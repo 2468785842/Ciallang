@@ -4,6 +4,7 @@
 #pragma once
 
 #include "runtime/Runtime.hpp"
+#include "types/ApiMeta.hpp"
 #include "types/Function.hpp"
 #include "types/NativeObject.hpp"
 #include "types/TypeId.hpp"
@@ -73,10 +74,20 @@ namespace cial {
         Map<Atom, NativePropGetter> instanceProperties; // 只读属性，like `str.length`
     };
 
+    // 注册期 API 元数据聚合（doc/api-metadata.md）：绑定注册时自动登记，仅描述注册
+    // 事实，导出消费方为 cial --api-json 与后续 .d.tjs 生成器；纯 C++ 所有权非 GC。
+    struct ApiCatalog {
+        // 全局/命名空间符号（Module::function/module；registryGlobalFunc 形态无签名
+        // 信息，由调用点显式补记 variadic/ret）。owner 为点分归属路径，""= 顶层。
+        std::vector<ApiMeta> globals;
+        // 每个原生类型的注册名与成员元数据；名字缺失的类型不进入 classes 导出。
+        Map<NativeTypeKey, std::string> typeNames;
+        Map<NativeTypeKey, std::vector<ApiMeta>> typeMembers;
+    };
+
     class NativeRegister {
     public:
         explicit NativeRegister(Runtime &rt) : _rt(rt) {}
-
         template <typename Callable>
         void registerMethod(const NativeTypeKey typeId, const Atom name, Callable &&fn) {
             auto *nativeFn = _rt.create<NativeFunction>(std::forward<Callable>(fn)).get();
@@ -166,6 +177,8 @@ namespace cial {
         }
 
         Map<NativeTypeKey, std::shared_ptr<NativeTypeBinding>> bindings;
+
+        ApiCatalog apiCatalog; // 注册期 API 元数据；登记走 Context 的 recordApi* 转发
 
         u64 revision{}; // VM 调用点缓存随宿主注册/替换方法失效
 

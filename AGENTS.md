@@ -15,7 +15,7 @@ Ciallang 是 C++20 实现的 TJS2 解释器。先读 [README](README.md) 和[文
 | `src/gen/` | 指令定义、代码生成、CFG、SSA 与优化 |
 | `src/vm/` | 字节码、调用帧、执行、调试与可选 JIT |
 | `src/runtime/` | Context、Runtime、Atom、GC 根与标记清除 |
-| `src/types/` | Value、对象、函数、属性与容器 |
+| `src/types/` | Value、对象、函数、属性与容器；注册期 API 元数据（ApiMeta，导出见 [api-metadata](doc/api-metadata.md)） |
 | `src/Binding.hpp` | 宿主 Module / ClassBuilder 声明式绑定 |
 | `src/stdlib/` | 各库的实现与注册入口；StandardLibrary 汇总安装 |
 | `src/tjsbc/` | TJS2 字节码读取与转译 |

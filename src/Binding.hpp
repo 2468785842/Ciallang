@@ -8,6 +8,7 @@
 #include <tuple>
 #include <utility>
 #include "runtime/Context.hpp"
+#include "types/ApiMeta.hpp"
 #include "types/Class.hpp"
 #include "types/NativeObject.hpp"
 #include "vm/VM.hpp"
@@ -162,6 +163,7 @@ namespace cial::binding {
     public:
         ClassBuilder(Context &ctx, Namespace *classObject, const Atom name) :
             _ctx(ctx), _class(&ctx.rt(), classObject) {
+            _ctx.recordApiTypeName(nativeTypeKeyFor<T>(), ctx.rt().atomTable.get(name)->str->toStdStr());
             if(!ctx.nativeBinding(nativeTypeKeyFor<T>()))
                 ctx.registerNativeBinding(std::make_shared<NativeTypeBinding>(
                     NativeTypeBinding{ .key = nativeTypeKeyFor<T>(), .name = name, .trace = {} }));
@@ -178,8 +180,10 @@ namespace cial::binding {
             return *this;
         }
         template <typename F>
-        ClassBuilder &method(const String &name, F fn) {
+        ClassBuilder &method(const String &name, F fn, std::string doc = {}) {
             using Traits = native::NativeFunTraits<F>;
+            _ctx.recordApiMember(nativeTypeKeyFor<T>(),
+                                 api::makeMeta<F>(ApiKind::Method, name.toStdStr(), {}, std::move(doc)));
             _ctx.registerMethod(
                 nativeTypeKeyFor<T>(), name, [fn](const VM *vm, const Value &self, const size_t argc, Value *args) {
                     checkArity(argc, Traits::arity);
@@ -191,7 +195,7 @@ namespace cial::binding {
             return *this;
         }
         template <typename G, typename S = std::nullptr_t>
-        ClassBuilder &property(const String &name, G getter, S setter = nullptr) {
+        ClassBuilder &property(const String &name, G getter, S setter = nullptr, std::string doc = {}) {
             auto get = makeFunction(_ctx, [getter](const VM *vm, const Value &self, size_t, Value *) {
                 return toValue(vm->context(), std::invoke(getter, thisAs<T>(self)));
             });
@@ -205,6 +209,11 @@ namespace cial::binding {
                 });
             }
             _ctx.registerAccessor(nativeTypeKeyFor<T>(), name, get.get(), set.get());
+            ApiMeta meta{ .kind = ApiKind::Property,
+                          .name = name.toStdStr(),
+                          .ret = api::typeName<std::invoke_result_t<G, T &>>(),
+                          .doc = std::move(doc) };
+            _ctx.recordApiMember(nativeTypeKeyFor<T>(), std::move(meta));
             return *this;
         }
         template <typename F>
@@ -219,6 +228,7 @@ namespace cial::binding {
         ClassBuilder &staticFunction(const String &name, F fn) {
             const auto function = makeTypedFunction(_ctx, std::move(fn));
             _class->members[_ctx.rt().atomTable.intern(name)] = Value{ function.get() };
+            _ctx.recordApiMember(nativeTypeKeyFor<T>(), api::makeMeta<F>(ApiKind::Static, name.toStdStr(), {}, {}));
             return *this;
         }
     };
@@ -226,6 +236,8 @@ namespace cial::binding {
     class Module {
         Context &_ctx;
         RootGuard<Namespace> _namespace;
+        // 点分归属路径（""= 顶层）；嵌套 module() 逐级拼接，供 API 元数据登记。
+        std::string _path;
         void put(const String &name, const Value &value) const {
             if(_namespace.get())
                 _namespace->members[_ctx.rt().atomTable.intern(name)] = value;
@@ -234,7 +246,8 @@ namespace cial::binding {
         }
 
     public:
-        explicit Module(Context &ctx, Namespace *space = nullptr) : _ctx(ctx), _namespace(&ctx.rt(), space) {}
+        explicit Module(Context &ctx, Namespace *space = nullptr, std::string path = {}) :
+            _ctx(ctx), _namespace(&ctx.rt(), space), _path(std::move(path)) {}
         [[nodiscard]] Module module(const String &name) const {
             const auto atom = _ctx.rt().atomTable.intern(name);
             Object *parent = _namespace.get() ? static_cast<Object *>(_namespace.get()) : _ctx.global();
@@ -243,15 +256,18 @@ namespace cial::binding {
                 auto *space = value.isObject() ? dynamic_cast<Namespace *>(value.asObject().unwrap()) : nullptr;
                 if(!space)
                     throw std::runtime_error("native module name already belongs to another value");
-                return Module{ _ctx, space };
+                _ctx.recordApiGlobal(ApiMeta{ .kind = ApiKind::Namespace, .name = name.toStdStr(), .owner = _path });
+                return Module{ _ctx, space, joinPath(name.toStdStr()) };
             }
             const auto space = _ctx.rt().create<Namespace>();
+            _ctx.recordApiGlobal(ApiMeta{ .kind = ApiKind::Namespace, .name = name.toStdStr(), .owner = _path });
             put(name, Value{ space.get() });
-            return Module{ _ctx, space.get() };
+            return Module{ _ctx, space.get(), joinPath(name.toStdStr()) };
         }
         template <typename T>
         ClassBuilder<T> class_(const String &name) {
             const auto type = _ctx.rt().create<Namespace>();
+            _ctx.recordApiGlobal(ApiMeta{ .kind = ApiKind::Class, .name = name.toStdStr(), .owner = _path });
             put(name, Value{ type.get() });
             return ClassBuilder<T>{ _ctx, type.get(), _ctx.rt().atomTable.intern(name) };
         }
@@ -259,8 +275,12 @@ namespace cial::binding {
         Module &function(const String &name, F fn) {
             const auto function = makeTypedFunction(_ctx, std::move(fn));
             put(name, Value{ function.get() });
+            _ctx.recordApiGlobal(api::makeMeta<F>(ApiKind::Global, name.toStdStr(), _path));
             return *this;
         }
+
+    private:
+        [[nodiscard]] std::string joinPath(std::string leaf) const { return _path.empty() ? leaf : _path + "." + leaf; }
     };
 } // namespace cial::binding
 

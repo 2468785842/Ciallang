@@ -44,6 +44,44 @@ class CliTest(CliTestCase):
                 self.assertEqual(process.returncode, 2, process.stderr)
                 self.assertEqual(process.stdout, "")
 
+    def test_api_json(self):
+        # 注册期 API 元数据导出（doc/api-metadata.md）：schemaVersion 1，仅描述注册
+        # 事实；签名与 src/stdlib 注册代码对照，推导不出的类型输出 null
+        process = self.run_cial("--api-json")
+        self.assertEqual(process.returncode, 0, process.stderr)
+        payload = json.loads(process.stdout)
+        self.assertEqual(payload["schemaVersion"], 1)
+        if self.expected_version:
+            self.assertEqual(payload["version"], self.expected_version)
+        classes = {entry["name"]: entry["members"] for entry in payload["classes"]}
+        # 内建容器与内建类型均有注册名与成员（对照 ArrayLib/StringLib 注册代码）
+        self.assertIn("Array", classes)
+        self.assertIn("String", classes)
+        self.assertIn("Math", classes)
+        self.assertIn("Scripts", classes)
+        array = {m["name"]: m for m in classes["Array"]}
+        self.assertTrue(array["push"]["variadic"])  # (VM*, Value, size_t, Value*) 变长形态
+        self.assertEqual(array["count"]["kind"], "property")
+        string = {m["name"]: m for m in classes["String"]}
+        self.assertEqual(string["charAt"]["params"], ["Integer"])
+        self.assertEqual(string["charAt"]["ret"], "String")
+        math = {m["name"]: m for m in classes["Math"]}
+        self.assertEqual(math["abs"]["kind"], "method")
+        self.assertEqual(math["abs"]["variadic"], True)
+        scripts = {m["name"]: m for m in classes["Scripts"]}
+        self.assertEqual(scripts["execStorage"]["variadic"], True)
+        # 全局函数（Session 注册链显式登记）
+        globals_map = {g["name"]: g for g in payload["globals"]}
+        self.assertEqual(globals_map["print"]["ret"], "void")
+        self.assertEqual(globals_map["print"]["params"], ["any"])
+        # 互斥与不接受输入/执行选项
+        for flags in [("--api-json", "--check-json", self.script), ("--api-json", self.script),
+                      ("--api-json", "--jit", self.script)]:
+            with self.subTest(flags=flags):
+                process = self.run_cial(*flags)
+                self.assertEqual(process.returncode, 2, process.stderr)
+                self.assertEqual(process.stdout, "")
+
     def test_script_output_and_timing(self):
         process = self.run_cial(self.script)
         self.assertEqual(process.returncode, 0, process.stderr)

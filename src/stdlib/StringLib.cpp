@@ -23,6 +23,8 @@
 
 namespace cial::stdlib {
     void registerStringLib(Context &context) {
+        // String 是语言内建类型，不走 registerClass；导出与声明生成需要注册名
+        context.recordApiTypeName(TypeTraits<String>::key(), "String");
         context.nativeType<String>()
             .method("charAt"_str, &stdlib::stringCharAt)
             .method("indexOf"_str, &stdlib::stringIndexOf)

@@ -5,7 +5,7 @@
 #include "vm/IntegerJit.hpp"
 
 namespace cial::cli {
-    enum class Mode { Script, Bytecode, CheckJson, DumpCfg, DumpSsa, Decompile, Repl, Capabilities };
+    enum class Mode { Script, Bytecode, CheckJson, DumpCfg, DumpSsa, Decompile, Repl, Capabilities, ApiJson };
 
     struct Options {
         Mode mode{ Mode::Script };

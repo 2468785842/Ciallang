@@ -205,6 +205,9 @@ namespace cial {
 
 namespace cial::stdlib {
     void registerRandomLib(Context &context) {
+        // RandomGen 经 Math.RandomGenerator 类对象使用，无顶层 registerClass；
+        // 导出名与类对象名保持一致
+        context.recordApiTypeName(TypeTraits<RandomGen>::key(), "RandomGenerator");
         context.nativeType<RandomGen>()
             .method("randomize"_str, &stdlib::rgRandomize)
             .method("random"_str, &stdlib::rgRandom)

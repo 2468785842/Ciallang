@@ -17,10 +17,15 @@
 #include "common/Colorizer.hpp"
 #include "common/Defer.hpp"
 #include "decompile/Decompiler.hpp"
+#include "stdlib/ExceptionLib.hpp"
+#include "stdlib/ScriptsLib.hpp"
+#include "stdlib/StandardLibrary.hpp"
 #include "tjsbc/TjsBytecodeReader.hpp"
 #include "tjsbc/TjsTranslator.hpp"
 #include "types/Class.hpp"
 #include "vm/VM.hpp"
+
+#include <algorithm>
 
 namespace cial::cli {
     namespace {
@@ -169,6 +174,117 @@ namespace cial::cli {
                 cial::capabilities::hasJit() ? "true" : "false");
             return 0;
         }
+
+        std::string apiJsonString(const std::string &text) {
+            std::string out;
+            out.reserve(text.size() + 8);
+            for(const char ch : text) {
+                switch(ch) {
+                    case '"':
+                        out += "\\\"";
+                        break;
+                    case '\\':
+                        out += "\\\\";
+                        break;
+                    case '\n':
+                        out += "\\n";
+                        break;
+                    case '\r':
+                        out += "\\r";
+                        break;
+                    case '\t':
+                        out += "\\t";
+                        break;
+                    default:
+                        out += ch;
+                        break;
+                }
+            }
+            return out;
+        }
+
+        const char *apiKindName(const ApiKind kind) {
+            switch(kind) {
+                case ApiKind::Method:
+                    return "method";
+                case ApiKind::Property:
+                    return "property";
+                case ApiKind::Static:
+                    return "static";
+                case ApiKind::Global:
+                    return "global";
+                case ApiKind::Namespace:
+                    return "namespace";
+                case ApiKind::Class:
+                    return "class";
+            }
+            return "";
+        }
+
+        void appendApiMetaJson(std::string &out, const ApiMeta &meta) {
+            out += fmt::format("{{\"kind\":\"{}\",\"name\":\"{}\"", apiKindName(meta.kind), apiJsonString(meta.name));
+            if(!meta.owner.empty())
+                out += fmt::format(",\"owner\":\"{}\"", apiJsonString(meta.owner));
+            out += ",\"variadic\":";
+            out += meta.variadic ? "true" : "false";
+            out += ",\"ret\":";
+            out += meta.ret.empty() ? "null" : fmt::format("\"{}\"", apiJsonString(meta.ret));
+            out += ",\"params\":[";
+            for(size_t i = 0; i < meta.paramTypes.size(); ++i) {
+                if(i)
+                    out += ',';
+                out += meta.paramTypes[i].empty() ? "null" : fmt::format("\"{}\"", apiJsonString(meta.paramTypes[i]));
+            }
+            out += ']';
+            if(!meta.doc.empty())
+                out += fmt::format(",\"doc\":\"{}\"", apiJsonString(meta.doc));
+            out += '}';
+        }
+
+        // 注册期 API 元数据导出（doc/api-metadata.md）：仅描述注册事实，不执行用户
+        // 脚本；schemaVersion 1，未知类型输出 null。Exception/Debug 为脚本侧自举类，
+        // 不属原生注册，不进入导出。
+        int runApiJson() {
+            Runtime runtime;
+            Context context{ runtime };
+            vm::VMState state{ context };
+            VM vm{ &state };
+            // 与普通会话同一注册链（标准库 + print/println + Debug shim + Scripts）；
+            // Debug shim 为脚本自举类，不属原生注册，导出仅含 API catalog。
+            setupSession(context, vm, state, {});
+            const auto &catalog = context.apiCatalog();
+            // classes 按注册名排序保证输出确定性（typeMembers 为 unordered_map）；
+            // 未登记名字的类型不进入导出。
+            std::vector<std::pair<std::string, const std::vector<ApiMeta> *>> classes;
+            for(const auto &[key, members] : catalog.typeMembers) {
+                const auto nameIt = catalog.typeNames.find(key);
+                if(nameIt != catalog.typeNames.end())
+                    classes.emplace_back(nameIt->second, &members);
+            }
+            std::ranges::sort(classes, [](const auto &l, const auto &r) { return l.first < r.first; });
+            std::string out = fmt::format("{{\"schemaVersion\":1,\"version\":\"{}\"", CIAL_VERSION_STRING);
+            out += ",\"classes\":[";
+            for(size_t i = 0; i < classes.size(); ++i) {
+                if(i)
+                    out += ',';
+                out += fmt::format("{{\"name\":\"{}\",\"members\":[", apiJsonString(classes[i].first));
+                for(size_t m = 0; m < classes[i].second->size(); ++m) {
+                    if(m)
+                        out += ',';
+                    appendApiMetaJson(out, (*classes[i].second)[m]);
+                }
+                out += "]}";
+            }
+            out += "],\"globals\":[";
+            for(size_t i = 0; i < catalog.globals.size(); ++i) {
+                if(i)
+                    out += ',';
+                appendApiMetaJson(out, catalog.globals[i]);
+            }
+            out += "]}\n";
+            fmt::print("{}", out);
+            return 0;
+        }
     } // namespace
 
     int runApplication(const Options &options) {
@@ -177,6 +293,8 @@ namespace cial::cli {
             Common::G_ColorEnabled = false;
         if(options.mode == Mode::Capabilities)
             return runCapabilities();
+        if(options.mode == Mode::ApiJson)
+            return runApiJson();
         Runtime runtime;
         Context context{ runtime };
         vm::VMState state{ context };

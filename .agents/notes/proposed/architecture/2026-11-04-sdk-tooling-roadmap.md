@@ -17,12 +17,16 @@ Status: proposed
   Release JIT-ON 四个 job 全部通过，Ubuntu 另含 "Configure library consumer"。
   前置阻塞为此前 Windows Release JIT-ON job 的 CiallangCli 失败（同日修复，
   见该 note）。剩余：拆分核心与开发工具仓库并建立独立发行。
-- 批次 2 未开始：API 元数据与 `.d.tjs` 声明模式，连接标准库/宿主导出与 LSP，
-  逐步统一核心前端分析；执行器和脚本扫描须正确区分声明文件。
+- 批次 2 进行中：API 元数据模型与 `cial --api-json` 导出已落地（2026-11-11，模型
+  `src/types/ApiMeta.hpp`、聚合 `ApiCatalog` 挂 `NativeRegister`、导出 schemaVersion 1；
+  依据与推导规则见 doc/api-metadata.md，测试 `[api]` 标签 + test_cli.py 的
+  test_api_json）。剩余：`.d.tjs` 声明模式（Parser decl 模式、执行侧拒绝、生成器、
+  测试扫描排除）与 LSP 消费声明（替换 `BUILTIN_MEMBERS`，doc 文案随注册点逐步补全）。
 - 批次 3 未开始：模块作用域、显式导出、宿主解析、Context 缓存、循环诊断及
   异常/GC 恢复，保留 `Scripts` 兼容入口；稳定后再讨论 `import/export` 语法。
 - 批次 4 未开始：核心脚本调试接口、DAP 适配器及 VSCode 端到端调试，
-  先覆盖行断点、单步、调用栈、变量和异常暂停。
+  先覆盖行断点、单步、调用栈、变量和异常暂停。已定决策：DAP 适配层用 C++ 内建
+  `cial-dap`（链接 cialdbg 复用 DebugSession 能力），不引入 Python 适配层。
 
 ## 建议下一步
 

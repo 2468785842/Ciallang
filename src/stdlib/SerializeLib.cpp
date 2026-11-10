@@ -26,6 +26,8 @@
 
 namespace cial::stdlib {
     void registerSerializeLib(Context &context) {
+        // Octet 是语言内建类型，不走 registerClass；导出与声明生成需要注册名
+        context.recordApiTypeName(TypeTraits<Octet>::key(), "Octet");
         context.nativeType<Array>()
             .method("load"_str, &stdlib::arrayLoad)
             .method("save"_str, &stdlib::arraySave)

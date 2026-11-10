@@ -180,6 +180,14 @@ namespace cial::stdlib {
         ns->setBaseDir(std::move(baseDir));
         ns->setStorageReader(std::move(reader));
 
+        // exec/eval 方法走 ScriptsNS 的绑定闭包而非 registerMethod，元数据在此补记
+        context.recordApiMember(
+            TypeTraits<ScriptsNS>::key(),
+            api::makeMetaOf(ApiKind::Method, &stdlib::scriptsExecStorage, "execStorage", {}, "执行存储中的脚本文件"));
+        context.recordApiMember(TypeTraits<ScriptsNS>::key(),
+                                api::makeMetaOf(ApiKind::Method, &stdlib::scriptsEvalStorage, "evalStorage", {},
+                                                "对存储中的脚本文件求值并返回结果"));
+
         auto &rt = context.rt();
         // 方法对象注册期创建一次并绑定 ns（成员读现场返回同一绑定闭包）。
         // create 的 RootGuard 临时随全表达式析构，存入 ns（全局表保根）后

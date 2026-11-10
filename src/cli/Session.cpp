@@ -25,8 +25,19 @@
 namespace cial::cli {
     void setupSession(Context &context, VM &vm, vm::VMState &state, const std::filesystem::path &scriptPath) {
         stdlib::registerStandardLibrary(context);
+        // print/println 是类型擦除的 NativeFunction，签名无法自动推导；按注册事实显式登记
         context.registryGlobalFunc("print"_str, &stdlib::S_PrintFunction);
+        context.recordApiGlobal(ApiMeta{ .kind = ApiKind::Global,
+                                         .name = "print",
+                                         .paramTypes = { "any" },
+                                         .ret = "void",
+                                         .doc = "输出值的字符串化结果（不换行）" });
         context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
+        context.recordApiGlobal(ApiMeta{ .kind = ApiKind::Global,
+                                         .name = "println",
+                                         .paramTypes = { "any" },
+                                         .ret = "void",
+                                         .doc = "输出值的字符串化结果并换行" });
         vm.eval(R"(class __DebugShim {
     function message(s) { println(s); }
 }

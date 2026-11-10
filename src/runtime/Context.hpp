@@ -44,6 +44,7 @@ namespace cial {
 
         template <typename T, typename... Args>
         T *registerClass(const String &name, Args &&...args) {
+            recordApiTypeName(TypeTraits<T>::key(), name.toStdStr());
             auto object = rt().create<T>(std::forward<Args>(args)...);
             registerGlobal(name, Value{ object.get() });
             return object.get();
@@ -101,6 +102,17 @@ namespace cial {
 
         [[nodiscard]] u64 nativeRevision() const { return nativeRegister().revision; }
 
+        // 注册期 API 元数据登记与读取（doc/api-metadata.md）；数据在 NativeRegister，
+        // 生命周期同 Context，纯 C++ 所有权。
+        void recordApiTypeName(NativeTypeKey key, std::string name) {
+            nativeRegister().apiCatalog.typeNames[key] = std::move(name);
+        }
+        void recordApiMember(NativeTypeKey key, ApiMeta meta) {
+            nativeRegister().apiCatalog.typeMembers[key].push_back(std::move(meta));
+        }
+        void recordApiGlobal(ApiMeta meta) { nativeRegister().apiCatalog.globals.push_back(std::move(meta)); }
+        [[nodiscard]] const ApiCatalog &apiCatalog() const { return nativeRegister().apiCatalog; }
+
         template <typename T>
         class NativeTypeBuilder {
             Context &_ctx;
@@ -108,12 +120,17 @@ namespace cial {
         public:
             explicit NativeTypeBuilder(Context &ctx) : _ctx(ctx) {}
             template <typename Callable>
-            NativeTypeBuilder &method(const String &name, Callable &&fn) {
+            NativeTypeBuilder &method(const String &name, Callable &&fn, std::string doc = {}) {
                 _ctx.registerMethod<T>(name, std::forward<Callable>(fn));
+                _ctx.recordApiMember(TypeTraits<T>::key(),
+                                     api::makeMeta<Callable>(ApiKind::Method, name.toStdStr(), {}, std::move(doc)));
                 return *this;
             }
-            NativeTypeBuilder &property(const String &name, NativePropGetter getter) {
+            NativeTypeBuilder &property(const String &name, NativePropGetter getter, std::string doc = {}) {
                 _ctx.registerProperty<T>(name, getter);
+                // NativePropGetter 返回 Value，具体属性类型注册点未声明时推导不出
+                ApiMeta meta{ .kind = ApiKind::Property, .name = name.toStdStr(), .ret = "any", .doc = std::move(doc) };
+                _ctx.recordApiMember(TypeTraits<T>::key(), std::move(meta));
                 return *this;
             }
         };
