@@ -1,24 +1,27 @@
 # 反编译器 M5 与移交遗留
 
-Status: proposed
+Status: implemented（2026-11-10 关闭评审通过）
 
-## 当前状态（2026-11-08，接续先读此节）
+## 当前状态（2026-11-10 关闭评审，接续先读此节）
 
-M5 仍在进行；当前能力与剩余工作以
+**M5 已完成并关闭**。§6 完成条件逐项核对全部达成：能力矩阵七维量化验收、
+Unsupported 清单可量化（61 组固定语料断言 + 模糊 120 程序 KNOWN_FAILURES
+清零 + CLI/Catch2 拒绝原因断言）；移交项全部闭环（deref bc 恢复、super
+构造 prologue 自产路径、CallMethodV 行表 2026-11-10 双侧复核收敛、s7_ext
+归因修复、表达式位置 FuncLit）。
+关闭评审证据（2026-11-10）：Windows Release 全量 CTest **248/248**（重建
+因同步而过期的 cial-fmt 后）、WSL Ubuntu Linux Debug 全量 CTest **449/449**、
+CI 42766969898 八个 job 全绿。诚实边界随能力矩阵登记，不阻塞关闭：环③按
+§7 补偿控制替代；super bc 路径被参考编译器段错误阻断（参考侧缺陷）；具名
+局部被 catch 读取的声明落点协议保持拒绝。能力与边界以
 [方案当前状态表](../../../../doc/bytecode/decompiler-plan.md#m5-当前状态2026-11-05)为准。
-异常区域已完成状态机首版（2026-11-07 验收）、结构化 try/catch 首版、catch
-数据流存储提升与无名循环携带提升（2026-11-08 三批），实现与边界见
-[实现记录](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)：
-**异常语料 9/9 全部结构化 try/catch**（无名寄存器与无名循环携带变量提升为合
-成存储），具名局部被 catch 读取（声明落点未证明）保持诚实回退，9 组语料
-darwin 参考对拍一致。switch 主线的调用标签表达式（`case f():`，自产与参考
-模板）已验收，新增 4 组 calllabel 语料。状态机调用族白名单扩展（含接收者内
-联 `o.m(...)`）与 try 写入侧 join 合流提升已验收，新增 `m5_exception_call_in_try`
-语料，异常语料 10/10 结构化。
+异常区域状态机与结构化恢复、调用标签表达式、状态机调用族等批次事实见下文
+与[实现记录](2026-11-07-decompiler-exception-regions.md)。
 下面各批次保留当时的拒绝与验证事实，后续修复不覆盖历史失败记录。
 特别是早期“嵌套 switch 一律拒绝”和“赋值右值 FuncLit 待实现”不再是现状：
 自产双层/三层与参考函数内双层 switch 已验收；赋值右值 FuncLit 的源码
-恢复已复核，参考字节码路径仍待验收。参考嵌套返回与三层合流的固定样本现已通过；对象成员 FuncLit 的 NEW/this 差异仍未闭环。
+恢复与参考字节码路径均已验收；对象成员 FuncLit 的 NEW/this 差异已修复
+（2026-11-08 批）。
 
 ## 问题
 
@@ -38,7 +41,7 @@ with 与 eval 名字依赖；M4→M5 移交的 bc 路径验收扩展（super 构
   注意：早先"pc 12 跨脏区间"失败来自 11-03 旧二进制（M3 时代产物）——当时
   `src/format/Files.cpp` 缺 `<io.h>`/`<fcntl.h>`（clang-cl 无法编译）使增量构建
   静默失败、探测跑在旧 exe 上。已补显式 include（本机 clang-cl 构建恢复）。
-  证据核对产物身份的教训与 [cial-verify](../../skills/cial-verify/SKILL.md) 一致。
+  证据核对产物身份的教训与 [cial-verify](../../../skills/cial-verify/SKILL.md) 一致。
 - **类体逗号声明链修复（2026-11-04）**：`class C { var a, b; }` 此前只注册首名
   （`VarDeclNode::next` 链未走，`Parser.cpp` 类体循环只收头节点；IRGen 每条目
   单名），实例化不预注册后续成员、反编译如实输出 `var a;`。修复后逐名注册
@@ -509,7 +512,7 @@ with 与 eval 名字依赖；M4→M5 移交的 bc 路径验收扩展（super 构
 
 函数内 51 类受支持 TAC 的不可约 CFG 降级已实现并验收。实现不变量、拒绝边界、
 首轮失败、原始 TAC/恢复源码/独立模型比较与参考验证见
-[已实现记录](../../implemented/architecture/2026-11-05-decompiler-cfg-fallback.md)。
+[已实现记录](2026-11-05-decompiler-cfg-fallback.md)。
 M5 专项 552 assertions / 4 cases 通过，最终全量 CTest 245/245（22.00s）；
 4 份实际状态机函数的参考执行一致。当时记录的“下一大项异常区域与重抛”已在
 `edbf3ae` 落地并于 2026-11-07 完成验收，见下节；不能把 CFG
@@ -520,7 +523,7 @@ M5 专项 552 assertions / 4 cases 通过，最终全量 CTest 245/245（22.00s�
 实现随 `edbf3ae`（2026-11-05）提交：状态机逐 pc 包 try、条件求值固定在原
 比较 pc、catch 写异常槽后跳 `tryEnd`；Optimizer catch 入口不继承前驱拷贝事实、
 转译器 ENTRY 内层优先登记配套修复。实现不变量与拒绝边界见
-[异常区域实现记录](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)。
+[异常区域实现记录](2026-11-07-decompiler-exception-regions.md)。
 本批补齐的验收与修复：
 
 - 基线复现 CiallangSwitch 33 个子失败：`decompile/` 语料源码哈希全部平台行尾
@@ -550,7 +553,7 @@ M5 专项 552 assertions / 4 cases 通过，最终全量 CTest 245/245（22.00s�
 体区与 catch 体递归发射；异常槽 Pass A/B 双游标重绑定；无绑定槽输出裸 catch。
 实现不变量、首轮失败（同起点嵌套 map 碰撞、Pass B 游标重置、存储提升回退、
 声明落点守卫）与验收证据见
-[实现记录"结构化区域恢复首版"](../../implemented/architecture/2026-11-07-decompiler-exception-regions.md)。
+[实现记录"结构化区域恢复首版"](2026-11-07-decompiler-exception-regions.md)。
 
 - 能力：bc 路径 return/catch_switch 走结构化（manifest `structured: true`）；
   自产 catch 仅读异常槽/裸 catch/嵌套重抛结构化输出经 4 个新 Catch2 用例断言
@@ -798,11 +801,10 @@ Debug，clang 21.1.8，仓库克隆 `/root/Ciallang`，vcpkg `/root/vcpkg`）复
 
 ## 建议下一步
 
-1. M5 关闭评审：对照 §6 完成条件逐项核对（能力矩阵已量化、Unsupported 已登
-   记、移交项全部闭环），通过后 M5 批次转 implemented。
-2. 参考更复杂合流形态按需扩展（switch 主线剩余）。
+1. （已完成 2026-11-10）M5 关闭评审通过，本 note 转 implemented。
+2. 参考更复杂合流形态按需扩展（switch 主线剩余，非完成条件）。
 3. 具名局部被 catch 读取的声明落点协议（需 IRGen 侧把 `var` 落点锚定到
-   localVars 语义位置），优先级低于上述主线。
+   localVars 语义位置），作为 M5 后续改进项按需立项。
 
 ## 完成条件
 

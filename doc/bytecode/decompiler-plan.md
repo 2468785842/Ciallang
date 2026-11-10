@@ -116,7 +116,7 @@ with、eval 和局部值保活，"生成名字不冲突"不足以保证安全。
 | M2 | ExprBuilder：后优化形态模式表（含 BinaryImm/CompareTestImm 逆映射）、调用族/成员访问族 | 表达式级 round-trip 逐形态对拍；**已完成（2026-11-02，`ExprBuilder.*`）** |
 | M3 | 语句结构化：if/while/for 归约、短路/三元跨块折叠 | 路径副作用、求值次数、break/continue 对拍通过；**已完成（2026-11-03，ExprBuilder 结构化发射）** |
 | M4 | 壳组装（context 树→声明）+ `+=` 逆融合（双守卫） | 类/继承/property/初始化顺序用例；getter 计数不翻倍。**已完成（2026-11-04，`ExprBuilder.*`/`Decompiler.cpp` 壳组装）：顶层与体内 function/class/property 声明 round-trip 通过；`+=`/`++` 逆融合覆盖成员/下标/具名局部/全局/`*p` 目标（单读者 + 对象一致性双守卫，匿名拷贝按源头解析）；实参位置匿名函数字面量恢复；类成员注册按源码位置排序（枚举序对齐 TJS2）；property 安装名登记 `_declaredGlobals`。验收扩展项（super 构造 prologue、`CallMethodV`/`testDeref` 形态）移交 M5** |
-| M5 | 硬核兜底：任意 CFG 降级、switch、嵌套异常及覆盖扩展 | **进行中（收尾）**。switch/循环/异常区域/数据流提升/调用族/声明落点/**with/eval 恢复**全部验收；模糊覆盖落地且 KNOWN_FAILURES 清零；能力矩阵与 Unsupported 清单已量化（见下文）；闭包捕获经复核为**两引擎一致的对齐特性**（自由名 this-proxy 降级，非缺口），项关闭。CallMethodV 行表经 Windows/WSL Linux 双侧复核收敛（2026-11-10，见下文），移交项全部闭环。剩余：M5 关闭评审（对照本表完成条件逐项核对）。当前状态见下节，历史证据见 M5 note。 |
+| M5 | 硬核兜底：任意 CFG 降级、switch、嵌套异常及覆盖扩展 | **已完成（2026-11-10 关闭评审）**。switch/循环/异常区域/数据流提升/调用族/声明落点/**with/eval 恢复**全部验收；模糊覆盖落地且 KNOWN_FAILURES 清零；能力矩阵与 Unsupported 清单已量化（见下文）；闭包捕获经复核为**两引擎一致的对齐特性**（自由名 this-proxy 降级，非缺口）；CallMethodV 行表经 Windows/WSL Linux 双侧复核收敛，移交项全部闭环。关闭证据：Windows Release CTest **248/248**、WSL Linux Debug CTest **449/449**、CI 八 job 全绿。当前状态见下节，历史证据见 M5 note。 |
 
 M0/M1 后以真实产物的语义缺口重新估算工期；属性协议、异常、动态作用域是主要不确定项。
 
@@ -134,8 +134,8 @@ M0/M1 后以真实产物的语义缺口重新估算工期；属性协议、异�
 实现见 `src/decompile/ExprBuilder.cpp`；回归按接口/表达式与控制流分在
 `tests/cli/test_decompile.py`、`tests/cli/test_switch.py`，运行入口见
 [测试导航](../../tests/README.md)。固定输入与参考身份见
-`tests/test_files/tjsbc/decompile/manifest.json`。M5 总体仍为进行中；
-各批次命令和失败证据见 [M5 note](../../.agents/notes/proposed/architecture/2026-11-04-decompiler-m5.md)。
+`tests/test_files/tjsbc/decompile/manifest.json`。M5 已完成（2026-11-10 关闭评审）；
+各批次命令和失败证据见 [M5 note](../../.agents/notes/implemented/architecture/2026-11-04-decompiler-m5.md)。
 
 ### CFG 降级首版（2026-11-05）
 
