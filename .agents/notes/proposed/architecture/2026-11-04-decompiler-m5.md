@@ -769,15 +769,38 @@ M5 关闭不受环③阻塞：§6 M5 行完成条件不含四环；环③是 §7
 - 全量 CTest **450/450**；模糊 **119/119**（KNOWN_FAILURES 空）；clang-format、
   git diff --check 通过。参考对拍 10/10（异常语料）。
 
+## CallMethodV 行表平台收敛复核（2026-11-10，Windows + WSL Linux）
+
+M4 时代的"Linux CTest 全绿 vs Windows s7_ext 行表失败"冲突，根因是参考导出器
+垃圾条目 + 平局不稳定排序（2026-11-04 批已修复）。本批用 WSL Ubuntu（Linux
+Debug，clang 21.1.8，仓库克隆 `/root/Ciallang`，vcpkg `/root/vcpkg`）复核平台
+收敛，与 Windows Release 逐字节对比：
+
+- s7_ext（super 方法调用即 CallMethodV）与 s6_class（testDeref 方法直调 + `*p`）
+  的 `--map` 行表 JSON 逐字节一致，反编译文本一致（仅行尾）；行表值符合 debug
+  manifest `expectedLines`。
+- M4 移交形态严格模式已全部恢复：4 组 debug 语料 `--decompile` 均 success，
+  恢复源码执行与原源码输出一致（s7 `"dog:legs=4"`、s6 五行），双侧一致。
+  super.<Ctor> prologue / super.<方法> 经 this-proxy 降级渲染 `global.Animal.*`。
+- 顺带刷新：debug manifest 的 stale `pendingUnits`（testDeref、describe (Dog)
+  两条"恢复未落地"登记已不成立，改为 `recoveredUnits` 记录现状）；
+  `test_decompile_outputdebug_source_lines` 增加严格模式 + 回放对拍断言
+  （4 组 subTest）；`--view` 的 map status 按设计恒为 unsupported（诊断产物
+  不可重编译），测试注释已标明，恢复状态以严格模式为准。
+- 本机 Windows 工作树曾因 `.gitattributes` 修复前检出保留 CRLF 导致 decompile
+  语料哈希失败（M5 note 2026-11-07 批记录的已知事项），重检出后通过——拉取
+  后须重检出 `tests/test_files/tjsbc/decompile/` 的教训再次适用。
+- Windows：CiallangDecompile/CiallangSwitch/CiallangFuzz 通过；WSL Linux：
+  严格恢复 + 回放 4/4 一致（行表对比脚本与证据在 `out/m5-linemap/`，
+  `linemap-check.sh` / `linemap-strict.sh`）。
+
+
+
 ## 建议下一步
 
 1. M5 关闭评审：对照 §6 完成条件逐项核对（能力矩阵已量化、Unsupported 已登
-   记、移交项除 CallMethodV 行表外全部闭环）。
-2. CallMethodV 行表收敛（需 Linux 侧复核 M4 记录与本机差异）。
-3. 参考更复杂合流形态按需扩展（switch 主线剩余）。
-2. switch 后续批次：参考更复杂合流形态；按方案 §7 继续参考 TJS2 四环验收。
-2. `CallMethodV` 行表收敛：先在 Linux 侧复核 M4 记录与本机差异，再修
-   origin 分段继承。
+   记、移交项全部闭环），通过后 M5 批次转 implemented。
+2. 参考更复杂合流形态按需扩展（switch 主线剩余）。
 3. 具名局部被 catch 读取的声明落点协议（需 IRGen 侧把 `var` 落点锚定到
    localVars 语义位置），优先级低于上述主线。
 
@@ -786,7 +809,8 @@ M5 关闭不受环③阻塞：§6 M5 行完成条件不含四环；环③是 §7
 方案 §6 M5 行的验收达成：能力矩阵逐项验收、Unsupported 集合可量化；
 移交的验收扩展：deref（testDeref 记法所指的 &/* 形态）bc 恢复已修复并验收、
 super 构造 prologue 自产路径已验收（bc 侧被参考编译器崩溃阻断，见 2026-11-08
-批次）；`CallMethodV` 行表需 Linux 侧；
+批次）；`CallMethodV` 行表已于 2026-11-10 经 Windows/WSL Linux 双侧复核收敛
+（见上文批次）；
 s7_ext 差异归因并修复；表达式位置 FuncLit round-trip 通过。
 
 ## 风险或备选方案

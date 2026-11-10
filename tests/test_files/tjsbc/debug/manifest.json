@@ -26,8 +26,7 @@
         "(getter)": [6],
         "(setter)": [7],
         "testDeref": [15, 16, 17, 18, 19, 20, 21, 22]
-      },
-      "pendingUnits": { "testDeref": "体内方法直调形态（g_method_c/call_method 族）恢复未落地，见 TODO 反编译器 M4 验收扩展" }
+      }
     },
     {
       "name": "s7_ext",
@@ -35,8 +34,8 @@
       "sourceSha256": "72bfa2f198ee0cf15bf3c51982567d7ce1e9a601d1098b3544d4cc82da0d3453",
       "bytecodeSha256": "530079590eb936d9d7dab42ee82dbad2053e8255af4af100dfa8c133aee1be72",
       "expectedLines": { "global": [10, 11, 12], "Animal": [3], "describe": [4, 8] },
-      "pendingUnits": {
-        "describe (Dog)": "super.<Ctor>() 构造直调 context 的实参搬运 prologue 与 super.<方法>() 直调形态恢复未落地，Dog.describe 未进壳装配；行表中的 describe = Animal.describe，见 TODO 反编译器 M4 验收扩展"
+      "recoveredUnits": {
+        "describe (Dog)": "super.<Ctor>() prologue 与 super.<方法>()（CallMethodV）随 M5 批次恢复（this-proxy 降级渲染 global.Animal.*）；Dog.describe 已进壳装配并携带行 8 的行表行；严格模式恢复源码执行与原源码一致（2026-11-10 Windows/WSL Linux 双侧复核）"
       }
     },
     {

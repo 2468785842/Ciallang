@@ -87,6 +87,7 @@ class DecompileTest(CliTestCase):
                                         "--map", map_path, bytecode)
                 self.assertEqual(process.returncode, 0, process.stderr)
                 payload = json.loads(map_path.read_text(encoding="utf-8"))
+                # view 产物本身不可重编译，status 按设计恒为 unsupported；恢复状态以下面的严格模式为准
                 self.assertEqual(payload["status"], "unsupported")
 #行号落在源文件行数内（0 基；末条目可指向末尾之后，由换算收敛）
                 line_count = source.read_text(encoding="utf-8").count("\n") + 1
@@ -103,6 +104,21 @@ class DecompileTest(CliTestCase):
                     self.assertIn(name, units, f"{sample['name']}/{name}")
                     for line in expected:
                         self.assertIn(line, units[name], f"{sample['name']}/{name}")
+        # 严格模式恢复 4 组全部 success（super/CallMethodV 与 testDeref 形态随 M5 批次落地），
+        # 恢复源码执行与原源码输出逐字节一致
+        for sample in manifest["samples"]:
+            source = corpus / sample.get("source", f"{sample['name']}.tjs")
+            bytecode = corpus / f"{sample['name']}.tjsbc"
+            with self.subTest(sample=sample["name"], mode="strict"):
+                process = self.run_cial("--decompile", bytecode)
+                self.assertEqual(process.returncode, 0, process.stderr)
+                recovered = self.root / f"{sample['name']}_recovered.tjs"
+                recovered.write_text(process.stdout, encoding="utf-8")
+                original = self.run_cial(source)
+                self.assertEqual(original.returncode, 0, original.stderr)
+                replay = self.run_cial(recovered)
+                self.assertEqual(replay.returncode, 0, replay.stderr)
+                self.assertEqual(replay.stdout, original.stdout)
 #无 outputdebug 表的既有语料不携带 srcLine
         plain_map = self.root / "plain_map.json"
         process = self.run_cial("--decompile", "--view", "--source", corpus.parent / "s6_class.tjs",

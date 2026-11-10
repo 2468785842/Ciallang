@@ -116,7 +116,7 @@ with、eval 和局部值保活，"生成名字不冲突"不足以保证安全。
 | M2 | ExprBuilder：后优化形态模式表（含 BinaryImm/CompareTestImm 逆映射）、调用族/成员访问族 | 表达式级 round-trip 逐形态对拍；**已完成（2026-11-02，`ExprBuilder.*`）** |
 | M3 | 语句结构化：if/while/for 归约、短路/三元跨块折叠 | 路径副作用、求值次数、break/continue 对拍通过；**已完成（2026-11-03，ExprBuilder 结构化发射）** |
 | M4 | 壳组装（context 树→声明）+ `+=` 逆融合（双守卫） | 类/继承/property/初始化顺序用例；getter 计数不翻倍。**已完成（2026-11-04，`ExprBuilder.*`/`Decompiler.cpp` 壳组装）：顶层与体内 function/class/property 声明 round-trip 通过；`+=`/`++` 逆融合覆盖成员/下标/具名局部/全局/`*p` 目标（单读者 + 对象一致性双守卫，匿名拷贝按源头解析）；实参位置匿名函数字面量恢复；类成员注册按源码位置排序（枚举序对齐 TJS2）；property 安装名登记 `_declaredGlobals`。验收扩展项（super 构造 prologue、`CallMethodV`/`testDeref` 形态）移交 M5** |
-| M5 | 硬核兜底：任意 CFG 降级、switch、嵌套异常及覆盖扩展 | **进行中（收尾）**。switch/循环/异常区域/数据流提升/调用族/声明落点/**with/eval 恢复**全部验收；模糊覆盖落地且 KNOWN_FAILURES 清零；能力矩阵与 Unsupported 清单已量化（见下文）；闭包捕获经复核为**两引擎一致的对齐特性**（自由名 this-proxy 降级，非缺口），项关闭。剩余：CallMethodV 行表（需 Linux）。当前状态见下节，历史证据见 M5 note。 |
+| M5 | 硬核兜底：任意 CFG 降级、switch、嵌套异常及覆盖扩展 | **进行中（收尾）**。switch/循环/异常区域/数据流提升/调用族/声明落点/**with/eval 恢复**全部验收；模糊覆盖落地且 KNOWN_FAILURES 清零；能力矩阵与 Unsupported 清单已量化（见下文）；闭包捕获经复核为**两引擎一致的对齐特性**（自由名 this-proxy 降级，非缺口），项关闭。CallMethodV 行表经 Windows/WSL Linux 双侧复核收敛（2026-11-10，见下文），移交项全部闭环。剩余：M5 关闭评审（对照本表完成条件逐项核对）。当前状态见下节，历史证据见 M5 note。 |
 
 M0/M1 后以真实产物的语义缺口重新估算工期；属性协议、异常、动态作用域是主要不确定项。
 
@@ -128,8 +128,8 @@ M0/M1 后以真实产物的语义缺口重新估算工期；属性协议、异�
 | 循环组合 | 自产/参考 while、do、for 与 switch 的 break/continue；case/default 内循环；for 更新段调用计数 | 更多数据流形态；顶层无名寄存器携带的 for 初值仍拒绝 |
 | 控制流与异常 | 结构化优先；函数内受支持 TAC 的任意 CFG（含不可约）可降为状态机（调用族、容器/成员/下标语句、字符串与函数字面量已入白名单，接收者内联渲染 `o.m(...)`），寄存器逐次赋值，合成行不伪造来源；函数内 try/catch 结构化恢复（嵌套/重抛/无绑定/同起点嵌套），体/catch 定义寄存器的 catch 读取与 join 后读取提升为合成存储（含无名循环携带），10 组语料全部结构化且参考对拍一致 | 具名局部被 catch 读取的声明落点协议；函数字面量在状态机中需装配宿主；闭包及对象常量中仍拒的协议形态（ChgThis/TestVoid/With/EvalStr/CallExpand/CollapseArgs/Super） |
 | 动态名字 | 避让已有参数、局部与 Atom 名；合成存储仅限函数，声明提升、赋值留原路径 | with/eval 名字依赖与不能恢复的边界裁定 |
-| M4 移交 | s7_ext outputdebug 读取已修复；实参及赋值右值匿名函数字面量的自产恢复已验证 | super 构造 prologue、CallMethodV 行表、testDeref 形态验收；ExprFunction 变量赋值/实参参考路径已验收；对象成员赋值的 NEW/this 差异待修 |
-| 最终验收 | 37 组成功 switch 字节码三路执行一致；新返回/三层及 ExprFunction 针对性参考对拍通过，扩展参考运行有间歇失败，见 note；拒绝样本固定登记 | 完整能力矩阵与 Unsupported 清单、模糊覆盖；参考原字节码直接加载环缺入口 |
+| M4 移交 | s7_ext outputdebug 读取已修复；实参及赋值右值匿名函数字面量的自产恢复已验证；super 构造 prologue 自产路径已验收（bc 侧被参考编译器段错误阻断，登记绕开）；testDeref 与 super/CallMethodV 形态严格恢复 + 回放一致（2026-11-10 复核）；对象成员赋值 NEW/this 已修复（2026-11-08） | —（移交项全部闭环；debug 语料 pendingUnits 登记已按现状刷新） |
+| 最终验收 | 37 组成功 switch 字节码三路执行一致；新返回/三层及 ExprFunction 针对性参考对拍通过，扩展参考运行有间歇失败，见 note；拒绝样本固定登记；能力矩阵与 Unsupported 清单已量化，模糊覆盖落地（KNOWN_FAILURES 清零） | 参考原字节码直接加载环缺入口（环③按 §7 补偿控制替代） |
 
 实现见 `src/decompile/ExprBuilder.cpp`；回归按接口/表达式与控制流分在
 `tests/cli/test_decompile.py`、`tests/cli/test_switch.py`，运行入口见
@@ -253,6 +253,24 @@ property owner 是全局对象时触发（`&o.x` 引用存入全局 var 不再�
 量化锚点：61 组固定语料（manifest `expectedRecovery`/`rejectReason` 断言）+
 CiallangFuzz 120 程序（KNOWN_FAILURES 空）+ CLI/Catch2 拒绝原因断言。
 四环状态：环①②④ 全覆盖；环③（参考字节码直接加载）缺参考引擎入口。
+
+### CallMethodV 行表平台收敛复核（2026-11-10，Windows + WSL Linux）
+
+M4 记录的"Linux CTest 全绿 vs Windows s7_ext 行表失败"冲突已由读取端修复闭环
+（导出器字节数 count 垃圾条目 + 平局不稳定排序，见 M5 note 2026-11-04 批）；
+本批复核确认无残留平台漂移。WSL Ubuntu（Linux Debug，clang 21）与 Windows
+（Release）对 `debug/` outputdebug 语料逐字节对比：
+
+- s7_ext（super.<方法>() 即 CallMethodV 形态）与 s6_class（testDeref 体内方法
+  直调 + `*p` 形态）的 `--map` 行表 JSON **逐字节一致**，反编译文本一致（仅行
+  尾）；行表值符合 manifest `expectedLines`（s7 describe 合并 [4, 8]、s6
+  testDeref [15..22]）。
+- 复核同时确认 M4 移交形态已在严格模式全部恢复：4 组 debug 语料 `--decompile`
+  均 success（rc 0），恢复源码执行输出与原源码一致（s7 `"dog:legs=4"`、s6 五行
+  输出），Windows/WSL 双侧一致。manifest 的 stale `pendingUnits` 登记随之刷新；
+  `test_decompile_outputdebug_source_lines` 补严格模式 + 回放对拍断言。
+- `--view` 诊断视图的 map status 按设计恒为 unsupported（诊断产物不可重编译，
+  `Decompiler.cpp` 无条件记 diagnostic），不反映样本恢复状态。
 
 ## 7. 验证闭环
 

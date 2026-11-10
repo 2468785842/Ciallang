@@ -32,11 +32,12 @@
 ## 当前各项工作的顺序
 
 - [反编译器 M5 与移交遗留](notes/proposed/architecture/2026-11-04-decompiler-m5.md)：
-  M0–M4 已完成；switch/循环组合、自产双层/三层及参考双层嵌套已验收。
-  M5 仍在进行，参考返回/三层固定样本与 ExprFunction 变量赋值已验收；函数内标量 CFG 安全降级首版已验收；异常兜底、对象成员构造/this 与移交验收等剩余项见
+  M0–M4 已完成；switch/循环组合、嵌套、异常区域、状态机降级、with/eval 已验收，
+  模糊 KNOWN_FAILURES 清零，能力矩阵与 Unsupported 清单已量化；移交项全部闭环
+  （CallMethodV 行表 2026-11-10 经 Windows/WSL Linux 双侧复核收敛）。
+  M5 剩余关闭评审，见
   [当前状态表](../doc/bytecode/decompiler-plan.md#m5-当前状态2026-11-05)。
-  测试脚本已按 CLI/反编译/switch 分组，入口见[测试导航](../tests/README.md)；
-  最新 Windows Debug CTest **245/245**。
+  测试脚本已按 CLI/反编译/switch 分组，入口见[测试导航](../tests/README.md)。
 - [krkr2 接入](notes/proposed/architecture/2026-11-04-krkr2-integration.md)：五个阶段均未开始，
   入口为双向 `iTJSDispatch2` 桥；完成标准见[接入说明](../doc/krkr2-integration.md)。
 - [SDK 与工具路线图批次](notes/proposed/architecture/2026-11-04-sdk-tooling-roadmap.md)：
