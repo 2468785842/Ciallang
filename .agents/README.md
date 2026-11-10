@@ -44,14 +44,12 @@
   批次 1 部分完成，批次 2–4 未开始；设计边界以[路线图](../doc/roadmap.md)为准。
 - [诊断批次 5 剩余](../doc/diagnostics-plan.md#5-实施状态2026-10-31)：剩余 JIT 等价位置验证
   （继续扩展原生互调与异常恢复组合），状态以该文档实施状态一节为准。
-- [GC 标记工作队列](notes/proposed/performance/2026-11-04-gc-mark-worklist.md)：对象图标记仍为
-  C++ 递归，Windows 依赖 16 MiB 显式栈预算。
-- [GCC 整数循环回退](notes/proposed/performance/2026-11-04-gcc-integer-loop-regression.md)：
-  语义对齐批次后约 +10%，TAC 一致，待归因；正式发布前复核。
-- [Windows 类压力回退](notes/proposed/performance/2026-11-04-win-release-class-pressure.md)：
-  异常栈/getter 隔离批次后约 +8%，两次测量方向一致，尚未归因。
-- [stdlib 临时值拷贝](notes/proposed/performance/2026-11-04-stdlib-temp-copy.md)：
-  优化候补，先测拷贝占比再决定是否立批次。
+- 性能提案已全部收口（2026-11-10，见
+  [性能记录](../doc/performance.md#2026-11-10-三项遗留归因与-gc-标记队列化)）：
+  GC 标记改显式工作队列（16 MiB 栈特例移除）；GCC 整数循环回退二分定位到
+  全局快路径守卫的 `Context::global()` 跨 TU 调用并消除；Windows 类压力回退
+  归因于 getter 异常隔离哨兵帧（~95 ns/次，接受并登记优化候选）；stdlib
+  临时值拷贝占比测量后决定不立批次。
 
 其他提案按需浏览 `notes/proposed/`，不因为文件已存在就视为已实现。
 历史测量与验证放 `notes/implemented/`，否决提案与理由放 `notes/rejected/`

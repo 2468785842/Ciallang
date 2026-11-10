@@ -178,6 +178,35 @@ fib(35) 66%、probe 91%；与调用路径无关的用例比值不变。Windows �
 this 绑定语义（incontextof / super / 方法调用）由既有 tests/tjs 套件覆盖。原始批次
 报告、采样与二进制 SHA-256 位于本机忽略目录 `bench/results/20261101-thisdata-macos/`。
 
+## 2026-11-10 三项遗留归因与 GC 标记队列化
+
+[测量报告](../.agents/reports/2026-11-10-perf-attribution.json)；GC 标记工作队列见
+[实现记录](../.agents/notes/implemented/performance/2026-11-04-gc-mark-worklist.md)。
+
+**Windows 类压力回退（归因并接受）**：VS 2022 LLVM clang 19.1.5 Release、20 万次迭代
+x10 负载（原 2 万次负载约 41 ms 含启动，噪声占主导）。三方对照（before=源码快照
+批次终态 / stack=2fe2d59 / head）：构造与方法调用路径批次后更快（ctoronly −3.6%/
+−4.3%，nogetter −3.4%/−1.6%）；回退完全来自 getter 异常隔离哨兵帧——full−nogetter
+差值 ≈ +19 ms/20 万次 ≈ 95 ns/次访问（head 91 ns）。旧路径为缺陷实现（循环内直接
+访问 getter 崩溃，嵌套 run 重复执行父帧语句），接受该常量开销并保留"哨兵并入
+getter 帧"为后续优化候选。
+
+**GCC 整数循环回退（归因并消除）**：g++ 15.2.0/WSL2，loop_int 交替 11 轮两轮
+独立测量。复现 +7.8%/+9.8%（原 GCC 14.2 记录 +10%）；git bisect（72 提交，
+7 轮构建）定位首坏提交 `b9ae0db`（该点 +19.4%）。根因：该提交给 GThis/DThis
+全局快路径守卫加入 `thisObj == context.global()` 比较，`Context::global()` 定义
+在 Context.cpp（pimpl）无 LTO 不可内联，顶层脚本每次全局读写一次真实调用。
+修复：VMState 缓存 `_globalObject` 指针（守卫与尾递归判定共用）。修复后
+loop_int 相对 04dbd2e 基线 **−2.35%/−3.95%**——回归消除且后续批次（A3+D+B）
+的优化不再被掩盖。Windows/WSL 全量 CTest 249/249、449/449。
+
+**stdlib 临时值拷贝占比（不立批次）**：临时插桩 Value 拷贝构造计数 +
+invokeCallV 原生作用域标记（测后还原，属性协议路径未计入）。native_methods
+压力（100 万次原生调用）：每次调用总拷贝 8 次、stdlib 内 3 次，原生调用约
+150 ns/次、内拷贝约 3-6 ns，上限约 2-4% 且为纯原生微基准；loop_int 全程仅
+31 次拷贝。收益不足，不立批次；`NativeFn` 的 `Value thisVal` 传值形参是
+最明显的单点（约 1 拷贝/次），如未来做调用机械批次可顺带改为 const 引用。
+
 ## 过程问题记录
 
 - thisData 补丁初版按 Windows 轮记录的猜测改在调用者 this 继承分支，复测无收益，采样定位后确认必败 `dynamic_cast` 在绑定 this 分支——热路径源点必须实测，不能沿用上一平台的画像推断。

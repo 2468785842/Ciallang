@@ -37,6 +37,8 @@ namespace cial {
 } // namespace cial
 
 namespace cial::vm {
+    VMState::VMState(Context &context) : rt(context.rt()), context(context), _globalObject(context.global()) {}
+
     [[nodiscard]] bool VMState::globalHas(const Atom atom) const { return context.global()->hasProp(atom); }
 
     [[nodiscard]] bool VMState::globalHas(const std::string &name) const {
@@ -1133,7 +1135,7 @@ namespace cial::vm {
         const u32 atom = read<u32>(ip, pc);
         const u16 r1 = read<u16>(ip, pc);
         if(!cur->thisData && (!cur->closure || !cur->closure->funcMeta) &&
-           (!cur->thisObj.isObject() || cur->thisObj.isNull() || cur->thisObj.asObject().value() == context.global())) {
+           (!cur->thisObj.isObject() || cur->thisObj.isNull() || cur->thisObj.asObject().value() == _globalObject)) {
             loadGlobal(Atom{ atom }, regs[r1], pc);
             return DispatchRet::Continue;
         }
@@ -1149,7 +1151,7 @@ namespace cial::vm {
         const Atom a{ atom };
         const Value &srcVal = regs[r1];
         if(!cur->thisData && (!cur->closure || !cur->closure->funcMeta) && srcVal.isIntegerFast() &&
-           (!cur->thisObj.isObject() || cur->thisObj.isNull() || cur->thisObj.asObject().value() == context.global())) {
+           (!cur->thisObj.isObject() || cur->thisObj.isNull() || cur->thisObj.asObject().value() == _globalObject)) {
             if(const Value *slot = cachedGlobal(a); slot && slot->isIntegerFast()) {
                 const_cast<Value *>(slot)->asIntegerStore(srcVal.asIntegerUnsafe());
                 return DispatchRet::Continue;
@@ -1716,8 +1718,7 @@ namespace cial::vm {
         if(meta->tailRecursionSafe < 0)
             meta->tailRecursionSafe = numericSelfRecursion(*meta) ? 1 : 0;
         if(!meta->tailRecursionSafe || argc != meta->arity || cur->actualArgc != meta->arity || cur->closure ||
-           !(cur->thisObj.isVoid() ||
-             (cur->thisObj.isObject() && cur->thisObj.asObject().unwrap() == context.global())))
+           !(cur->thisObj.isVoid() || (cur->thisObj.isObject() && cur->thisObj.asObject().unwrap() == _globalObject)))
             return false;
         const auto &code = cur->chunk->code();
         if(pc + 3 > code.size() || code[pc] != static_cast<u8>(VmOpCode::Ret))

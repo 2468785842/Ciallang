@@ -1,0 +1,173 @@
+{
+  "date": "2026-11-10",
+  "summary": "三项性能提案归因：Windows 类压力回退、GCC 整数循环回退、stdlib 临时值拷贝占比",
+  "class_pressure_windows": {
+    "environment": "Windows-10-10.0.19045-SP0",
+    "compiler": "VS 2022 LLVM clang 19.1.5, Release -O3 -DNDEBUG, static CRT, JIT off",
+    "binaries": {
+      "before": "build/cial-before-stack.exe（源码快照批次终态，2026-11-01 留存）",
+      "stack": "2fe2d59 worktree 重建（out/perf-stack-build.cmd）",
+      "head": "7ab81e3 build/Windows/Release",
+      "sha256": {
+        "before": {
+          "sha256": "18ceed96e559a77b79ffd8e0cb62e7cec16f535fe8a348db3fff0b16c348b2aa"
+        },
+        "stack": {
+          "sha256": "f2bf66e153df1574e5955df8d96025c3d4b30ed09d1b4e3aac01bb14cde0ed05"
+        },
+        "head": {
+          "sha256": "8b107b4508f3fea8f3ade5f6d8a8dc2a71db422ec801e209109411543a48a2f6"
+        }
+      }
+    },
+    "method": "预热后交替 11 轮取含启动 wall-time 中位数；20 万次迭代（x10）使负载占主导；stdout 一致性断言",
+    "session1_median_ms": {
+      "full_x10": {
+        "before": 363.9273000007961,
+        "stack": 372.59260000428185,
+        "head": 378.5073999897577
+      },
+      "nogetter_x10": {
+        "before": 365.9683000005316,
+        "stack": 353.6135999893304,
+        "head": 360.193700005766
+      },
+      "ctoronly_x10": {
+        "before": 289.2905999906361,
+        "stack": 278.7384999974165,
+        "head": 276.789399998961
+      }
+    },
+    "session1_change_percent_vs_before": {
+      "full_x10": {
+        "stack": 2.381052480390111,
+        "head": 4.0063221387704795
+      },
+      "nogetter_x10": {
+        "stack": -3.3758934889123626,
+        "head": -1.5778962261914997
+      },
+      "ctoronly_x10": {
+        "stack": -3.6475779004091935,
+        "head": -4.3213294839444245
+      }
+    },
+    "session2_median_ms": {
+      "full_x10": {
+        "before": 416.6,
+        "head": 421.0,
+        "change_percent": 1.03
+      },
+      "nogetter_x10": {
+        "before": 388.3,
+        "head": 387.7,
+        "change_percent": -0.17
+      }
+    },
+    "short_scale_note": "原 2 万次负载总耗时约 41 ms（含约 30 ms 进程启动），full before/stack/head = 41.5/41.4/43.1 ms，启动噪声占主导",
+    "getteronly_before": "循环内直接访问 getter 的负载在 before 二进制上崩溃（rc=127），stack/head 正常",
+    "attribution": "getter 异常隔离哨兵帧：full-nogetter 差值 stack +19.0 ms / 20 万次 ≈ 95 ns/次，head ≈ 91 ns/次；构造与方法调用路径同期变快",
+    "decision": "接受：隔离是正确性修复（旧路径嵌套 run 有重复执行/崩溃缺陷），每次 getter 访问的常量开销已量化"
+  },
+  "gcc_loop_int": {
+    "environment": "WSL2 Ubuntu 26.04, x86_64",
+    "compiler": "g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0, Release -O3 -DNDEBUG, JIT off, -Wno-error=format-truncation",
+    "note": "原测量为 GCC 14.2；GCC 15 对旧代码新增 format-truncation 分析警告，仅放宽该警告，不影响代码生成",
+    "method": "bench/loop_int.tjs，预热后交替 11 轮取含启动 wall-time 中位数，独立两轮",
+    "binaries_sha256": {
+      "base_04dbd2e": "122f92be05b6741d12c8a112cc8f83bc6fb6412e4855e19b239660c8dd4b0eb2",
+      "head_7ab81e3": "9287446ad24e3021e13ff758a19e9420656624a5fd3fbf00b542d7aca9bd6f11",
+      "head_fixed": "def19b282339809e34c2fefebd4fa7a5a74c37370f8795099072916b0a82de50"
+    },
+    "pre_fix_rounds_us": [
+      {
+        "base": 282519,
+        "head": 310141,
+        "change_percent": 9.78
+      },
+      {
+        "base": 282462,
+        "head": 304376,
+        "change_percent": 7.76
+      }
+    ],
+    "bisect": {
+      "range": "04dbd2e..7ab81e3 (72 commits)",
+      "criterion": "交替 7 轮中位数 head/base >= 1.05 判 bad",
+      "trail": [
+        {
+          "commit": "ae15a30",
+          "ratio": 1.111
+        },
+        {
+          "commit": "2c20534",
+          "ratio": 1.1293
+        },
+        {
+          "commit": "3f4c913",
+          "ratio": 1.409
+        },
+        {
+          "commit": "3f48fc2",
+          "ratio": 1.1736
+        },
+        {
+          "commit": "8c9e343",
+          "ratio": 1.1901
+        },
+        {
+          "commit": "b9ae0db",
+          "ratio": 1.1937
+        }
+      ],
+      "first_bad_commit": "b9ae0db feat(sdk): align TJS2 values and add installable host runtime"
+    },
+    "root_cause": "b9ae0db 给 GThis/DThis 全局快路径守卫加入 cur->thisObj == context.global() 比较；Context::global() 定义在 Context.cpp（pimpl 解引用），无 LTO 不可内联，顶层脚本每次全局读写一次真实调用（loop_int 每轮约 6 次）",
+    "fix": "VMState 缓存 _globalObject 指针，守卫与尾递归判定改用缓存值",
+    "post_fix_rounds_us": [
+      {
+        "base": 272463,
+        "head": 261703,
+        "change_percent": -3.95
+      },
+      {
+        "base": 281628,
+        "head": 274999,
+        "change_percent": -2.35
+      }
+    ]
+  },
+  "stdlib_value_copy_probe": {
+    "environment": "Windows x64, clang 19.1.5 Release, 临时插桩（Value 拷贝构造计数 + invokeCallV 原生作用域标记），测后还原",
+    "scope": "计入 NativeFunction::callDirect 与对象虚 call 内的同步工作；容器 getProp/setProp 属性协议路径未计入",
+    "counts": {
+      "native_x10": {
+        "copies": 8000030,
+        "nativeCopies": 3000000,
+        "nativeCalls": 1000001
+      },
+      "string_x10": {
+        "copies": 1000031,
+        "nativeCopies": 0,
+        "nativeCalls": 1
+      },
+      "full_x10": {
+        "copies": 4400033,
+        "nativeCopies": 1600000,
+        "nativeCalls": 200001
+      },
+      "loop_int": {
+        "copies": 31,
+        "nativeCopies": 0,
+        "nativeCalls": 1
+      }
+    },
+    "timing_median_ms_instrumented": {
+      "native_x10": 151.6,
+      "full_x10": 456.8,
+      "loop_int": 365.2
+    },
+    "estimate": "原生调用约 150 ns/次，其中 stdlib 内拷贝 3 次约 3-6 ns，上限约 2-4%（纯原生调用微基准）；混合负载可忽略",
+    "decision": "收益不足，不立批次"
+  }
+}

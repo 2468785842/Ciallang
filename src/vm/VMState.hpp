@@ -53,7 +53,7 @@ namespace cial::vm {
         Runtime &rt;
         Context &context;
 
-        explicit VMState(Context &context) : rt(context.rt()), context(context) {}
+        explicit VMState(Context &context);
 
         VMState(const VMState &) = delete;
         VMState &operator=(const VMState &) = delete;
@@ -298,6 +298,10 @@ namespace cial::vm {
         mutable GlobalSlotCache _globalCache[64]{};
         const Value *cachedGlobal(Atom atom) const;
         CIAL_INLINE void loadGlobal(Atom atom, Value &dst, u64 resumePc);
+        // 全局对象指针缓存：GThis/DThis/尾递归守卫逐次比较 thisObj 时免去
+        // Context::global() 的跨 TU 调用（b9ae0db 起守卫含此比较，GCC 无 LTO
+        // 下每次全局访问一次真实调用，整数循环回归主因）
+        Object *_globalObject{};
         bool _zf{ false };
         PendingCF _pending{};
         Value _exValue{};
