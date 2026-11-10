@@ -104,9 +104,16 @@ if(Python3_Interpreter_FOUND AND TARGET cial)
                     --expected-version "${CIAL_VERSION_STRING}")
         set_tests_properties(CiallangFormatter PROPERTIES TIMEOUT 120)
     endif()
+    # --capabilities 报告的 jit 能力须与 CIAL_ENABLE_JIT 构建事实一致，测试按此断言
+    if(CIAL_ENABLE_JIT)
+        set(CIAL_CLI_EXPECTED_JIT true)
+    else()
+        set(CIAL_CLI_EXPECTED_JIT false)
+    endif()
     add_test(NAME CiallangCli
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli/test_cli.py"
-                --cial "$<TARGET_FILE:cial>" --expected-version "${CIAL_VERSION_STRING}")
+                --cial "$<TARGET_FILE:cial>" --expected-version "${CIAL_VERSION_STRING}"
+                --expected-jit "${CIAL_CLI_EXPECTED_JIT}")
     set_tests_properties(CiallangCli PROPERTIES TIMEOUT 60)
     add_test(NAME CiallangDecompile
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli/test_decompile.py"

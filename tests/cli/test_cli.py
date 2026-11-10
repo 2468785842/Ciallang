@@ -33,7 +33,9 @@ class CliTest(CliTestCase):
         self.assertTrue(payload["version"])
         if self.expected_version:
             self.assertEqual(payload["version"], self.expected_version)
-        self.assertEqual(payload["capabilities"]["jit"], False)
+        if self.expected_jit is not None:
+            # 报告值须与构建事实一致（CIAL_ENABLE_JIT），而非硬编码关闭
+            self.assertEqual(payload["capabilities"]["jit"], self.expected_jit)
         # 互斥与不接受输入/执行选项
         for flags in [("--capabilities", "--tjsbc"), ("--capabilities", self.script),
                       ("--capabilities", "--time", self.script), ("--capabilities", "--trace-execution")]:
@@ -413,7 +415,10 @@ selected
         self.assertIn("[tail]", process.stderr)
         self.assertIn("Time taken", process.stderr)
         process = self.run_cial("--jit", self.script)
-        if process.returncode == 0:
+        if self.expected_jit is False:
+            self.assertEqual(process.returncode, 1)
+            self.assertIn("JIT backend not enabled", process.stderr)
+        elif process.returncode == 0:  # expected_jit 为 True 或未知时
             self.assertEqual(process.stdout, "42\n")
             self.assertIn("[jit]", process.stderr)
         else:

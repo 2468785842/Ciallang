@@ -42,6 +42,10 @@ SDK 此前安装整个 `src/`（仅排除 cli/format/dbg），公共接口的事
 - `tests/installed/main.cpp`：`hasJit()` 与宏一致、`sdkApiVersion()`/schema 断言、
   别名一致。
 - `tests/cli/test_cli.py`：`test_capabilities_json` 覆盖 JSON 字段与互斥/输入拒绝。
+  后续修正（2026-11-10）：初版硬编码 `jit == False`，CI 的 Windows Release JIT-ON
+  job 必然失败（run 42652843648）。现由 CTest 注册按 `CIAL_ENABLE_JIT` 传入
+  `--expected-jit`（support.py 可选参数，未告知时跳过断言），
+  `test_execution_options_compose_and_jit_is_optional` 同步按构建事实收紧为确定分支。
 - 文档：`doc/embedding.md` 公共接口分层表 + 能力查询段；`doc/roadmap.md` §1 宿主集成
   尚缺项与 §3.1 状态更新。
 - 后续（同日）：`src/config.h` 改名 `src/common/Config.hpp`（4 个引用点同步；初拟 CompilerDefs.hpp，
@@ -80,6 +84,10 @@ SDK 此前安装整个 `src/`（仅排除 cli/format/dbg），公共接口的事
 ## 遗留与下一步
 
 - 三平台远端安装验收以 CI 结果为准（路线图批次 1 既定）。
+- 2026-11-10 补充验证（Windows x64 本机，两份 Release 构建）：
+  JIT-ON（`build/Windows/Jit`）与 JIT-OFF（`build/Windows/Release`）各重配置 +
+  增量构建 `cial` 后，`--capabilities` 分别报告 `"jit":true`/`"jit":false`，
+  `ctest -R CiallangCli` 在两份构建下均通过（注册分别带 `--expected-jit true|false`）。
 - `CIAL_CAP_MODULES`/`CIAL_CAP_SCRIPT_DEBUG`/`CIAL_CAP_DECL_METADATA` 随批次 2/3/4
   落地接通；`SDK_API_VERSION` 别名计划 0.2 移除。
 - 仓库拆分与独立发行（`ciallang-tools`）是批次 1 剩余主体，见

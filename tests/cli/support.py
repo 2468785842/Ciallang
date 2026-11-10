@@ -13,6 +13,8 @@ TJSBC_CORPUS = pathlib.Path(__file__).resolve().parents[1] / "test_files" / "tjs
 class CliTestCase(unittest.TestCase):
     cial = None
     expected_version = None
+    # CIAL_ENABLE_JIT 构建事实（"true"/"false"，见 tests/CMakeLists.txt）；None 表示构建方未告知
+    expected_jit = None
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -34,7 +36,9 @@ def run_tests():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cial", required=True)
     parser.add_argument("--expected-version")
+    parser.add_argument("--expected-jit", choices=["true", "false"])
     args, remaining = parser.parse_known_args()
     CliTestCase.cial = str(pathlib.Path(args.cial).resolve())
     CliTestCase.expected_version = args.expected_version
+    CliTestCase.expected_jit = None if args.expected_jit is None else args.expected_jit == "true"
     unittest.main(argv=[sys.argv[0], *remaining])
