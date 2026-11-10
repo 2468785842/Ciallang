@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "gc/gc.hpp"
+#include "runtime/gc.hpp"
 
 namespace cial {
     class Octet final {

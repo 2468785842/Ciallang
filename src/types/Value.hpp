@@ -24,7 +24,7 @@
 #include "String.hpp"
 
 #include "common/Ret.hpp"
-#include "gc/gc.hpp"
+#include "runtime/gc.hpp"
 
 namespace cial {
 

@@ -28,7 +28,7 @@
 | 函数 | 默认参数（TestVoid 守卫，实参优先） | ✅ |
 | 函数 | 收拢 `args*`、省略调用 `...`、展开调用 `expr*` | ✅（2026-10-27 源码路径补齐，与字节码路径能力对齐） |
 | 类 | 多继承/slot 链/super/构造函数/property（29 个语义测试） | ✅ |
-| 类 | static / finalize 触发语义 | finalize ✅（GC 保活队列 + 所属 VM 安全点 drain，显式 invalidate 保持同步，`src/gc/gc.hpp`、`src/types/Class.cpp`、`src/vm/VMState.cpp`；Runtime 销毁不执行脚本）。static ✅ 定论（2026-10-30）：原版 tjs.y 保留 static/private/public/protected 但产生式零使用，类内 `static var` 在原版即语法错误；本项目同为编译错误（tjsLex.cpp:926 仅注册保留字），行为锁定 tests/compat_reserved_test.cpp |
+| 类 | static / finalize 触发语义 | finalize ✅（GC 保活队列 + 所属 VM 安全点 drain，显式 invalidate 保持同步，`src/runtime/gc.hpp`、`src/types/Class.cpp`、`src/vm/VMState.cpp`；Runtime 销毁不执行脚本）。static ✅ 定论（2026-10-30）：原版 tjs.y 保留 static/private/public/protected 但产生式零使用，类内 `static var` 在原版即语法错误；本项目同为编译错误（tjsLex.cpp:926 仅注册保留字），行为锁定 tests/compat_reserved_test.cpp |
 | 成员 | `delete obj.member`（实例自有成员） | ✅ |
 | 成员 | `str.length` 只读属性 | ✅ |
 | 异常 | Exception 类（message 成员）+ 原生错误转脚本可捕获异常 | ✅ |

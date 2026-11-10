@@ -24,7 +24,7 @@ API 与示例见[宿主集成](embedding.md)，实现约束见 `src/runtime/Runt
 
 GC 池默认 512 个固定节点（每节点 512 字节，对象数而非字节数受限）。标记清扫后仍无空闲节点时：
 有待终结对象先扩池 64 节点；仍不足则抛出 `std::runtime_error`，由宿主按运行期错误处理
-（CLI 报告错误并以非零码退出），不会 abort 或解引用空节点。实现见 `src/gc/gc.cpp` 的 `findIdleNode`；
+（CLI 报告错误并以非零码退出），不会 abort 或解引用空节点。实现见 `src/runtime/gc.cpp` 的 `findIdleNode`；
 存活对象数接近池上限的行为由 `tests/runtime_lifetime_test.cpp` 覆盖。
 
 ## Windows 构建为什么不需要复制依赖 DLL
@@ -86,7 +86,7 @@ TJSCompiler 的旧入口曾使用固定脚本路径；`d8044c3` 已提交 `TJSCo
 ## Windows CI 的深数组压力测试为什么配置较大栈？
 
 **历史条目（2026-11-10 起不再适用）**：对象图标记已改为显式工作队列
-（`MarkSweepHeader::marked()` 入队 + `drainMarkQueue` 排空，`src/gc/gc.hpp`），
+（`MarkSweepHeader::marked()` 入队 + `drainMarkQueue` 排空，`src/runtime/gc.hpp`），
 深图遍历不消耗宿主线程栈；此前为此在 Windows 上给 `CiallangTests` 显式预留的
 16 MiB 链接栈预算已移除，2 万层深数组用例在默认栈通过。
 保留条目供追溯当时 Linux 1 MiB 栈溢出、8 MiB 通过的实测结论。

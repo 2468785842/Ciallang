@@ -15,8 +15,8 @@
 #include "NativeTypeKey.hpp"
 #include "TypeId.hpp"
 #include "Value.hpp"
-#include "gc/gc.hpp"
 #include "runtime/AtomTable.hpp"
+#include "runtime/gc.hpp"
 
 namespace cial::vm {
     class VMState;

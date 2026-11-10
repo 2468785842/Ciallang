@@ -82,7 +82,7 @@
 - `VM.hpp`：宿主 API 门面，`eval/evalExpr<T>` 返回 GC 根保护的 `Handle<T>`。
 - `src/cli/`：argparse 参数校验、编译诊断、脚本/字节码执行、REPL；`src/main.cpp` 负责进程入口。
 
-### 2.5 `src/runtime/` + `src/gc/` — 运行时
+### 2.5 `src/runtime/` — 运行时
 
 - `Runtime`：运行时资源所有者——AtomTable、MarkSweep GC（固定 512B 节点 × 自由链表）、
   GC 根句柄集合、`create<T>()`（返回 `RootGuard<T>`，析构摘根；生命周期见 `Runtime.hpp` 注释）。
@@ -150,12 +150,12 @@
 改异常/try           → src/vm/VMState.cpp（unwind）, src/vm/Chunk.hpp（ThrowHandler）
 改全局查找/作用域    → src/vm/VMState.cpp（getThis/setThis/getUpVal）
 加原生函数/标准库    → src/stdlib/*（NativeRegister 注册）
-GC/内存              → src/gc/gc.cpp, src/runtime/Runtime.*
+GC/内存              → src/runtime/gc.cpp, src/runtime/Runtime.*
 ```
 
 ## 6. GC 终结与访问缓存
 
-`src/gc/gc.hpp` 的 collect 在标记根后先快照不可达且需要 finalize 的对象，再标记整个队列及其依赖，
+`src/runtime/gc.hpp` 的 collect 在标记根后先快照不可达且需要 finalize 的对象，再标记整个队列及其依赖，
 sweep 不运行脚本。`src/vm/VMState.cpp` 在指令安全点 drain 所属 VM 的队列并保存 `_zf`；
 `src/types/Class.cpp` 通过 `VM::callValue` 同步执行一次终结回调。队列是 Runtime 的根，支持环、
 回调内再次 GC 和复活；异常经过现有脚本异常协议传播。没有活动 VM 的 Runtime 销毁不运行脚本。

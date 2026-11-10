@@ -131,6 +131,7 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/Runtime.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/Context.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/AtomTable.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/runtime/gc.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Chunk.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/Bytecode.cpp
@@ -167,8 +168,6 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/tjsbc/TjsTranslator.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/decompile/Decompiler.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/decompile/ExprBuilder.cpp
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/logging/Logger.cpp
 )
