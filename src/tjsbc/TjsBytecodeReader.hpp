@@ -14,6 +14,10 @@
 
 namespace cial::tjsbc {
 
+    // 文件魔数：'T','J','S','2','1','0','0',0（"TJS2" "100\0"，第 5 字节 '1' 无空格）；
+    // 读取校验与调用方的输入探测共用同一常量
+    inline constexpr u8 FILE_TAG[8] = { 'T', 'J', 'S', '2', '1', '0', '0', 0 };
+
     // 常量槽类型 tag（tjsConstArrayData.h）
     enum TjsConstSlotType : i16 {
         TJS_TYPE_VOID = 0,

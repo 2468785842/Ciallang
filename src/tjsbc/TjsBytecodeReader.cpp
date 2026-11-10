@@ -13,8 +13,6 @@ namespace cial::tjsbc {
 
     namespace {
 
-        // 文件魔数：'T','J','S','2','1','0','0',0（与 context 记录的 "TJS2" tag 同串前缀）
-        constexpr u8 FILE_TAG[8] = { 'T', 'J', 'S', '2', '1', '0', '0', 0 };
         constexpr u8 DATA_TAG[4] = { 'D', 'A', 'T', 'A' };
         constexpr u8 OBJ_TAG[4] = { 'O', 'B', 'J', 'S' };
         constexpr u8 CODE_TAG[4] = { 'T', 'J', 'S', '2' };

@@ -136,6 +136,12 @@ if(Python3_Interpreter_FOUND AND TARGET cial)
                     --dbg "$<TARGET_FILE:cial-dbg>")
         set_tests_properties(CiallangDbg PROPERTIES TIMEOUT 30)
     endif()
+    if(TARGET cial-disasm)
+        add_test(NAME CiallangDisasm
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli/test_disasm.py"
+                    --disasm "$<TARGET_FILE:cial-disasm>")
+        set_tests_properties(CiallangDisasm PROPERTIES TIMEOUT 30)
+    endif()
     add_test(NAME CiallangBytecodeTool
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../bench/test_bytecode_conformance.py"
                 --cial "$<TARGET_FILE:cial>")

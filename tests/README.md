@@ -10,7 +10,7 @@
 | `cli/test_decompile.py` | 反编译接口、严格模式、表达式、声明、字面量、行表 |
 | `cli/test_switch.py` | switch 派发、循环组合、嵌套、参考字节码与拒绝回归 |
 | `cli/support.py` | 共用进程执行、临时目录、参数及语料路径；不定义测试 |
-| `formatter_test.py` / `dbg_test.py` | 格式化器与调试器进程回归（按构建目标注册） |
+| `formatter_test.py` / `dbg_test.py` / `cli/test_disasm.py` | 格式化器、调试器与反汇编器进程回归（按构建目标注册） |
 | `run_tjs_tests.py` / `test_tjs_runner.py` | TJS 执行器与执行器自身回归 |
 | `sdk_install_test.py` / `test_packaging.py` | SDK 安装消费与打包验证，入口见 CMake/CI |
 | `test_files/` | C++/CLI 固定输入、预期及参考导出的字节码；不是独立脚本测试目录 |

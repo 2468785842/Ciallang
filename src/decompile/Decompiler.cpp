@@ -159,7 +159,8 @@ namespace cial::decompile {
                           DeclHost *host) {
             if(options.diagnosticView) {
                 emitBody(builder, chunk, nullptr, nullptr);
-                emitRecovered(builder, rt, chunk, meta, functionLike, host, result, unit, true);
+                if(!options.disassemblyOnly)
+                    emitRecovered(builder, rt, chunk, meta, functionLike, host, result, unit, true);
             } else if(!emitRecovered(builder, rt, chunk, meta, functionLike, host, result, unit, false)) {
                 emitBody(builder, chunk, nullptr, nullptr);
             }
@@ -638,10 +639,13 @@ namespace cial::decompile {
                 unit.kind = "header";
                 UnitBuilder builder{ unit, _cursor };
                 builder.synthetic(_options.diagnosticView
-                                      ? "// cial decompile (diagnostic view): disassembly, not recompilable"
+                                      ? (_options.disassemblyOnly
+                                             ? "// cial disasm: instruction dump, not recompilable"
+                                             : "// cial decompile (diagnostic view): disassembly, not recompilable")
                                       : "// cial decompile: recovered source (TAC-level recovery, M4)");
-                // 视图产物恒不承诺可重编译：以诊断记录，使状态公式统一为"无诊断即 Success"
-                if(_options.diagnosticView)
+                // 视图产物恒不承诺可重编译：以诊断记录，使状态公式统一为"无诊断即 Success"；
+                // 纯反汇编不尝试恢复、无恢复承诺可言，不记诊断
+                if(_options.diagnosticView && !_options.disassemblyOnly)
                     _result.diagnostics.push_back(
                         "diagnostic view: disassembly annotated with recovery, not recompilable");
             }
@@ -921,13 +925,16 @@ namespace cial::decompile {
             UnitBuilder builder{ unit, cursor };
             builder.synthetic(
                 options.diagnosticView
-                    ? "// cial decompile (diagnostic view): disassembly of TJS2 bytecode, not recompilable"
+                    ? (options.disassemblyOnly
+                           ? "// cial disasm: instruction dump of TJS2 bytecode, not recompilable"
+                           : "// cial decompile (diagnostic view): disassembly of TJS2 bytecode, not recompilable")
                     : "// cial decompile: recovered source of TJS2 bytecode (TAC-level recovery, M4)");
-            if(options.diagnosticView)
+            if(options.diagnosticView && !options.disassemblyOnly)
                 result.diagnostics.push_back("diagnostic view: disassembly annotated with recovery, not recompilable");
         }
         // 声明装配（M4）：context 树的函数/类/property 均已在宿主 context 体的
-        // Load+安装链处内联装配，不再独立成单元；未被引用的 context 兜底独立发射
+        // Load+安装链处内联装配，不再独立成单元；未被引用的 context 兜底独立发射。
+        // 纯反汇编不做壳装配，为保指令全量覆盖，已装配 context 也独立发射
         for(size_t ci = 0; ci < program.contexts.size(); ++ci) {
             const auto &ctx = program.contexts[ci];
             const bool isTop = ci == static_cast<size_t>(program.topLevel);
@@ -937,7 +944,7 @@ namespace cial::decompile {
                  (closure.contains(ctx.classMeta) || visited.contains(ctx.classMeta))) ||
                 (ctx.isProperty && ctx.propMeta != nullptr &&
                  (closure.contains(ctx.propMeta) || visited.contains(ctx.propMeta)));
-            if(!isTop && declared)
+            if(!isTop && declared && !options.disassemblyOnly)
                 continue;
             auto &unit = result.units.emplace_back();
             unit.kind = contextKind(ctx.type);
@@ -960,8 +967,9 @@ namespace cial::decompile {
             if(ctx.chunk) {
                 if(options.diagnosticView) {
                     emitBody(builder, *ctx.chunk, &ctx.origin, options.originalSource);
-                    emitRecovered(builder, rt, *ctx.chunk, ctx.funcMeta, ctx.isFunctionLike, &assembler, result, unit,
-                                  true);
+                    if(!options.disassemblyOnly)
+                        emitRecovered(builder, rt, *ctx.chunk, ctx.funcMeta, ctx.isFunctionLike, &assembler, result,
+                                      unit, true);
                 } else if(!emitRecovered(builder, rt, *ctx.chunk, ctx.funcMeta, ctx.isFunctionLike, &assembler, result,
                                          unit, false)) {
                     emitBody(builder, *ctx.chunk, &ctx.origin, options.originalSource);

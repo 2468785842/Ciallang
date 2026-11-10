@@ -37,6 +37,18 @@ cial --help
 
 `CIAL_DUMP` 和 `CIAL_TJSBC_DUMP` 保留用于调试，输出统一写 stderr；后者值为 `all` 时输出全部转译 context（`src/cli/Application.cpp`）。
 
+## 反汇编
+
+`cial-disasm`（`CIAL_BUILD_DISASM` 门控）输出 TAC 层指令 dump，不执行、不做源码恢复：输入按前 8 字节魔数探测——TJS2 字节码经 tjsbc 读取与转译后逐 context 发射（含码字偏移 `; wN` 与可选源偏移/行号），其它输入按 Ciallang 源码编译后发射（常量图收集嵌套单元）。渲染复用反编译器的 `disassemblyOnly` 视图路径（`src/decompile/`），已装配进壳的 context 仍独立发射以保证指令全量覆盖。
+
+```sh
+cial-disasm program.tjsbc                      # 逐 context 指令 dump 到 stdout
+cial-disasm --source program.tjs script.tjsbc  # 源偏移换算为行号（L 列）
+cial-disasm -o dump.txt --map dump.json script.tjs
+```
+
+`--map` 输出行表 JSON（`textLine`、TAC 半开区间、可选 `tjsWord`/`srcOffset`/`srcLine`），形状与 `cial --decompile --map` 一致。退出码：成功 `0`，编译失败 `1`，输入/参数错误 `2`。
+
 ## REPL
 
 ```text

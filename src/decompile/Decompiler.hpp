@@ -68,6 +68,10 @@ namespace cial {
             // 反汇编级诊断视图（显式标注不可重编译）；false = 严格模式，
             // M0 对全部单元 Unsupported，diagnostics 给出原因
             bool diagnosticView{};
+            // 纯反汇编（与 diagnosticView 同用）：只渲染指令与来源表，不附恢复
+            // 注释，也不记"视图不可重编译"诊断——反汇编本身不失败，状态可为
+            // Success；供 cial-disasm 等只读工具消费
+            bool disassemblyOnly{};
             // bc 路径可选：原源码文本（sourceOffset → 行号换算；无则只保留偏移）
             const Common::SourceFile *originalSource{};
         };

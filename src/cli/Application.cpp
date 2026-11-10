@@ -106,9 +106,7 @@ namespace cial::cli {
                 throw std::runtime_error("cannot open input: " + options.input);
             char magic[8]{};
             input.read(magic, sizeof(magic));
-            // 与 Reader::FILE_TAG 同串：'T','J','S','2','1','0','0',0（第 5 字节 '1'，无空格）
-            constexpr char tjs2Magic[8] = { 'T', 'J', 'S', '2', '1', '0', '0', '\0' };
-            const bool isBytecode = input.gcount() == 8 && std::memcmp(magic, tjs2Magic, 8) == 0;
+            const bool isBytecode = input.gcount() == 8 && std::memcmp(magic, tjsbc::FILE_TAG, 8) == 0;
             input.close();
 
             Common::SourceFile originalSource;
