@@ -83,7 +83,10 @@ SDK 此前安装整个 `src/`（仅排除 cli/format/dbg），公共接口的事
 
 ## 遗留与下一步
 
-- 三平台远端安装验收以 CI 结果为准（路线图批次 1 既定）。
+- 三平台远端安装验收以 CI 结果为准（路线图批次 1 既定）——**已收口
+  （2026-11-10，run 42775661634）**："Test relocated installed SDK" 在
+  Linux/macOS/Windows Release 及 Windows Release JIT-ON 全部通过，状态回写
+  [路线图批次 note](../../proposed/architecture/2026-11-04-sdk-tooling-roadmap.md)。
 - 2026-11-10 补充验证（Windows x64 本机，两份 Release 构建）：
   JIT-ON（`build/Windows/Jit`）与 JIT-OFF（`build/Windows/Release`）各重配置 +
   增量构建 `cial` 后，`--capabilities` 分别报告 `"jit":true`/`"jit":false`，
