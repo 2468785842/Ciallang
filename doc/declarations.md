@@ -148,6 +148,7 @@ cial-dbg/cial-disasm 工具）与 `VM::execute`（`src/vm/VM.cpp`，覆盖 `Scri
 kind/name/doc/params/ret/extends/members、属性访问方式及声明名的 begin/end UTF-8 字节偏移；
 check 为现有 schema 2 的 JSON 诊断。输入无效时退出 1，工具不得把残缺符号当作有效接口。
 该选项显式选择声明解析，不依赖文件扩展名；支持文件与 stdin，拒绝执行选项。
+客户端通过 stdin 发送原始 UTF-8 字节，不使用会自动转换换行的文本管道，以保持偏移与原文一致。
 
 ## 5. 测试与扫描排除
 

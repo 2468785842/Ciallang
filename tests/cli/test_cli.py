@@ -134,7 +134,10 @@ class CliTest(CliTestCase):
 
     def test_core_declaration_symbols_json(self):
         text = '/** 中文接口 😀\x01 */\nclass Window {\n/** 显示标题 */\nfunction show(title: String = "标题"): void;\nproperty caption { getter: String; setter(value: String); }\n}\n'
-        result = self.run_cial('--decl-json', '--source-name', 'file:///host.d.tjs', '-', input=text)
+        # The protocol counts the bytes actually transmitted, so avoid text-mode
+        # newline translation by the Python client as well as by the native CLI.
+        result = subprocess.run([self.cial, '--decl-json', '--source-name', 'file:///host.d.tjs', '-'],
+                                input=text.encode('utf-8'), capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(result.stdout)
         self.assertEqual(report['schemaVersion'], 1)
