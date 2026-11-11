@@ -59,7 +59,8 @@ namespace cial::dbg {
             auto end = text.end();
             while(end != begin && isSpace(*(end - 1)))
                 --end;
-            return { begin, static_cast<size_t>(end - begin) };
+            // MSVC STL 的 const_iterator 非指针，(iterator, count) 构造不可用，按下标截取
+            return text.substr(static_cast<size_t>(begin - text.begin()), static_cast<size_t>(end - begin));
         }
 
         // 首个空白分隔的 token 与剩余参数
