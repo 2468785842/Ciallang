@@ -15,7 +15,8 @@ CMake 在 `project()` 前调用生成器；manifest 或生成器变化会触发�
 源码构建（包括 `add_subdirectory` 嵌入方式）因此需要 Python 3.10+；
 已打包的 CLI 运行不需要 Python。生成文件不入库，也不覆盖 `src/common/Config.hpp`。
 
-CLI 压缩包只包含 Runtime 组件，并附带构建期生成的系统声明
+CLI 压缩包只包含 Runtime 组件：CLI、已构建的工具 exe（预设默认开启
+formatter/lsp/dbg/disasm）与构建期生成的系统声明
 （`share/ciallang/declarations/`，见[声明文件](declarations.md) §3）；SDK 可从源码另行安装，
 见[宿主集成](embedding.md)；不承诺稳定 C++ ABI。声明/实现一致性检查、模块和 DAP 的
 后续工作见[路线图](roadmap.md)。

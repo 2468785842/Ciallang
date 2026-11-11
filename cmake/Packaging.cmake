@@ -114,6 +114,13 @@ string(APPEND cial_build_json "\n}\n")
 file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/packaging/$<CONFIG>/build-info.json" CONTENT "${cial_build_json}")
 
 install(TARGETS cial RUNTIME DESTINATION bin COMPONENT Runtime)
+# 归档附带已构建的工具 exe（预设开启对应 CIAL_BUILD_*）：cial-lsp 随包提供语言服务，
+# 并按自身相对路径读取 share/ciallang/declarations（doc/lsp.md）。
+foreach(cial_tool IN ITEMS cial-lsp cial-disasm cial-dbg)
+    if(TARGET ${cial_tool})
+        install(TARGETS ${cial_tool} RUNTIME DESTINATION bin COMPONENT Runtime)
+    endif()
+endforeach()
 # CLI 归档附带系统声明（构建期按符号拆分生成）：编辑器从 bin/../share/ciallang/declarations
 # 读取 .d.tjs，接口文档与跳转不依赖 C++ 注册源码（doc/declarations.md §3）。
 install(DIRECTORY "$<TARGET_FILE_DIR:cial>/declarations/"

@@ -1,6 +1,6 @@
 # Ciallang CLI 预览版
 
-本包提供 CLI（默认新构建包含 cial-fmt）；C++ SDK 从源码另行安装。版本与构建信息见 `build-info.json`。
+本包提供 CLI 与构建的工具 exe（`bin/cial-lsp` 语言服务器、`bin/cial-disasm` 反汇编器、`bin/cial-dbg` 调试器、`bin/cial-fmt` 格式化器），以及 `share/ciallang/declarations/` 系统接口声明；C++ SDK 从源码另行安装。版本与构建信息见 `build-info.json`。
 
 Windows 使用 `bin/cial.exe`；Linux/macOS 使用 `bin/cial`：
 
@@ -9,9 +9,10 @@ bin/cial --version
 bin/cial examples/hello.tjs
 bin/cial --repl
 bin/cial-fmt examples/hello.tjs
+bin/cial-lsp --help
 ```
 
-Windows 下分别使用 `bin/cial.exe` 和 `bin/cial-fmt.exe`。也可将 bin 目录加入 PATH。
+Windows 下程序名带 `.exe` 后缀。`cial-lsp` 从自身相对路径读取 `share/ciallang/declarations`（也可放到编辑器可发现的位置）。也可将 bin 目录加入 PATH。
 程序不需要 vcpkg、源码目录或 Python；操作系统的基础运行库仍由系统提供。
 Linux 的兼容性下限与构建环境有关，macOS 下限见构建信息。
 JIT 是否编译启用见构建信息，预览版默认关闭。

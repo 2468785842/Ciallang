@@ -19,7 +19,8 @@ bin/cial --repl
 ```
 
 Windows 将程序名替换为 `bin/cial.exe`。程序运行不需要源码、vcpkg 或 Python。
-包内 `build-info.json` 记录提交、系统/架构、编译器、运行库及功能开关，`licenses/` 包含第三方许可与依赖资料，`share/ciallang/declarations/` 为系统接口声明。
+包内 `bin/` 还包含 `cial-lsp`（语言服务器）、`cial-disasm`、`cial-dbg` 与 `cial-fmt`；
+`build-info.json` 记录提交、系统/架构、编译器、运行库及功能开关，`licenses/` 包含第三方许可与依赖资料，`share/ciallang/declarations/` 为系统接口声明（`cial-lsp` 按自身相对路径读取）。
 本版关闭可选 JIT。Linux 包使用 Ubuntu 24.04 构建；macOS 部署下限为 15.6，均只面向包名所列架构，系统基础运行库仍由操作系统提供。
 
 ## 已知限制

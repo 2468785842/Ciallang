@@ -31,7 +31,7 @@ jobs:
           export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
           cmake --preset "${{ matrix.platform }} ${{ matrix.configuration }}" -DCIAL_ENABLE_JIT=${{ matrix.jit || 'OFF' }} -DCIAL_BUILD_DISASM=ON -DCIAL_BUILD_LSP=ON
       - name: Build tests
-        run: cmake --build build/${{ matrix.platform }}/${{ matrix.configuration }} --target cial cial-lsp cial-fmt cial-disasm CiallangTests --parallel 4
+        run: cmake --build build/${{ matrix.platform }}/${{ matrix.configuration }} --target cial cial-lsp cial-dbg cial-fmt cial-disasm CiallangTests --parallel 4
       - name: Test
         run: ctest --test-dir build/${{ matrix.platform }}/${{ matrix.configuration }} --output-on-failure
       - name: Save build and test artifacts
