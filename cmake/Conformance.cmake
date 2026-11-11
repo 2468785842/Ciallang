@@ -75,6 +75,8 @@ function(normalize_output engine text out_var)
 endfunction()
 
 file(GLOB cases RELATIVE "${CORPUS_DIR}" "${CORPUS_DIR}/*.tjs")
+# 声明文件 (.d.tjs) 不是可执行脚本（doc/declarations.md §5），排除出对拍语料
+list(FILTER cases EXCLUDE REGEX "\\.d\\.tjs$")
 list(SORT cases)
 
 set(n_match 0)

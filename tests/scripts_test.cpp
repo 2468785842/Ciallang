@@ -161,6 +161,35 @@ try {
     REQUIRE(*session.vm.evalExpr<bool>("hit"_str));
 }
 
+TEST_CASE("Scripts 拒绝执行声明文件且异常可捕获", "[stdlib][scripts][decl]") {
+    const TempDir dir;
+    dir.write("lib.d.tjs", "function lib(): void;\n");
+
+    Session session{ dir.path() };
+    session.vm.eval(R"(
+var execHit = false;
+var evalHit = false;
+var msg = "";
+try {
+    Scripts.execStorage("lib.d.tjs");
+} catch(e) {
+    execHit = true;
+    msg = e.message;
+}
+try {
+    Scripts.evalStorage("lib.d.tjs");
+} catch(e) {
+    evalHit = true;
+    msg = msg + " | " + e.message;
+}
+)"_str);
+    REQUIRE(*session.vm.evalExpr<bool>("execHit"_str));
+    REQUIRE(*session.vm.evalExpr<bool>("evalHit"_str));
+    const auto msg = (*session.vm.evalExpr<String *>("msg"_str))->toStdStr();
+    INFO("caught message: " << msg);
+    REQUIRE(msg.find("declaration file") != std::string::npos);
+}
+
 TEST_CASE("Scripts host storage forwards virtual names mode and source identity", "[stdlib][scripts][sdk]") {
     struct Storage final : TextStorageReader {
         std::string name, mode, from;

@@ -16,6 +16,7 @@
 
 #include "Lexer.hpp"
 #include "common/SourceFile.hpp"
+#include "decl/DeclModel.hpp"
 #include "parser/ast/AstBuilder.hpp"
 
 namespace cial::syntax {
@@ -148,6 +149,10 @@ namespace cial::syntax {
         void synchronize(Result &r);
 
         AstNode *parse(Result &r);
+
+        // 声明模式（doc/declarations.md）：.d.tjs → decl::Module。
+        // 语法诊断码以 decl. 为前缀；实现见 src/parser/DeclParser.cpp
+        decl::Module parseDeclarations(Result &r);
 
         bool parseScope(Result &r, BlockStmtNode *blockStmtNode, TokenType terminatorToken = TokenType::EndOfFile);
 

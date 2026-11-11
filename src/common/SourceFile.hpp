@@ -23,6 +23,14 @@
 #include "SourceSpan.hpp"
 
 namespace cial::Common {
+    // 声明文件身份：名字以 .d.tjs 结尾（大小写不敏感），只看名字后缀、不访问
+    // 文件系统，stdin/虚拟路径/归档内路径同样适用（doc/declarations.md §4）
+    [[nodiscard]] bool isDeclarationSourceName(const std::string &name);
+
+    // 声明文件拒绝的统一文案：CLI 编译、SDK Engine、Scripts 共用，码 decl.not-executable
+    inline constexpr const char *DeclarationNotExecutableMessage =
+        "declaration files (.d.tjs) describe interfaces and cannot be compiled or executed as scripts";
+
     using SourceFileRangeType = std::pair<size_t, size_t>;
 
     struct SourceFileRangeCompareType {
@@ -57,6 +65,9 @@ namespace cial::Common {
 
         // 源码身份：默认为路径字符串；REPL/eval/宿主可设置逻辑名
         [[nodiscard]] std::string sourceName() const;
+
+        // 源码身份是否为声明文件（.d.tjs）；执行入口据此拒绝编译运行
+        [[nodiscard]] bool isDeclaration() const;
 
         void setSourceName(std::string name) {
             _sourceName = std::move(name);

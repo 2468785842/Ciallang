@@ -84,6 +84,8 @@ message(STATUS "${report_header}")
 
 # ── 逐脚本交替执行 ──────────────────────────────────────────
 file(GLOB scripts RELATIVE "${BENCH_DIR}" "${BENCH_DIR}/*.tjs")
+# 声明文件 (.d.tjs) 不是可执行脚本（doc/declarations.md §5），排除出基准
+list(FILTER scripts EXCLUDE REGEX "\\.d\\.tjs$")
 list(SORT scripts)
 
 if(NOT scripts)

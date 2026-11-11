@@ -9,6 +9,12 @@ namespace cial {
             throw std::runtime_error("execution context must be an object");
         if(result.isFailed())
             return { &rt(), Value{} };
+        // 声明文件不可执行（doc/declarations.md §4）：Scripts/Engine/未来模块
+        // 加载器的统一闸口，仅写 Result，不编译
+        if(source.isDeclaration()) {
+            result.error(Common::DeclarationNotExecutableMessage, {}, {}, "decl.not-executable", source.sourceName());
+            return { &rt(), Value{} };
+        }
         syntax::Parser parser{ source, context().pp() };
         syntax::AstNode *node = expression ? parser.parseExpression(result, true) : parser.parse(result);
         if(result.isFailed() || !node)

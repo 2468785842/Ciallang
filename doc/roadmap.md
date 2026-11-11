@@ -93,6 +93,12 @@
 声明/实现分离的设计参考：[TypeScript 声明文件](https://www.typescriptlang.org/docs/handbook/declaration-files/introduction.html)、
 [Python stub 分发规范](https://typing.python.org/en/latest/spec/distributing.html)。
 
+已实现（2026-11-11，见[声明文件](declarations.md)）：版本化 API 元数据与
+`--api-json`（[api-metadata](api-metadata.md)）、`.d.tjs` 声明语法与解析模式、
+执行侧拒绝（CLI/`Scripts`/SDK `Engine`）、`--api-decl` 生成器与
+CTest/基准/语料/fuzz 扫描排除。剩余：LSP 消费声明（批次 C）、声明/实现
+一致性检查、同名声明查找优先级与冲突诊断。
+
 ## 4. `Scripts` 兼容层与新模块系统
 
 继续保留现有 **`Scripts`** 命名空间的 `execStorage()` / `evalStorage()` 作为 TJS2/Kirikiri

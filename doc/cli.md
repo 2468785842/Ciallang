@@ -7,12 +7,14 @@ cial script.tjs
 cial --tjsbc program.tjsbc
 cial --check-json script.tjs
 cial --check-json --source-name untitled:1 -        # 从 stdin 读取，保留逻辑源码名
+cial --check-json interface.d.tjs                   # .d.tjs 按声明模式分析（decl.* 诊断）
 cial --dump-cfg script.tjs
 cial --dump-ssa script.tjs
 cial --trace-execution script.tjs output.dot
 cial --tail-recursion --time script.tjs
 cial --jit script.tjs
 cial --trace-jit script.tjs
+cial --api-decl                                     # 注册事实导出为 .d.tjs 声明文本
 cial --repl
 cial --help
 ```
@@ -25,6 +27,8 @@ cial --help
 - `--check-json` 只编译，不初始化脚本标准库，不执行用户脚本；stdout 为一个 JSON 对象，位置为从零开始的 UTF-8 字节列，LSP 负责转换为 UTF-16。见 [lsp.md](lsp.md)。
 - `--dump-cfg` / `--dump-ssa` 编译并输出分析结果，不执行脚本；`--dump-tac` 将执行前的 TAC 写 stderr。
 - `--trace-execution` 把执行路径写入指定 DOT 文件；运行期错误发生时仍保存此前的路径；拒绝将输出写回输入文件。
+- `--api-decl` 输出标准库与内建宿主的 `.d.tjs` 声明文本（与 `--api-json` 同一注册链，不执行用户脚本）；声明语法、生成规则与宿主侧导出见[声明文件](declarations.md)。
+- 声明文件（`.d.tjs`，按源码身份识别）不可当作脚本执行：执行与编译型模式（含 `--dump-cfg`/`--dump-ssa`/`--decompile` 的源码路径）报 `decl.not-executable`；`--check-json` 对其按声明模式分析。`Scripts.execStorage/evalStorage` 与 SDK `Engine::execute` 同样拒绝。
 - 退出码：成功 `0`，输入文件/编译/运行/输出错误 `1`，命令行参数错误 `2`。
 
 ## 诊断
@@ -33,7 +37,7 @@ cial --help
 
 `--check-json` 默认输出 schema 2：`schema`、`ok`、`columnEncoding`、`source`（源码身份）与 `diagnostics[]`；每条含 `code`、`severity`、纯文本 `message`、半开的 `line/column/endLine/endColumn`（0 基字节列，`end` 为排他）及可选 `range`（字节偏移）。`--json-schema 1` 派生输出旧字段形状（无 `schema` 标记、`endColumn` 为包含式），供未迁移消费者过渡；其他版本号报参数错误。stdin 输入（`-`）配合 `--source-name` 为未保存内容保留逻辑源码名，宿主不得把临时路径暴露给编辑器。
 
-错误码按阶段前缀划分（`lex.*`、`parse.*`、`gen.*`、`io.*`），首批覆盖已迁移路径，见 [诊断重构计划](diagnostics-plan.md)。
+错误码按阶段前缀划分（`lex.*`、`parse.*`、`gen.*`、`io.*`，声明模式为 `decl.*`），首批覆盖已迁移路径，见 [诊断重构计划](diagnostics-plan.md)。
 
 `CIAL_DUMP` 和 `CIAL_TJSBC_DUMP` 保留用于调试，输出统一写 stderr；后者值为 `all` 时输出全部转译 context（`src/cli/Application.cpp`）。
 

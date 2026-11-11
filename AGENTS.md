@@ -11,7 +11,8 @@ Ciallang 是 C++20 实现的 TJS2 解释器。先读 [README](README.md) 和[文
 | 位置 | 职责 |
 |---|---|
 | `src/common/` | 错误、源码位置、UTF-8 与通用工具 |
-| `src/parser/` | 词法、预处理、Pratt 解析与 AST |
+| `src/parser/` | 词法、预处理、Pratt 解析与 AST；声明模式入口 `DeclParser.cpp` |
+| `src/decl/` | 声明文件 (.d.tjs) 模型、生成器与注册目录转换（[声明文件](doc/declarations.md)） |
 | `src/gen/` | 指令定义、代码生成、CFG、SSA 与优化 |
 | `src/vm/` | 字节码、调用帧、执行、调试与可选 JIT |
 | `src/runtime/` | Context、Runtime、Atom、GC 根与标记清除 |
@@ -75,6 +76,7 @@ CLI、LSP 与字节码工具测试也通过 CTest 运行。
 | 改动 | 入口及约束 |
 |---|---|
 | 语法 | [语法说明](doc/syntax.md)、`doc/grammar/tjs.y`、`src/parser/Parser.cpp` |
+| 声明文件 | [声明文件](doc/declarations.md)、`src/decl/`、`src/parser/DeclParser.cpp`；执行入口不得把 .d.tjs 当脚本（`decl.not-executable`） |
 | 运算符 | `src/types/Value.cpp`、`src/gen/IRGenerator.cpp`、`src/gen/Instruction.cpp` |
 | 指令与字节码 | [内部指令](doc/bytecode/ciallang-bytecode.md)、`Bytecode.cpp`、`VMState.cpp`；保持编码、派发与异常表一致 |
 | TJS2 转译 | [转译设计](doc/bytecode/mapping.md)、`src/tjsbc/` 及 fixture；检查截断输入和索引边界 |

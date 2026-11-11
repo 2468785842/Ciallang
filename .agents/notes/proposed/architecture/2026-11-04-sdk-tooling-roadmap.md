@@ -20,8 +20,14 @@ Status: proposed
 - 批次 2 进行中：API 元数据模型与 `cial --api-json` 导出已落地（2026-11-11，模型
   `src/types/ApiMeta.hpp`、聚合 `ApiCatalog` 挂 `NativeRegister`、导出 schemaVersion 1；
   依据与推导规则见 doc/api-metadata.md，测试 `[api]` 标签 + test_cli.py 的
-  test_api_json）。剩余：`.d.tjs` 声明模式（Parser decl 模式、执行侧拒绝、生成器、
-  测试扫描排除）与 LSP 消费声明（替换 `BUILTIN_MEMBERS`，doc 文案随注册点逐步补全）。
+  test_api_json）。`.d.tjs` 声明模式已落地（2026-11-11，批次 2 的 B 步）：声明语法与
+  解析（`src/parser/DeclParser.cpp` + `decl::parseDeclarations`，doc/declarations.md）、
+  执行侧拒绝（`cli::compile`/`VM::execute`/`Scripts`，码 `decl.not-executable`）、
+  `cial --api-decl` 生成器（`decl::declarationsFromCatalog` + `generateDeclarations`，
+  往返幂等）与 CTest/基准/语料/fuzz 扫描排除；登记顺带修复 `--api-json` 中 Scripts
+  成员重复条目（`recordApiMember` 改为同名同类别替换）。剩余：LSP 消费声明
+  （替换 `BUILTIN_MEMBERS`，doc 文案随注册点逐步补全）、声明/实现一致性检查、
+  同名声明查找优先级与冲突诊断。
 - 批次 3 未开始：模块作用域、显式导出、宿主解析、Context 缓存、循环诊断及
   异常/GC 恢复，保留 `Scripts` 兼容入口；稳定后再讨论 `import/export` 语法。
 - 批次 4 未开始：核心脚本调试接口、DAP 适配器及 VSCode 端到端调试，

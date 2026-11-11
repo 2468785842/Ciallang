@@ -82,6 +82,87 @@ class CliTest(CliTestCase):
                 self.assertEqual(process.returncode, 2, process.stderr)
                 self.assertEqual(process.stdout, "")
 
+    def test_api_decl(self):
+        # 声明文件生成（doc/declarations.md §3）：与 --api-json 同一注册链，
+        # 输出仅由模型决定、跨调用逐字节确定
+        first = self.run_cial("--api-decl")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        second = self.run_cial("--api-decl")
+        self.assertEqual(first.stdout, second.stdout)
+        self.assertTrue(first.stdout.endswith("\n"))
+        self.assertIn("class String {", first.stdout)
+        self.assertIn("function charAt(arg0: Integer): String;", first.stdout)
+        self.assertIn("function push(*): any;", first.stdout)
+        self.assertIn("property length: any;", first.stdout)
+        self.assertIn("/** 输出值的字符串化结果（不换行） */", first.stdout)
+        # 类集合与 --api-json 一致
+        api = json.loads(self.run_cial("--api-json").stdout)
+        for entry in api["classes"]:
+            self.assertIn("class %s {" % entry["name"], first.stdout)
+        # 互斥与不接受输入/执行选项
+        for flags in [("--api-decl", "--api-json"), ("--api-decl", self.script),
+                      ("--api-decl", "--time", self.script), ("--api-decl", "--dump-tac", self.script)]:
+            with self.subTest(flags=flags):
+                process = self.run_cial(*flags)
+                self.assertEqual(process.returncode, 2, process.stderr)
+                self.assertEqual(process.stdout, "")
+
+    def test_declaration_check_json(self):
+        # 声明检查（doc/declarations.md §4）：--check-json 对 .d.tjs 按声明模式分析
+        generated = self.run_cial("--api-decl").stdout
+        generated_file = self.root / "generated.d.tjs"
+        generated_file.write_text(generated, encoding="utf-8")
+        process = self.run_cial("--check-json", generated_file)
+        self.assertEqual(process.returncode, 0, process.stdout)
+        report = json.loads(process.stdout)
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["diagnostics"], [])
+
+        good = self.root / "good.d.tjs"
+        good.write_text(
+            "/** 文档 */\n"
+            "class Thing extends Base {\n"
+            "    function make(name: String = \"x\"): Thing;\n"
+            "    property value: Integer;\n"
+            "    var table: Dictionary;\n"
+            "}\n"
+            "namespace Nested { function helper(*): void; }\n"
+            "function top(a, b: any = null): void;\n", encoding="utf-8")
+        process = self.run_cial("--check-json", good)
+        self.assertEqual(process.returncode, 0, process.stdout)
+        self.assertTrue(json.loads(process.stdout)["ok"])
+
+        bad = self.root / "bad.d.tjs"
+        # 诊断同步只在声明关键字处停驻，非声明语句放最前避免被跳过
+        bad.write_text("if (x) {}\nvar x = 1;\nfunction f(a = (1));\n", encoding="utf-8")
+        process = self.run_cial("--check-json", bad)
+        self.assertEqual(process.returncode, 1)
+        report = json.loads(process.stdout)
+        self.assertFalse(report["ok"])
+        codes = [entry["code"] for entry in report["diagnostics"]]
+        self.assertIn("decl.initializer", codes)
+        self.assertIn("decl.invalid-default", codes)
+        self.assertIn("decl.not-a-declaration", codes)
+
+        # stdin + --source-name 识别声明身份（LSP 文档路径）
+        process = self.run_cial("--check-json", "--source-name", "virtual.d.tjs", "-", input="function f();")
+        self.assertEqual(process.returncode, 0, process.stdout)
+        self.assertTrue(json.loads(process.stdout)["ok"])
+
+    def test_declaration_execution_refused(self):
+        # .d.tjs 不可当脚本执行（doc/declarations.md §4），编译型模式同样拒绝
+        declaration = self.root / "lib.d.tjs"
+        declaration.write_text("function f(): void;\n", encoding="utf-8")
+        for flags in [(), ("--dump-cfg",), ("--dump-ssa",), ("--decompile",)]:
+            with self.subTest(flags=flags):
+                process = self.run_cial(*flags, declaration)
+                self.assertEqual(process.returncode, 1)
+                self.assertIn("decl.not-executable", process.stderr)
+                self.assertEqual(process.stdout, "")
+        # --tjsbc 走字节码探测，不因扩展名误报声明拒绝
+        process = self.run_cial("--tjsbc", declaration)
+        self.assertNotIn("decl.not-executable", process.stderr)
+
     def test_script_output_and_timing(self):
         process = self.run_cial(self.script)
         self.assertEqual(process.returncode, 0, process.stderr)

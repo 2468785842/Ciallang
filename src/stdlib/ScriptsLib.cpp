@@ -12,6 +12,7 @@
 
 #include <fstream>
 
+#include "common/SourceFile.hpp"
 #include "common/UTF16.hpp"
 #include "runtime/Context.hpp"
 #include "types/Class.hpp"
@@ -94,6 +95,11 @@ namespace cial::stdlib {
             if(argCount < 1 || !args[0].isString())
                 throw std::runtime_error("Scripts storage name must be a string");
             const auto name = args[0].asString().unwrap()->toStdStr();
+            // 声明文件不可通过 Scripts 执行（doc/declarations.md §4）；
+            // 消息进脚本异常协议，可被 catch
+            if(Common::isDeclarationSourceName(name))
+                throw std::runtime_error(
+                    fmt::format("storage '{}' is a declaration file and cannot be executed", name));
             std::string mode;
             if(argCount > 1 && !args[1].isVoid()) {
                 Value value = args[1];

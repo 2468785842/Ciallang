@@ -12,10 +12,12 @@
  */
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iterator>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 
 #include "SourceFile.hpp"
 
@@ -49,6 +51,20 @@ namespace cial::Common {
             return _path.string();
         return "<input>";
     }
+
+    bool isDeclarationSourceName(const std::string &name) {
+        constexpr std::string_view suffix = ".d.tjs";
+        if(name.size() < suffix.size())
+            return false;
+        const auto offset = name.size() - suffix.size();
+        for(size_t i = 0; i < suffix.size(); ++i) {
+            if(std::tolower(static_cast<unsigned char>(name[offset + i])) != suffix[i])
+                return false;
+        }
+        return true;
+    }
+
+    bool SourceFile::isDeclaration() const { return isDeclarationSourceName(sourceName()); }
 
     std::shared_ptr<const SourceFile> SourceFile::snapshot() const {
         if(!_retainSource)

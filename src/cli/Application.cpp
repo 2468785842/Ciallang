@@ -16,6 +16,7 @@
 #include "cial/Capability.hpp"
 #include "common/Colorizer.hpp"
 #include "common/Defer.hpp"
+#include "decl/DeclModel.hpp"
 #include "decompile/Decompiler.hpp"
 #include "stdlib/ExceptionLib.hpp"
 #include "stdlib/ScriptsLib.hpp"
@@ -42,6 +43,13 @@ namespace cial::cli {
                     source.load(diagnostics, content);
                 } else {
                     source.load(diagnostics);
+                }
+                // .d.tjs 按声明模式分析（doc/declarations.md §4）：诊断走 decl.* 码；
+                // 其余模式的声明输入由 compile 拒绝
+                if(options.mode == Mode::CheckJson && source.isDeclaration()) {
+                    decl::parseDeclarations(source, diagnostics, state.context.pp());
+                    printJsonDiagnostics(diagnostics, options.jsonSchema, source.sourceName());
+                    return diagnostics.isFailed() ? 1 : 0;
                 }
                 compilation = compile(diagnostics, state.context, source);
             } catch(const std::exception &error) {
@@ -285,6 +293,20 @@ namespace cial::cli {
             fmt::print("{}", out);
             return 0;
         }
+
+        // --api-decl（doc/declarations.md §3）：注册事实 → .d.tjs 声明文本。
+        // 与 --api-json 同一注册链（标准库 + print/println + Scripts），不执行用户脚本；
+        // 输出仅由模型决定，宿主可经 decl::declarationsFromCatalog +
+        // decl::generateDeclarations 导出自己的声明
+        int runApiDecl() {
+            Runtime runtime;
+            Context context{ runtime };
+            vm::VMState state{ context };
+            VM vm{ &state };
+            setupSession(context, vm, state, {});
+            fmt::print("{}", decl::generateDeclarations(decl::declarationsFromCatalog(context.apiCatalog())));
+            return 0;
+        }
     } // namespace
 
     int runApplication(const Options &options) {
@@ -295,6 +317,8 @@ namespace cial::cli {
             return runCapabilities();
         if(options.mode == Mode::ApiJson)
             return runApiJson();
+        if(options.mode == Mode::ApiDecl)
+            return runApiDecl();
         Runtime runtime;
         Context context{ runtime };
         vm::VMState state{ context };

@@ -81,5 +81,9 @@
 - 元数据登记与推导：`tests/native_registration_test.cpp`（`[api]` 标签）。
 - CLI 导出与参数校验：`tests/cli/test_cli.py` 的 `test_api_json`（签名对照 stdlib
   注册代码断言）。
-- 后续消费方：`.d.tjs` 生成器（路线图批次 B）、LSP 替代 `BUILTIN_MEMBERS`
-  （路线图批次 C）；宿主可随 SDK/应用发布该导出产物。
+- 声明生成（已实现）：`cial --api-decl` 与 `decl::declarationsFromCatalog` /
+  `decl::generateDeclarations`（`src/decl/`），规则见[声明文件](declarations.md)；
+  同名同类别成员按注册表语义替换，重注册回填不产生重复条目
+  （`Context.hpp` 的 `recordApiMember`）。
+- 后续消费方：LSP 替代 `BUILTIN_MEMBERS`（路线图批次 C）；宿主可随 SDK/应用
+  发布该导出产物。

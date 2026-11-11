@@ -5,7 +5,7 @@
 | 位置 | 用途 |
 |---|---|
 | `*_test.cpp` | Catch2：内部状态、原生绑定、AST、GC、VM 与优化器；显式登记于 CMakeLists.txt |
-| `tjs/` | 语言与标准库行为，TJS 断言；见 [脚本指南](tjs/README.md)，由 CMake 自动登记 |
+| `tjs/` | 语言与标准库行为，TJS 断言；见 [脚本指南](tjs/README.md)，由 CMake 自动登记；`.d.tjs` 声明文件不登记为脚本测试（[声明文件](../doc/declarations.md)） |
 | `cli/test_cli.py` | 命令行参数、执行、诊断、JSON、stdin、REPL |
 | `cli/test_decompile.py` | 反编译接口、严格模式、表达式、声明、字面量、行表 |
 | `cli/test_switch.py` | switch 派发、循环组合、嵌套、参考字节码与拒绝回归 |

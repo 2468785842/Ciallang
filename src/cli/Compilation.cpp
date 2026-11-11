@@ -14,6 +14,13 @@ namespace cial::cli {
     Compilation compile(Common::Result &diagnostics, Context &context, Common::SourceFile &source,
                         const bool expression) {
         Compilation compilation{};
+        // 声明文件不可编译/执行（doc/declarations.md §4）；声明分析走
+        // decl::parseDeclarations（CLI --check-json 的 .d.tjs 分支）
+        if(source.isDeclaration()) {
+            source.error(diagnostics, Common::DeclarationNotExecutableMessage, source.spanOf(0, source.length()),
+                         "decl.not-executable");
+            return compilation;
+        }
         if(expression)
             compilation.result = inter::Register{ 0xFFFF }; // request a value, including postfix ++/--
         if(diagnostics.isFailed())

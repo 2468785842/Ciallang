@@ -53,7 +53,8 @@ def main(argv=None):
         if not path.exists():
             parser.error(f"test path does not exist: {path}")
         candidates = path.rglob("*.tjs") if path.is_dir() else [path]
-        scripts.update(p.resolve() for p in candidates if p.name != "assert.tjs")
+        scripts.update(p.resolve() for p in candidates
+                       if p.name != "assert.tjs" and not p.name.lower().endswith(".d.tjs"))
     if not scripts:
         parser.error("no test files selected")
     results = [run_case(engine, script, args.timeout) for script in sorted(scripts)]

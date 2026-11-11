@@ -41,7 +41,10 @@
 - [krkr2 接入](notes/proposed/architecture/2026-11-04-krkr2-integration.md)：五个阶段均未开始，
   入口为双向 `iTJSDispatch2` 桥；完成标准见[接入说明](../doc/krkr2-integration.md)。
 - [SDK 与工具路线图批次](notes/proposed/architecture/2026-11-04-sdk-tooling-roadmap.md)：
-  批次 1 部分完成，批次 2–4 未开始；设计边界以[路线图](../doc/roadmap.md)为准。
+  批次 2 进行中——API 元数据与 `--api-json`、`.d.tjs` 声明模式（解析/执行侧拒绝/
+  `--api-decl` 生成器/扫描排除）均已落地（2026-11-11，见
+  [声明文件](../doc/declarations.md)）；剩余 LSP 消费声明等；设计边界以
+  [路线图](../doc/roadmap.md)为准。
 - [诊断批次 5 剩余](../doc/diagnostics-plan.md#5-实施状态2026-10-31)：剩余 JIT 等价位置验证
   （继续扩展原生互调与异常恢复组合），状态以该文档实施状态一节为准。
 - 性能提案已全部收口（2026-11-10，见

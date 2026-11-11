@@ -115,6 +115,9 @@ set(SOURCE_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/parser/PreProcessor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/parser/Lexer.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/parser/Parser.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/parser/DeclParser.cpp
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/decl/DeclModel.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/common/SourceLocation.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/common/SourceFile.cpp

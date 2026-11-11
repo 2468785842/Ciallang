@@ -13,6 +13,7 @@ set(SOURCES
         runtime_lifetime_test.cpp
         fuzz_regress_test.cpp
         compat_reserved_test.cpp
+        declaration_test.cpp
         native_binding_test.cpp
         native_registration_test.cpp
         native_function_test.cpp
@@ -49,6 +50,11 @@ target_link_libraries(CiallangTests
         Ciallang
 )
 
+# declaration_test 的执行侧拒绝用例直接驱动 cli::compile（CLI 关闭时跳过）
+if(TARGET cialcli)
+    target_link_libraries(CiallangTests PRIVATE cialcli)
+endif()
+
 target_include_directories(CiallangTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 include(Catch)
@@ -69,6 +75,9 @@ find_package(Python3 COMPONENTS Interpreter QUIET)
 set(CIAL_TJS_TEST_REFERENCE "" CACHE FILEPATH "Optional TJSCompiler CLI for the TJS script suite")
 file(GLOB_RECURSE TJS_TEST_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tjs/*.tjs")
 list(FILTER TJS_TEST_FILES EXCLUDE REGEX "/assert\\.tjs$")
+# 声明文件 (.d.tjs) 不登记为脚本测试；声明解析另设 Catch2 用例
+# （tests/declaration_test.cpp，doc/declarations.md §5）
+list(FILTER TJS_TEST_FILES EXCLUDE REGEX "\\.d\\.tjs$")
 function(register_tjs_tests prefix engine)
     foreach(script IN LISTS TJS_TEST_FILES)
         file(RELATIVE_PATH case_name "${CMAKE_CURRENT_SOURCE_DIR}/tjs" "${script}")

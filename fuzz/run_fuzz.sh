@@ -7,8 +7,10 @@ repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 fuzz_build=${CIAL_FUZZ_BUILD:-"$repo/build/fuzz"}
 mkdir -p "$fuzz_build/corpus/$name" "$fuzz_build/artifacts/$name"
 # Keep generated coverage inputs and crash artifacts in the build directory.
+# Declaration files (.d.tjs) are not scripts; exclude them from fuzz seeds.
 for seed in "$repo"/tests/test_files/*.tjs "$repo"/tests/fuzz_regress/*.tjs; do
     [[ -f "$seed" ]] || continue
+    [[ "$seed" == *.d.tjs ]] && continue
     destination="$fuzz_build/corpus/$name/$(basename -- "$seed")"
     [[ -e "$destination" ]] || head -c 4096 "$seed" > "$destination"
 done

@@ -9,22 +9,24 @@ namespace cial::cli {
     Options parseOptions(const int argc, char **argv) {
         argparse::ArgumentParser parser{ "cial", CIAL_VERSION_STRING };
         parser.add_description("TJS2-compatible interpreter. With no input, start the REPL.");
-        for(const auto &[name, help] : { std::pair{ "--tjsbc", "execute TJS2 bytecode" },
-                                         { "--check-json", "compile only; emit JSON diagnostics" },
-                                         { "--dump-cfg", "compile only; emit control-flow graphs" },
-                                         { "--dump-ssa", "compile only; emit SSA analysis" },
-                                         { "--decompile", "decompile TJS2 bytecode or source to TJS2 source (strict)" },
-                                         { "--view", "with --decompile: emit the disassembly-level diagnostic view" },
-                                         { "--repl", "start an interactive session" },
-                                         { "--jit", "enable the optional x64 integer JIT" },
-                                         { "--trace-jit", "enable the optional trace JIT" },
-                                         { "--tail-recursion", "enable numeric self-tail recursion elimination" },
-                                         { "--trace-execution", "record execution; takes input and output.dot" },
-                                         { "--time", "report elapsed time on stderr" },
-                                         { "--no-color", "disable colored diagnostics even on a terminal" },
-                                         { "--dump-tac", "dump compiled TAC on stderr before execution" },
-                                         { "--capabilities", "print SDK version and capability JSON and exit" },
-                                         { "--api-json", "print registered native API metadata JSON and exit" } })
+        for(const auto &[name, help] :
+            { std::pair{ "--tjsbc", "execute TJS2 bytecode" },
+              { "--check-json", "compile only; emit JSON diagnostics" },
+              { "--dump-cfg", "compile only; emit control-flow graphs" },
+              { "--dump-ssa", "compile only; emit SSA analysis" },
+              { "--decompile", "decompile TJS2 bytecode or source to TJS2 source (strict)" },
+              { "--view", "with --decompile: emit the disassembly-level diagnostic view" },
+              { "--repl", "start an interactive session" },
+              { "--jit", "enable the optional x64 integer JIT" },
+              { "--trace-jit", "enable the optional trace JIT" },
+              { "--tail-recursion", "enable numeric self-tail recursion elimination" },
+              { "--trace-execution", "record execution; takes input and output.dot" },
+              { "--time", "report elapsed time on stderr" },
+              { "--no-color", "disable colored diagnostics even on a terminal" },
+              { "--dump-tac", "dump compiled TAC on stderr before execution" },
+              { "--capabilities", "print SDK version and capability JSON and exit" },
+              { "--api-json", "print registered native API metadata JSON and exit" },
+              { "--api-decl", "print registered native API as a .d.tjs declaration file and exit" } })
             parser.add_argument(name).flag().help(help);
         parser.add_argument("--json-schema")
             .help("JSON diagnostics schema version (1 legacy, 2 half-open ranges; default 2)")
@@ -48,7 +50,8 @@ namespace cial::cli {
                                          { "--decompile", Mode::Decompile },
                                          { "--repl", Mode::Repl },
                                          { "--capabilities", Mode::Capabilities },
-                                         { "--api-json", Mode::ApiJson } }) {
+                                         { "--api-json", Mode::ApiJson },
+                                         { "--api-decl", Mode::ApiDecl } }) {
             if(parser.get<bool>(flag)) {
                 options.mode = mode;
                 ++modes;
@@ -56,7 +59,7 @@ namespace cial::cli {
         }
         if(modes > 1)
             throw std::runtime_error("choose only one of --tjsbc, --check-json, --dump-cfg, --dump-ssa, "
-                                     "--decompile, --repl, --capabilities, --api-json");
+                                     "--decompile, --repl, --capabilities, --api-json, --api-decl");
         options.decompileView = parser.get<bool>("--view");
         if(parser.is_used("--map"))
             options.decompileMap = parser.get<std::string>("--map");
@@ -94,16 +97,18 @@ namespace cial::cli {
         }
         if(inputs.empty() && modes == 0)
             options.mode = Mode::Repl;
-        const size_t expected =
-            options.mode == Mode::Repl || options.mode == Mode::Capabilities || options.mode == Mode::ApiJson ? 0
-            : trace                                                                                           ? 2
-                                                                                                              : 1;
+        const size_t expected = options.mode == Mode::Repl || options.mode == Mode::Capabilities ||
+                options.mode == Mode::ApiJson || options.mode == Mode::ApiDecl
+            ? 0
+            : trace ? 2
+                    : 1;
         if(inputs.size() != expected)
             throw std::runtime_error(
                 trace                                    ? "usage: cial --trace-execution <script-file> <output.dot>"
                     : options.mode == Mode::Repl         ? "--repl does not accept an input file"
                     : options.mode == Mode::Capabilities ? "--capabilities does not accept an input file"
                     : options.mode == Mode::ApiJson      ? "--api-json does not accept an input file"
+                    : options.mode == Mode::ApiDecl      ? "--api-decl does not accept an input file"
                                                          : "expected exactly one input file; use --help for usage");
         if(!inputs.empty())
             options.input = inputs[0];
@@ -120,7 +125,12 @@ namespace cial::cli {
         if(options.mode == Mode::ApiJson &&
            (trace || options.jit != vm::JitMode::Off || options.tailRecursion || options.timing || options.dumpTac))
             throw std::runtime_error("--api-json does not accept execution options");
-        if((options.mode == Mode::Repl || options.mode == Mode::Capabilities || options.mode == Mode::ApiJson) && trace)
+        if(options.mode == Mode::ApiDecl &&
+           (trace || options.jit != vm::JitMode::Off || options.tailRecursion || options.timing || options.dumpTac))
+            throw std::runtime_error("--api-decl does not accept execution options");
+        if((options.mode == Mode::Repl || options.mode == Mode::Capabilities || options.mode == Mode::ApiJson ||
+            options.mode == Mode::ApiDecl) &&
+           trace)
             throw std::runtime_error("--trace-execution requires an input file");
         if(!options.sourceName.empty() && options.input != "-")
             throw std::runtime_error("--source-name only applies to stdin input ('-')");
