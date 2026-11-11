@@ -34,8 +34,7 @@ namespace cial::lsp {
     // 行偏移索引：字节偏移 ↔ LSP 行/UTF-16 列（诊断、声明、定义共用）。
     class LineIndex {
     public:
-        explicit LineIndex(std::string_view text) :
-            _text(text) {
+        explicit LineIndex(std::string_view text) : _text(text) {
             _lineStarts.push_back(0);
             for(size_t i = 0; i < _text.size(); ++i)
                 if(_text[i] == '\n')
@@ -70,7 +69,7 @@ namespace cial::lsp {
         // externalType/externalReturn：本文件解析不到时向声明索引查询
         // （变量值类型 / owner 点分路径的返回类型），返回空串表示未知。
         DocumentIndex(const std::string &text, std::function<std::string(const std::string &)> externalType = {},
-            std::function<std::string(const std::string &)> externalReturn = {});
+                      std::function<std::string(const std::string &)> externalReturn = {});
 
         [[nodiscard]] bool valid() const noexcept { return _valid; }
 

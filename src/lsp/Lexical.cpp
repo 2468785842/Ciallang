@@ -26,12 +26,13 @@ namespace cial::lsp {
 
         // 纯语言关键字（TJS2 语义，无 API 事实）；类型名等接口一律来自声明索引。
         const std::set<std::string> &languageKeywords() {
-            static const std::set<std::string> keywords = {"function", "var",    "const",   "class",
-                "property", "namespace", "static", "getter", "setter", "catch",   "try",     "finally",
-                "with",     "return",    "if",     "else",   "while",  "for",     "switch",  "case",
-                "break",    "continue",  "default", "new",   "throw",  "this",    "super",   "global",
-                "void",     "true",      "false",  "null",   "do",     "extends", "instanceof", "typeof",
-                "delete",   "in",        "debugger"};
+            static const std::set<std::string> keywords = {
+                "function", "var",     "const",      "class",   "property", "namespace", "static",  "getter",
+                "setter",   "catch",   "try",        "finally", "with",     "return",    "if",      "else",
+                "while",    "for",     "switch",     "case",    "break",    "continue",  "default", "new",
+                "throw",    "this",    "super",      "global",  "void",     "true",      "false",   "null",
+                "do",       "extends", "instanceof", "typeof",  "delete",   "in",        "debugger"
+            };
             return keywords;
         }
 
@@ -88,12 +89,10 @@ namespace cial::lsp {
         }
     } // namespace
 
-    bool isIdentifierByte(const unsigned char ch) {
-        return isWordByte(ch);
-    }
+    bool isIdentifierByte(const unsigned char ch) { return isWordByte(ch); }
 
     std::string maskedSource(std::string_view text) {
-        std::string masked{text};
+        std::string masked{ text };
         size_t index = 0;
         bool expression = true;
         while(index < text.size()) {
@@ -151,17 +150,17 @@ namespace cial::lsp {
         auto it = std::ranges::upper_bound(_lineStarts, offset);
         const size_t line = static_cast<size_t>(it - _lineStarts.begin()) - 1;
         const size_t lineStart = _lineStarts[line];
-        return {static_cast<int>(line),
-            static_cast<int>(
-                Common::utf16Length(std::string_view{_text}.substr(lineStart, offset - lineStart)))};
+        return { static_cast<int>(line),
+                 static_cast<int>(
+                     Common::utf16Length(std::string_view{ _text }.substr(lineStart, offset - lineStart))) };
     }
 
     Range LineIndex::tokenRange(const size_t start, const size_t end) const {
         const Position begin = positionAt(start);
-        return {begin,
-            {begin.line,
-                begin.character +
-                    static_cast<int>(Common::utf16Length(std::string_view{_text}.substr(start, end - start)))}};
+        return { begin,
+                 { begin.line,
+                   begin.character +
+                       static_cast<int>(Common::utf16Length(std::string_view{ _text }.substr(start, end - start))) } };
     }
 
     size_t LineIndex::offsetAt(const Position position) const {
@@ -170,27 +169,27 @@ namespace cial::lsp {
         const size_t lineStart = _lineStarts[static_cast<size_t>(position.line)];
         const size_t lineEnd =
             static_cast<size_t>(position.line) + 1 < _lineStarts.size() ? _lineStarts[position.line + 1] : _text.size();
-        std::string_view line = std::string_view{_text}.substr(lineStart, lineEnd - lineStart);
+        std::string_view line = std::string_view{ _text }.substr(lineStart, lineEnd - lineStart);
         if(!line.empty() && line.back() == '\n')
             line.remove_suffix(1);
         return lineStart + columnOffset(line, position.character);
     }
 
     std::vector<DocumentDeclaration> documentDeclarations(const LineIndex &lines) {
-        static const std::regex declaration{R"(\b(function|var|const|class|property|namespace)\s+([\w$]+))"};
+        static const std::regex declaration{ R"(\b(function|var|const|class|property|namespace)\s+([\w$]+))" };
         const std::string masked = maskedSource(lines.text());
         std::vector<DocumentDeclaration> symbols;
-        for(std::sregex_iterator it{masked.begin(), masked.end(), declaration}; it != std::sregex_iterator{}; ++it) {
+        for(std::sregex_iterator it{ masked.begin(), masked.end(), declaration }; it != std::sregex_iterator{}; ++it) {
             const auto &match = *it;
             const size_t nameStart = static_cast<size_t>(match.position(2));
             const size_t nameEnd = nameStart + match.length(2);
-            symbols.push_back({match.str(2), match.str(1), nameStart, nameEnd, lines.tokenRange(nameStart, nameEnd)});
+            symbols.push_back({ match.str(2), match.str(1), nameStart, nameEnd, lines.tokenRange(nameStart, nameEnd) });
         }
         return symbols;
     }
 
     DocumentIndex::DocumentIndex(const std::string &text, std::function<std::string(const std::string &)> externalType,
-        std::function<std::string(const std::string &)> externalReturn) :
+                                 std::function<std::string(const std::string &)> externalReturn) :
         _text(text), _externalType(std::move(externalType)), _externalReturn(std::move(externalReturn)),
         _budget(MAX_INFER_STEPS) {
         build();
@@ -209,10 +208,10 @@ namespace cial::lsp {
                 size_t end = i;
                 while(end < source.size() && isWordByte(static_cast<unsigned char>(source[end])))
                     ++end;
-                _tokens.push_back({source.substr(i, end - i), i, end});
+                _tokens.push_back({ source.substr(i, end - i), i, end });
                 i = end;
             } else {
-                _tokens.push_back({source.substr(i, 1), i, i + 1});
+                _tokens.push_back({ source.substr(i, 1), i, i + 1 });
                 ++i;
             }
             if(_tokens.size() > 100000)
@@ -243,15 +242,15 @@ namespace cial::lsp {
 
         // 作用域收集：块、函数/参数、类/属性体、for/with
         std::map<size_t, int> braceScope; // '{' token → 作用域下标
-        _scopes.push_back({0, _text.size() + 1, ScopeKind::Root, -1, {}});
+        _scopes.push_back({ 0, _text.size() + 1, ScopeKind::Root, -1, {} });
         for(size_t index = 0; index < tokens.size(); ++index) {
             if(tokens[index].value == "{") {
                 braceScope[index] = static_cast<int>(_scopes.size());
-                _scopes.push_back({tokens[index].start, tokens[_pairs[index]].end, ScopeKind::Block, -1, {}});
+                _scopes.push_back({ tokens[index].start, tokens[_pairs[index]].end, ScopeKind::Block, -1, {} });
             }
         }
         std::vector<std::tuple<int, size_t, size_t>> parameters; // (scope, 参数首 token, ')' token)
-        std::vector<std::tuple<size_t, int, size_t>> functions;  // (名 token, scope, 体 '{' token)
+        std::vector<std::tuple<size_t, int, size_t>> functions; // (名 token, scope, 体 '{' token)
         std::map<size_t, std::pair<size_t, std::optional<size_t>>> classDecls; // 名 token → (体 '{', extends 名 token)
         for(size_t index = 0; index < tokens.size(); ++index) {
             const std::string &value = tokens[index].value;
@@ -272,11 +271,15 @@ namespace cial::lsp {
                 if(brace == braceScope.end())
                     continue;
                 const int scope = static_cast<int>(_scopes.size());
-                _scopes.push_back({tokens[cursor].start, _scopes[brace->second].end,
-                    value == "catch" ? ScopeKind::Catch : ScopeKind::Function, -1, {}});
+                _scopes.push_back({ tokens[cursor].start,
+                                    _scopes[brace->second].end,
+                                    value == "catch" ? ScopeKind::Catch : ScopeKind::Function,
+                                    -1,
+                                    {} });
                 parameters.emplace_back(scope, cursor + 1, closing);
-                if(name.has_value() && (index == 0 || tokens[index - 1].value == ";" || tokens[index - 1].value == "{" ||
-                                           tokens[index - 1].value == "}"))
+                if(name.has_value() &&
+                   (index == 0 || tokens[index - 1].value == ";" || tokens[index - 1].value == "{" ||
+                    tokens[index - 1].value == "}"))
                     functions.emplace_back(*name, scope, body);
             } else if((value == "class" || value == "property") && identifier(index + 1)) {
                 size_t cursor = index + 2;
@@ -292,7 +295,7 @@ namespace cial::lsp {
                 if(brace != braceScope.end()) {
                     _scopes[brace->second].kind = value == "class" ? ScopeKind::Class : ScopeKind::Property;
                     if(value == "class")
-                        classDecls[index + 1] = {cursor, extends};
+                        classDecls[index + 1] = { cursor, extends };
                 }
             } else if((value == "for" || value == "with") && index + 1 < tokens.size() &&
                       tokens[index + 1].value == "(") {
@@ -314,8 +317,11 @@ namespace cial::lsp {
                     }
                 }
                 if(end < tokens.size())
-                    _scopes.push_back({tokens[index].start, tokens[end].end,
-                        value == "for" ? ScopeKind::For : ScopeKind::With, -1, {}});
+                    _scopes.push_back({ tokens[index].start,
+                                        tokens[end].end,
+                                        value == "for" ? ScopeKind::For : ScopeKind::With,
+                                        -1,
+                                        {} });
             }
         }
 
@@ -377,9 +383,9 @@ namespace cial::lsp {
                     const int scope = scopeAt(tokens[name].start);
                     if(_scopes[scope].kind == ScopeKind::Property)
                         continue; // property 体成员仍不参与绑定
-                    const size_t visible =
-                        init.has_value() ? tokens[std::min(init->terminator, tokens.size() - 1)].start
-                                         : tokens[name].end;
+                    const size_t visible = init.has_value()
+                        ? tokens[std::min(init->terminator, tokens.size() - 1)].start
+                        : tokens[name].end;
                     auto &binding = addBinding(scope, name, visible);
                     binding.init = init;
                 }
@@ -409,8 +415,8 @@ namespace cial::lsp {
         return it != _pairs.end() ? it->second : std::string::npos;
     }
 
-    std::vector<std::pair<size_t, std::optional<DocumentIndex::Binding::Init>>> DocumentIndex::declarators(
-        size_t cursor, const size_t end) const {
+    std::vector<std::pair<size_t, std::optional<DocumentIndex::Binding::Init>>>
+    DocumentIndex::declarators(size_t cursor, const size_t end) const {
         std::vector<std::pair<size_t, std::optional<Binding::Init>>> result;
         while(cursor < end && identifier(cursor)) {
             const size_t name = cursor;
@@ -427,7 +433,7 @@ namespace cial::lsp {
                     const auto pair = _pairs.find(cursor);
                     cursor = (pair == _pairs.end() ? cursor : pair->second) + 1;
                 }
-                init = Binding::Init{equals, equals + 1, cursor};
+                init = Binding::Init{ equals, equals + 1, cursor };
             } else if(cursor < end && _tokens[cursor].value == "*") {
                 ++cursor;
             }
@@ -469,7 +475,7 @@ namespace cial::lsp {
         if(cursor != 0 && _tokens[cursor - 1].value == ".")
             return {};
         if(const auto declared = _bindingAt.find(token.start); declared != _bindingAt.end())
-            return {declared->second, false, {}};
+            return { declared->second, false, {} };
         if(languageKeywords().contains(token.value))
             return {};
         if(cursor + 1 < _tokens.size() && _tokens[cursor + 1].value == ":")
@@ -496,7 +502,7 @@ namespace cial::lsp {
                 if(match != nullptr) {
                     if(_scopes[scope].kind == ScopeKind::Root && matchCount != 1)
                         return {};
-                    return {match, false, {}};
+                    return { match, false, {} };
                 }
             }
             if(_scopes[scope].kind == ScopeKind::Function) {
@@ -508,7 +514,7 @@ namespace cial::lsp {
             }
             scope = _scopes[scope].parent;
         }
-        return {nullptr, !dynamic, dynamic ? std::string{} : token.value};
+        return { nullptr, !dynamic, dynamic ? std::string{} : token.value };
     }
 
     DocumentIndex::ResolveResult DocumentIndex::resolve(const Position position) const {
@@ -523,11 +529,11 @@ namespace cial::lsp {
     std::pair<size_t, size_t> DocumentIndex::tokenSpan(const size_t tokenIndex) const {
         if(tokenIndex >= _tokens.size())
             return {};
-        return {_tokens[tokenIndex].start, _tokens[tokenIndex].end};
+        return { _tokens[tokenIndex].start, _tokens[tokenIndex].end };
     }
 
     int DocumentIndex::tokenCursor(const Position position) const {
-        const LineIndex lines{_text};
+        const LineIndex lines{ _text };
         const size_t offset = lines.offsetAt(position);
         if(offset == std::string::npos)
             return -1;
@@ -540,7 +546,7 @@ namespace cial::lsp {
     std::optional<std::pair<int, std::string>> DocumentIndex::memberContext(const Position position) const {
         if(!_valid)
             return std::nullopt;
-        const LineIndex lines{_text};
+        const LineIndex lines{ _text };
         const size_t offset = lines.offsetAt(position);
         if(offset == std::string::npos)
             return std::nullopt;
@@ -625,7 +631,7 @@ namespace cial::lsp {
             // 表达式整体被遮蔽：字符串与正则字面量
             const size_t rawStart = equals < tokens.size() ? tokens[equals].end : _text.size();
             const size_t rawEnd = terminator < tokens.size() ? tokens[terminator].start : _text.size();
-            std::string_view raw = std::string_view{_text}.substr(rawStart, rawEnd - rawStart);
+            std::string_view raw = std::string_view{ _text }.substr(rawStart, rawEnd - rawStart);
             while(!raw.empty() && isSpaceByte(static_cast<unsigned char>(raw.front())))
                 raw.remove_prefix(1);
             if(!raw.empty() && (raw.front() == '"' || raw.front() == '\''))
@@ -663,16 +669,15 @@ namespace cial::lsp {
             return firstToken == "[" ? "Array" : std::string{};
         if(identifier(first)) {
             size_t cursor = first + 1;
-            std::vector<std::string> parts{firstToken};
+            std::vector<std::string> parts{ firstToken };
             while(cursor + 1 < terminator && tokens[cursor].value == "." && identifier(cursor + 1)) {
                 parts.push_back(tokens[cursor + 1].value);
                 cursor += 2;
             }
             if(parts.size() > 1 && cursor < terminator && pairAt(cursor) == last) {
                 const ResolveResult resolved = resolveToken(first);
-                const std::string owner = resolved.binding != nullptr
-                    ? inferFromBinding(*resolved.binding, depth + 1)
-                    : _externalType(resolved.freeName);
+                const std::string owner = resolved.binding != nullptr ? inferFromBinding(*resolved.binding, depth + 1)
+                                                                      : _externalType(resolved.freeName);
                 if(!owner.empty()) {
                     std::string path = owner;
                     for(size_t i = 1; i < parts.size(); ++i)
@@ -723,7 +728,7 @@ namespace cial::lsp {
                 ++expression;
             if(expression == index + 1)
                 return {}; // return; 无表达式：保守放弃
-            const std::string kind = inferExpression(Binding::Init{index, index + 1, expression}, depth);
+            const std::string kind = inferExpression(Binding::Init{ index, index + 1, expression }, depth);
             if(kind.empty() || (seen && result != kind))
                 return {};
             result = kind;

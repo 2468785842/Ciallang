@@ -38,43 +38,45 @@ namespace cial::lsp {
         constexpr int CHECK_DEBOUNCE_MILLISECONDS = 150;
 
         const std::set<std::string> &excludedDirectories() {
-            static const std::set<std::string> excluded = {".git", ".idea", ".vscode", ".venv", ".cache", "build",
-                "bin", "ext", "node_modules", "__pycache__"};
+            static const std::set<std::string> excluded = {
+                ".git", ".idea", ".vscode", ".venv", ".cache", "build", "bin", "ext", "node_modules", "__pycache__"
+            };
             return excluded;
         }
 
         // 纯语言关键字说明（语言语义，非 API 事实；接口文档一律来自 .d.tjs）。
         const std::map<std::string, std::string> &keywordDocs() {
             static const std::map<std::string, std::string> docs = {
-                {"function", "定义函数：function name(parameters) { ... }"},
-                {"var", "声明变量：var name = value;"},
-                {"const", "声明带初值的变量；当前 TJS2 兼容语义仍允许后续赋值。"},
-                {"class", "定义类：class Name extends Base { ... }"},
-                {"property", "定义具有 getter / setter 的属性。"},
-                {"namespace", ".d.tjs 命名空间声明：namespace Name { ... }"},
-                {"static", ".d.tjs 类静态方法声明。"},
-                {"try", "try { ... } catch(e) { ... }"},
-                {"with", "with(object) { .member; }"},
-                {"return", "返回函数结果。"},
-                {"if", "if(condition) statement; else statement;"},
-                {"while", "while(condition) statement;"},
-                {"for", "for(init; condition; step) statement;"},
-                {"switch", "switch(value) { case value: ...; break; default: ...; }"},
-                {"new", "创建类或内置容器实例。"},
-                {"throw", "抛出可由 catch 捕获的脚本异常。"},
-                {"this", "当前调用上下文。"},
-                {"super", "父类上下文。"},
-                {"global", "全局对象。"},
-                {"void", "空值。"},
-                {"true", "逻辑真（整数 1）。"},
-                {"false", "逻辑假（整数 0）。"},
+                { "function", "定义函数：function name(parameters) { ... }" },
+                { "var", "声明变量：var name = value;" },
+                { "const", "声明带初值的变量；当前 TJS2 兼容语义仍允许后续赋值。" },
+                { "class", "定义类：class Name extends Base { ... }" },
+                { "property", "定义具有 getter / setter 的属性。" },
+                { "namespace", ".d.tjs 命名空间声明：namespace Name { ... }" },
+                { "static", ".d.tjs 类静态方法声明。" },
+                { "try", "try { ... } catch(e) { ... }" },
+                { "with", "with(object) { .member; }" },
+                { "return", "返回函数结果。" },
+                { "if", "if(condition) statement; else statement;" },
+                { "while", "while(condition) statement;" },
+                { "for", "for(init; condition; step) statement;" },
+                { "switch", "switch(value) { case value: ...; break; default: ...; }" },
+                { "new", "创建类或内置容器实例。" },
+                { "throw", "抛出可由 catch 捕获的脚本异常。" },
+                { "this", "当前调用上下文。" },
+                { "super", "父类上下文。" },
+                { "global", "全局对象。" },
+                { "void", "空值。" },
+                { "true", "逻辑真（整数 1）。" },
+                { "false", "逻辑假（整数 0）。" },
             };
             return docs;
         }
 
         bool isDeclarationUri(const std::string &uri) {
             std::string lower = uri;
-            std::ranges::transform(lower, lower.begin(), [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+            std::ranges::transform(lower, lower.begin(),
+                                   [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
             return lower.size() >= 6 && lower.substr(lower.size() - 6) == ".d.tjs";
         }
 
@@ -91,7 +93,8 @@ namespace cial::lsp {
         std::string percentDecode(std::string_view value) {
             std::string out;
             for(size_t i = 0; i < value.size(); ++i) {
-                if(value[i] == '%' && i + 2 < value.size() && hexValue(value[i + 1]) < 16 && hexValue(value[i + 2]) < 16) {
+                if(value[i] == '%' && i + 2 < value.size() && hexValue(value[i + 1]) < 16 &&
+                   hexValue(value[i + 2]) < 16) {
                     out.push_back(static_cast<char>(hexValue(value[i + 1]) * 16 + hexValue(value[i + 2])));
                     i += 2;
                 } else {
@@ -123,18 +126,18 @@ namespace cial::lsp {
             std::vector<char> buffer(4096, '\0');
 #if defined(_WIN32)
             const auto size = GetModuleFileNameA(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
-            return std::filesystem::path{std::string{buffer.data(), size}};
+            return std::filesystem::path{ std::string{ buffer.data(), size } };
 #elif defined(__APPLE__)
             uint32_t size = static_cast<uint32_t>(buffer.size());
             if(_NSGetExecutablePath(buffer.data(), &size) == 0)
-                return std::filesystem::path{std::string{buffer.data()}};
+                return std::filesystem::path{ std::string{ buffer.data() } };
             buffer.resize(size + 1);
             _NSGetExecutablePath(buffer.data(), &size);
-            return std::filesystem::path{std::string{buffer.data()}};
+            return std::filesystem::path{ std::string{ buffer.data() } };
 #else
             const ssize_t size = readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
             if(size > 0)
-                return std::filesystem::path{std::string{buffer.data(), static_cast<size_t>(size)}};
+                return std::filesystem::path{ std::string{ buffer.data(), static_cast<size_t>(size) } };
             return {};
 #endif
         }
@@ -151,7 +154,7 @@ namespace cial::lsp {
         }
 
         std::string wordAt(const std::string &text, const Position position) {
-            const LineIndex lines{text};
+            const LineIndex lines{ text };
             const size_t offset = lines.offsetAt(position);
             return offset == std::string::npos ? std::string{} : wordAtOffset(text, offset);
         }
@@ -181,10 +184,9 @@ namespace cial::lsp {
 
         // LSP 通知方法永不响应（即使客户端违规附带 id）
         bool isNotificationMethod(const std::string &method) {
-            return method == "initialized" || method == "textDocument/didOpen" ||
-                method == "textDocument/didChange" || method == "textDocument/didClose" ||
-                method == "workspace/didChangeWorkspaceFolders" || method == "exit" ||
-                method == "$/cancelRequest";
+            return method == "initialized" || method == "textDocument/didOpen" || method == "textDocument/didChange" ||
+                method == "textDocument/didClose" || method == "workspace/didChangeWorkspaceFolders" ||
+                method == "exit" || method == "$/cancelRequest";
         }
     } // namespace
 
@@ -208,7 +210,7 @@ namespace cial::lsp {
 
     Server::~Server() {
         {
-            std::lock_guard lock{_checkMutex};
+            std::lock_guard lock{ _checkMutex };
             _stop = true;
         }
         _checkWake.notify_all();
@@ -230,7 +232,7 @@ namespace cial::lsp {
             rest = rest.substr(authorityEnd);
         else if(!rest.starts_with('/'))
             return {};
-        std::filesystem::path path{percentDecode(rest)};
+        std::filesystem::path path{ percentDecode(rest) };
         std::error_code ec;
         const auto resolved = std::filesystem::weakly_canonical(path, ec);
         return ec ? path : resolved;
@@ -265,7 +267,7 @@ namespace cial::lsp {
 
     void Server::sendMessage(std::ostream &out, const Json &message) {
         const std::string body = message.dump();
-        std::lock_guard lock{_sinkMutex};
+        std::lock_guard lock{ _sinkMutex };
         out << "Content-Length: " << body.size() << "\r\n\r\n" << body;
         out.flush();
     }
@@ -298,7 +300,7 @@ namespace cial::lsp {
             std::string error;
             const Json message = Json::parse(content, &error);
             if(message.isNull()) {
-                respondError(out, Json{nullptr}, -32700, "parse error: " + error);
+                respondError(out, Json{ nullptr }, -32700, "parse error: " + error);
                 continue;
             }
             const bool isRequest = message.find("id") != nullptr && !message.find("id")->isNull() &&
@@ -327,7 +329,7 @@ namespace cial::lsp {
             return onInitialize(*params);
         if(method == "shutdown") {
             shutdown = true;
-            return Json{nullptr};
+            return Json{ nullptr };
         }
         if(method == "textDocument/didOpen") {
             onDidOpen(*params);
@@ -376,18 +378,20 @@ namespace cial::lsp {
         }
         std::vector<std::filesystem::path> systemFiles;
         {
-            std::lock_guard lock{_mutex};
+            std::lock_guard lock{ _mutex };
             if(!_systemLoaded) {
                 _systemLoaded = true;
                 for(const auto &directory : _declarationDirectories) {
                     std::error_code ec;
                     if(!std::filesystem::is_directory(directory, ec))
                         continue;
-                    for(std::filesystem::directory_iterator it{directory, ec}, end; !ec && it != end; it.increment(ec)) {
+                    for(std::filesystem::directory_iterator it{ directory, ec }, end; !ec && it != end;
+                        it.increment(ec)) {
                         const auto name = it->path().filename().string();
                         std::string lower = name;
-                        std::ranges::transform(lower, lower.begin(),
-                            [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                        std::ranges::transform(lower, lower.begin(), [](const unsigned char ch) {
+                            return static_cast<char>(std::tolower(ch));
+                        });
                         if(lower.size() >= 6 && lower.substr(lower.size() - 6) == ".d.tjs")
                             systemFiles.push_back(it->path());
                     }
@@ -417,16 +421,16 @@ namespace cial::lsp {
     }
 
     Server::Document Server::document(const std::string &uri) const {
-        std::lock_guard lock{_mutex};
+        std::lock_guard lock{ _mutex };
         const auto it = _documents.find(uri);
         return it != _documents.end() ? it->second : Document{};
     }
 
     void Server::storeDocument(const std::string &uri, const std::string &text, const int version,
-        const bool publishEmpty) {
+                               const bool publishEmpty) {
         {
-            std::lock_guard lock{_mutex};
-            _documents[uri] = Document{text, version};
+            std::lock_guard lock{ _mutex };
+            _documents[uri] = Document{ text, version };
         }
         if(publishEmpty)
             publishDiagnostics(uri, Json::array());
@@ -461,11 +465,11 @@ namespace cial::lsp {
             return;
         const std::string uri = textDocument->stringAt("uri");
         {
-            std::lock_guard lock{_mutex};
+            std::lock_guard lock{ _mutex };
             _documents.erase(uri);
         }
         {
-            std::lock_guard lock{_checkMutex};
+            std::lock_guard lock{ _checkMutex };
             _pending.erase(uri);
         }
         publishDiagnostics(uri, Json::array());
@@ -475,7 +479,7 @@ namespace cial::lsp {
         const Json *event = params.find("event");
         if(event == nullptr)
             return;
-        std::lock_guard lock{_mutex};
+        std::lock_guard lock{ _mutex };
         if(const auto *added = event->find("added"); added != nullptr && added->isArray())
             for(const auto &folder : added->asArray()) {
                 const auto path = uriToPath(folder.stringAt("uri"));
@@ -492,8 +496,8 @@ namespace cial::lsp {
 
     void Server::scheduleCheck(const std::string &uri, const int version, const std::string &text) {
         {
-            std::lock_guard lock{_checkMutex};
-            _pending[uri] = PendingCheck{version, text}; // 只保留最新版本
+            std::lock_guard lock{ _checkMutex };
+            _pending[uri] = PendingCheck{ version, text }; // 只保留最新版本
         }
         _checkWake.notify_all();
     }
@@ -502,9 +506,9 @@ namespace cial::lsp {
         for(;;) {
             std::map<std::string, PendingCheck> batch;
             {
-                std::unique_lock lock{_checkMutex};
+                std::unique_lock lock{ _checkMutex };
                 _checkWake.wait_for(lock, std::chrono::milliseconds(CHECK_DEBOUNCE_MILLISECONDS),
-                    [&] { return _stop || !_pending.empty(); });
+                                    [&] { return _stop || !_pending.empty(); });
                 if(_stop)
                     return;
                 batch.swap(_pending);
@@ -539,8 +543,8 @@ namespace cial::lsp {
         Common::Result diagnostics;
         try {
             Runtime runtime;
-            Context context{runtime};
-            vm::VMState state{context};
+            Context context{ runtime };
+            vm::VMState state{ context };
             Common::SourceFile source;
             source.setSourceName(uri);
             source.load(diagnostics, text);
@@ -554,14 +558,12 @@ namespace cial::lsp {
         } catch(const std::exception &failure) {
             diagnostics.error(failure.what());
         }
-        const LineIndex lines{text};
+        const LineIndex lines{ text };
         Json array = Json::array();
         for(const auto &message : diagnostics.messages()) {
             Json item = Json::object();
             const auto &span = message.span();
-            const Range range = span.valid()
-                ? lines.tokenRange(span.begin, span.end)
-                : Range{{0, 0}, {0, 0}};
+            const Range range = span.valid() ? lines.tokenRange(span.begin, span.end) : Range{ { 0, 0 }, { 0, 0 } };
             Json start = Json::object();
             start.set("line", range.start.line);
             start.set("character", range.start.character);
@@ -572,9 +574,10 @@ namespace cial::lsp {
             rangeJson.set("start", start);
             rangeJson.set("end", end);
             item.set("range", rangeJson);
-            item.set("severity", message.type() == Common::ResultMessage::Types::error ? 1
-                : message.type() == Common::ResultMessage::Types::warning                             ? 2
-                                                                                                      : 3);
+            item.set("severity",
+                     message.type() == Common::ResultMessage::Types::error         ? 1
+                         : message.type() == Common::ResultMessage::Types::warning ? 2
+                                                                                   : 3);
             item.set("message", message.message());
             if(!message.code().empty())
                 item.set("code", message.code());
@@ -585,8 +588,8 @@ namespace cial::lsp {
     }
 
     std::unique_ptr<DocumentIndex> Server::documentIndex(const std::string &text) const {
-        return std::make_unique<DocumentIndex>(text,
-            [this](const std::string &name) { return _declarations.valueType(name); },
+        return std::make_unique<DocumentIndex>(
+            text, [this](const std::string &name) { return _declarations.valueType(name); },
             [this](const std::string &path) { return _declarations.callType(path); });
     }
 
@@ -596,11 +599,11 @@ namespace cial::lsp {
             return members;
         std::vector<std::pair<std::string, std::string>> docs; // (uri, text)
         {
-            std::lock_guard lock{_mutex};
+            std::lock_guard lock{ _mutex };
             for(const auto &[uri, doc] : _documents)
                 docs.emplace_back(uri, doc.text);
         }
-        const std::regex classHeader{"class\\s+" + typeName + "\\b"};
+        const std::regex classHeader{ "class\\s+" + typeName + "\\b" };
         for(const auto &[uri, text] : docs) {
             const std::string masked = maskedSource(text);
             std::smatch match;
@@ -626,20 +629,20 @@ namespace cial::lsp {
             }
             if(depth != 0)
                 continue; // 括号不平衡：编辑中保守放弃
-            const LineIndex lines{text};
+            const LineIndex lines{ text };
             for(const auto &declaration : documentDeclarations(lines)) {
                 if(declaration.keyword == "class" && declaration.name == typeName)
                     continue;
                 if(declaration.nameStart <= bodyStart || declaration.nameStart >= bodyEnd)
                     continue; // 仅类体成员
-                members.push_back({declaration.name, declaration.keyword, uri, declaration.range});
+                members.push_back({ declaration.name, declaration.keyword, uri, declaration.range });
             }
         }
         return members;
     }
 
     void Server::refreshDeclarations() {
-        std::lock_guard lock{_mutex};
+        std::lock_guard lock{ _mutex };
         _declarations.mergeProjectSources(projectDeclarationSources());
     }
 
@@ -665,10 +668,10 @@ namespace cial::lsp {
             if(!std::filesystem::is_regular_file(path, ec) ||
                std::filesystem::file_size(path, ec) > std::min(remaining, MAX_DOCUMENT_BYTES))
                 continue;
-            std::ifstream input{path, std::ios::binary};
+            std::ifstream input{ path, std::ios::binary };
             if(!input)
                 continue;
-            std::string text{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+            std::string text{ std::istreambuf_iterator<char>{ input }, std::istreambuf_iterator<char>{} };
             if(text.starts_with("\xEF\xBB\xBF"))
                 text.erase(0, 3);
             sources.emplace_back(file, text);
@@ -679,8 +682,8 @@ namespace cial::lsp {
             if(sources.size() >= MAX_DECLARATION_FILES || remaining <= MAX_DOCUMENT_BYTES)
                 break;
             std::error_code ec;
-            for(std::filesystem::recursive_directory_iterator it{root,
-                     std::filesystem::directory_options::skip_permission_denied, ec},
+            for(std::filesystem::recursive_directory_iterator
+                    it{ root, std::filesystem::directory_options::skip_permission_denied, ec },
                 end;
                 !ec && it != end && sources.size() < MAX_DECLARATION_FILES; it.increment(ec)) {
                 if(it->is_directory(ec))
@@ -688,12 +691,12 @@ namespace cial::lsp {
                 const auto name = it->path().filename().string();
                 std::string lower = name;
                 std::ranges::transform(lower, lower.begin(),
-                    [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                                       [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
                 if(lower.size() >= 6 && lower.substr(lower.size() - 6) == ".d.tjs" && !seen.contains(it->path())) {
-                    std::ifstream input{it->path(), std::ios::binary};
+                    std::ifstream input{ it->path(), std::ios::binary };
                     if(!input)
                         continue;
-                    std::string text{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+                    std::string text{ std::istreambuf_iterator<char>{ input }, std::istreambuf_iterator<char>{} };
                     if(text.size() > std::min(remaining, MAX_DOCUMENT_BYTES))
                         continue;
                     if(text.starts_with("\xEF\xBB\xBF"))
@@ -719,8 +722,8 @@ namespace cial::lsp {
         if(doc.text.empty())
             return Json::array();
         refreshDeclarations();
-        const Position at{position->intAt("line"), position->intAt("character")};
-        LineIndex lines{doc.text};
+        const Position at{ position->intAt("line"), position->intAt("character") };
+        LineIndex lines{ doc.text };
         auto index = documentIndex(doc.text);
         Json items = Json::array();
         std::set<std::string> seen;
@@ -746,9 +749,11 @@ namespace cial::lsp {
                     seen.insert(fallback.name);
                     Json item = Json::object();
                     item.set("label", fallback.name);
-                    item.set("kind", fallback.keyword == "class" ? 7 : fallback.keyword == "function" ? 2
-                            : fallback.keyword == "property"                                            ? 10
-                                                                                                        : 5);
+                    item.set("kind",
+                             fallback.keyword == "class"          ? 7
+                                 : fallback.keyword == "function" ? 2
+                                 : fallback.keyword == "property" ? 10
+                                                                  : 5);
                     items.push(item);
                 }
             }
@@ -782,10 +787,11 @@ namespace cial::lsp {
             seen.insert(declaration.name);
             Json item = Json::object();
             item.set("label", declaration.name);
-            item.set("kind", declaration.keyword == "class" ? 7
-                    : declaration.keyword == "function"     ? 2
-                    : declaration.keyword == "property"     ? 10
-                                                            : 5);
+            item.set("kind",
+                     declaration.keyword == "class"          ? 7
+                         : declaration.keyword == "function" ? 2
+                         : declaration.keyword == "property" ? 10
+                                                             : 5);
             items.push(item);
         }
         for(const auto &[qualified, entries] : _declarations.entries()) {
@@ -814,8 +820,8 @@ namespace cial::lsp {
         if(doc.text.empty())
             return Json{};
         refreshDeclarations();
-        const Position at{position->intAt("line"), position->intAt("character")};
-        LineIndex lines{doc.text};
+        const Position at{ position->intAt("line"), position->intAt("character") };
+        LineIndex lines{ doc.text };
         auto index = documentIndex(doc.text);
         const std::string word = wordAt(doc.text, at);
         if(word.empty())
@@ -832,7 +838,7 @@ namespace cial::lsp {
                 if(fallback.name == word) {
                     Json contents = Json::object();
                     contents.set("kind", "plaintext");
-                    contents.set("value", std::string{kindWord(fallback.keyword)} + " " + fallback.name);
+                    contents.set("value", std::string{ kindWord(fallback.keyword) } + " " + fallback.name);
                     Json result = Json::object();
                     result.set("contents", contents);
                     return result;
@@ -850,7 +856,7 @@ namespace cial::lsp {
         const auto resolved = index->resolve(at);
         if(resolved.binding != nullptr) {
             const auto &binding = *resolved.binding;
-            std::string value = std::string{bindingKindWord(binding)} + " " + word;
+            std::string value = std::string{ bindingKindWord(binding) } + " " + word;
             if(!binding.annotation.empty() && binding.annotation != "void")
                 value += ": " + binding.annotation;
             Json contents = Json::object();
@@ -865,7 +871,7 @@ namespace cial::lsp {
                 return DeclarationIndex::hover(*entry);
             for(const auto &source : workspaceSources())
                 if(source.name == word) {
-                    std::string value = std::string{kindWord(source.keyword)} + " " + source.name;
+                    std::string value = std::string{ kindWord(source.keyword) } + " " + source.name;
                     Json contents = Json::object();
                     contents.set("kind", "plaintext");
                     contents.set("value", value);
@@ -884,7 +890,7 @@ namespace cial::lsp {
             return Json{};
         const std::string uri = textDocument->stringAt("uri");
         const Document doc = document(uri);
-        const Position at{position->intAt("line"), position->intAt("character")};
+        const Position at{ position->intAt("line"), position->intAt("character") };
         if(isDeclarationUri(uri)) {
             // 声明文件内：跳转到该文件中同名符号的名称位置
             std::string word = wordAt(doc.text, at);
@@ -933,7 +939,7 @@ namespace cial::lsp {
         Json array = Json::array();
         if(resolved.binding != nullptr) {
             const auto [start, stop] = index->tokenSpan(resolved.binding->token);
-            const Range range = LineIndex{doc.text}.tokenRange(start, stop);
+            const Range range = LineIndex{ doc.text }.tokenRange(start, stop);
             Json location = Json::object();
             location.set("uri", uri);
             Json startJson = Json::object();
@@ -993,17 +999,18 @@ namespace cial::lsp {
         if(textDocument == nullptr)
             return Json::array();
         const Document doc = document(textDocument->stringAt("uri"));
-        LineIndex lines{doc.text};
+        LineIndex lines{ doc.text };
         Json array = Json::array();
         for(const auto &declaration : documentDeclarations(lines)) {
             Json symbol = Json::object();
             symbol.set("name", declaration.name);
-            symbol.set("kind", declaration.keyword == "class" ? 5
-                    : declaration.keyword == "function"       ? 12
-                    : declaration.keyword == "property"       ? 7
-                    : declaration.keyword == "namespace"      ? 3
-                    : declaration.keyword == "const"          ? 14
-                                                              : 13);
+            symbol.set("kind",
+                       declaration.keyword == "class"           ? 5
+                           : declaration.keyword == "function"  ? 12
+                           : declaration.keyword == "property"  ? 7
+                           : declaration.keyword == "namespace" ? 3
+                           : declaration.keyword == "const"     ? 14
+                                                                : 13);
             Json start = Json::object();
             start.set("line", declaration.range.start.line);
             start.set("character", declaration.range.start.character);
@@ -1024,7 +1031,7 @@ namespace cial::lsp {
         std::vector<WorkspaceSymbol> results;
         std::vector<std::pair<std::string, std::string>> buffers; // (uri, text)
         {
-            std::lock_guard lock{_mutex};
+            std::lock_guard lock{ _mutex };
             for(const auto &[uri, doc] : _documents) {
                 const auto path = uriToPath(uri);
                 if(!path.empty() && path.extension() == ".tjs")
@@ -1038,9 +1045,9 @@ namespace cial::lsp {
             const auto path = uriToPath(uri);
             if(!path.empty())
                 overlayPaths.insert(path);
-            LineIndex lines{text};
+            LineIndex lines{ text };
             for(const auto &declaration : documentDeclarations(lines))
-                results.push_back({declaration.name, declaration.keyword, uri, declaration.range});
+                results.push_back({ declaration.name, declaration.keyword, uri, declaration.range });
         }
         size_t totalBytes = 0;
         size_t fileCount = 0;
@@ -1049,10 +1056,11 @@ namespace cial::lsp {
             if(fileCount >= MAX_WORKSPACE_FILES || directoryCount >= MAX_WORKSPACE_DIRECTORIES)
                 break;
             std::error_code ec;
-            for(std::filesystem::recursive_directory_iterator it{root,
-                     std::filesystem::directory_options::skip_permission_denied |
-                         std::filesystem::directory_options::follow_directory_symlink,
-                     ec},
+            for(std::filesystem::recursive_directory_iterator
+                    it{ root,
+                        std::filesystem::directory_options::skip_permission_denied |
+                            std::filesystem::directory_options::follow_directory_symlink,
+                        ec },
                 end;
                 !ec && it != end && fileCount < MAX_WORKSPACE_FILES; it.increment(ec)) {
                 if(it->is_directory(ec)) {
@@ -1069,17 +1077,18 @@ namespace cial::lsp {
                 const auto size = it->file_size(sizeError);
                 if(sizeError || size > MAX_DOCUMENT_BYTES || totalBytes + size > MAX_WORKSPACE_BYTES)
                     continue;
-                std::ifstream input{it->path(), std::ios::binary};
+                std::ifstream input{ it->path(), std::ios::binary };
                 if(!input)
                     continue;
-                std::string text{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+                std::string text{ std::istreambuf_iterator<char>{ input }, std::istreambuf_iterator<char>{} };
                 if(text.starts_with("\xEF\xBB\xBF"))
                     text.erase(0, 3);
                 ++fileCount;
                 totalBytes += text.size();
-                LineIndex lines{text};
+                LineIndex lines{ text };
                 for(const auto &declaration : documentDeclarations(lines))
-                    results.push_back({declaration.name, declaration.keyword, pathToUri(it->path()), declaration.range});
+                    results.push_back(
+                        { declaration.name, declaration.keyword, pathToUri(it->path()), declaration.range });
             }
             if(ec)
                 break;
@@ -1102,22 +1111,23 @@ namespace cial::lsp {
         const std::string query = params.stringAt("query");
         std::string lowerQuery = query;
         std::ranges::transform(lowerQuery, lowerQuery.begin(),
-            [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                               [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
         Json array = Json::array();
         for(const auto &symbol : workspaceSources()) {
             std::string lowerName = symbol.name;
             std::ranges::transform(lowerName, lowerName.begin(),
-                [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                                   [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
             if(lowerName.find(lowerQuery) == std::string::npos)
                 continue;
             Json item = Json::object();
             item.set("name", symbol.name);
-            item.set("kind", symbol.keyword == "class" ? 5
-                    : symbol.keyword == "function"     ? 12
-                    : symbol.keyword == "property"     ? 7
-                    : symbol.keyword == "namespace"    ? 3
-                    : symbol.keyword == "const"        ? 14
-                                                       : 13);
+            item.set("kind",
+                     symbol.keyword == "class"           ? 5
+                         : symbol.keyword == "function"  ? 12
+                         : symbol.keyword == "property"  ? 7
+                         : symbol.keyword == "namespace" ? 3
+                         : symbol.keyword == "const"     ? 14
+                                                         : 13);
             Json start = Json::object();
             start.set("line", symbol.range.start.line);
             start.set("character", symbol.range.start.character);

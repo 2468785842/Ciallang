@@ -49,7 +49,7 @@ namespace cial::lsp {
         [[nodiscard]] const Json *find(std::string_view key) const {
             if(_type != Type::Object)
                 return nullptr;
-            const auto it = _object.find(std::string{key});
+            const auto it = _object.find(std::string{ key });
             return it == _object.end() ? nullptr : &it->second;
         }
         // 成员便捷读取：缺失或类型不符返回 fallback
@@ -69,8 +69,8 @@ namespace cial::lsp {
         void set(std::string key, Json value) { _object[std::move(key)] = std::move(value); }
         void push(Json value) { _array.push_back(std::move(value)); }
 
-        static Json array() { return Json{Type::Array}; }
-        static Json object() { return Json{Type::Object}; }
+        static Json array() { return Json{ Type::Array }; }
+        static Json object() { return Json{ Type::Object }; }
 
         // 解析非法输入返回 Null 并可选带错误信息
         static Json parse(std::string_view text, std::string *error = nullptr);

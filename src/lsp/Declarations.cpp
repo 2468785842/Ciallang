@@ -14,9 +14,7 @@ namespace cial::lsp {
                 if(index != 0)
                     out += ", ";
                 const auto &param = symbol.params[index];
-                std::string value = param.name.empty() && !param.collapse
-                    ? "arg" + std::to_string(index)
-                    : param.name;
+                std::string value = param.name.empty() && !param.collapse ? "arg" + std::to_string(index) : param.name;
                 if(!param.type.empty()) {
                     value += ": ";
                     value += param.type;
@@ -57,7 +55,7 @@ namespace cial::lsp {
             const decl::Module module = decl::parseDeclarations(source, diagnostics, _state->context.pp());
             if(diagnostics.isFailed())
                 return; // 解析失败的声明整文件不当作事实
-            const LineIndex lines{text};
+            const LineIndex lines{ text };
             visit(module.symbols, {}, uri, text, lines, out);
         } catch(const std::exception &) {
             // 瞬时工具故障不缓存为空接口（与 Python 版一致：本轮跳过）
@@ -65,7 +63,8 @@ namespace cial::lsp {
     }
 
     void DeclarationIndex::visit(const std::vector<decl::Symbol> &symbols, const std::string &owner,
-        const std::string &uri, const std::string &text, const LineIndex &lines, std::vector<Entry> &out) const {
+                                 const std::string &uri, const std::string &text, const LineIndex &lines,
+                                 std::vector<Entry> &out) const {
         for(const auto &symbol : symbols) {
             std::string qualified = owner.empty() ? symbol.name : owner + '.' + symbol.name;
             Entry entry;
@@ -87,10 +86,10 @@ namespace cial::lsp {
             const auto resolved = std::filesystem::weakly_canonical(path, ec);
             if(ec || !std::filesystem::is_regular_file(resolved, ec))
                 continue;
-            std::ifstream file{resolved, std::ios::binary};
+            std::ifstream file{ resolved, std::ios::binary };
             if(!file)
                 continue;
-            std::string text{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+            std::string text{ std::istreambuf_iterator<char>{ file }, std::istreambuf_iterator<char>{} };
             // 磁盘声明按 UTF-8 BOM 规则读取（与 SourceFile::load 语义一致）
             if(text.starts_with("\xEF\xBB\xBF"))
                 text.erase(0, 3);
@@ -159,14 +158,14 @@ namespace cial::lsp {
         return it != _entries.end() && it->second.size() == 1 ? &it->second.front() : nullptr;
     }
 
-    std::map<std::string, const DeclarationIndex::Entry *> DeclarationIndex::membersOf(
-        const std::string &qualified) const {
+    std::map<std::string, const DeclarationIndex::Entry *>
+    DeclarationIndex::membersOf(const std::string &qualified) const {
         std::set<std::string> visited;
         return membersOfImpl(qualified, visited);
     }
 
-    std::map<std::string, const DeclarationIndex::Entry *> DeclarationIndex::membersOfImpl(
-        const std::string &qualified, std::set<std::string> &visited) const {
+    std::map<std::string, const DeclarationIndex::Entry *>
+    DeclarationIndex::membersOfImpl(const std::string &qualified, std::set<std::string> &visited) const {
         std::map<std::string, const Entry *> result;
         if(visited.contains(qualified) || visited.size() >= 8)
             return result;
@@ -196,7 +195,8 @@ namespace cial::lsp {
             const std::string local = owner + '.' + result;
             const Entry *candidate = unique(local);
             if(candidate != nullptr &&
-               (candidate->symbol.kind == decl::SymbolKind::Class || candidate->symbol.kind == decl::SymbolKind::Namespace))
+               (candidate->symbol.kind == decl::SymbolKind::Class ||
+                candidate->symbol.kind == decl::SymbolKind::Namespace))
                 return local;
             const auto dot = owner.rfind('.');
             owner = dot == std::string::npos ? std::string{} : owner.substr(0, dot);
@@ -214,9 +214,9 @@ namespace cial::lsp {
 
     std::string DeclarationIndex::callType(const std::string &qualified) const {
         const Entry *entry = unique(qualified);
-        if(entry == nullptr || (entry->symbol.kind != decl::SymbolKind::Function &&
-                                entry->symbol.kind != decl::SymbolKind::StaticFunction &&
-                                entry->symbol.kind != decl::SymbolKind::Class))
+        if(entry == nullptr ||
+           (entry->symbol.kind != decl::SymbolKind::Function &&
+            entry->symbol.kind != decl::SymbolKind::StaticFunction && entry->symbol.kind != decl::SymbolKind::Class))
             return {};
         return returnType(*entry);
     }
@@ -273,9 +273,10 @@ namespace cial::lsp {
         if(!typedPrefix.empty() && symbol.name.starts_with(typedPrefix) == false)
             return Json{};
         static const std::map<decl::SymbolKind, int> kinds{
-            {decl::SymbolKind::Function, 2},     {decl::SymbolKind::StaticFunction, 2},
-            {decl::SymbolKind::Class, 7},        {decl::SymbolKind::Namespace, 9},
-            {decl::SymbolKind::Property, 10},    {decl::SymbolKind::Variable, 5}};
+            { decl::SymbolKind::Function, 2 },  { decl::SymbolKind::StaticFunction, 2 },
+            { decl::SymbolKind::Class, 7 },     { decl::SymbolKind::Namespace, 9 },
+            { decl::SymbolKind::Property, 10 }, { decl::SymbolKind::Variable, 5 }
+        };
         Json item = Json::object();
         item.set("label", symbol.name);
         item.set("kind", kinds.at(symbol.kind));

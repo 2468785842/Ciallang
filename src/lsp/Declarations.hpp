@@ -67,10 +67,10 @@ namespace cial::lsp {
     private:
         void parseFile(const std::string &uri, const std::string &text, std::vector<Entry> &out);
         void visit(const std::vector<decl::Symbol> &symbols, const std::string &owner, const std::string &uri,
-            const std::string &text, const LineIndex &lines, std::vector<Entry> &out) const;
+                   const std::string &text, const LineIndex &lines, std::vector<Entry> &out) const;
         void ensureSession(); // 声明解析会话（Runtime/Context/VMState，惰性创建）
         std::map<std::string, const Entry *> membersOfImpl(const std::string &qualified,
-            std::set<std::string> &visited) const;
+                                                           std::set<std::string> &visited) const;
 
         std::unique_ptr<Runtime> _runtime;
         std::unique_ptr<Context> _context;

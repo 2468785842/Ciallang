@@ -29,7 +29,7 @@ namespace cial::lsp {
 
         private:
             [[noreturn]] void fail(const char *reason) {
-                throw std::runtime_error(std::string{reason} + " at offset " + std::to_string(_pos));
+                throw std::runtime_error(std::string{ reason } + " at offset " + std::to_string(_pos));
             }
 
             void skipWs() {
@@ -62,17 +62,21 @@ namespace cial::lsp {
 
             Json parseValue() {
                 switch(peek()) {
-                    case '{': return parseObject();
-                    case '[': return parseArray();
-                    case '"': return Json{parseString()};
-                    default: break;
+                    case '{':
+                        return parseObject();
+                    case '[':
+                        return parseArray();
+                    case '"':
+                        return Json{ parseString() };
+                    default:
+                        break;
                 }
                 if(literal("true"))
-                    return Json{true};
+                    return Json{ true };
                 if(literal("false"))
-                    return Json{false};
+                    return Json{ false };
                 if(literal("null"))
-                    return Json{nullptr};
+                    return Json{ nullptr };
                 return parseNumber();
             }
 
@@ -136,14 +140,30 @@ namespace cial::lsp {
                         continue;
                     }
                     switch(peek()) {
-                        case '"': out.push_back('"'); break;
-                        case '\\': out.push_back('\\'); break;
-                        case '/': out.push_back('/'); break;
-                        case 'b': out.push_back('\b'); break;
-                        case 'f': out.push_back('\f'); break;
-                        case 'n': out.push_back('\n'); break;
-                        case 'r': out.push_back('\r'); break;
-                        case 't': out.push_back('\t'); break;
+                        case '"':
+                            out.push_back('"');
+                            break;
+                        case '\\':
+                            out.push_back('\\');
+                            break;
+                        case '/':
+                            out.push_back('/');
+                            break;
+                        case 'b':
+                            out.push_back('\b');
+                            break;
+                        case 'f':
+                            out.push_back('\f');
+                            break;
+                        case 'n':
+                            out.push_back('\n');
+                            break;
+                        case 'r':
+                            out.push_back('\r');
+                            break;
+                        case 't':
+                            out.push_back('\t');
+                            break;
                         case 'u': {
                             ++_pos;
                             const unsigned point = hex4();
@@ -162,7 +182,8 @@ namespace cial::lsp {
                             }
                             break;
                         }
-                        default: fail("invalid escape");
+                        default:
+                            fail("invalid escape");
                     }
                     ++_pos;
                 }
@@ -216,10 +237,10 @@ namespace cial::lsp {
                     ++_pos;
                 if(_pos == start)
                     fail("invalid number");
-                const double value = std::strtod(std::string{_text.substr(start, _pos - start)}.c_str(), nullptr);
+                const double value = std::strtod(std::string{ _text.substr(start, _pos - start) }.c_str(), nullptr);
                 if(std::isnan(value) || std::isinf(value))
                     fail("number out of range");
-                return Json{value};
+                return Json{ value };
             }
 
             std::string_view _text;
@@ -231,13 +252,27 @@ namespace cial::lsp {
             out.push_back('"');
             for(const char ch : value) {
                 switch(ch) {
-                    case '"': out += "\\\""; break;
-                    case '\\': out += "\\\\"; break;
-                    case '\b': out += "\\b"; break;
-                    case '\f': out += "\\f"; break;
-                    case '\n': out += "\\n"; break;
-                    case '\r': out += "\\r"; break;
-                    case '\t': out += "\\t"; break;
+                    case '"':
+                        out += "\\\"";
+                        break;
+                    case '\\':
+                        out += "\\\\";
+                        break;
+                    case '\b':
+                        out += "\\b";
+                        break;
+                    case '\f':
+                        out += "\\f";
+                        break;
+                    case '\n':
+                        out += "\\n";
+                        break;
+                    case '\r':
+                        out += "\\r";
+                        break;
+                    case '\t':
+                        out += "\\t";
+                        break;
                     default:
                         if(static_cast<unsigned char>(ch) < 0x20) {
                             char escape[7];
@@ -253,8 +288,12 @@ namespace cial::lsp {
 
         void dumpValue(std::string &out, const Json &value) {
             switch(value.type()) {
-                case Json::Type::Null: out += "null"; break;
-                case Json::Type::Bool: out += value.asBool() ? "true" : "false"; break;
+                case Json::Type::Null:
+                    out += "null";
+                    break;
+                case Json::Type::Bool:
+                    out += value.asBool() ? "true" : "false";
+                    break;
                 case Json::Type::Number: {
                     const double number = value.asNumber();
                     if(number == static_cast<long long>(number) && std::fabs(number) < 9.0e15)
@@ -263,7 +302,9 @@ namespace cial::lsp {
                         out += std::to_string(number);
                     break;
                 }
-                case Json::Type::String: dumpString(out, value.asString()); break;
+                case Json::Type::String:
+                    dumpString(out, value.asString());
+                    break;
                 case Json::Type::Array: {
                     out.push_back('[');
                     bool first = true;
@@ -294,9 +335,7 @@ namespace cial::lsp {
         }
     } // namespace
 
-    Json Json::parse(std::string_view text, std::string *error) {
-        return Parser{text, error}.run();
-    }
+    Json Json::parse(std::string_view text, std::string *error) { return Parser{ text, error }.run(); }
 
     std::string Json::dump() const {
         std::string out;
