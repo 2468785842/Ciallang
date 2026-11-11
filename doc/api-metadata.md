@@ -94,7 +94,7 @@ context.nativeType<Array>()
 
 - `classes` 按注册名排序（内部为 `unordered_map`），含 `members`；未登记注册名的类型
   不进入导出。
-- `kind` 取值 `method` / `property` / `static` / `global` / `namespace` / `class`；
+- `kind` 取值 `method` / `property` / `static` / `global` / `namespace` / `class` / `constructor`；
   `owner` 为点分归属路径（`Math.RandomGenerator` 类的成员归属仍由 `classes` 表达）。
 - 类型未知输出 `null`；`doc` 存在时才出现该字段。消费方按 `schemaVersion` 判断兼容，
   忽略未知字段。

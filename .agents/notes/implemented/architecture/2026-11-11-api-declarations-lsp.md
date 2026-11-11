@@ -54,7 +54,16 @@ Status: implemented
 主体提交的格式检查与 Linux/macOS 四个构建通过；Windows 三个配置在 LSP 测试失败：
 原生成员缺失及中文方法范围 28 != 31（27 项中 3 失败、1 错误）。
 失败与 CRT stdin 的 CRLF 转换导致字节偏移错位相符；收尾修改以原始字节传输/保存声明，
-新增原始 CRLF 与 BOM 回归，后续 Windows 复验结果另补充，不将 Linux 通过计为 Windows 通过。
+新增原始 CRLF 与 BOM 回归。以真实核心分析模拟 CRT 换行转换时，110 个声明名偏移不匹配；
+原始字节传输下为 0（`out/declarations-eol-repro.json`，这是 Linux 上的原因分析，非 Windows 执行证据）。
+
+最终远端验证：源 `ef2ac0ccb8a5dbc47b8cddf70aac7bd8330c7566`，
+[43009783934](https://github.com/2468785842/Ciallang/actions/runs/43009783934) 整体 success，8/8 job 通过：
+格式检查、Linux/macOS Debug/Release、Windows Debug/Release/Release JIT-ON。
+Windows 三个配置各 249/249 CTest 通过（含真实 LSP 子进程协议与 CRLF/BOM 回归），
+两个 Windows Release 配置的 relocated installed SDK 也分别 1/1 通过。
+首轮失败和最终成功分开保留；中间源 3330267、5603556 的旧运行由本会话取消以集中验证最新代码。
+本机在最终原始字节改动后再次核对全量 460/460、39 项 CLI、27 项协议及打包服务器 stdio 补全流程。
 
 ## 保留边界
 
