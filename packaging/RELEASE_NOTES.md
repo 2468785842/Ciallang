@@ -1,10 +1,12 @@
-这是 Ciallang 的首个预览版，面向 TJS2 脚本执行、兼容性验证与宿主嵌入探索。
+这是 Ciallang 的第二个预览版，在首个预览版的基础上交付 C++ 语言服务器与可分发的系统接口声明。
 
 ## 本版提供
 
-- CLI、REPL、JSON 编译诊断，以及 TJS2 字节码加载与转译；兼容范围见[兼容性说明](https://github.com/2468785842/Ciallang/blob/v0.1.0-preview.1/doc/compatibility.md)。
-- 常用语言与标准库功能；本批区分 null/void，基础字符串操作按 UTF-16 码元计数，RegExp 使用 Oniguruma。
-- 源码中的实验性 C++ SDK：CMake install/export、Engine 执行入口、带根结果、执行 context 与宿主文本存储读取器。SDK 从源码另行安装，不包含在 CLI 压缩包内，尚未承诺稳定 ABI。
+- **C++ 语言服务器 `cial-lsp`**（新增，随源码构建，配置预设 `CIAL_BUILD_LSP`）：stdio LSP 提供实时编译/声明诊断、关键字与文档补全、基于保守类型推导的成员补全、悬停、跳转定义与文档/工作区符号。诊断与声明解析在进程内完成；VSCode 扩展（`editors/vscode`）直接启动该服务器，不再依赖 Python。绑定级重命名尚未移植。
+- **系统接口声明随包分发**：构建期按顶层符号生成 `.d.tjs`（`Array.d.tjs`、`Math.d.tjs`、`globals.d.tjs` 等，CLI 新增 `--api-decl-dir`），CLI 压缩包与 SDK 安装均包含 `share/ciallang/declarations/`；脚本工具直接读取声明文件获得签名与文档，无需查看 C++ 源码。
+- **标准库具名签名与文档**：Math、Date、Dictionary、RegExp、Array、String、Octet、RandomGenerator、Scripts 的方法登记具名参数、返回类型与 `/** */` 文档，类级文档随声明导出。
+- **宿主 SDK 声明导出**：注册的类可附类型级文档（`ApiCatalog` typeDocs），可选能力库按构建开关门控注册——关闭的库不出现在声明产物中。
+- CLI、REPL、JSON 编译诊断、TJS2 字节码加载与转译、源码 SDK 安装等首版能力延续，兼容范围见[兼容性说明](https://github.com/2468785842/Ciallang/blob/v0.1.0-preview.2/doc/compatibility.md)。
 
 ## 下载与运行
 
@@ -17,14 +19,14 @@ bin/cial --repl
 ```
 
 Windows 将程序名替换为 `bin/cial.exe`。程序运行不需要源码、vcpkg 或 Python。
-包内 `build-info.json` 记录提交、系统/架构、编译器、运行库及功能开关，`licenses/` 包含第三方许可与依赖资料。
+包内 `build-info.json` 记录提交、系统/架构、编译器、运行库及功能开关，`licenses/` 包含第三方许可与依赖资料，`share/ciallang/declarations/` 为系统接口声明。
 本版关闭可选 JIT。Linux 包使用 Ubuntu 24.04 构建；macOS 部署下限为 15.6，均只面向包名所列架构，系统基础运行库仍由操作系统提供。
 
 ## 已知限制
 
-- 尚不能直接替换 krkr2 的 TJS2 核心：双向对象桥、TVP/XP3 接入及真实游戏验收仍未完成，见[接入计划](https://github.com/2468785842/Ciallang/blob/v0.1.0-preview.1/doc/krkr2-integration.md)。
-- 字节码 proxy、缺失成员 typeof、动态类及部分 Unicode 边界仍有缺口；`.d.tjs`、模块系统和 DAP 调试器尚未实现。
-- 本批 GCC 全局整数循环对照存在约 10% 性能回退，尚待定位；环境、基线与原始样本见[性能记录](https://github.com/2468785842/Ciallang/blob/v0.1.0-preview.1/doc/performance.md)。该数据不代表发布包所用编译器的性能结论。
+- 语言服务器的绑定级重命名、声明/实现一致性检查与完整静态类型检查尚未实现；范围见[LSP 文档](https://github.com/2468785842/Ciallang/blob/v0.1.0-preview.2/doc/lsp.md)。
+- 尚不能直接替换 krkr2 的 TJS2 核心：双向对象桥、TVP/XP3 接入及真实游戏验收仍未完成，见[接入计划](https://github.com/2468785842/Ciallang/blob/v0.1.0-preview.2/doc/krkr2-integration.md)。
+- 字节码 proxy、缺失成员 typeof、动态类及部分 Unicode 边界仍有缺口；模块系统和 DAP 调试器尚未实现。
 
-普通 CI 覆盖三平台 Debug/Release、Windows JIT 与 Release SDK 安装消费测试。
+普通 CI 覆盖三平台 Debug/Release、Windows JIT、LSP 协议回归与 Release SDK 安装消费测试。
 发布流程另在各平台执行构建、全部 CTest、打包、独立目录解压运行及校验和核验，全部通过后才生成 Release 草稿。
