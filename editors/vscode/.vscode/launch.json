@@ -8,8 +8,7 @@
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
         "${workspaceFolder}/../.."
-      ],
-      "preLaunchTask": "npm: prepare"
+      ]
     }
   ]
 }
