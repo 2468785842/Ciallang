@@ -11,7 +11,8 @@
 // 预留能力位：对应批次落地前保持 0，宿主与工具不得报告为已支持（doc/roadmap.md §5）。
 #define CIAL_CAP_MODULES 0
 #define CIAL_CAP_SCRIPT_DEBUG 0
-#define CIAL_CAP_DECL_METADATA 0
+// 声明模型、注册元数据与导出已落地；不表示普通脚本具备静态类型检查。
+#define CIAL_CAP_DECL_METADATA 1
 
 namespace cial::capabilities {
     // 编译期能力查询（doc/roadmap.md §3.1）：向链接宿主提供安装库的构建配置事实。

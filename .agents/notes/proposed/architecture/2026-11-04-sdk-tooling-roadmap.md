@@ -27,7 +27,8 @@ Status: proposed
   往返幂等）与 CTest/基准/语料/fuzz 扫描排除；登记顺带修复 `--api-json` 中 Scripts
   成员重复条目（`recordApiMember` 改为同名同类别替换）。批次 C 已实现：
   核心 --decl-json、丰富 ApiMeta、LSP 声明补全/悬停/导航、外部 SDK 声明配置；
-  BUILTIN_MEMBERS 已移除，原生说明移至注册点；具体边界见 doc/lsp.md。
+  BUILTIN_MEMBERS 已移除，原生说明移至注册点；具体边界见 doc/lsp.md，
+  [验证记录](../../implemented/architecture/2026-11-11-api-declarations-lsp.md)保留实际范围。
   剩余：声明/实现一致性检查、独立冲突诊断、重载选择及普通不完整源码的统一核心分析。
 - 批次 3 未开始：模块作用域、显式导出、宿主解析、Context 缓存、循环诊断及
   异常/GC 恢复，保留 `Scripts` 兼容入口；稳定后再讨论 `import/export` 语法。

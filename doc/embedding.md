@@ -38,7 +38,7 @@ CRT 或动态库 ABI。`tjsbc`、`decompile`、`cli`、`format`、`dbg` 为工�
 
 能力查询：链接宿主用生成的 `cial/Capability.hpp` 提供 `cial::capabilities::` 下的
 constexpr 查询（`sdkApiVersion()`、`capabilitySchemaVersion()`、`hasJit()` 及模块/
-调试/声明元数据预留位）；不链接 SDK 的工具用 `cial --capabilities` 取单行 JSON，
+调试预留位与已开启的 `hasDeclarationMetadata()`）；不链接 SDK 的工具用 `cial --capabilities` 取单行 JSON，
 按 `schemaVersion` 判断兼容并忽略未知字段。预留能力位在对应能力落地前保持关闭，
 宿主与工具不得报告为已支持；`CIAL_DEBUG` 反映包含方构建配置，不属于库能力
 （`cmake/Capability.hpp.in`、`tools/generate_version.py`）。

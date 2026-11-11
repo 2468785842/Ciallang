@@ -1,5 +1,6 @@
 #include "Binding.hpp"
 #include "cial/Engine.hpp"
+#include "decl/DeclModel.hpp"
 
 struct Counter {
     int value{};
@@ -9,7 +10,17 @@ struct Counter {
 int main() {
     using namespace cial;
     cial::Engine engine;
-    engine.context().module("Host"_str).class_<Counter>("Counter"_str).constructor<>().method("add"_str, &Counter::add);
+    static_assert(cial::capabilities::hasDeclarationMetadata());
+    engine.context()
+        .module("Host"_str)
+        .class_<Counter>("Counter"_str)
+        .constructor<>()
+        .method("add"_str, &Counter::add,
+                api::signature({ { .name = "n", .type = "Integer" } }, "Integer", "增加并返回计数"));
+    const auto declaration = decl::generateDeclarations(decl::declarationsFromCatalog(engine.context().apiCatalog()));
+    if(declaration.find("function add(n: Integer): Integer;") == std::string::npos ||
+       declaration.find("增加并返回计数") == std::string::npos)
+        return 3;
     cial::Common::Result result;
     auto value = engine.execute("(new Host.Counter()).add(42) + \"😀\".length - 2", result, "host://smoke", true);
     if(result.isFailed() || value->asInteger().unwrap() != 42)
