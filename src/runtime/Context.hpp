@@ -13,6 +13,7 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <ranges>
 
 #include "parser/PreProcessor.hpp"
@@ -108,7 +109,15 @@ namespace cial {
             nativeRegister().apiCatalog.typeNames[key] = std::move(name);
         }
         void recordApiMember(NativeTypeKey key, ApiMeta meta) {
-            nativeRegister().apiCatalog.typeMembers[key].push_back(std::move(meta));
+            auto &members = nativeRegister().apiCatalog.typeMembers[key];
+            // 注册表按名字覆盖（MethodTable/属性表同名替换）；目录保持同语义，
+            // 重注册回填（如 registerScriptsLib 的二次绑定）不产生重复条目
+            const auto existing = std::ranges::find_if(
+                members, [&](const ApiMeta &entry) { return entry.name == meta.name && entry.kind == meta.kind; });
+            if(existing != members.end())
+                *existing = std::move(meta);
+            else
+                members.push_back(std::move(meta));
         }
         void recordApiGlobal(ApiMeta meta) { nativeRegister().apiCatalog.globals.push_back(std::move(meta)); }
         [[nodiscard]] const ApiCatalog &apiCatalog() const { return nativeRegister().apiCatalog; }
