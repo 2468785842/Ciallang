@@ -235,7 +235,7 @@ if(CIAL_BUILD_CLI)
         COMMAND "${CMAKE_COMMAND}"
             -DCIAL_EXE=$<TARGET_FILE:cial>
             -DCIAL_DECL_DIR=$<TARGET_FILE_DIR:cial>/declarations
-            -DCIAL_SCRIPT_BUILTINS=${PROJECT_SOURCE_DIR}/tools/lsp/script-builtins.d.tjs
+            -DCIAL_SCRIPT_BUILTINS=${PROJECT_SOURCE_DIR}/tools/lsp/Exception.d.tjs
             -P "${PROJECT_SOURCE_DIR}/cmake/GenerateApiDeclarations.cmake"
         VERBATIM)
 endif()

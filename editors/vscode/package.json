@@ -54,8 +54,9 @@
     ]
   },
   "scripts": {
-    "check": "node --check extension.js && node --check launch-options.js && node --check test/smoke.js",
-    "test": "node --test test/*.test.js"
+    "check": "node --check extension.js && node --check launch-options.js && node --check prepare.js && node --check test/smoke.js",
+    "test": "node --test test/*.test.js",
+    "prepare": "node prepare.js"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

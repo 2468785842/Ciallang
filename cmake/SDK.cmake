@@ -37,7 +37,7 @@ if(TARGET cial)
     install(DIRECTORY "$<TARGET_FILE_DIR:cial>/declarations/"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/ciallang/declarations" COMPONENT SDK)
 else()
-    install(FILES "${PROJECT_SOURCE_DIR}/tools/lsp/script-builtins.d.tjs"
+    install(FILES "${PROJECT_SOURCE_DIR}/tools/lsp/Exception.d.tjs"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/ciallang/declarations" COMPONENT SDK)
 endif()
 install(FILES "${PROJECT_SOURCE_DIR}/tests/installed/CMakeLists.txt"

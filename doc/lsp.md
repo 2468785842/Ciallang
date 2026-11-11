@@ -14,7 +14,7 @@
 `/** */` 注释——
 
 - 构建期生成在可执行文件旁的 `declarations/`（每类型一个文件 + `globals.d.tjs` + 手写
-  `script-builtins.d.tjs`，生成方式见 [声明文件](declarations.md) §3）；
+  `Exception.d.tjs`，生成方式见 [声明文件](declarations.md) §3）；
 - 安装布局 `<prefix>/share/ciallang/declarations/`（SDK 与 CLI 归档随装）；
 - `initializationOptions.declarationFiles` 显式文件（外部宿主 SDK）；
 - 工作区发现的 `.d.tjs`（未保存缓冲优先，关闭恢复磁盘）。

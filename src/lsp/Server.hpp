@@ -7,6 +7,7 @@
 // API 事实只来自随编译器分发的 .d.tjs 与项目声明（doc/lsp.md），服务端不内置接口。
 #pragma once
 
+#include <condition_variable>
 #include <filesystem>
 #include <map>
 #include <mutex>

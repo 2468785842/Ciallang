@@ -25,7 +25,7 @@ target_link_libraries(host PRIVATE Ciallang::Ciallang)
 
 `share/ciallang/declarations/` 提供声明文件：按顶层符号拆分的系统声明（`Array.d.tjs`、
 `Math.d.tjs`、`globals.d.tjs` 等，构建期由 `cial --api-decl-dir` 生成，需要构建 CLI，
-`CIAL_BUILD_CLI=OFF` 的纯 SDK 配置没有该产物），`script-builtins.d.tjs` 描述脚本自举的
+`CIAL_BUILD_CLI=OFF` 的纯 SDK 配置没有该产物），`Exception.d.tjs` 描述脚本自举的
 Exception（见 [声明文件](declarations.md) §3）。
 把该目录配置进编辑器（如 VSCode 的 `ciallang.declarationFiles`）即可获得标准库的
 接口文档与跳转，不需要查看 C++ 注册源码。
