@@ -239,7 +239,9 @@ namespace cial::lsp {
     }
 
     std::string pathToUri(const std::filesystem::path &path) {
-        return "file:///" + percentEncodePath(std::filesystem::weakly_canonical(path));
+        const std::string encoded = percentEncodePath(std::filesystem::weakly_canonical(path));
+        // Windows 盘符路径（D:/...）补第三个斜杠；POSIX 绝对路径自带前导 /
+        return encoded.starts_with('/') ? "file://" + encoded : "file:///" + encoded;
     }
 
     bool Server::readMessage(std::istream &in, std::string &content) {
