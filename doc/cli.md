@@ -8,6 +8,7 @@ cial --tjsbc program.tjsbc
 cial --check-json script.tjs
 cial --check-json --source-name untitled:1 -        # 从 stdin 读取，保留逻辑源码名
 cial --check-json interface.d.tjs                   # .d.tjs 按声明模式分析（decl.* 诊断）
+cial --decl-json --source-name interface.d.tjs -    # 核心声明符号、文档、UTF-8 名称范围与诊断
 cial --dump-cfg script.tjs
 cial --dump-ssa script.tjs
 cial --trace-execution script.tjs output.dot
@@ -28,6 +29,7 @@ cial --help
 - `--dump-cfg` / `--dump-ssa` 编译并输出分析结果，不执行脚本；`--dump-tac` 将执行前的 TAC 写 stderr。
 - `--trace-execution` 把执行路径写入指定 DOT 文件；运行期错误发生时仍保存此前的路径；拒绝将输出写回输入文件。
 - `--api-decl` 输出标准库与内建宿主的 `.d.tjs` 声明文本（与 `--api-json` 同一注册链，不执行用户脚本）；声明语法、生成规则与宿主侧导出见[声明文件](declarations.md)。
+- `--decl-json` 显式按声明模式解析输入，不初始化用户会话或执行输入；返回 schemaVersion 1 的符号树及嵌套 schema 2 诊断，见[声明传输接口](declarations.md#4-cli-行为与执行侧拒绝)。
 - 声明文件（`.d.tjs`，按源码身份识别）不可当作脚本执行：执行与编译型模式（含 `--dump-cfg`/`--dump-ssa`/`--decompile` 的源码路径）报 `decl.not-executable`；`--check-json` 对其按声明模式分析。`Scripts.execStorage/evalStorage` 与 SDK `Engine::execute` 同样拒绝。
 - 退出码：成功 `0`，输入文件/编译/运行/输出错误 `1`，命令行参数错误 `2`。
 

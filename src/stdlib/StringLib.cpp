@@ -26,23 +26,40 @@ namespace cial::stdlib {
         // String 是语言内建类型，不走 registerClass；导出与声明生成需要注册名
         context.recordApiTypeName(TypeTraits<String>::key(), "String");
         context.nativeType<String>()
-            .method("charAt"_str, &stdlib::stringCharAt)
-            .method("indexOf"_str, &stdlib::stringIndexOf)
-            .method("toUpperCase"_str, &stdlib::stringToUpperCase)
-            .method("toLowerCase"_str, &stdlib::stringToLowerCase)
-            .method("substring"_str, &stdlib::stringSubstring)
-            .method("substr"_str, &stdlib::stringSubstring)
-            .method("sprintf"_str, &stdlib::stringSprintf)
-            .method("replace"_str, &stdlib::stringReplace)
-            .method("split"_str, &stdlib::stringSplitWith)
-            .method("escape"_str, &stdlib::stringEscape)
-            .method("trim"_str, &stdlib::stringTrim)
-            .method("reverse"_str, &stdlib::stringReverse)
-            .method("repeat"_str, &stdlib::stringRepeat)
-            .property("length"_str, [](const Value &thisObj) {
-                const auto *str = thisObj.asString().unwrap();
-                return Value{ Integer{ static_cast<Integer>(Common::utf16Length({ str->getData(), str->length() })) } };
-            });
+            .method("charAt"_str, &stdlib::stringCharAt,
+                    api::signature({ { .name = "index", .type = "Integer" } }, "String", "取指定位置的 UTF-16 字符。"))
+            .method("indexOf"_str, &stdlib::stringIndexOf,
+                    api::signature({ { .name = "subStr", .type = "String" },
+                                     { .name = "start", .type = "Integer", .optional = true, .defaultText = "0" } },
+                                   "Integer", "查找子串，未找到返回 -1。"))
+            .method("toUpperCase"_str, &stdlib::stringToUpperCase, api::signature({}, "String", "转大写。"))
+            .method("toLowerCase"_str, &stdlib::stringToLowerCase, api::signature({}, "String", "转小写。"))
+            .method("substring"_str, &stdlib::stringSubstring,
+                    api::signature({ { .name = "start", .type = "Integer" },
+                                     { .name = "length", .type = "Integer", .optional = true, .defaultText = "void" } },
+                                   "String", "按 UTF-16 位置与长度取子串。"))
+            .method("substr"_str, &stdlib::stringSubstring,
+                    api::signature({ { .name = "start", .type = "Integer" },
+                                     { .name = "length", .type = "Integer", .optional = true, .defaultText = "void" } },
+                                   "String", "substring 的别名。"))
+            .method("sprintf"_str, &stdlib::stringSprintf,
+                    api::signature({ { .name = "args", .type = "any", .collapse = true } }, "String",
+                                   "以当前字符串为格式模板。"))
+            .method("replace"_str, &stdlib::stringReplace, "用正则 re 替换")
+            .method("split"_str, &stdlib::stringSplitWith, "按模式拆分")
+            .method("escape"_str, &stdlib::stringEscape, api::signature({}, "String", "转义特殊字符。"))
+            .method("trim"_str, &stdlib::stringTrim, api::signature({}, "String", "去除首尾空白。"))
+            .method("reverse"_str, &stdlib::stringReverse, api::signature({}, "String", "反转字符串。"))
+            .method("repeat"_str, &stdlib::stringRepeat,
+                    api::signature({ { .name = "count", .type = "Integer" } }, "String", "重复字符串。"))
+            .property(
+                "length"_str,
+                [](const Value &thisObj) {
+                    const auto *str = thisObj.asString().unwrap();
+                    return Value{ Integer{
+                        static_cast<Integer>(Common::utf16Length({ str->getData(), str->length() })) } };
+                },
+                ApiMeta{ .ret = "Integer", .doc = "UTF-16 码元数。" });
     }
 
 

@@ -12,6 +12,7 @@ namespace cial::cli {
         for(const auto &[name, help] :
             { std::pair{ "--tjsbc", "execute TJS2 bytecode" },
               { "--check-json", "compile only; emit JSON diagnostics" },
+              { "--decl-json", "analyze declarations only; emit symbols and diagnostics JSON" },
               { "--dump-cfg", "compile only; emit control-flow graphs" },
               { "--dump-ssa", "compile only; emit SSA analysis" },
               { "--decompile", "decompile TJS2 bytecode or source to TJS2 source (strict)" },
@@ -45,6 +46,7 @@ namespace cial::cli {
         int modes = 0;
         for(const auto &[flag, mode] : { std::pair{ "--tjsbc", Mode::Bytecode },
                                          { "--check-json", Mode::CheckJson },
+                                         { "--decl-json", Mode::DeclJson },
                                          { "--dump-cfg", Mode::DumpCfg },
                                          { "--dump-ssa", Mode::DumpSsa },
                                          { "--decompile", Mode::Decompile },
@@ -59,7 +61,7 @@ namespace cial::cli {
         }
         if(modes > 1)
             throw std::runtime_error("choose only one of --tjsbc, --check-json, --dump-cfg, --dump-ssa, "
-                                     "--decompile, --repl, --capabilities, --api-json, --api-decl");
+                                     "--decompile, --repl, --capabilities, --api-json, --api-decl, --decl-json");
         options.decompileView = parser.get<bool>("--view");
         if(parser.is_used("--map"))
             options.decompileMap = parser.get<std::string>("--map");
@@ -114,8 +116,8 @@ namespace cial::cli {
             options.input = inputs[0];
         if(trace && inputs.size() == 2)
             options.traceOutput = inputs[1];
-        const bool compileOnly = options.mode == Mode::CheckJson || options.mode == Mode::DumpCfg ||
-            options.mode == Mode::DumpSsa || options.mode == Mode::Decompile;
+        const bool compileOnly = options.mode == Mode::CheckJson || options.mode == Mode::DeclJson ||
+            options.mode == Mode::DumpCfg || options.mode == Mode::DumpSsa || options.mode == Mode::Decompile;
         if(compileOnly &&
            (trace || options.jit != vm::JitMode::Off || options.tailRecursion || options.timing || options.dumpTac))
             throw std::runtime_error("compile-only modes do not accept execution options");

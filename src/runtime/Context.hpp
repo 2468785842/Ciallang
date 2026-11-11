@@ -109,6 +109,7 @@ namespace cial {
             nativeRegister().apiCatalog.typeNames[key] = std::move(name);
         }
         void recordApiMember(NativeTypeKey key, ApiMeta meta) {
+            api::normalize(meta);
             auto &members = nativeRegister().apiCatalog.typeMembers[key];
             // 注册表按名字覆盖（MethodTable/属性表同名替换）；目录保持同语义，
             // 重注册回填（如 registerScriptsLib 的二次绑定）不产生重复条目
@@ -119,7 +120,10 @@ namespace cial {
             else
                 members.push_back(std::move(meta));
         }
-        void recordApiGlobal(ApiMeta meta) { nativeRegister().apiCatalog.globals.push_back(std::move(meta)); }
+        void recordApiGlobal(ApiMeta meta) {
+            api::normalize(meta);
+            nativeRegister().apiCatalog.globals.push_back(std::move(meta));
+        }
         [[nodiscard]] const ApiCatalog &apiCatalog() const { return nativeRegister().apiCatalog; }
 
         template <typename T>
@@ -140,6 +144,22 @@ namespace cial {
                 // NativePropGetter 返回 Value，具体属性类型注册点未声明时推导不出
                 ApiMeta meta{ .kind = ApiKind::Property, .name = name.toStdStr(), .ret = "any", .doc = std::move(doc) };
                 _ctx.recordApiMember(TypeTraits<T>::key(), std::move(meta));
+                return *this;
+            }
+            template <typename Callable>
+            NativeTypeBuilder &method(const String &name, Callable &&fn, const ApiMeta &description) {
+                _ctx.registerMethod<T>(name, std::forward<Callable>(fn));
+                _ctx.recordApiMember(
+                    TypeTraits<T>::key(),
+                    api::annotate(api::makeMeta<Callable>(ApiKind::Method, name.toStdStr()), description));
+                return *this;
+            }
+            NativeTypeBuilder &property(const String &name, NativePropGetter getter, const ApiMeta &description) {
+                _ctx.registerProperty<T>(name, getter);
+                _ctx.recordApiMember(
+                    TypeTraits<T>::key(),
+                    api::annotate(ApiMeta{ .kind = ApiKind::Property, .name = name.toStdStr(), .ret = "any" },
+                                  description));
                 return *this;
             }
         };

@@ -15,23 +15,23 @@
 namespace cial::stdlib {
     void registerDateLib(Context &context) {
         context.nativeType<DateNS>()
-            .method("getYear"_str, &stdlib::dateGetYear)
-            .method("getMonth"_str, &stdlib::dateGetMonth)
-            .method("getDate"_str, &stdlib::dateGetDate)
-            .method("getDay"_str, &stdlib::dateGetDay)
-            .method("getHours"_str, &stdlib::dateGetHours)
-            .method("getMinutes"_str, &stdlib::dateGetMinutes)
-            .method("getSeconds"_str, &stdlib::dateGetSeconds)
-            .method("getTime"_str, &stdlib::dateGetTime)
-            .method("setYear"_str, &stdlib::dateSetYear)
-            .method("setMonth"_str, &stdlib::dateSetMonth)
-            .method("setDate"_str, &stdlib::dateSetDate)
-            .method("setHours"_str, &stdlib::dateSetHours)
-            .method("setMinutes"_str, &stdlib::dateSetMinutes)
-            .method("setSeconds"_str, &stdlib::dateSetSeconds)
-            .method("setTime"_str, &stdlib::dateSetTime)
-            .method("parse"_str, &stdlib::dateParse)
-            .method("getTimezoneOffset"_str, &stdlib::dateGetTimezoneOffset);
+            .method("getYear"_str, &stdlib::dateGetYear, "年")
+            .method("getMonth"_str, &stdlib::dateGetMonth, "月（0 起）")
+            .method("getDate"_str, &stdlib::dateGetDate, "日")
+            .method("getDay"_str, &stdlib::dateGetDay, "星期")
+            .method("getHours"_str, &stdlib::dateGetHours, "时")
+            .method("getMinutes"_str, &stdlib::dateGetMinutes, "分")
+            .method("getSeconds"_str, &stdlib::dateGetSeconds, "秒")
+            .method("getTime"_str, &stdlib::dateGetTime, "毫秒时间戳")
+            .method("setYear"_str, &stdlib::dateSetYear, "设置年")
+            .method("setMonth"_str, &stdlib::dateSetMonth, "设置月")
+            .method("setDate"_str, &stdlib::dateSetDate, "设置日")
+            .method("setHours"_str, &stdlib::dateSetHours, "设置时")
+            .method("setMinutes"_str, &stdlib::dateSetMinutes, "设置分")
+            .method("setSeconds"_str, &stdlib::dateSetSeconds, "设置秒")
+            .method("setTime"_str, &stdlib::dateSetTime, "设置毫秒时间戳")
+            .method("parse"_str, &stdlib::dateParse, "解析日期文本")
+            .method("getTimezoneOffset"_str, &stdlib::dateGetTimezoneOffset, "时区偏移（分钟）");
         // Date 类对象：占位实例（call 即构造：new Date()/分量/字符串）
         context.registerClass<DateNS>("Date"_str);
     }

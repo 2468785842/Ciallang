@@ -65,6 +65,12 @@ class CliTest(CliTestCase):
         string = {m["name"]: m for m in classes["String"]}
         self.assertEqual(string["charAt"]["params"], ["Integer"])
         self.assertEqual(string["charAt"]["ret"], "String")
+        self.assertEqual(string['charAt']['parameters'][0]['name'], 'index')
+        self.assertEqual(array['join']['parameters'][0]['defaultText'], '","')
+        self.assertEqual([param['name'] for param in array['split']['parameters']],
+                         ['pattern', 'text', 'reserved', 'purgeempty'])
+        self.assertEqual(array['sort']['ret'], 'void')
+        self.assertTrue(array['count']['hasSetter'])
         math = {m["name"]: m for m in classes["Math"]}
         self.assertEqual(math["abs"]["kind"], "method")
         self.assertEqual(math["abs"]["variadic"], True)
@@ -91,9 +97,10 @@ class CliTest(CliTestCase):
         self.assertEqual(first.stdout, second.stdout)
         self.assertTrue(first.stdout.endswith("\n"))
         self.assertIn("class String {", first.stdout)
-        self.assertIn("function charAt(arg0: Integer): String;", first.stdout)
-        self.assertIn("function push(*): any;", first.stdout)
-        self.assertIn("property length: any;", first.stdout)
+        self.assertIn("function charAt(index: Integer): String;", first.stdout)
+        self.assertIn("function push(values: any*): Integer;", first.stdout)
+        self.assertIn('function join(delim: String = ","): String;', first.stdout)
+        self.assertIn("property length: Integer;", first.stdout)
         self.assertIn("/** 输出值的字符串化结果（不换行） */", first.stdout)
         # 类集合与 --api-json 一致
         api = json.loads(self.run_cial("--api-json").stdout)
@@ -106,6 +113,45 @@ class CliTest(CliTestCase):
                 process = self.run_cial(*flags)
                 self.assertEqual(process.returncode, 2, process.stderr)
                 self.assertEqual(process.stdout, "")
+
+    def test_native_export_declaration_symbol_consistency(self):
+        api = json.loads(self.run_cial('--api-json').stdout)
+        text = self.run_cial('--api-decl').stdout
+        process = self.run_cial('--decl-json', '--source-name', 'stdlib.d.tjs', '-', input=text)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        symbols = json.loads(process.stdout)['symbols']
+        classes = {node['name']: node for node in symbols if node['kind'] == 'class'}
+        for native in api['classes']:
+            actual = {member['name']: member for member in classes[native['name']]['members']}
+            self.assertEqual(set(actual), {member['name'] for member in native['members']})
+            for metadata in native['members']:
+                symbol = actual[metadata['name']]
+                self.assertEqual(symbol['doc'], metadata.get('doc', ''))
+                self.assertEqual(symbol['ret'], metadata['ret'] or '')
+                if 'parameters' in metadata:
+                    self.assertEqual(symbol['params'], metadata['parameters'])
+
+    def test_core_declaration_symbols_json(self):
+        text = '/** 中文接口 😀\x01 */\nclass Window {\n/** 显示标题 */\nfunction show(title: String = "标题"): void;\nproperty caption { getter: String; setter(value: String); }\n}\n'
+        result = self.run_cial('--decl-json', '--source-name', 'file:///host.d.tjs', '-', input=text)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(report['schemaVersion'], 1)
+        self.assertTrue(report['check']['ok'])
+        window = report['symbols'][0]
+        self.assertEqual(window['doc'], '中文接口 😀\x01')
+        show = window['members'][0]
+        self.assertEqual(show['params'][0]['name'], 'title')
+        self.assertEqual(show['params'][0]['defaultText'], '"标题"')
+        self.assertTrue(show['params'][0]['optional'])
+        self.assertEqual(text.encode('utf-8')[show['begin']:show['end']].decode('utf-8'), 'show')
+        self.assertTrue(window['members'][1]['hasSetter'])
+        bad = self.run_cial('--decl-json', '--source-name', 'bad.d.tjs', '-', input='println("must not run");')
+        self.assertEqual(bad.returncode, 1)
+        self.assertFalse(json.loads(bad.stdout)['check']['ok'])
+        self.assertNotIn('must not run\n', bad.stdout)
+        flags = self.run_cial('--decl-json', '--time', '-')
+        self.assertEqual(flags.returncode, 2)
 
     def test_declaration_check_json(self):
         # 声明检查（doc/declarations.md §4）：--check-json 对 .d.tjs 按声明模式分析

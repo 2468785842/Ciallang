@@ -33,11 +33,14 @@ function scoped(rows, text, scope, line = 0) {
 
 test('manifest contributes the grammar and language editing configuration', () => {
   const manifest = require('../package.json');
+  const language = manifest.contributes.languages.find(item => item.id === 'ciallang');
   const contributed = manifest.contributes.grammars.find(item => item.language === 'ciallang');
   assert.equal(contributed.scopeName, 'source.ciallang');
   assert(fs.existsSync(path.join(__dirname, '..', contributed.path)));
   const config = require('../language-configuration.json');
-  assert.equal(config.comments.lineComment, '//');
+  const lineComment = config.comments.lineComment;
+  assert.equal(typeof lineComment === 'string' ? lineComment : lineComment.comment, '//');
+  assert.ok(language.extensions.includes('.d.tjs'));
   assert.deepEqual(config.comments.blockComment, ['/*', '*/']);
   assert(config.brackets.some(([open, close]) => open === '{' && close === '}'));
 });

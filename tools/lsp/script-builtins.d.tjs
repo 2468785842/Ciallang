@@ -1,0 +1,5 @@
+/** 脚本自举异常类，定义于 src/stdlib/ExceptionLib.hpp。 */
+class Exception {
+    function Exception(message: any = "Exception");
+    var message: any;
+}

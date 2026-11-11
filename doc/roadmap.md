@@ -20,7 +20,7 @@
 | 编辑器 | VSCode 客户端、高亮与语言配置，仍与核心同仓库 | 独立工具仓库、发行与兼容性检查 |
 
 实现依据：`CMakeLists.txt`、`src/Binding.hpp`、`src/runtime/Runtime.hpp`、`src/vm/VM.hpp`、
-`tools/lsp/cial_lsp.py` 的 `DefinitionIndex` / `BUILTIN_MEMBERS` / `check`、
+`tools/lsp/cial_lsp.py` 的 `DefinitionIndex` / `decl_index.py` / `check`、
 `src/stdlib/ScriptsLib.*`、`src/vm/VMState.cpp` 的 Debugger 派发、`Rlc.hpp`、`CallFrame.hpp`、
 `Constant.hpp` 的 `FuncMeta::localVars` 及 `editors/vscode/`。
 目前的 `import` / `export` 保留字也不代表已具备模块语义（`src/parser/Token.hpp`、`Parser.*`）。
@@ -71,33 +71,33 @@
 它描述可用接口，不执行实现，也不等同于 C++ 头文件。
 
 声明模型需要表达函数、参数、返回值、类、属性、继承、文档及必要的可选/变长参数信息。
-声明语法尚待设计，不直接照搬 TypeScript 语法。现有 `.tjs` 类型注解会被解析并忽略，
-不能据此宣称已实现静态类型检查或声明模式。
+声明语法基于 TJS2，已实现解析与生成，见[声明文件](declarations.md)。普通 `.tjs` 的
+类型注解参与语言服务推导，运行时仍保持动态类型，不等于静态类型检查。
 
 先建立版本化 API 元数据模型，再让导出器、`.d.tjs` 解析器、LSP 和文档生成共享该模型。
 从 C++ 绑定中导出可确定的签名，动态回调、默认值或无法自动推导的返回类型需补充元数据；
-不制造虚假的确定类型。标准库补全逐步由该模型提供，替代手写的内置成员表。
+不制造虚假的确定类型。标准库补全已由该模型提供，替代手写的内置成员表。
 宿主可随 SDK/应用发布声明及导出元数据；LSP 读取产物，不为取得补全而自动运行宿主程序。
 
 声明文件需要专用读取/分析模式。实现时必须同步处理以下边界：
 
 - CLI、`Scripts` 和模块加载器不得将 `.d.tjs` 当普通脚本执行，应给出明确的声明文件诊断。
 - CTest 登记、脚本 runner、基准与相关 `*.tjs` 扫描应排除声明文件，声明解析另设测试。
-  当前 `tests/CMakeLists.txt` 和 `tests/run_tjs_tests.py` 尚未提供这项排除。
 - 编辑器识别 `.d.tjs`，允许导航和补全，同时区分声明诊断与普通脚本编译诊断。
 - 为同名实现、宿主全局声明、标准库声明制定查找优先级和冲突诊断；这些规则与项目配置
   一同设计，不能仅靠扩展名猜测运行时加载行为。
 - 声明不增加运行时导出，不改变模块初始化顺序；实现与声明的一致性检查单独定义。
 
-本路线图阶段不新增可执行声明样本，避免现有脚本扫描器误收集。
+声明样本不登记为执行用例；脚本测试、基准和 fuzz 扫描已排除 `.d.tjs`。
 声明/实现分离的设计参考：[TypeScript 声明文件](https://www.typescriptlang.org/docs/handbook/declaration-files/introduction.html)、
 [Python stub 分发规范](https://typing.python.org/en/latest/spec/distributing.html)。
 
 已实现（2026-11-11，见[声明文件](declarations.md)）：版本化 API 元数据与
 `--api-json`（[api-metadata](api-metadata.md)）、`.d.tjs` 声明语法与解析模式、
 执行侧拒绝（CLI/`Scripts`/SDK `Engine`）、`--api-decl` 生成器与
-CTest/基准/语料/fuzz 扫描排除。剩余：LSP 消费声明（批次 C）、声明/实现
-一致性检查、同名声明查找优先级与冲突诊断。
+CTest/基准/语料/fuzz 扫描排除。LSP 声明消费（批次 C）也已落地：核心 `--decl-json`、
+签名与文档补全/悬停/跳转、显式 SDK 声明路径及同名保守处理，见 [LSP](lsp.md)。
+剩余：声明/实现一致性检查、独立冲突诊断、重载选择及普通不完整源码的统一核心分析。
 
 ## 4. `Scripts` 兼容层与新模块系统
 
@@ -164,7 +164,7 @@ Release CI。该基础已实现并通过本机 Windows/Linux 包验收，三平�
 各批次先形成接口说明和最小可用实现，再扩展能力。源码身份和运行时持有关系在第一批就明确，
 避免模块和调试器后续重复重构；SDK 不必等待全部语言工具能力才能首次发布。
 
-暂未定案：公共头文件具体布局、分析/调试接口的传输形式及字段、`.d.tjs` 具体语法与查找
+暂未定案：公共头文件具体布局、分析/调试接口的传输形式及字段、`.d.tjs` 重载与声明冲突
 优先级、模块加载函数名与导出绑定规则，以及未来 `import/export` 语法。仓库迁移和 SDK 发布
 在各自实现批次执行，CLI 发布基础的实际状态以发布指南为准。
 

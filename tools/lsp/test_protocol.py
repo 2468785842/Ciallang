@@ -578,6 +578,140 @@ holder.member;
         self.send("exit")
         self.assertEqual(self.process.wait(timeout=5), 0)
 
+    def test_generated_native_declarations_supply_docs_and_navigation(self):
+        self.initialize()
+        uri = 'file:///native-metadata.tjs'
+        text = 'var values = [];\nvalues.push;'
+        self.open_document(uri, text)
+        items = {item['label']: item for item in self.complete(uri, text, 'values.push', len('values.'))}
+        self.assertEqual(items['push']['detail'], 'push(values: any*): Integer')
+        self.assertIn('末尾追加', items['push']['documentation']['value'])
+        position = self.position_of(text, 'values.push', len('values.'))
+        self.send('textDocument/hover', {'textDocument': {'uri': uri}, 'position': position}, 40)
+        self.assertIn('末尾追加', self.receive()['result']['contents']['value'])
+        location = self.definition(uri, text, 'values.push', len('values.'))
+        self.assertTrue(location['uri'].endswith('/stdlib.d.tjs'))
+        path = cial_lsp.file_path(location['uri'])
+        self.assertTrue(path.is_file())
+        line = path.read_text(encoding='utf-8').splitlines()[location['range']['start']['line']]
+        self.assertIn('function push(values: any*): Integer;', line)
+        self.assertIsNone(self.prepare(uri, text, 'values.push', len('values.')))
+
+    def test_declarations_members_returns_inheritance_namespaces_and_unicode(self):
+        with tempfile.TemporaryDirectory(prefix='cial 声明 %20 ') as directory:
+            root = pathlib.Path(directory).resolve()
+            host = root / 'host.d.tjs'
+            declaration = '''/** 根接口 */
+class Base { function base(): void; }
+/** 中文窗口 😀 */ class Window extends Base {
+    /** 修改标题，保留中文。 */ function show(title: String = "标题"): void;
+    property caption { getter: String; setter(value: String); }
+}
+/** 创建窗口 */ function makeWindow(): Window;
+namespace Host {
+    function version(): String;
+    class Counter { function Counter(); function read(): Integer; function clone(): Counter; }
+    function create(): Counter;
+}
+'''
+            host.write_text(declaration, encoding='utf-8')
+            self.initialize({'rootUri': root.as_uri()})
+            uri = (root / 'main.tjs').as_uri()
+            text = ('var w: Window;\nvar made = makeWindow();\nw.show;\nmade.caption;\nHost.version;\nmakeWindow;\n'
+                    'var counter = new Host.Counter();\ncounter.read;\nvar created = Host.create();\ncreated.read;\n'
+                    'makeWindow.caption;\nvar cloned = counter.clone();\ncloned.read;\n'
+                    'function shadow(Host) { var bad = new Host.Counter(); bad.read; }')
+            self.open_document(uri, text)
+            items = {item['label']: item for item in self.complete(uri, text, 'w.show', len('w.'))}
+            self.assertEqual(set(items), {'show', 'caption', 'base'})
+            self.assertEqual(items['show']['detail'], 'show(title: String = "标题"): void')
+            self.assertIn('修改标题', items['show']['documentation']['value'])
+            self.assertIn('caption', {item['label'] for item in self.complete(uri, text, 'made.caption', len('made.'))})
+            self.assertEqual({item['label'] for item in self.complete(uri, text, 'Host.version', len('Host.'))},
+                             {'version', 'Counter', 'create'})
+            for expression in ('counter.read', 'created.read', 'cloned.read'):
+                items = self.complete(uri, text, expression, expression.index('.') + 1)
+                self.assertEqual({item['label'] for item in items}, {'read', 'clone'})
+            self.assertNotIn('caption', {item['label'] for item in
+                             self.complete(uri, text, 'makeWindow.caption', len('makeWindow.'))})
+            self.assertNotIn('read', {item['label'] for item in
+                             self.complete(uri, text, 'bad.read', len('bad.'))})
+            location = self.definition(uri, text, 'w.show', len('w.'))
+            self.assertEqual(location['uri'], host.as_uri())
+            row = declaration.splitlines()[location['range']['start']['line']]
+            self.assertEqual(location['range']['start']['character'], utf16(row[:row.index('show')]))
+            self.assertEqual(self.definition(uri, text, 'makeWindow;', 0)['uri'], host.as_uri())
+            self.send('textDocument/hover', {'textDocument': {'uri': uri},
+                      'position': self.position_of(text, 'w.show', len('w.'))}, 40)
+            self.assertIn('保留中文', self.receive()['result']['contents']['value'])
+            self.open_document(host.as_uri(), declaration)
+            self.send('textDocument/documentSymbol', {'textDocument': {'uri': host.as_uri()}}, 41)
+            self.assertIn('version', {item['name'] for item in self.receive()['result']})
+            self.assertIsNone(self.rename(uri, text, 'w.show', len('w.'), 'renamed'))
+
+    def test_declaration_buffers_disk_changes_invalid_files_and_conflicts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory).resolve()
+            host = root / 'host.d.tjs'
+            original = 'class Widget { function first(): Integer; }'
+            host.write_text(original, encoding='utf-8')
+            self.initialize({'rootUri': root.as_uri()})
+            uri = (root / 'main.tjs').as_uri()
+            text = 'var w = new Widget();\nw.anything;'
+            self.open_document(uri, text)
+            def labels():
+                return {item['label'] for item in self.complete(uri, text, 'w.anything', len('w.'))}
+            self.assertEqual(labels(), {'first'})
+            self.open_document(host.as_uri(), 'class Widget { function second(): String; }')
+            self.assertEqual(labels(), {'second'})
+            self.send('textDocument/didClose', {'textDocument': {'uri': host.as_uri()}})
+            self.receive()
+            self.assertEqual(labels(), {'first'})
+            host.write_text('class Widget { function third(): String; }', encoding='utf-8')
+            self.assertEqual(labels(), {'third'})
+            (root / 'duplicate.d.tjs').write_text('class Widget { function other(): void; }', encoding='utf-8')
+            self.assertNotIn('third', labels())
+            (root / 'duplicate.d.tjs').unlink()
+            host.write_text('class Widget { function bad() {} }', encoding='utf-8')
+            self.assertNotIn('third', labels())
+            self.assertNotIn('bad', labels())
+            host.unlink()
+            self.assertNotIn('third', labels())
+
+    def test_unanalyzed_declaration_cannot_make_a_duplicate_look_unique(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory).resolve()
+            (root / '00.d.tjs').write_text('class Widget { function known(): void; }', encoding='utf-8')
+            for number in range(1, 64):
+                (root / f'{number:02}.d.tjs').write_text(f'class Other{number} {{}}', encoding='utf-8')
+            (root / '99.d.tjs').write_text('class Widget { function hidden(): void; }', encoding='utf-8')
+            self.initialize({'rootUri': root.as_uri()})
+            uri = (root / 'main.tjs').as_uri()
+            text = 'var value = new Widget();\nvalue.known;'
+            self.open_document(uri, text)
+            items = self.complete(uri, text, 'value.known', len('value.'))
+            self.assertNotIn('known', {item['label'] for item in items})
+
+    def test_explicit_sdk_declarations_outside_workspace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory).resolve()
+            workspace = root / 'game'
+            workspace.mkdir()
+            sdk = root / 'sdk.d.tjs'
+            sdk.write_text('/** 外部接口 */ class External { function ping(): String; }', encoding='utf-8')
+            self.initialize({'rootUri': workspace.as_uri(),
+                             'initializationOptions': {'declarationFiles': [sdk.as_uri()]}})
+            uri = (workspace / 'main.tjs').as_uri()
+            text = 'var value = new External();\nvalue.ping;'
+            self.open_document(uri, text)
+            items = self.complete(uri, text, 'value.ping', len('value.'))
+            self.assertEqual([item['label'] for item in items], ['ping'])
+            self.assertEqual(self.definition(uri, text, 'value.ping', len('value.'))['uri'], sdk.as_uri())
+            # An unfinished declaration buffer cannot expose stale disk signatures.
+            self.open_document(sdk.as_uri(), 'class External {')
+            self.assertNotIn('ping', {item['label'] for item in
+                             self.complete(uri, text, 'value.ping', len('value.'))})
+
     def test_utf8_columns_and_utf16_cursor(self):
         text = "var 中文 = '😀';"
         prefix = "var 中文 = '😀"

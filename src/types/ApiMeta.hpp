@@ -2,18 +2,21 @@
 //
 #pragma once
 
+#include <optional>
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "NativeFunDetail.hpp"
+#include "common/ApiParam.hpp"
 
 namespace cial {
     // 注册期 API 元数据（doc/api-metadata.md）：描述宿主/标准库注册的符号及注册点
     // 可确定的签名。类型推导不出的字段保持空串，导出时输出 null，不编造类型；
     // 数据为纯 C++ 字符串所有权，不涉及 GC。
-    enum class ApiKind { Method, Property, Static, Global, Namespace, Class };
+    enum class ApiKind { Method, Property, Static, Global, Namespace, Class, Constructor };
 
     struct ApiMeta {
         ApiKind kind{ ApiKind::Method };
@@ -25,11 +28,56 @@ namespace cial {
         bool variadic{}; // Value* 尾参形态或注册点显式声明
         std::string ret; // 空串 = 未知
         std::string doc;
+        // nullopt = 旧签名推导；显式空数组 = 确定无参数（可覆盖 Value* 回调）。
+        std::optional<std::vector<ApiParam>> params;
+        bool accessSpecified{};
+        bool hasGetter{};
+        bool hasSetter{};
+        std::vector<std::string> extends;
     };
 
     namespace api {
+        inline void normalize(ApiMeta &meta) {
+            if(!meta.params)
+                return;
+            meta.paramTypes.clear();
+            meta.variadic = false;
+            for(const auto &param : *meta.params) {
+                meta.paramTypes.push_back(param.type);
+                meta.variadic |= param.collapse;
+            }
+        }
+
+        // 只补充描述，不允许注解改写实际登记的名字、归属或成员类别。
+        inline ApiMeta annotate(ApiMeta inferred, const ApiMeta &description) {
+            if(!description.ret.empty())
+                inferred.ret = description.ret;
+            if(!description.doc.empty())
+                inferred.doc = description.doc;
+            if(description.params) {
+                inferred.params = description.params;
+                normalize(inferred);
+            }
+            if(description.accessSpecified) {
+                inferred.accessSpecified = true;
+                inferred.hasGetter = description.hasGetter;
+                inferred.hasSetter = description.hasSetter;
+            }
+            if(!description.extends.empty())
+                inferred.extends = description.extends;
+            return inferred;
+        }
+
+        inline ApiMeta signature(std::vector<ApiParam> params, std::string ret = {}, std::string doc = {}) {
+            ApiMeta meta;
+            meta.params = std::move(params);
+            meta.ret = std::move(ret);
+            meta.doc = std::move(doc);
+            normalize(meta);
+            return meta;
+        }
         // 注册点可确定类型的名称推导；宿主 payload 类第一版无名字映射（空串）。
-        // 参数名与默认值无法从 C++ 类型推导，仅能由注册点以 doc/显式 ApiMeta 提供。
+        // 参数名与默认值由注册点显式提供；doc 只保存说明，不从注释猜测签名。
         template <typename T>
         consteval const char *typeName() {
             using U = std::remove_cv_t<std::remove_reference_t<T>>;
@@ -48,7 +96,7 @@ namespace cial {
             else if constexpr(std::is_same_v<U, Octet>)
                 return "Octet";
             else if constexpr(std::is_pointer_v<U>) {
-                using P = std::remove_pointer_t<U>;
+                using P = std::remove_cv_t<std::remove_pointer_t<U>>;
                 if constexpr(std::is_same_v<P, String>)
                     return "String";
                 else if constexpr(std::is_same_v<P, Octet>)

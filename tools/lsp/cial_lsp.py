@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 import time
+from decl_index import DeclarationIndex, is_declaration
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
@@ -20,6 +21,8 @@ KEYWORDS = {
     "const": "声明带初值的变量；当前 TJS2 兼容语义仍允许后续赋值。",
     "class": "定义类：class Name extends Base { ... }",
     "property": "定义具有 getter / setter 的属性。",
+    "namespace": ".d.tjs 命名空间声明：namespace Name { ... }",
+    "static": ".d.tjs 类静态方法声明。",
     "try": "try { ... } catch(e) { ... }",
     "with": "with(object) { .member; }",
     "return": "返回函数结果。",
@@ -44,9 +47,9 @@ KEYWORDS = {
     "Exception": "异常对象，包含 message 成员。",
     "Scripts": "宿主脚本存储：execStorage 执行脚本文件，evalStorage 求值脚本文件（src/stdlib/ScriptsLib.cpp）。",
 }
-DECLARATION = re.compile(r"\b(function|var|const|class|property)\s+([\w$]+)")
+DECLARATION = re.compile(r"\b(function|var|const|class|property|namespace)\s+([\w$]+)")
 WORD = re.compile(r"[\w$]+")
-SYMBOL_KINDS = {"function": 12, "class": 5, "property": 7}
+SYMBOL_KINDS = {"function": 12, "class": 5, "property": 7, "namespace": 3}
 MAX_DOCUMENT_BYTES = 2_000_000
 MAX_WORKSPACE_BYTES = 20_000_000
 MAX_WORKSPACE_FILES = 2000
@@ -60,137 +63,9 @@ MAX_RENAME_EDITS = 5_000     # 单次 rename 产生的编辑总数上限
 CHECK_DEBOUNCE_SECONDS = 0.15  # didChange 防抖：合并快速连续输入
 CHECK_TIMEOUT_SECONDS = 5.0     # 单次检查子进程超时；超时即杀，避免悬挂后续请求
 
-# 内置类型成员名单：逐一核对自 src/stdlib 的注册代码（勿凭记忆增删）：
-#   Array      src/stdlib/ArrayLib.cpp:17-35 + src/stdlib/SerializeLib.cpp:28-33
-#   String     src/stdlib/StringLib.cpp:26-42
-#   Dictionary src/stdlib/DictLib.cpp:12-17 + src/stdlib/SerializeLib.cpp:34-38
-#   Math       src/stdlib/MathLib.cpp:18-44
-#   Date       src/stdlib/DateLib.cpp:17-33
-#   RegExp     src/stdlib/RegExpLib.cpp:13-18
-#   RandomGen  src/stdlib/RandomLib.cpp:209-214（当前无全局构造入口，仅备查）
-#   Exception  src/stdlib/ExceptionLib.hpp:15-21（TJS 自举类，message 成员）
+# 类型名仅用于词法回退；成员与签名由核心导出的声明提供。
 BUILTIN_TYPE_NAMES = {"Array", "String", "Dictionary", "Math", "Date", "RegExp", "Exception", "Scripts"}
-MEMBER_METHOD, MEMBER_FIELD, MEMBER_PROPERTY = 2, 5, 10  # LSP CompletionItemKind
-BUILTIN_MEMBERS = {
-    "Array": {
-        "push": (MEMBER_METHOD, "push(value, ...): Integer — 末尾追加元素，返回新 count"),
-        "pop": (MEMBER_METHOD, "pop(): 元素 — 移除并返回末尾元素"),
-        "unshift": (MEMBER_METHOD, "unshift(value, ...): Integer — 头部插入元素"),
-        "shift": (MEMBER_METHOD, "shift(): 元素 — 移除并返回头部元素"),
-        "insert": (MEMBER_METHOD, "insert(index, value, ...): Integer — 在 index 处插入"),
-        "remove": (MEMBER_METHOD, "remove(index): 元素 — 移除指定位置元素"),
-        "erase": (MEMBER_METHOD, "erase() — 清空所有元素"),
-        "reverse": (MEMBER_METHOD, "reverse() — 反转元素顺序"),
-        "join": (MEMBER_METHOD, 'join(delim = ","): String — 以分隔符连接元素'),
-        "split": (MEMBER_METHOD, "split(pattern, string, purgeempty = false): Array — 用 pattern 拆分 string 并替换自身元素"),
-        "sort": (MEMBER_METHOD, "sort(order = '+'): Array — 排序（'+'/'-'/比较函数）"),
-        "load": (MEMBER_METHOD, "load(filename) — 反序列化读取"),
-        "save": (MEMBER_METHOD, "save(filename) — 序列化保存"),
-        "loadStruct": (MEMBER_METHOD, "loadStruct(storage) — 从结构化数据恢复"),
-        "saveStruct": (MEMBER_METHOD, "saveStruct(storage = void): String — 结构化导出"),
-        "pack": (MEMBER_METHOD, "pack(): Octet — 打包为 Octet"),
-        "assignStruct": (MEMBER_METHOD, "assignStruct(source) — 从源结构赋值"),
-        "count": (MEMBER_PROPERTY, "count: Integer — 元素个数（只读）"),
-        "length": (MEMBER_PROPERTY, "length: Integer — 元素个数（只读）"),
-    },
-    "String": {
-        "charAt": (MEMBER_METHOD, "charAt(index): String — 取指定位置字符"),
-        "indexOf": (MEMBER_METHOD, "indexOf(subStr, start = 0): Integer — 子串位置，未找到返回 -1"),
-        "toUpperCase": (MEMBER_METHOD, "toUpperCase(): String — 转大写"),
-        "toLowerCase": (MEMBER_METHOD, "toLowerCase(): String — 转小写"),
-        "substring": (MEMBER_METHOD, "substring(start, length = void): String — 取子串"),
-        "substr": (MEMBER_METHOD, "substr(start, length = void): String — substring 的别名"),
-        "sprintf": (MEMBER_METHOD, "sprintf(...): String — 格式化自身"),
-        "replace": (MEMBER_METHOD, "replace(re, replacement): String — 用正则 re 替换"),
-        "split": (MEMBER_METHOD, "split(pattern, reserved = void, purgeempty = false): Array — 按模式拆分"),
-        "escape": (MEMBER_METHOD, "escape(): String — 转义反斜杠"),
-        "trim": (MEMBER_METHOD, "trim(): String — 去除首尾空白"),
-        "reverse": (MEMBER_METHOD, "reverse(): String — 反转字符串"),
-        "repeat": (MEMBER_METHOD, "repeat(count): String — 重复 count 次"),
-        "length": (MEMBER_PROPERTY, "length: Integer — UTF-16 码元数（只读）"),
-    },
-    "Dictionary": {
-        "assign": (MEMBER_METHOD, "assign(source) — 复制源字典的全部成员"),
-        "clear": (MEMBER_METHOD, "clear() — 清空成员"),
-        "erase": (MEMBER_METHOD, "erase(key): Integer — 删除键，返回是否删除"),
-        "load": (MEMBER_METHOD, "load(filename) — 反序列化读取（当前为空实现）"),
-        "save": (MEMBER_METHOD, "save(filename) — 序列化保存（当前为空实现）"),
-        "loadStruct": (MEMBER_METHOD, "loadStruct(storage) — 从结构化数据恢复"),
-        "saveStruct": (MEMBER_METHOD, "saveStruct(storage = void): String — 结构化导出"),
-        "assignStruct": (MEMBER_METHOD, "assignStruct(source) — 从源结构赋值"),
-        "count": (MEMBER_PROPERTY, "count: Integer — 成员个数（只读）"),
-    },
-    "Math": {
-        "abs": (MEMBER_METHOD, "abs(v) — 绝对值"),
-        "acos": (MEMBER_METHOD, "acos(v): Real — 反余弦"),
-        "asin": (MEMBER_METHOD, "asin(v): Real — 反正弦"),
-        "atan": (MEMBER_METHOD, "atan(v): Real — 反正切"),
-        "atan2": (MEMBER_METHOD, "atan2(y, x): Real — 二参数反正切"),
-        "ceil": (MEMBER_METHOD, "ceil(v): Integer — 向上取整"),
-        "exp": (MEMBER_METHOD, "exp(v): Real — e 的幂"),
-        "floor": (MEMBER_METHOD, "floor(v): Integer — 向下取整"),
-        "log": (MEMBER_METHOD, "log(v): Real — 自然对数"),
-        "pow": (MEMBER_METHOD, "pow(base, exp): Real — 幂"),
-        "max": (MEMBER_METHOD, "max(...): Real — 最大值"),
-        "min": (MEMBER_METHOD, "min(...): Real — 最小值"),
-        "random": (MEMBER_METHOD, "random(): Real — [0,1) 随机数"),
-        "round": (MEMBER_METHOD, "round(v): Integer — 四舍五入"),
-        "sin": (MEMBER_METHOD, "sin(v): Real — 正弦"),
-        "cos": (MEMBER_METHOD, "cos(v): Real — 余弦"),
-        "sqrt": (MEMBER_METHOD, "sqrt(v): Real — 平方根"),
-        "tan": (MEMBER_METHOD, "tan(v): Real — 正切"),
-        "E": (MEMBER_PROPERTY, "E: Real — 自然对数底"),
-        "LOG2E": (MEMBER_PROPERTY, "LOG2E: Real — log2(e)"),
-        "LOG10E": (MEMBER_PROPERTY, "LOG10E: Real — log10(e)"),
-        "LN10": (MEMBER_PROPERTY, "LN10: Real — ln(10)"),
-        "LN2": (MEMBER_PROPERTY, "LN2: Real — ln(2)"),
-        "PI": (MEMBER_PROPERTY, "PI: Real — 圆周率"),
-        "SQRT1_2": (MEMBER_PROPERTY, "SQRT1_2: Real — 1/√2"),
-        "SQRT2": (MEMBER_PROPERTY, "SQRT2: Real — √2"),
-    },
-    "Scripts": {
-        "execStorage": (MEMBER_METHOD, "execStorage(name, mode = void, context = void): 执行存储脚本；可由宿主读取器加载"),
-        "evalStorage": (MEMBER_METHOD, "evalStorage(name, mode = void, context = void): 值 — 在指定上下文求值存储表达式"),
-    },
-    "Date": {
-        "getYear": (MEMBER_METHOD, "getYear(): Integer — 年"),
-        "getMonth": (MEMBER_METHOD, "getMonth(): Integer — 月（0 起）"),
-        "getDate": (MEMBER_METHOD, "getDate(): Integer — 日"),
-        "getDay": (MEMBER_METHOD, "getDay(): Integer — 星期"),
-        "getHours": (MEMBER_METHOD, "getHours(): Integer — 时"),
-        "getMinutes": (MEMBER_METHOD, "getMinutes(): Integer — 分"),
-        "getSeconds": (MEMBER_METHOD, "getSeconds(): Integer — 秒"),
-        "getTime": (MEMBER_METHOD, "getTime(): Integer — 毫秒时间戳"),
-        "setYear": (MEMBER_METHOD, "setYear(year) — 设置年"),
-        "setMonth": (MEMBER_METHOD, "setMonth(month) — 设置月"),
-        "setDate": (MEMBER_METHOD, "setDate(date) — 设置日"),
-        "setHours": (MEMBER_METHOD, "setHours(hours) — 设置时"),
-        "setMinutes": (MEMBER_METHOD, "setMinutes(minutes) — 设置分"),
-        "setSeconds": (MEMBER_METHOD, "setSeconds(seconds) — 设置秒"),
-        "setTime": (MEMBER_METHOD, "setTime(ms) — 设置毫秒时间戳"),
-        "parse": (MEMBER_METHOD, "parse(text): Integer — 解析日期文本"),
-        "getTimezoneOffset": (MEMBER_METHOD, "getTimezoneOffset(): Integer — 时区偏移（分钟）"),
-    },
-    "RegExp": {
-        "test": (MEMBER_METHOD, "test(target): Integer — 是否匹配"),
-        "match": (MEMBER_METHOD, "match(target): Array — 全局匹配结果"),
-        "exec": (MEMBER_METHOD, "exec(target): Array — 单次匹配与分组"),
-        "compile": (MEMBER_METHOD, "compile(pattern, flags) — 重新编译正则"),
-        "replace": (MEMBER_METHOD, "replace(target, replacement): String — 正则替换"),
-        "split": (MEMBER_METHOD, "split(target, purgeempty = false): Array — 按正则拆分"),
-    },
-    "Exception": {
-        "message": (MEMBER_FIELD, "message: String — 异常消息"),
-    },
-    "RandomGen": {
-        "randomize": (MEMBER_METHOD, "randomize(seed = void) — 重置种子"),
-        "random": (MEMBER_METHOD, "random(): Real — [0,1) 随机数"),
-        "random32": (MEMBER_METHOD, "random32(): Integer — 32 位随机整数"),
-        "random63": (MEMBER_METHOD, "random63(): Integer — 63 位随机整数"),
-        "random64": (MEMBER_METHOD, "random64(): Integer — 64 位随机整数"),
-        "serialize": (MEMBER_METHOD, "serialize(): String — 序列化状态"),
-    },
-}
+MEMBER_METHOD, MEMBER_FIELD, MEMBER_PROPERTY = 2, 5, 10
 
 
 def file_path(uri):
@@ -313,8 +188,10 @@ class LexicalScope:
 
 class DefinitionIndex:
     """Conservative binding index for balanced, non-preprocessed source."""
-    def __init__(self, text):
+    def __init__(self, text, external_type=None, external_return=None):
         self.text = text
+        self.external_type = external_type or (lambda name: None)
+        self.external_return = external_return or (lambda name: None)
         self.source = masked_source(text)
         self.tokens = []
         self.scopes = []
@@ -473,6 +350,12 @@ class DefinitionIndex:
         token = self.tokens[token_index]
         binding = {"token": token, "visible": visible, "scope": scope}
         binding.update(extra)
+        if token_index + 2 < len(self.tokens) and self.tokens[token_index + 1][0] == ':':
+            binding['annotation'] = self.tokens[token_index + 2][0]
+        if 'body' in extra:
+            opening = extra['body'][0] - 1
+            if opening >= 2 and self.tokens[opening - 2][0] == ':':
+                binding['annotation'] = self.tokens[opening - 1][0]
         scope.bindings.setdefault(token[0], []).append(binding)
         self.declared[token.start()] = binding
         return binding
@@ -594,16 +477,20 @@ class DefinitionIndex:
     def infer_receiver_type(self, receiver):
         tokens = self.tokens
         if receiver + 1 < len(tokens) and tokens[receiver + 1][0] == "(" and receiver + 1 in self.pairs:
-            binding, unused = self.resolve_token(receiver)  # foo()：函数返回值类型
-            return self.infer_from_binding(binding, 0) if binding is not None else None
+            binding, free = self.resolve_token(receiver)  # foo()：函数返回值类型
+            return self.infer_from_binding(binding, 0) if binding is not None else self.external_return(free)
         binding, free = self.resolve_token(receiver)
         if binding is not None:
+            if 'body' in binding:
+                return None  # A function value is not its return value.
             return self.infer_from_binding(binding, 0)
-        return free if free in BUILTIN_TYPE_NAMES else None  # Math./Array./... 内置类型直引用
+        return self.external_type(free) or (free if free in BUILTIN_TYPE_NAMES else None)
 
     def infer_from_binding(self, binding, depth):
         if depth > MAX_INFER_DEPTH or not self._spend():
             return None
+        if binding.get('annotation'):
+            return binding['annotation'] if binding['annotation'] not in ('any', 'void') else None
         if binding.get("init") is not None:
             return self.infer_expression(binding["init"], depth)
         if "body" in binding:
@@ -627,23 +514,46 @@ class DefinitionIndex:
         last = terminator - 1
         first_token = tokens[first][0]
         if first_token == "new":
-            if first + 1 < len(tokens) and self.identifier(first + 1) \
-                    and (first + 2 >= terminator or tokens[first + 2][0] == "("):
-                return tokens[first + 1][0]  # 内置或工作区类名由 Server.type_members 校验
+            if first + 1 < terminator:
+                constructor, unused = self.resolve_token(first + 1)
+                if constructor is not None and not constructor.get('is_class'):
+                    return None  # A local variable/parameter may shadow a declared constructor.
+            cursor, parts = first + 1, []
+            while cursor < terminator and self.identifier(cursor):
+                parts.append(tokens[cursor][0])
+                cursor += 1
+                if cursor < terminator and tokens[cursor][0] == '.':
+                    cursor += 1
+                    continue
+                if cursor >= terminator or tokens[cursor][0] == '(':
+                    return '.'.join(parts)  # The server validates the class identity.
+                break
             return None
         if first_token == "%" and first + 1 < len(tokens) and self.pairs.get(first + 1) == last:
             return "Dictionary"
         if self.pairs.get(first) == last:
             return "Array" if first_token == "[" else None
         if self.identifier(first):
+            cursor, parts = first + 1, [first_token]
+            while cursor + 1 < terminator and tokens[cursor][0] == '.' and self.identifier(cursor + 1):
+                parts.append(tokens[cursor + 1][0])
+                cursor += 2
+            if len(parts) > 1 and cursor < terminator and self.pairs.get(cursor) == last:
+                binding, free = self.resolve_token(first)
+                owner = self.infer_from_binding(binding, depth + 1) if binding is not None else self.external_type(free)
+                if owner:
+                    return self.external_return(owner + '.' + '.'.join(parts[1:]))
+                return None
             if first + 1 < len(tokens) and tokens[first + 1][0] == "(" and self.pairs.get(first + 1) == last:
-                binding, unused = self.resolve_token(first)  # 函数调用
-                return self.infer_from_binding(binding, depth + 1) if binding is not None else None
+                binding, free = self.resolve_token(first)  # 函数调用
+                return self.infer_from_binding(binding, depth + 1) if binding is not None else self.external_return(free)
             if first == last:
                 if first_token in BUILTIN_TYPE_NAMES:
                     return first_token
-                binding, unused = self.resolve_token(first)  # 变量拷贝链
-                return self.infer_from_binding(binding, depth + 1) if binding is not None else None
+                binding, free = self.resolve_token(first)  # 变量拷贝链
+                if binding is not None and 'body' in binding:
+                    return None
+                return self.infer_from_binding(binding, depth + 1) if binding is not None else self.external_type(free)
             return None  # 链式/下标/双目运算：unknown
         if first == last:
             if first_token.isdigit() or re.fullmatch(r"0[xX][\da-fA-F]+", first_token) \
@@ -700,6 +610,8 @@ class Server:
         self.documents = {}
         self.workspace_roots = set()
         self.symbol_cache = {}
+        self.declaration_index = DeclarationIndex(self.cial)
+        self.declaration_files = []
         self.initialized = False
         self.shutdown = False
         # 检查在后台线程执行：主循环不被编译阻塞，发布前按版本丢弃过期结果
@@ -811,9 +723,107 @@ class Server:
         document = self.documents.get(uri)
         if document is None or len(document["text"].encode("utf-8")) > MAX_DOCUMENT_BYTES:
             return None
-        return DefinitionIndex(document["text"])
+        return DefinitionIndex(document["text"], self.declaration_index.value_type, self.declaration_index.call_type)
+
+    def refresh_declarations(self):
+        sources = self.workspace_sources()
+        seen = {file_path(uri) for uri, unused, text in sources}
+        remaining = MAX_WORKSPACE_BYTES - sum(len(text.encode('utf-8')) for uri, unused, text in sources)
+        overlays = {file_path(uri): (uri, doc['text']) for uri, doc in self.documents.items()}
+        for uri in self.declaration_files[:64]:
+            path = file_path(uri)
+            if path is None or path in seen or not is_declaration(uri):
+                continue
+            try:
+                if path in overlays:
+                    source_uri, text = overlays[path]
+                else:
+                    if path.stat().st_size > min(remaining, MAX_DOCUMENT_BYTES):
+                        continue
+                    source_uri, text = uri, path.read_text(encoding='utf-8')
+                size = len(text.encode('utf-8'))
+                if size <= min(remaining, MAX_DOCUMENT_BYTES):
+                    sources.append((source_uri, declarations(text), text))
+                    seen.add(path)
+                    remaining -= size
+            except (OSError, UnicodeError):
+                continue
+        self.declaration_index.update(sources)
+
+    def declared_receiver(self, uri, prefix, row=0):
+        """Resolve a bounded identifier/member/call chain using declared return types."""
+        match = re.search(r'([\w$]+(?:\([^()\n]*\))?(?:\.[\w$]+(?:\([^()\n]*\))?)*)\.$',
+                          masked_source(prefix).rstrip())
+        if match is None:
+            return None
+        parts = re.findall(r'([\w$]+)(\([^()\n]*\))?', match[1])
+        if not parts or len(parts) > MAX_CLASS_HIERARCHY:
+            return None
+        current = self.document_index(uri)
+        if current is None or not current.valid:
+            return None
+        offset = sum(len(line) + 1 for line in current.text.split('\n')[:row]) + match.start(1)
+        token = next((i for i, value in enumerate(current.tokens) if value.start() == offset), None)
+        if token is None:
+            return None
+        name = current.infer_receiver_type(token)
+        if name is None:
+            return None
+        for part, called in parts[1:]:
+            entry = self.declaration_index.members(name).get(part)
+            if entry is None:
+                return None
+            name = (self.declaration_index.value_type(entry['qualified']) if not called else
+                    self.declaration_index.return_type(entry))
+            if name is None:
+                return None
+        return name
+
+    def declaration_target(self, uri, position):
+        document = self.documents.get(uri)
+        if document is None:
+            return []
+        text = document['text']
+        prefix = line_prefix(text, position)
+        rows = text.split('\n')
+        row = position.get('line', -1)
+        if not 0 <= row < len(rows):
+            return []
+        word = next((word for word in WORD.finditer(masked_source(text).split('\n')[row])
+                     if word.start() <= len(prefix) < word.end()), None)
+        if word is None:
+            return []
+        if is_declaration(uri):
+            entries = [entry for entries in self.declaration_index.entries.values() for entry in entries
+                    if entry['uri'] == uri and entry['range']['start']['line'] == row
+                    and entry['range']['start']['character'] == utf16(rows[row][:word.start()])]
+            if entries:
+                return entries
+            before = rows[row][:word.start()].rstrip()
+            if before.endswith(':') or re.search(r'\bextends\s*$', before):
+                return self.declaration_index.entries.get(word[0], [])
+            return []
+        before = rows[row][:word.start()].rstrip()
+        if before.endswith('.'):
+            owner = self.declared_receiver(uri, before, row)
+            entry = self.declaration_index.members(owner).get(word[0]) if owner else None
+            return [entry] if entry is not None else []
+        current = self.document_index(uri)
+        if current is None or not current.valid:
+            return []
+        binding, unused = current.resolve(position) if current is not None else (None, None)
+        if binding is not None:
+            return []  # Local script bindings take precedence over API declarations.
+        return self.declaration_index.entries.get(word[0], [])
 
     def definition(self, uri, position):
+        self.refresh_declarations()
+        declared = self.declaration_target(uri, position)
+        if declared:
+            locations = [self.declaration_index.location(entry) for entry in declared]
+            return locations[0] if len(locations) == 1 else locations
+        if is_declaration(uri):
+            return None
         current = self.document_index(uri)
         if current is None:
             return None
@@ -824,6 +834,8 @@ class Server:
             return None
         matches = []
         for source_uri, symbols, text in self.workspace_sources():
+            if is_declaration(source_uri):
+                continue
             index = DefinitionIndex(text)
             if not index.valid:
                 if any(symbol["name"] == global_name for symbol in symbols):
@@ -842,6 +854,8 @@ class Server:
         """name 的唯一顶层全局声明 (uri, index, binding)；无/多义/作用域未知返回 None。"""
         found = None
         for source_uri, symbols, text in self.workspace_sources():
+            if is_declaration(source_uri):
+                continue
             index = DefinitionIndex(text)
             if not index.valid:
                 if any(symbol["name"] == name for symbol in symbols):
@@ -868,6 +882,8 @@ class Server:
             return candidates[0]
         found = None
         for source_uri, symbols, text in self.workspace_sources():
+            if is_declaration(source_uri):
+                continue
             index = DefinitionIndex(text)
             if not index.valid:
                 continue
@@ -892,10 +908,10 @@ class Server:
 
     def type_members(self, type_name, current):
         """类型名 -> 成员补全项列表；内置类型走注册面名单，工作区 class 沿 extends 展开。"""
-        builtin = BUILTIN_MEMBERS.get(type_name)
-        if builtin is not None:
-            return [{"label": label, "kind": kind, "detail": signature}
-                    for label, (kind, signature) in sorted(builtin.items())]
+        local_class = any(binding.get('is_class') for binding in current.root.bindings.get(type_name, []))
+        declared = {} if local_class else self.declaration_index.members(type_name)
+        if declared:
+            return [self.declaration_index.completion(entry) for name, entry in sorted(declared.items())]
         collected, visited, name, depth = {}, set(), type_name, 0
         while name and name not in visited and depth < MAX_CLASS_HIERARCHY:
             visited.add(name)
@@ -909,6 +925,9 @@ class Server:
         return sorted(collected.values(), key=lambda item: item["label"]) if collected else None
 
     def prepare_rename(self, uri, position):
+        self.refresh_declarations()
+        if is_declaration(uri) or self.declaration_target(uri, position):
+            return None  # Editing a declaration cannot rename its native implementation.
         index = self.document_index(uri)
         if index is None:
             return None
@@ -921,6 +940,9 @@ class Server:
         return {"range": index.token_range(cursor), "placeholder": index.tokens[cursor][0]}
 
     def rename(self, uri, position, new_name):
+        self.refresh_declarations()
+        if is_declaration(uri) or self.declaration_target(uri, position):
+            return None
         current = self.document_index(uri)
         if current is None or not re.fullmatch(r"[\w$]+", new_name or "") or new_name[0].isdigit():
             return None
@@ -941,7 +963,7 @@ class Server:
                     or found[2]["token"].start() != target["token"].start():
                 return None
             for source_uri, symbols, text in self.workspace_sources():
-                if source_uri == target_uri:
+                if source_uri == target_uri or is_declaration(source_uri):
                     continue
                 index = DefinitionIndex(text)
                 if not index.valid:
@@ -1067,6 +1089,11 @@ class Server:
             self.check_queue.put(None)  # 终止后台检查线程；在途子进程由超时回收
             return 0 if self.shutdown else 1
         if method == "initialize":
+            options = params.get('initializationOptions') or {}
+            files = options.get('declarationFiles', []) if isinstance(options, dict) else None
+            if not isinstance(files, list) or any(not isinstance(uri, str) for uri in files):
+                raise ValueError('declarationFiles must be a list of file URIs')
+            self.declaration_files = files
             if self.initialized or self.shutdown:
                 self.error(identifier, -32600, "Server was already initialized")
                 return None
@@ -1080,7 +1107,7 @@ class Server:
                     folders = [{"uri": pathlib.Path(params["rootPath"]).resolve().as_uri()}]
             self.update_workspace_folders(folders or [])
             self.result(identifier, {"capabilities": {"positionEncoding": "utf-16", "textDocumentSync": {"openClose": True, "change": 1},
-                                                     "completionProvider": {}, "hoverProvider": True,
+                                                     "completionProvider": {"triggerCharacters": ["."]}, "hoverProvider": True,
                                                      "documentSymbolProvider": True, "workspaceSymbolProvider": True,
                                                      "definitionProvider": True,
                                                      "renameProvider": {"prepareProvider": True},
@@ -1132,6 +1159,7 @@ class Server:
                 self._send_locked({"jsonrpc": "2.0", "method": "textDocument/publishDiagnostics",
                                    "params": {"uri": uri, "diagnostics": []}})
         elif method in ("textDocument/completion", "textDocument/hover", "textDocument/documentSymbol"):
+            self.refresh_declarations()
             document = self.documents.get(params["textDocument"]["uri"], {"text": ""})
             text = document["text"]
             if method.endswith("completion"):
@@ -1140,20 +1168,38 @@ class Server:
                 typed = match[0] if match else ""
                 items = None
                 if "." in prefix:  # 成员形态才值得建索引做类型推导
+                    member_prefix = prefix[:-len(typed)] if typed else prefix
+                    owner = self.declared_receiver(params['textDocument']['uri'], member_prefix, params['position']['line'])
+                    if owner:
+                        members = self.type_members(owner, self.document_index(params['textDocument']['uri']))
+                        if members is not None:
+                            items = [item for item in members if item['label'].startswith(typed)]
                     index = self.document_index(params["textDocument"]["uri"])
-                    context = index.member_context(params["position"]) if index is not None else None
+                    context = index.member_context(params["position"]) if index is not None and items is None else None
                     if context is not None:
                         type_name = index.infer_receiver_type(context[0])
                         members = self.type_members(type_name, index) if type_name else None
                         if members is not None:
                             items = [item for item in members if item["label"].startswith(context[1])]
                 if items is None:  # 推导不出类型/非成员位置：回落既有词法补全
-                    names = set(KEYWORDS) | {symbol["name"] for symbol in declarations(text)}
+                    document_names = {symbol["name"] for symbol in declarations(text)}
+                    names = set(KEYWORDS) | document_names
                     items = [{"label": name, "kind": 14 if name in KEYWORDS else 6,
                               "detail": KEYWORDS.get(name, "document declaration")}
                              for name in sorted(names) if name.startswith(typed)]
+                    present = {item['label'] for item in items}
+                    for name, entries in sorted(self.declaration_index.entries.items()):
+                        if '.' not in name and name.startswith(typed) and len(entries) == 1 and name not in document_names:
+                            item = self.declaration_index.completion(entries[0])
+                            if name in present:
+                                items = [old for old in items if old['label'] != name]
+                            items.append(item)
                 self.result(identifier, items)
             elif method.endswith("hover"):
+                declared = self.declaration_target(params['textDocument']['uri'], params['position'])
+                if len(declared) == 1:
+                    self.result(identifier, self.declaration_index.hover(declared[0]))
+                    return None
                 prefix = line_prefix(text, params["position"])
                 line = text.split("\n")[params["position"]["line"]]
                 column = len(prefix)
@@ -1161,7 +1207,14 @@ class Server:
                 help_text = KEYWORDS.get(match[0]) if match else None
                 self.result(identifier, {"contents": {"kind": "plaintext", "value": help_text}} if help_text else None)
             else:
-                self.result(identifier, declarations(text))
+                if is_declaration(params['textDocument']['uri']):
+                    entries = self.declaration_index.parse(params['textDocument']['uri'], text) or []
+                    self.result(identifier, [{'name': entry['symbol']['name'],
+                        'kind': {'namespace': 3, 'class': 5, 'function': 12, 'static': 6,
+                                 'property': 7, 'variable': 13}[entry['symbol']['kind']],
+                        'range': entry['range'], 'selectionRange': entry['range']} for entry in entries])
+                else:
+                    self.result(identifier, declarations(text))
         elif "id" in request:
             self.error(identifier, -32601, "Method not found: " + str(method))
         return None
@@ -1201,7 +1254,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cial", required=True, help="Path to the built cial executable")
     args = parser.parse_args()
-    return Server(args.cial).run()
+    server = Server(args.cial)
+    try:
+        return server.run()
+    finally:
+        server.declaration_index.close()
 
 
 if __name__ == "__main__":

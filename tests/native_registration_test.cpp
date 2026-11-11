@@ -1,10 +1,59 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include "Binding.hpp"
+#include "decl/DeclModel.hpp"
 #include "vm/VM.hpp"
 #include "vm/VMState.hpp"
 
 using namespace cial;
+
+TEST_CASE("Explicit API descriptions preserve binding identity and rich signatures",
+          "[native][registration][api][decl]") {
+    struct Counter {
+        Integer value;
+        explicit Counter(Integer seed) : value(seed) {}
+        Integer read() const { return value; }
+    };
+    Runtime runtime;
+    Context context{ runtime };
+    vm::VMState state{ context };
+    VM vm{ &state };
+    binding::Module root{ context };
+    root.module("Host"_str)
+        .class_<Counter>("Counter"_str, ApiMeta{ .doc = "宿主计数器" })
+        .constructor<Integer>(api::signature({ { .name = "seed", .type = "Integer" } }, {}, "初始值"))
+        .method("read"_str, &Counter::read, api::signature({}, "Integer", "读取当前值"))
+        .property("value"_str, [](Counter &value) { return value.value; }, nullptr, ApiMeta{ .doc = "只读计数" });
+    const auto &members = context.apiCatalog().typeMembers.at(nativeTypeKeyFor<Counter>());
+    REQUIRE(members.size() == 3);
+    CHECK(members[0].kind == ApiKind::Constructor);
+    REQUIRE(members[0].params.has_value());
+    CHECK(members[0].params->at(0).name == "seed");
+    CHECK(members[2].accessSpecified);
+    CHECK(members[2].hasGetter);
+    CHECK_FALSE(members[2].hasSetter);
+    const auto output = decl::generateDeclarations(decl::declarationsFromCatalog(context.apiCatalog()));
+    CHECK(output.find("function Counter(seed: Integer);") != std::string::npos);
+    CHECK(output.find("function read(): Integer;") != std::string::npos);
+    CHECK(output.find("getter: Integer;") != std::string::npos);
+    CHECK(output.find("宿主计数器") != std::string::npos);
+    vm.eval("var c = new Host.Counter(9);"_str);
+    REQUIRE(*vm.evalExpr<Integer>("c.read()"_str) == 9);
+
+    const auto explicitEmpty = api::annotate(ApiMeta{ .kind = ApiKind::Global, .name = "actual", .variadic = true },
+                                             ApiMeta{ .name = "ignored", .params = std::vector<ApiParam>{} });
+    CHECK(explicitEmpty.name == "actual");
+    CHECK_FALSE(explicitEmpty.variadic);
+    CHECK(explicitEmpty.params->empty());
+    CHECK(std::string(api::typeName<const String *>()) == "String");
+    context.recordApiGlobal(
+        ApiMeta{ .kind = ApiKind::Global,
+                 .name = "direct",
+                 .params = std::vector<ApiParam>{ { .name = "args", .type = "any", .collapse = true } } });
+    const auto &direct = context.apiCatalog().globals.back();
+    CHECK(direct.paramTypes == std::vector<std::string>{ "any" });
+    CHECK(direct.variadic);
+}
 
 namespace {
     class HostCounter final : public NativeObjectType<HostCounter> {

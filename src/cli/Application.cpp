@@ -30,6 +30,8 @@
 
 namespace cial::cli {
     namespace {
+        std::string declarationJson(const std::vector<decl::Symbol> &symbols);
+
         int runSource(const Options &options, vm::VMState &state) {
             Common::Result diagnostics;
             // `-` 从 stdin 读取；诊断身份用逻辑名（默认 <stdin>），不暴露宿主临时路径
@@ -37,6 +39,7 @@ namespace cial::cli {
             Common::SourceFile source{ fromStdin ? std::filesystem::path{} : std::filesystem::path{ options.input } };
             source.setSourceName(fromStdin && options.sourceName.empty() ? "<stdin>" : options.sourceName);
             Compilation compilation;
+            decl::Module declarations;
             try {
                 if(fromStdin) {
                     std::string content{ std::istreambuf_iterator<char>{ std::cin }, std::istreambuf_iterator<char>{} };
@@ -46,14 +49,23 @@ namespace cial::cli {
                 }
                 // .d.tjs 按声明模式分析（doc/declarations.md §4）：诊断走 decl.* 码；
                 // 其余模式的声明输入由 compile 拒绝
-                if(options.mode == Mode::CheckJson && source.isDeclaration()) {
+                if(options.mode == Mode::DeclJson) {
+                    declarations = decl::parseDeclarations(source, diagnostics, state.context.pp());
+                } else if(options.mode == Mode::CheckJson && source.isDeclaration()) {
                     decl::parseDeclarations(source, diagnostics, state.context.pp());
                     printJsonDiagnostics(diagnostics, options.jsonSchema, source.sourceName());
                     return diagnostics.isFailed() ? 1 : 0;
+                } else {
+                    compilation = compile(diagnostics, state.context, source);
                 }
-                compilation = compile(diagnostics, state.context, source);
             } catch(const std::exception &error) {
                 diagnostics.error(error.what());
+            }
+            if(options.mode == Mode::DeclJson) {
+                fmt::print("{{\"schemaVersion\":1,\"symbols\":{},\"check\":", declarationJson(declarations.symbols));
+                printJsonDiagnostics(diagnostics, 2, source.sourceName());
+                fmt::println("}}");
+                return diagnostics.isFailed() ? 1 : 0;
             }
             if(options.mode == Mode::CheckJson) {
                 printJsonDiagnostics(diagnostics, options.jsonSchema, source.sourceName());
@@ -204,7 +216,10 @@ namespace cial::cli {
                         out += "\\t";
                         break;
                     default:
-                        out += ch;
+                        if(static_cast<unsigned char>(ch) < 0x20)
+                            out += fmt::format("\\u{:04x}", static_cast<unsigned char>(ch));
+                        else
+                            out += ch;
                         break;
                 }
             }
@@ -225,8 +240,65 @@ namespace cial::cli {
                     return "namespace";
                 case ApiKind::Class:
                     return "class";
+                case ApiKind::Constructor:
+                    return "constructor";
             }
             return "";
+        }
+
+        std::string parameterJson(const ApiParam &param) {
+            return fmt::format(
+                "{{\"name\":\"{}\",\"type\":\"{}\",\"optional\":{},\"collapse\":{},\"defaultText\":\"{}\"}}",
+                apiJsonString(param.name), apiJsonString(param.type), param.optional, param.collapse,
+                apiJsonString(param.defaultText));
+        }
+
+        std::string declarationJson(const std::vector<decl::Symbol> &symbols) {
+            std::string out = "[";
+            for(const auto &symbol : symbols) {
+                if(out.size() > 1)
+                    out += ',';
+                const char *kind = "variable";
+                switch(symbol.kind) {
+                    case decl::SymbolKind::Namespace:
+                        kind = "namespace";
+                        break;
+                    case decl::SymbolKind::Class:
+                        kind = "class";
+                        break;
+                    case decl::SymbolKind::Function:
+                        kind = "function";
+                        break;
+                    case decl::SymbolKind::StaticFunction:
+                        kind = "static";
+                        break;
+                    case decl::SymbolKind::Property:
+                        kind = "property";
+                        break;
+                    case decl::SymbolKind::Variable:
+                        break;
+                }
+                out += fmt::format("{{\"kind\":\"{}\",\"name\":\"{}\",\"doc\":\"{}\",\"ret\":\"{}\",\"hasGetter\":{},"
+                                   "\"hasSetter\":{},\"constant\":{}",
+                                   kind, apiJsonString(symbol.name), apiJsonString(symbol.doc),
+                                   apiJsonString(symbol.ret), symbol.hasGetter, symbol.hasSetter, symbol.constant);
+                if(symbol.span.valid())
+                    out += fmt::format(",\"begin\":{},\"end\":{}", symbol.span.begin, symbol.span.end);
+                out += ",\"params\":[";
+                for(size_t i = 0; i < symbol.params.size(); ++i) {
+                    if(i)
+                        out += ',';
+                    out += parameterJson(symbol.params[i]);
+                }
+                out += "],\"extends\":[";
+                for(size_t i = 0; i < symbol.extends.size(); ++i) {
+                    if(i)
+                        out += ',';
+                    out += fmt::format("\"{}\"", apiJsonString(symbol.extends[i]));
+                }
+                out += "],\"members\":" + declarationJson(symbol.members) + '}';
+            }
+            return out + ']';
         }
 
         void appendApiMetaJson(std::string &out, const ApiMeta &meta) {
@@ -246,6 +318,26 @@ namespace cial::cli {
             out += ']';
             if(!meta.doc.empty())
                 out += fmt::format(",\"doc\":\"{}\"", apiJsonString(meta.doc));
+            if(meta.params) {
+                out += ",\"parameters\":[";
+                for(size_t i = 0; i < meta.params->size(); ++i) {
+                    if(i)
+                        out += ',';
+                    out += parameterJson((*meta.params)[i]);
+                }
+                out += ']';
+            }
+            if(meta.accessSpecified)
+                out += fmt::format(",\"hasGetter\":{},\"hasSetter\":{}", meta.hasGetter, meta.hasSetter);
+            if(!meta.extends.empty()) {
+                out += ",\"extends\":[";
+                for(size_t i = 0; i < meta.extends.size(); ++i) {
+                    if(i)
+                        out += ',';
+                    out += fmt::format("\"{}\"", apiJsonString(meta.extends[i]));
+                }
+                out += ']';
+            }
             out += '}';
         }
 
@@ -323,8 +415,8 @@ namespace cial::cli {
         Context context{ runtime };
         vm::VMState state{ context };
         VM vm{ &state };
-        const bool compileOnly = options.mode == Mode::CheckJson || options.mode == Mode::DumpCfg ||
-            options.mode == Mode::DumpSsa || options.mode == Mode::Decompile;
+        const bool compileOnly = options.mode == Mode::CheckJson || options.mode == Mode::DeclJson ||
+            options.mode == Mode::DumpCfg || options.mode == Mode::DumpSsa || options.mode == Mode::Decompile;
         if(!compileOnly)
             setupSession(context, vm, state,
                          options.input.empty() ? std::filesystem::path{} : std::filesystem::path{ options.input });

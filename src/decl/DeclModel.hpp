@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "common/ApiParam.hpp"
 #include "common/SourceSpan.hpp"
 
 namespace cial {
@@ -26,13 +27,7 @@ namespace cial::decl {
     enum class SymbolKind { Namespace, Class, Function, StaticFunction, Property, Variable };
 
     // 参数：`name: type = 默认字面量` / `name*` / `*`（未命名收拢）
-    struct Param {
-        std::string name; // 空串 = 未命名收拢 `*`
-        std::string type; // 空串 = 类型未知（省略注解）
-        bool optional{}; // 带字面量默认值
-        bool collapse{}; // 收拢参数，必须是参数表最后一项
-        std::string defaultText; // 默认值字面量的源码原文；空 = 必选
-    };
+    using Param = ApiParam;
 
     struct Symbol {
         SymbolKind kind{ SymbolKind::Function };
@@ -65,6 +60,6 @@ namespace cial::decl {
     // 注册事实（doc/api-metadata.md）→ 模型（实现在 DeclModel.cpp）：
     // typeMembers+typeNames 生成类符号（按注册名排序），globals 按 owner 点分
     // 路径归位为嵌套 namespace/class；variadic 转单个未命名收拢参数；
-    // 登记属性一律转简写（读写性在注册点不可推导）。
+    // 显式参数与属性访问方式保留；未知访问方式使用简写，不猜测只读性。
     Module declarationsFromCatalog(const ApiCatalog &catalog);
 } // namespace cial::decl

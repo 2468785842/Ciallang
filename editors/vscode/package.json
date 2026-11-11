@@ -21,6 +21,7 @@
           "TJS2"
         ],
         "extensions": [
+          ".d.tjs",
           ".tjs"
         ],
         "configuration": "./language-configuration.json"
@@ -33,6 +34,12 @@
           "type": "string",
           "default": "",
           "description": "Python interpreter (defaults to python on Windows, python3 elsewhere)"
+        },
+        "ciallang.declarationFiles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional .d.tjs files, absolute or relative to the active workspace; workspace declarations are discovered automatically"
         },
         "ciallang.executable": {
           "type": "string",

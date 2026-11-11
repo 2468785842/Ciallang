@@ -159,17 +159,18 @@ namespace cial::binding {
         static_assert(!std::is_base_of_v<Object, T>, "Object subclasses use Context::nativeType<T>()");
         Context &_ctx;
         RootGuard<Namespace> _class;
+        std::string _name;
 
     public:
         ClassBuilder(Context &ctx, Namespace *classObject, const Atom name) :
-            _ctx(ctx), _class(&ctx.rt(), classObject) {
+            _ctx(ctx), _class(&ctx.rt(), classObject), _name(ctx.rt().atomTable.get(name)->str->toStdStr()) {
             _ctx.recordApiTypeName(nativeTypeKeyFor<T>(), ctx.rt().atomTable.get(name)->str->toStdStr());
             if(!ctx.nativeBinding(nativeTypeKeyFor<T>()))
                 ctx.registerNativeBinding(std::make_shared<NativeTypeBinding>(
                     NativeTypeBinding{ .key = nativeTypeKeyFor<T>(), .name = name, .trace = {} }));
         }
         template <typename... Args>
-        ClassBuilder &constructor() {
+        ClassBuilder &constructor(const ApiMeta &description = {}) {
             auto fn = makeFunction(_ctx, [](const VM *vm, const Value &, const size_t argc, Value *args) {
                 checkArity(argc, sizeof...(Args));
                 return [&]<size_t... I>(std::index_sequence<I...>) {
@@ -177,6 +178,11 @@ namespace cial::binding {
                 }(std::index_sequence_for<Args...>{});
             });
             _class->constructor = fn.get();
+            _ctx.recordApiMember(
+                nativeTypeKeyFor<T>(),
+                api::annotate(
+                    ApiMeta{ .kind = ApiKind::Constructor, .name = _name, .paramTypes = { api::typeName<Args>()... } },
+                    description));
             return *this;
         }
         template <typename F>
@@ -192,6 +198,13 @@ namespace cial::binding {
                     return cial::binding::invoke<decltype(bound) &, typename Traits::ArgsTuple>(
                         vm->context(), bound, args, std::make_index_sequence<Traits::arity>{});
                 });
+            return *this;
+        }
+        template <typename F>
+        ClassBuilder &method(const String &name, F fn, const ApiMeta &description) {
+            method(name, fn);
+            _ctx.recordApiMember(nativeTypeKeyFor<T>(),
+                                 api::annotate(api::makeMeta<F>(ApiKind::Method, name.toStdStr()), description));
             return *this;
         }
         template <typename G, typename S = std::nullptr_t>
@@ -213,6 +226,9 @@ namespace cial::binding {
                           .name = name.toStdStr(),
                           .ret = api::typeName<std::invoke_result_t<G, T &>>(),
                           .doc = std::move(doc) };
+            meta.accessSpecified = true;
+            meta.hasGetter = true;
+            meta.hasSetter = !std::same_as<S, std::nullptr_t>;
             _ctx.recordApiMember(nativeTypeKeyFor<T>(), std::move(meta));
             return *this;
         }
@@ -230,6 +246,30 @@ namespace cial::binding {
             _class->members[_ctx.rt().atomTable.intern(name)] = Value{ function.get() };
             _ctx.recordApiMember(nativeTypeKeyFor<T>(), api::makeMeta<F>(ApiKind::Static, name.toStdStr(), {}, {}));
             return *this;
+        }
+        template <typename F>
+        ClassBuilder &staticFunction(const String &name, F fn, const ApiMeta &description) {
+            staticFunction(name, fn);
+            _ctx.recordApiMember(nativeTypeKeyFor<T>(),
+                                 api::annotate(api::makeMeta<F>(ApiKind::Static, name.toStdStr()), description));
+            return *this;
+        }
+        template <typename G, typename S = std::nullptr_t>
+        ClassBuilder &property(const String &name, G getter, S setter, const ApiMeta &description) {
+            property(name, getter, setter);
+            auto meta = api::annotate(ApiMeta{ .kind = ApiKind::Property,
+                                               .name = name.toStdStr(),
+                                               .ret = api::typeName<std::invoke_result_t<G, T &>>() },
+                                      description);
+            meta.accessSpecified = true;
+            meta.hasGetter = true;
+            meta.hasSetter = !std::same_as<S, std::nullptr_t>;
+            _ctx.recordApiMember(nativeTypeKeyFor<T>(), std::move(meta));
+            return *this;
+        }
+        template <typename G>
+        ClassBuilder &property(const String &name, G getter, const ApiMeta &description) {
+            return property(name, getter, nullptr, description);
         }
     };
 
@@ -265,17 +305,18 @@ namespace cial::binding {
             return Module{ _ctx, space.get(), joinPath(name.toStdStr()) };
         }
         template <typename T>
-        ClassBuilder<T> class_(const String &name) {
+        ClassBuilder<T> class_(const String &name, const ApiMeta &description = {}) {
             const auto type = _ctx.rt().create<Namespace>();
-            _ctx.recordApiGlobal(ApiMeta{ .kind = ApiKind::Class, .name = name.toStdStr(), .owner = _path });
+            _ctx.recordApiGlobal(
+                api::annotate(ApiMeta{ .kind = ApiKind::Class, .name = name.toStdStr(), .owner = _path }, description));
             put(name, Value{ type.get() });
             return ClassBuilder<T>{ _ctx, type.get(), _ctx.rt().atomTable.intern(name) };
         }
         template <typename F>
-        Module &function(const String &name, F fn) {
+        Module &function(const String &name, F fn, const ApiMeta &description = {}) {
             const auto function = makeTypedFunction(_ctx, std::move(fn));
             put(name, Value{ function.get() });
-            _ctx.recordApiGlobal(api::makeMeta<F>(ApiKind::Global, name.toStdStr(), _path));
+            _ctx.recordApiGlobal(api::annotate(api::makeMeta<F>(ApiKind::Global, name.toStdStr(), _path), description));
             return *this;
         }
 

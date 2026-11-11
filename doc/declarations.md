@@ -12,7 +12,7 @@
   以 `;` 收尾；类型注解即 TJS2 原有的 `: type` 记法。
 - 声明解析与生成共享 [API 元数据模型](api-metadata.md)所属的符号体系：
   `cial --api-decl`（注册事实 → 声明文本）与声明解析器（声明文本 → 符号模型）互为
-  逆操作，往返保持稳定。LSP 消费声明属路线图批次 C，不在本篇范围。
+  逆操作，往返保持稳定。[LSP](lsp.md) 通过核心声明分析读取相同模型。
 
 ## 1. 语法
 
@@ -106,9 +106,9 @@ literal      := 数字/字符串/true/false/null/void 字面量，可带一元�
 `declarationsFromCatalog` 规则：`typeMembers` + `typeNames` 生成 `class` 符号
 （按注册名排序保证确定性）；`globals` 按 `owner` 点分路径归位为嵌套
 `namespace`/`class`（globals 按登记顺序，先父后子）；`variadic` 条目转换为单个
-未命名收拢参数；无法推导的类型保持未知；登记属性转换为简写形式（登记点不含
-读写性事实——实测 getter-only 登记在语言层未必只读，如 `Array.count`，见
-`src/stdlib/NativeRegister.hpp` 的 `NativePropGetter` 与 VM 的属性特判）。
+未命名收拢参数；无法推导的类型保持未知。显式参数与访问方式保留原描述；未知访问方式
+使用属性简写。不能仅凭 getter 登记推断只读，如 `Array.count`，见
+`src/stdlib/NativeRegister.hpp` 的 `NativePropGetter` 与 VM 的属性特判。
 
 ## 3. 生成器
 
@@ -116,9 +116,10 @@ literal      := 数字/字符串/true/false/null/void 字面量，可带一元�
 导出标准库与内建宿主接口的声明文本。输出规则：
 
 - 类按注册名排序；成员保持登记顺序；文档注释以 `/** */` 输出。
-- 参数名不可从 C++ 类型推导，生成 `arg0`、`arg1`……占位名（模型有名时用原名）。
-- 变长条目输出 `function name(*);`；未知类型省略注解。
-- 属性一律输出简写 `property name: type;`（读写性未知，不声称只读/可写）。
+- 参数名不可从 C++ 类型推导；注册点可显式提供，否则生成 `arg0`、`arg1`……占位名。
+- 显式签名保留参数名、可选字面量和具名收拢参数；仅知变长时输出 `function name(*);`。
+  未知类型省略注解。
+- 属性在访问方式明确时输出 getter/setter，否则使用简写，避免误称只读/可写。
 - 输出仅由模型决定，不含版本戳或头部注释；对同一注册事实输出逐字节稳定，
   且 `generate(parse(generate(catalog)))` 与 `generate(catalog)` 一致（往返幂等，
   由 `tests/declaration_test.cpp` 验证）。
@@ -135,12 +136,18 @@ literal      := 数字/字符串/true/false/null/void 字面量，可带一元�
 | `cial foo.d.tjs`（执行模式） | 拒绝：`decl.not-executable`，退出码 1 |
 | `cial --dump-cfg/--dump-ssa/--decompile foo.d.tjs` | 同上拒绝（声明无可执行代码） |
 | `cial --check-json - --source-name x.d.tjs` | stdin + 逻辑名识别为声明（LSP 路径） |
+| `cial --decl-json --source-name x.d.tjs -` | 按声明模式输出符号和诊断；不执行输入 |
 | `Scripts.execStorage("x.d.tjs")` / `evalStorage` | 运行期异常（可被脚本 catch），消息含声明文件说明 |
 | SDK `Engine::execute(text, r, "x.d.tjs")` | 仅写 Result 诊断（`decl.not-executable`），不编译 |
 
 拒绝检查集中在两处：`cli::compile`（`src/cli/Compilation.cpp`，覆盖 CLI 各模式与
 cial-dbg/cial-disasm 工具）与 `VM::execute`（`src/vm/VM.cpp`，覆盖 `Scripts` 与
 `Engine`）。身份判定 `Common::isDeclarationSourceName` 在 `src/common/SourceFile.hpp`。
+
+`--decl-json` 为工具传输接口：schemaVersion 1，symbols 为递归的声明模型，含
+kind/name/doc/params/ret/extends/members、属性访问方式及声明名的 begin/end UTF-8 字节偏移；
+check 为现有 schema 2 的 JSON 诊断。输入无效时退出 1，工具不得把残缺符号当作有效接口。
+该选项显式选择声明解析，不依赖文件扩展名；支持文件与 stdin，拒绝执行选项。
 
 ## 5. 测试与扫描排除
 
@@ -157,13 +164,9 @@ Catch2）与 `tests/cli/test_cli.py`（CLI 行为）。声明语料放 `tests/de
 
 ## 6. 现状与限制
 
-- 属性读写性、参数名、默认值、条件变长在注册点不可推导，生成器如实省略或
-  占位（`argN`），不编造；注册点可按 [api-metadata](api-metadata.md) 以 `doc`
-  尾参/显式 `ApiMeta` 补充。
-- 宿主构造器（`ClassBuilder::constructor`）不登记成员元数据，生成的类无构造器
-  条目；手写声明可用与类同名的成员函数表达（TJS2 惯例）。
-- LSP 消费声明（替换 `tools/lsp/cial_lsp.py` 的 `BUILTIN_MEMBERS`）、编辑器
-  `.d.tjs` 关联、声明/实现一致性检查、同名声明的查找优先级与冲突诊断属路线图
-  批次 C 及后续设计；本阶段不引入可被脚本扫描器误收集的声明样本。
+- 自动推导未知的事实仍如实省略；注册点可按 [api-metadata](api-metadata.md) 显式补充。
+  ClassBuilder 已登记构造器；原生 registerClass 的任意动态调用协议不会被猜测为构造签名。
+- LSP 已支持声明补全、悬停、继承与跳转；同名歧义保守放弃推断，具体优先级见 [LSP](lsp.md)。
+  声明/实现一致性检查、重载选择和独立冲突诊断尚未实现。
 - `namespace` 是声明模式中的上下文关键字（后随标识符 + `{` 才成立），TJS2 保留字
   表不含它，脚本模式行为不变。

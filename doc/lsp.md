@@ -1,6 +1,6 @@
 # LSP 与编辑器接入
 
-`tools/lsp/cial_lsp.py` 使用 Python 3 标准库提供 stdio LSP：完整文本同步、实时语法/编译诊断、关键字与当前文档声明补全、基于保守类型推导的语义成员补全、`textDocument/definition` 跳转（本文件作用域解析 + 跨文件顶层声明）、`textDocument/rename` 绑定级重命名、内置关键字悬停说明、词法级文档符号列表，以及跨文件工作区符号搜索。诊断由 `cial --check-json --source-name <文档URI> -` 经 stdin 返回（schema 2：半开范围、纯文本消息、稳定错误码透传为 `code`），不落临时文件、不暴露宿主路径；检查过程不执行被检查脚本，位置从原生 UTF-8 字节列按完整字符边界转换成 LSP UTF-16 列（`src/cli/Application.cpp`、`src/cli/Compilation.cpp`、`src/common/SourceFile.cpp`、`tools/lsp/cial_lsp.py`）。无 `schema` 字段的旧版检查器走兼容转换（包含式列 +1、剥离消息位置前缀）。
+`tools/lsp/cial_lsp.py` 使用 Python 3 标准库提供 stdio LSP：完整文本同步、实时语法/编译诊断、关键字与当前文档声明补全、基于保守类型推导的语义成员补全、`textDocument/definition` 跳转（本文件作用域解析 + 跨文件顶层声明）、`textDocument/rename` 绑定级重命名、关键字与接口文档悬停说明、词法级文档符号列表，以及跨文件工作区符号搜索。诊断由 `cial --check-json --source-name <文档URI> -` 经 stdin 返回（schema 2：半开范围、纯文本消息、稳定错误码透传为 `code`），不落临时文件、不暴露宿主路径；检查过程不执行被检查脚本，位置从原生 UTF-8 字节列按完整字符边界转换成 LSP UTF-16 列（`src/cli/Application.cpp`、`src/cli/Compilation.cpp`、`src/common/SourceFile.cpp`、`tools/lsp/cial_lsp.py`）。无 `schema` 字段的旧版检查器走兼容转换（包含式列 +1、剥离消息位置前缀）。
 
 启动命令（将路径替换为实际绝对路径）：
 
@@ -39,9 +39,47 @@ python tools/lsp/cial_lsp.py --cial build/Windows/Debug/cial.exe
 
 ### 保守类型推导与语义成员补全
 
-`textDocument/completion` 在 `receiver.` 形态（光标紧跟点号，或点号后已输入半截成员名）做类型推导：`DefinitionIndex.member_context` 识别接收者（仅支持标识符或单次 `foo()` 调用；`a.b.` 链式与下标结果一律 unknown），`infer_receiver_type` / `infer_expression` 按声明与调用点确定性推导——`new Array()/Dictionary()/RegExp()/Date()`、字符串/整实数/`[]`/`%[]`/正则字面量、`new MyClass()` 的工作区 class、`foo()` 的函数返回值（分析函数体 `return` 表达式，跨绑定递归深度 ≤ `MAX_INFER_DEPTH`=3，循环/多返回不一致/预算耗尽一律 unknown）。推导命中后按类型返回成员：内置类型走 `BUILTIN_MEMBERS` 名单（逐一核对自 `src/stdlib/ArrayLib.cpp`、`StringLib.cpp`、`DictLib.cpp`、`MathLib.cpp`、`DateLib.cpp`、`RegExpLib.cpp`、`SerializeLib.cpp`、`ExceptionLib.hpp` 的注册代码，含 kind 与一行签名）；工作区 class 给出类体内 var/function/property 声明（`DefinitionIndex` 现在把类体字段/property 名绑定进类作用域），并沿 `extends` 名字解析父类成员（`Server.type_members`、`unique_workspace_class`，层级上限 `MAX_CLASS_HIERARCHY`=8，派生类成员覆盖基类同名成员）。推导不出类型时原样回落既有词法补全（关键字 + 文档声明），不报错；非成员位置行为完全不变（`tools/lsp/cial_lsp.py` 的 `member_context`、`infer_*`、`BUILTIN_MEMBERS`、`type_members`）。
+`textDocument/completion` 在 `receiver.` 形态（光标紧跟点号，或点号后已输入半截成员名）做类型推导：`DefinitionIndex.member_context` 识别接收者（仅支持标识符或单次 `foo()` 调用；`a.b.` 链式与下标结果一律 unknown），`infer_receiver_type` / `infer_expression` 按声明与调用点确定性推导——`new Array()/Dictionary()/RegExp()/Date()`、字符串/整实数/`[]`/`%[]`/正则字面量、`new MyClass()` 的工作区 class、`foo()` 的函数返回值（分析函数体 `return` 表达式，跨绑定递归深度 ≤ `MAX_INFER_DEPTH`=3，循环/多返回不一致/预算耗尽一律 unknown）。推导命中后按类型返回成员：标准库由 `cial --api-decl` 生成声明，
+工作区与外部宿主读取 `.d.tjs`，均交给 `cial --decl-json` 的核心解析器转为声明模型，
+不在 Python 内另写声明解析器。声明提供成员签名、参数名/默认值、文档、属性访问方式和继承；
+普通脚本 class 仍使用已有保守作用域索引。声明的函数返回类型及脚本显式类型注解参与推导，
+不改变运行时动态类型行为（`tools/lsp/decl_index.py`、`src/decl/`、`src/cli/Application.cpp`）。
+未知类型仍回落关键字和文档声明，不猜测成员。
 
-推导边界（如实声明）：非流敏感，不做控制流/赋值序列分析；不解析 `@` 预处理指令；成员访问链与下标之后 unknown；Integer/Real 无成员表，回落词法补全。单次请求推理有 `MAX_INFER_STEPS`=20000 步预算，超限宁可 unknown。
+推导边界（如实声明）：非流敏感，不做控制流/赋值序列分析；不解析 `@` 预处理指令；声明可描述的标识符/调用/成员链可沿返回类型查询；普通动态成员链与下标之后 unknown；Integer/Real 无成员表，回落词法补全。单次请求推理有 `MAX_INFER_STEPS`=20000 步预算，超限宁可 unknown。
+
+### 声明文件与宿主接口
+
+原生接口的签名和注释在 C++ 注册点维护，经 ApiMeta 导出；脚本接口和第三方 SDK 可手写
+`.d.tjs`。类型使用 `: Type` 声明语法，`/** */` 注释写用途和行为。两类声明使用同一解析器，
+见 [元数据](api-metadata.md) 与 [声明文件](declarations.md)。
+
+工作区自动发现 `.d.tjs`。SDK 声明在工作区之外或处于默认排除目录时，VSCode 可配置：
+
+```json
+{
+  "ciallang.declarationFiles": ["types/host.d.tjs", "/opt/host-sdk/host.d.tjs"]
+}
+```
+
+相对路径按活动工作区解析，配置变更后重新加载窗口。其他客户端在 initialize 的
+initializationOptions.declarationFiles 中传入 file URI 数组。显式文件只读取指定路径，
+不会扩展为扫描整个 SDK 目录；未保存缓冲覆盖磁盘，关闭恢复磁盘，修改与删除会更新索引。
+
+标准库仅调用已配置 cial 的 `--api-decl`；生成文件保存在服务生命周期内的临时目录，
+可从补全处跳转查看。`script-builtins.d.tjs` 描述脚本自举的 Exception；扩展打包同时复制
+两个 Python 模块与该声明。不会为获取接口而启动第三方宿主应用，也不会执行声明输入。
+需要包含 `--api-decl` 和 `--decl-json` 的新版 cial；旧检查器仍可用于原语法诊断，无法提供声明成员。
+
+补全和悬停显示签名及纯文本文档，定义跳转使用核心给出的 UTF-8 名称范围并转换为 UTF-16。
+当前文件的脚本绑定优先于同名 API；项目顶层声明覆盖对应生成标准库，派生成员覆盖基类成员。
+多个项目声明具有同名身份时不合并、不猜测返回类型；全局定义返回候选位置，成员推导保守放弃。
+无效声明整文件不提供接口，避免把旧签名或残缺类型继续当作事实。
+API 声明及其引用不提供自动 rename，以免只修改声明却未修改实际宿主；脚本局部绑定的 rename 保持原行为。
+
+声明查询最多处理 64 个文件，共享工作区内容预算；单文件上限 2 MB，核心调用超时 5 秒，
+一轮未缓存声明分析也有 5 秒总预算；超出范围保守放弃。正文未改变时复用核心分析结果。
+这仍是保守语言服务，不是静态类型检查器；重载选择、声明/实现一致性与完整动态访问分析未实现。
 
 ### rename / prepareRename
 
@@ -49,7 +87,7 @@ python tools/lsp/cial_lsp.py --cial build/Windows/Debug/cial.exe
 
 ### 跨文件跳转定义
 
-`textDocument/definition` 保留保守的作用域感知解析：`DefinitionIndex` 对平衡的、未使用预处理指令的源码建立词法绑定索引——函数/getter/setter/catch 作用域、class/property 体、for/with 头部与单语句体、参数与 var/const 声明（含初始化表达式可见性、类型注解、收拢参数），按最近嵌套作用域解析标识符；成员访问（`.x` 前置点号）、关键字与内置类名、含 `@` 指令或括号不平衡的源码一律拒绝（宁缺毋错）。本文件解析不到的全局名再查工作区：命中的全部顶层声明按（同文件优先，URI，位置）确定性排序后**全部返回**（`Location[]`），唯一时保持单 `Location` 向后兼容，无匹配才返回 null；存在无法确认作用域（`@`/括号不平衡）又词法声明了该名字的文件时仍整体放弃（`tools/lsp/cial_lsp.py` 的 `DefinitionIndex`、`resolve`、`definition`）。
+`textDocument/definition` 保留保守的作用域感知解析：`DefinitionIndex` 对平衡的、未使用预处理指令的源码建立词法绑定索引——函数/getter/setter/catch 作用域、class/property 体、for/with 头部与单语句体、参数与 var/const 声明（含初始化表达式可见性、类型注解、收拢参数），按最近嵌套作用域解析标识符；缺少声明支持的成员访问（`.x` 前置点号）、关键字与内置类名、含 `@` 指令或括号不平衡的源码一律拒绝（宁缺毋错）。本文件解析不到的全局名再查工作区：命中的全部顶层声明按（同文件优先，URI，位置）确定性排序后**全部返回**（`Location[]`），唯一时保持单 `Location` 向后兼容，无匹配才返回 null；存在无法确认作用域（`@`/括号不平衡）又词法声明了该名字的文件时仍整体放弃（`tools/lsp/cial_lsp.py` 的 `DefinitionIndex`、`resolve`、`definition`）。
 
 ### 测试
 

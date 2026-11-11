@@ -19,19 +19,50 @@ namespace cial::stdlib {
                 static_cast<Integer>(dynamic_cast<Array &>(*thisObj.requireObject()).elements.size()) } };
         };
         context.nativeType<Array>()
-            .method("push"_str, &stdlib::arrayPush)
-            .method("pop"_str, &stdlib::arrayPop)
-            .method("unshift"_str, &stdlib::arrayUnshift)
-            .method("shift"_str, &stdlib::arrayShift)
-            .method("insert"_str, &stdlib::arrayInsert)
-            .method("remove"_str, &stdlib::arrayRemove)
-            .method("erase"_str, &stdlib::arrayErase)
-            .method("reverse"_str, &stdlib::arrayReverse)
-            .method("join"_str, &stdlib::arrayJoin)
-            .method("split"_str, &stdlib::arraySplitWith)
-            .method("sort"_str, &stdlib::arraySort)
-            .property("count"_str, arrayCount)
-            .property("length"_str, arrayCount);
+            .method("push"_str, &stdlib::arrayPush,
+                    api::signature({ { .name = "values", .type = "any", .collapse = true } }, "Integer",
+                                   "末尾追加元素，返回新长度。"))
+            .method("pop"_str, &stdlib::arrayPop, api::signature({}, "any", "移除并返回末元素；空数组返回 void。"))
+            .method("unshift"_str, &stdlib::arrayUnshift,
+                    api::signature({ { .name = "values", .type = "any", .collapse = true } }, "Integer",
+                                   "头部插入元素，返回新长度。"))
+            .method("shift"_str, &stdlib::arrayShift, api::signature({}, "any", "移除并返回首元素；空数组返回 void。"))
+            .method("insert"_str, &stdlib::arrayInsert,
+                    api::signature({ { .name = "index", .type = "Integer" },
+                                     { .name = "values", .type = "any", .collapse = true } },
+                                   "Integer", "在指定位置插入元素，返回新长度。"))
+            .method(
+                "remove"_str, &stdlib::arrayRemove,
+                api::signature({ { .name = "index", .type = "Integer" } }, "any", "移除并返回指定元素；越界抛出异常。"))
+            .method("erase"_str, &stdlib::arrayErase, api::signature({}, "void", "清空元素。"))
+            .method("reverse"_str, &stdlib::arrayReverse, api::signature({}, "void", "原地反转元素顺序。"))
+            .method("join"_str, &stdlib::arrayJoin,
+                    api::signature({ { .name = "delim", .type = "String", .optional = true, .defaultText = "\",\"" } },
+                                   "String", "用分隔符连接数组元素。"))
+            .method("split"_str, &stdlib::arraySplitWith,
+                    api::signature(
+                        { { .name = "pattern", .type = "any" },
+                          { .name = "text", .type = "String" },
+                          { .name = "reserved", .type = "any", .optional = true, .defaultText = "void" },
+                          { .name = "purgeempty", .type = "Boolean", .optional = true, .defaultText = "false" } },
+                        "Array", "拆分文本并替换自身元素。"))
+            .method(
+                "sort"_str, &stdlib::arraySort,
+                api::signature({ { .name = "order", .type = "any", .optional = true, .defaultText = "'+'" },
+                                 { .name = "stable", .type = "Boolean", .optional = true, .defaultText = "false" } },
+                               "void", "原地排序；order 可以是排序模式或比较函数。"))
+            .property("count"_str, arrayCount,
+                      ApiMeta{ .ret = "Integer",
+                               .doc = "元素个数；可写入以调整数组长度。",
+                               .accessSpecified = true,
+                               .hasGetter = true,
+                               .hasSetter = true })
+            .property("length"_str, arrayCount,
+                      ApiMeta{ .ret = "Integer",
+                               .doc = "元素个数；可写入以调整数组长度。",
+                               .accessSpecified = true,
+                               .hasGetter = true,
+                               .hasSetter = true });
         context.registerClass<Array>("Array"_str, &context.rt());
     }
 

@@ -20,7 +20,11 @@ async function activate(context) {
       executable: settings.get('executable')
     });
     client = new LanguageClient('ciallang', 'Ciallang', server, {
-      documentSelector: [{ scheme: 'file', language: 'ciallang' }]
+      documentSelector: [{ scheme: 'file', language: 'ciallang' }],
+      initializationOptions: {
+        declarationFiles: settings.get('declarationFiles', []).map(file =>
+          vscode.Uri.file(path.resolve(roots[0] || (resource ? path.dirname(resource.fsPath) : context.extensionPath), file)).toString())
+      }
     });
     await client.start();
   } catch (error) {

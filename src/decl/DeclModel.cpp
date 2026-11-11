@@ -156,15 +156,19 @@ namespace cial::decl {
             switch(meta.kind) {
                 case ApiKind::Method:
                 case ApiKind::Global:
+                case ApiKind::Constructor:
                     symbol.kind = SymbolKind::Function;
                     break;
                 case ApiKind::Static:
                     symbol.kind = SymbolKind::StaticFunction;
                     break;
                 case ApiKind::Property:
-                    // 登记点不含读写性事实（getter-only 登记在语言层未必只读），
-                    // 生成简写形式，不声称只读/可写
+                    // 只采用显式访问方式；getter-only 登记在语言层未必只读。
                     symbol.kind = SymbolKind::Property;
+                    if(meta.accessSpecified) {
+                        symbol.hasGetter = meta.hasGetter;
+                        symbol.hasSetter = meta.hasSetter;
+                    }
                     break;
                 case ApiKind::Namespace:
                     symbol.kind = SymbolKind::Namespace;
@@ -173,7 +177,10 @@ namespace cial::decl {
                     symbol.kind = SymbolKind::Class;
                     break;
             }
-            if(meta.variadic) {
+            symbol.extends = meta.extends;
+            if(meta.params) {
+                symbol.params = *meta.params;
+            } else if(meta.variadic) {
                 // (VM*, Value, size_t, Value*) 形态：参数表未知，转未命名收拢
                 Param collapse;
                 collapse.collapse = true;
@@ -248,6 +255,8 @@ namespace cial::decl {
                     break;
                 case ApiKind::Class: {
                     auto &node = ensureNode(parent, meta.name, SymbolKind::Class);
+                    node.doc = meta.doc;
+                    node.extends = meta.extends;
                     const auto claimed = classSymbols.find(meta.name);
                     if(claimed != classSymbols.end()) {
                         node.members = std::move(claimed->second.members);

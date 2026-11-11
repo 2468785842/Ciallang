@@ -11,7 +11,7 @@ Status: proposed
 
 - 批次 1（SDK 兼容承诺与仓库拆分）：install/export、Engine 入口、逻辑源码身份、
   安装后示例、公共头两层承诺与能力查询（`cial/Capability.hpp` + `cial --capabilities`，
-  证据见 [implemented note](../implemented/architecture/2026-11-09-sdk-public-header-capability.md)）
+  证据见 [implemented note](../../implemented/architecture/2026-11-09-sdk-public-header-capability.md)）
   已完成；**三平台远端安装验收已收口（2026-11-10，run 42775661634）**：
   "Test relocated installed SDK" 在 Linux/macOS/Windows Release 及 Windows
   Release JIT-ON 四个 job 全部通过，Ubuntu 另含 "Configure library consumer"。
@@ -25,9 +25,10 @@ Status: proposed
   执行侧拒绝（`cli::compile`/`VM::execute`/`Scripts`，码 `decl.not-executable`）、
   `cial --api-decl` 生成器（`decl::declarationsFromCatalog` + `generateDeclarations`，
   往返幂等）与 CTest/基准/语料/fuzz 扫描排除；登记顺带修复 `--api-json` 中 Scripts
-  成员重复条目（`recordApiMember` 改为同名同类别替换）。剩余：LSP 消费声明
-  （替换 `BUILTIN_MEMBERS`，doc 文案随注册点逐步补全）、声明/实现一致性检查、
-  同名声明查找优先级与冲突诊断。
+  成员重复条目（`recordApiMember` 改为同名同类别替换）。批次 C 已实现：
+  核心 --decl-json、丰富 ApiMeta、LSP 声明补全/悬停/导航、外部 SDK 声明配置；
+  BUILTIN_MEMBERS 已移除，原生说明移至注册点；具体边界见 doc/lsp.md。
+  剩余：声明/实现一致性检查、独立冲突诊断、重载选择及普通不完整源码的统一核心分析。
 - 批次 3 未开始：模块作用域、显式导出、宿主解析、Context 缓存、循环诊断及
   异常/GC 恢复，保留 `Scripts` 兼容入口；稳定后再讨论 `import/export` 语法。
 - 批次 4 未开始：核心脚本调试接口、DAP 适配器及 VSCode 端到端调试，
