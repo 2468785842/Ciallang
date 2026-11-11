@@ -1,5 +1,6 @@
 """CLI、诊断和 REPL 的进程回归。"""
 import json
+import subprocess
 
 from support import CliTestCase, TJSBC_CORPUS, run_tests
 
@@ -146,6 +147,12 @@ class CliTest(CliTestCase):
         self.assertTrue(show['params'][0]['optional'])
         self.assertEqual(text.encode('utf-8')[show['begin']:show['end']].decode('utf-8'), 'show')
         self.assertTrue(window['members'][1]['hasSetter'])
+        raw = text.replace('\n', '\r\n').encode('utf-8')
+        crlf = subprocess.run([self.cial, '--decl-json', '--source-name', 'host.d.tjs', '-'],
+                              input=raw, capture_output=True, timeout=15)
+        self.assertEqual(crlf.returncode, 0, crlf.stderr)
+        raw_symbol = json.loads(crlf.stdout)['symbols'][0]['members'][0]
+        self.assertEqual(raw[raw_symbol['begin']:raw_symbol['end']].decode('utf-8'), 'show')
         bad = self.run_cial('--decl-json', '--source-name', 'bad.d.tjs', '-', input='println("must not run");')
         self.assertEqual(bad.returncode, 1)
         self.assertFalse(json.loads(bad.stdout)['check']['ok'])

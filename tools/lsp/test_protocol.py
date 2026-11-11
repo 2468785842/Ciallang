@@ -645,6 +645,9 @@ namespace Host {
                       'position': self.position_of(text, 'w.show', len('w.'))}, 40)
             self.assertIn('保留中文', self.receive()['result']['contents']['value'])
             self.open_document(host.as_uri(), declaration)
+            self.open_document(host.as_uri(), declaration.replace('\n', '\r\n'), version=2)
+            crlf_location = self.definition(uri, text, 'w.show', len('w.'))
+            self.assertEqual(crlf_location, location)
             self.send('textDocument/documentSymbol', {'textDocument': {'uri': host.as_uri()}}, 41)
             self.assertIn('version', {item['name'] for item in self.receive()['result']})
             self.assertIsNone(self.rename(uri, text, 'w.show', len('w.'), 'renamed'))
@@ -654,7 +657,7 @@ namespace Host {
             root = pathlib.Path(directory).resolve()
             host = root / 'host.d.tjs'
             original = 'class Widget { function first(): Integer; }'
-            host.write_text(original, encoding='utf-8')
+            host.write_text('\ufeff' + original, encoding='utf-8')
             self.initialize({'rootUri': root.as_uri()})
             uri = (root / 'main.tjs').as_uri()
             text = 'var w = new Widget();\nw.anything;'
@@ -662,6 +665,8 @@ namespace Host {
             def labels():
                 return {item['label'] for item in self.complete(uri, text, 'w.anything', len('w.'))}
             self.assertEqual(labels(), {'first'})
+            location = self.definition(uri, text, 'Widget')
+            self.assertEqual(location['range']['start']['character'], original.index('Widget'))
             self.open_document(host.as_uri(), 'class Widget { function second(): String; }')
             self.assertEqual(labels(), {'second'})
             self.send('textDocument/didClose', {'textDocument': {'uri': host.as_uri()}})
@@ -698,7 +703,8 @@ namespace Host {
             workspace = root / 'game'
             workspace.mkdir()
             sdk = root / 'sdk.d.tjs'
-            sdk.write_text('/** 外部接口 */ class External { function ping(): String; }', encoding='utf-8')
+            sdk_text = '/** 外部接口 */ class External { function ping(): String; }'
+            sdk.write_text('\ufeff' + sdk_text, encoding='utf-8')
             self.initialize({'rootUri': workspace.as_uri(),
                              'initializationOptions': {'declarationFiles': [sdk.as_uri()]}})
             uri = (workspace / 'main.tjs').as_uri()
@@ -706,7 +712,9 @@ namespace Host {
             self.open_document(uri, text)
             items = self.complete(uri, text, 'value.ping', len('value.'))
             self.assertEqual([item['label'] for item in items], ['ping'])
-            self.assertEqual(self.definition(uri, text, 'value.ping', len('value.'))['uri'], sdk.as_uri())
+            location = self.definition(uri, text, 'value.ping', len('value.'))
+            self.assertEqual(location['uri'], sdk.as_uri())
+            self.assertEqual(location['range']['start']['character'], sdk_text.index('ping'))
             # An unfinished declaration buffer cannot expose stale disk signatures.
             self.open_document(sdk.as_uri(), 'class External {')
             self.assertNotIn('ping', {item['label'] for item in

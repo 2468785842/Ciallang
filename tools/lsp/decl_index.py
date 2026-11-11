@@ -109,7 +109,8 @@ class DeclarationIndex:
             text = run.stdout.decode('utf-8')
             self.directory = tempfile.TemporaryDirectory(prefix='cial-lsp-declarations-')
             path = pathlib.Path(self.directory.name) / 'stdlib.d.tjs'
-            path.write_text(text, encoding='utf-8')
+            # Keep native stdout bytes: text-mode writes can double CR on Windows.
+            path.write_bytes(run.stdout)
             self.standard = self.parse(path.as_uri(), text) or []
             script = pathlib.Path(__file__).with_name('script-builtins.d.tjs')
             if script.exists():

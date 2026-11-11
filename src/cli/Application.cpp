@@ -3,11 +3,17 @@
 #include "Application.hpp"
 
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 #include "Compilation.hpp"
 #include "Diagnostics.hpp"
@@ -42,6 +48,11 @@ namespace cial::cli {
             decl::Module declarations;
             try {
                 if(fromStdin) {
+#ifdef _WIN32
+                    // 声明协议返回原始 UTF-8 字节偏移；CRT 文本模式会吞掉 CRLF 的 CR。
+                    if(options.mode == Mode::DeclJson && _setmode(_fileno(stdin), _O_BINARY) == -1)
+                        throw std::runtime_error("cannot configure binary declaration input");
+#endif
                     std::string content{ std::istreambuf_iterator<char>{ std::cin }, std::istreambuf_iterator<char>{} };
                     source.load(diagnostics, content);
                 } else {

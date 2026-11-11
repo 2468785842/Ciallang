@@ -30,6 +30,9 @@ Status: implemented
   API rename 保守拒绝，脚本局部 rename 保持现状。分析结果按正文缓存，临时工具失败不永久缓存为空接口。
 - VSCode 显式关联 .d.tjs，打包两个 Python 模块及脚本 Exception 声明；必要编辑配置有单元测试。
 - SDK 的 hasDeclarationMetadata() 开启；安装消费方实际注册具名接口、生成声明、检查文档并执行宿主调用。
+- Windows 的 --decl-json stdin 使用二进制模式，保留 CRLF 原始字节；显式 SDK 磁盘声明按 UTF-8 BOM
+  规则读取，与工作区扫描一致；生成标准声明按原始 stdout 字节落盘，避免 Windows 再次转换换行。
+  原始 CRLF 管道及 CRLF/BOM 导航均有回归。
 
 ## 验证
 
@@ -48,7 +51,10 @@ Status: implemented
 
 原始输出在 `out/declarations-*.log`。主体提交的远端矩阵已启动：
 [43007349270](https://github.com/2468785842/Ciallang/actions/runs/43007349270)，
-本记录建立时仍运行，未计为本机通过依据。
+主体提交的格式检查与 Linux/macOS 四个构建通过；Windows 三个配置在 LSP 测试失败：
+原生成员缺失及中文方法范围 28 != 31（27 项中 3 失败、1 错误）。
+失败与 CRT stdin 的 CRLF 转换导致字节偏移错位相符；收尾修改以原始字节传输/保存声明，
+新增原始 CRLF 与 BOM 回归，后续 Windows 复验结果另补充，不将 Linux 通过计为 Windows 通过。
 
 ## 保留边界
 

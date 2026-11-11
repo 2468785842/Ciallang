@@ -740,7 +740,7 @@ class Server:
                 else:
                     if path.stat().st_size > min(remaining, MAX_DOCUMENT_BYTES):
                         continue
-                    source_uri, text = uri, path.read_text(encoding='utf-8')
+                    source_uri, text = uri, path.read_text(encoding='utf-8-sig')
                 size = len(text.encode('utf-8'))
                 if size <= min(remaining, MAX_DOCUMENT_BYTES):
                     sources.append((source_uri, declarations(text), text))
