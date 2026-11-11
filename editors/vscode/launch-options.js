@@ -8,40 +8,42 @@ function resolveCommand(command, directory) {
     ? command : path.resolve(directory, command);
 }
 
-function findBinary(roots, platform = process.platform) {
+// cial-lsp 服务器发现：构建树可能把工具 exe 放在 tools/lsp 子目录。
+function findServer(roots, platform = process.platform) {
   const system = platform === 'win32' ? 'Windows' : platform === 'darwin' ? 'MacOS' : 'Linux';
-  const executable = platform === 'win32' ? 'cial.exe' : 'cial';
+  const name = platform === 'win32' ? 'cial-lsp.exe' : 'cial-lsp';
   const visited = new Set();
   for (const root of roots) {
     for (let directory = path.resolve(root); !visited.has(directory); directory = path.dirname(directory)) {
       visited.add(directory);
       for (const mode of ['Debug', 'Release']) {
-        const candidate = path.join(directory, 'build', system, mode, executable);
-        try {
-          if (fs.statSync(candidate).isFile()) return candidate;
-        } catch (error) {
-          if (!['ENOENT', 'ENOTDIR', 'EACCES', 'EPERM'].includes(error.code)) throw error;
+        for (const relative of [path.join('build', system, mode, name), path.join('build', system, mode, 'tools', 'lsp', name)]) {
+          const candidate = path.join(directory, relative);
+          try {
+            if (fs.statSync(candidate).isFile()) return candidate;
+          } catch (error) {
+            if (!['ENOENT', 'ENOTDIR', 'EACCES', 'EPERM'].includes(error.code)) throw error;
+          }
         }
       }
       if (path.dirname(directory) === directory) break;
     }
   }
-  return 'cial';
+  return name; // 最后回落 PATH
 }
 
-function launchOptions({ extensionPath, workspaceRoots, documentDirectory, python, executable, platform = process.platform }) {
+function launchOptions({ extensionPath, workspaceRoots, documentDirectory, executable, platform = process.platform }) {
   const roots = [...workspaceRoots];
   if (documentDirectory) roots.unshift(documentDirectory);
   // Source checkouts can run the extension without an open workspace.
-  if (fs.existsSync(path.resolve(extensionPath, '../../tools/lsp/cial_lsp.py'))) roots.push(extensionPath);
+  if (fs.existsSync(path.resolve(extensionPath, '../../tools/lsp/main.cpp'))) roots.push(extensionPath);
   const directory = workspaceRoots[0] || documentDirectory || extensionPath;
-  const server = path.join(extensionPath, 'server', 'cial_lsp.py');
-  if (!fs.existsSync(server)) throw new Error('缺少语言服务脚本 server/cial_lsp.py；源码调试请先运行 npm run prepare，安装版请重新安装扩展。');
+  const command = executable ? resolveCommand(executable, directory) : findServer(roots, platform);
   return {
-    command: resolveCommand(python || (platform === 'win32' ? 'python' : 'python3'), directory),
-    args: [server, '--cial', executable ? resolveCommand(executable, directory) : findBinary(roots, platform)],
+    command,
+    args: [],
     options: { cwd: directory }
   };
 }
 
-module.exports = { findBinary, launchOptions };
+module.exports = { findServer, launchOptions };

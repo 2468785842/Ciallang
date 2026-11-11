@@ -30,21 +30,18 @@
     "configuration": {
       "title": "Ciallang",
       "properties": {
-        "ciallang.python": {
-          "type": "string",
-          "default": "",
-          "description": "Python interpreter (defaults to python on Windows, python3 elsewhere)"
-        },
         "ciallang.declarationFiles": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Additional .d.tjs files, absolute or relative to the active workspace; workspace declarations are discovered automatically"
         },
         "ciallang.executable": {
           "type": "string",
           "default": "",
-          "description": "cial path or command; defaults to an ancestor build/<platform>/Debug or Release/cial, then PATH"
+          "description": "cial-lsp language server path or command; defaults to an ancestor build/<platform>/Debug or Release/cial-lsp (also tools/lsp), then PATH"
         }
       }
     },
@@ -57,9 +54,7 @@
     ]
   },
   "scripts": {
-    "prepare": "node prepare.js",
-    "vscode:prepublish": "node prepare.js",
-    "check": "node --check extension.js && node --check launch-options.js && node --check prepare.js && node --check test/smoke.js",
+    "check": "node --check extension.js && node --check launch-options.js && node --check test/smoke.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {

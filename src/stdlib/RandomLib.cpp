@@ -209,12 +209,19 @@ namespace cial::stdlib {
         // 导出名与类对象名保持一致
         context.recordApiTypeName(TypeTraits<RandomGen>::key(), "RandomGenerator");
         context.nativeType<RandomGen>()
-            .method("randomize"_str, &stdlib::rgRandomize)
-            .method("random"_str, &stdlib::rgRandom)
-            .method("random32"_str, &stdlib::rgRandom32)
-            .method("random63"_str, &stdlib::rgRandom63)
-            .method("random64"_str, &stdlib::rgRandom64)
-            .method("serialize"_str, &stdlib::rgSerialize);
+            .doc("伪随机数生成器；经 new Math.RandomGenerator(seed) 构造。")
+            .method("randomize"_str, &stdlib::rgRandomize,
+                    api::signature({ { .name = "seed", .type = "any", .optional = true, .defaultText = "void" } },
+                                   "void",
+                                   "重播种；无参按当前时间播种，Integer 作种子，"
+                                   "Dictionary（serialize 结果）恢复状态。"))
+            .method("random"_str, &stdlib::rgRandom, api::signature({}, "Real", "[0,1) 伪随机实数"))
+            .method("random32"_str, &stdlib::rgRandom32, api::signature({}, "Integer", "32 位伪随机整数"))
+            .method("random63"_str, &stdlib::rgRandom63, api::signature({}, "Integer", "63 位伪随机整数（非负）"))
+            .method("random64"_str, &stdlib::rgRandom64, api::signature({}, "Integer", "64 位伪随机整数"))
+            .method("serialize"_str, &stdlib::rgSerialize,
+                    api::signature({}, "Dictionary",
+                                   "导出内部状态（state 十六进制文本、left、next），可传给 randomize 恢复。"));
     }
 
 

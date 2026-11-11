@@ -7,6 +7,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "common/ApiParam.hpp"
@@ -56,6 +57,11 @@ namespace cial::decl {
     // 2 空格缩进、类/命名空间块后无分号、属性按 hasGetter/hasSetter 选简写或
     // 显式访问器、无名参数生成 argN 占位。generate(parse(text)) == text 幂等。
     std::string generateDeclarations(const Module &module);
+
+    // 模型 → 按顶层符号拆分的声明文件（LSP 与安装分发形态，doc/declarations.md §3）：
+    // 每个顶层 class/namespace 一个 <名字>.d.tjs，其余顶层符号（自由函数/变量/属性）
+    // 归入 globals.d.tjs。返回 {文件名, 文本}，顺序与顶层符号一致。
+    std::vector<std::pair<std::string, std::string>> generateDeclarationFiles(const Module &module);
 
     // 注册事实（doc/api-metadata.md）→ 模型（实现在 DeclModel.cpp）：
     // typeMembers+typeNames 生成类符号（按注册名排序），globals 按 owner 点分

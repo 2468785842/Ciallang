@@ -25,7 +25,7 @@ Ciallang 是 C++20 实现的 TJS2 解释器。先读 [README](README.md) 和[文
 | `tests/` · `bench/` · `fuzz/` | 回归测试、基准、前端 fuzz 及语料 |
 | `src/format/` | cial-fmt 无损词素扫描、布局与安全文件写回（CiallangFormat 库） |
 | `src/dbg/` | 调试会话 DebugSession（`vm::DebugHook` 实现，`cialdbg` 库） |
-| `tools/` · `editors/vscode/` | 工具 exe 入口：各目录只放 main.cpp（argparse 解析），功能实现放 src/ 对应库。`cial-fmt`（fmt，[格式化](doc/formatting.md)）、调试器 `cial-dbg`（dbg，[用法](doc/debugger.md)）、反汇编器 `cial-disasm`（disasm，TJS2 字节码/自产 TAC 指令 dump，渲染复用 decompile 库 disassemblyOnly）、`cial-lsp` 桩（`CIAL_BUILD_*` 门控，另含 stdio 协议原型）与 VSCode 客户端 |
+| `tools/` · `editors/vscode/` | 工具 exe 入口：各目录只放 main.cpp（argparse 解析），功能实现放 src/ 对应库。`cial-fmt`（fmt，[格式化](doc/formatting.md)）、调试器 `cial-dbg`（dbg，[用法](doc/debugger.md)）、反汇编器 `cial-disasm`（disasm，TJS2 字节码/自产 TAC 指令 dump，渲染复用 decompile 库 disassemblyOnly）、语言服务器 `cial-lsp`（[LSP](doc/lsp.md)，实现库 src/lsp/，核心集）与 VSCode 客户端 |
 
 ## 构建与验证
 

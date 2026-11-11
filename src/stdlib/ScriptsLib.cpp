@@ -185,6 +185,9 @@ namespace cial::stdlib {
         ns->setState(state);
         ns->setBaseDir(std::move(baseDir));
         ns->setStorageReader(std::move(reader));
+        // registerClass 返回命名空间对象本身；类型级文档走 nativeType 链登记
+        context.nativeType<ScriptsNS>().doc(
+            "宿主脚本存储命名空间：execStorage 执行脚本文件，evalStorage 求值脚本文件。");
 
         // exec/eval 方法走 ScriptsNS 的绑定闭包而非 registerMethod，元数据在此补记
         context.recordApiMember(

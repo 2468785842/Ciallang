@@ -16,7 +16,6 @@ async function activate(context) {
       extensionPath: context.extensionPath,
       workspaceRoots: roots,
       documentDirectory: resource ? path.dirname(resource.fsPath) : undefined,
-      python: settings.get('python'),
       executable: settings.get('executable')
     });
     client = new LanguageClient('ciallang', 'Ciallang', server, {
@@ -31,7 +30,7 @@ async function activate(context) {
     await client?.dispose();
     client = undefined;
     void vscode.window.showErrorMessage(
-      `Ciallang 语言服务启动失败：${error.message}。请检查 Python 3 和 ciallang.executable 配置。`, '打开设置').then(action => {
+      `Ciallang 语言服务启动失败：${error.message}。请检查 ciallang.executable 配置，或构建 cial-lsp（CIAL_BUILD_LSP=ON）。`, '打开设置').then(action => {
       if (action === '打开设置') return vscode.commands.executeCommand('workbench.action.openSettings', '@ext:ciallang.ciallang-language');
     });
     throw error;

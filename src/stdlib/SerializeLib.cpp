@@ -28,20 +28,38 @@ namespace cial::stdlib {
     void registerSerializeLib(Context &context) {
         // Octet 是语言内建类型，不走 registerClass；导出与声明生成需要注册名
         context.recordApiTypeName(TypeTraits<Octet>::key(), "Octet");
+        // load/save/loadStruct/saveStruct 返回自身（thisObj），pack 产出 Octet
         context.nativeType<Array>()
-            .method("load"_str, &stdlib::arrayLoad)
-            .method("save"_str, &stdlib::arraySave)
-            .method("loadStruct"_str, &stdlib::arrayLoadStruct)
-            .method("saveStruct"_str, &stdlib::arraySaveStruct)
-            .method("pack"_str, &stdlib::arrayPack)
-            .method("assignStruct"_str, &stdlib::arrayAssignStruct);
+            .method("load"_str, &stdlib::arrayLoad,
+                    api::signature({ { .name = "filename", .type = "String" } }, "Array"))
+            .method("save"_str, &stdlib::arraySave,
+                    api::signature({ { .name = "filename", .type = "String" } }, "Array"))
+            .method("loadStruct"_str, &stdlib::arrayLoadStruct,
+                    api::signature({ { .name = "filename", .type = "String" } }, "Array"))
+            .method("saveStruct"_str, &stdlib::arraySaveStruct,
+                    api::signature({ { .name = "filename", .type = "String" },
+                                     { .name = "mode", .type = "String", .optional = true, .defaultText = "\"\"" } },
+                                   "Array"))
+            .method("pack"_str, &stdlib::arrayPack,
+                    api::signature({ { .name = "template", .type = "String" } }, "Octet"))
+            .method("assignStruct"_str, &stdlib::arrayAssignStruct,
+                    api::signature({ { .name = "src", .type = "Array" } }, "Array"));
+        // load/save 为原版同款 TODO 空实现；loadStruct 文本形态返回解析值，返回类型不定
         context.nativeType<Dictionary>()
-            .method("load"_str, &stdlib::dictLoad)
-            .method("save"_str, &stdlib::dictSave)
-            .method("loadStruct"_str, &stdlib::dictLoadStruct)
-            .method("saveStruct"_str, &stdlib::dictSaveStruct)
-            .method("assignStruct"_str, &stdlib::dictAssignStruct);
-        context.nativeType<Octet>().method("unpack"_str, &stdlib::octetUnpack);
+            .method("load"_str, &stdlib::dictLoad, api::signature({ { .name = "filename", .type = "String" } }, "void"))
+            .method("save"_str, &stdlib::dictSave, api::signature({ { .name = "filename", .type = "String" } }, "void"))
+            .method("loadStruct"_str, &stdlib::dictLoadStruct,
+                    api::signature({ { .name = "filename", .type = "String" } }))
+            .method("saveStruct"_str, &stdlib::dictSaveStruct,
+                    api::signature({ { .name = "filename", .type = "String" },
+                                     { .name = "mode", .type = "String", .optional = true, .defaultText = "\"\"" } },
+                                   "Dictionary"))
+            .method("assignStruct"_str, &stdlib::dictAssignStruct,
+                    api::signature({ { .name = "src", .type = "Dictionary" } }, "Dictionary"));
+        context.nativeType<Octet>()
+            .doc("字节串。")
+            .method("unpack"_str, &stdlib::octetUnpack,
+                    api::signature({ { .name = "template", .type = "String" } }, "Array"));
     }
 
     namespace {

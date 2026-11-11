@@ -26,6 +26,7 @@ namespace cial::stdlib {
         // String 是语言内建类型，不走 registerClass；导出与声明生成需要注册名
         context.recordApiTypeName(TypeTraits<String>::key(), "String");
         context.nativeType<String>()
+            .doc("字符串；不可变，方法返回新字符串或分析结果。")
             .method("charAt"_str, &stdlib::stringCharAt,
                     api::signature({ { .name = "index", .type = "Integer" } }, "String", "取指定位置的 UTF-16 字符。"))
             .method("indexOf"_str, &stdlib::stringIndexOf,
@@ -45,8 +46,16 @@ namespace cial::stdlib {
             .method("sprintf"_str, &stdlib::stringSprintf,
                     api::signature({ { .name = "args", .type = "any", .collapse = true } }, "String",
                                    "以当前字符串为格式模板。"))
-            .method("replace"_str, &stdlib::stringReplace, "用正则 re 替换")
-            .method("split"_str, &stdlib::stringSplitWith, "按模式拆分")
+            .method(
+                "replace"_str, &stdlib::stringReplace,
+                api::signature({ { .name = "pattern", .type = "RegExp" }, { .name = "replacement", .type = "any" } },
+                               "String", "用正则 re 替换"))
+            .method("split"_str, &stdlib::stringSplitWith,
+                    api::signature(
+                        { { .name = "pattern", .type = "any" },
+                          { .name = "reserved", .type = "any", .optional = true, .defaultText = "void" },
+                          { .name = "purgeempty", .type = "Boolean", .optional = true, .defaultText = "false" } },
+                        "Array", "按模式拆分"))
             .method("escape"_str, &stdlib::stringEscape, api::signature({}, "String", "转义特殊字符。"))
             .method("trim"_str, &stdlib::stringTrim, api::signature({}, "String", "去除首尾空白。"))
             .method("reverse"_str, &stdlib::stringReverse, api::signature({}, "String", "反转字符串。"))

@@ -169,6 +169,11 @@ namespace cial::binding {
                 ctx.registerNativeBinding(std::make_shared<NativeTypeBinding>(
                     NativeTypeBinding{ .key = nativeTypeKeyFor<T>(), .name = name, .trace = {} }));
         }
+        // 类型级文档：导出为声明文件中 class 上方的 /** */ 注释（doc/declarations.md §3）。
+        ClassBuilder &doc(std::string text) {
+            _ctx.recordApiTypeDoc(nativeTypeKeyFor<T>(), std::move(text));
+            return *this;
+        }
         template <typename... Args>
         ClassBuilder &constructor(const ApiMeta &description = {}) {
             auto fn = makeFunction(_ctx, [](const VM *vm, const Value &, const size_t argc, Value *args) {

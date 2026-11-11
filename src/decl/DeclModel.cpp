@@ -115,37 +115,42 @@ namespace cial::decl {
             out += indent + "}\n";
         }
 
-        void emitMembers(std::string &out, const std::vector<Symbol> &members, const size_t depth) {
+        void emitMembers(std::string &out, const std::vector<Symbol> &members, size_t depth);
+
+        void emitOne(std::string &out, const Symbol &symbol, const size_t depth) {
             const std::string indent(depth * 2, ' ');
-            for(const auto &member : members) {
-                switch(member.kind) {
-                    case SymbolKind::Namespace:
-                        emitDoc(out, indent, member.doc);
-                        out += indent + "namespace " + member.name + " {\n";
-                        emitMembers(out, member.members, depth + 1);
-                        out += indent + "}\n";
-                        break;
-                    case SymbolKind::Class:
-                        emitDoc(out, indent, member.doc);
-                        out += indent + "class " + member.name;
-                        for(size_t i = 0; i < member.extends.size(); ++i)
-                            out += i == 0 ? " extends " + member.extends[i] : ", " + member.extends[i];
-                        out += " {\n";
-                        emitMembers(out, member.members, depth + 1);
-                        out += indent + "}\n";
-                        break;
-                    case SymbolKind::Function:
-                    case SymbolKind::StaticFunction:
-                        emitFunction(out, indent, member);
-                        break;
-                    case SymbolKind::Property:
-                        emitProperty(out, indent, member);
-                        break;
-                    case SymbolKind::Variable:
-                        emitVariable(out, indent, member);
-                        break;
-                }
+            switch(symbol.kind) {
+                case SymbolKind::Namespace:
+                    emitDoc(out, indent, symbol.doc);
+                    out += indent + "namespace " + symbol.name + " {\n";
+                    emitMembers(out, symbol.members, depth + 1);
+                    out += indent + "}\n";
+                    break;
+                case SymbolKind::Class:
+                    emitDoc(out, indent, symbol.doc);
+                    out += indent + "class " + symbol.name;
+                    for(size_t i = 0; i < symbol.extends.size(); ++i)
+                        out += i == 0 ? " extends " + symbol.extends[i] : ", " + symbol.extends[i];
+                    out += " {\n";
+                    emitMembers(out, symbol.members, depth + 1);
+                    out += indent + "}\n";
+                    break;
+                case SymbolKind::Function:
+                case SymbolKind::StaticFunction:
+                    emitFunction(out, indent, symbol);
+                    break;
+                case SymbolKind::Property:
+                    emitProperty(out, indent, symbol);
+                    break;
+                case SymbolKind::Variable:
+                    emitVariable(out, indent, symbol);
+                    break;
             }
+        }
+
+        void emitMembers(std::string &out, const std::vector<Symbol> &members, const size_t depth) {
+            for(const auto &member : members)
+                emitOne(out, member, depth);
         }
 
         Symbol symbolFromMeta(const ApiMeta &meta) {
@@ -230,6 +235,23 @@ namespace cial::decl {
         return out;
     }
 
+    std::vector<std::pair<std::string, std::string>> generateDeclarationFiles(const Module &module) {
+        std::vector<std::pair<std::string, std::string>> files;
+        std::string globals;
+        for(const auto &symbol : module.symbols) {
+            if(symbol.kind == SymbolKind::Class || symbol.kind == SymbolKind::Namespace) {
+                std::string text;
+                emitOne(text, symbol, 0);
+                files.emplace_back(symbol.name + ".d.tjs", std::move(text));
+            } else {
+                emitOne(globals, symbol, 0);
+            }
+        }
+        if(!globals.empty())
+            files.emplace_back("globals.d.tjs", std::move(globals));
+        return files;
+    }
+
     Module declarationsFromCatalog(const ApiCatalog &catalog) {
         Module module;
         // 类符号：按注册名排序保证确定性（typeMembers 为 unordered_map）；
@@ -242,6 +264,9 @@ namespace cial::decl {
             auto &symbol = classSymbols[nameIt->second];
             symbol.kind = SymbolKind::Class;
             symbol.name = nameIt->second;
+            const auto docIt = catalog.typeDocs.find(key);
+            if(docIt != catalog.typeDocs.end())
+                symbol.doc = docIt->second;
             for(const auto &meta : members)
                 symbol.members.push_back(symbolFromMeta(meta));
         }
@@ -250,9 +275,12 @@ namespace cial::decl {
         for(const auto &meta : catalog.globals) {
             auto &parent = meta.owner.empty() ? module.symbols : nodeForOwner(module.symbols, meta.owner).members;
             switch(meta.kind) {
-                case ApiKind::Namespace:
-                    ensureNode(parent, meta.name, SymbolKind::Namespace);
+                case ApiKind::Namespace: {
+                    auto &node = ensureNode(parent, meta.name, SymbolKind::Namespace);
+                    if(!meta.doc.empty())
+                        node.doc = meta.doc;
                     break;
+                }
                 case ApiKind::Class: {
                     auto &node = ensureNode(parent, meta.name, SymbolKind::Class);
                     node.doc = meta.doc;

@@ -400,14 +400,32 @@ namespace cial::cli {
         // --api-decl（doc/declarations.md §3）：注册事实 → .d.tjs 声明文本。
         // 与 --api-json 同一注册链（标准库 + print/println + Scripts），不执行用户脚本；
         // 输出仅由模型决定，宿主可经 decl::declarationsFromCatalog +
-        // decl::generateDeclarations 导出自己的声明
-        int runApiDecl() {
+        // decl::generateDeclarations 导出自己的声明。--api-decl-dir 按顶层符号
+        // 拆分写出到目录（构建期声明分发形态），否则单文件走 stdout。
+        int runApiDecl(const std::string &apiDeclDir) {
             Runtime runtime;
             Context context{ runtime };
             vm::VMState state{ context };
             VM vm{ &state };
             setupSession(context, vm, state, {});
-            fmt::print("{}", decl::generateDeclarations(decl::declarationsFromCatalog(context.apiCatalog())));
+            if(apiDeclDir.empty()) {
+                fmt::print("{}", decl::generateDeclarations(decl::declarationsFromCatalog(context.apiCatalog())));
+                return 0;
+            }
+            const std::filesystem::path dir{ apiDeclDir };
+            std::error_code ec;
+            std::filesystem::create_directories(dir, ec);
+            if(ec)
+                throw std::runtime_error("cannot create declaration directory: " + apiDeclDir);
+            for(const auto &[name, text] :
+                decl::generateDeclarationFiles(decl::declarationsFromCatalog(context.apiCatalog()))) {
+                std::ofstream file{ dir / name, std::ios::binary };
+                if(!file)
+                    throw std::runtime_error("cannot write declaration file: " + (dir / name).string());
+                file.write(text.data(), static_cast<std::streamsize>(text.size()));
+                if(!file)
+                    throw std::runtime_error("cannot write declaration file: " + (dir / name).string());
+            }
             return 0;
         }
     } // namespace
@@ -421,7 +439,7 @@ namespace cial::cli {
         if(options.mode == Mode::ApiJson)
             return runApiJson();
         if(options.mode == Mode::ApiDecl)
-            return runApiDecl();
+            return runApiDecl(options.apiDeclDir);
         Runtime runtime;
         Context context{ runtime };
         vm::VMState state{ context };

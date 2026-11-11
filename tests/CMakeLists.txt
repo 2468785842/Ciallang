@@ -131,10 +131,13 @@ if(Python3_Interpreter_FOUND AND TARGET cial)
                 --cial "$<TARGET_FILE:cial>")
     set_tests_properties(CiallangDecompile CiallangSwitch CiallangFuzz PROPERTIES TIMEOUT 120)
 
-    add_test(NAME CiallangLspProtocol
-        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/lsp/test_protocol.py"
-                --cial "$<TARGET_FILE:cial>")
-    set_tests_properties(CiallangLspProtocol PROPERTIES TIMEOUT 30)
+    # cial-lsp 进程内语言服务器协议回归（doc/lsp.md）
+    if(TARGET cial-lsp)
+        add_test(NAME CiallangLspProtocol
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli/test_lsp.py"
+                    --lsp "$<TARGET_FILE:cial-lsp>")
+        set_tests_properties(CiallangLspProtocol PROPERTIES TIMEOUT 60)
+    endif()
     if(TARGET cial-dbg)
         add_test(NAME CiallangDbg
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/dbg_test.py"

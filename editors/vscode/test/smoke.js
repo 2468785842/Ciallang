@@ -1,4 +1,4 @@
-// Runs inside a real VSCode Extension Development Host, after `node prepare.js`.
+// Runs inside a real VSCode Extension Development Host.
 const assert = require('node:assert/strict');
 const vscode = require('vscode');
 

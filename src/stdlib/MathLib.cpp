@@ -16,33 +16,62 @@
 namespace cial::stdlib {
     void registerMathLib(Context &context) {
         context.nativeType<MathNS>()
-            .method("abs"_str, &stdlib::mathAbs, "绝对值")
-            .method("acos"_str, &stdlib::mathAcos, "反余弦")
-            .method("asin"_str, &stdlib::mathAsin, "反正弦")
-            .method("atan"_str, &stdlib::mathAtan, "反正切")
-            .method("atan2"_str, &stdlib::mathAtan2, "二参数反正切")
-            .method("ceil"_str, &stdlib::mathCeil, "向上取整")
-            .method("exp"_str, &stdlib::mathExp, "e 的幂")
-            .method("floor"_str, &stdlib::mathFloor, "向下取整")
-            .method("log"_str, &stdlib::mathLog, "自然对数")
-            .method("pow"_str, &stdlib::mathPow, "幂")
-            .method("max"_str, &stdlib::mathMax, "最大值")
-            .method("min"_str, &stdlib::mathMin, "最小值")
-            .method("random"_str, &stdlib::mathRandom, "[0,1) 随机数")
-            .method("round"_str, &stdlib::mathRound, "四舍五入")
-            .method("sin"_str, &stdlib::mathSin, "正弦")
-            .method("cos"_str, &stdlib::mathCos, "余弦")
-            .method("sqrt"_str, &stdlib::mathSqrt, "平方根")
-            .method("tan"_str, &stdlib::mathTan, "正切")
+            .doc("数学方法、常量与随机数；作为命名空间直接 Math.abs(...) 调用。")
+            .method("abs"_str, &stdlib::mathAbs, api::signature({ { .name = "n", .type = "Real" } }, "Real", "绝对值"))
+            .method("acos"_str, &stdlib::mathAcos,
+                    api::signature({ { .name = "n", .type = "Real" } }, "Real", "反余弦"))
+            .method("asin"_str, &stdlib::mathAsin,
+                    api::signature({ { .name = "n", .type = "Real" } }, "Real", "反正弦"))
+            .method("atan"_str, &stdlib::mathAtan,
+                    api::signature({ { .name = "n", .type = "Real" } }, "Real", "反正切"))
+            .method("atan2"_str, &stdlib::mathAtan2,
+                    api::signature({ { .name = "y", .type = "Real" }, { .name = "x", .type = "Real" } }, "Real",
+                                   "二参数反正切"))
+            .method("ceil"_str, &stdlib::mathCeil,
+                    api::signature({ { .name = "n", .type = "Real" } }, "Real", "向上取整（返回 Real）"))
+            .method("exp"_str, &stdlib::mathExp, api::signature({ { .name = "n", .type = "Real" } }, "Real", "e 的幂"))
+            .method("floor"_str, &stdlib::mathFloor,
+                    api::signature({ { .name = "n", .type = "Real" } }, "Real", "向下取整（返回 Real）"))
+            .method("log"_str, &stdlib::mathLog,
+                    api::signature({ { .name = "n", .type = "Real" } }, "Real", "自然对数"))
+            .method("pow"_str, &stdlib::mathPow,
+                    api::signature({ { .name = "base", .type = "Real" }, { .name = "exponent", .type = "Real" } },
+                                   "Real", "幂"))
+            .method("max"_str, &stdlib::mathMax,
+                    api::signature({ { .name = "values", .type = "Real", .collapse = true } }, "Real", "最大值"))
+            .method("min"_str, &stdlib::mathMin,
+                    api::signature({ { .name = "values", .type = "Real", .collapse = true } }, "Real", "最小值"))
+            .method("random"_str, &stdlib::mathRandom, api::signature({}, "Real", "[0,1) 随机数"))
+            .method("round"_str, &stdlib::mathRound,
+                    api::signature({ { .name = "n", .type = "Real" } }, "Real", "四舍五入"))
+            .method("sin"_str, &stdlib::mathSin, api::signature({ { .name = "n", .type = "Real" } }, "Real", "正弦"))
+            .method("cos"_str, &stdlib::mathCos, api::signature({ { .name = "n", .type = "Real" } }, "Real", "余弦"))
+            .method("sqrt"_str, &stdlib::mathSqrt,
+                    api::signature({ { .name = "n", .type = "Real" } }, "Real", "平方根"))
+            .method("tan"_str, &stdlib::mathTan, api::signature({ { .name = "n", .type = "Real" } }, "Real", "正切"))
             // 常量属性 getter 须为无捕获 lambda（NativePropGetter 是裸函数指针）
-            .property("E"_str, [](const Value &) { return Value{ Real{ M_E } }; })
-            .property("LOG2E"_str, [](const Value &) { return Value{ Real{ M_LOG2E } }; })
-            .property("LOG10E"_str, [](const Value &) { return Value{ Real{ M_LOG10E } }; })
-            .property("LN10"_str, [](const Value &) { return Value{ Real{ M_LN10 } }; })
-            .property("LN2"_str, [](const Value &) { return Value{ Real{ M_LN2 } }; })
-            .property("PI"_str, [](const Value &) { return Value{ Real{ M_PI } }; })
-            .property("SQRT1_2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 / 2 } }; })
-            .property("SQRT2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 } }; });
+            .property(
+                "E"_str, [](const Value &) { return Value{ Real{ M_E } }; }, api::signature({}, "Real", "自然对数底 e"))
+            .property(
+                "LOG2E"_str, [](const Value &) { return Value{ Real{ M_LOG2E } }; },
+                api::signature({}, "Real", "log2(e)，2 为底对数的换底常数"))
+            .property(
+                "LOG10E"_str, [](const Value &) { return Value{ Real{ M_LOG10E } }; },
+                api::signature({}, "Real", "log10(e)，10 为底对数的换底常数"))
+            .property(
+                "LN10"_str, [](const Value &) { return Value{ Real{ M_LN10 } }; },
+                api::signature({}, "Real", "10 的自然对数"))
+            .property(
+                "LN2"_str, [](const Value &) { return Value{ Real{ M_LN2 } }; },
+                api::signature({}, "Real", "2 的自然对数"))
+            .property(
+                "PI"_str, [](const Value &) { return Value{ Real{ M_PI } }; }, api::signature({}, "Real", "圆周率 π"))
+            .property(
+                "SQRT1_2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 / 2 } }; },
+                api::signature({}, "Real", "1/2 的平方根"))
+            .property(
+                "SQRT2"_str, [](const Value &) { return Value{ Real{ M_SQRT2 } }; },
+                api::signature({}, "Real", "2 的平方根"));
         auto *mathNS = context.registerClass<MathNS>("Math"_str);
         // Math.RandomGenerator 类对象（new Math.RandomGenerator(seed) 构造入口）
         mathNS->setRandomGenerator(context.rt().atomTable.intern("RandomGenerator"_str),

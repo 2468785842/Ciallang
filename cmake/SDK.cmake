@@ -30,6 +30,16 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/CiallangConfig.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Ciallang" COMPONENT SDK)
 install(FILES "${PROJECT_SOURCE_DIR}/LICENSE"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/ciallang" COMPONENT SDK)
+# 系统声明（构建期由 cial POST_BUILD 经 --api-decl-dir 按符号拆分生成，
+# doc/declarations.md §3）随 SDK 安装：宿主把该目录配置进编辑器即可获得接口
+# 文档与跳转，不需要翻查 C++ 注册源码。无 CLI 的配置没有产物，只安装手写声明。
+if(TARGET cial)
+    install(DIRECTORY "$<TARGET_FILE_DIR:cial>/declarations/"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/ciallang/declarations" COMPONENT SDK)
+else()
+    install(FILES "${PROJECT_SOURCE_DIR}/tools/lsp/script-builtins.d.tjs"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/ciallang/declarations" COMPONENT SDK)
+endif()
 install(FILES "${PROJECT_SOURCE_DIR}/tests/installed/CMakeLists.txt"
     "${PROJECT_SOURCE_DIR}/tests/installed/main.cpp"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/ciallang/examples/host" COMPONENT SDK)

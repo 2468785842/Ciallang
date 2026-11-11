@@ -11,12 +11,26 @@
 namespace cial::stdlib {
     void registerRegExpLib(Context &context) {
         context.nativeType<RegExp>()
-            .method("test"_str, &stdlib::regexpTest, "是否匹配")
-            .method("match"_str, &stdlib::regexpMatch, "全局匹配结果")
-            .method("exec"_str, &stdlib::regexpExec, "单次匹配与分组")
-            .method("compile"_str, &stdlib::regexpCompile, "重新编译正则")
-            .method("replace"_str, &stdlib::regexpReplace, "正则替换")
-            .method("split"_str, &stdlib::regexpSplit, "按正则拆分");
+            .doc("正则表达式；支持 /pattern/flags 字面量。")
+            .method("test"_str, &stdlib::regexpTest,
+                    api::signature({ { .name = "target", .type = "String" } }, "Boolean", "是否匹配"))
+            .method("match"_str, &stdlib::regexpMatch,
+                    api::signature({ { .name = "target", .type = "String" } }, "Array", "全局匹配结果"))
+            .method("exec"_str, &stdlib::regexpExec,
+                    api::signature({ { .name = "target", .type = "String" } }, "Array", "单次匹配与分组"))
+            .method("compile"_str, &stdlib::regexpCompile,
+                    api::signature({ { .name = "pattern", .type = "String" },
+                                     { .name = "flags", .type = "String", .optional = true, .defaultText = "\"\"" } },
+                                   "void", "重新编译正则"))
+            .method("replace"_str, &stdlib::regexpReplace,
+                    api::signature({ { .name = "target", .type = "String" }, { .name = "replacement", .type = "any" } },
+                                   "String", "正则替换"))
+            .method("split"_str, &stdlib::regexpSplit,
+                    api::signature(
+                        { { .name = "target", .type = "String" },
+                          { .name = "reserved", .type = "any", .optional = true, .defaultText = "void" },
+                          { .name = "purgeempty", .type = "Boolean", .optional = true, .defaultText = "false" } },
+                        "Array", "按正则拆分"));
         context.registerClass<RegExp>("RegExp"_str, &context.rt(), ""_str);
     }
 

@@ -114,6 +114,10 @@ string(APPEND cial_build_json "\n}\n")
 file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/packaging/$<CONFIG>/build-info.json" CONTENT "${cial_build_json}")
 
 install(TARGETS cial RUNTIME DESTINATION bin COMPONENT Runtime)
+# CLI 归档附带系统声明（构建期按符号拆分生成）：编辑器从 bin/../share/ciallang/declarations
+# 读取 .d.tjs，接口文档与跳转不依赖 C++ 注册源码（doc/declarations.md §3）。
+install(DIRECTORY "$<TARGET_FILE_DIR:cial>/declarations/"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/ciallang/declarations" COMPONENT Runtime)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/packaging/$<CONFIG>/build-info.json" "${PROJECT_SOURCE_DIR}/LICENSE"
     DESTINATION . COMPONENT Runtime)
 install(FILES "${PROJECT_SOURCE_DIR}/packaging/README.md" DESTINATION . COMPONENT Runtime)

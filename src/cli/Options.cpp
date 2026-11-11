@@ -29,6 +29,8 @@ namespace cial::cli {
               { "--api-json", "print registered native API metadata JSON and exit" },
               { "--api-decl", "print registered native API as a .d.tjs declaration file and exit" } })
             parser.add_argument(name).flag().help(help);
+        parser.add_argument("--api-decl-dir")
+            .help("with --api-decl: write one .d.tjs per top-level symbol into this directory");
         parser.add_argument("--json-schema")
             .help("JSON diagnostics schema version (1 legacy, 2 half-open ranges; default 2)")
             .default_value(std::string{ "2" });
@@ -91,6 +93,13 @@ namespace cial::cli {
         }
         if(parser.is_used("--source-name"))
             options.sourceName = parser.get<std::string>("--source-name");
+        if(parser.is_used("--api-decl-dir")) {
+            options.apiDeclDir = parser.get<std::string>("--api-decl-dir");
+            if(options.mode != Mode::ApiDecl)
+                throw std::runtime_error("--api-decl-dir requires --api-decl");
+            if(options.apiDeclDir.empty())
+                throw std::runtime_error("--api-decl-dir expects a directory path");
+        }
         const bool trace = parser.get<bool>("--trace-execution");
         auto inputs = parser.get<std::vector<std::string>>("input");
         if(parser.is_used("--")) {

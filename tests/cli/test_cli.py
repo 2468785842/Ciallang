@@ -74,7 +74,9 @@ class CliTest(CliTestCase):
         self.assertTrue(array['count']['hasSetter'])
         math = {m["name"]: m for m in classes["Math"]}
         self.assertEqual(math["abs"]["kind"], "method")
-        self.assertEqual(math["abs"]["variadic"], True)
+        # Math.abs 已登记具名参数（api::signature），不再是 (VM*, Value, size_t, Value*) 变长形态
+        self.assertEqual(math["abs"]["variadic"], False)
+        self.assertEqual(math["abs"]["parameters"][0]["name"], "n")
         scripts = {m["name"]: m for m in classes["Scripts"]}
         self.assertEqual(scripts["execStorage"]["variadic"], True)
         # 全局函数（Session 注册链显式登记）

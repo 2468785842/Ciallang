@@ -127,11 +127,19 @@ literal      := 数字/字符串/true/false/null/void 字面量，可带一元�
 宿主应用可在注册后调用 `decl::declarationsFromCatalog(context.apiCatalog())` +
 `decl::generateDeclarations` 随 SDK/应用发布自己的 `.d.tjs`。
 
+标准库声明在构建期落盘：`cial` 目标的 POST_BUILD 步骤运行 `--api-decl-dir`，把按顶层符号
+拆分的声明（`Array.d.tjs`、`Math.d.tjs`……顶层自由函数归入 `globals.d.tjs`）写到可执行文件旁的
+`declarations/`，并复制手写的 `script-builtins.d.tjs`（`cmake/GenerateApiDeclarations.cmake`）。
+SDK 组件与 CLI 归档安装时在 `share/ciallang/declarations/` 发布该目录，脚本工具直接读取这些
+声明文件获得接口文档与跳转，不需要查看 C++ 注册源码；安装/构建布局的读取顺序见
+[LSP](lsp.md)。可选能力库按 CMake 开关门控注册：关闭的库不进注册目录，声明产物自然不含它。
+
 ## 4. CLI 行为与执行侧拒绝
 
 | 用法 | 行为 |
 |---|---|
 | `cial --api-decl` | 输出标准库声明文本，退出码 0；不接受输入与执行选项 |
+| `cial --api-decl-dir <dir>` | 与 `--api-decl` 同用：按顶层符号拆分写出 `.d.tjs` 到目录 |
 | `cial --check-json foo.d.tjs` | 按**声明模式**分析，输出 JSON 诊断（`decl.*` 码）；无错误退出 0 |
 | `cial foo.d.tjs`（执行模式） | 拒绝：`decl.not-executable`，退出码 1 |
 | `cial --dump-cfg/--dump-ssa/--decompile foo.d.tjs` | 同上拒绝（声明无可执行代码） |

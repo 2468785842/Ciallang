@@ -15,8 +15,10 @@ CMake 在 `project()` 前调用生成器；manifest 或生成器变化会触发�
 源码构建（包括 `add_subdirectory` 嵌入方式）因此需要 Python 3.10+；
 已打包的 CLI 运行不需要 Python。生成文件不入库，也不覆盖 `src/common/Config.hpp`。
 
-CLI 压缩包只包含 Runtime 组件，SDK 可从源码另行安装，见[宿主集成](embedding.md)；
-不承诺稳定 C++ ABI。SDK、`.d.tjs`、模块和 DAP 的后续工作见[路线图](roadmap.md)。
+CLI 压缩包只包含 Runtime 组件，并附带构建期生成的系统声明
+（`share/ciallang/declarations/`，见[声明文件](declarations.md) §3）；SDK 可从源码另行安装，
+见[宿主集成](embedding.md)；不承诺稳定 C++ ABI。声明/实现一致性检查、模块和 DAP 的
+后续工作见[路线图](roadmap.md)。
 首个预览版为 [v0.1.0-preview.1](https://github.com/2468785842/Ciallang/releases/tag/v0.1.0-preview.1)，
 提供 Windows x64、Linux x64 与 macOS ARM64 的 CLI 包。附件包含校验和、许可与构建信息；
 每个平台均在独立工作目录、精简 PATH 下验证版本、示例与 JSON 检查器。

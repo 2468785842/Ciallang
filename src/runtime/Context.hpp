@@ -108,6 +108,9 @@ namespace cial {
         void recordApiTypeName(NativeTypeKey key, std::string name) {
             nativeRegister().apiCatalog.typeNames[key] = std::move(name);
         }
+        void recordApiTypeDoc(NativeTypeKey key, std::string doc) {
+            nativeRegister().apiCatalog.typeDocs[key] = std::move(doc);
+        }
         void recordApiMember(NativeTypeKey key, ApiMeta meta) {
             api::normalize(meta);
             auto &members = nativeRegister().apiCatalog.typeMembers[key];
@@ -132,6 +135,10 @@ namespace cial {
 
         public:
             explicit NativeTypeBuilder(Context &ctx) : _ctx(ctx) {}
+            NativeTypeBuilder &doc(std::string text) {
+                _ctx.recordApiTypeDoc(TypeTraits<T>::key(), std::move(text));
+                return *this;
+            }
             template <typename Callable>
             NativeTypeBuilder &method(const String &name, Callable &&fn, std::string doc = {}) {
                 _ctx.registerMethod<T>(name, std::forward<Callable>(fn));

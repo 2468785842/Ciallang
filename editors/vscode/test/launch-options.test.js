@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { findBinary, launchOptions } = require('../launch-options');
+const { findServer, launchOptions } = require('../launch-options');
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cial editor 中文 '));
@@ -18,50 +18,50 @@ function touch(file) {
 
 test('discovers Debug build when opening a nested script directory', t => {
   const root = fixture(t);
-  const exe = touch(path.join(root, 'build/Windows/Debug/cial.exe'));
-  assert.equal(findBinary([path.join(root, 'tests/tjs')], 'win32'), exe);
+  const exe = touch(path.join(root, 'build/Windows/Debug/cial-lsp.exe'));
+  assert.equal(findServer([path.join(root, 'tests/tjs')], 'win32'), exe);
+});
+
+test('finds tool-exe layouts inside build/<platform>/<mode>/tools/lsp', t => {
+  const root = fixture(t);
+  const exe = touch(path.join(root, 'build/Windows/Debug/tools/lsp/cial-lsp.exe'));
+  assert.equal(findServer([root], 'win32'), exe);
 });
 
 test('uses Release when Debug is absent, prefers Debug when both exist', t => {
   const root = fixture(t);
-  const release = touch(path.join(root, 'build/Linux/Release/cial'));
-  assert.equal(findBinary([root], 'linux'), release);
-  const debug = touch(path.join(root, 'build/Linux/Debug/cial'));
-  assert.equal(findBinary([root], 'linux'), debug);
+  const release = touch(path.join(root, 'build/Linux/Release/cial-lsp'));
+  assert.equal(findServer([root], 'linux'), release);
+  const debug = touch(path.join(root, 'build/Linux/Debug/cial-lsp'));
+  assert.equal(findServer([root], 'linux'), debug);
 });
 
 test('checks other workspace folders and macOS paths', t => {
   const root = fixture(t);
-  const exe = touch(path.join(root, 'second/build/MacOS/Release/cial'));
-  assert.equal(findBinary([path.join(root, 'first'), path.join(root, 'second')], 'darwin'), exe);
+  const exe = touch(path.join(root, 'second/build/MacOS/Release/cial-lsp'));
+  assert.equal(findServer([path.join(root, 'first'), path.join(root, 'second')], 'darwin'), exe);
 });
 
 test('rejects a directory masquerading as an executable and falls back to PATH', t => {
   const root = fixture(t);
-  fs.mkdirSync(path.join(root, 'build/Windows/Debug/cial.exe'), { recursive: true });
-  assert.equal(findBinary([root], 'win32'), 'cial');
+  fs.mkdirSync(path.join(root, 'build/Windows/Debug/cial-lsp.exe'), { recursive: true });
+  assert.equal(findServer([root], 'win32'), 'cial-lsp.exe');
+  assert.equal(findServer([root], 'linux'), 'cial-lsp');
 });
 
 test('keeps paths with spaces as single arguments and resolves configured relative paths', t => {
   const root = fixture(t);
-  const extensionPath = path.join(root, 'extension');
-  const server = touch(path.join(extensionPath, 'server/cial_lsp.py'));
-  const options = launchOptions({extensionPath, workspaceRoots: [root], python: './python dir/python.exe', executable: './binary dir/cial.exe'});
-  assert.equal(options.command, path.join(root, 'python dir/python.exe'));
-  assert.deepEqual(options.args, [server, '--cial', path.join(root, 'binary dir/cial.exe')]);
+  const options = launchOptions({ extensionPath: root, workspaceRoots: [root], executable: './binary dir/cial-lsp.exe' });
+  assert.equal(options.command, path.join(root, 'binary dir/cial-lsp.exe'));
+  assert.deepEqual(options.args, []);
   assert.equal(options.options.cwd, root);
 });
 
 test('source checkout without workspace locates its own build', t => {
   const root = fixture(t);
   const extensionPath = path.join(root, 'editors/vscode');
-  touch(path.join(extensionPath, 'server/cial_lsp.py'));
-  touch(path.join(root, 'tools/lsp/cial_lsp.py'));
-  const exe = touch(path.join(root, 'build/Windows/Debug/cial.exe'));
-  assert.equal(launchOptions({extensionPath, workspaceRoots: [], platform: 'win32'}).args[2], exe);
-});
-
-test('missing bundled server reports a preparation error', t => {
-  const root = fixture(t);
-  assert.throws(() => launchOptions({extensionPath: root, workspaceRoots: []}), /npm run prepare/);
+  touch(path.join(root, 'tools/lsp/main.cpp'));
+  const exe = touch(path.join(root, 'build/Windows/Debug/tools/lsp/cial-lsp.exe'));
+  const options = launchOptions({ extensionPath, workspaceRoots: [], platform: 'win32' });
+  assert.equal(options.command, exe);
 });

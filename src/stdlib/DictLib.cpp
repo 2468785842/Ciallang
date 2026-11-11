@@ -10,9 +10,12 @@
 namespace cial::stdlib {
     void registerDictLib(Context &context) {
         context.nativeType<Dictionary>()
-            .method("assign"_str, &stdlib::dictAssign, "复制源字典的全部成员")
-            .method("clear"_str, &stdlib::dictClear, "清空成员")
-            .method("erase"_str, &stdlib::dictErase, "删除键，返回是否删除")
+            .doc("字典；支持字面量 %[] 与键值存取。")
+            .method("assign"_str, &stdlib::dictAssign,
+                    api::signature({ { .name = "dict", .type = "Dictionary" } }, "void", "复制源字典的全部成员"))
+            .method("clear"_str, &stdlib::dictClear, api::signature({}, "void", "清空成员"))
+            .method("erase"_str, &stdlib::dictErase,
+                    api::signature({ { .name = "key", .type = "String" } }, "Boolean", "删除键，返回是否删除"))
             // count 属性
             .property("count"_str, [](const Value &thisObj) {
                 return Value{ Integer{

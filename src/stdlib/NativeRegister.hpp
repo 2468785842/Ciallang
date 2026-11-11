@@ -82,6 +82,8 @@ namespace cial {
         std::vector<ApiMeta> globals;
         // 每个原生类型的注册名与成员元数据；名字缺失的类型不进入 classes 导出。
         Map<NativeTypeKey, std::string> typeNames;
+        // 类型级文档（注册点显式提供，导出为声明文件中 class 上方的 /** */ 注释）。
+        Map<NativeTypeKey, std::string> typeDocs;
         Map<NativeTypeKey, std::vector<ApiMeta>> typeMembers;
     };
 

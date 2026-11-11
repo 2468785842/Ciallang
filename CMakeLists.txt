@@ -21,7 +21,7 @@ option(CIAL_BUILD_FORMATTER "Build the cial-fmt source formatter" ${CIAL_BUILD_C
 option(CIAL_BUILD_FUZZ "Build libFuzzer targets" OFF)
 option(CIAL_BUILD_BENCH "Build benchmark and TJS2 conformance tooling" OFF)
 option(CIAL_ENABLE_JIT "Enable the optional x64 integer JIT backend" OFF)
-option(CIAL_BUILD_LSP "Build the cial-lsp skeleton executable" OFF)
+option(CIAL_BUILD_LSP "Build the cial-lsp language server" OFF)
 option(CIAL_BUILD_DISASM "Build the cial-disasm TAC disassembler" OFF)
 option(CIAL_BUILD_DBG "Build the cial-dbg skeleton executable" OFF)
 option(CIAL_BUILD_TOOLS "Build all auxiliary tools (lsp/dbg skeletons, disasm, cial-fmt)" OFF)
@@ -229,6 +229,15 @@ if(CIAL_BUILD_CLI)
     if(MSVC)
         target_compile_options(cial PRIVATE /EHsc /utf-8)
     endif()
+    # 构建期导出系统声明到可执行文件旁的 declarations/：LSP 与安装产物读取这些
+    # .d.tjs 而非运行时生成或查看 C++ 注册源码（doc/declarations.md §3、doc/lsp.md）。
+    add_custom_command(TARGET cial POST_BUILD
+        COMMAND "${CMAKE_COMMAND}"
+            -DCIAL_EXE=$<TARGET_FILE:cial>
+            -DCIAL_DECL_DIR=$<TARGET_FILE_DIR:cial>/declarations
+            -DCIAL_SCRIPT_BUILTINS=${PROJECT_SOURCE_DIR}/tools/lsp/script-builtins.d.tjs
+            -P "${PROJECT_SOURCE_DIR}/cmake/GenerateApiDeclarations.cmake"
+        VERBATIM)
 endif()
 
 # 源码格式化：词素扫描、布局与安全写回以 CiallangFormat 库形态放在 src/format/，
@@ -261,7 +270,24 @@ if(CIAL_BUILD_DBG)
     set_target_properties(cialdbg PROPERTIES CXX_EXTENSIONS OFF
         COMPILE_WARNING_AS_ERROR ${CIAL_WARNINGS_AS_ERRORS})
     if(MSVC)
-        target_compile_options(cialdbg PRIVATE /EHsc /utf-8)
+        target_compile_options(cialdbg PRIVATE /EHsc /MP /utf-8)
+    endif()
+endif()
+# cial-lsp：核心集 stdio 语言服务器库（src/lsp/，见 doc/lsp.md）；依赖 cialcli 的
+# 进程内编译诊断与 decl 声明解析，因此要求 CIAL_BUILD_CLI。
+if(CIAL_BUILD_LSP)
+    add_library(ciallsp STATIC
+        src/lsp/Json.cpp
+        src/lsp/Lexical.cpp
+        src/lsp/Declarations.cpp
+        src/lsp/Server.cpp)
+    target_link_libraries(ciallsp PUBLIC Ciallang::Ciallang cialcli)
+    target_include_directories(ciallsp PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>")
+    set_target_properties(ciallsp PROPERTIES CXX_EXTENSIONS OFF
+        COMPILE_WARNING_AS_ERROR ${CIAL_WARNINGS_AS_ERRORS})
+    if(MSVC)
+        target_compile_options(ciallsp PRIVATE /EHsc /MP /utf-8)
     endif()
 endif()
 set(CIAL_TOOL_TARGETS "")

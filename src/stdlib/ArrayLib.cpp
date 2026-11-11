@@ -19,6 +19,7 @@ namespace cial::stdlib {
                 static_cast<Integer>(dynamic_cast<Array &>(*thisObj.requireObject()).elements.size()) } };
         };
         context.nativeType<Array>()
+            .doc("动态数组；支持字面量 []、下标访问、push/pop/sort 等。")
             .method("push"_str, &stdlib::arrayPush,
                     api::signature({ { .name = "values", .type = "any", .collapse = true } }, "Integer",
                                    "末尾追加元素，返回新长度。"))
