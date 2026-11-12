@@ -9,7 +9,7 @@
   不敏感）识别并拒绝，诊断码 `decl.not-executable`。
 - 声明语法基于 TJS2 自身文法（`doc/grammar/tjs.y` 的 `variable_type`、`func_def`、
   `property_def`、`class_def`），不照搬 TypeScript：每个定义去掉函数体/访问器体，
-  以 `;` 收尾；类型注解即 TJS2 原有的 `: type` 记法。
+  以 `;` 收尾；类型注解沿用 `: type`，声明模式扩展支持限定名、联合类型和数组元素类型；脚本执行文法不变。
 - 声明解析与生成共享 [API 元数据模型](api-metadata.md)所属的符号体系：
   `cial --api-decl`（注册事实 → 声明文本）与声明解析器（声明文本 → 符号模型）互为
   逆操作，往返保持稳定。[LSP](lsp.md) 通过核心声明分析读取相同模型。
@@ -17,29 +17,31 @@
 ## 1. 语法
 
 ```tjs
-/**
- * 标准库数组。文档注释取紧邻声明上方的块注释（/** 开头），
- * 多行合并为一条 doc。
- */
-class Array extends Object {
-    function join(*);                          // 变长：未命名收拢参数（注册点无签名信息）
-    function push(value: any): Integer;        // 参数/返回类型注解
-    function indexOf(start, value: any): Integer; // 无注解参数 = 类型未知
-    function fill(value: any, start: Integer = 0): void; // 字面量默认值 = 可选参数
-    property count { getter: Integer; setter(value: Integer); } // 显式访问器
-    property length: Integer;                  // 访问方式未指定（简写）
-    var buffer: Array;                         // 成员变量（const 同形，不带初始化器）
-    static function from(iterable: any): Array; // 类静态函数
-    function Array();                          // 构造器：与类同名的成员函数（TJS2 惯例）
+/** 动态数组；元素可以是不同的脚本值。 */
+class Array {
+    /**
+     * 向末尾追加元素。
+     * @param values 要追加的脚本值，允许混合类型。
+     * @returns 修改后的数组长度。
+     * @example var values = []; values.push(1, "hello");
+     */
+    function push(values: any*): Integer;
+    function join(delim: String = ","): String;
+    function sort(order: String | Function = '+', stable: Boolean = false): void;
+    property count { getter: Integer; setter(value: Integer); }
 }
 
-namespace Nested {                             // 宿主 Module（命名空间对象）
-    function helper(): void;
-    class Widget extends Base { function draw(): void; } // 嵌套：身份为点分路径 Nested.Widget
+/** 工程宿主 API 按命名空间组织，避免污染全局。 */
+namespace Assets {
+    class Image { property width { getter: Integer; } }
+    /**
+     * 加载一组图像。
+     * @param filenames 资源路径数组。
+     * @returns 图像资源数组。
+     * @throws 文件读取或解码异常。
+     */
+    function loadImages(filenames: String[]): Assets.Image[];
 }
-
-function print(value: any): void;              // 顶层全局函数
-var enabled: Boolean;                          // 顶层全局变量
 ```
 
 文法（`EBNF` 摘要，词法与 TJS2 脚本一致，含预处理行与注释）：
@@ -58,7 +60,9 @@ property_decl := "property" SYMBOL ( variable_type ";" | "{" { handler } "}" )
 handler      := "getter" [ "(" ")" ] [ variable_type ] ";"
               | "setter" "(" SYMBOL [ variable_type ] ")" ";"
 variable_decl := ( "var" | "const" ) SYMBOL [ variable_type ] ";"
-variable_type := [ ":" ( SYMBOL | "void" | "int" | "real" | "string" | "octet" ) ]
+variable_type := [ ":" type_expr ]
+type_expr     := named_type { "|" named_type }
+named_type    := ( SYMBOL | "void" | "int" | "real" | "string" | "octet" ) { "." SYMBOL } { "[" "]" }
 literal      := 数字/字符串/true/false/null/void 字面量，可带一元负号
 ```
 
@@ -67,7 +71,7 @@ literal      := 数字/字符串/true/false/null/void 字面量，可带一元�
 
 - **类型规范化**：关键字 `int`/`real`/`string`/`octet` 解析为模型名
   `Integer`/`Real`/`String`/`Octet`（与 `--api-json` 一致）；`void` 保持 `void`；
-  标识符按原文保留（可为内置类名或宿主类型）。省略注解 = 类型未知。
+  标识符按原文保留（可为内置类名或宿主类型）；支持 `Assets.Image`、`String | RegExp`、`String[]`。联合类型规范为带空格的 ` | `。省略注解 = 类型未知。
 - **可选与变长**：带字面量默认值的参数为可选；`*`/`name*` 收拢参数表达变长，
   必须是参数表最后一项（与 tjs.y 相同）。默认值只接受字面量——声明文件不描述
   计算；其余表达式按 `decl.invalid-default` 诊断。
@@ -120,6 +124,8 @@ literal      := 数字/字符串/true/false/null/void 字面量，可带一元�
 - 显式签名保留参数名、可选字面量和具名收拢参数；仅知变长时输出 `function name(*);`。
   未知类型省略注解。
 - 属性在访问方式明确时输出 getter/setter，否则使用简写，避免误称只读/可写。
+- 函数文档保留注册点行为说明，补齐可由签名确定的 `@param` 类型/默认值、`@returns`；
+  文档格式使用 `/** */`，允许 `@throws`、`@example`，LSP 以 Markdown 悬停展示。
 - 输出仅由模型决定，不含版本戳或头部注释；对同一注册事实输出逐字节稳定，
   且 `generate(parse(generate(catalog)))` 与 `generate(catalog)` 一致（往返幂等，
   由 `tests/declaration_test.cpp` 验证）。
@@ -130,6 +136,8 @@ literal      := 数字/字符串/true/false/null/void 字面量，可带一元�
 标准库声明在构建期落盘：`cial` 目标的 POST_BUILD 步骤运行 `--api-decl-dir`，把按顶层符号
 拆分的声明（`Array.d.tjs`、`Math.d.tjs`……顶层自由函数归入 `globals.d.tjs`）写到可执行文件旁的
 `declarations/`，并复制手写的 `Exception.d.tjs`（`cmake/GenerateApiDeclarations.cmake`）。
+构建目录同时包含 `index.json`（schemaVersion、SDK 版本、各文件 path/SHA-256）与独立 README，
+方便整体分发和核对接口包；清单由构建脚本生成，不作为可执行源码。
 SDK 组件与 CLI 归档安装时在 `share/ciallang/declarations/` 发布该目录，脚本工具直接读取这些
 声明文件获得接口文档与跳转，不需要查看 C++ 注册源码；安装/构建布局的读取顺序见
 [LSP](lsp.md)。可选能力库按 CMake 开关门控注册：关闭的库不进注册目录，声明产物自然不含它。
@@ -179,3 +187,38 @@ Catch2）与 `tests/cli/test_cli.py`（CLI 行为）。声明语料放 `tests/de
   声明/实现一致性检查、重载选择和独立冲突诊断尚未实现。
 - `namespace` 是声明模式中的上下文关键字（后随标识符 + `{` 才成立），TJS2 保留字
   表不含它，脚本模式行为不变。
+
+
+## 7. 工程声明包规范
+
+建议目录结构如下，运行代码与接口声明分开维护：
+
+```text
+project/
+  src/                         # 运行脚本
+  types/
+    host/Assets.d.tjs           # 宿主命名空间及类型
+    host/Widget.d.tjs
+  .vscode/settings.json         # 外部 SDK 的 declarationFiles 配置（按需）
+SDK/share/ciallang/declarations/
+  README.md                    # 使用约定与工程示例
+  index.json                   # 版本、文件清单与 SHA-256
+  Array.d.tjs                  # 每个主要公共类型单独成文件
+  Exception.d.tjs
+  globals.d.tjs
+```
+
+按 TypeScript/Javadoc 常见的接口契约方式编写：摘要说明行为，参数说明单位、边界和默认值，
+返回说明实际结果，异常说明触发条件，并提供能运行的示例。宿主类型用 namespace 归属，
+跨命名空间引用使用限定名。属性明确 getter/setter，构造器沿用 TJS 的同名成员函数形式；
+LSP 对类引用导航到 class，而不额外列出同名构造器。
+
+优先使用真实具体类型；有限选择使用联合类型，已知数组元素类型使用 `T[]`。`Function`
+表示可调用对象，回调的参数和返回协议写在文档中。`any` 仍用于 Array 的异构元素、脚本
+求值结果和按原值保存的 Exception.message；`values: any*` 是具名变长实参，星号不是
+未知类型占位。不能为减少 any 而把动态返回值假写成 String 或 Integer。
+
+此版本没有实现泛型、类型别名、import/export、重载选择或 Java 式完整静态类型检查。
+联合类型不会被猜测为唯一接收者；`String[]` 等数组返回类型可按 Array 查找容器成员。
+宿主生成自己的接口包时，应通过 API 元数据登记具名参数和语义说明，保持注册事实为唯一来源；
+不要修改构建生成的标准库文件。标准包更新时整体替换，避免混入不同版本。

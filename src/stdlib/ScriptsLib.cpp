@@ -190,12 +190,25 @@ namespace cial::stdlib {
             "宿主脚本存储命名空间：execStorage 执行脚本文件，evalStorage 求值脚本文件。");
 
         // exec/eval 方法走 ScriptsNS 的绑定闭包而非 registerMethod，元数据在此补记
-        context.recordApiMember(
-            TypeTraits<ScriptsNS>::key(),
-            api::makeMetaOf(ApiKind::Method, &stdlib::scriptsExecStorage, "execStorage", {}, "执行存储中的脚本文件"));
-        context.recordApiMember(TypeTraits<ScriptsNS>::key(),
-                                api::makeMetaOf(ApiKind::Method, &stdlib::scriptsEvalStorage, "evalStorage", {},
-                                                "对存储中的脚本文件求值并返回结果"));
+        for(const auto *name : { "execStorage", "evalStorage" }) {
+            auto meta = api::signature(
+                { { .name = "filename", .type = "String" },
+                  { .name = "mode", .type = "String", .optional = true, .defaultText = "\"\"" },
+                  { .name = "context", .type = "Object | void", .optional = true, .defaultText = "void" } },
+                "any",
+                std::string{ name } == "execStorage"
+                    ? "执行指定脚本文件。\n@param filename 存储名称；相对当前脚本的存储目录解析。\n@param mode "
+                      "文本存储读取模式，空串使用默认模式。\n@param context "
+                      "执行上下文；省略时使用默认全局上下文。\n@returns 脚本执行结果；由被执行脚本决定类型。\n@throws "
+                      "文件读取、编译或脚本异常；.d.tjs 不可执行。\n@example Scripts.execStorage(\"startup.tjs\");"
+                    : "对脚本文件中的表达式求值。\n@param filename 表达式脚本的存储名称。\n@param mode "
+                      "文本存储读取模式。\n@param context 可选执行上下文。\n@returns "
+                      "表达式结果；类型由表达式决定。\n@throws 文件读取、编译或求值异常。\n@example var result = "
+                      "Scripts.evalStorage(\"config.tjs\");");
+            meta.kind = ApiKind::Method;
+            meta.name = name;
+            context.recordApiMember(TypeTraits<ScriptsNS>::key(), std::move(meta));
+        }
 
         auto &rt = context.rt();
         // 方法对象注册期创建一次并绑定 ns（成员读现场返回同一绑定闭包）。

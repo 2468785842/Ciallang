@@ -23,7 +23,7 @@ exports.run = async function run() {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri;
   assert(root, 'Open an isolated smoke-test workspace');
   const uri = vscode.Uri.joinPath(root, 'smoke.tjs');
-  const text = 'function greet(name) { return name; }\nvar result = greet("world");\nvar items = [];\nitems.push(1);\n';
+  const text = 'function greet(name) { return name; }\nvar result = greet("world");\nvar items = [];\nitems.push(1);\nArray.push;\nMath.abs;\n';
   await vscode.workspace.fs.writeFile(uri, Buffer.from(text));
   const document = await vscode.workspace.openTextDocument(uri);
   const editor = await vscode.window.showTextDocument(document);
@@ -39,6 +39,23 @@ exports.run = async function run() {
   const definitions = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', uri, new vscode.Position(1, 15));
   assert.equal(definitions.length, 1);
   assert.equal((definitions[0].range || definitions[0].targetSelectionRange).start.line, 0);
+  const memberDefinitions = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', uri, new vscode.Position(3, 7));
+  assert.equal(memberDefinitions.length, 1, 'Array.push should have a declaration definition');
+  const memberUri = memberDefinitions[0].uri || memberDefinitions[0].targetUri;
+  assert(memberUri.path.endsWith('/Array.d.tjs'), memberUri.toString());
+  const declarationDocument = await vscode.workspace.openTextDocument(memberUri);
+  assert(declarationDocument.getText().includes('function push(values: any*): Integer;'), 'definition target should be a readable declaration');
+  for (const [line, character, filename, signature] of [
+    [4, 7, 'Array.d.tjs', 'function push(values: any*): Integer;'],
+    [5, 7, 'Math.d.tjs', 'function abs(']
+  ]) {
+    const locations = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', uri, new vscode.Position(line, character));
+    assert.equal(locations.length, 1, `qualified member should resolve to ${filename}`);
+    const target = locations[0].uri || locations[0].targetUri;
+    assert(target.path.endsWith('/' + filename), target.toString());
+    const targetDocument = await vscode.workspace.openTextDocument(target);
+    assert(targetDocument.getText().includes(signature), 'qualified definition target should be readable');
+  }
   await document.save();
   const validText = document.getText();
   const invalid = new vscode.WorkspaceEdit();
@@ -52,5 +69,5 @@ exports.run = async function run() {
   await vscode.workspace.applyEdit(fix);
   await errorCleared;
   await document.save();
-  console.log('Ciallang VSCode smoke: startup, diagnostics, completion, definition passed');
+  console.log('Ciallang VSCode smoke: startup, diagnostics, completion, definition and declaration file reading passed');
 };

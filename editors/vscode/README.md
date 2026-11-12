@@ -4,16 +4,33 @@
 Extension Development Host 会打开 Ciallang 工程根目录。打开 `.tjs` 文件即可启动语言服务。
 客户端直接启动 `cial-lsp` 可执行文件，不依赖 Python（服务器实现见 `src/lsp/`，[LSP 文档](../../doc/lsp.md)）。
 
+F5 配置通过 `CIALLANG_DEBUG_ROOT` 绑定当前源码仓库，只使用
+`build/<平台>/Debug/tools/lsp/cial-lsp[.exe]`（兼容 Debug 根目录布局），并显式传入
+`--declarations <仓库>/build/<平台>/Debug/declarations`；开发/测试宿主中的此绑定优先于
+保存的 executable/SDK 设置。调试窗口会禁用其他已安装扩展，以减少冲突。
+预启动任务在 `.vscode/tasks.json` 中显式登记，不依赖 npm 任务自动发现；缺少 Debug
+服务器或 `Array.d.tjs` 时直接失败，先构建 `cial` 和 `cial-lsp` 后再启动。
+普通安装的扩展忽略此开发环境变量，仍使用下面的自动发现/SDK 下载顺序。
+
+启动后打开“输出 → Ciallang”，可看到实际服务器、工作目录与声明目录；确认调试时指向
+当前仓库 Debug 构建，而不是已发布的旧 SDK。
+
+默认配置 `Ciallang extension` 运行本地 Debug 语言服务器，不附加 JavaScript 调试器；
+需要给 extension.js 设置断点时选择 `Ciallang extension (JavaScript debugger)`。
+本机验收中，附加 JavaScript 调试器的嵌套宿主曾以代码 134 退出，默认运行入口已通过
+实际预启动任务、路径绑定和声明文件跳转读取验收。
+
 语法高亮在打开 `.tjs` 时直接生效，使用当前 VSCode 主题。覆盖关键字、类与函数声明、
 字符串与转义、嵌套注释、数值、Octet、预处理指令，以及 `@"..."` / `@'...'` 中的
 `${expr}`、`&expr;` 插值。支持括号匹配、引号与括号自动补全，以及注释快捷键。
 这些编辑功能不依赖语言服务；正则与除法使用局部上下文保守区分，不提供语义着色。
 词法依据见 [语法说明](../../doc/syntax.md)，规则位于 `syntaxes/ciallang.tmLanguage.json`。
 
-安装发布附件 `ciallang-language-0.2.0.vsix` 后打开 `.tjs` 即可使用。首次找不到语言服务器时，
-插件自动从官方 GitHub Release 下载指定版本的 Cial 工具 SDK，校验同名 `.sha256`，
+安装发布附件 `ciallang-language-0.2.1.vsix` 后打开 `.tjs` 即可使用。首次找不到语言服务器时，
+插件显示“下载 SDK / 打开设置”通知，点击下载后从官方 GitHub Release 获取指定版本，校验同名 `.sha256`，
 解压到 VSCode 全局存储并启动 `bin/cial-lsp.exe`（Linux/macOS 为 `bin/cial-lsp`）。
 系统声明通过 SDK 的 `share/ciallang/declarations/` 自动加载，无需手动配置路径。
+有效 SDK 缓存启动时直接使用，不重复提示；关闭下载通知时暂不启动语言服务，可重新加载窗口再选择。
 下载完成后可离线复用；下载或校验失败不会留下半成品，修复网络后重新加载窗口即可重试。
 工具 SDK 是 CLI 发布包（含工具和声明）；C++ 开发库仍按源码 SDK 安装流程提供。
 
@@ -63,3 +80,11 @@ npm test
 `test/smoke.js` 在真实 VSCode 扩展宿主中验证语言配置、启动、编译器诊断、补全与定义跳转。
 它会覆盖工作区的 `smoke.tjs`，须使用独立的临时工作区；启动参数见
 [宿主验收](../../doc/lsp.md#vscode-宿主验收)。
+
+
+工作区在服务器启动时建索引，Ciallang 输出显示就绪文件数。客户端监听 `.tjs`（含 `.d.tjs`）
+创建、修改、删除，并通知服务端更新；重复导航复用词法和声明解析结果。Exception 等类名
+引用只跳转 class，不把构造函数当作第二个候选。标准声明包的 README/index.json 随 SDK
+分发，类型与文档编写方式见[工程声明包规范](../../doc/declarations.md#7-工程声明包规范)。
+
+0.2.1 为同版本 SDK 修订使用独立缓存目录；升级插件后不会复用原 preview.2 自动下载缓存，旧缓存保留在磁盘。

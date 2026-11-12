@@ -106,6 +106,10 @@ function validateSdk(directory, identity) {
 }
 
 const installations = new Map();
+function cachedSdk({ storagePath, version, platform = process.platform, arch = process.arch }) {
+  const identity = packageIdentity(version, platform, arch);
+  try { return validateSdk(path.join(storagePath, identity.name), identity); } catch { return undefined; }
+}
 async function ensureSdk({ storagePath, version, platform = process.platform, arch = process.arch, fetch = download, report = () => {} }) {
   const identity = packageIdentity(version, platform, arch);
   const destination = path.join(storagePath, identity.name);
@@ -137,4 +141,4 @@ async function ensureSdk({ storagePath, version, platform = process.platform, ar
   try { return await pending; } finally { installations.delete(destination); }
 }
 
-module.exports = { packageIdentity, verifyChecksum, safeMember, extract, sdkServer, validateSdk, ensureSdk };
+module.exports = { packageIdentity, verifyChecksum, safeMember, extract, sdkServer, validateSdk, cachedSdk, ensureSdk };

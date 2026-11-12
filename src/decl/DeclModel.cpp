@@ -66,7 +66,26 @@ namespace cial::decl {
         }
 
         void emitFunction(std::string &out, const std::string &indent, const Symbol &symbol) {
-            emitDoc(out, indent, symbol.doc);
+            std::string doc = symbol.doc;
+            for(const auto &param : symbol.params) {
+                if(param.name.empty() || doc.find("@param " + param.name + " ") != std::string::npos)
+                    continue;
+                if(!doc.empty())
+                    doc += '\n';
+                doc += "@param " + param.name + " 类型：" + (param.type.empty() ? "未指定" : param.type);
+                if(param.collapse)
+                    doc += "，可传入多个实参";
+                if(param.optional)
+                    doc += "，默认 " + param.defaultText;
+                doc += "。";
+            }
+            if(!symbol.ret.empty() && doc.find("@returns") == std::string::npos &&
+               doc.find("@return ") == std::string::npos) {
+                if(!doc.empty())
+                    doc += '\n';
+                doc += "@returns " + symbol.ret + "。";
+            }
+            emitDoc(out, indent, doc);
             out += indent;
             if(symbol.kind == SymbolKind::StaticFunction)
                 out += "static ";

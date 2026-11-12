@@ -42,6 +42,10 @@ Status: proposed
 扩展宿主验收通过；不改变核心/工具拆仓和正式公开发布的剩余状态，见
 [路径修复与分发记录](../../implemented/bug-fix/2026-11-12-windows-lsp-sdk-release.md)。
 
+后续已完成本地常驻索引、SDK 缺失下载通知、Exception 单类导航和工程声明契约，见
+[索引与契约验收](../../implemented/architecture/2026-11-12-lsp-index-contracts.md)。
+这不包含声明一致性/重载选择，也未更新公开 preview.2 的附件。
+
 按批次顺序推进；每批先在路线图核对设计边界与依赖，完成后把状态回写本 note
 并更新路线图对应章节。
 

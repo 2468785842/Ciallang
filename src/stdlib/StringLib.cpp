@@ -48,14 +48,20 @@ namespace cial::stdlib {
                                    "以当前字符串为格式模板。"))
             .method(
                 "replace"_str, &stdlib::stringReplace,
-                api::signature({ { .name = "pattern", .type = "RegExp" }, { .name = "replacement", .type = "any" } },
-                               "String", "用正则 re 替换"))
+                api::signature(
+                    { { .name = "pattern", .type = "RegExp" }, { .name = "replacement", .type = "String | Function" } },
+                    "String",
+                    "用正则替换文本，返回新字符串。\n@param pattern 匹配规则；g 标志控制全局替换。\n@param replacement "
+                    "替换字符串，或接收匹配数组并返回替换文本的函数。\n@returns 新字符串，不修改原字符串。"))
             .method("split"_str, &stdlib::stringSplitWith,
                     api::signature(
-                        { { .name = "pattern", .type = "any" },
-                          { .name = "reserved", .type = "any", .optional = true, .defaultText = "void" },
+                        { { .name = "pattern", .type = "String | RegExp" },
+                          { .name = "reserved", .type = "void", .optional = true, .defaultText = "void" },
                           { .name = "purgeempty", .type = "Boolean", .optional = true, .defaultText = "false" } },
-                        "Array", "按模式拆分"))
+                        "String[]",
+                        "按模式拆分为字符串数组。\n@param pattern RegExp 按正则匹配；String 作为分隔字符集合。\n@param "
+                        "reserved 保留位置，传 void。\n@param purgeempty 是否移除空片段。\n@returns "
+                        "Array，所有元素均为 String。"))
             .method("escape"_str, &stdlib::stringEscape, api::signature({}, "String", "转义特殊字符。"))
             .method("trim"_str, &stdlib::stringTrim, api::signature({}, "String", "去除首尾空白。"))
             .method("reverse"_str, &stdlib::stringReverse, api::signature({}, "String", "反转字符串。"))

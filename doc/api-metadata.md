@@ -113,3 +113,16 @@ context.nativeType<Array>()
   （`Context.hpp` 的 `recordApiMember`）。
 - LSP 已消费 `--api-decl` 与核心 `--decl-json` 符号，替代 BUILTIN_MEMBERS；宿主随
   SDK/应用发布自己的声明即可，编辑器不会自动执行宿主应用来探测接口，见 [LSP](lsp.md)。
+
+
+## 精确类型与工程文档约定
+
+注册点可以显式填写 `String | RegExp`、`String | Function`、`Object | void`、
+`Host.Resource` 和 `String[]` 等声明类型表达式，生成器与声明解析器保持字符串往返。
+只细化实现能够保证的契约：例如 Dictionary.count 是 Integer，Scripts 的 filename/mode/context
+具名登记，保留位置使用 void；动态脚本结果和异构数组元素仍为 any。
+
+方法说明使用 Javadoc 风格的行为摘要和 @param/@returns/@throws/@example。生成器保留
+注册点原始说明，并补充签名能够确定的类型/默认值标签，因此声明 doc 可以比 api-json 的
+原始 doc 更丰富；其参数、返回与读写性仍与 API 元数据一致。完整工程组织约定见
+[声明包规范](declarations.md#7-工程声明包规范)。

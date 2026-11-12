@@ -211,7 +211,10 @@ namespace cial::stdlib {
         context.nativeType<RandomGen>()
             .doc("伪随机数生成器；经 new Math.RandomGenerator(seed) 构造。")
             .method("randomize"_str, &stdlib::rgRandomize,
-                    api::signature({ { .name = "seed", .type = "any", .optional = true, .defaultText = "void" } },
+                    api::signature({ { .name = "seed",
+                                       .type = "Integer | Dictionary | void",
+                                       .optional = true,
+                                       .defaultText = "void" } },
                                    "void",
                                    "重播种；无参按当前时间播种，Integer 作种子，"
                                    "Dictionary（serialize 结果）恢复状态。"))

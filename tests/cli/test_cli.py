@@ -78,7 +78,10 @@ class CliTest(CliTestCase):
         self.assertEqual(math["abs"]["variadic"], False)
         self.assertEqual(math["abs"]["parameters"][0]["name"], "n")
         scripts = {m["name"]: m for m in classes["Scripts"]}
-        self.assertEqual(scripts["execStorage"]["variadic"], True)
+        self.assertEqual(scripts["execStorage"]["variadic"], False)
+        self.assertEqual([p['name'] for p in scripts['execStorage']['parameters']], ['filename', 'mode', 'context'])
+        self.assertEqual(array['split']['parameters'][0]['type'], 'String | RegExp')
+        self.assertEqual(array['sort']['parameters'][0]['type'], 'String | Function')
         # 全局函数（Session 注册链显式登记）
         globals_map = {g["name"]: g for g in payload["globals"]}
         self.assertEqual(globals_map["print"]["ret"], "void")
@@ -104,7 +107,9 @@ class CliTest(CliTestCase):
         self.assertIn("function push(values: any*): Integer;", first.stdout)
         self.assertIn('function join(delim: String = ","): String;', first.stdout)
         self.assertIn("property length: Integer;", first.stdout)
-        self.assertIn("/** 输出值的字符串化结果（不换行） */", first.stdout)
+        self.assertIn("输出值的字符串化结果（不换行）", first.stdout)
+        self.assertIn('@param value', first.stdout)
+        self.assertIn('@returns void', first.stdout)
         # 类集合与 --api-json 一致
         api = json.loads(self.run_cial("--api-json").stdout)
         for entry in api["classes"]:
@@ -129,7 +134,9 @@ class CliTest(CliTestCase):
             self.assertEqual(set(actual), {member['name'] for member in native['members']})
             for metadata in native['members']:
                 symbol = actual[metadata['name']]
-                self.assertEqual(symbol['doc'], metadata.get('doc', ''))
+                self.assertTrue(symbol['doc'].startswith(metadata.get('doc', '')))
+                if metadata['kind'] in ('method', 'static') and metadata['ret']:
+                    self.assertIn('@returns', symbol['doc'])
                 self.assertEqual(symbol['ret'], metadata['ret'] or '')
                 if 'parameters' in metadata:
                     self.assertEqual(symbol['params'], metadata['parameters'])

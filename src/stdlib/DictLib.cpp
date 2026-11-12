@@ -17,10 +17,16 @@ namespace cial::stdlib {
             .method("erase"_str, &stdlib::dictErase,
                     api::signature({ { .name = "key", .type = "String" } }, "Boolean", "删除键，返回是否删除"))
             // count 属性
-            .property("count"_str, [](const Value &thisObj) {
-                return Value{ Integer{
-                    static_cast<Integer>(dynamic_cast<Dictionary &>(*thisObj.requireObject()).members.size()) } };
-            });
+            .property(
+                "count"_str,
+                [](const Value &thisObj) {
+                    return Value{ Integer{
+                        static_cast<Integer>(dynamic_cast<Dictionary &>(*thisObj.requireObject()).members.size()) } };
+                },
+                ApiMeta{ .ret = "Integer",
+                         .doc = "字典中的键值对数量；只读。",
+                         .accessSpecified = true,
+                         .hasGetter = true });
         context.registerClass<Dictionary>("Dictionary"_str);
     }
 

@@ -42,6 +42,22 @@ namespace {
     }
 } // namespace
 
+TEST_CASE("声明类型：联合、命名空间限定和数组类型往返", "[decl]") {
+    Common::Result diagnostics;
+    const auto module =
+        parseText("function split(pattern: String | RegExp, resources: Host.Resource[]): String[];\n", diagnostics);
+    REQUIRE_FALSE(diagnostics.isFailed());
+    REQUIRE(module.symbols.front().params[0].type == "String | RegExp");
+    REQUIRE(module.symbols.front().params[1].type == "Host.Resource[]");
+    REQUIRE(module.symbols.front().ret == "String[]");
+    const auto generated = decl::generateDeclarations(module);
+    Common::Result again;
+    REQUIRE(decl::generateDeclarations(parseText(generated, again)) == generated);
+    REQUIRE_FALSE(again.isFailed());
+    CHECK(firstErrorCode("function broken(value: String |): void;") == "decl.invalid-type");
+    CHECK(firstErrorCode("function broken(value: String[): void;") == "decl.invalid-type");
+}
+
 TEST_CASE("声明解析：函数参数、类型规范化与默认值", "[decl]") {
     Common::Result result;
     const auto module =
@@ -208,15 +224,21 @@ TEST_CASE("生成器：目录转换确定性输出", "[decl]") {
     // 变长条目转未命名收拢；登记属性转简写（读写性未知）
     REQUIRE(decl::generateDeclarations(module) ==
             "class Array {\n"
+            "  /** @returns Array。 */\n"
             "  static function create(arg0: any): Array;\n"
             "}\n"
             "class String {\n"
-            "  /** 取字符 */\n"
+            "  /**\n"
+            "   * 取字符\n"
+            "   * @returns String。\n"
+            "   */\n"
             "  function charAt(arg0: Integer): String;\n"
+            "  /** @returns any。 */\n"
             "  function push(*): any;\n"
             "  property length: any;\n"
             "}\n"
             "namespace Host {\n"
+            "  /** @returns void。 */\n"
             "  function util(): void;\n"
             "}\n");
 }

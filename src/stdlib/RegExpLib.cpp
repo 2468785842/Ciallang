@@ -15,22 +15,23 @@ namespace cial::stdlib {
             .method("test"_str, &stdlib::regexpTest,
                     api::signature({ { .name = "target", .type = "String" } }, "Boolean", "是否匹配"))
             .method("match"_str, &stdlib::regexpMatch,
-                    api::signature({ { .name = "target", .type = "String" } }, "Array", "全局匹配结果"))
+                    api::signature({ { .name = "target", .type = "String" } }, "String[]", "全局匹配结果"))
             .method("exec"_str, &stdlib::regexpExec,
-                    api::signature({ { .name = "target", .type = "String" } }, "Array", "单次匹配与分组"))
+                    api::signature({ { .name = "target", .type = "String" } }, "String[]", "单次匹配与分组"))
             .method("compile"_str, &stdlib::regexpCompile,
                     api::signature({ { .name = "pattern", .type = "String" },
                                      { .name = "flags", .type = "String", .optional = true, .defaultText = "\"\"" } },
                                    "void", "重新编译正则"))
             .method("replace"_str, &stdlib::regexpReplace,
-                    api::signature({ { .name = "target", .type = "String" }, { .name = "replacement", .type = "any" } },
+                    api::signature({ { .name = "target", .type = "String" },
+                                     { .name = "replacement", .type = "String | Function" } },
                                    "String", "正则替换"))
             .method("split"_str, &stdlib::regexpSplit,
                     api::signature(
                         { { .name = "target", .type = "String" },
-                          { .name = "reserved", .type = "any", .optional = true, .defaultText = "void" },
+                          { .name = "reserved", .type = "void", .optional = true, .defaultText = "void" },
                           { .name = "purgeempty", .type = "Boolean", .optional = true, .defaultText = "false" } },
-                        "Array", "按正则拆分"));
+                        "String[]", "按正则拆分"));
         context.registerClass<RegExp>("RegExp"_str, &context.rt(), ""_str);
     }
 

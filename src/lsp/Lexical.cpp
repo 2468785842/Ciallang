@@ -179,11 +179,20 @@ namespace cial::lsp {
         static const std::regex declaration{ R"(\b(function|var|const|class|property|namespace)\s+([\w$]+))" };
         const std::string masked = maskedSource(lines.text());
         std::vector<DocumentDeclaration> symbols;
+        size_t scanned = 0;
+        int depth = 0;
         for(std::sregex_iterator it{ masked.begin(), masked.end(), declaration }; it != std::sregex_iterator{}; ++it) {
             const auto &match = *it;
             const size_t nameStart = static_cast<size_t>(match.position(2));
             const size_t nameEnd = nameStart + match.length(2);
-            symbols.push_back({ match.str(2), match.str(1), nameStart, nameEnd, lines.tokenRange(nameStart, nameEnd) });
+            for(; scanned < nameStart; ++scanned) {
+                if(masked[scanned] == '{')
+                    ++depth;
+                else if(masked[scanned] == '}')
+                    --depth;
+            }
+            symbols.push_back(
+                { match.str(2), match.str(1), nameStart, nameEnd, lines.tokenRange(nameStart, nameEnd), depth == 0 });
         }
         return symbols;
     }
@@ -469,6 +478,8 @@ namespace cial::lsp {
         --_budget;
         return _budget >= 0;
     }
+
+    void DocumentIndex::resetQueryBudget() { _budget = MAX_INFER_STEPS; }
 
     DocumentIndex::ResolveResult DocumentIndex::resolveToken(const size_t cursor) const {
         const auto &token = _tokens[cursor];

@@ -20,3 +20,17 @@ list(LENGTH cial_declaration_files cial_declaration_count)
 if(cial_declaration_count LESS 2)
     message(FATAL_ERROR "expected per-type declarations plus Exception.d.tjs in ${CIAL_DECL_DIR}")
 endif()
+
+execute_process(COMMAND "${CIAL_EXE}" --version OUTPUT_VARIABLE cial_decl_version
+    OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+set(cial_decl_catalog "{\"schemaVersion\":1,\"version\":\"${cial_decl_version}\",\"files\":[]}")
+set(cial_decl_index 0)
+foreach(cial_decl_file IN LISTS cial_declaration_files)
+    get_filename_component(cial_decl_name "${cial_decl_file}" NAME)
+    file(SHA256 "${cial_decl_file}" cial_decl_hash)
+    string(JSON cial_decl_catalog SET "${cial_decl_catalog}" files ${cial_decl_index}
+        "{\"path\":\"${cial_decl_name}\",\"sha256\":\"${cial_decl_hash}\"}")
+    math(EXPR cial_decl_index "${cial_decl_index} + 1")
+endforeach()
+file(WRITE "${CIAL_DECL_DIR}/index.json" "${cial_decl_catalog}\n")
+file(COPY_FILE "${CMAKE_CURRENT_LIST_DIR}/../packaging/declarations/README.md" "${CIAL_DECL_DIR}/README.md")

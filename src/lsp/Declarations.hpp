@@ -63,6 +63,7 @@ namespace cial::lsp {
         // 悬停（纯文本签名 + 文档）。
         [[nodiscard]] static Json hover(const Entry &entry);
         [[nodiscard]] static Json location(const Entry &entry);
+        [[nodiscard]] size_t parseCount() const noexcept { return _parseCount; }
 
     private:
         void parseFile(const std::string &uri, const std::string &text, std::vector<Entry> &out);
@@ -77,5 +78,13 @@ namespace cial::lsp {
         std::unique_ptr<vm::VMState> _state;
         std::vector<Entry> _system; // 系统声明（不随项目覆盖规则丢弃，仅被同名项目声明遮蔽）
         std::map<std::string, std::vector<Entry>> _entries; // qualified → 条目
+        struct CachedSource {
+            std::string text;
+            std::vector<Entry> entries;
+        };
+        std::map<std::string, CachedSource> _projectCache;
+        std::vector<std::pair<std::string, std::string>> _lastSources;
+        bool _merged{};
+        size_t _parseCount{};
     };
 } // namespace cial::lsp

@@ -1,5 +1,14 @@
-/** 脚本自举异常类，定义于 src/stdlib/ExceptionLib.hpp。 */
+/**
+ * 脚本异常对象；由运行时自举类提供。
+ * @example throw new Exception("配置文件不存在");
+ */
 class Exception {
+    /**
+     * 创建异常对象。
+     * @param message 异常说明，缺省为 "Exception"。运行时按原值保存，允许任意脚本值，建议使用 String。
+     * @example var error = new Exception("invalid argument");
+     */
     function Exception(message: any = "Exception");
+    /** 异常说明；为构造实参的原值，未做强制字符串转换。 */
     var message: any;
 }

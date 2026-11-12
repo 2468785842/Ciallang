@@ -31,25 +31,48 @@ namespace cial::stdlib {
         // load/save/loadStruct/saveStruct 返回自身（thisObj），pack 产出 Octet
         context.nativeType<Array>()
             .method("load"_str, &stdlib::arrayLoad,
-                    api::signature({ { .name = "filename", .type = "String" } }, "Array"))
+                    api::signature(
+                        { { .name = "filename", .type = "String" } }, "Array",
+                        "逐行读取文本文件并替换数组内容；每个元素为 String。\n@param filename "
+                        "文件路径，自动识别受支持的文本 BOM。\n@returns 当前数组。\n@throws 文件读取或文本解码失败。"))
             .method("save"_str, &stdlib::arraySave,
-                    api::signature({ { .name = "filename", .type = "String" } }, "Array"))
+                    api::signature({ { .name = "filename", .type = "String" } }, "Array",
+                                   "按行写出数组；String/Integer/Real 写值，void/对象只写换行。\n@param filename "
+                                   "输出文件路径。\n@returns 当前数组。\n@throws 文件写入失败。"))
             .method("loadStruct"_str, &stdlib::arrayLoadStruct,
-                    api::signature({ { .name = "filename", .type = "String" } }, "Array"))
+                    api::signature(
+                        { { .name = "filename", .type = "String" } }, "Array",
+                        "从二进制结构文件读取当前数组。\n@param filename 具有 KBAD100 头的二进制文件路径。\n@returns "
+                        "当前数组。\n@throws 非二进制结构文件、读取失败或结构数据损坏。"))
             .method("saveStruct"_str, &stdlib::arraySaveStruct,
                     api::signature({ { .name = "filename", .type = "String" },
                                      { .name = "mode", .type = "String", .optional = true, .defaultText = "\"\"" } },
-                                   "Array"))
+                                   "Array",
+                                   "序列化当前数组。\n@param filename 输出文件路径。\n@param mode 包含 b "
+                                   "时输出二进制，其他情况输出文本结构。\n@returns 当前数组。\n@example "
+                                   "values.saveStruct(\"values.bin\", \"b\");"))
             .method("pack"_str, &stdlib::arrayPack,
-                    api::signature({ { .name = "template", .type = "String" } }, "Octet"))
-            .method("assignStruct"_str, &stdlib::arrayAssignStruct,
-                    api::signature({ { .name = "src", .type = "Array" } }, "Array"));
+                    api::signature({ { .name = "template", .type = "String" } }, "Octet",
+                                   "根据 pack 模板编码数组元素，返回独立字节串。\n@param template TJS pack "
+                                   "格式模板。\n@throws 模板或元素格式无效。"))
+            .method(
+                "assignStruct"_str, &stdlib::arrayAssignStruct,
+                api::signature(
+                    { { .name = "src", .type = "Array" } }, "Array",
+                    "结构化深拷贝源数组；嵌套容器新建，循环引用转为 null。\n@param src 源数组。\n@returns 当前数组。"));
         // load/save 为原版同款 TODO 空实现；loadStruct 文本形态返回解析值，返回类型不定
         context.nativeType<Dictionary>()
-            .method("load"_str, &stdlib::dictLoad, api::signature({ { .name = "filename", .type = "String" } }, "void"))
-            .method("save"_str, &stdlib::dictSave, api::signature({ { .name = "filename", .type = "String" } }, "void"))
+            .method("load"_str, &stdlib::dictLoad,
+                    api::signature({ { .name = "filename", .type = "String" } }, "void",
+                                   "兼容占位接口，目前不读取文件，也不修改字典。请使用 loadStruct。"))
+            .method("save"_str, &stdlib::dictSave,
+                    api::signature({ { .name = "filename", .type = "String" } }, "void",
+                                   "兼容占位接口，目前不写文件。请使用 saveStruct。"))
             .method("loadStruct"_str, &stdlib::dictLoadStruct,
-                    api::signature({ { .name = "filename", .type = "String" } }))
+                    api::signature({ { .name = "filename", .type = "String" } }, "any",
+                                   "读取结构化文件；读取前清空当前字典。\n@param filename 输入文件路径。\n@returns "
+                                   "二进制形态读入并返回当前字典；文本形态返回解析值，不写回当前字典，结果类型由文件内"
+                                   "容决定。\n@throws 读取、解析或格式错误。"))
             .method("saveStruct"_str, &stdlib::dictSaveStruct,
                     api::signature({ { .name = "filename", .type = "String" },
                                      { .name = "mode", .type = "String", .optional = true, .defaultText = "\"\"" } },

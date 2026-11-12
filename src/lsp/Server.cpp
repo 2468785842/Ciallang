@@ -38,9 +38,9 @@ namespace cial::lsp {
         constexpr int CHECK_DEBOUNCE_MILLISECONDS = 150;
 
         const std::set<std::string> &excludedDirectories() {
-            static const std::set<std::string> excluded = {
-                ".git", ".idea", ".vscode", ".venv", ".cache", "build", "bin", "ext", "node_modules", "__pycache__"
-            };
+            static const std::set<std::string> excluded = { ".git",   ".idea",        ".vscode",    ".venv",
+                                                            ".cache", "build",        "bin",        "ext",
+                                                            "out",    "node_modules", "__pycache__" };
             return excluded;
         }
 
@@ -194,7 +194,7 @@ namespace cial::lsp {
         bool isNotificationMethod(const std::string &method) {
             return method == "initialized" || method == "textDocument/didOpen" || method == "textDocument/didChange" ||
                 method == "textDocument/didClose" || method == "workspace/didChangeWorkspaceFolders" ||
-                method == "exit" || method == "$/cancelRequest";
+                method == "workspace/didChangeWatchedFiles" || method == "exit" || method == "$/cancelRequest";
         }
     } // namespace
 
@@ -359,6 +359,19 @@ namespace cial::lsp {
             onDidChangeFolders(*params);
             return Json{};
         }
+        if(method == "workspace/didChangeWatchedFiles") {
+            onWatchedFiles(*params);
+            return Json{};
+        }
+        if(method == "ciallang/indexStatus") {
+            Json status = Json::object();
+            status.set("files", static_cast<int>(_diskIndex.size()));
+            status.set("scans", static_cast<int>(_indexScans));
+            status.set("reads", static_cast<int>(_fileReads));
+            status.set("lexicalBuilds", static_cast<int>(_lexicalBuilds));
+            status.set("declarationParses", static_cast<int>(_declarations.parseCount()));
+            return status;
+        }
         if(method == "textDocument/completion")
             return onCompletion(*params);
         if(method == "textDocument/hover")
@@ -429,6 +442,7 @@ namespace cial::lsp {
         capabilities.set("workspaceSymbolProvider", true);
         Json result = Json::object();
         result.set("capabilities", capabilities);
+        refreshWorkspaceIndex();
         return result;
     }
 
@@ -479,6 +493,8 @@ namespace cial::lsp {
         {
             std::lock_guard lock{ _mutex };
             _documents.erase(uri);
+            _documentIndex.erase(uri);
+            _workspaceDirty = true;
         }
         {
             std::lock_guard lock{ _checkMutex };
@@ -492,6 +508,7 @@ namespace cial::lsp {
         if(event == nullptr)
             return;
         std::lock_guard lock{ _mutex };
+        _workspaceDirty = true;
         if(const auto *added = event->find("added"); added != nullptr && added->isArray())
             for(const auto &folder : added->asArray()) {
                 const auto path = uriToPath(folder.stringAt("uri"));
@@ -599,10 +616,117 @@ namespace cial::lsp {
         return array;
     }
 
-    std::unique_ptr<DocumentIndex> Server::documentIndex(const std::string &text) const {
-        return std::make_unique<DocumentIndex>(
-            text, [this](const std::string &name) { return _declarations.valueType(name); },
-            [this](const std::string &path) { return _declarations.callType(path); });
+    DocumentIndex *Server::documentIndex(const std::string &uri, const std::string &text) {
+        auto found = _documentIndex.find(uri);
+        if(found == _documentIndex.end() || found->second.text != text) {
+            if(found == _documentIndex.end() && _documentIndex.size() >= 64)
+                _documentIndex.erase(_documentIndex.begin());
+            IndexedDocument source;
+            source.text = text;
+            source.lexical = std::make_unique<DocumentIndex>(
+                text, [this](const std::string &name) { return _declarations.valueType(name); },
+                [this](const std::string &name) { return _declarations.callType(name); });
+            source.symbols = documentDeclarations(LineIndex{ text });
+            ++_lexicalBuilds;
+            found = _documentIndex.insert_or_assign(uri, std::move(source)).first;
+        }
+        found->second.lexical->resetQueryBudget();
+        return found->second.lexical.get();
+    }
+
+    const std::vector<DocumentDeclaration> &Server::indexedDeclarations(const std::string &uri,
+                                                                        const std::string &text) {
+        documentIndex(uri, text);
+        return _documentIndex.at(uri).symbols;
+    }
+
+    const Server::IndexedFile *Server::readIndexedFile(const std::filesystem::path &path,
+                                                       std::map<std::filesystem::path, IndexedFile> &cache) {
+        std::error_code ec;
+        const auto modified = std::filesystem::last_write_time(path, ec);
+        if(ec) {
+            cache.erase(path);
+            return nullptr;
+        }
+        const auto size = std::filesystem::file_size(path, ec);
+        if(ec || size > MAX_DOCUMENT_BYTES) {
+            cache.erase(path);
+            return nullptr;
+        }
+        auto found = cache.find(path);
+        if(found != cache.end() && found->second.modified == modified && found->second.size == size)
+            return &found->second;
+        std::ifstream input{ path, std::ios::binary };
+        if(!input) {
+            cache.erase(path);
+            return nullptr;
+        }
+        IndexedFile source;
+        source.modified = modified;
+        source.size = size;
+        source.uri = pathToUri(path);
+        source.text.assign(std::istreambuf_iterator<char>{ input }, std::istreambuf_iterator<char>{});
+        ++_fileReads;
+        if(source.text.size() > MAX_DOCUMENT_BYTES) {
+            cache.erase(path);
+            return nullptr;
+        }
+        if(source.text.starts_with("\xEF\xBB\xBF"))
+            source.text.erase(0, 3);
+        source.symbols = documentDeclarations(LineIndex{ source.text });
+        return &cache.insert_or_assign(path, std::move(source)).first->second;
+    }
+
+    void Server::refreshWorkspaceIndex() {
+        const auto now = std::chrono::steady_clock::now();
+        if(!_workspaceDirty && now < _nextIndexScan)
+            return;
+        _workspaceDirty = false;
+        _nextIndexScan = now + std::chrono::seconds(2);
+        ++_indexScans;
+        std::set<std::filesystem::path> live;
+        size_t bytes = 0, directories = 0;
+        for(const auto &root : _roots) {
+            std::error_code ec;
+            for(std::filesystem::recursive_directory_iterator
+                    it{ root, std::filesystem::directory_options::skip_permission_denied, ec },
+                end;
+                !ec && it != end && live.size() < MAX_WORKSPACE_FILES && directories < MAX_WORKSPACE_DIRECTORIES;
+                it.increment(ec)) {
+                if(it->is_directory(ec)) {
+                    ++directories;
+                    if(excludedDirectories().contains(utf8Path(it->path().filename())))
+                        it.disable_recursion_pending();
+                    continue;
+                }
+                auto extension = utf8Path(it->path().extension());
+                std::ranges::transform(extension, extension.begin(),
+                                       [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                if(extension != ".tjs" || !it->is_regular_file(ec))
+                    continue;
+                const auto path = std::filesystem::weakly_canonical(it->path(), ec);
+                if(ec || live.contains(path))
+                    continue;
+                const auto size = it->file_size(ec);
+                if(ec || size > MAX_DOCUMENT_BYTES || bytes + size > MAX_WORKSPACE_BYTES)
+                    continue;
+                if(readIndexedFile(path, _diskIndex) != nullptr) {
+                    live.insert(path);
+                    bytes += size;
+                }
+            }
+        }
+        std::erase_if(_diskIndex, [&](const auto &entry) { return !live.contains(entry.first); });
+    }
+
+    void Server::onWatchedFiles(const Json &params) {
+        if(const auto *changes = params.find("changes"); changes != nullptr && changes->isArray())
+            for(const auto &change : changes->asArray()) {
+                const auto path = uriToPath(change.stringAt("uri"));
+                _diskIndex.erase(path);
+                _explicitIndex.erase(path);
+            }
+        _workspaceDirty = true;
     }
 
     std::vector<Server::WorkspaceMember> Server::workspaceClassMembers(const std::string &typeName) const {
@@ -658,68 +782,41 @@ namespace cial::lsp {
         _declarations.mergeProjectSources(projectDeclarationSources());
     }
 
-    std::vector<std::pair<std::string, std::string>> Server::projectDeclarationSources() const {
-        // 调用方须已持有 _mutex（主循环线程）；按 64 文件 / 2 MB / 共享 20 MB 预算读取。
+    std::vector<std::pair<std::string, std::string>> Server::projectDeclarationSources() {
         constexpr size_t MAX_DECLARATION_FILES = 64;
-        std::vector<std::pair<std::string, std::string>> sources; // (uri, text)
+        refreshWorkspaceIndex();
+        std::vector<std::pair<std::string, std::string>> sources;
         std::set<std::filesystem::path> seen;
+        size_t bytes = 0;
         for(const auto &[uri, doc] : _documents)
-            if(isDeclarationUri(uri)) {
+            if(isDeclarationUri(uri) && doc.text.size() <= MAX_DOCUMENT_BYTES &&
+               sources.size() < MAX_DECLARATION_FILES && bytes + doc.text.size() <= MAX_WORKSPACE_BYTES) {
                 sources.emplace_back(uri, doc.text);
-                if(const auto path = uriToPath(uri); !path.empty())
-                    seen.insert(path);
+                seen.insert(uriToPath(uri));
+                bytes += doc.text.size();
             }
-        size_t remaining = MAX_WORKSPACE_BYTES;
-        for(const auto &file : _declarationFiles) {
-            if(sources.size() >= MAX_DECLARATION_FILES || remaining <= MAX_DOCUMENT_BYTES)
+        for(const auto &uri : _declarationFiles) {
+            if(sources.size() >= MAX_DECLARATION_FILES)
                 break;
-            const auto path = uriToPath(file);
+            const auto path = uriToPath(uri);
             if(path.empty() || seen.contains(path))
                 continue;
-            std::error_code ec;
-            if(!std::filesystem::is_regular_file(path, ec) ||
-               std::filesystem::file_size(path, ec) > std::min(remaining, MAX_DOCUMENT_BYTES))
-                continue;
-            std::ifstream input{ path, std::ios::binary };
-            if(!input)
-                continue;
-            std::string text{ std::istreambuf_iterator<char>{ input }, std::istreambuf_iterator<char>{} };
-            if(text.starts_with("\xEF\xBB\xBF"))
-                text.erase(0, 3);
-            sources.emplace_back(file, text);
-            seen.insert(path);
-            remaining -= text.size();
-        }
-        for(const auto &root : _roots) {
-            if(sources.size() >= MAX_DECLARATION_FILES || remaining <= MAX_DOCUMENT_BYTES)
-                break;
-            std::error_code ec;
-            for(std::filesystem::recursive_directory_iterator
-                    it{ root, std::filesystem::directory_options::skip_permission_denied, ec },
-                end;
-                !ec && it != end && sources.size() < MAX_DECLARATION_FILES; it.increment(ec)) {
-                if(it->is_directory(ec))
-                    continue;
-                const auto name = utf8Path(it->path().filename());
-                std::string lower = name;
-                std::ranges::transform(lower, lower.begin(),
-                                       [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-                if(lower.size() >= 6 && lower.substr(lower.size() - 6) == ".d.tjs" && !seen.contains(it->path())) {
-                    std::ifstream input{ it->path(), std::ios::binary };
-                    if(!input)
-                        continue;
-                    std::string text{ std::istreambuf_iterator<char>{ input }, std::istreambuf_iterator<char>{} };
-                    if(text.size() > std::min(remaining, MAX_DOCUMENT_BYTES))
-                        continue;
-                    if(text.starts_with("\xEF\xBB\xBF"))
-                        text.erase(0, 3);
-                    sources.emplace_back(pathToUri(it->path()), text);
-                    seen.insert(it->path());
-                    remaining -= text.size();
-                }
+            if(const auto *source = readIndexedFile(path, _explicitIndex);
+               source != nullptr && bytes + source->text.size() <= MAX_WORKSPACE_BYTES) {
+                sources.emplace_back(uri, source->text);
+                seen.insert(path);
+                bytes += source->text.size();
             }
-            if(ec)
+        }
+        for(const auto &[path, source] : _diskIndex) {
+            if(sources.size() >= MAX_DECLARATION_FILES)
                 break;
+            if(!isDeclarationUri(utf8Path(path)) || seen.contains(path) ||
+               bytes + source.text.size() > MAX_WORKSPACE_BYTES)
+                continue;
+            sources.emplace_back(source.uri, source.text);
+            seen.insert(path);
+            bytes += source.text.size();
         }
         return sources;
     }
@@ -736,7 +833,7 @@ namespace cial::lsp {
         refreshDeclarations();
         const Position at{ position->intAt("line"), position->intAt("character") };
         LineIndex lines{ doc.text };
-        auto index = documentIndex(doc.text);
+        auto *index = documentIndex(uri, doc.text);
         Json items = Json::array();
         std::set<std::string> seen;
         // 成员补全：receiver. 形态走声明推导；无接收者回落关键字 + 文档声明 + API 顶层
@@ -791,7 +888,7 @@ namespace cial::lsp {
             item.set("detail", docText);
             items.push(item);
         }
-        for(const auto &declaration : documentDeclarations(lines)) {
+        for(const auto &declaration : indexedDeclarations(uri, doc.text)) {
             if(!prefix.empty() && !declaration.name.starts_with(prefix))
                 continue;
             if(seen.contains(declaration.name))
@@ -834,7 +931,7 @@ namespace cial::lsp {
         refreshDeclarations();
         const Position at{ position->intAt("line"), position->intAt("character") };
         LineIndex lines{ doc.text };
-        auto index = documentIndex(doc.text);
+        auto *index = documentIndex(uri, doc.text);
         const std::string word = wordAt(doc.text, at);
         if(word.empty())
             return Json{};
@@ -903,10 +1000,24 @@ namespace cial::lsp {
         const std::string uri = textDocument->stringAt("uri");
         const Document doc = document(uri);
         const Position at{ position->intAt("line"), position->intAt("character") };
+        refreshDeclarations();
         if(isDeclarationUri(uri)) {
             // 声明文件内：跳转到该文件中同名符号的名称位置
             std::string word = wordAt(doc.text, at);
             if(word.empty())
+                return Json{};
+            const size_t offset = LineIndex{ doc.text }.offsetAt(at);
+            size_t begin = offset, end = offset;
+            while(begin > 0 &&
+                  (isIdentifierByte(static_cast<unsigned char>(doc.text[begin - 1])) || doc.text[begin - 1] == '.'))
+                --begin;
+            while(end < doc.text.size() && isIdentifierByte(static_cast<unsigned char>(doc.text[end])))
+                ++end;
+            const auto qualifiedName = doc.text.substr(begin, end - begin);
+            if(const auto *entry = _declarations.unique(qualifiedName); entry != nullptr &&
+               (entry->symbol.kind == decl::SymbolKind::Class || entry->symbol.kind == decl::SymbolKind::Namespace))
+                return DeclarationIndex::location(*entry);
+            if(qualifiedName.find('.') != std::string::npos)
                 return Json{};
             Json array = Json::array();
             for(const auto &[qualified, entries] : _declarations.entries())
@@ -918,7 +1029,7 @@ namespace cial::lsp {
         if(doc.text.empty())
             return Json{};
         refreshDeclarations();
-        auto index = documentIndex(doc.text);
+        auto *index = documentIndex(uri, doc.text);
         // 成员位置：`receiver.member` 走声明推导定位（与悬停一致）
         if(const auto member = index->memberContext(at); member.has_value()) {
             const std::string type = index->inferReceiverType(member->first);
@@ -967,6 +1078,9 @@ namespace cial::lsp {
             return location; // 本文件绑定优先于 API 声明
         }
         if(!resolved.freeName.empty()) {
+            if(const auto *entry = _declarations.unique(resolved.freeName); entry != nullptr &&
+               (entry->symbol.kind == decl::SymbolKind::Class || entry->symbol.kind == decl::SymbolKind::Namespace))
+                return DeclarationIndex::location(*entry);
             for(const auto &[qualified, entries] : _declarations.entries())
                 if(qualified == resolved.freeName)
                     for(const auto &entry : entries)
@@ -1010,10 +1124,10 @@ namespace cial::lsp {
         const Json *textDocument = params.find("textDocument");
         if(textDocument == nullptr)
             return Json::array();
-        const Document doc = document(textDocument->stringAt("uri"));
-        LineIndex lines{ doc.text };
+        const std::string uri = textDocument->stringAt("uri");
+        const Document doc = document(uri);
         Json array = Json::array();
-        for(const auto &declaration : documentDeclarations(lines)) {
+        for(const auto &declaration : indexedDeclarations(uri, doc.text)) {
             Json symbol = Json::object();
             symbol.set("name", declaration.name);
             symbol.set("kind",
@@ -1039,71 +1153,24 @@ namespace cial::lsp {
         return array;
     }
 
-    std::vector<Server::WorkspaceSymbol> Server::workspaceSources() const {
+    std::vector<Server::WorkspaceSymbol> Server::workspaceSources() {
+        refreshWorkspaceIndex();
         std::vector<WorkspaceSymbol> results;
-        std::vector<std::pair<std::string, std::string>> buffers; // (uri, text)
-        {
-            std::lock_guard lock{ _mutex };
-            for(const auto &[uri, doc] : _documents) {
-                const auto path = uriToPath(uri);
-                if(!path.empty() && path.extension() == ".tjs")
-                    buffers.emplace_back(uri, doc.text);
-            }
-        }
-        std::set<std::filesystem::path> overlayPaths;
-        for(const auto &[uri, text] : buffers) {
-            if(text.size() > MAX_DOCUMENT_BYTES)
+        std::set<std::filesystem::path> overlays;
+        for(const auto &[uri, document] : _documents) {
+            if(isDeclarationUri(uri) || document.text.size() > MAX_DOCUMENT_BYTES)
                 continue;
-            const auto path = uriToPath(uri);
-            if(!path.empty())
-                overlayPaths.insert(path);
-            LineIndex lines{ text };
-            for(const auto &declaration : documentDeclarations(lines))
-                results.push_back({ declaration.name, declaration.keyword, uri, declaration.range });
+            overlays.insert(uriToPath(uri));
+            for(const auto &symbol : indexedDeclarations(uri, document.text))
+                if(symbol.topLevel)
+                    results.push_back({ symbol.name, symbol.keyword, uri, symbol.range });
         }
-        size_t totalBytes = 0;
-        size_t fileCount = 0;
-        size_t directoryCount = 0;
-        for(const auto &root : _roots) {
-            if(fileCount >= MAX_WORKSPACE_FILES || directoryCount >= MAX_WORKSPACE_DIRECTORIES)
-                break;
-            std::error_code ec;
-            for(std::filesystem::recursive_directory_iterator
-                    it{ root,
-                        std::filesystem::directory_options::skip_permission_denied |
-                            std::filesystem::directory_options::follow_directory_symlink,
-                        ec },
-                end;
-                !ec && it != end && fileCount < MAX_WORKSPACE_FILES; it.increment(ec)) {
-                if(it->is_directory(ec)) {
-                    ++directoryCount;
-                    if(directoryCount > MAX_WORKSPACE_DIRECTORIES)
-                        break;
-                    if(excludedDirectories().contains(utf8Path(it->path().filename())))
-                        it.disable_recursion_pending();
-                    continue;
-                }
-                if(it->path().extension() != ".tjs" || overlayPaths.contains(it->path()))
-                    continue;
-                std::error_code sizeError;
-                const auto size = it->file_size(sizeError);
-                if(sizeError || size > MAX_DOCUMENT_BYTES || totalBytes + size > MAX_WORKSPACE_BYTES)
-                    continue;
-                std::ifstream input{ it->path(), std::ios::binary };
-                if(!input)
-                    continue;
-                std::string text{ std::istreambuf_iterator<char>{ input }, std::istreambuf_iterator<char>{} };
-                if(text.starts_with("\xEF\xBB\xBF"))
-                    text.erase(0, 3);
-                ++fileCount;
-                totalBytes += text.size();
-                LineIndex lines{ text };
-                for(const auto &declaration : documentDeclarations(lines))
-                    results.push_back(
-                        { declaration.name, declaration.keyword, pathToUri(it->path()), declaration.range });
-            }
-            if(ec)
-                break;
+        for(const auto &[path, source] : _diskIndex) {
+            if(overlays.contains(path) || isDeclarationUri(utf8Path(path)))
+                continue;
+            for(const auto &symbol : source.symbols)
+                if(symbol.topLevel)
+                    results.push_back({ symbol.name, symbol.keyword, source.uri, symbol.range });
         }
         std::ranges::sort(results, [](const WorkspaceSymbol &a, const WorkspaceSymbol &b) {
             if(a.name != b.name)
@@ -1114,8 +1181,6 @@ namespace cial::lsp {
                 return a.range.start.line < b.range.start.line;
             return a.range.start.character < b.range.start.character;
         });
-        if(results.size() > MAX_WORKSPACE_SYMBOLS)
-            results.resize(MAX_WORKSPACE_SYMBOLS);
         return results;
     }
 
@@ -1125,7 +1190,10 @@ namespace cial::lsp {
         std::ranges::transform(lowerQuery, lowerQuery.begin(),
                                [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
         Json array = Json::array();
+        size_t returned = 0;
         for(const auto &symbol : workspaceSources()) {
+            if(returned >= MAX_WORKSPACE_SYMBOLS)
+                break;
             std::string lowerName = symbol.name;
             std::ranges::transform(lowerName, lowerName.begin(),
                                    [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
@@ -1154,6 +1222,7 @@ namespace cial::lsp {
             location.set("range", range);
             item.set("location", location);
             array.push(item);
+            ++returned;
         }
         return array;
     }

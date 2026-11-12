@@ -1,7 +1,7 @@
 // F5 前的准备检查：定位 cial-lsp 语言服务器并打印路径。
 // npm 安装时不下载 SDK；扩展激活时按需下载。
 const path = require('node:path');
-const { findServer } = require('./launch-options');
+const { findServer, debugLaunchOptions } = require('./launch-options');
 
 const repoRoot = path.resolve(__dirname, '../..');
 const manifest = require('./package.json');
@@ -9,7 +9,10 @@ const runtimeVersion = require(path.join(repoRoot, 'vcpkg.json'))['version-strin
 if (manifest.contributes.configuration.properties['ciallang.sdk.version'].default !== runtimeVersion) {
   throw new Error('ciallang.sdk.version 默认值必须与 vcpkg.json 的发布版本一致');
 }
-const server = findServer([repoRoot]);
+const debug = process.argv.includes('--debug');
+const options = debug ? debugLaunchOptions(repoRoot, repoRoot) : undefined;
+const server = options?.command || findServer([repoRoot]);
+if (options) console.log(`declarations: ${options.args[1]}`);
 if (/[\\/]cial-lsp(\.exe)?$/.test(server)) {
   console.log(`cial-lsp: ${server}`);
 } else {

@@ -22,16 +22,22 @@ namespace cial::stdlib {
             .doc("动态数组；支持字面量 []、下标访问、push/pop/sort 等。")
             .method("push"_str, &stdlib::arrayPush,
                     api::signature({ { .name = "values", .type = "any", .collapse = true } }, "Integer",
-                                   "末尾追加元素，返回新长度。"))
+                                   "末尾追加元素，返回新长度。\n@param values "
+                                   "要追加的零个或多个脚本值；允许混合类型，按顺序存入。\n@returns "
+                                   "修改后的元素个数。\n@example var items = []; items.push(1, \"hello\");"))
             .method("pop"_str, &stdlib::arrayPop, api::signature({}, "any", "移除并返回末元素；空数组返回 void。"))
             .method("unshift"_str, &stdlib::arrayUnshift,
                     api::signature({ { .name = "values", .type = "any", .collapse = true } }, "Integer",
-                                   "头部插入元素，返回新长度。"))
+                                   "头部插入元素，返回新长度。\n@param values "
+                                   "插入的任意脚本值；按实参顺序依次插到头部。\n@returns 修改后的元素个数。"))
             .method("shift"_str, &stdlib::arrayShift, api::signature({}, "any", "移除并返回首元素；空数组返回 void。"))
-            .method("insert"_str, &stdlib::arrayInsert,
-                    api::signature({ { .name = "index", .type = "Integer" },
-                                     { .name = "values", .type = "any", .collapse = true } },
-                                   "Integer", "在指定位置插入元素，返回新长度。"))
+            .method(
+                "insert"_str, &stdlib::arrayInsert,
+                api::signature(
+                    { { .name = "index", .type = "Integer" }, { .name = "values", .type = "any", .collapse = true } },
+                    "Integer",
+                    "在指定位置插入元素，返回新长度。\n@param index 插入位置；负数或超出长度时追加到末尾。\n@param "
+                    "values 插入的脚本值；元素可以混合类型。\n@returns 修改后的元素个数。"))
             .method(
                 "remove"_str, &stdlib::arrayRemove,
                 api::signature({ { .name = "index", .type = "Integer" } }, "any", "移除并返回指定元素；越界抛出异常。"))
@@ -42,16 +48,23 @@ namespace cial::stdlib {
                                    "String", "用分隔符连接数组元素。"))
             .method("split"_str, &stdlib::arraySplitWith,
                     api::signature(
-                        { { .name = "pattern", .type = "any" },
+                        { { .name = "pattern", .type = "String | RegExp" },
                           { .name = "text", .type = "String" },
-                          { .name = "reserved", .type = "any", .optional = true, .defaultText = "void" },
+                          { .name = "reserved", .type = "void", .optional = true, .defaultText = "void" },
                           { .name = "purgeempty", .type = "Boolean", .optional = true, .defaultText = "false" } },
-                        "Array", "拆分文本并替换自身元素。"))
-            .method(
-                "sort"_str, &stdlib::arraySort,
-                api::signature({ { .name = "order", .type = "any", .optional = true, .defaultText = "'+'" },
-                                 { .name = "stable", .type = "Boolean", .optional = true, .defaultText = "false" } },
-                               "void", "原地排序；order 可以是排序模式或比较函数。"))
+                        "Array",
+                        "拆分文本并替换自身元素。\n@param pattern RegExp 按正则拆分，String "
+                        "按分隔字符集合拆分。\n@param text 待拆分文本。\n@param reserved 保留位置，传 void。\n@param "
+                        "purgeempty true 时删除空片段。\n@returns 当前数组；所有片段均为 String。"))
+            .method("sort"_str, &stdlib::arraySort,
+                    api::signature(
+                        { { .name = "order", .type = "String | Function", .optional = true, .defaultText = "'+'" },
+                          { .name = "stable", .type = "Boolean", .optional = true, .defaultText = "false" } },
+                        "void",
+                        "原地排序。\n@param order 排序模式：+/- 常规升降序，0/9 数值升降序，a/z "
+                        "字符串升降序；或比较函数(left, right)，返回真值表示 left 在前。\n@param stable "
+                        "是否保持相等元素原有顺序，默认 false。\n@returns void；修改当前数组。\n@throws "
+                        "比较函数抛出的脚本异常原样传播。"))
             .property("count"_str, arrayCount,
                       ApiMeta{ .ret = "Integer",
                                .doc = "元素个数；可写入以调整数组长度。",

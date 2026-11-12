@@ -6,9 +6,48 @@
 
 #include <algorithm>
 #include <fstream>
+#include <sstream>
 
 namespace cial::lsp {
     namespace {
+        std::string markdownDoc(const std::string &doc) {
+            std::istringstream input{ doc };
+            std::string out, line;
+            bool example = false, parameters = false;
+            for(; std::getline(input, line);) {
+                if(line.starts_with('@') && example) {
+                    out += "```\n";
+                    example = false;
+                }
+                if(line.starts_with("@param ")) {
+                    if(!parameters) {
+                        out += "\n\n**参数**\n\n";
+                        parameters = true;
+                    }
+                    const auto stop = line.find(' ', 7);
+                    out += "- `" + line.substr(7, stop == std::string::npos ? stop : stop - 7) + "`：";
+                    if(stop != std::string::npos)
+                        out += line.substr(stop + 1);
+                    out += '\n';
+                } else if(line.starts_with("@returns "))
+                    out += "\n\n**返回**：" + line.substr(9) + '\n';
+                else if(line.starts_with("@return "))
+                    out += "\n\n**返回**：" + line.substr(8) + '\n';
+                else if(line.starts_with("@throws "))
+                    out += "\n\n**异常**：" + line.substr(8) + '\n';
+                else if(line.starts_with("@example")) {
+                    out += "\n\n**示例**\n\n```tjs\n";
+                    example = true;
+                    if(line.size() > 9)
+                        out += line.substr(9) + '\n';
+                } else
+                    out += line + '\n';
+            }
+            if(example)
+                out += "```\n";
+            return out;
+        }
+
         std::string signatureParams(const decl::Symbol &symbol) {
             std::string out;
             for(size_t index = 0; index < symbol.params.size(); ++index) {
@@ -43,6 +82,7 @@ namespace cial::lsp {
     }
 
     void DeclarationIndex::parseFile(const std::string &uri, const std::string &text, std::vector<Entry> &out) {
+        ++_parseCount;
         if(text.size() > 2000000)
             return; // 单文件上限 2 MB，超限保守放弃
         try {
@@ -81,6 +121,7 @@ namespace cial::lsp {
     }
 
     void DeclarationIndex::loadSystemFiles(const std::vector<std::filesystem::path> &files) {
+        _merged = false;
         _system.clear();
         for(const auto &path : files) {
             std::error_code ec;
@@ -113,6 +154,7 @@ namespace cial::lsp {
     }
 
     void DeclarationIndex::removeFile(const std::string &uri) {
+        _merged = false;
         for(auto it = _entries.begin(); it != _entries.end();) {
             std::erase_if(it->second, [&](const Entry &entry) { return entry.uri == uri; });
             if(it->second.empty())
@@ -123,6 +165,7 @@ namespace cial::lsp {
     }
 
     void DeclarationIndex::merge(const std::vector<Entry> &projectEntries) {
+        _merged = false;
         // 项目声明覆盖同名系统声明（按顶层限定名首段），与 Python 版 update() 一致。
         std::set<std::string> projectRoots;
         for(const auto &entry : projectEntries) {
@@ -142,16 +185,31 @@ namespace cial::lsp {
     }
 
     void DeclarationIndex::reset() {
+        _merged = false;
         _entries.clear();
         for(const auto &entry : _system)
             _entries[entry.qualified].push_back(entry);
     }
 
     void DeclarationIndex::mergeProjectSources(const std::vector<std::pair<std::string, std::string>> &sources) {
+        if(_merged && sources == _lastSources)
+            return;
         std::vector<Entry> entries;
-        for(const auto &[uri, text] : sources)
-            parseFile(uri, text, entries);
+        std::set<std::string> live;
+        for(const auto &[uri, text] : sources) {
+            live.insert(uri);
+            auto found = _projectCache.find(uri);
+            if(found == _projectCache.end() || found->second.text != text) {
+                CachedSource source{ text, {} };
+                parseFile(uri, text, source.entries);
+                found = _projectCache.insert_or_assign(uri, std::move(source)).first;
+            }
+            entries.insert(entries.end(), found->second.entries.begin(), found->second.entries.end());
+        }
+        std::erase_if(_projectCache, [&](const auto &entry) { return !live.contains(entry.first); });
         merge(entries);
+        _lastSources = sources;
+        _merged = true;
     }
 
     const DeclarationIndex::Entry *DeclarationIndex::unique(const std::string &qualified) const {
@@ -189,6 +247,10 @@ namespace cial::lsp {
 
     std::string DeclarationIndex::returnType(const Entry &entry) const {
         std::string result = entry.symbol.ret;
+        if(result.find('|') != std::string::npos)
+            return {}; // 联合类型不能猜测唯一接收者。
+        if(result.ends_with("[]"))
+            return "Array";
         if(result.empty() || result == "any" || result == "void")
             return {};
         std::string owner = entry.owner;
@@ -210,6 +272,9 @@ namespace cial::lsp {
         if(entry == nullptr || entry->symbol.kind == decl::SymbolKind::Function ||
            entry->symbol.kind == decl::SymbolKind::StaticFunction)
             return {};
+        // 类/命名空间本身没有返回类型，但限定成员引用仍由其声明定义。
+        if(entry->symbol.kind == decl::SymbolKind::Class || entry->symbol.kind == decl::SymbolKind::Namespace)
+            return entry->qualified;
         return returnType(*entry);
     }
 
@@ -284,8 +349,8 @@ namespace cial::lsp {
         item.set("detail", signature(symbol));
         if(!symbol.doc.empty()) {
             Json documentation = Json::object();
-            documentation.set("kind", "plaintext");
-            documentation.set("value", symbol.doc);
+            documentation.set("kind", "markdown");
+            documentation.set("value", markdownDoc(symbol.doc));
             item.set("documentation", documentation);
         }
         item.set("sortText", symbol.name);
@@ -293,13 +358,13 @@ namespace cial::lsp {
     }
 
     Json DeclarationIndex::hover(const Entry &entry) {
-        std::string value = signature(entry.symbol);
+        std::string value = "```tjs\n" + signature(entry.symbol) + "\n```";
         if(!entry.symbol.doc.empty()) {
             value += "\n\n";
-            value += entry.symbol.doc;
+            value += markdownDoc(entry.symbol.doc);
         }
         Json contents = Json::object();
-        contents.set("kind", "plaintext");
+        contents.set("kind", "markdown");
         contents.set("value", value);
         Json result = Json::object();
         result.set("contents", contents);

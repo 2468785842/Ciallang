@@ -124,34 +124,56 @@ namespace cial::syntax {
                 return false;
             Token colon{};
             consume(r, colon);
-            Token type{};
-            if(!consume(r, type) ||
-               (type.type() != TokenType::Identifier && type.type() != TokenType::Void &&
-                type.type() != TokenType::Int && type.type() != TokenType::Real && type.type() != TokenType::String &&
-                type.type() != TokenType::Octet)) {
-                error(r, "declaration type expects symbol or void/int/real/string/octet",
-                      type.span.valid() ? type : colon, "decl.invalid-type");
-                return true;
-            }
-            switch(type.type()) {
-                case TokenType::Void:
-                    out = "void";
+            out.clear();
+            for(;;) {
+                Token type{};
+                if(!consume(r, type) ||
+                   (type.type() != TokenType::Identifier && type.type() != TokenType::Void &&
+                    type.type() != TokenType::Int && type.type() != TokenType::Real &&
+                    type.type() != TokenType::String && type.type() != TokenType::Octet)) {
+                    error(r, "expected a declaration type", type.span.valid() ? type : colon, "decl.invalid-type");
+                    return true;
+                }
+                switch(type.type()) {
+                    case TokenType::Void:
+                        out += "void";
+                        break;
+                    case TokenType::Int:
+                        out += "Integer";
+                        break;
+                    case TokenType::Real:
+                        out += "Real";
+                        break;
+                    case TokenType::String:
+                        out += "String";
+                        break;
+                    case TokenType::Octet:
+                        out += "Octet";
+                        break;
+                    default:
+                        out += type.getString().toStdStr();
+                        break;
+                }
+                while(peek(r, TokenType::Dot)) {
+                    consume(r);
+                    Token name{};
+                    if(!expectIdentifier(name, type, "qualified type"))
+                        return true;
+                    out += '.' + name.getString().toStdStr();
+                }
+                while(peek(r, TokenType::LBracket)) {
+                    consume(r);
+                    if(!peek(r, TokenType::RBracket)) {
+                        error(r, "array type expects ']'", type, "decl.invalid-type");
+                        return true;
+                    }
+                    consume(r);
+                    out += "[]";
+                }
+                if(!peek(r, TokenType::VertLine))
                     break;
-                case TokenType::Int:
-                    out = "Integer";
-                    break;
-                case TokenType::Real:
-                    out = "Real";
-                    break;
-                case TokenType::String:
-                    out = "String";
-                    break;
-                case TokenType::Octet:
-                    out = "Octet";
-                    break;
-                default:
-                    out = type.getString().toStdStr();
-                    break;
+                consume(r);
+                out += " | ";
             }
             return true;
         };

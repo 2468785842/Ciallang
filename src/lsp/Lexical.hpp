@@ -57,6 +57,7 @@ namespace cial::lsp {
         size_t nameStart{};
         size_t nameEnd{};
         Range range; // 名称范围的 LSP 行列
+        bool topLevel{ true };
     };
 
     // 文档符号与普通补全用的词法声明列表（掩码后正则扫描）。
@@ -72,6 +73,7 @@ namespace cial::lsp {
                       std::function<std::string(const std::string &)> externalReturn = {});
 
         [[nodiscard]] bool valid() const noexcept { return _valid; }
+        void resetQueryBudget();
 
         struct Binding {
             size_t token{}; // 声明名 token 下标

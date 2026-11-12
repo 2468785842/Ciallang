@@ -31,13 +31,15 @@ namespace cial::cli {
                                          .name = "print",
                                          .paramTypes = { "any" },
                                          .ret = "void",
-                                         .doc = "输出值的字符串化结果（不换行）" });
+                                         .doc = "输出值的字符串化结果（不换行）",
+                                         .params = std::vector<ApiParam>{ { .name = "value", .type = "any" } } });
         context.registryGlobalFunc("println"_str, &stdlib::S_PrintlnFunction);
         context.recordApiGlobal(ApiMeta{ .kind = ApiKind::Global,
                                          .name = "println",
                                          .paramTypes = { "any" },
                                          .ret = "void",
-                                         .doc = "输出值的字符串化结果并换行" });
+                                         .doc = "输出值的字符串化结果并换行",
+                                         .params = std::vector<ApiParam>{ { .name = "value", .type = "any" } } });
         vm.eval(R"(class __DebugShim {
     function message(s) { println(s); }
 }

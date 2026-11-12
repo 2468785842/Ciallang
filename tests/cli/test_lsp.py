@@ -194,6 +194,8 @@ class LspProtocolTest(unittest.TestCase):
         # 跨文件唯一顶层声明
         other = self.root / "other.tjs"
         other.write_text("function uniqueHelper() {}\n", encoding="utf-8", newline="\n")
+        self.client.send({'jsonrpc': '2.0', 'method': 'workspace/didChangeWatchedFiles',
+                          'params': {'changes': [{'uri': uri_of(other), 'type': 1}]}})
         self.client.change(main_uri, "uniqueHelper;", version=2)
         self.client.diagnostics()
         location = self.client.request(9, "textDocument/definition",
@@ -221,6 +223,126 @@ class LspProtocolTest(unittest.TestCase):
         matches = self.client.request(12, "workspace/symbol", {"query": "widget"})
         self.assertTrue(any(symbol["name"] == "Widget" and symbol["location"]["uri"] == uri
                             for symbol in matches))
+
+    def test_qualified_class_and_namespace_members_jump_to_declarations(self):
+        uri = self.open_document("qualified.tjs", "Array.push;\nMath.abs;")
+        for identifier, line, character, filename, signature in [
+                (40, 0, 7, "Array.d.tjs", "push(values: any*): Integer"),
+                (41, 1, 7, "Math.d.tjs", "abs(")]:
+            with self.subTest(filename=filename):
+                params = {"textDocument": {"uri": uri}, "position": {"line": line, "character": character}}
+                location = self.client.request(identifier, "textDocument/definition", params)
+                self.assertIsNotNone(location)
+                self.assertTrue(location["uri"].endswith('/' + filename), location)
+                hover = self.client.request(identifier + 10, "textDocument/hover", params)
+                self.assertIn(signature, hover["contents"]["value"])
+        # 同名局部变量仍按绑定推导，不能直接套用系统类/命名空间。
+        self.client.change(uri, "var Array = unknown();\nArray.push;", version=2)
+        self.client.diagnostics()
+        location = self.client.request(60, "textDocument/definition", {
+            "textDocument": {"uri": uri}, "position": {"line": 1, "character": 7}})
+        self.assertIsNone(location)
+
+    def test_generated_sdk_declarations_do_not_shadow_system_or_project_declarations(self):
+        for directory in ('build/Debug/declarations', 'build/Release/declarations', 'out/sdk/types',
+                          'node_modules/sdk', 'ext/sdk', 'bin/cache', '.git/cache'):
+            target = self.root / directory / 'Array.d.tjs'
+            target.parent.mkdir(parents=True)
+            target.write_text('class Array { function push(value: any): Integer; }', encoding='utf-8')
+        uri = self.open_document('arrays.tjs', 'var values = [];\nvalues.push(1);')
+        params = {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 8}}
+        location = self.client.request(70, 'textDocument/definition', params)
+        self.assertIsNotNone(location)
+        self.assertTrue(location['uri'].endswith('/Array.d.tjs'))
+        self.assertNotIn(uri_of(self.root) + '/', location['uri'])
+        # 实际项目声明仍可覆盖系统声明，过滤只针对自动扫描的产物目录。
+        declaration = self.root / 'types/host.d.tjs'
+        declaration.parent.mkdir()
+        declaration.write_text('class Array { function push(value: any): Integer; }', encoding='utf-8')
+        self.client.send({'jsonrpc': '2.0', 'method': 'workspace/didChangeWatchedFiles',
+                          'params': {'changes': [{'uri': uri_of(declaration), 'type': 1}]}})
+        location = self.client.request(71, 'textDocument/definition', params)
+        self.assertEqual(location['uri'], uri_of(declaration))
+
+    def test_index_reuses_unchanged_files_and_invalidates_one_declaration(self):
+        declaration = self.root / 'types/Widget.D.TJS'
+        declaration.parent.mkdir()
+        declaration.write_text('class Widget { function open(): String; }', encoding='utf-8')
+        self.client.send({'jsonrpc': '2.0', 'method': 'workspace/didChangeWatchedFiles',
+                          'params': {'changes': [{'uri': uri_of(declaration), 'type': 1}]}})
+        uri = self.open_document('indexed.tjs', 'var box = new Widget();\nbox.open;')
+        params = {'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 5}}
+        self.assertEqual(self.client.request(80, 'textDocument/definition', params)['uri'], uri_of(declaration))
+        before = self.client.request(81, 'ciallang/indexStatus')
+        for identifier in range(100, 130):
+            self.assertEqual(self.client.request(identifier, 'textDocument/definition', params)['uri'], uri_of(declaration))
+        after = self.client.request(82, 'ciallang/indexStatus')
+        for key in ('reads', 'lexicalBuilds', 'declarationParses'):
+            self.assertEqual(before[key], after[key], key)
+        declaration.write_text('class Widget { function open(): Integer; }', encoding='utf-8')
+        self.client.send({'jsonrpc': '2.0', 'method': 'workspace/didChangeWatchedFiles',
+                          'params': {'changes': [{'uri': uri_of(declaration), 'type': 2}]}})
+        hover = self.client.request(83, 'textDocument/hover', params)
+        self.assertIn('Integer', hover['contents']['value'])
+        changed = self.client.request(84, 'ciallang/indexStatus')
+        self.assertEqual(changed['declarationParses'], after['declarationParses'] + 1)
+        self.assertEqual(changed['lexicalBuilds'], after['lexicalBuilds'])
+        declaration.unlink()
+        self.client.send({'jsonrpc': '2.0', 'method': 'workspace/didChangeWatchedFiles',
+                          'params': {'changes': [{'uri': uri_of(declaration), 'type': 3}]}})
+        self.assertIsNone(self.client.request(85, 'textDocument/definition', params))
+
+    def test_exception_class_reference_has_one_class_target(self):
+        self.open_document('exception-implementation.tjs', 'class Exception { function Exception(message) {} }')
+        uri = self.open_document('exception-use.tjs', 'var failure = new Exception("failed");\nException("other");')
+        for identifier, line, character in [(90, 0, 22), (91, 1, 3)]:
+            location = self.client.request(identifier, 'textDocument/definition', {
+                'textDocument': {'uri': uri}, 'position': {'line': line, 'character': character}})
+            self.assertIsInstance(location, dict)
+            self.assertTrue(location['uri'].endswith('/Exception.d.tjs'))
+            decoded = urllib.parse.unquote(urllib.parse.urlsplit(location['uri']).path)
+            if sys.platform == 'win32' and decoded[2:3] == ':': decoded = decoded[1:]
+            target_line = pathlib.Path(decoded).read_text(encoding='utf-8').splitlines()[location['range']['start']['line']]
+            self.assertIn('class Exception', target_line)
+        symbols = self.client.request(92, 'workspace/symbol', {'query': 'Exception'})
+        self.assertTrue(all(item['kind'] == 5 for item in symbols))
+
+    def test_definition_and_symbol_search_reach_names_beyond_display_limit(self):
+        definitions = '\n'.join(f'function helper{i:03}() {{}}' for i in range(300))
+        target = self.open_document('many-symbols.tjs', definitions)
+        uri = self.open_document('lookup-last.tjs', 'helper299;')
+        location = self.client.request(93, 'textDocument/definition', {
+            'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 4}})
+        self.assertEqual(location['uri'], target)
+        self.assertEqual(location['range']['start']['line'], 299)
+        symbols = self.client.request(94, 'workspace/symbol', {'query': 'helper299'})
+        self.assertEqual(len(symbols), 1)
+        self.assertEqual(symbols[0]['name'], 'helper299')
+
+    def test_qualified_type_reference_in_declaration_avoids_global_class_with_same_name(self):
+        text = 'namespace Host { class Exception {} }\nfunction create(): Host.Exception;'
+        uri = self.open_document('qualified-types.d.tjs', text)
+        location = self.client.request(95, 'textDocument/definition', {
+            'textDocument': {'uri': uri}, 'position': {'line': 1, 'character': 27}})
+        self.assertEqual(location['uri'], uri)
+        self.assertEqual(location['range']['start']['line'], 0)
+
+    def test_explicit_declaration_file_inside_excluded_directory_remains_available(self):
+        declaration = self.root / 'out/host/Host.d.tjs'
+        declaration.parent.mkdir(parents=True)
+        declaration.write_text('function explicitOnly(): Integer;', encoding='utf-8')
+        client = LspClient(args.lsp)
+        self.addCleanup(client.dispose)
+        client.request(1, 'initialize', {
+            'capabilities': {}, 'workspaceFolders': [{'uri': uri_of(self.root), 'name': 'workspace'}],
+            'initializationOptions': {'declarationFiles': [uri_of(declaration)]}})
+        uri = uri_of(self.root / 'explicit.tjs')
+        client.open(uri, 'explicitOnly;')
+        client.diagnostics()
+        location = client.request(2, 'textDocument/definition', {
+            'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 3}})
+        self.assertEqual(location['uri'], uri_of(declaration))
+        client.close()
 
     def test_member_completion_falls_back_to_workspace_class(self):
         self.open_document("widget.tjs",

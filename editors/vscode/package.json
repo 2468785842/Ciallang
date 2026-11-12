@@ -2,7 +2,7 @@
   "name": "ciallang-language",
   "displayName": "Ciallang / TJS2",
   "description": "Ciallang / TJS2 syntax highlighting and language tools",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "ciallang",
   "license": "MIT",
   "engines": {

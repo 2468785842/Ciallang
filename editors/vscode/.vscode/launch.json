@@ -5,11 +5,30 @@
       "name": "Ciallang extension",
       "type": "extensionHost",
       "request": "launch",
+      "noDebug": true,
+      "env": {
+        "CIALLANG_DEBUG_ROOT": "${workspaceFolder}/../.."
+      },
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
+        "--disable-extensions",
         "${workspaceFolder}/../.."
       ],
-      "preLaunchTask": "npm: prepare"
+      "preLaunchTask": "Ciallang: prepare Debug"
+    },
+    {
+      "name": "Ciallang extension (JavaScript debugger)",
+      "type": "extensionHost",
+      "request": "launch",
+      "env": {
+        "CIALLANG_DEBUG_ROOT": "${workspaceFolder}/../.."
+      },
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--disable-extensions",
+        "${workspaceFolder}/../.."
+      ],
+      "preLaunchTask": "Ciallang: prepare Debug"
     }
   ]
 }

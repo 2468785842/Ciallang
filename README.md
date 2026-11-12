@@ -25,7 +25,7 @@
 校验 SHA-256 后解压，执行 `bin/cial examples/hello.tjs`（Windows 使用 `bin/cial.exe`）。
 系统要求与已知限制见发布说明；C++ SDK 需从源码安装。
 
-VSCode 可安装同一发布页的 `ciallang-language-0.2.0.vsix`；打开 `.tjs` 后，插件会在缺少
+VSCode 可安装同一发布页的 `ciallang-language-0.2.1.vsix`；打开 `.tjs` 后，插件会在缺少
 本地语言服务器时自动下载工具 SDK，并引用包内 `cial-lsp`，见 [LSP 与编辑器接入](doc/lsp.md)。
 
 从源码构建：

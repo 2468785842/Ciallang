@@ -43,12 +43,26 @@ function findServer(roots, platform = process.platform) {
   return name; // 最后回落 PATH
 }
 
-function launchOptions({ extensionPath, workspaceRoots, documentDirectory, executable, platform = process.platform }) {
+function debugLaunchOptions(root, directory, platform = process.platform) {
+  const system = platform === 'win32' ? 'Windows' : platform === 'darwin' ? 'MacOS' : 'Linux';
+  const name = platform === 'win32' ? 'cial-lsp.exe' : 'cial-lsp';
+  const build = path.resolve(root, 'build', system, 'Debug');
+  const candidates = [path.join(build, 'tools/lsp', name), path.join(build, name)];
+  const command = candidates.find(file => fs.statSync(file, { throwIfNoEntry: false })?.isFile());
+  const declarations = path.join(build, 'declarations');
+  if (!command || !fs.statSync(path.join(declarations, 'Array.d.tjs'), { throwIfNoEntry: false })?.isFile()) {
+    throw new Error(`Debug 服务器或系统声明缺失，请先构建 cial 和 cial-lsp：${build}`);
+  }
+  return { command, args: ['--declarations', declarations], options: { cwd: directory } };
+}
+
+function launchOptions({ extensionPath, workspaceRoots, documentDirectory, executable, debugRoot, platform = process.platform }) {
   const roots = [...workspaceRoots];
   if (documentDirectory) roots.unshift(documentDirectory);
   // Source checkouts can run the extension without an open workspace.
   if (fs.existsSync(path.resolve(extensionPath, '../../tools/lsp/main.cpp'))) roots.push(extensionPath);
   const directory = workspaceRoots[0] || documentDirectory || extensionPath;
+  if (debugRoot) return debugLaunchOptions(debugRoot, directory, platform);
   const command = executable ? resolveCommand(executable, directory) : findServer(roots, platform);
   return {
     command,
@@ -57,4 +71,4 @@ function launchOptions({ extensionPath, workspaceRoots, documentDirectory, execu
   };
 }
 
-module.exports = { findServer, findOnPath, launchOptions };
+module.exports = { findServer, findOnPath, debugLaunchOptions, launchOptions };

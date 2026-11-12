@@ -65,3 +65,25 @@ test('source checkout without workspace locates its own build', t => {
   const options = launchOptions({ extensionPath, workspaceRoots: [], platform: 'win32' });
   assert.equal(options.command, exe);
 });
+
+test('F5 binds Debug executable and declarations despite a different workspace and configured executable', t => {
+  const root = fixture(t);
+  const exe = touch(path.join(root, 'build/Windows/Debug/tools/lsp/cial-lsp.exe'));
+  touch(path.join(root, 'build/Windows/Debug/declarations/Array.d.tjs'));
+  const directory = path.join(root, 'other-workspace');
+  const options = launchOptions({ extensionPath: root, workspaceRoots: [directory], executable: '/old/lsp', debugRoot: root, platform: 'win32' });
+  assert.equal(options.command, exe);
+  assert.deepEqual(options.args, ['--declarations', path.join(root, 'build/Windows/Debug/declarations')]);
+  assert.equal(options.options.cwd, directory);
+});
+
+test('F5 never falls back to Release or SDK when Debug server or declarations are missing', t => {
+  const root = fixture(t);
+  touch(path.join(root, 'build/Linux/Release/cial-lsp'));
+  const options = { extensionPath: root, workspaceRoots: [], debugRoot: root, platform: 'linux' };
+  assert.throws(() => launchOptions(options), /Debug/);
+  const exe = touch(path.join(root, 'build/Linux/Debug/cial-lsp'));
+  assert.throws(() => launchOptions(options), /Debug/);
+  touch(path.join(root, 'build/Linux/Debug/declarations/Array.d.tjs'));
+  assert.equal(launchOptions(options).command, exe);
+});

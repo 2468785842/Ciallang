@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Ciallang: prepare Debug",
+      "type": "process",
+      "command": "node",
+      "args": ["${workspaceFolder}/prepare.js", "--debug"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}

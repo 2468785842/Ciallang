@@ -7,6 +7,7 @@
 // API 事实只来自随编译器分发的 .d.tjs 与项目声明（doc/lsp.md），服务端不内置接口。
 #pragma once
 
+#include <chrono>
 #include <condition_variable>
 #include <filesystem>
 #include <map>
@@ -61,7 +62,10 @@ namespace cial::lsp {
         // 文档与索引辅助
         Document document(const std::string &uri) const;
         void storeDocument(const std::string &uri, const std::string &text, int version, bool publishEmpty);
-        std::unique_ptr<DocumentIndex> documentIndex(const std::string &text) const;
+        DocumentIndex *documentIndex(const std::string &uri, const std::string &text);
+        const std::vector<DocumentDeclaration> &indexedDeclarations(const std::string &uri, const std::string &text);
+        void refreshWorkspaceIndex();
+        void onWatchedFiles(const Json &params);
         void scheduleCheck(const std::string &uri, int version, const std::string &text);
         void checkLoop();
         void publishDiagnostics(const std::string &uri, const Json &diagnostics);
@@ -69,14 +73,34 @@ namespace cial::lsp {
         // 刷新项目声明（加锁；projectDeclarations 需在持有 _mutex 时调用）
         void refreshDeclarations();
         // 项目声明来源：显式文件 + 工作区 .d.tjs（磁盘与未保存缓冲）；需持有 _mutex。
-        std::vector<std::pair<std::string, std::string>> projectDeclarationSources() const;
+        std::vector<std::pair<std::string, std::string>> projectDeclarationSources();
         struct WorkspaceSymbol {
             std::string name;
             std::string keyword;
             std::string uri;
             Range range;
         };
-        std::vector<WorkspaceSymbol> workspaceSources() const;
+        std::vector<WorkspaceSymbol> workspaceSources();
+        struct IndexedFile {
+            std::filesystem::file_time_type modified;
+            uintmax_t size{};
+            std::string uri;
+            std::string text;
+            std::vector<DocumentDeclaration> symbols;
+        };
+        const IndexedFile *readIndexedFile(const std::filesystem::path &path,
+                                           std::map<std::filesystem::path, IndexedFile> &cache);
+        struct IndexedDocument {
+            std::string text;
+            std::unique_ptr<DocumentIndex> lexical;
+            std::vector<DocumentDeclaration> symbols;
+        };
+        std::map<std::filesystem::path, IndexedFile> _diskIndex;
+        std::map<std::filesystem::path, IndexedFile> _explicitIndex;
+        std::map<std::string, IndexedDocument> _documentIndex;
+        bool _workspaceDirty{ true };
+        std::chrono::steady_clock::time_point _nextIndexScan{};
+        size_t _indexScans{}, _fileReads{}, _lexicalBuilds{};
         // 工作区 class 成员回退：声明索引未命中类型时，在已打开文档中查找
         // `class <typeName>` 并收集类体内的声明（v1 边界：仅已打开文档）。
         struct WorkspaceMember {
