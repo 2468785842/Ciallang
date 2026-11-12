@@ -238,7 +238,8 @@ class LspProtocolTest(unittest.TestCase):
         self.assertEqual(self.client.close(), 0)
 
     def test_disk_workspace_accepts_utf8_localhost_and_encoded_drive(self):
-        other = self.root / "跨文件 %25.tjs"
+        other = self.root / "子目录 %25" / "跨文件 %25.tjs"
+        other.parent.mkdir()
         other.write_text("function diskOnlyHelper() {}\n", encoding="utf-8")
         uri = uri_of(self.root).replace("file:///", "file://localhost/")
         if sys.platform == "win32":

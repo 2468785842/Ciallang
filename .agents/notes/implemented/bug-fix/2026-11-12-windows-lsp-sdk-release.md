@@ -65,3 +65,20 @@ Linux/macOS 普通 CI 作业通过，格式检查通过。
 现有 `v0.1.0-preview.2` 标签指向修复前提交，不能把本地产物等同于该标签的干净来源；
 正式发布需先确定修复提交和版本/标签策略，再完成三平台流程与公开附件。
 其他架构、Linux/macOS 新代码与真实网络下载的最终验收仍由发布矩阵覆盖。
+
+## 远端发布接续：代码页遗漏（2026-11-12）
+
+用户随后授权重跑 CI 并公开 preview.2。修复提交 `8b7fbd3` 推送后，以旧 SHA lease
+将尚未公开的 preview.2 标签从 `d0eeeb5` 更新；普通 CI `43161915716` 和发布流程
+`43161920792` 实际重跑。Linux/macOS CI 和原生打包通过；Windows 在新增 Unicode
+文件名回归中报 JSON-RPC -32603：
+`No mapping for the Unicode character exists in the target multi-byte code page.`
+Windows Debug job `130994876608` 的日志确认失败，发布汇总因此跳过。
+
+这是实际代码遗漏：工作区初始化、项目声明发现、排除目录检查的三处
+`filename().string()` 仍依赖本地代码页。现统一复用 `utf8Path`（`generic_u8string`）；
+同一回归进一步覆盖中文子目录和文件名。本机增量构建成功，
+`ctest --test-dir build/Windows/Release -R CiallangLspProtocol --output-on-failure --no-tests=error`
+退出 0（1 项 CTest、内部 9 项协议测试）。clang-format 20.1.0 与 diff 检查通过。
+原始日志保留于 `out/preview2-windows-debug-failed.log`。以新的修复提交重跑全矩阵和
+三平台发布验收后再公开，不能复用上一提交的包冒充新来源。

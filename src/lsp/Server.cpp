@@ -104,10 +104,14 @@ namespace cial::lsp {
             return out;
         }
 
+        std::string utf8Path(const std::filesystem::path &path) {
+            const auto utf8 = path.generic_u8string();
+            return { utf8.begin(), utf8.end() };
+        }
+
         std::string percentEncodePath(const std::filesystem::path &path) {
             static const std::string safe = "-._~!$&'()*+,;=:@/";
-            const auto utf8 = path.generic_u8string();
-            const std::string bytes{ utf8.begin(), utf8.end() };
+            const auto bytes = utf8Path(path);
             std::string out;
             for(const unsigned char ch : bytes) {
                 if(std::isalnum(ch) || safe.find(static_cast<char>(ch)) != std::string::npos)
@@ -395,7 +399,7 @@ namespace cial::lsp {
                         continue;
                     for(std::filesystem::directory_iterator it{ directory, ec }, end; !ec && it != end;
                         it.increment(ec)) {
-                        const auto name = it->path().filename().string();
+                        const auto name = utf8Path(it->path().filename());
                         std::string lower = name;
                         std::ranges::transform(lower, lower.begin(), [](const unsigned char ch) {
                             return static_cast<char>(std::tolower(ch));
@@ -696,7 +700,7 @@ namespace cial::lsp {
                 !ec && it != end && sources.size() < MAX_DECLARATION_FILES; it.increment(ec)) {
                 if(it->is_directory(ec))
                     continue;
-                const auto name = it->path().filename().string();
+                const auto name = utf8Path(it->path().filename());
                 std::string lower = name;
                 std::ranges::transform(lower, lower.begin(),
                                        [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
@@ -1075,7 +1079,7 @@ namespace cial::lsp {
                     ++directoryCount;
                     if(directoryCount > MAX_WORKSPACE_DIRECTORIES)
                         break;
-                    if(excludedDirectories().contains(it->path().filename().string()))
+                    if(excludedDirectories().contains(utf8Path(it->path().filename())))
                         it.disable_recursion_pending();
                     continue;
                 }
