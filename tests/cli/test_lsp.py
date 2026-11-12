@@ -85,6 +85,11 @@ class LspClient:
         self.send({"jsonrpc": "2.0", "method": "exit"})
         return self.process.wait(timeout=5)
 
+    def dispose(self):
+        if self.process.poll() is None:
+            self.process.kill()
+        self.process.communicate(timeout=5)
+
 
 class LspProtocolTest(unittest.TestCase):
     def setUp(self):
@@ -92,7 +97,7 @@ class LspProtocolTest(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory(prefix="cial lsp %20 中文 ")
         self.addCleanup(self.directory.cleanup)
         self.root = pathlib.Path(self.directory.name).resolve()
-        self.addCleanup(self.client.process.kill)
+        self.addCleanup(self.client.dispose)
         result = self.client.request(1, "initialize", {
             "capabilities": {},
             "workspaceFolders": [{"uri": uri_of(self.root), "name": "workspace"}],
@@ -200,7 +205,10 @@ class LspProtocolTest(unittest.TestCase):
         location = self.client.request(10, "textDocument/definition",
                                        {"textDocument": {"uri": main_uri}, "position": {"line": 1, "character": 2}})
         self.assertTrue(location["uri"].endswith("/Array.d.tjs"), location["uri"])
-        path = pathlib.Path(urllib.parse.unquote(location["uri"].removeprefix("file:///")))
+        decoded = urllib.parse.unquote(urllib.parse.urlsplit(location["uri"]).path)
+        if sys.platform == "win32" and len(decoded) > 2 and decoded[2] == ':':
+            decoded = decoded[1:]
+        path = pathlib.Path(decoded)
         self.assertTrue(path.is_file())
         line = path.read_text(encoding="utf-8").splitlines()[location["range"]["start"]["line"]]
         self.assertIn("function push(values: any*): Integer;", line)
@@ -228,6 +236,23 @@ class LspProtocolTest(unittest.TestCase):
 
     def test_shutdown_and_exit_code(self):
         self.assertEqual(self.client.close(), 0)
+
+    def test_disk_workspace_accepts_utf8_localhost_and_encoded_drive(self):
+        other = self.root / "跨文件 %25.tjs"
+        other.write_text("function diskOnlyHelper() {}\n", encoding="utf-8")
+        uri = uri_of(self.root).replace("file:///", "file://localhost/")
+        if sys.platform == "win32":
+            uri = uri.replace(f"/{self.root.drive}/", f"/{self.root.drive[0]}%3a/", 1)
+        self.client.send({"jsonrpc": "2.0", "method": "workspace/didChangeWorkspaceFolders",
+                          "params": {"event": {"removed": [{"uri": uri_of(self.root)}],
+                                               "added": []}}})
+        self.client.send({"jsonrpc": "2.0", "method": "workspace/didChangeWorkspaceFolders",
+                          "params": {"event": {"removed": [],
+                                               "added": [{"uri": uri, "name": "encoded"}]}}})
+        main = self.open_document("lookup.tjs", "diskOnlyHelper;")
+        location = self.client.request(30, "textDocument/definition", {
+            "textDocument": {"uri": main}, "position": {"line": 0, "character": 5}})
+        self.assertEqual(location["uri"], uri_of(other))
 
 
 if __name__ == "__main__":

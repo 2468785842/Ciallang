@@ -46,11 +46,18 @@ stdout 仅承载带 Content-Length 的 JSON-RPC 帧：Windows 下 stdin/stdout �
 实现见 `editors/vscode/syntaxes/ciallang.tmLanguage.json`，分词回归见 `test/grammar.test.js`。
 正则/除法按局部上下文识别，不等价于解析器的完整上下文判定。
 
-配置项 `ciallang.executable` 指定 `cial-lsp` 路径。未显式配置时，客户端根据活动文件和工作区向
-父目录查找 `build/<平台>/Debug|Release/cial-lsp`（含 `tools/lsp` 子目录布局），最后回落 PATH。
-`ciallang.declarationFiles` 可显式指定工作区之外的 `.d.tjs`（相对路径按活动工作区解析）；
-修改配置后重新加载 VSCode 窗口。服务缺失或启动失败时弹出错误并提供设置入口。
-源码调试及排错见[客户端说明](../editors/vscode/README.md)。
+插件自动引用 `cial-lsp`：显式 `ciallang.executable` 优先，其次为 `ciallang.sdk.path` 的
+`bin/cial-lsp[.exe]`；未配置时查找活动文件/工作区祖先构建树，再查 PATH。均未找到时，
+默认自动下载官方 Release 的工具 SDK（CLI、语言服务器与系统声明），校验 SHA-256 后安装到
+VSCode 全局存储，按版本/系统/架构缓存。声明随服务器的相对安装布局自动发现。
+`ciallang.sdk.version` 指定完整版本（默认 `0.1.0-preview.2`，不带 `v`）；
+`ciallang.sdk.autoDownload=false` 关闭下载；`ciallang.sdk.path` 可指定手动解压的离线 SDK。
+版本对应附件需已公开；旧版缺少 LSP 的包会被拒绝。C++ 开发 SDK 仍从源码安装。
+配置不修改工作区文件或系统 PATH；未受信任工作区不启动扩展。
+
+`ciallang.declarationFiles` 可显式指定工作区之外的 `.d.tjs`（相对路径按活动工作区解析）。
+修改配置后重新加载 VSCode 窗口；服务缺失或下载/启动失败时弹出错误并提供设置入口。
+源码调试、VSIX 打包与排错见[客户端说明](../editors/vscode/README.md)。
 
 ## IDEA / CLion 等客户端
 
@@ -134,5 +141,7 @@ LSP/编辑器随之不展示该接口；开启后声明随下一次构建自动�
 Code --extensionDevelopmentPath=<仓库>/editors/vscode --extensionTestsPath=<仓库>/editors/vscode/test/smoke.js --user-data-dir=<临时用户目录> <临时工作区>
 ```
 
-Windows 盘符 URI 可能为 `file:///d%3A/...`。服务端仅先还原盘符冒号，再对其余部分百分号解码，
-避免相对路径误判与文件名二次解码（`src/lsp/Server.cpp` 的 `uriToPath`）。
+Windows 盘符 URI 可能为 `file:///d%3A/...`，也接受小写 `%3a` 与 `localhost`。
+服务端只解码一次，去除盘符前的 URI 斜杠，并显式按 UTF-8 转换原生路径；输出 URI 也按
+UTF-8 百分号编码，避免中文目录依赖系统代码页。系统声明位置复用同一转换
+（`src/lsp/Server.cpp` 的 `uriToPath` / `pathToUri`、`src/lsp/Declarations.cpp`）。

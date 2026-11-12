@@ -2,7 +2,7 @@
   "name": "ciallang-language",
   "displayName": "Ciallang / TJS2",
   "description": "Ciallang / TJS2 syntax highlighting and language tools",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "ciallang",
   "license": "MIT",
   "engines": {
@@ -41,7 +41,24 @@
         "ciallang.executable": {
           "type": "string",
           "default": "",
-          "description": "cial-lsp language server path or command; defaults to an ancestor build/<platform>/Debug or Release/cial-lsp (also tools/lsp), then PATH"
+          "description": "cial-lsp path or command; empty discovers a local build, PATH, then downloads the Cial SDK"
+        },
+        "ciallang.sdk.path": {
+          "type": "string",
+          "default": "",
+          "description": "Existing Cial SDK root containing bin/cial-lsp and share/ciallang/declarations"
+        },
+        "ciallang.sdk.autoDownload": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Download and verify the official Cial SDK when no local server is available"
+        },
+        "ciallang.sdk.version": {
+          "type": "string",
+          "default": "0.1.0-preview.2",
+          "scope": "application",
+          "description": "Exact official Cial SDK release version (without v)"
         }
       }
     },
@@ -54,15 +71,30 @@
     ]
   },
   "scripts": {
-    "check": "node --check extension.js && node --check launch-options.js && node --check prepare.js && node --check test/smoke.js",
+    "check": "node --check extension.js && node --check launch-options.js && node --check prepare.js && node --check test/smoke.js && node --check sdk.js",
     "test": "node --test test/*.test.js",
-    "prepare": "node prepare.js"
+    "prepare": "node prepare.js",
+    "package": "vsce package --out ../../build/packages/"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
+    "tar": "^7.5.23",
     "vscode-languageclient": "9.0.1"
   },
   "devDependencies": {
+    "@vscode/vsce": "^4.1.0",
     "vscode-oniguruma": "2.0.1",
     "vscode-textmate": "9.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/2468785842/Ciallang.git",
+    "directory": "editors/vscode"
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "语言服务会启动本地可执行文件。"
+    }
   }
 }

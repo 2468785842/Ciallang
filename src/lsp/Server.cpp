@@ -106,7 +106,8 @@ namespace cial::lsp {
 
         std::string percentEncodePath(const std::filesystem::path &path) {
             static const std::string safe = "-._~!$&'()*+,;=:@/";
-            std::string bytes = path.generic_string();
+            const auto utf8 = path.generic_u8string();
+            const std::string bytes{ utf8.begin(), utf8.end() };
             std::string out;
             for(const unsigned char ch : bytes) {
                 if(std::isalnum(ch) || safe.find(static_cast<char>(ch)) != std::string::npos)
@@ -125,8 +126,11 @@ namespace cial::lsp {
         std::filesystem::path executablePath() {
             std::vector<char> buffer(4096, '\0');
 #if defined(_WIN32)
-            const auto size = GetModuleFileNameA(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
-            return std::filesystem::path{ std::string{ buffer.data(), size } };
+            std::vector<wchar_t> wideBuffer(32768, L'\0');
+            const auto size = GetModuleFileNameW(nullptr, wideBuffer.data(), static_cast<DWORD>(wideBuffer.size()));
+            if(size == 0 || size >= wideBuffer.size())
+                return {};
+            return std::filesystem::path{ std::wstring{ wideBuffer.data(), size } };
 #elif defined(__APPLE__)
             uint32_t size = static_cast<uint32_t>(buffer.size());
             if(_NSGetExecutablePath(buffer.data(), &size) == 0)
@@ -222,17 +226,19 @@ namespace cial::lsp {
         if(!uri.starts_with("file://"))
             return {};
         std::string rest = uri.substr(7);
-        // VSCode 把 Windows 盘符冒号编码为 %3A；先还原盘符，避免其余部分二次解码出错
-        if(rest.size() > 5 && rest[0] == '/' && std::isalpha(static_cast<unsigned char>(rest[1])) &&
-           rest.compare(2, 3, "%3A") == 0)
-            rest.replace(2, 3, ":");
         const auto authorityEnd = rest.find('/');
         if(rest.compare(0, authorityEnd == std::string::npos ? rest.size() : authorityEnd, "localhost") == 0 &&
            authorityEnd != std::string::npos)
             rest = rest.substr(authorityEnd);
         else if(!rest.starts_with('/'))
             return {};
-        std::filesystem::path path{ percentDecode(rest) };
+        rest = percentDecode(rest);
+#if defined(_WIN32)
+        // URI 的 UTF-8 路径不能经本地代码页转换；盘符前的 URI 斜杠不属于原生路径。
+        if(rest.size() >= 3 && rest[0] == '/' && std::isalpha(static_cast<unsigned char>(rest[1])) && rest[2] == ':')
+            rest.erase(0, 1);
+#endif
+        const std::filesystem::path path{ std::u8string{ rest.begin(), rest.end() } };
         std::error_code ec;
         const auto resolved = std::filesystem::weakly_canonical(path, ec);
         return ec ? path : resolved;

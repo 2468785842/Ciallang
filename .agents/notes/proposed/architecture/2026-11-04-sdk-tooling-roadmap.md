@@ -38,6 +38,10 @@ Status: proposed
 
 ## 建议下一步
 
+2026-11-12 已完成工具 SDK 的 VSCode 自动安装与 VSIX 构建接入，Windows 本机包与真实
+扩展宿主验收通过；不改变核心/工具拆仓和正式公开发布的剩余状态，见
+[路径修复与分发记录](../../implemented/bug-fix/2026-11-12-windows-lsp-sdk-release.md)。
+
 按批次顺序推进；每批先在路线图核对设计边界与依赖，完成后把状态回写本 note
 并更新路线图对应章节。
 

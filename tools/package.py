@@ -143,6 +143,14 @@ def verify_archive(archive, expected_version=None):
                                     capture_output=True, text=True, encoding='utf-8', timeout=15)
             if result.returncode != 0 or result.stdout != 'var answer = 42;\n':
                 raise ValueError('Packaged formatter failed: ' + result.stdout + result.stderr)
+        if info.get('lsp') == 'ON':
+            server = root / 'bin' / ('cial-lsp.exe' if info['system'] == 'Windows' else 'cial-lsp')
+            declarations = root / 'share/ciallang/declarations/Array.d.tjs'
+            if not server.is_file() or not declarations.is_file():
+                raise ValueError('Missing packaged cial-lsp or system declarations')
+            # 同时验收解压后的 stdio 握手、诊断、声明补全与跨文件跳转。
+            run([__import__('sys').executable, SOURCE / 'tests/cli/test_lsp.py', '--lsp', server],
+                cwd=work, env=environment)
         print('Verified extracted archive:', archive, flush=True)
         return info
 
@@ -174,7 +182,7 @@ def main(argv=None):
     preset = args.preset or (None if (build / 'CMakeCache.txt').exists() else system + ' Release')
     configure = ['cmake', '--preset', preset, '-B', build] if preset else ['cmake', '-S', SOURCE, '-B', build]
     run([*configure, '-DCMAKE_BUILD_TYPE=Release', '-DCIAL_ENABLE_PACKAGING=ON', '-DCIAL_BUILD_CLI=ON',
-         '-DCIAL_BUILD_TESTS=ON', '-DCIAL_BUILD_FORMATTER=ON', '-DCIAL_ENABLE_JIT=OFF'], cwd=SOURCE)
+         '-DCIAL_BUILD_TESTS=ON', '-DCIAL_BUILD_TOOLS=ON', '-DCIAL_BUILD_FORMATTER=ON', '-DCIAL_ENABLE_JIT=OFF'], cwd=SOURCE)
     run(['cmake', '--build', build, '--config', 'Release', '--parallel', args.parallel])
     run(['ctest', '--test-dir', build, '-C', 'Release', '--output-on-failure', '--no-tests=error'])
     if revision and clean_revision(SOURCE, args.tag) != revision:

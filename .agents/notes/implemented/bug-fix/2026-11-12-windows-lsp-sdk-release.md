@@ -1,0 +1,67 @@
+# Windows LSP 路径修复与 VSCode 工具 SDK 分发
+
+Status: implemented
+
+## 问题与来源
+
+基于 `d0eeeb5` 的 dirty 工作树。CI run `43039580180` 的 Windows Debug、Release、
+Release/JIT 均在 `CiallangLspProtocol` 失败；Release run `43039579958` 的 Windows
+作业同样失败。日志为 `test_definition_jumps_to_local_binding_workspace_and_declarations`
+第 196 行：跨文件 definition 返回 null，触发 `TypeError: 'NoneType' object is not subscriptable`。
+Linux/macOS 普通 CI 作业通过，格式检查通过。
+
+## 实现与边界
+
+- `Server.cpp` 的 URI 输入只做一次百分号解码，Windows 去除盘符前的 URI 斜杠，
+  按 UTF-8 显式转换原生路径；输出使用 `generic_u8string` 编码，避免依赖 Windows 代码页。
+  可执行文件定位改为 `GetModuleFileNameW`。系统声明位置复用 `pathToUri`，修复 POSIX
+  多余斜杠与中文 SDK 目录的编码。
+- 协议测试补充 UTF-8/百分号文件名、localhost、小写编码盘符，并清理子进程与管道。
+  声明跳转检查使用标准 URI 拆分，保留 POSIX 绝对路径。
+- VSCode 扩展 0.2.0：显式 executable → 显式 SDK 根目录 → 本地构建 → PATH →
+  官方 Release SDK 缓存。下载指定完整版本的 ZIP/TAR.GZ 及校验文本，核对 SHA-256、
+  版本、系统/架构、LSP 与声明布局后安装；支持离线缓存、损坏缓存重装、关闭下载。
+  SDK 是含工具与声明的 CLI 包，C++ 开发 SDK 仍从源码安装。
+- `package.py` 强制开启全部工具，并在独立解压目录执行完整 LSP 协议回归；
+  `build-info.json` 新增 lsp 开关。CI/Release 加入客户端测试与 VSIX 打包，草稿汇总包含 VSIX。
+  扩展默认 SDK 版本由 prepare 检查与 manifest 一致。
+- 修正旧 smoke 测试中要求尚未实现 rename 的断言，保留实际支持的启动、补全、定义和诊断验收。
+  使用指南见 `doc/lsp.md`、`doc/releasing.md`、`editors/vscode/README.md`。
+
+## 验证证据（2026-11-12，Windows x64）
+
+- 本机原始八项协议测试通过，未单独复现 CI 的非 UTF-8 系统代码页环境；原始失败证据来自上述 CI。
+  新用例最初把等价 URI 的工作区同时 removed/added，服务端按当前顺序最终移除目录而失败；
+  已改成先移除、再添加两条通知。该次用例设计错误不能作为原始故障的本机复现证据。
+- VS Developer PowerShell 环境，复用已核对的 Windows Release 缓存、静态 CRT、
+  `x64-windows-static`，JIT OFF：
+  `python tools/package.py --build-dir build/Windows/Release --parallel 4` 最终退出 0；
+  `ctest -N` 注册 250 项，最终 **250/250** 通过（105.52 秒），解压后的协议 **9/9** 通过。
+  先前一次 249/250 的失败为上述用例设计错误，保留于 `out/package-windows.log`；
+  最终日志 `out/package-windows-final.log`。
+- 客户端 `npm ci`、`npm run check`、`npm test`：**27/27** 通过，覆盖激活优先级、
+  下载开关、ZIP/TAR.GZ、校验失败、缺失服务端、缓存修复与离线复用。
+- `npm run package` 生成 VSIX。首次重打包的 npm 内部 minipass 加载偶发失败，
+  同一命令重跑成功，没有更改或跳过依赖清单。
+- 真实 VSCode 宿主先用中文 SDK 路径验证，再解压最终 VSIX，从其中的 sdk.js 安装最终
+  原生 ZIP（本地替代下载源）到扩展 globalStorage；无 SDK 路径设置、无可发现源码构建的
+  临时工作区中，通过缓存自动启动服务器，诊断/补全/定义均通过，扩展宿主退出 0。
+  日志：`out/vsix-user/logs/20261112T132735/window1/renderer.log` 与 `main.log`。
+- 锁定 clang-format **20.1.0** 执行 `tools/check-format.sh` 全库通过；
+  workflow YAML 解析、`git diff --check` 通过。
+
+## 产物与发布下一步
+
+产物位于忽略目录 `build/packages/`，均为 dirty 来源候选包：
+
+- `ciallang-0.1.0-preview.2-windows-x64.zip`，SHA-256
+  `3185c1d8ee3f5a6e23b429d5ab4f2940f99b8343e122573fb7794f3fdd235b25`。
+- `ciallang-language-0.2.0.vsix`，SHA-256
+  `2ca7bb5aab76c7b2817bf2c33e95a3e42902f33a171bf70736c4ad26b641212a`。
+- 各自 `.sha256` 与 `SHA256SUMS-preview.2`。
+
+未提交、未推送、未创建公开 Release，未运行修复后的远端矩阵；不据本机结果宣称 CI 已绿。
+公开 Release 当前仅 preview.1，不含所需 LSP，preview.2 下载 URL 尚不可用。
+现有 `v0.1.0-preview.2` 标签指向修复前提交，不能把本地产物等同于该标签的干净来源；
+正式发布需先确定修复提交和版本/标签策略，再完成三平台流程与公开附件。
+其他架构、Linux/macOS 新代码与真实网络下载的最终验收仍由发布矩阵覆盖。

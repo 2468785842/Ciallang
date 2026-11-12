@@ -1,0 +1,6 @@
+.vscode/**
+test/**
+node_modules/@vscode/**
+package-lock.json
+prepare.js
+**/*.map

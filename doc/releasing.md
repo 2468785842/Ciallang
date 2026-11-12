@@ -1,6 +1,6 @@
 # CLI 预览版打包与发布
 
-运行时版本只在 `vcpkg.json` 的 `version-string` 中维护，当前为 `0.1.0-preview.1`。
+运行时版本只在 `vcpkg.json` 的 `version-string` 中维护，当前为 `0.1.0-preview.2`。
 `tools/generate_version.py` 读取并校验版本，在构建目录生成：
 
 - `generated/Version.cmake`：数值版本、预发布后缀和完整版本，供 `project(VERSION)` 与 CPack 使用。
@@ -52,7 +52,7 @@ python tools/package.py --preset "MacOS Release"
 python tools/package.py --build-dir build/Windows/Release
 ```
 
-入口依次配置 Release（CLI/测试开启、JIT 关闭）、构建、运行全部 CTest、调用 CPack，
+入口依次配置 Release（CLI/测试与全部工具开启、JIT 关闭）、构建、运行全部 CTest、调用 CPack，
 最后在含空格的独立临时目录中解压并验证。脚本不执行上传或发布。
 默认输出到 `build/packages/`，`--output` 可指定其他目录，`--parallel` 控制构建并行数。
 只有验证成功的压缩包和对应 SHA-256 文件才复制到输出目录；每次使用新的暂存目录，
@@ -72,6 +72,9 @@ Windows 生成 ZIP，Linux/macOS 生成 TAR.GZ，包名标明版本、系统和�
 ```text
 ciallang-<version>-<system>-<arch>/
   bin/cial[.exe]
+  bin/cial-lsp[.exe]
+  bin/cial-fmt[.exe] / cial-dbg[.exe] / cial-disasm[.exe]
+  share/ciallang/declarations/*.d.tjs
   LICENSE
   README.md
   build-info.json
@@ -108,7 +111,8 @@ python tools/package.py --verify build/packages/ciallang-0.1.0-preview.1-windows
 ```
 
 `--verify` 只运行对应本机平台的压缩包，核对元数据、目录、许可、程序版本、示例、
-有效/无效输入的 JSON 编译诊断。执行时切换到独立工作目录，PATH 仅保留系统路径，
+有效/无效输入的 JSON 编译诊断；新包还运行解压后 LSP 的全部协议回归，
+覆盖中文临时目录、跨文件跳转、系统声明补全与诊断。执行时切换到独立工作目录，PATH 仅保留系统路径，
 清除开发期 dump 开关及动态库搜索环境变量。归档路径穿越、链接和特殊文件会被拒绝。
 发布后下载的附件应先按 `.sha256` 或 `SHA256SUMS` 校验，再进行解压验收。
 
@@ -119,7 +123,7 @@ python tools/package.py --verify build/packages/ciallang-0.1.0-preview.1-windows
 
 ## CI 与 Release
 
-`.github/workflows/ci.yml` 在普通 push/PR 上构建测试，并保存 CLI 构建产物和测试报告；
+`.github/workflows/ci.yml` 同时执行 VSCode 客户端测试并构建 VSIX；在普通 push/PR 上构建测试，并保存 CLI 构建产物和测试报告；
 这些是 Actions 验收附件，不等于经过完整打包验收的公开发行包。
 
 `.github/workflows/release.yml` 提供两种入口：
@@ -129,7 +133,10 @@ python tools/package.py --verify build/packages/ciallang-0.1.0-preview.1-windows
 | `workflow_dispatch` | 校验版本/工作树，三平台构建、测试、打包及解压验收，上传验证产物；不创建 Release |
 | 推送 `v*` 标签 | 额外校验标签版本及提交；所有平台成功后才上传到新建的 GitHub Release 草稿 |
 
-发布作业校验各附件的 SHA-256，再生成汇总 `SHA256SUMS`。有预发布后缀时标记 prerelease；
+Release 增加独立 VSCode 作业：`npm ci`、语法检查、客户端测试和 `npm run package`，
+生成 `ciallang-language-<扩展版本>.vsix`。扩展默认 SDK 版本必须与 manifest 一致（`prepare.js` 校验）。
+三平台原生包与 VSIX 均通过后才汇总草稿；发布作业校验各附件的 SHA-256，
+再生成包含原生包与 VSIX 的 `SHA256SUMS`。有预发布后缀时标记 prerelease；
 首版因此是预览版草稿。只有创建草稿的汇总作业拥有 `contents: write` 权限，普通构建只读。
 已存在同名 Release 时不自动覆盖。草稿中的初始说明来自 `packaging/RELEASE_NOTES.md`，
 对外公开前核对已验证的平台、附件、限制和本次改动。

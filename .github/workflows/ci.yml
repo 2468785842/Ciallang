@@ -1,6 +1,28 @@
 name: build-and-test
 on: [push, pull_request]
 jobs:
+  vscode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - name: Test and package VSCode extension
+        working-directory: editors/vscode
+        run: |
+          npm ci
+          npm run check
+          npm test
+          mkdir -p ../../build/packages
+          npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ciallang-vscode
+          path: build/packages/*.vsix
+          if-no-files-found: error
   format:
     runs-on: ubuntu-latest
     steps:

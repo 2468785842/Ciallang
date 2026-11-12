@@ -8,6 +8,17 @@ function resolveCommand(command, directory) {
     ? command : path.resolve(directory, command);
 }
 
+function findOnPath(command, platform = process.platform) {
+  for (const directory of (process.env.PATH || '').split(path.delimiter)) {
+    if (!directory) continue;
+    const candidate = path.join(directory.replace(/^"|"$/g, ''), command);
+    try {
+      fs.accessSync(candidate, platform === 'win32' ? fs.constants.F_OK : fs.constants.X_OK);
+      if (fs.statSync(candidate).isFile()) return candidate;
+    } catch { /* 继续检查 PATH。 */ }
+  }
+}
+
 // cial-lsp 服务器发现：构建树可能把工具 exe 放在 tools/lsp 子目录。
 function findServer(roots, platform = process.platform) {
   const system = platform === 'win32' ? 'Windows' : platform === 'darwin' ? 'MacOS' : 'Linux';
@@ -46,4 +57,4 @@ function launchOptions({ extensionPath, workspaceRoots, documentDirectory, execu
   };
 }
 
-module.exports = { findServer, launchOptions };
+module.exports = { findServer, findOnPath, launchOptions };

@@ -1,7 +1,8 @@
 const path = require('node:path');
 const vscode = require('vscode');
 const { LanguageClient } = require('vscode-languageclient/node');
-const { launchOptions } = require('./launch-options');
+const { launchOptions, findOnPath } = require('./launch-options');
+const { ensureSdk, sdkServer } = require('./sdk');
 let client;
 
 async function activate(context) {
@@ -18,6 +19,25 @@ async function activate(context) {
       documentDirectory: resource ? path.dirname(resource.fsPath) : undefined,
       executable: settings.get('executable')
     });
+    if (!settings.get('executable')) {
+      const sdkPath = settings.get('sdk.path', '');
+      if (sdkPath) {
+        server.command = sdkServer(path.resolve(server.options.cwd, sdkPath));
+        if (!server.command) throw new Error('ciallang.sdk.path 中没有 bin/cial-lsp');
+      } else if (!path.isAbsolute(server.command)) {
+        const installed = findOnPath(server.command);
+        if (installed) server.command = installed;
+        else if (settings.get('sdk.autoDownload', true)) {
+          server.command = await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification, title: 'Ciallang SDK'
+          }, progress => ensureSdk({
+            storagePath: path.join(context.globalStorageUri.fsPath, 'sdk'),
+            version: settings.get('sdk.version'),
+            report: message => progress.report({ message })
+          }));
+        }
+      }
+    }
     client = new LanguageClient('ciallang', 'Ciallang', server, {
       documentSelector: [{ scheme: 'file', language: 'ciallang' }],
       initializationOptions: {
@@ -30,7 +50,7 @@ async function activate(context) {
     await client?.dispose();
     client = undefined;
     void vscode.window.showErrorMessage(
-      `Ciallang 语言服务启动失败：${error.message}。请检查 ciallang.executable 配置，或构建 cial-lsp（CIAL_BUILD_LSP=ON）。`, '打开设置').then(action => {
+      `Ciallang 语言服务启动失败：${error.message}。请检查网络与 SDK 版本，或设置 ciallang.sdk.path / ciallang.executable。`, '打开设置').then(action => {
       if (action === '打开设置') return vscode.commands.executeCommand('workbench.action.openSettings', '@ext:ciallang.ciallang-language');
     });
     throw error;

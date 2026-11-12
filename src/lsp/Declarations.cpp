@@ -2,6 +2,7 @@
 //
 // 声明索引实现：与 tools/lsp/decl_index.py 同一覆盖与推导规则。
 #include "lsp/Declarations.hpp"
+#include "lsp/Server.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -93,7 +94,7 @@ namespace cial::lsp {
             // 磁盘声明按 UTF-8 BOM 规则读取（与 SourceFile::load 语义一致）
             if(text.starts_with("\xEF\xBB\xBF"))
                 text.erase(0, 3);
-            parseFile("file:///" + resolved.generic_string(), text, _system);
+            parseFile(pathToUri(resolved), text, _system);
         }
         _entries.clear();
         for(const auto &entry : _system)

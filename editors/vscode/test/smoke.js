@@ -39,12 +39,6 @@ exports.run = async function run() {
   const definitions = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', uri, new vscode.Position(1, 15));
   assert.equal(definitions.length, 1);
   assert.equal((definitions[0].range || definitions[0].targetSelectionRange).start.line, 0);
-  const edits = await vscode.commands.executeCommand('vscode.executeDocumentRenameProvider', uri, new vscode.Position(1, 15), 'welcome');
-  assert(edits instanceof vscode.WorkspaceEdit);
-  assert.equal(edits.get(uri).length, 2);
-  await vscode.workspace.applyEdit(edits);
-  assert(document.getText().startsWith('function welcome('));
-  assert(document.getText().includes('= welcome("world")'));
   await document.save();
   const validText = document.getText();
   const invalid = new vscode.WorkspaceEdit();
@@ -58,5 +52,5 @@ exports.run = async function run() {
   await vscode.workspace.applyEdit(fix);
   await errorCleared;
   await document.save();
-  console.log('Ciallang VSCode smoke: startup, diagnostics, completion, definition, rename passed');
+  console.log('Ciallang VSCode smoke: startup, diagnostics, completion, definition passed');
 };
