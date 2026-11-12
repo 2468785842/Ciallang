@@ -82,3 +82,31 @@ Windows Debug job `130994876608` 的日志确认失败，发布汇总因此跳�
 退出 0（1 项 CTest、内部 9 项协议测试）。clang-format 20.1.0 与 diff 检查通过。
 原始日志保留于 `out/preview2-windows-debug-failed.log`。以新的修复提交重跑全矩阵和
 三平台发布验收后再公开，不能复用上一提交的包冒充新来源。
+
+## 最终发布验收（2026-11-12）
+
+最终源码提交为 `ee1a60b329ec129aee4c94bb993106a41ab35a32`，未公开标签经旧 SHA lease
+更新到该提交；[普通 CI 43163015675](https://github.com/2468785842/Ciallang/actions/runs/43163015675)
+**9/9 作业通过**。三平台 Debug/Release 各通过完整 CTest（Windows 250 项，
+Linux/macOS 462 项），Windows Release/JIT 亦通过 250 项；四组 Release 安装消费
+SDK 验收通过，Linux 独立源码消费者通过。VSCode 27 项与格式检查通过。
+
+[发布流程 43163021971](https://github.com/2468785842/Ciallang/actions/runs/43163021971)
+**6/6 作业通过**。三平台全量 CTest 及各自解压后的 9 项协议回归通过，VSIX 打包成功。
+实际下载草稿的 8 个附件，核对汇总/独立 SHA-256、干净来源提交、系统/架构、全部工具与
+Array 声明布局；VSIX 默认 SDK 版本和运行依赖正确。官方附件摘要：
+
+- Windows x64：`34e349a270e9d91d32d0fad09e6eb744ade1994517a952e83be880aa31c97fb9`。
+- Linux x64：`92c6d6bebc058ad987ecbc74b2d648958ea2df5bb3610b4d44ba6f0d3e49ff49`。
+- macOS ARM64：`1f8cbf6931fc6fc68dc96f763fe9c20f2dec537a1c009ece3938f7f57b59b627`。
+- VSIX 0.2.0：`fe482a0ff560fcd9ddb0b22fc8ca9e3ecc10e465ff36140d8a20d1edac0b9a41`。
+
+已按用户明确授权公开 [v0.1.0-preview.2](https://github.com/2468785842/Ciallang/releases/tag/v0.1.0-preview.2)，
+发布时间为 2026-11-12 13:51:37（Asia/Shanghai），`isDraft=false`、`isPrerelease=true`。
+公开后，从实际发布 VSIX 解压出的 sdk.js **不传认证凭据、不替换下载源**，自动下载官方
+Windows SDK 及校验文件，安装到中文/百分号路径；确认来源为 ee1a60b、dirty=false，
+随后拒绝网络回调验证离线缓存，并执行 9 项真实 LSP 协议测试，全部通过（退出 0）。
+日志 `out/preview2-public-sdk.log`；原生 CI/发布原始日志、下载附件和检查脚本均在忽略的 out/。
+
+上文的本机候选包哈希与“未推送/未公开”描述是发布前历史状态，以本节的官方附件和远端
+验收为准；旧失败与用例修正记录保留，不覆盖历史结果。README 已更新到本版下载入口。
