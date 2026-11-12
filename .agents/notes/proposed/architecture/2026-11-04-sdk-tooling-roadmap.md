@@ -46,6 +46,9 @@ Status: proposed
 [索引与契约验收](../../implemented/architecture/2026-11-12-lsp-index-contracts.md)。
 这不包含声明一致性/重载选择，也未更新公开 preview.2 的附件。
 
+后续用户授权同步替换已完成：preview.2 标签/附件为 d7dd1c0，VSIX 0.2.1；
+普通 CI 9/9 与三平台发布验收通过，公开下载回归通过。以上述索引 note 的最终发布节为准。
+
 按批次顺序推进；每批先在路线图核对设计边界与依赖，完成后把状态回写本 note
 并更新路线图对应章节。
 

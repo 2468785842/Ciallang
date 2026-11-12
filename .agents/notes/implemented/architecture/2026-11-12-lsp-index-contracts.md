@@ -49,3 +49,27 @@ CIAL_BUILD_TESTS/CLI/LSP/TOOLS 均开启，格式化使用 clang-format 20.1.0�
 
 原始构建、完整 CTest、协议与宿主脚本在忽略目录 out/。下一步如发布，需重新构建原生 SDK
 及 VSIX 并跑远端平台矩阵；不得把本地 Debug 的通过当作已下载 SDK 的版本更新。
+
+## 同步替换已完成
+
+用户随后明确要求“同步替换”。实现提交 d7dd1c0328dadc94da29984971f143627cc2d801
+已推送 master；插件独立升级为 0.2.1，并使用 sdk/contracts-v1 缓存目录，避免升级后
+继续使用原 preview.2 自动下载缓存。旧缓存保留，手动配置的离线路径仍由用户维护。
+
+- 普通 CI 43211369924：9/9 成功，含三平台 Debug/Release、Windows JIT、安装 SDK 与格式。
+- 发布验收 43211370817：validate、VSIX、三平台原生包均成功；手动入口不创建草稿，
+  draft-release 跳过。每个平台完整测试及独立目录解压验收通过。
+- 三平台归档均核对 revision=d7dd1c0、dirty=false；每包 11 个声明文件的清单 SHA-256
+  验证通过。VSIX 版本 0.2.1、默认 SDK preview.2、新缓存目录与依赖验证通过。
+- 已覆盖公开 preview.2 的三平台归档/各自 sha256、SHA256SUMS，上传 0.2.1 VSIX 并移除
+  旧 0.2.0 附件；更新发布说明。标签从 ee1a60b 移到 d7dd1c0，推送使用旧 SHA lease。
+  标签引起的重复任务 43214045768/43214045615 已主动取消，复用上述同 SHA 完整验收。
+- 公开 8 个附件重新下载后逐字节哈希一致；从公开 VSIX 提取 sdk.js，不传凭据下载到
+  中文/百分号路径，核对新提交和离线复用，实际下载 exe 16/16 协议测试成功。
+
+附件 SHA-256：Windows c0e3078fc8f53b099404518cb3b7f075a79218278690616772a01142ad68b20d；
+Linux 9e04ae48e9b4d88c3a4a1ab386b498828d25d325d8882009fab609ea0e3f6ab2；
+macOS 8edd373d028d028f5e0877c0d7ba4758474e9d09198f533e5261af51f6e468a6；
+VSIX 91afff9f6d75eca97082d78b2618afa2b2238386c4dec23d53e2a280918f905f。
+备份原附件在 out/preview2-original-assets；新包、发布说明、原生日志和公开验证日志均在
+out/preview2-refreshed-* 与 out/preview2-refresh-*。本节替代前文“未提交/未更新附件”的初始状态。
